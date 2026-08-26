@@ -2,12 +2,8 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useFormik } from "formik";
-import * as Yup from "yup";
 import { PageHeader } from "@/components/shared/page-header";
-import { useBooking } from "@/context/booking-context";
-import { useQuotation } from "@/context/quotation-context";
-import { useEnquiry } from "@/context/enquiry-context";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +14,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  tripClient,
+  customerClient,
+  quotationClient,
+  bookingClient,
+  TripWithRelations,
+  QuotationWithRelations,
+} from "@/lib/api-client";
+import { Customer, BookingStatus } from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
 import {
@@ -26,14 +31,12 @@ import {
   FileText,
   User,
   Calendar,
-  MapPin,
   Users,
   IndianRupee,
-  Hotel,
-  Car,
-  Ticket,
   ArrowLeft,
   Sparkles,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
 export default function NewBookingPage() {
@@ -41,8 +44,8 @@ export default function NewBookingPage() {
     <React.Suspense
       fallback={
         <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-slate-50/50">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-          <span className="mt-2 text-xs text-slate-500 font-semibold">Loading booking form...</span>
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-2" />
+          <span className="text-xs text-slate-500 font-semibold">Loading booking workspace...</span>
         </div>
       }
     >
@@ -54,466 +57,378 @@ export default function NewBookingPage() {
 function NewBookingForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const quotationId = searchParams.get("quotationId");
-  const tripId = searchParams.get("tripId");
+  const initialQuotationId = searchParams.get("quotationId");
+  const initialTripId = searchParams.get("tripId");
 
-  const { createBookingFromQuotation, createManualBooking } = useBooking();
-  const { quotations } = useQuotation();
-  const { customers, trips } = useEnquiry();
-
-  // Mode: "quotation" | "manual"
-  const [mode, setMode] = React.useState<"quotation" | "manual">(
-    quotationId ? "quotation" : "quotation"
-  );
-  const [selectedQuotationId, setSelectedQuotationId] = React.useState<string>(
-    quotationId || quotations[0]?.id || ""
+  // Mode: "quotation" | "trip"
+  const [mode, setMode] = React.useState<"quotation" | "trip">(
+    initialQuotationId ? "quotation" : "quotation"
   );
 
+  // Data sources from real PostgreSQL API
+  const [quotations, setQuotations] = React.useState<QuotationWithRelations[]>([]);
+  const [trips, setTrips] = React.useState<TripWithRelations[]>([]);
+  const [customers, setCustomers] = React.useState<Customer[]>([]);
+  const [loadingData, setLoadingData] = React.useState(true);
+  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  // Form State
+  const [selectedQuotationId, setSelectedQuotationId] = React.useState<string>(initialQuotationId || "");
+  const [selectedTripId, setSelectedTripId] = React.useState<string>(initialTripId || "");
+  const [selectedCustomerId, setSelectedCustomerId] = React.useState<string>("");
+  const [bookingTotal, setBookingTotal] = React.useState<string>("0");
+  const [initialAdvance, setInitialAdvance] = React.useState<string>("0");
+  const [bookingNotes, setBookingNotes] = React.useState("");
+  const [bookingInternalNotes, setBookingInternalNotes] = React.useState("");
+
+  // Load real active quotations, trips, customers
+  React.useEffect(() => {
+    async function loadResources() {
+      try {
+        setLoadingData(true);
+        const [quotesRes, tripsRes, custRes] = await Promise.all([
+          quotationClient.getQuotations({ limit: 100, sortBy: "createdAt", sortOrder: "desc" }),
+          tripClient.getTrips({ limit: 100 }),
+          customerClient.getCustomers({ limit: 100 }),
+        ]);
+
+        if (quotesRes.success && quotesRes.data) {
+          setQuotations(quotesRes.data);
+          if (!initialQuotationId && quotesRes.data.length > 0) {
+            setSelectedQuotationId(quotesRes.data[0].id);
+            setBookingTotal(String(quotesRes.data[0].finalAmount));
+          } else if (initialQuotationId) {
+            const found = quotesRes.data.find((q) => q.id === initialQuotationId);
+            if (found) setBookingTotal(String(found.finalAmount));
+          }
+        }
+
+        if (tripsRes.success && tripsRes.data) {
+          setTrips(tripsRes.data);
+          if (!initialTripId && tripsRes.data.length > 0) {
+            setSelectedTripId(tripsRes.data[0].id);
+            setSelectedCustomerId(tripsRes.data[0].customerId);
+          }
+        }
+
+        if (custRes.success && custRes.data) {
+          setCustomers(custRes.data);
+        }
+      } catch (err: any) {
+        if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+          setIsReadOnly(true);
+        }
+      } finally {
+        setLoadingData(false);
+      }
+    }
+    loadResources();
+  }, [initialQuotationId, initialTripId]);
+
+  // When quotation changes in quotation mode
   const selectedQuotation = React.useMemo(() => {
     return quotations.find((q) => q.id === selectedQuotationId);
   }, [quotations, selectedQuotationId]);
 
-  // Form for manual creation mode
-  const formik = useFormik({
-    initialValues: {
-      customerId: selectedQuotation?.customerId || customers[0]?.id || "",
-      tripId: selectedQuotation?.tripId || trips[0]?.id || "",
-      title: selectedQuotation?.title || "Kerala Family Holiday",
-      destination: selectedQuotation?.tripSnapshot?.destination || "Kerala",
-      startDate: selectedQuotation?.tripSnapshot?.startDate || "2026-08-27",
-      endDate: selectedQuotation?.tripSnapshot?.endDate || "2026-09-03",
-      adults: selectedQuotation?.tripSnapshot?.adults || 2,
-      children: selectedQuotation?.tripSnapshot?.children || 0,
-      infants: 0,
-      totalAmount: selectedQuotation?.sellingPrice || 75000,
-      notes: "",
-    },
-    enableReinitialize: true,
-    onSubmit: (values) => {
-      if (mode === "quotation" && selectedQuotation) {
-        try {
-          const newBooking = createBookingFromQuotation(selectedQuotation);
-          toast.success(`Booking ${newBooking.bookingNumber} created from quotation!`);
-          router.push(`/bookings/${newBooking.id}`);
-        } catch (err: unknown) {
-          toast.error(err instanceof Error ? err.message : "Failed to convert quotation");
+  React.useEffect(() => {
+    if (mode === "quotation" && selectedQuotation) {
+      setBookingTotal(String(selectedQuotation.finalAmount));
+    }
+  }, [mode, selectedQuotation]);
+
+  // When trip changes in trip mode
+  const selectedTrip = React.useMemo(() => {
+    return trips.find((t) => t.id === selectedTripId);
+  }, [trips, selectedTripId]);
+
+  React.useEffect(() => {
+    if (mode === "trip" && selectedTrip) {
+      setSelectedCustomerId(selectedTrip.customerId);
+    }
+  }, [mode, selectedTrip]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isReadOnly) {
+      toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      if (mode === "quotation") {
+        if (!selectedQuotationId) {
+          toast.error("Please select a quotation proposal.");
+          return;
+        }
+
+        const res = await bookingClient.convertQuotationToBooking(selectedQuotationId, {
+          notes: bookingNotes.trim() || undefined,
+          internalNotes: bookingInternalNotes.trim() || undefined,
+        });
+
+        if (res.success && res.data) {
+          toast.success(`Booking ${res.data.bookingNumber} created successfully!`);
+          router.push(`/bookings/${res.data.id}`);
         }
       } else {
-        const customer = customers.find((c) => c.id === values.customerId);
-        const trip = trips.find((t) => t.id === values.tripId);
+        if (!selectedTripId) {
+          toast.error("Please select a trip.");
+          return;
+        }
+        if (!selectedCustomerId) {
+          toast.error("Please select a customer.");
+          return;
+        }
 
-        try {
-          const newBooking = createManualBooking({
-            customerId: values.customerId,
-            tripId: values.tripId,
-            title: values.title,
-            destination: values.destination,
-            startDate: values.startDate,
-            endDate: values.endDate,
-            adults: Number(values.adults),
-            children: Number(values.children),
-            infants: Number(values.infants),
-            totalAmount: Number(values.totalAmount),
-            customerSnapshot: {
-              id: values.customerId,
-              name: customer?.name || "Customer",
-              phone: customer?.phone || "",
-              email: customer?.email || "",
-              city: customer?.city || "",
-              travellersLabel: `${values.adults} Adults${values.children > 0 ? `, ${values.children} Children` : ""}`,
-            },
-            tripSnapshot: {
-              id: values.tripId,
-              title: values.title,
-              destination: values.destination,
-              startDate: values.startDate,
-              endDate: values.endDate,
-              durationLabel: "7 Nights / 8 Days",
-              nights: 7,
-              days: 8,
-              adults: Number(values.adults),
-              children: Number(values.children),
-              infants: Number(values.infants),
-            },
-            agencySnapshot: {
-              name: "TripDesk Travel Studio",
-              tagline: "Tailor-Made Luxury & Experiential Journeys",
-              phone: "+91 98470 12345",
-              email: "holidays@tripdesk.in",
-            },
-            items: [
-              {
-                type: "Hotel",
-                title: "Primary Hotel Accommodation",
-                subtitle: `${values.destination} • 4★`,
-                destination: values.destination,
-                startDate: values.startDate,
-                endDate: values.endDate,
-                nights: 3,
-                roomType: "Deluxe Room",
-                numberOfRooms: 1,
-                mealPlan: "CP (Breakfast)",
-                status: "Pending",
-                supplierCost: Math.round(Number(values.totalAmount) * 0.7),
-                customerPrice: Number(values.totalAmount),
-              },
-            ],
-            notes: values.notes,
-          });
+        const total = Number(bookingTotal) || 0;
+        const advance = Number(initialAdvance) || 0;
 
-          toast.success(`Booking ${newBooking.bookingNumber} initialized successfully!`);
-          router.push(`/bookings/${newBooking.id}`);
-        } catch (err: unknown) {
-          toast.error(err instanceof Error ? err.message : "Failed to create booking");
+        const res = await bookingClient.createBooking({
+          tripId: selectedTripId,
+          customerId: selectedCustomerId,
+          totalAmount: total,
+          paidAmount: advance,
+          notes: bookingNotes.trim() || undefined,
+          internalNotes: bookingInternalNotes.trim() || undefined,
+        });
+
+        if (res.success && res.data) {
+          toast.success(`Booking ${res.data.bookingNumber} created successfully!`);
+          router.push(`/bookings/${res.data.id}`);
         }
       }
-    },
-  });
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to create booking.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        {/* Top Header */}
+        {isReadOnly && <ReadOnlyBanner moduleName="Bookings & Reservations" />}
+
         <PageHeader
           title="Create New Booking"
-          description="Convert an accepted quotation or initialize a direct confirmed travel booking."
+          description="Convert an accepted quotation proposal into a confirmed booking or initialize a direct trip reservation."
           breadcrumbs={[
             { label: "Bookings", href: "/bookings" },
             { label: "New Booking" },
           ]}
         />
 
-        {/* ─── CREATION MODE TOGGLE ────────────────────────────────────────── */}
-        <div className="max-w-4xl mx-auto flex items-center justify-between bg-white border border-slate-200/90 rounded-2xl p-2 shadow-2xs">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setMode("quotation")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                mode === "quotation"
-                  ? "bg-indigo-600 text-white shadow-xs"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              }`}
-            >
-              <FileText className="h-4 w-4" />
-              <span>Convert from Quotation (Recommended)</span>
-            </button>
+        <div className="max-w-3xl mx-auto w-full">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Mode Selector */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-600" />
+                <span>Booking Source Type</span>
+              </h3>
 
-            <button
-              type="button"
-              onClick={() => setMode("manual")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                mode === "manual"
-                  ? "bg-indigo-600 text-white shadow-xs"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              }`}
-            >
-              <CalendarCheck className="h-4 w-4" />
-              <span>Direct Manual Booking</span>
-            </button>
-          </div>
-        </div>
-
-        <form onSubmit={formik.handleSubmit}>
-          <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* ─── MAIN COLUMN: DETAILS ─────────────────────────────────────── */}
-            <div className="lg:col-span-2 space-y-5">
-              {/* MODE 1: QUOTATION SELECTION */}
-              {mode === "quotation" ? (
-                <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-2xs space-y-5">
-                  <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                    <Sparkles className="h-5 w-5 text-indigo-600" />
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                      Select Approved Quotation
-                    </h3>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setMode("quotation")}
+                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                    mode === "quotation"
+                      ? "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20"
+                      : "border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="font-bold text-slate-900 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-indigo-600" />
+                    <span>From Quotation Proposal</span>
                   </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Inherits accepted pricing, itinerary, travelers, and quotation snapshots.
+                  </p>
+                </button>
 
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700">
-                      Quotation Proposal <span className="text-red-500">*</span>
-                    </label>
+                <button
+                  type="button"
+                  onClick={() => setMode("trip")}
+                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                    mode === "trip"
+                      ? "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20"
+                      : "border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="font-bold text-slate-900 flex items-center gap-2">
+                    <Compass className="h-4 w-4 text-emerald-600" />
+                    <span>Direct Trip Workspace</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Select a trip workspace and specify custom commercial contract amounts.
+                  </p>
+                </button>
+              </div>
+            </div>
+
+            {/* Source Configuration */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">
+                {mode === "quotation" ? "Select Client Proposal" : "Select Trip & Customer"}
+              </h3>
+
+              {loadingData ? (
+                <div className="p-8 text-center space-y-2">
+                  <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
+                  <p className="text-xs text-slate-500">Loading resources from database...</p>
+                </div>
+              ) : mode === "quotation" ? (
+                <div className="space-y-4 text-xs">
+                  {quotations.length === 0 ? (
+                    <div className="p-4 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-xs">
+                      No quotation proposals found. Please generate a proposal from a trip first.
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="font-bold text-slate-700">Quotation Proposal *</label>
+                      <Select
+                        value={selectedQuotationId}
+                        onValueChange={(val) => val && setSelectedQuotationId(val)}
+                      >
+                        <SelectTrigger className="h-10 text-xs bg-slate-50/50 border-slate-200">
+                          <SelectValue placeholder="Choose a proposal..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-slate-200">
+                          {quotations.map((q) => (
+                            <SelectItem key={q.id} value={q.id} className="text-xs">
+                              {q.quotationNumber} — {q.trip?.title} ({q.customer?.name}) • {formatCurrency(Number(q.finalAmount))}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {selectedQuotation && (
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-500 font-semibold">Customer:</span>
+                        <strong className="text-slate-900">{selectedQuotation.customer?.name} ({selectedQuotation.customer?.phone})</strong>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-500 font-semibold">Proposal Final Amount:</span>
+                        <strong className="text-indigo-600 font-extrabold text-sm">{formatCurrency(Number(selectedQuotation.finalAmount))}</strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4 text-xs">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700">Trip Workspace *</label>
                     <Select
-                      value={selectedQuotationId}
-                      onValueChange={(val) => setSelectedQuotationId(val || "")}
+                      value={selectedTripId}
+                      onValueChange={(val) => val && setSelectedTripId(val)}
                     >
-                      <SelectTrigger className="h-10 text-xs font-semibold">
-                        <SelectValue placeholder="Select an existing quotation" />
+                      <SelectTrigger className="h-10 text-xs bg-slate-50/50 border-slate-200">
+                        <SelectValue placeholder="Choose a trip..." />
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
-                        {quotations.map((q) => (
-                          <SelectItem key={q.id} value={q.id}>
-                            {q.quotationNumber} • {q.title} ({q.customerSnapshot.name}) -{" "}
-                            {formatCurrency(q.sellingPrice)}
+                        {trips.map((t) => (
+                          <SelectItem key={t.id} value={t.id} className="text-xs">
+                            {t.tripNumber} — {t.title} ({t.customer?.name})
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {/* Quotation Snapshot Preview Card */}
-                  {selectedQuotation && (
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-indigo-900">
-                          {selectedQuotation.title}
-                        </span>
-                        <span className="font-mono text-xs font-bold text-slate-500">
-                          {selectedQuotation.quotationNumber}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs text-slate-600">
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Customer</span>
-                          <span className="font-bold text-slate-800">{selectedQuotation.customerSnapshot.name}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Dates</span>
-                          <span className="font-bold text-slate-800">
-                            {selectedQuotation.tripSnapshot.startDate} → {selectedQuotation.tripSnapshot.endDate}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Guests</span>
-                          <span className="font-bold text-slate-800">
-                            {selectedQuotation.tripSnapshot.adults} Adults
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Included services count */}
-                      <div className="border-t border-slate-200/60 pt-2 flex items-center gap-3 text-xs text-slate-500">
-                        <span className="flex items-center gap-1">
-                          <Hotel className="h-3.5 w-3.5 text-indigo-600" />
-                          {selectedQuotation.hotelSnapshot?.length || 0} Hotels
-                        </span>
-                        {selectedQuotation.vehicleSnapshot && (
-                          <span className="flex items-center gap-1">
-                            <Car className="h-3.5 w-3.5 text-emerald-600" />
-                            1 Vehicle
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Ticket className="h-3.5 w-3.5 text-amber-600" />
-                          {selectedQuotation.activitySnapshot?.length || 0} Activities
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* MODE 2: DIRECT MANUAL FORM */
-                <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-2xs space-y-5">
-                  <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                    <CalendarCheck className="h-5 w-5 text-indigo-600" />
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                      Trip & Customer Information
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Customer */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">
-                        Customer <span className="text-red-500">*</span>
-                      </label>
-                      <Select
-                        value={formik.values.customerId}
-                        onValueChange={(val) => formik.setFieldValue("customerId", val)}
-                      >
-                        <SelectTrigger className="h-9.5 text-xs font-semibold">
-                          <SelectValue placeholder="Select Customer" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border-slate-200">
-                          {customers.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name} ({c.phone})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Trip Name */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">
-                        Trip / Booking Title <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        placeholder="e.g. Kerala Family Getaway"
-                        {...formik.getFieldProps("title")}
-                        className="h-9.5 text-xs font-semibold"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {/* Destination */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">
-                        Destination <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        placeholder="e.g. Kerala, Goa, Jaipur"
-                        {...formik.getFieldProps("destination")}
-                        className="h-9.5 text-xs"
-                      />
-                    </div>
-
-                    {/* Start Date */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Start Date</label>
-                      <Input
-                        type="date"
-                        {...formik.getFieldProps("startDate")}
-                        className="h-9.5 text-xs font-medium"
-                      />
-                    </div>
-
-                    {/* End Date */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">End Date</label>
-                      <Input
-                        type="date"
-                        {...formik.getFieldProps("endDate")}
-                        className="h-9.5 text-xs font-medium"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {/* Adults */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Adults</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700">Total Contract Value (₹) *</label>
                       <Input
                         type="number"
-                        min="1"
-                        {...formik.getFieldProps("adults")}
-                        className="h-9.5 text-xs"
+                        min={0}
+                        value={bookingTotal}
+                        onChange={(e) => setBookingTotal(e.target.value)}
+                        className="h-9.5 bg-slate-50/50 border-slate-200 text-xs font-bold"
+                        required
                       />
                     </div>
-
-                    {/* Children */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Children</label>
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700">Initial Advance Paid (₹)</label>
                       <Input
                         type="number"
-                        min="0"
-                        {...formik.getFieldProps("children")}
-                        className="h-9.5 text-xs"
+                        min={0}
+                        value={initialAdvance}
+                        onChange={(e) => setInitialAdvance(e.target.value)}
+                        placeholder="0"
+                        className="h-9.5 bg-slate-50/50 border-slate-200 text-xs font-bold"
                       />
                     </div>
-
-                    {/* Total Package Amount */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">
-                        Total Amount (₹) <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        type="number"
-                        {...formik.getFieldProps("totalAmount")}
-                        className="h-9.5 text-xs font-bold"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Notes */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Booking Notes</label>
-                    <Textarea
-                      placeholder="Special requests, flight timings, meal preferences..."
-                      rows={3}
-                      {...formik.getFieldProps("notes")}
-                      className="text-xs"
-                    />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* ─── SIDEBAR: SUMMARY CARD ────────────────────────────────────── */}
-            <div className="space-y-5">
-              <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-2xs space-y-5 sticky top-24">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-3">
-                  Booking Summary
-                </h3>
+            {/* Notes */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">
+                Booking Remarks & Internal Notes
+              </h3>
 
-                <div className="space-y-3 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Customer:</span>
-                    <span className="font-bold text-slate-900">
-                      {mode === "quotation"
-                        ? selectedQuotation?.customerSnapshot.name || "None"
-                        : customers.find((c) => c.id === formik.values.customerId)?.name || "None"}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Trip Destination:</span>
-                    <span className="font-bold text-slate-900">
-                      {mode === "quotation"
-                        ? selectedQuotation?.tripSnapshot.destination || "None"
-                        : formik.values.destination}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Travel Dates:</span>
-                    <span className="font-bold text-slate-900">
-                      {mode === "quotation"
-                        ? `${selectedQuotation?.tripSnapshot.startDate} → ${selectedQuotation?.tripSnapshot.endDate}`
-                        : `${formik.values.startDate} → ${formik.values.endDate}`}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Total Travellers:</span>
-                    <span className="font-bold text-slate-900">
-                      {mode === "quotation"
-                        ? `${selectedQuotation?.tripSnapshot.adults} Adults`
-                        : `${formik.values.adults} Adults`}
-                    </span>
-                  </div>
-
-                  <div className="border-t border-slate-100 pt-3 flex justify-between items-baseline">
-                    <span className="font-bold text-slate-900">Package Value:</span>
-                    <span className="text-lg font-black text-indigo-600">
-                      {formatCurrency(
-                        mode === "quotation"
-                          ? selectedQuotation?.sellingPrice || 0
-                          : Number(formik.values.totalAmount) || 0
-                      )}
-                    </span>
-                  </div>
-
-                  <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3 text-[11px] text-amber-800 space-y-1">
-                    <span className="font-bold block">Initial Status: Pending Confirmation</span>
-                    <p className="text-amber-700/80 text-[10px]">
-                      Services (hotels, cabs, activities) will be initialized as Pending and can be individually confirmed.
-                    </p>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Customer Remarks</label>
+                  <Textarea
+                    value={bookingNotes}
+                    onChange={(e) => setBookingNotes(e.target.value)}
+                    placeholder="Notes visible on customer booking confirmation..."
+                    rows={3}
+                    className="bg-slate-50/50 border-slate-200 text-xs"
+                  />
                 </div>
-
-                <div className="pt-2 space-y-2">
-                  <Button
-                    type="submit"
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 rounded-xl shadow-xs cursor-pointer"
-                  >
-                    Create Booking
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => router.push("/bookings")}
-                    className="w-full text-xs font-semibold h-9 rounded-xl cursor-pointer"
-                  >
-                    Cancel
-                  </Button>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Internal Agency Notes</label>
+                  <Textarea
+                    value={bookingInternalNotes}
+                    onChange={(e) => setBookingInternalNotes(e.target.value)}
+                    placeholder="Private staff instructions or operational requirements..."
+                    rows={3}
+                    className="bg-slate-50/50 border-slate-200 text-xs"
+                  />
                 </div>
               </div>
             </div>
-          </div>
-        </form>
+
+            {/* Form Actions */}
+            <div className="flex items-center justify-between gap-4 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push("/bookings")}
+                className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-10 px-5 cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={submitting || isReadOnly || (mode === "quotation" && quotations.length === 0)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-6 cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating Booking...
+                  </>
+                ) : (
+                  <>
+                    <CalendarCheck className="h-4 w-4" />
+                    Confirm Booking
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

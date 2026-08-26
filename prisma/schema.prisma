@@ -1,0 +1,1333 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// ENUMS
+// ═════════════════════════════════════════════════════════════════════
+
+enum UserRole {
+  PLATFORM_OWNER
+  AGENCY_OWNER
+}
+
+enum AgencyStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum TripStatus {
+  DRAFT
+  PLANNING
+  QUOTED
+  BOOKED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum TravelerType {
+  ADULT
+  CHILD
+  INFANT
+}
+
+enum VehiclePricingType {
+  PER_KM
+  TOTAL
+}
+
+enum ActivityType {
+  INCLUDED
+  OPTIONAL
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum BookingStatus {
+  DRAFT
+  CONFIRMED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingPaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  UPI
+  BANK_TRANSFER
+  CASH
+  CARD
+  CHEQUE
+  OTHER
+}
+
+enum ShareLinkStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum EnquiryStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  FOLLOW_UP
+  QUOTATION_SENT
+  NEGOTIATION
+  CONVERTED
+  LOST
+  CANCELLED
+}
+
+enum EnquiryPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum EnquirySource {
+  WEBSITE
+  INSTAGRAM
+  FACEBOOK
+  WHATSAPP
+  PHONE
+  EMAIL
+  REFERRAL
+  WALK_IN
+  AGENT
+  OTHER
+}
+
+enum FollowUpType {
+  CALL
+  WHATSAPP
+  EMAIL
+  MEETING
+  OTHER
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum RateInventoryType {
+  HOTEL
+  VEHICLE
+  ACTIVITY
+}
+
+enum RateStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  EXPIRED
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProposalItemType {
+  INCLUSION
+  EXCLUSION
+  IMPORTANT_NOTE
+}
+
+enum OperationStatus {
+  PENDING
+  PREPARING
+  READY
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum ConfirmationStatus {
+  PENDING
+  REQUESTED
+  CONFIRMED
+  AMENDED
+  CANCELLED
+}
+
+enum DispatchStatus {
+  PENDING
+  ASSIGNED
+  CONFIRMED
+  ON_DUTY
+  COMPLETED
+  CANCELLED
+}
+
+enum IssuePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 1. AGENCY
+// ═════════════════════════════════════════════════════════════════════
+
+model Agency {
+  id        String       @id @default(cuid())
+  name      String
+  logo      String?
+  phone     String
+  email     String
+  address   String?
+  status    AgencyStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  // Relationships
+  users            User[]
+  subscriptions    Subscription[]
+  customers        Customer[]
+  enquiries        Enquiry[]
+  enquiryFollowUps EnquiryFollowUp[]
+  trips            Trip[]
+  hotels           Hotel[]
+  vehicles         Vehicle[]
+  activities       Activity[]
+  quotations       Quotation[]
+  bookings         Booking[]
+  payments         Payment[]
+  publicShareLinks PublicShareLink[]
+  suppliers             Supplier[]
+  rateSheets            RateSheet[]
+  tripOperations        TripOperation[]
+  hotelConfirmations    HotelConfirmation[]
+  vehicleDispatches     VehicleDispatch[]
+  activityConfirmations ActivityConfirmation[]
+  operationalIssues     OperationalIssue[]
+  operationEvents       OperationEvent[]
+
+  @@map("agencies")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 2. USER
+// ═════════════════════════════════════════════════════════════════════
+
+model User {
+  id            String    @id
+  agencyId      String?
+  name          String
+  email         String    @unique
+  phone         String?
+  passwordHash  String?
+  role          UserRole  @default(AGENCY_OWNER)
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  agency Agency? @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@map("users")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 3. SUBSCRIPTION PLAN
+// ═════════════════════════════════════════════════════════════════════
+
+model SubscriptionPlan {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  description  String?
+  price        Decimal  @db.Decimal(10, 2)
+  durationDays Int
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("subscription_plans")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 4. SUBSCRIPTION
+// ═════════════════════════════════════════════════════════════════════
+
+model Subscription {
+  id                String             @id @default(cuid())
+  agencyId          String
+  planId            String
+  status            SubscriptionStatus @default(TRIAL)
+  trialStart        DateTime?
+  trialEnd          DateTime?
+  subscriptionStart DateTime?
+  subscriptionEnd   DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  agency Agency           @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([agencyId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 5. CUSTOMER
+// ═════════════════════════════════════════════════════════════════════
+
+model Customer {
+  id             String    @id @default(cuid())
+  agencyId       String
+  customerNumber String?
+  name           String
+  phone          String
+  alternatePhone String?
+  email          String?
+  dateOfBirth    DateTime?
+  gender         String?
+  nationality    String?
+  address        String?
+  city           String?
+  state          String?
+  country        String?   @default("India")
+  postalCode     String?
+  source         String?
+  notes          String?
+  internalNotes  String?
+  archivedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  agency     Agency      @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  enquiries  Enquiry[]
+  trips      Trip[]
+  quotations Quotation[]
+  bookings   Booking[]
+  payments   Payment[]
+
+  @@index([agencyId])
+  @@index([agencyId, customerNumber])
+  @@index([agencyId, phone])
+  @@index([agencyId, email])
+  @@index([agencyId, city])
+  @@map("customers")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 6. TRIP
+// ═════════════════════════════════════════════════════════════════════
+
+model Trip {
+  id         String     @id @default(cuid())
+  agencyId   String
+  customerId String
+  tripNumber String
+  title      String
+  startDate  DateTime
+  endDate    DateTime
+  status     TripStatus @default(DRAFT)
+  notes      String?
+  archivedAt DateTime?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  agency           Agency            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  customer         Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  enquiries        Enquiry[]
+  travelers        Traveler[]
+  tripHotels       TripHotel[]
+  itineraryItems   ItineraryItem[]
+  tripVehicles     TripVehicle[]
+  tripActivities   TripActivity[]
+  quotations       Quotation[]
+  bookings         Booking[]
+  payments         Payment[]
+  publicShareLinks PublicShareLink[]
+  tripOperation    TripOperation?
+
+  @@unique([agencyId, tripNumber])
+  @@index([agencyId])
+  @@index([customerId])
+  @@index([agencyId, status])
+  @@index([agencyId, startDate])
+  @@map("trips")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 7. TRAVELER
+// ═════════════════════════════════════════════════════════════════════
+
+model Traveler {
+  id                  String       @id @default(cuid())
+  tripId              String
+  name                String
+  type                TravelerType @default(ADULT)
+  isPrimary           Boolean      @default(false)
+  dateOfBirth         DateTime?
+  gender              String?
+  nationality         String?
+  phone               String?
+  email               String?
+  idPhotoUrl          String?
+  specialRequirements String?
+  notes               String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("travelers")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 8. HOTEL
+// ═════════════════════════════════════════════════════════════════════
+
+model Hotel {
+  id         String    @id @default(cuid())
+  agencyId   String
+  supplierId String?
+  name       String
+  category   String?
+  address    String?
+  city       String?
+  state      String?
+  country    String?   @default("India")
+  phone      String?
+  email      String?
+  website    String?
+  notes      String?
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  agency     Agency      @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  supplier   Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  tripHotels TripHotel[]
+  rateSheets RateSheet[]
+
+  @@index([agencyId])
+  @@index([supplierId])
+  @@index([agencyId, city])
+  @@map("hotels")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 9. TRIP HOTEL
+// ═════════════════════════════════════════════════════════════════════
+
+model TripHotel {
+  id          String    @id @default(cuid())
+  tripId      String
+  hotelId     String
+  checkIn     DateTime
+  checkOut    DateTime
+  roomType    String
+  rooms       Int       @default(1)
+  mealPlan    String?
+  nightlyRate Decimal?  @db.Decimal(10, 2)
+  totalAmount Decimal?  @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  trip               Trip                @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  hotel              Hotel               @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  hotelConfirmations HotelConfirmation[]
+
+  @@index([tripId])
+  @@index([hotelId])
+  @@map("trip_hotels")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 10. ITINERARY ITEM
+// ═════════════════════════════════════════════════════════════════════
+
+model ItineraryItem {
+  id          String    @id @default(cuid())
+  tripId      String
+  dayNumber   Int
+  date        DateTime?
+  title       String
+  description String?
+  location    String?
+  startTime   String?
+  endTime     String?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@index([tripId, dayNumber])
+  @@map("itinerary_items")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 11. VEHICLE MASTER
+// ═════════════════════════════════════════════════════════════════════
+
+model Vehicle {
+  id                 String             @id @default(cuid())
+  agencyId           String
+  supplierId         String?
+  name               String
+  type               String
+  capacity           Int                @default(4)
+  registrationNumber String?
+  driverName         String?
+  driverPhone        String?
+  pricingType        VehiclePricingType @default(TOTAL)
+  baseRate           Decimal?           @db.Decimal(10, 2)
+  ratePerKm          Decimal?           @db.Decimal(10, 2)
+  notes              String?
+  archivedAt         DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  agency            Agency            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  supplier          Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  tripVehicles      TripVehicle[]
+  rateSheets        RateSheet[]
+  vehicleDispatches VehicleDispatch[]
+
+  @@index([agencyId])
+  @@index([supplierId])
+  @@index([agencyId, type])
+  @@map("vehicles")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 12. TRIP VEHICLE
+// ═════════════════════════════════════════════════════════════════════
+
+model TripVehicle {
+  id             String             @id @default(cuid())
+  tripId         String
+  vehicleId      String?
+  vehicleName    String
+  vehicleType    String
+  capacity       Int?
+  startDate      DateTime?
+  endDate        DateTime?
+  pickupLocation String?
+  dropLocation   String?
+  driverName     String?
+  driverPhone    String?
+  pricingType    VehiclePricingType @default(TOTAL)
+  ratePerKm      Decimal?           @db.Decimal(10, 2)
+  estimatedKm    Decimal?           @db.Decimal(10, 2)
+  totalRate      Decimal?           @db.Decimal(10, 2)
+  notes          String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  trip              Trip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  vehicle           Vehicle?          @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  vehicleDispatches VehicleDispatch[]
+
+  @@index([tripId])
+  @@index([vehicleId])
+  @@map("trip_vehicles")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 13. ACTIVITY MASTER
+// ═════════════════════════════════════════════════════════════════════
+
+model Activity {
+  id          String       @id @default(cuid())
+  agencyId    String
+  supplierId  String?
+  name        String
+  location    String?
+  description String?
+  duration    String?
+  type        ActivityType @default(INCLUDED)
+  adultPrice  Decimal?     @db.Decimal(10, 2)
+  childPrice  Decimal?     @db.Decimal(10, 2)
+  price       Decimal?     @db.Decimal(10, 2)
+  notes       String?
+  archivedAt  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  agency                Agency                 @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  supplier              Supplier?              @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  tripActivities        TripActivity[]
+  rateSheets            RateSheet[]
+  activityConfirmations ActivityConfirmation[]
+
+  @@index([agencyId])
+  @@index([supplierId])
+  @@index([agencyId, location])
+  @@map("activities")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 14. TRIP ACTIVITY
+// ═════════════════════════════════════════════════════════════════════
+
+model TripActivity {
+  id                   String       @id @default(cuid())
+  tripId               String
+  activityId           String?
+  name                 String
+  description          String?
+  date                 DateTime?
+  time                 String?
+  location             String?
+  numberOfParticipants Int?         @default(1)
+  type                 ActivityType @default(INCLUDED)
+  adultPrice           Decimal?     @db.Decimal(10, 2)
+  childPrice           Decimal?     @db.Decimal(10, 2)
+  totalPrice           Decimal?     @db.Decimal(10, 2)
+  notes                String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  trip                  Trip                   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  activity              Activity?              @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  activityConfirmations ActivityConfirmation[]
+
+  @@index([tripId])
+  @@index([activityId])
+  @@map("trip_activities")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 13. QUOTATION
+// ═════════════════════════════════════════════════════════════════════
+
+model Quotation {
+  id                 String          @id @default(cuid())
+  agencyId           String
+  tripId             String
+  customerId         String
+  quotationNumber    String
+  version            Int             @default(1)
+  title              String?
+  status             QuotationStatus @default(DRAFT)
+  validUntil         DateTime?
+  currency           String          @default("INR")
+  subtotal           Decimal         @default(0) @db.Decimal(12, 2)
+  markupPercentage   Decimal         @default(0) @db.Decimal(5, 2)
+  markupAmount       Decimal         @default(0) @db.Decimal(12, 2)
+  discountPercentage Decimal         @default(0) @db.Decimal(5, 2)
+  discountAmount     Decimal         @default(0) @db.Decimal(12, 2)
+  taxPercentage      Decimal         @default(0) @db.Decimal(5, 2)
+  taxAmount          Decimal         @default(0) @db.Decimal(12, 2)
+  finalAmount        Decimal         @default(0) @db.Decimal(12, 2)
+  proposalSubtitle   String?
+  customerMessage    String?
+  inclusionsIntro    String?
+  exclusionsIntro    String?
+  paymentTerms       String?
+  cancellationPolicy String?
+  importantNotes     String?
+  customerFeedback   String?
+  customerFeedbackAt DateTime?
+  internalNotes      String?
+  terms              String?
+  shareToken              String?
+  sharedAt                DateTime?
+  viewedAt                DateTime?
+  acceptedAt              DateTime?
+  rejectedAt              DateTime?
+  selectedPackageOptionId String?
+  archivedAt              DateTime?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  agency                Agency                      @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  trip                  Trip                        @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  customer              Customer                    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  selectedPackageOption QuotationPackageOption?     @relation("QuotationSelectedOption", fields: [selectedPackageOptionId], references: [id], onDelete: SetNull)
+  enquiries             Enquiry[]
+  items                 QuotationItem[]
+  proposalItems         QuotationProposalItem[]
+  paymentMilestones     QuotationPaymentMilestone[]
+  packageOptions        QuotationPackageOption[]    @relation("QuotationPackageOptions")
+  bookings              Booking[]
+  publicShareLinks      PublicShareLink[]
+
+  @@unique([agencyId, quotationNumber, version])
+  @@index([agencyId])
+  @@index([tripId])
+  @@index([customerId])
+  @@index([shareToken])
+  @@index([selectedPackageOptionId])
+  @@index([agencyId, status])
+  @@map("quotations")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 14. QUOTATION ITEM
+// ═════════════════════════════════════════════════════════════════════
+
+model QuotationItem {
+  id               String   @id @default(cuid())
+  quotationId      String
+  type             String
+  category         String?
+  sourceType       String?
+  sourceId         String?
+  name             String
+  description      String?
+  quantity         Int      @default(1)
+  unit             String?
+  unitPrice        Decimal  @default(0) @db.Decimal(12, 2)
+  costPrice        Decimal  @default(0) @db.Decimal(12, 2)
+  markupPercentage Decimal  @default(0) @db.Decimal(5, 2)
+  sellingPrice     Decimal  @default(0) @db.Decimal(12, 2)
+  totalPrice       Decimal  @default(0) @db.Decimal(12, 2)
+  discount         Decimal  @default(0) @db.Decimal(12, 2)
+  tax              Decimal  @default(0) @db.Decimal(12, 2)
+  isOptional       Boolean  @default(false)
+  sortOrder        Int      @default(0)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId])
+  @@map("quotation_items")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 14A. QUOTATION PROPOSAL ITEM (INCLUSIONS / EXCLUSIONS / NOTES)
+// ═════════════════════════════════════════════════════════════════════
+
+model QuotationProposalItem {
+  id          String           @id @default(cuid())
+  quotationId String
+  type        ProposalItemType
+  title       String
+  description String?
+  sortOrder   Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId])
+  @@index([quotationId, type])
+  @@map("quotation_proposal_items")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 14B. QUOTATION PAYMENT MILESTONE
+// ═════════════════════════════════════════════════════════════════════
+
+model QuotationPaymentMilestone {
+  id          String    @id @default(cuid())
+  quotationId String
+  title       String
+  description String?
+  percentage  Decimal?  @db.Decimal(5, 2)
+  amount      Decimal?  @db.Decimal(12, 2)
+  dueDate     DateTime?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId])
+  @@map("quotation_payment_milestones")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 14C. QUOTATION PACKAGE OPTION (TIERED PRICING / MULTI-OPTION PROPOSAL)
+// ═════════════════════════════════════════════════════════════════════
+
+model QuotationPackageOption {
+  id                 String   @id @default(cuid())
+  quotationId        String
+  name               String
+  subtitle           String?
+  description        String?
+  isRecommended      Boolean  @default(false)
+  subtotal           Decimal  @default(0) @db.Decimal(12, 2)
+  markupPercentage   Decimal  @default(0) @db.Decimal(5, 2)
+  markupAmount       Decimal  @default(0) @db.Decimal(12, 2)
+  discountPercentage Decimal  @default(0) @db.Decimal(5, 2)
+  discountAmount     Decimal  @default(0) @db.Decimal(12, 2)
+  taxPercentage      Decimal  @default(0) @db.Decimal(5, 2)
+  taxAmount          Decimal  @default(0) @db.Decimal(12, 2)
+  finalAmount        Decimal  @default(0) @db.Decimal(12, 2)
+  hotelNotes         String?
+  vehicleNotes       String?
+  activityNotes      String?
+  inclusions         String[] @default([])
+  exclusions         String[] @default([])
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  quotation            Quotation   @relation("QuotationPackageOptions", fields: [quotationId], references: [id], onDelete: Cascade)
+  selectedByQuotations Quotation[] @relation("QuotationSelectedOption")
+
+  @@unique([quotationId, name])
+  @@index([quotationId])
+  @@index([quotationId, sortOrder])
+  @@map("quotation_package_options")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 15. BOOKING
+// ═════════════════════════════════════════════════════════════════════
+
+model Booking {
+  id                 String               @id @default(cuid())
+  agencyId           String
+  tripId             String
+  customerId         String
+  quotationId        String?
+  packageOptionName  String?
+  bookingNumber      String
+  status             BookingStatus        @default(CONFIRMED)
+  paymentStatus      BookingPaymentStatus @default(UNPAID)
+  bookingDate        DateTime             @default(now())
+  travelStartDate    DateTime?
+  travelEndDate      DateTime?
+  currency           String               @default("INR")
+  totalAmount        Decimal              @db.Decimal(12, 2)
+  paidAmount         Decimal              @default(0) @db.Decimal(12, 2)
+  balanceAmount      Decimal              @default(0) @db.Decimal(12, 2)
+  notes              String?
+  internalNotes      String?
+  cancellationReason String?
+  confirmedAt        DateTime?            @default(now())
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  archivedAt         DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  agency    Agency     @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  trip      Trip       @relation(fields: [tripId], references: [id], onDelete: Restrict)
+  quotation Quotation? @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  payments      Payment[]
+  tripOperation TripOperation?
+
+  @@unique([agencyId, bookingNumber])
+  @@index([agencyId])
+  @@index([tripId])
+  @@index([customerId])
+  @@index([quotationId])
+  @@index([agencyId, status])
+  @@index([agencyId, paymentStatus])
+  @@map("bookings")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 16. PAYMENT
+// ═════════════════════════════════════════════════════════════════════
+
+model Payment {
+  id              String        @id @default(cuid())
+  agencyId        String
+  bookingId       String
+  tripId          String?
+  customerId      String?
+  paymentNumber   String        @default("")
+  amount          Decimal       @db.Decimal(12, 2)
+  currency        String        @default("INR")
+  paymentMethod   PaymentMethod @default(UPI)
+  paymentDate     DateTime      @default(now())
+  status          PaymentStatus @default(COMPLETED)
+  referenceNumber String?
+  receiptNumber   String?
+  notes           String?
+  refundedAmount  Decimal       @default(0) @db.Decimal(12, 2)
+  refundedAt      DateTime?
+  archivedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  agency   Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  booking  Booking   @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  trip     Trip?     @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId])
+  @@index([bookingId])
+  @@index([tripId])
+  @@index([customerId])
+  @@index([agencyId, paymentNumber])
+  @@index([agencyId, status])
+  @@index([agencyId, paymentDate])
+  @@map("payments")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 17. PUBLIC SHARE LINK
+// ═════════════════════════════════════════════════════════════════════
+
+model PublicShareLink {
+  id             String          @id @default(cuid())
+  agencyId       String
+  tripId         String
+  quotationId    String?
+  tokenHash      String          @unique
+  status         ShareLinkStatus @default(ACTIVE)
+  createdAt      DateTime        @default(now())
+  revokedAt      DateTime?
+  lastAccessedAt DateTime?
+
+  agency    Agency     @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  trip      Trip       @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  quotation Quotation? @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId])
+  @@index([tripId])
+  @@index([tokenHash])
+  @@map("public_share_links")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 18. ENQUIRY
+// ═════════════════════════════════════════════════════════════════════
+
+model Enquiry {
+  id                  String          @id @default(cuid())
+  agencyId            String
+  customerId          String
+  enquiryNumber       String
+  title               String
+  destination         String
+  origin              String?
+  startDate           DateTime?
+  endDate             DateTime?
+  adults              Int             @default(1)
+  children            Int             @default(0)
+  infants             Int             @default(0)
+  budget              Decimal?        @db.Decimal(12, 2)
+  budgetType          String?         @default("total")
+  currency            String          @default("INR")
+  hotelCategory       String?
+  mealPlan            String?
+  vehiclePreference   String?
+  transportRequired   Boolean         @default(false)
+  source              EnquirySource   @default(WHATSAPP)
+  priority            EnquiryPriority @default(MEDIUM)
+  status              EnquiryStatus   @default(NEW)
+  specialRequirements String?
+  notes               String?
+  internalNotes       String?
+  assignedTo          String?
+  nextFollowUpAt      DateTime?
+  convertedTripId     String?
+  convertedQuotationId String?
+  lostReason          String?
+  closedAt            DateTime?
+  archivedAt          DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  agency             Agency            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  customer           Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  convertedTrip      Trip?             @relation(fields: [convertedTripId], references: [id], onDelete: SetNull)
+  convertedQuotation Quotation?        @relation(fields: [convertedQuotationId], references: [id], onDelete: SetNull)
+  followUps          EnquiryFollowUp[]
+
+  @@unique([agencyId, enquiryNumber])
+  @@index([agencyId])
+  @@index([customerId])
+  @@index([convertedTripId])
+  @@index([convertedQuotationId])
+  @@index([agencyId, status])
+  @@index([agencyId, priority])
+  @@index([agencyId, source])
+  @@index([agencyId, nextFollowUpAt])
+  @@index([agencyId, createdAt])
+  @@map("enquiries")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 19. ENQUIRY FOLLOW-UP
+// ═════════════════════════════════════════════════════════════════════
+
+model EnquiryFollowUp {
+  id          String         @id @default(cuid())
+  agencyId    String
+  enquiryId   String
+  type        FollowUpType   @default(CALL)
+  status      FollowUpStatus @default(PENDING)
+  scheduledAt DateTime
+  notes       String?
+  completedAt DateTime?
+  archivedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  agency  Agency  @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  enquiry Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([enquiryId])
+  @@index([agencyId, scheduledAt])
+  @@index([agencyId, status])
+  @@map("enquiry_follow_ups")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 20. SUPPLIER / VENDOR
+// ═════════════════════════════════════════════════════════════════════
+
+model Supplier {
+  id             String         @id @default(cuid())
+  agencyId       String
+  supplierCode   String?
+  name           String
+  type           String?        @default("Hotel Supplier")
+  contactPerson  String?
+  phone          String?
+  alternatePhone String?
+  email          String?
+  address        String?
+  city           String?
+  state          String?
+  country        String?        @default("India")
+  postalCode     String?
+  gstNumber      String?
+  panNumber      String?
+  paymentTerms   String?
+  bankDetails    String?
+  notes          String?
+  internalNotes  String?
+  status         SupplierStatus @default(ACTIVE)
+  archivedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  agency             Agency              @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  hotels             Hotel[]
+  vehicles           Vehicle[]
+  activities         Activity[]
+  rateSheets         RateSheet[]
+  hotelConfirmations HotelConfirmation[]
+
+  @@index([agencyId])
+  @@index([agencyId, supplierCode])
+  @@index([agencyId, name])
+  @@index([agencyId, city])
+  @@index([agencyId, status])
+  @@map("suppliers")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 21. RATE SHEET (COMMERCIAL PRICING FOUNDATION)
+// ═════════════════════════════════════════════════════════════════════
+
+model RateSheet {
+  id                 String              @id @default(cuid())
+  agencyId           String
+  supplierId         String?
+  rateSheetNumber    String?
+  name               String
+  inventoryType      RateInventoryType
+  
+  // Specific inventory link (nullable based on inventoryType)
+  hotelId            String?
+  vehicleId          String?
+  activityId         String?
+
+  // Hotel specific
+  roomType           String?
+  mealPlan           String?
+  
+  // Season & Validity
+  seasonName         String?
+  validFrom          DateTime
+  validTo            DateTime
+
+  // Financial rates (Decimal-safe)
+  currency           String              @default("INR")
+  costPrice          Decimal             @default(0) @db.Decimal(12, 2)
+  extraAdultRate     Decimal?            @db.Decimal(12, 2)
+  extraChildRate     Decimal?            @db.Decimal(12, 2)
+  
+  // Vehicle specific
+  vehiclePricingType VehiclePricingType?
+  ratePerKm          Decimal?            @db.Decimal(10, 2)
+  minimumKm          Decimal?            @db.Decimal(10, 2)
+  totalRate          Decimal?            @db.Decimal(12, 2)
+  extraKmRate        Decimal?            @db.Decimal(10, 2)
+  driverAllowance    Decimal?            @db.Decimal(10, 2)
+  nightAllowance     Decimal?            @db.Decimal(10, 2)
+  tollIncluded       Boolean             @default(false)
+  parkingIncluded    Boolean             @default(false)
+
+  // Activity specific
+  adultCost          Decimal?            @db.Decimal(12, 2)
+  childCost          Decimal?            @db.Decimal(12, 2)
+  infantCost         Decimal?            @db.Decimal(12, 2)
+
+  // Metadata
+  taxPercentage      Decimal?            @default(0) @db.Decimal(5, 2)
+  priority           Int                 @default(0)
+  status             RateStatus          @default(ACTIVE)
+  sourceType         String?             @default("MANUAL")
+  notes              String?
+  internalNotes      String?
+  archivedAt         DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  agency             Agency              @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  supplier           Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  hotel              Hotel?              @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  vehicle            Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  activity           Activity?           @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([supplierId])
+  @@index([hotelId])
+  @@index([vehicleId])
+  @@index([activityId])
+  @@index([agencyId, inventoryType])
+  @@index([agencyId, status])
+  @@index([agencyId, validFrom, validTo])
+  @@map("rate_sheets")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 22. TRIP OPERATION
+// ═════════════════════════════════════════════════════════════════════
+
+model TripOperation {
+  id                 String           @id @default(cuid())
+  agencyId           String
+  tripId             String           @unique
+  bookingId          String?          @unique
+  coordinatorId      String?
+  status             OperationStatus  @default(PENDING)
+  operationStartDate DateTime?
+  operationEndDate   DateTime?
+  notes              String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  agency                Agency                 @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  trip                  Trip                   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  booking               Booking?               @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  hotelConfirmations    HotelConfirmation[]
+  vehicleDispatches     VehicleDispatch[]
+  activityConfirmations ActivityConfirmation[]
+  issues                OperationalIssue[]
+  events                OperationEvent[]
+
+  @@unique([agencyId, tripId])
+  @@index([agencyId])
+  @@index([agencyId, status])
+  @@index([agencyId, tripId])
+  @@index([agencyId, bookingId])
+  @@map("trip_operations")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 23. HOTEL CONFIRMATION
+// ═════════════════════════════════════════════════════════════════════
+
+model HotelConfirmation {
+  id                 String             @id @default(cuid())
+  agencyId           String
+  tripOperationId    String
+  tripHotelId        String?
+  supplierId         String?
+  confirmationNumber String?
+  status             ConfirmationStatus @default(PENDING)
+  confirmedAt        DateTime?
+  checkIn            DateTime?
+  checkOut           DateTime?
+  roomDetails        String?
+  mealPlan           String?
+  supplierNotes      String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  agency        Agency        @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  tripOperation TripOperation @relation(fields: [tripOperationId], references: [id], onDelete: Cascade)
+  tripHotel     TripHotel?    @relation(fields: [tripHotelId], references: [id], onDelete: SetNull)
+  supplier      Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId])
+  @@index([tripOperationId])
+  @@index([agencyId, tripOperationId])
+  @@index([agencyId, tripHotelId])
+  @@index([agencyId, status])
+  @@map("hotel_confirmations")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 24. VEHICLE DISPATCH
+// ═════════════════════════════════════════════════════════════════════
+
+model VehicleDispatch {
+  id              String         @id @default(cuid())
+  agencyId        String
+  tripOperationId String
+  tripVehicleId   String?
+  vehicleId       String?
+  driverName      String?
+  driverPhone     String?
+  vehicleNumber   String?
+  pickupDate      DateTime?
+  pickupTime      String?
+  pickupLocation  String?
+  dropLocation    String?
+  status          DispatchStatus @default(PENDING)
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  agency        Agency        @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  tripOperation TripOperation @relation(fields: [tripOperationId], references: [id], onDelete: Cascade)
+  tripVehicle   TripVehicle?  @relation(fields: [tripVehicleId], references: [id], onDelete: SetNull)
+  vehicle       Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId])
+  @@index([tripOperationId])
+  @@index([agencyId, tripOperationId])
+  @@index([agencyId, tripVehicleId])
+  @@index([agencyId, status])
+  @@map("vehicle_dispatches")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 25. ACTIVITY CONFIRMATION
+// ═════════════════════════════════════════════════════════════════════
+
+model ActivityConfirmation {
+  id                 String             @id @default(cuid())
+  agencyId           String
+  tripOperationId    String
+  tripActivityId     String?
+  activityId         String?
+  confirmationNumber String?
+  ticketNumber       String?
+  status             ConfirmationStatus @default(PENDING)
+  confirmedAt        DateTime?
+  supplierNotes      String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  agency        Agency        @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  tripOperation TripOperation @relation(fields: [tripOperationId], references: [id], onDelete: Cascade)
+  tripActivity  TripActivity? @relation(fields: [tripActivityId], references: [id], onDelete: SetNull)
+  activity      Activity?     @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId])
+  @@index([tripOperationId])
+  @@index([agencyId, tripOperationId])
+  @@index([agencyId, tripActivityId])
+  @@index([agencyId, status])
+  @@map("activity_confirmations")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 26. OPERATIONAL ISSUE
+// ═════════════════════════════════════════════════════════════════════
+
+model OperationalIssue {
+  id              String        @id @default(cuid())
+  agencyId        String
+  tripOperationId String
+  title           String
+  description     String
+  priority        IssuePriority @default(MEDIUM)
+  status          IssueStatus   @default(OPEN)
+  assignedTo      String?
+  reportedBy      String?
+  resolution      String?
+  resolvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  agency        Agency        @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  tripOperation TripOperation @relation(fields: [tripOperationId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([tripOperationId])
+  @@index([agencyId, tripOperationId])
+  @@index([agencyId, status])
+  @@index([agencyId, priority])
+  @@map("operational_issues")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 27. OPERATION EVENT (TIMELINE & AUDIT LOG)
+// ═════════════════════════════════════════════════════════════════════
+
+model OperationEvent {
+  id              String   @id @default(cuid())
+  agencyId        String
+  tripOperationId String
+  eventType       String
+  description     String
+  metadata        Json?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+
+  agency        Agency        @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  tripOperation TripOperation @relation(fields: [tripOperationId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([tripOperationId])
+  @@index([agencyId, tripOperationId])
+  @@index([agencyId, createdAt])
+  @@map("operation_events")
+}
+
