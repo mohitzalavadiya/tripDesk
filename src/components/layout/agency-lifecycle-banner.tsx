@@ -10,11 +10,11 @@ import { Button } from "@/components/ui/button";
 
 export function AgencyLifecycleBanner() {
   const router = useRouter();
-  const { currentUser } = useAuth();
+  const { currentUser, isPlatformOwner } = useAuth();
   const { agencies, subscriptions } = useSaaS();
 
-  // If user is TripDesk Owner, lifecycle banner is not applicable
-  if (currentUser.role === "TRIPDESK_OWNER" || !currentUser.agencyId) {
+  // If user is Platform Owner, lifecycle banner is not applicable
+  if (isPlatformOwner || !currentUser.agencyId) {
     return null;
   }
 

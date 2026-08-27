@@ -1,19 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-
-/**
- * Normalizes Supabase base URL, defensively stripping mistakenly appended /rest/v1, /auth/v1, or trailing slashes.
- */
-export function normalizeSupabaseUrl(rawUrl?: string): string {
-  if (!rawUrl) return "";
-  let url = rawUrl.trim();
-  url = url.replace(/\/(rest|auth|storage)\/v1\/?$/i, "");
-  url = url.replace(/\/+$/, "");
-  return url;
-}
+import { normalizeSupabaseUrl } from "./normalize";
+export { normalizeSupabaseUrl };
 
 export async function createClient() {
-  const cookieStore = await cookies();
+  let cookieStore: any = null;
+  try {
+    cookieStore = await cookies();
+  } catch {
+    // Fallback when invoked outside Next.js request store (e.g. background task, test harness)
+  }
+
   const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseUrl = normalizeSupabaseUrl(rawUrl);
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -21,9 +18,10 @@ export async function createClient() {
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
-        return cookieStore.getAll();
+        return cookieStore ? cookieStore.getAll() : [];
       },
       setAll(cookiesToSet) {
+        if (!cookieStore) return;
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
             cookieStore.set(name, value, options)

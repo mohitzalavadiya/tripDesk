@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { deleteAuthUser } from "@/lib/supabase/admin";
+import { getAdminClient, deleteAuthUser } from "@/lib/supabase/admin";
 import prisma from "@/lib/prisma";
 
 export interface AuthActionResult {
@@ -12,7 +12,7 @@ export interface AuthActionResult {
 
 /**
  * Hardened single unified Agency Onboarding + Supabase Auth signup.
- * Creates Supabase Auth User, TripDesk Agency, TripDesk User (AGENCY_OWNER), and 7-day TRIAL subscription.
+ * Creates confirmed Supabase Auth User, TripDesk Agency, TripDesk User (AGENCY_OWNER), and 7-day TRIAL subscription.
  * Recovers safely from partial database failure by rolling back Prisma transactions and cleaning up orphaned Auth accounts.
  */
 export async function signupAgencyOwnerAction(
@@ -47,34 +47,63 @@ export async function signupAgencyOwnerAction(
     return { error: "Passwords do not match." };
   }
 
-  const supabase = await createClient();
+  let supabaseUserId: string;
 
-  // 1. Supabase Auth Signup
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
+  // 1. Supabase Auth Account Creation
+  const adminClient = getAdminClient();
+  if (adminClient) {
+    // Create confirmed user using Admin API to prevent email rate limit lockouts
+    const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
         name: ownerName,
         phone,
+        role: "AGENCY_OWNER",
       },
-    },
-  });
+    });
 
-  if (authError) {
-    return { error: authError.message || "Failed to create authentication account." };
+    if (authError || !authData.user) {
+      if (
+        authError?.message?.toLowerCase().includes("already registered") ||
+        authError?.message?.toLowerCase().includes("already exists")
+      ) {
+        return { error: "An account with this email already exists. Please log in instead." };
+      }
+      return { error: authError?.message || "Failed to create authentication account." };
+    }
+
+    supabaseUserId = authData.user.id;
+  } else {
+    // Standard client fallback if service role key is not configured
+    const supabase = await createClient();
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name: ownerName,
+          phone,
+        },
+      },
+    });
+
+    if (authError) {
+      return { error: authError.message || "Failed to create authentication account." };
+    }
+
+    if (!authData.user) {
+      return { error: "Authentication service did not return a valid user identity." };
+    }
+
+    if (authData.user.identities && authData.user.identities.length === 0) {
+      return { error: "An account with this email already exists. Please log in instead." };
+    }
+
+    supabaseUserId = authData.user.id;
   }
 
-  if (!authData.user) {
-    return { error: "Authentication service did not return a valid user identity." };
-  }
-
-  // Check for duplicate registered account in Supabase (identities array is empty for existing accounts)
-  if (authData.user.identities && authData.user.identities.length === 0) {
-    return { error: "An account with this email already exists. Please log in instead." };
-  }
-
-  const supabaseUserId = authData.user.id;
   let isNewlyCreated = true;
 
   try {
@@ -147,7 +176,7 @@ export async function signupAgencyOwnerAction(
       });
     });
   } catch (err: any) {
-    console.error("Agency onboarding failed during database transaction. Attempting cleanup of newly-created Auth user.");
+    console.error("Agency onboarding failed during database transaction. Attempting cleanup of newly-created Auth user:", err);
 
     // Safe cleanup: Delete ONLY the newly created Auth user from this signup attempt
     if (isNewlyCreated) {
@@ -157,6 +186,18 @@ export async function signupAgencyOwnerAction(
     return {
       error: "Unable to complete your agency setup right now. Please try again.",
     };
+  }
+
+  // 3. Establish active session in cookies for seamless immediate onboarding
+  const serverSupabase = await createClient();
+  const { error: signInError } = await serverSupabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (signInError) {
+    console.warn("Auto-login after registration had notice:", signInError.message);
+    redirect("/login?registered=true");
   }
 
   redirect("/dashboard");
@@ -205,21 +246,32 @@ export async function loginAction(
     };
   }
 
-  // Safe internal redirect validation (prevent open redirect attacks)
-  if (
-    redirectTo &&
-    redirectTo.startsWith("/") &&
-    !redirectTo.startsWith("//") &&
-    !redirectTo.includes(":")
-  ) {
-    redirect(redirectTo);
-  }
+  // Role-specific redirect validation (prevents open redirects and cross-role routing)
+  const isPlatformOwner = dbUser.role === "PLATFORM_OWNER";
 
-  if (dbUser.role === "PLATFORM_OWNER") {
+  if (isPlatformOwner) {
+    if (
+      redirectTo &&
+      redirectTo.startsWith("/admin") &&
+      !redirectTo.startsWith("//") &&
+      !redirectTo.includes(":")
+    ) {
+      redirect(redirectTo);
+    }
     redirect("/admin");
+  } else {
+    // Agency User (AGENCY_OWNER, etc.)
+    if (
+      redirectTo &&
+      redirectTo.startsWith("/") &&
+      !redirectTo.startsWith("/admin") &&
+      !redirectTo.startsWith("//") &&
+      !redirectTo.includes(":")
+    ) {
+      redirect(redirectTo);
+    }
+    redirect("/dashboard");
   }
-
-  redirect("/dashboard");
 }
 
 /**

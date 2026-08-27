@@ -112,14 +112,16 @@ export const customerService = {
     const orConditions: Prisma.CustomerWhereInput[] = [];
 
     if (params.phone?.trim()) {
-      const cleanPhone = params.phone.trim().replace(/\D/g, "");
-      orConditions.push({
-        phone: {
-          contains: cleanPhone.length > 5 ? cleanPhone.slice(-10) : params.phone.trim(),
-        },
-      });
-      if (params.phone.trim().length >= 5) {
-        orConditions.push({ alternatePhone: { contains: params.phone.trim() } });
+      const rawPhone = params.phone.trim();
+      const cleanPhone = rawPhone.replace(/\D/g, "");
+
+      orConditions.push({ phone: { contains: rawPhone, mode: "insensitive" } });
+      orConditions.push({ alternatePhone: { contains: rawPhone, mode: "insensitive" } });
+
+      if (cleanPhone.length >= 6) {
+        const last10 = cleanPhone.slice(-10);
+        orConditions.push({ phone: { contains: last10 } });
+        orConditions.push({ alternatePhone: { contains: last10 } });
       }
     }
 

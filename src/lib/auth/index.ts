@@ -126,9 +126,13 @@ export async function requireAuth(): Promise<AuthenticatedContext> {
 
 /**
  * Server-side guard: Ensures the user is the PLATFORM_OWNER.
+ * Redirects unauthenticated users to /login and agency users to /dashboard.
  */
 export async function requirePlatformOwner(): Promise<AuthenticatedContext> {
-  const auth = await requireAuth();
+  const auth = await getCurrentUser();
+  if (!auth) {
+    redirect("/login");
+  }
   if (!auth.isPlatformOwner) {
     redirect("/dashboard");
   }
@@ -137,9 +141,16 @@ export async function requirePlatformOwner(): Promise<AuthenticatedContext> {
 
 /**
  * Server-side guard: Ensures the user is an AGENCY_OWNER with a valid agency.
+ * Redirects unauthenticated users to /login and PLATFORM_OWNER to /admin.
  */
 export async function requireAgencyOwner(): Promise<AuthenticatedContext> {
-  const auth = await requireAuth();
+  const auth = await getCurrentUser();
+  if (!auth) {
+    redirect("/login");
+  }
+  if (auth.isPlatformOwner) {
+    redirect("/admin");
+  }
   if (!auth.isAgencyOwner || !auth.agency) {
     redirect("/login");
   }

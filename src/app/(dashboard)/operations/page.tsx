@@ -78,11 +78,11 @@ export default function OperationsDashboardPage() {
     ).length;
 
     return {
-      activeTrips: Math.max(1, activeTrips),
-      todayPickups: Math.max(2, todayPickups),
-      pendingActions: Math.max(3, pendingActions),
+      activeTrips,
+      todayPickups,
+      pendingActions,
       openIssues,
-      upcomingTrips: Math.max(1, upcomingTrips),
+      upcomingTrips,
     };
   }, [operations]);
 
