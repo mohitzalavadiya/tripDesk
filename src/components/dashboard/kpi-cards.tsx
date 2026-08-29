@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import Link from "next/link"
+import * as React from "react";
+import Link from "next/link";
 import {
   Inbox,
   FileText,
@@ -12,80 +12,106 @@ import {
   Car,
   Ticket,
   Building2,
-  FileSpreadsheet,
   ChevronRight,
-} from "lucide-react"
-import { useEnquiry } from "@/context/enquiry-context"
-import { useInventory } from "@/context/inventory-context"
+  CreditCard,
+} from "lucide-react";
+import { DashboardSummary } from "@/lib/services/dashboard-service";
 
-export function KpiCards() {
-  const { enquiries, trips } = useEnquiry()
-  const { hotels, vehicles, activities, suppliers, rateSheets } = useInventory()
+interface KpiCardsProps {
+  summary?: DashboardSummary | null;
+  loading?: boolean;
+}
 
-  // Compute KPI values
-  const newEnquiriesCount = enquiries.filter((e) => e.status === "New").length
-  const quotedCount = enquiries.filter((e) => e.status === "Quoted").length
-  const confirmedCount = trips.length
-
-  // Calculate revenue from confirmed trips
-  const totalRevenue = enquiries
-    .filter((e) => e.status === "Confirmed" || e.status === "Quoted" || e.status === "Follow-up")
-    .reduce((acc, curr) => acc + (curr.budget || 0), 0)
-
-  const formatRupees = (val: number) => {
-    if (val >= 100000) {
-      return `₹${(val / 100000).toFixed(2)}L`
+export function KpiCards({ summary, loading = false }: KpiCardsProps) {
+  const formatRupees = (valStr?: string) => {
+    const val = Number(valStr || "0");
+    if (isNaN(val)) return "₹0";
+    if (val >= 10000000) {
+      return `₹${(val / 10000000).toFixed(2)}Cr`;
     }
-    return `₹${val.toLocaleString("en-IN")}`
-  }
+    if (val >= 100000) {
+      return `₹${(val / 100000).toFixed(2)}L`;
+    }
+    return `₹${val.toLocaleString("en-IN")}`;
+  };
+
+  const newEnquiriesCount = summary?.enquiries.new ?? 0;
+  const activeQuotationsCount = summary?.quotations.total ?? 0;
+  const confirmedBookingsCount = summary?.bookings.confirmed ?? 0;
+  const totalCollected = summary?.payments.collected ?? "0.00";
+  const totalOutstanding = summary?.payments.outstanding ?? "0.00";
 
   const kpiItems = [
     {
       title: "New Enquiries",
       value: String(newEnquiriesCount).padStart(2, "0"),
-      trend: "+18%",
-      comparison: "vs last month",
+      subtext: `${summary?.enquiries.total ?? 0} total lifetime`,
       icon: Inbox,
+      href: "/enquiries?status=NEW",
     },
     {
-      title: "Quotations",
-      value: String(quotedCount).padStart(2, "0"),
-      trend: "+12%",
-      comparison: "vs last month",
+      title: "Active Quotations",
+      value: String(activeQuotationsCount).padStart(2, "0"),
+      subtext: `${summary?.quotations.accepted ?? 0} accepted`,
       icon: FileText,
+      href: "/quotations",
     },
     {
-      title: "Confirmed Trips",
-      value: String(confirmedCount).padStart(2, "0"),
-      trend: "+22%",
-      comparison: "vs last month",
+      title: "Confirmed Bookings",
+      value: String(confirmedBookingsCount).padStart(2, "0"),
+      subtext: `${summary?.bookings.total ?? 0} total bookings`,
       icon: Compass,
+      href: "/bookings",
     },
     {
-      title: "Pipeline Value",
-      value: formatRupees(totalRevenue),
-      trend: "+16%",
-      comparison: "vs last month",
+      title: "Payments Collected",
+      value: formatRupees(totalCollected),
+      subtext: `₹${Number(totalOutstanding).toLocaleString("en-IN")} balance due`,
       icon: IndianRupee,
+      href: "/payments",
     },
-  ]
+  ];
 
-  const activeHotels = hotels.filter((h) => h.status === "Active").length
-  const activeVehicles = vehicles.filter((v) => v.status === "Active").length
-  const activeActivities = activities.filter((a) => a.status === "Active").length
-  const activeSuppliers = suppliers.filter((s) => s.status === "Active").length
+  const activeHotels = summary?.inventory.activeHotels ?? 0;
+  const activeVehicles = summary?.inventory.activeVehicles ?? 0;
+  const activeActivities = summary?.inventory.activeActivities ?? 0;
+  const activeSuppliers = summary?.inventory.activeSuppliers ?? 0;
+  const activeRateSheets = summary?.inventory.activeRateSheets ?? 0;
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="h-32 rounded-xl border border-slate-100 bg-white p-5 animate-pulse shadow-2xs"
+            >
+              <div className="flex justify-between items-center">
+                <div className="h-3 w-24 bg-slate-200 rounded" />
+                <div className="h-8 w-8 bg-slate-100 rounded-lg" />
+              </div>
+              <div className="h-7 w-16 bg-slate-200 rounded mt-4" />
+              <div className="h-3 w-32 bg-slate-100 rounded mt-2" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       {/* 4 Core Sales KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpiItems.map((kpi, idx) => {
-          const Icon = kpi.icon
+          const Icon = kpi.icon;
           return (
-            <div
+            <Link
               key={idx}
-              className="rounded-xl border border-border bg-card p-5 transition-all hover:shadow-xs group/card animate-in fade-in duration-200 slide-in-from-bottom-2"
-              style={{ animationDelay: `${idx * 50}ms` }}
+              href={kpi.href}
+              className="rounded-xl border border-slate-200/80 bg-white p-5 transition-all hover:shadow-xs hover:border-indigo-200 group/card animate-in fade-in duration-200 slide-in-from-bottom-2 cursor-pointer"
+              style={{ animationDelay: `${idx * 40}ms` }}
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -102,21 +128,18 @@ export function KpiCards() {
                 </span>
               </div>
 
-              <div className="mt-2 flex items-center gap-1.5 text-xs">
-                <span className="flex items-center font-semibold text-emerald-650 bg-emerald-50 px-1.5 py-0.5 rounded-sm">
-                  <ArrowUpRight className="mr-0.5 h-3 w-3" />
-                  {kpi.trend}
-                </span>
-                <span className="text-slate-400 font-medium">
-                  {kpi.comparison}
+              <div className="mt-2 flex items-center justify-between text-xs">
+                <span className="text-slate-400 font-medium">{kpi.subtext}</span>
+                <span className="flex items-center font-semibold text-indigo-600 group-hover/card:translate-x-0.5 transition-transform">
+                  View <ChevronRight className="h-3 w-3 ml-0.5" />
                 </span>
               </div>
-            </div>
-          )
+            </Link>
+          );
         })}
       </div>
 
-      {/* Inventory & Supplier Quick Strip */}
+      {/* Inventory & Supplier Live Quick Strip */}
       <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
@@ -126,7 +149,7 @@ export function KpiCards() {
             </h4>
           </div>
           <span className="text-[11px] text-slate-400 font-medium">
-            {rateSheets.length} Active Supplier Contracts Loaded
+            {activeRateSheets} Active Supplier Tariffs Loaded
           </span>
         </div>
 
@@ -197,5 +220,5 @@ export function KpiCards() {
         </div>
       </div>
     </div>
-  )
+  );
 }

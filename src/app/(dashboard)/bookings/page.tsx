@@ -3,19 +3,36 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useBooking } from "@/context/booking-context";
-import { BookingStatus, PaymentStatus } from "@/types";
-import { PageHeader } from "@/components/shared/page-header";
+import {
+  CalendarCheck,
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  Calendar,
+  Users,
+  CheckCircle2,
+  Clock,
+  Send,
+  Eye,
+  AlertCircle,
+  Sparkles,
+  MoreVertical,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  X,
+  Compass,
+  CreditCard,
+  Phone,
+  IndianRupee,
+} from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -32,418 +49,485 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BookingStatusBadge, PaymentStatusBadge } from "@/components/booking/booking-status-badge";
-import { formatCurrency } from "@/lib/costing-engine";
 import {
-  CalendarCheck,
-  Plus,
-  Search,
-  RotateCcw,
-  MoreVertical,
-  Eye,
-  CreditCard,
-  CheckCircle2,
-  Clock,
-  MapPin,
-  Calendar,
-  Users,
-  AlertTriangle,
-  IndianRupee,
-  Phone,
-} from "lucide-react";
+  BookingStatusBadge,
+  PaymentStatusBadge,
+} from "@/components/booking/booking-status-badge";
+import { bookingClient, BookingWithRelations } from "@/lib/api-client";
+import { BookingStatus, BookingPaymentStatus } from "@prisma/client";
+import { formatCurrency } from "@/lib/costing-engine";
+import { toast } from "sonner";
 
 export default function BookingsDashboardPage() {
   const router = useRouter();
-  const { bookings } = useBooking();
 
-  // Search & Filter State
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState<string>("ALL");
-  const [paymentFilter, setPaymentFilter] = React.useState<string>("ALL");
+  // Data states
+  const [bookings, setBookings] = React.useState<BookingWithRelations[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
-  // Derive KPIs dynamically
-  const kpis = React.useMemo(() => {
-    const total = bookings.length;
-    const pendingConfirmation = bookings.filter(
-      (b) => b.status === "Pending Confirmation" || b.status === "Partially Confirmed"
-    ).length;
-    const confirmed = bookings.filter((b) => b.status === "Confirmed").length;
-    const upcoming = bookings.filter(
-      (b) => new Date(b.startDate) >= new Date() && b.status !== "Cancelled"
-    ).length;
-    const paymentPending = bookings.filter(
-      (b) => b.paymentStatus === "Unpaid" || b.paymentStatus === "Partially Paid"
-    ).length;
+  // Search & Filter states
+  const [search, setSearch] = React.useState("");
+  const [debouncedSearch, setDebouncedSearch] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
+  const [paymentFilter, setPaymentFilter] = React.useState<string>("all");
+  const [page, setPage] = React.useState(1);
+  const [pagination, setPagination] = React.useState({
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 1,
+  });
 
-    return { total, pendingConfirmation, confirmed, upcoming, paymentPending };
-  }, [bookings]);
+  // Debounce search (300ms)
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  // Upcoming Trips highlight
-  const upcomingTrips = React.useMemo(() => {
-    return bookings
-      .filter((b) => b.status !== "Cancelled")
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-      .slice(0, 3);
-  }, [bookings]);
+  // Fetch real bookings from database API
+  const fetchBookings = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  // Filter Bookings
-  const filteredBookings = React.useMemo(() => {
-    return bookings.filter((b) => {
-      // Search
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesId = b.bookingNumber.toLowerCase().includes(q);
-        const matchesCust = b.customerSnapshot.name.toLowerCase().includes(q);
-        const matchesTrip = b.title.toLowerCase().includes(q);
-        const matchesDest = b.destination.toLowerCase().includes(q);
-        const matchesPhone = b.customerSnapshot.phone?.includes(q);
+      const res = await bookingClient.getBookings({
+        search: debouncedSearch || undefined,
+        status: statusFilter !== "all" ? (statusFilter as BookingStatus) : undefined,
+        paymentStatus: paymentFilter !== "all" ? (paymentFilter as BookingPaymentStatus) : undefined,
+        page,
+        limit: 20,
+        sortBy: "createdAt",
+        sortOrder: "desc",
+      });
 
-        if (!matchesId && !matchesCust && !matchesTrip && !matchesDest && !matchesPhone) {
-          return false;
-        }
+      if (res.success && res.data) {
+        setBookings(res.data);
+        setPagination(res.meta);
       }
-
-      // Status
-      if (statusFilter !== "ALL" && b.status !== statusFilter) {
-        return false;
+    } catch (err: any) {
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setIsReadOnly(true);
       }
+      setError(err?.message || "Failed to load bookings from database.");
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, statusFilter, paymentFilter, page]);
 
-      // Payment
-      if (paymentFilter !== "ALL" && b.paymentStatus !== paymentFilter) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [bookings, searchQuery, statusFilter, paymentFilter]);
-
-  const isFilterActive = searchQuery || statusFilter !== "ALL" || paymentFilter !== "ALL";
+  React.useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
 
   const handleClearFilters = () => {
-    setSearchQuery("");
-    setStatusFilter("ALL");
-    setPaymentFilter("ALL");
+    setSearch("");
+    setDebouncedSearch("");
+    setStatusFilter("all");
+    setPaymentFilter("all");
+    setPage(1);
+  };
+
+  const isFilterActive = search.trim() !== "" || statusFilter !== "all" || paymentFilter !== "all";
+
+  // Soft Archive Booking
+  const handleDelete = async (id: string, number: string) => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+      return;
+    }
+
+    if (!confirm(`Archive booking ${number}? This will preserve historical payment audit trails.`)) {
+      return;
+    }
+
+    try {
+      setDeletingId(id);
+      await bookingClient.deleteBooking(id);
+      toast.success(`Booking ${number} archived successfully.`);
+      await fetchBookings();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to archive booking.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const formatDateDisplay = (date: Date | string | null | undefined) => {
+    if (!date) return "TBD";
+    return new Date(date).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        {/* Top Header */}
-        <PageHeader
-          title="Bookings"
-          description="Manage confirmed, pending, and upcoming travel bookings."
-          breadcrumbs={[{ label: "Bookings" }]}
-          primaryAction={{
-            label: "New Booking",
-            onClick: () => router.push("/bookings/new"),
-            icon: Plus,
-          }}
-        />
+        {/* Read-Only Banner */}
+        {isReadOnly && <ReadOnlyBanner moduleName="Bookings & Reservations" />}
 
-        {/* ─── 5 SUMMARY KPI CARDS ────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Total Bookings</span>
-              <CalendarCheck className="h-4 w-4 text-indigo-600" />
-            </div>
-            <p className="text-2xl font-black text-slate-900 tracking-tight">{kpis.total}</p>
-            <p className="text-[11px] text-slate-500 font-medium">All active & past files</p>
-          </div>
+        {/* Top Hero Command Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-amber-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Pending Confirmation</span>
-              <Clock className="h-4 w-4 text-amber-500" />
-            </div>
-            <p className="text-2xl font-black text-amber-700 tracking-tight">{kpis.pendingConfirmation}</p>
-            <p className="text-[11px] text-amber-600/80 font-medium">Supplier block required</p>
-          </div>
-
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-emerald-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Confirmed</span>
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            </div>
-            <p className="text-2xl font-black text-emerald-700 tracking-tight">{kpis.confirmed}</p>
-            <p className="text-[11px] text-emerald-600/80 font-medium">All services blocked</p>
-          </div>
-
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-indigo-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Upcoming Trips</span>
-              <Calendar className="h-4 w-4 text-indigo-500" />
-            </div>
-            <p className="text-2xl font-black text-indigo-700 tracking-tight">{kpis.upcoming}</p>
-            <p className="text-[11px] text-slate-500 font-medium">Departures upcoming</p>
-          </div>
-
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1 col-span-2 sm:col-span-1">
-            <div className="flex items-center justify-between text-rose-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Payment Pending</span>
-              <IndianRupee className="h-4 w-4 text-rose-500" />
-            </div>
-            <p className="text-2xl font-black text-rose-700 tracking-tight">{kpis.paymentPending}</p>
-            <p className="text-[11px] text-slate-500 font-medium">Awaiting balance</p>
-          </div>
-        </div>
-
-        {/* ─── UPCOMING TRIP ALERT SECTION ───────────────────────────────── */}
-        {upcomingTrips.length > 0 && (
-          <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse"></span>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-900">
-                  Operational Watch: Immediate Upcoming Departures
-                </h3>
-              </div>
-              <span className="text-[11px] font-semibold text-indigo-600">Next 3 departures</span>
+          {/* Left Title & Telemetry */}
+          <div className="space-y-3 z-10">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
+                <CalendarCheck className="h-3 w-3 text-emerald-500" />
+                Active Operations
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-xs font-semibold text-slate-500">
+                {pagination.total} bookings managed
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {upcomingTrips.map((tr) => (
-                <div
-                  key={tr.id}
-                  onClick={() => router.push(`/bookings/${tr.id}`)}
-                  className="bg-white border border-indigo-100/80 rounded-xl p-3 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between gap-2 group"
+            <div className="flex flex-wrap items-baseline gap-3">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+                Bookings & Operations
+              </h1>
+              <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
+                Confirmed client itineraries, travel schedules, and payment ledger tracking
+              </span>
+            </div>
+
+            {/* Status Quick Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+              {[
+                { label: "All", value: "all" },
+                { label: "Confirmed", value: BookingStatus.CONFIRMED },
+                { label: "On Trip", value: BookingStatus.ONGOING },
+                { label: "Completed", value: BookingStatus.COMPLETED },
+                { label: "Cancelled", value: BookingStatus.CANCELLED },
+              ].map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => {
+                    setStatusFilter(tab.value);
+                    setPage(1);
+                  }}
+                  className={`px-3 py-1 rounded-lg font-semibold text-xs transition-colors cursor-pointer ${
+                    statusFilter === tab.value
+                      ? "bg-indigo-600 text-white shadow-2xs"
+                      : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
+                  }`}
                 >
-                  <div className="min-w-0 space-y-0.5">
-                    <span className="font-bold text-xs text-slate-900 group-hover:text-indigo-600 transition-colors block truncate">
-                      {tr.customerSnapshot.name}
-                    </span>
-                    <span className="text-[11px] text-slate-500 block truncate">
-                      {tr.title} • {tr.startDate}
-                    </span>
-                    <span className="text-[10px] font-mono text-slate-400 font-semibold">
-                      {tr.bookingNumber} ({tr.adults} Adults)
-                    </span>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <BookingStatusBadge status={tr.status} />
-                  </div>
-                </div>
+                  {tab.label}
+                </button>
               ))}
             </div>
           </div>
-        )}
 
-        {/* ─── SEARCH & FILTER CONTROLS ───────────────────────────────────── */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-3">
-          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-            {/* Search Input */}
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search Booking ID, Customer, Trip..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 text-xs"
-              />
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-              <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || "ALL")}>
-                <SelectTrigger className="h-9 text-xs w-44">
-                  <SelectValue placeholder="Booking Status" />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-slate-200">
-                  <SelectItem value="ALL">All Booking Statuses</SelectItem>
-                  <SelectItem value="Draft">Draft</SelectItem>
-                  <SelectItem value="Pending Confirmation">Pending Confirmation</SelectItem>
-                  <SelectItem value="Partially Confirmed">Partially Confirmed</SelectItem>
-                  <SelectItem value="Confirmed">Confirmed</SelectItem>
-                  <SelectItem value="On Trip">On Trip</SelectItem>
-                  <SelectItem value="Completed">Completed</SelectItem>
-                  <SelectItem value="Cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={paymentFilter} onValueChange={(val) => setPaymentFilter(val || "ALL")}>
-                <SelectTrigger className="h-9 text-xs w-40">
-                  <SelectValue placeholder="Payment Status" />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-slate-200">
-                  <SelectItem value="ALL">All Payment States</SelectItem>
-                  <SelectItem value="Unpaid">Unpaid</SelectItem>
-                  <SelectItem value="Partially Paid">Partially Paid</SelectItem>
-                  <SelectItem value="Paid">Paid</SelectItem>
-                  <SelectItem value="Refund Pending">Refund Pending</SelectItem>
-                  <SelectItem value="Refunded">Refunded</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {isFilterActive && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleClearFilters}
-                  className="h-9 text-xs font-semibold text-slate-500 hover:text-slate-900 cursor-pointer"
-                >
-                  <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                  Reset
-                </Button>
-              )}
-            </div>
+          {/* Right Action Controls */}
+          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
+            <Button
+              onClick={() => router.push("/bookings/new")}
+              disabled={isReadOnly}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" />
+              New Booking
+            </Button>
           </div>
         </div>
 
-        {/* ─── DATA TABLE ─────────────────────────────────────────────────── */}
-        <div className="border border-slate-200/90 rounded-2xl overflow-hidden shadow-2xs bg-white">
-          {filteredBookings.length === 0 ? (
+        {/* Master Card (Filter Bar + Table) */}
+        <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+          {/* Search Toolbar */}
+          <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-2xl">
+                <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search by booking number, trip title, customer name, phone..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">Payment:</span>
+                  <select
+                    value={paymentFilter}
+                    onChange={(e) => {
+                      setPaymentFilter(e.target.value);
+                      setPage(1);
+                    }}
+                    className="h-8 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value={BookingPaymentStatus.UNPAID}>Unpaid</option>
+                    <option value={BookingPaymentStatus.PARTIALLY_PAID}>Partially Paid</option>
+                    <option value={BookingPaymentStatus.PAID}>Fully Paid</option>
+                  </select>
+                </div>
+
+                {isFilterActive && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearFilters}
+                    className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 shrink-0 cursor-pointer font-semibold rounded-lg"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                    Reset
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Loading State */}
+          {loading && (
+            <div className="p-16 text-center space-y-3">
+              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
+              <p className="text-xs text-slate-500 font-medium">Fetching bookings from database...</p>
+            </div>
+          )}
+
+          {/* Error State */}
+          {!loading && error && (
+            <div className="p-12 text-center space-y-3">
+              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <p className="text-xs font-bold text-slate-800">{error}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchBookings()}
+                className="text-xs h-8 rounded-lg cursor-pointer"
+              >
+                Try Again
+              </Button>
+            </div>
+          )}
+
+          {/* Table Content */}
+          {!loading && !error && bookings.length === 0 ? (
             <div className="p-12 text-center">
               <EmptyState
                 icon={CalendarCheck}
-                title={isFilterActive ? "No matching bookings found" : "No bookings yet"}
+                title={isFilterActive ? "No matching bookings found" : "No bookings confirmed yet"}
                 description={
                   isFilterActive
-                    ? "Try adjusting your search criteria or resetting filters."
-                    : "Convert an accepted quotation or create a new booking to start managing supplier confirmations."
+                    ? "Try adjusting your search or status filter."
+                    : "Convert accepted client quotations or create a new booking to start managing operations and payments."
                 }
-                actionText={isFilterActive ? "Clear Search" : "New Booking"}
+                actionText={isFilterActive ? "Clear Filter" : "Create New Booking"}
                 onAction={isFilterActive ? handleClearFilters : () => router.push("/bookings/new")}
               />
             </div>
-          ) : (
-            <div className="overflow-x-auto max-h-[620px] overflow-y-auto">
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
-                  <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">
-                    <TableHead className="py-3 px-4 font-bold text-slate-600 w-[140px]">Booking ID</TableHead>
-                    <TableHead className="py-3 px-4 font-bold text-slate-600">Customer</TableHead>
-                    <TableHead className="py-3 px-4 font-bold text-slate-600">Trip Package</TableHead>
-                    <TableHead className="py-3 px-4 font-bold text-slate-600">Travel Dates</TableHead>
-                    <TableHead className="py-3 px-4 font-bold text-slate-600">Guests</TableHead>
-                    <TableHead className="py-3 px-4 font-bold text-slate-600 text-right">Total Package</TableHead>
-                    <TableHead className="py-3 px-4 font-bold text-slate-600 text-center">Payment</TableHead>
-                    <TableHead className="py-3 px-4 font-bold text-slate-600">Booking Status</TableHead>
-                    <TableHead className="py-3 px-4 w-[60px] text-right font-bold text-slate-600">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-
-                <TableBody>
-                  {filteredBookings.map((booking) => (
-                    <TableRow
-                      key={booking.id}
-                      onClick={() => router.push(`/bookings/${booking.id}`)}
-                      className="hover:bg-slate-50/70 cursor-pointer transition-colors group border-b border-slate-100/80"
-                    >
-                      {/* Booking ID */}
-                      <TableCell className="py-3.5 px-4 font-mono font-bold text-xs text-indigo-600">
-                        {booking.bookingNumber}
-                      </TableCell>
-
-                      {/* Customer */}
-                      <TableCell className="py-3.5 px-4">
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-semibold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">
-                            {booking.customerSnapshot.name}
-                          </span>
-                          <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                            <Phone className="h-2.5 w-2.5 text-slate-400 shrink-0" />
-                            {booking.customerSnapshot.phone || "-"}
-                          </span>
-                        </div>
-                      </TableCell>
-
-                      {/* Trip & Destination */}
-                      <TableCell className="py-3.5 px-4">
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-bold text-slate-800 text-xs truncate">
-                            {booking.title}
-                          </span>
-                          <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                            <MapPin className="h-2.5 w-2.5 text-slate-400 shrink-0" />
-                            {booking.destination}
-                          </span>
-                        </div>
-                      </TableCell>
-
-                      {/* Travel Dates */}
-                      <TableCell className="py-3.5 px-4 text-xs font-medium text-slate-700 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                          <span>
-                            {booking.startDate} → {booking.endDate}
-                          </span>
-                        </div>
-                      </TableCell>
-
-                      {/* Guests */}
-                      <TableCell className="py-3.5 px-4 text-xs font-medium text-slate-600 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                          <span>
-                            {booking.adults}A {booking.children > 0 ? `+ ${booking.children}C` : ""}
-                          </span>
-                        </div>
-                      </TableCell>
-
-                      {/* Total Amount & Balance */}
-                      <TableCell className="py-3.5 px-4 text-right">
-                        <div className="flex flex-col items-end">
-                          <span className="font-black text-xs text-slate-900">
-                            {formatCurrency(booking.totalAmount)}
-                          </span>
-                          {booking.pendingAmount > 0 ? (
-                            <span className="text-[10px] font-semibold text-amber-600">
-                              {formatCurrency(booking.pendingAmount)} due
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-semibold text-emerald-600">
-                              Fully Settled
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      {/* Payment Status */}
-                      <TableCell className="py-3.5 px-4 text-center">
-                        <PaymentStatusBadge status={booking.paymentStatus} />
-                      </TableCell>
-
-                      {/* Booking Status */}
-                      <TableCell className="py-3.5 px-4">
-                        <BookingStatusBadge status={booking.status} />
-                      </TableCell>
-
-                      {/* Actions */}
-                      <TableCell className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            render={
-                              <Button
-                                variant="ghost"
-                                className="h-8 w-8 p-0 text-slate-400 hover:text-slate-700 rounded-md cursor-pointer"
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            }
-                          />
-                          <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md rounded-xl p-1 w-44">
-                            <DropdownMenuGroup>
-                              <DropdownMenuLabel className="text-[10px] font-bold uppercase text-slate-400 px-2 py-1">
-                                Options
-                              </DropdownMenuLabel>
-                              <DropdownMenuItem
-                                onClick={() => router.push(`/bookings/${booking.id}`)}
-                                className="text-xs cursor-pointer rounded-md"
-                              >
-                                <Eye className="mr-2 h-3.5 w-3.5 text-slate-400" />
-                                View Workspace
-                              </DropdownMenuItem>
-                            </DropdownMenuGroup>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+          ) : !loading && !error && (
+            <div className="overflow-hidden">
+              <div className="hidden lg:block overflow-x-auto max-h-[620px] overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
+                    <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">
+                      <TableHead className="py-3 px-4 font-bold text-slate-600 w-[240px]">Booking</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">Customer & Contact</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">Travel Schedule</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">Status</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">Financial Ledger</TableHead>
+                      <TableHead className="py-3 px-4 w-[110px] text-right font-bold text-slate-600">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {bookings.map((b) => (
+                      <TableRow
+                        key={b.id}
+                        onClick={() => router.push(`/bookings/${b.id}`)}
+                        className="hover:bg-slate-50/70 cursor-pointer transition-colors group border-b border-slate-100/80"
+                      >
+                        <TableCell className="py-3.5 px-4 font-medium text-slate-900">
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs flex items-center justify-center border border-emerald-100 shrink-0">
+                              <CalendarCheck className="h-4 w-4" />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-bold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">
+                                {b.bookingNumber}
+                              </span>
+                              <span className="text-[11px] text-slate-500 truncate">
+                                {b.trip?.title || "Direct Itinerary"}
+                              </span>
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="py-3.5 px-4">
+                          <div className="flex flex-col text-xs">
+                            <span className="font-semibold text-slate-800">{b.customer?.name}</span>
+                            <span className="text-[11px] text-slate-500">
+                              {b.customer?.phone} {b.customer?.email ? `• ${b.customer.email}` : ""}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="py-3.5 px-4 text-xs text-slate-600">
+                          <div className="flex flex-col">
+                            <span className="font-medium text-slate-800">
+                              {formatDateDisplay(b.travelStartDate)} → {formatDateDisplay(b.travelEndDate)}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              Booked on {formatDateDisplay(b.bookingDate)}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="py-3.5 px-4">
+                          <div className="flex flex-col gap-1">
+                            <BookingStatusBadge status={b.status} />
+                            <PaymentStatusBadge status={b.paymentStatus} />
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="py-3.5 px-4">
+                          <div className="flex flex-col text-xs">
+                            <span className="font-extrabold text-slate-900 text-sm">
+                              {formatCurrency(Number(b.totalAmount))}
+                            </span>
+                            <div className="flex items-center gap-2 text-[10px]">
+                              <span className="text-emerald-700 font-bold">
+                                Paid: {formatCurrency(Number(b.paidAmount))}
+                              </span>
+                              <span className="text-slate-300">•</span>
+                              <span className="text-rose-700 font-bold">
+                                Due: {formatCurrency(Number(b.balanceAmount))}
+                              </span>
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-slate-700 rounded-md cursor-pointer"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              }
+                            />
+                            <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md rounded-xl p-1 w-44">
+                              <DropdownMenuGroup>
+                                <DropdownMenuLabel className="text-[10px] font-bold uppercase text-slate-400 px-2 py-1">
+                                  Booking Actions
+                                </DropdownMenuLabel>
+                                <DropdownMenuItem
+                                  onClick={() => router.push(`/bookings/${b.id}`)}
+                                  className="text-xs cursor-pointer rounded-md"
+                                >
+                                  <Eye className="mr-2 h-3.5 w-3.5 text-slate-400" />
+                                  View Booking Workspace
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => router.push(`/trips/${b.tripId}`)}
+                                  className="text-xs cursor-pointer rounded-md"
+                                >
+                                  <Compass className="mr-2 h-3.5 w-3.5 text-slate-400" />
+                                  Open Trip Workspace
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDelete(b.id, b.bookingNumber)}
+                                  disabled={isReadOnly || deletingId === b.id}
+                                  className="text-xs text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md disabled:opacity-50"
+                                >
+                                  <Trash2 className="mr-2 h-3.5 w-3.5 text-rose-500" />
+                                  {deletingId === b.id ? "Archiving..." : "Archive Booking"}
+                                </DropdownMenuItem>
+                              </DropdownMenuGroup>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="block lg:hidden divide-y divide-slate-100">
+                {bookings.map((b) => (
+                  <div
+                    key={b.id}
+                    onClick={() => router.push(`/bookings/${b.id}`)}
+                    className="p-4 space-y-2.5 hover:bg-slate-50/50 cursor-pointer active:bg-slate-100 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs">{b.bookingNumber}</h4>
+                        <p className="text-[11px] text-slate-500">{b.trip?.title} • {b.customer?.name}</p>
+                      </div>
+                      <div className="flex flex-col gap-1 items-end">
+                        <BookingStatusBadge status={b.status} />
+                        <PaymentStatusBadge status={b.paymentStatus} />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-900 pt-1">
+                      <span>{formatCurrency(Number(b.totalAmount))}</span>
+                      <span className="text-[11px] font-semibold text-rose-600">
+                        Due: {formatCurrency(Number(b.balanceAmount))}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Master Footer with Pagination */}
+          <div className="px-5 py-3.5 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
+            <span>
+              Showing <strong className="text-slate-800">{bookings.length}</strong> of{" "}
+              <strong className="text-slate-800">{pagination.total}</strong> bookings
+            </span>
+
+            {pagination.totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="h-8 px-2.5 text-xs rounded-lg cursor-pointer"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Prev
+                </Button>
+                <span className="text-xs font-bold text-slate-700 px-1">
+                  {page} / {pagination.totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= pagination.totalPages || loading}
+                  onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                  className="h-8 px-2.5 text-xs rounded-lg cursor-pointer"
+                >
+                  Next <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

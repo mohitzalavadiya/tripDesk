@@ -1,71 +1,67 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { useRouter } from "next/navigation"
-import { Enquiry, Customer, EnquiryStatus } from "@/types"
-import { useEnquiry } from "@/context/enquiry-context"
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { EnquiryWithRelations } from "@/lib/api-client";
+import { PriorityBadge } from "./status-badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Button } from "@/components/ui/button"
-import { MoreVertical, Calendar, Users, MapPin, ArrowRight } from "lucide-react"
-import { toast } from "sonner"
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { MoreVertical, Calendar, Users, MapPin, ArrowRight } from "lucide-react";
+import { formatCurrency } from "@/lib/costing-engine";
+import { EnquiryStatus } from "@prisma/client";
 
 interface EnquiryPipelineProps {
-  enquiries: Enquiry[]
+  enquiries: EnquiryWithRelations[];
+  isReadOnly?: boolean;
+  onStatusChange?: (id: string, status: EnquiryStatus) => void;
 }
 
 const PIPELINE_STAGES: { label: string; status: EnquiryStatus; color: string }[] = [
-  { label: "New", status: "New", color: "bg-blue-500" },
-  { label: "Contacted", status: "Contacted", color: "bg-slate-500" },
-  { label: "Qualified", status: "Qualified", color: "bg-teal-500" },
-  { label: "Quoted", status: "Quoted", color: "bg-indigo-500" },
-  { label: "Follow-up", status: "Follow-up", color: "bg-amber-500" },
-  { label: "Confirmed", status: "Confirmed", color: "bg-emerald-500" },
-]
+  { label: "New", status: EnquiryStatus.NEW, color: "bg-blue-500" },
+  { label: "Contacted", status: EnquiryStatus.CONTACTED, color: "bg-purple-500" },
+  { label: "Qualified", status: EnquiryStatus.QUALIFIED, color: "bg-teal-500" },
+  { label: "Quoted", status: EnquiryStatus.QUOTATION_SENT, color: "bg-indigo-500" },
+  { label: "Follow-up", status: EnquiryStatus.FOLLOW_UP, color: "bg-amber-500" },
+  { label: "Negotiation", status: EnquiryStatus.NEGOTIATION, color: "bg-orange-500" },
+  { label: "Converted", status: EnquiryStatus.CONVERTED, color: "bg-emerald-500" },
+];
 
-export function EnquiryPipeline({ enquiries }: EnquiryPipelineProps) {
-  const router = useRouter()
-  const { customers, updateEnquiryStatus } = useEnquiry()
+export function EnquiryPipeline({
+  enquiries,
+  isReadOnly = false,
+  onStatusChange,
+}: EnquiryPipelineProps) {
+  const router = useRouter();
 
-  const getCustomer = (customerId: string): Customer | undefined => {
-    return customers.find((c) => c.id === customerId)
-  }
-
-  const formatRupees = (val?: number) => {
-    if (val === undefined) return "-"
-    if (val >= 100000) {
-      return `₹ ${(val / 100000).toFixed(2)}L`
-    }
-    return `₹ ${val.toLocaleString("en-IN")}`
-  }
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    if (isNaN(date.getTime())) return dateStr
-    return date.toLocaleDateString("en-IN", {
+  const formatDate = (date: Date | string | null | undefined) => {
+    if (!date) return "TBD";
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "TBD";
+    return d.toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
-    })
-  }
+    });
+  };
 
   const handleMoveStage = (id: string, e: React.MouseEvent, status: EnquiryStatus) => {
-    e.stopPropagation()
-    updateEnquiryStatus(id, status)
-    toast.success(`Moved lead to ${status}`)
-  }
+    e.stopPropagation();
+    onStatusChange?.(id, status);
+  };
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x scroll-smooth min-h-[550px] no-scrollbar">
       {PIPELINE_STAGES.map((stage) => {
-        const stageEnquiries = enquiries.filter((e) => e.status === stage.status)
-        const stageTotal = stageEnquiries.reduce((acc, curr) => acc + (curr.budget || 0), 0)
+        const stageEnquiries = enquiries.filter((e) => e.status === stage.status);
+        const stageTotal = stageEnquiries.reduce(
+          (acc, curr) => acc + (curr.budget ? Number(curr.budget) : 0),
+          0
+        );
 
         return (
           <div
@@ -84,7 +80,7 @@ export function EnquiryPipeline({ enquiries }: EnquiryPipelineProps) {
                 </span>
               </div>
               <span className="text-[10px] font-semibold text-slate-500">
-                {formatRupees(stageTotal)}
+                {formatCurrency(stageTotal)}
               </span>
             </div>
 
@@ -96,101 +92,96 @@ export function EnquiryPipeline({ enquiries }: EnquiryPipelineProps) {
                 </div>
               ) : (
                 stageEnquiries.map((enq) => {
-                  const customer = getCustomer(enq.customerId)
+                  const customer = enq.customer;
+                  const totalPax = enq.adults + enq.children + enq.infants;
+
                   return (
                     <div
                       key={enq.id}
                       onClick={() => router.push(`/enquiries/${enq.id}`)}
-                      className="bg-white rounded-lg border border-slate-200/80 p-3.5 shadow-2xs hover:shadow-xs hover:border-slate-300 transition-all cursor-pointer space-y-3 group relative"
+                      className="bg-white rounded-lg border border-slate-200/80 p-3.5 shadow-2xs hover:shadow-sm hover:border-indigo-200/80 transition-all cursor-pointer space-y-2.5 group relative"
                     >
-                      {/* Customer & Actions */}
+                      {/* Top bar */}
                       <div className="flex items-start justify-between gap-1">
-                        <div className="min-w-0">
-                          <span className="font-bold text-xs text-slate-900 block truncate group-hover:text-indigo-600 transition-colors">
-                            {customer?.name}
-                          </span>
-                          <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider block mt-0.5">
-                            {enq.id}
+                        <div className="min-w-0 pr-1">
+                          <h5 className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
+                            {customer?.name || "Unknown"}
+                          </h5>
+                          <span className="text-[10px] text-slate-400 font-mono block">
+                            {enq.enquiryNumber}
                           </span>
                         </div>
-                        
-                        <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              render={
-                                <Button variant="ghost" className="h-7 w-7 p-0 cursor-pointer">
-                                  <MoreVertical className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-600" />
-                                </Button>
-                              }
-                            />
-                            <DropdownMenuContent align="end" className="bg-white border border-slate-200">
-                               <DropdownMenuGroup>
-                                 <DropdownMenuLabel className="text-xs">Pipeline</DropdownMenuLabel>
-                                 <DropdownMenuItem onClick={() => router.push(`/enquiries/${enq.id}`)}>
-                                   <ArrowRight className="h-3 w-3 mr-1 text-slate-400" /> View details
-                                 </DropdownMenuItem>
-                               </DropdownMenuGroup>
-                               
-                               <DropdownMenuSeparator />
-                               
-                               <DropdownMenuGroup>
-                                 <DropdownMenuLabel className="text-[10px] text-slate-400">Move to stage</DropdownMenuLabel>
-                                 {PIPELINE_STAGES.map((st) => (
-                                   <DropdownMenuItem
-                                     key={st.status}
-                                     disabled={enq.status === st.status}
-                                     onClick={(e) => handleMoveStage(enq.id, e, st.status)}
-                                     className="text-xs"
-                                   >
-                                     {st.label}
-                                   </DropdownMenuItem>
-                                 ))}
-                               </DropdownMenuGroup>
-                             </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => e.stopPropagation()}
+                                className="h-6 w-6 p-0 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer"
+                              >
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              </Button>
+                            }
+                          />
+                          <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 rounded-xl p-1 text-xs">
+                            <DropdownMenuGroup>
+                              <DropdownMenuItem
+                                onClick={() => router.push(`/enquiries/${enq.id}`)}
+                                className="cursor-pointer"
+                              >
+                                View Workspace
+                              </DropdownMenuItem>
+                              {PIPELINE_STAGES.filter((s) => s.status !== stage.status).map((target) => (
+                                <DropdownMenuItem
+                                  key={target.status}
+                                  disabled={isReadOnly}
+                                  onClick={(e) => handleMoveStage(enq.id, e, target.status)}
+                                  className="cursor-pointer"
+                                >
+                                  Move to {target.label}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
 
-                      {/* Travel Specs */}
-                      <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 border-t border-slate-50 pt-2.5 text-[11px] text-slate-600 font-medium">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
-                          <span className="truncate text-slate-900 font-semibold">{enq.destination}</span>
+                      {/* Destination & Dates */}
+                      <div className="space-y-1 text-[11px] text-slate-600 bg-slate-50/70 p-2 rounded-md border border-slate-100">
+                        <div className="flex items-center gap-1.5 font-medium text-slate-800">
+                          <MapPin className="h-3 w-3 text-indigo-500 shrink-0" />
+                          <span className="truncate">{enq.destination}</span>
                         </div>
-                        <div className="text-right text-slate-900 font-bold">
-                          {formatRupees(enq.budget)}
-                        </div>
-                        <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="flex items-center gap-1.5 text-slate-500">
                           <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
-                          <span className="truncate">{formatDate(enq.startDate)}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 justify-end">
-                          <Users className="h-3 w-3 text-slate-400 shrink-0" />
-                          <span>{enq.adults}A {enq.children > 0 && `+ ${enq.children}C`}</span>
+                          <span className="truncate">
+                            {formatDate(enq.startDate)} → {formatDate(enq.endDate)}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Card Footer badges */}
-                      <div className="flex items-center justify-between border-t border-slate-50 pt-2 text-[10px]">
-                        <span className="inline-flex items-center rounded-sm bg-slate-100 px-1 py-0.5 font-bold text-slate-600">
-                          {enq.source}
-                        </span>
-                        
-                        {enq.nextFollowUp && (
-                          <span className="text-amber-600 font-bold flex items-center gap-0.5">
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                            {formatDate(enq.nextFollowUp)}
+                      {/* Footer Info */}
+                      <div className="flex items-center justify-between pt-1 text-[10px]">
+                        <div className="flex items-center gap-1.5">
+                          <PriorityBadge priority={enq.priority} />
+                          <span className="text-slate-500 flex items-center gap-0.5">
+                            <Users className="h-2.5 w-2.5" /> {totalPax}
                           </span>
-                        )}
+                        </div>
+                        <span className="font-extrabold text-emerald-700 text-xs">
+                          {enq.budget ? formatCurrency(Number(enq.budget)) : "Flexible"}
+                        </span>
                       </div>
                     </div>
-                  )
+                  );
                 })
               )}
             </div>
           </div>
-        )
+        );
       })}
     </div>
-  )
+  );
 }

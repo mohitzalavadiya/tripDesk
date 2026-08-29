@@ -1482,4 +1482,133 @@ export interface AgencyReviewSettings {
   referralMinBookingAmount: number;
 }
 
+// ═════════════════════════════════════════════════════════════════════
+// PHASE 10.13A: OPERATIONS & FULFILLMENT DATA FOUNDATION
+// ═════════════════════════════════════════════════════════════════════
+
+export type OperationStatusType =
+  | "PENDING"
+  | "CONFIRMED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export type ConfirmationStatusType =
+  | "PENDING"
+  | "REQUESTED"
+  | "CONFIRMED"
+  | "FAILED"
+  | "CANCELLED";
+
+export type DispatchStatusType =
+  | "PENDING"
+  | "ASSIGNED"
+  | "CONFIRMED"
+  | "ON_DUTY"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export type IssuePriorityType = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+export type IssueStatusType = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+
+export interface HotelConfirmationItem {
+  id: string;
+  agencyId: string;
+  tripOperationId: string;
+  tripHotelId: string;
+  supplierId?: string | null;
+  confirmationNumber?: string | null;
+  status: ConfirmationStatusType;
+  confirmedAt?: string | null;
+  checkIn?: string | null;
+  checkOut?: string | null;
+  roomDetails?: string | null;
+  mealPlan?: string | null;
+  supplierNotes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VehicleDispatchItem {
+  id: string;
+  agencyId: string;
+  tripOperationId: string;
+  tripVehicleId: string;
+  vehicleId?: string | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
+  vehicleNumber?: string | null;
+  pickupDate?: string | null;
+  pickupTime?: string | null;
+  pickupLocation?: string | null;
+  dropLocation?: string | null;
+  status: DispatchStatusType;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActivityConfirmationItem {
+  id: string;
+  agencyId: string;
+  tripOperationId: string;
+  tripActivityId: string;
+  activityId?: string | null;
+  confirmationNumber?: string | null;
+  ticketNumber?: string | null;
+  status: ConfirmationStatusType;
+  confirmedAt?: string | null;
+  supplierNotes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OperationalIssueItem {
+  id: string;
+  agencyId: string;
+  tripOperationId: string;
+  title: string;
+  description: string;
+  priority: IssuePriorityType;
+  status: IssueStatusType;
+  assignedTo?: string | null;
+  reportedBy?: string | null;
+  resolution?: string | null;
+  resolvedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OperationEventItem {
+  id: string;
+  agencyId: string;
+  tripOperationId: string;
+  eventType: string;
+  description: string;
+  metadata?: Record<string, any> | null;
+  createdBy?: string | null;
+  createdAt: string;
+}
+
+export interface TripOperationEntity {
+  id: string;
+  agencyId: string;
+  tripId: string;
+  bookingId?: string | null;
+  coordinatorId?: string | null;
+  status: OperationStatusType;
+  operationStartDate?: string | null;
+  operationEndDate?: string | null;
+  notes?: string | null;
+  hotelConfirmations?: HotelConfirmationItem[];
+  vehicleDispatches?: VehicleDispatchItem[];
+  activityConfirmations?: ActivityConfirmationItem[];
+  issues?: OperationalIssueItem[];
+  events?: OperationEventItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+
 
