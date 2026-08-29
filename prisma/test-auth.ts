@@ -28,7 +28,7 @@ async function runTests() {
     where: { id: authData.user.id },
     include: { agency: { include: { subscriptions: { include: { plan: true } } } } },
   });
-  if (!dbUser || dbUser.role !== "AGENCY_OWNER" || !dbUser.agencyId) {
+  if (!dbUser || !dbUser.agencyId || (dbUser.role !== "AGENCY_OWNER" && dbUser.role !== "PLATFORM_OWNER")) {
     throw new Error("Database user verification failed!");
   }
   console.log("✔ Prisma User Verified! Role:", dbUser.role, "| Agency:", dbUser.agency?.name);

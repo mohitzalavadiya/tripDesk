@@ -21,9 +21,9 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
   const pathname = usePathname();
-  const { currentUser } = useAuth();
-  const isPlatformOwner = currentUser.role === "TRIPDESK_OWNER";
-  const navSections = isPlatformOwner ? adminNavigationConfig : agencyNavigationConfig;
+  const { currentUser, isPlatformOwner } = useAuth();
+  const isPlatform = isPlatformOwner || pathname.startsWith("/admin");
+  const navSections = isPlatform ? adminNavigationConfig : agencyNavigationConfig;
 
   return (
     <TooltipProvider delay={0}>
@@ -36,15 +36,15 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
         {/* Branding Logo Header */}
         <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border/30 shrink-0">
           <Link
-            href={isPlatformOwner ? "/admin" : "/dashboard"}
+            href={isPlatform ? "/admin" : "/dashboard"}
             className="flex items-center gap-2.5 font-bold tracking-tight text-white focus-visible:ring-1 focus-visible:ring-indigo-400 rounded-md"
           >
             <div
               className={`flex h-9 w-9 items-center justify-center rounded-lg shadow-sm shrink-0 ${
-                isPlatformOwner ? "bg-purple-600" : "bg-indigo-600"
+                isPlatform ? "bg-purple-600" : "bg-indigo-600"
               }`}
             >
-              {isPlatformOwner ? (
+              {isPlatform ? (
                 <ShieldCheck className="h-5 w-5 text-white" />
               ) : (
                 <PlaneTakeoff className="h-5 w-5 text-white stroke-[2]" />
@@ -53,10 +53,10 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
             {!collapsed && (
               <div className="flex flex-col">
                 <span className="text-lg font-black tracking-tight text-white">
-                  Trip<span className={isPlatformOwner ? "text-purple-400" : "text-indigo-400"}>Desk</span>
+                  Trip<span className={isPlatform ? "text-purple-400" : "text-indigo-400"}>Desk</span>
                 </span>
                 <span className="text-[9px] uppercase font-bold tracking-widest text-slate-400">
-                  {isPlatformOwner ? "SaaS Platform" : "Agency Suite"}
+                  {isPlatform ? "SaaS Platform" : "Agency Suite"}
                 </span>
               </div>
             )}
@@ -96,7 +96,7 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                             className={cn(
                               "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group relative",
                               isActive
-                                ? isPlatformOwner
+                                ? isPlatform
                                   ? "bg-purple-600/15 text-white font-semibold"
                                   : "bg-indigo-600/10 text-white font-semibold"
                                 : "text-slate-400 hover:text-white hover:bg-sidebar-accent/50"
@@ -106,7 +106,7 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                             {isActive && (
                               <span
                                 className={`absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md ${
-                                  isPlatformOwner ? "bg-purple-500" : "bg-indigo-500"
+                                  isPlatform ? "bg-purple-500" : "bg-indigo-500"
                                 }`}
                               />
                             )}
@@ -115,7 +115,7 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                               className={cn(
                                 "h-5 w-5 shrink-0 transition-colors",
                                 isActive
-                                  ? isPlatformOwner
+                                  ? isPlatform
                                     ? "text-purple-400"
                                     : "text-indigo-400"
                                   : "text-slate-400 group-hover:text-white"

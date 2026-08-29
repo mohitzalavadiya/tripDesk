@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { User, Settings, HelpCircle, LogOut, CreditCard, ShieldCheck, RefreshCw, Building } from "lucide-react";
+import { Settings, LogOut, CreditCard, Building } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import {
   DropdownMenu,
@@ -14,12 +14,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { toast } from "sonner";
 
 export function UserMenu() {
   const router = useRouter();
-  const { currentUser, currentAgency, switchRole, logout } = useAuth();
-  const isPlatformOwner = currentUser.role === "TRIPDESK_OWNER";
+  const { currentUser, currentAgency, isPlatformOwner, logout } = useAuth();
+
+  const displayName = currentUser.name || "TripDesk User";
+  const initials = isPlatformOwner
+    ? "AD"
+    : displayName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || "TD";
 
   return (
     <DropdownMenu>
@@ -32,7 +40,7 @@ export function UserMenu() {
                   isPlatformOwner ? "bg-purple-600" : "bg-indigo-600"
                 }`}
               >
-                {isPlatformOwner ? "AD" : currentUser.name.slice(0, 2).toUpperCase()}
+                {initials}
               </AvatarFallback>
             </Avatar>
           </button>
@@ -45,9 +53,11 @@ export function UserMenu() {
       >
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-3 py-2 flex flex-col">
-            <span className="font-bold text-sm text-foreground">{currentUser.name}</span>
+            <span className="font-bold text-sm text-foreground">{displayName}</span>
             <span className="text-[11px] text-muted-foreground font-normal">
-              {isPlatformOwner ? "TripDesk Platform Owner" : `${currentAgency.name} (Agency Owner)`}
+              {isPlatformOwner
+                ? "TripDesk Platform Owner"
+                : `${currentAgency.name || "Agency"} (Agency Owner)`}
             </span>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
@@ -91,21 +101,6 @@ export function UserMenu() {
             </DropdownMenuItem>
           </>
         )}
-
-        <DropdownMenuSeparator className="my-1 border-t border-slate-100" />
-
-        {/* Quick Role Switcher */}
-        <DropdownMenuItem
-          onClick={() =>
-            switchRole(isPlatformOwner ? "AGENCY_OWNER" : "TRIPDESK_OWNER")
-          }
-          className="hover:bg-indigo-50 text-indigo-700 cursor-pointer text-xs font-medium"
-        >
-          <RefreshCw className="mr-2 h-4 w-4 text-indigo-600" />
-          <span>
-            Switch to {isPlatformOwner ? "Agency Owner" : "TripDesk Admin"}
-          </span>
-        </DropdownMenuItem>
 
         <DropdownMenuSeparator className="my-1 border-t border-slate-100" />
 

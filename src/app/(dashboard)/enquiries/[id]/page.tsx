@@ -102,6 +102,10 @@ export default function EnquiryDetailPage() {
   const [tripNotes, setTripNotes] = React.useState("");
   const [converting, setConverting] = React.useState(false);
 
+  // Archive Enquiry Modal State
+  const [isArchiveOpen, setIsArchiveOpen] = React.useState(false);
+  const [archiving, setArchiving] = React.useState(false);
+
   // Internal Notes Editing
   const [internalNotes, setInternalNotes] = React.useState("");
   const [savingNotes, setSavingNotes] = React.useState(false);
@@ -291,16 +295,17 @@ export default function EnquiryDetailPage() {
     }
 
     if (!enquiry) return;
-    if (!confirm(`Archive enquiry ${enquiry.enquiryNumber}? Converted trips will remain intact.`)) {
-      return;
-    }
 
     try {
+      setArchiving(true);
       await enquiryClient.archiveEnquiry(id);
       toast.success(`Enquiry ${enquiry.enquiryNumber} archived.`);
+      setIsArchiveOpen(false);
       router.push("/enquiries");
     } catch (err: any) {
       toast.error(err?.message || "Failed to archive enquiry.");
+    } finally {
+      setArchiving(false);
     }
   };
 
@@ -456,7 +461,7 @@ export default function EnquiryDetailPage() {
               <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 rounded-xl p-1 text-xs">
                 <DropdownMenuGroup>
                   <DropdownMenuItem
-                    onClick={handleArchiveEnquiry}
+                    onClick={() => setIsArchiveOpen(true)}
                     disabled={isReadOnly}
                     className="text-rose-600 hover:bg-rose-50 cursor-pointer"
                   >
@@ -924,6 +929,40 @@ export default function EnquiryDetailPage() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* ─── ARCHIVE ENQUIRY CONFIRMATION MODAL ─── */}
+        <Dialog open={isArchiveOpen} onOpenChange={setIsArchiveOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-6 shadow-xl">
+            <DialogHeader>
+              <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-rose-600" />
+                <span>Archive Enquiry</span>
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 text-xs mt-1">
+                Are you sure you want to archive enquiry <strong>{enquiry.enquiryNumber}</strong> ({enquiry.title || enquiry.destination})? Converted trips and historical customer records will remain intact.
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogClose
+                render={
+                  <Button type="button" variant="outline" size="sm" disabled={archiving} className="bg-white border-slate-200 text-xs font-semibold rounded-xl cursor-pointer">
+                    Cancel
+                  </Button>
+                }
+              />
+              <Button
+                type="button"
+                disabled={archiving || isReadOnly}
+                onClick={handleArchiveEnquiry}
+                size="sm"
+                className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-4 rounded-xl cursor-pointer disabled:opacity-50"
+              >
+                {archiving ? "Archiving..." : "Confirm Archive"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

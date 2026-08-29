@@ -27,12 +27,12 @@ interface MobileNavProps {
 export function MobileNav({ open, setOpen }: MobileNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser } = useAuth();
-  const isPlatformOwner = currentUser.role === "TRIPDESK_OWNER";
-  const navSections = isPlatformOwner ? adminNavigationConfig : agencyNavigationConfig;
+  const { currentUser, isPlatformOwner } = useAuth();
+  const isPlatform = isPlatformOwner || pathname.startsWith("/admin");
+  const navSections = isPlatform ? adminNavigationConfig : agencyNavigationConfig;
 
   // Bottom navigation items for mobile
-  const bottomNavItems = isPlatformOwner
+  const bottomNavItems = isPlatform
     ? [
         { label: "Admin", href: "/admin", icon: Home },
         { label: "Agencies", href: "/admin/agencies", icon: Building },
@@ -68,23 +68,23 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
             {/* Header branding & close button */}
             <div className="flex items-center justify-between pb-4 border-b border-sidebar-border/30 mb-4">
               <Link
-                href={isPlatformOwner ? "/admin" : "/dashboard"}
+                href={isPlatform ? "/admin" : "/dashboard"}
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-2 font-bold tracking-tight text-white"
               >
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded ${
-                    isPlatformOwner ? "bg-purple-600" : "bg-indigo-600"
+                    isPlatform ? "bg-purple-600" : "bg-indigo-600"
                   }`}
                 >
-                  {isPlatformOwner ? (
+                  {isPlatform ? (
                     <ShieldCheck className="h-4.5 w-4.5 text-white" />
                   ) : (
                     <PlaneTakeoff className="h-4.5 w-4.5 text-white" />
                   )}
                 </div>
                 <span className="text-base font-black">
-                  Trip<span className={isPlatformOwner ? "text-purple-400" : "text-indigo-400"}>Desk</span>
+                  Trip<span className={isPlatform ? "text-purple-400" : "text-indigo-400"}>Desk</span>
                 </span>
               </Link>
 
@@ -119,7 +119,7 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                           className={cn(
                             "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group",
                             isActive
-                              ? isPlatformOwner
+                              ? isPlatform
                                 ? "bg-purple-600/20 text-white font-semibold"
                                 : "bg-indigo-600/20 text-white font-semibold"
                               : "text-slate-400 hover:text-white hover:bg-sidebar-accent/50"
@@ -129,7 +129,7 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                             className={cn(
                               "h-4 w-4 shrink-0 transition-colors",
                               isActive
-                                ? isPlatformOwner
+                                ? isPlatform
                                   ? "text-purple-400"
                                   : "text-indigo-400"
                                 : "text-slate-400 group-hover:text-white"

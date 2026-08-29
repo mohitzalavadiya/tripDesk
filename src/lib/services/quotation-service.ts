@@ -2195,7 +2195,6 @@ export const quotationService = {
       validUntil: quotation.validUntil,
       isExpired,
       subtotal: Number(quotation.subtotal),
-      markupAmount: Number(quotation.markupAmount),
       discountAmount: Number(quotation.discountAmount),
       taxAmount: Number(quotation.taxAmount),
       finalAmount: Number(quotation.finalAmount),

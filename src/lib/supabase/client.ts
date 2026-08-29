@@ -1,5 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
-import { normalizeSupabaseUrl } from "./server";
+import { normalizeSupabaseUrl } from "./normalize";
 
 export function createClient() {
   const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;

@@ -260,6 +260,7 @@ export default function EnquiriesPage() {
                 { label: "Negotiation", value: EnquiryStatus.NEGOTIATION },
                 { label: "Converted", value: EnquiryStatus.CONVERTED },
                 { label: "Lost", value: EnquiryStatus.LOST },
+                { label: "Cancelled", value: EnquiryStatus.CANCELLED },
               ].map((tab) => (
                 <button
                   key={tab.value}

@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
-import { normalizeSupabaseUrl } from "./server";
+import { normalizeSupabaseUrl } from "./normalize";
 
 /**
  * Server-only Supabase Admin client initialized with the SUPABASE_SERVICE_ROLE_KEY.

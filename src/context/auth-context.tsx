@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
-export type PlatformRole = "TRIPDESK_OWNER" | "AGENCY_OWNER";
+export type PlatformRole = "PLATFORM_OWNER" | "AGENCY_OWNER" | "TRIPDESK_OWNER";
 
 export interface UserProfile {
   id: string;
@@ -19,216 +20,164 @@ export interface UserProfile {
 export interface AgencyAccount {
   id: string;
   name: string;
-  slug: string;
-  ownerName: string;
-  email: string;
-  phone: string;
-  city: string;
-  plan: "Starter" | "Professional" | "Growth" | "Enterprise";
-  planStatus: "Active" | "Trial" | "Suspended";
-  billingCycle: "Yearly" | "Monthly";
-  annualFee: number;
-  monthlyFee: number;
-  tripsThisMonth: number;
-  activeCustomers: number;
-  renewalDate: string;
-  joinedDate: string;
+  slug?: string;
+  ownerName?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  plan?: string;
+  planStatus?: string;
+  billingCycle?: string;
+  annualFee?: number;
+  monthlyFee?: number;
+  tripsThisMonth?: number;
+  activeCustomers?: number;
+  renewalDate?: string;
+  joinedDate?: string;
   logo?: string;
 }
 
-// Initial Mock Platform Agencies
-const initialAgencies: AgencyAccount[] = [
-  {
-    id: "agency-1",
-    name: "ABC Travels",
-    slug: "abc-travels",
-    ownerName: "Mohit Patel",
-    email: "mohit@abctravels.com",
-    phone: "+91 98470 12345",
-    city: "Kochi, Kerala",
-    plan: "Professional",
-    planStatus: "Active",
-    billingCycle: "Yearly",
-    annualFee: 49999,
-    monthlyFee: 4999,
-    tripsThisMonth: 18,
-    activeCustomers: 48,
-    renewalDate: "2027-08-22",
-    joinedDate: "2025-08-22",
-  },
-  {
-    id: "agency-2",
-    name: "Wanderlust India Holidays",
-    slug: "wanderlust-india",
-    ownerName: "Priya Shah",
-    email: "priya@wanderlust.in",
-    phone: "+91 98250 99887",
-    city: "Mumbai, Maharashtra",
-    plan: "Growth",
-    planStatus: "Active",
-    billingCycle: "Yearly",
-    annualFee: 99999,
-    monthlyFee: 9999,
-    tripsThisMonth: 34,
-    activeCustomers: 120,
-    renewalDate: "2027-06-15",
-    joinedDate: "2025-06-15",
-  },
-  {
-    id: "agency-3",
-    name: "Royal Rajasthan Tours",
-    slug: "royal-rajasthan",
-    ownerName: "Vikram Singh",
-    email: "vikram@royalrajasthan.com",
-    phone: "+91 94140 55667",
-    city: "Jaipur, Rajasthan",
-    plan: "Professional",
-    planStatus: "Active",
-    billingCycle: "Monthly",
-    annualFee: 59988,
-    monthlyFee: 4999,
-    tripsThisMonth: 22,
-    activeCustomers: 76,
-    renewalDate: "2026-09-10",
-    joinedDate: "2025-11-10",
-  },
-  {
-    id: "agency-4",
-    name: "Kerala Backwaters & Hills",
-    slug: "kerala-backwaters",
-    ownerName: "Kishan Kumar",
-    email: "kishan@keralatravel.com",
-    phone: "+91 97440 22334",
-    city: "Alleppey, Kerala",
-    plan: "Starter",
-    planStatus: "Trial",
-    billingCycle: "Monthly",
-    annualFee: 23988,
-    monthlyFee: 1999,
-    tripsThisMonth: 7,
-    activeCustomers: 19,
-    renewalDate: "2026-09-05",
-    joinedDate: "2026-08-15",
-  },
-  {
-    id: "agency-5",
-    name: "Goa Coastal Escapes",
-    slug: "goa-coastal",
-    ownerName: "Suresh Lobo",
-    email: "suresh@goaescapes.com",
-    phone: "+91 98221 44556",
-    city: "Panaji, Goa",
-    plan: "Starter",
-    planStatus: "Suspended",
-    billingCycle: "Monthly",
-    annualFee: 23988,
-    monthlyFee: 1999,
-    tripsThisMonth: 0,
-    activeCustomers: 12,
-    renewalDate: "2026-08-01",
-    joinedDate: "2026-02-01",
-  },
-];
+export interface SubscriptionAccessInfo {
+  status: string;
+  hasFullAccess: boolean;
+  isReadOnly: boolean;
+  canRead: boolean;
+  canWrite: boolean;
+  trialDaysRemaining: number;
+  planName?: string;
+}
 
 interface AuthContextType {
   currentUser: UserProfile;
   currentAgency: AgencyAccount;
   agencies: AgencyAccount[];
-  switchRole: (role: PlatformRole) => void;
+  subscriptionAccess: SubscriptionAccessInfo | null;
+  isLoading: boolean;
+  isPlatformOwner: boolean;
+  isAgencyOwner: boolean;
   updateAgencyStatus: (
     agencyId: string,
-    status: AgencyAccount["planStatus"]
+    status: "Active" | "Trial" | "Suspended"
   ) => void;
-  registerAgency: (data: Omit<AgencyAccount, "id" | "joinedDate" | "tripsThisMonth" | "activeCustomers">) => AgencyAccount;
-  login: (role: PlatformRole) => void;
-  logout: () => void;
+  registerAgency: (data: Partial<AgencyAccount>) => AgencyAccount;
+  logout: () => Promise<void>;
+  refreshAuth: () => Promise<void>;
 }
+
+const defaultUser: UserProfile = {
+  id: "",
+  name: "Loading...",
+  email: "",
+  role: "AGENCY_OWNER",
+  agencyId: null,
+};
+
+const defaultAgency: AgencyAccount = {
+  id: "",
+  name: "TripDesk Workspace",
+  email: "",
+  phone: "",
+  city: "",
+  plan: "Starter",
+  planStatus: "Active",
+  billingCycle: "Monthly",
+  annualFee: 0,
+  monthlyFee: 0,
+  tripsThisMonth: 0,
+  activeCustomers: 0,
+  renewalDate: "",
+  joinedDate: "",
+};
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
 
-  const [agencies, setAgencies] = React.useState<AgencyAccount[]>(initialAgencies);
-  const [activeAgencyId, setActiveAgencyId] = React.useState<string>("agency-1");
+  const [currentUser, setCurrentUser] = React.useState<UserProfile>(defaultUser);
+  const [currentAgency, setCurrentAgency] = React.useState<AgencyAccount>(defaultAgency);
+  const [agencies, setAgencies] = React.useState<AgencyAccount[]>([]);
+  const [subscriptionAccess, setSubscriptionAccess] =
+    React.useState<SubscriptionAccessInfo | null>(null);
+  const [isLoading, setIsLoading] = React.useState<boolean>(true);
 
-  const [currentUser, setCurrentUser] = React.useState<UserProfile>({
-    id: "user-1",
-    name: "Mohit Patel",
-    email: "mohit@abctravels.com",
-    role: "AGENCY_OWNER",
-    agencyId: "agency-1",
-    agencyName: "ABC Travels",
-  });
-
-  const currentAgency = React.useMemo(() => {
-    return (
-      agencies.find((a) => a.id === currentUser.agencyId) ||
-      agencies[0] || {
-        id: "agency-1",
-        name: "ABC Travels",
-        slug: "abc-travels",
-        ownerName: "Mohit Patel",
-        email: "mohit@abctravels.com",
-        phone: "+91 98470 12345",
-        city: "Kochi, Kerala",
-        plan: "Professional",
-        planStatus: "Active",
-        billingCycle: "Yearly",
-        annualFee: 49999,
-        monthlyFee: 4999,
-        tripsThisMonth: 18,
-        activeCustomers: 48,
-        renewalDate: "2027-08-22",
-        joinedDate: "2025-08-22",
-      }
-    );
-  }, [agencies, currentUser.agencyId]);
-
-  // Sync role based on path if navigating directly to /admin or /dashboard
-  React.useEffect(() => {
-    if (pathname.startsWith("/admin") && currentUser.role !== "TRIPDESK_OWNER") {
-      setCurrentUser({
-        id: "admin-1",
-        name: "TripDesk Administrator",
-        email: "admin@tripdesk.in",
-        role: "TRIPDESK_OWNER",
-        agencyId: null,
+  const fetchSession = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/me", {
+        cache: "no-store",
       });
-    }
-  }, [pathname, currentUser.role]);
 
-  const switchRole = React.useCallback(
-    (newRole: PlatformRole) => {
-      if (newRole === "TRIPDESK_OWNER") {
-        setCurrentUser({
-          id: "admin-1",
-          name: "TripDesk Administrator",
-          email: "admin@tripdesk.in",
-          role: "TRIPDESK_OWNER",
-          agencyId: null,
-        });
-        toast.info("Switched to TripDesk Platform Owner role");
-        router.push("/admin");
-      } else {
-        setCurrentUser({
-          id: "user-1",
-          name: "Mohit Patel",
-          email: "mohit@abctravels.com",
-          role: "AGENCY_OWNER",
-          agencyId: "agency-1",
-          agencyName: "ABC Travels",
-        });
-        toast.info("Switched to Agency Owner role (ABC Travels)");
-        router.push("/dashboard");
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          const u = json.data.user;
+          const a = json.data.agency;
+          const role = u.role as PlatformRole;
+
+          setCurrentUser({
+            id: u.id,
+            name: u.name || "TripDesk User",
+            email: u.email || "",
+            role: role,
+            agencyId: u.agencyId || null,
+            agencyName: a?.name,
+          });
+
+          if (a) {
+            const agencyObj: AgencyAccount = {
+              id: a.id,
+              name: a.name,
+              email: a.email || "",
+              phone: a.phone || "",
+              city: a.address || "",
+              plan: json.data.subscriptionAccess?.planName || "Starter",
+              planStatus: json.data.subscriptionAccess?.status || "Active",
+              billingCycle: "Monthly",
+              annualFee: 0,
+              monthlyFee: 0,
+              tripsThisMonth: 0,
+              activeCustomers: 0,
+              renewalDate: "",
+              joinedDate: "",
+            };
+            setCurrentAgency(agencyObj);
+            setAgencies([agencyObj]);
+          }
+
+          setSubscriptionAccess(json.data.subscriptionAccess || null);
+        }
       }
-    },
-    [router]
-  );
+    } catch (err) {
+      console.error("Failed to fetch authoritative session:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchSession();
+
+    const supabase = createClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        setCurrentUser(defaultUser);
+        setCurrentAgency(defaultAgency);
+        setSubscriptionAccess(null);
+        setIsLoading(false);
+      } else if (event === "SIGNED_IN") {
+        fetchSession();
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchSession]);
 
   const updateAgencyStatus = React.useCallback(
-    (agencyId: string, status: AgencyAccount["planStatus"]) => {
+    (agencyId: string, status: "Active" | "Trial" | "Suspended") => {
       setAgencies((prev) =>
         prev.map((a) => (a.id === agencyId ? { ...a, planStatus: status } : a))
       );
@@ -238,12 +187,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const registerAgency = React.useCallback(
-    (data: Omit<AgencyAccount, "id" | "joinedDate" | "tripsThisMonth" | "activeCustomers">) => {
+    (data: Partial<AgencyAccount>) => {
       const newAgency: AgencyAccount = {
-        ...data,
         id: `agency-${Date.now()}`,
+        name: data.name || "New Agency",
+        email: data.email || "",
+        phone: data.phone || "",
+        city: data.city || "",
+        plan: data.plan || "Starter",
+        planStatus: data.planStatus || "Trial",
+        billingCycle: data.billingCycle || "Monthly",
+        annualFee: data.annualFee || 0,
+        monthlyFee: data.monthlyFee || 0,
         tripsThisMonth: 0,
         activeCustomers: 0,
+        renewalDate: new Date().toISOString().split("T")[0],
         joinedDate: new Date().toISOString().split("T")[0],
       };
       setAgencies((prev) => [newAgency, ...prev]);
@@ -253,17 +211,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const login = React.useCallback(
-    (role: PlatformRole) => {
-      switchRole(role);
-    },
-    [switchRole]
-  );
+  const logout = React.useCallback(async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    } catch (err) {
+      console.error("Error signing out:", err);
+    } finally {
+      setCurrentUser(defaultUser);
+      setCurrentAgency(defaultAgency);
+      setSubscriptionAccess(null);
+      toast.success("Signed out successfully.");
+      // Full page redirect to purge Next.js client router cache
+      window.location.href = "/login";
+    }
+  }, []);
 
-  const logout = React.useCallback(() => {
-    toast("Logged out of session.");
-    router.push("/dashboard");
-  }, [router]);
+  const isPlatformOwner =
+    currentUser.role === "PLATFORM_OWNER" || currentUser.role === "TRIPDESK_OWNER";
+  const isAgencyOwner = currentUser.role === "AGENCY_OWNER" && !isPlatformOwner;
 
   return (
     <AuthContext.Provider
@@ -271,11 +238,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         currentUser,
         currentAgency,
         agencies,
-        switchRole,
+        subscriptionAccess,
+        isLoading,
+        isPlatformOwner,
+        isAgencyOwner,
         updateAgencyStatus,
         registerAgency,
-        login,
         logout,
+        refreshAuth: fetchSession,
       }}
     >
       {children}

@@ -921,4 +921,39 @@ export const operationsService = {
       checks,
     };
   },
+
+  createOperation(
+    agencyId: string,
+    input: CreateTripOperationInput,
+    userId?: string
+  ) {
+    return this.initializeOperation(agencyId, input, userId);
+  },
+
+  upsertHotelConfirmation(
+    agencyId: string,
+    tripOperationId: string,
+    input: CreateHotelConfirmationInput,
+    userId?: string
+  ) {
+    return this.createHotelConfirmation(agencyId, tripOperationId, input, userId);
+  },
+
+  upsertVehicleDispatch(
+    agencyId: string,
+    tripOperationId: string,
+    input: CreateVehicleDispatchInput,
+    userId?: string
+  ) {
+    return this.createVehicleDispatch(agencyId, tripOperationId, input, userId);
+  },
+
+  upsertActivityConfirmation(
+    agencyId: string,
+    tripOperationId: string,
+    input: CreateActivityConfirmationInput,
+    userId?: string
+  ) {
+    return this.createActivityConfirmation(agencyId, tripOperationId, input, userId);
+  },
 };

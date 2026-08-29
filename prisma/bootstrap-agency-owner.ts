@@ -26,8 +26,7 @@ export async function bootstrapAgencyOwner(options?: {
   const email = (
     options?.email ||
     process.env.AGENCY_OWNER_EMAIL ||
-    process.env.BOOTSTRAP_OWNER_EMAIL ||
-    "mzpatel14@gmail.com"
+    "agency.owner@tripdesk.io"
   )
     .trim()
     .toLowerCase();
@@ -35,7 +34,6 @@ export async function bootstrapAgencyOwner(options?: {
   const password =
     options?.password ||
     process.env.AGENCY_OWNER_PASSWORD ||
-    process.env.BOOTSTRAP_OWNER_PASSWORD ||
     "ChangeMeTripDesk2026!";
 
   const name = options?.name || process.env.AGENCY_OWNER_NAME || "TripDesk Agency Owner";
@@ -43,6 +41,19 @@ export async function bootstrapAgencyOwner(options?: {
   const phone = options?.phone || "+91 98765 43210";
 
   console.log(`🔐 Bootstrapping Agency Owner for target email: ${email}`);
+
+  // 0. Safety check: Refuse to touch or downgrade any existing PLATFORM_OWNER
+  const existingPlatformUser = await prisma.user.findFirst({
+    where: {
+      email,
+    },
+  });
+
+  if (existingPlatformUser && existingPlatformUser.role === UserRole.PLATFORM_OWNER) {
+    throw new Error(
+      `[SAFETY REJECTION] Cannot bootstrap Agency Owner: user "${existingPlatformUser.email}" (ID: ${existingPlatformUser.id}) is already configured as PLATFORM_OWNER. Refusing to downgrade role to AGENCY_OWNER.`
+    );
+  }
 
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error("❌ Missing Supabase URL or Service Role Key in environment.");
@@ -204,7 +215,23 @@ export async function bootstrapAgencyOwner(options?: {
     await prisma.user.delete({ where: { id: existingTypoPrismaUser.id } });
   }
 
-  // 6. Upsert Prisma User with AGENCY_OWNER role and corrected email
+  // 6. Safety check before upsert: Refuse to downgrade any existing PLATFORM_OWNER
+  const existingUserByIdOrEmail = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { id: supabaseUserId },
+        { email },
+      ],
+    },
+  });
+
+  if (existingUserByIdOrEmail && existingUserByIdOrEmail.role === UserRole.PLATFORM_OWNER) {
+    throw new Error(
+      `[SAFETY REJECTION] Cannot bootstrap Agency Owner: user "${existingUserByIdOrEmail.email}" (ID: ${existingUserByIdOrEmail.id}) is already configured as PLATFORM_OWNER. Refusing to downgrade role to AGENCY_OWNER.`
+    );
+  }
+
+  // Upsert Prisma User with AGENCY_OWNER role and corrected email
   const dbUser = await prisma.user.upsert({
     where: { id: supabaseUserId },
     update: {
