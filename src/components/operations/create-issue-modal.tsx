@@ -3,8 +3,8 @@
 import * as React from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { TripOperation, TripIssue } from "@/types";
-import { useOperations } from "@/context/operations-context";
+import { IssuePriority } from "@prisma/client";
+import { operationsClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,63 +16,85 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { X, AlertCircle } from "lucide-react";
+import { X, AlertCircle, Loader2 } from "lucide-react";
 
 interface CreateIssueModalProps {
-  operation?: TripOperation | null;
+  operationId?: string;
+  operationList?: Array<{
+    id: string;
+    title: string;
+    bookingNumber?: string | null;
+    customerName?: string;
+  }>;
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 const issueSchema = Yup.object({
-  type: Yup.string().required("Type is required"),
+  title: Yup.string().required("Issue title is required"),
+  description: Yup.string().required("Issue description is required"),
   priority: Yup.string().required("Priority is required"),
-  title: Yup.string().required("Title is required"),
-  description: Yup.string().required("Description is required"),
   assignedTo: Yup.string().optional(),
+  reportedBy: Yup.string().optional(),
 });
 
 export function CreateIssueModal({
-  operation,
+  operationId,
+  operationList = [],
   isOpen,
   onClose,
+  onSuccess,
 }: CreateIssueModalProps) {
-  const { createIssue, operations } = useOperations();
-  const [selectedTripId, setSelectedTripId] = React.useState<string>(
-    operation?.tripId || operations[0]?.tripId || ""
+  const [loading, setLoading] = React.useState(false);
+  const [selectedOpId, setSelectedOpId] = React.useState<string>(
+    operationId || operationList[0]?.id || ""
   );
 
-  const currentOp = operation || operations.find((o) => o.tripId === selectedTripId);
+  React.useEffect(() => {
+    if (operationId) {
+      setSelectedOpId(operationId);
+    } else if (operationList.length > 0 && !selectedOpId) {
+      setSelectedOpId(operationList[0].id);
+    }
+  }, [operationId, operationList]);
 
   const formik = useFormik({
     initialValues: {
-      type: "Hotel" as TripIssue["type"],
-      priority: "High" as TripIssue["priority"],
+      priority: IssuePriority.HIGH,
       title: "",
       description: "",
-      assignedTo: "Kishan (Support Desk)",
+      assignedTo: "",
+      reportedBy: "Operations Desk",
     },
     validationSchema: issueSchema,
     enableReinitialize: true,
-    onSubmit: (values) => {
-      if (!currentOp) return;
+    onSubmit: async (values) => {
+      const targetId = operationId || selectedOpId;
+      if (!targetId) {
+        toast.error("Please select an operation for this issue.");
+        return;
+      }
 
-      createIssue({
-        tripId: currentOp.tripId,
-        bookingId: currentOp.bookingId,
-        customerId: currentOp.customerSnapshot.id,
-        customerName: currentOp.customerSnapshot.name,
-        type: values.type,
-        priority: values.priority,
-        title: values.title.trim(),
-        description: values.description.trim(),
-        status: "Open",
-        assignedTo: values.assignedTo.trim() || undefined,
-      });
+      try {
+        setLoading(true);
+        await operationsClient.createIssue(targetId, {
+          title: values.title.trim(),
+          description: values.description.trim(),
+          priority: values.priority as IssuePriority,
+          assignedTo: values.assignedTo?.trim() || undefined,
+          reportedBy: values.reportedBy?.trim() || undefined,
+        });
 
-      toast.success(`Operational Issue "${values.title}" logged successfully!`);
-      formik.resetForm();
-      onClose();
+        toast.success(`Operational issue "${values.title}" logged successfully!`);
+        formik.resetForm();
+        if (onSuccess) onSuccess();
+        onClose();
+      } catch (err: any) {
+        toast.error(err.message || "Failed to create issue. Please try again.");
+      } finally {
+        setLoading(false);
+      }
     },
   });
 
@@ -89,8 +111,8 @@ export function CreateIssueModal({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">Log Operational Issue</h3>
-              <p className="text-xs text-slate-500 font-mono">
-                {currentOp ? `${currentOp.title} (${currentOp.bookingNumber})` : "Select Active Trip"}
+              <p className="text-xs text-slate-500 font-medium">
+                Record blockers, guest complaints, or delays
               </p>
             </div>
           </div>
@@ -103,18 +125,24 @@ export function CreateIssueModal({
           </button>
         </div>
 
-        {/* Trip Selector if not pre-selected */}
-        {!operation && (
+        {/* Operation Selector if opened globally */}
+        {!operationId && operationList.length > 0 && (
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">Select Trip</label>
-            <Select value={selectedTripId} onValueChange={(val) => setSelectedTripId(val || "")}>
+            <label className="text-xs font-bold text-slate-700">Select Trip Operation <span className="text-red-500">*</span></label>
+            <Select value={selectedOpId} onValueChange={(val) => setSelectedOpId(val || "")}>
               <SelectTrigger className="h-9.5 text-xs font-semibold">
-                <SelectValue placeholder="Select Trip" />
+                <SelectValue placeholder="Select Trip Operation">
+                  {(val: string | null) => {
+                    if (!val) return undefined;
+                    const op = operationList.find((item) => item.id === val);
+                    return op ? `${op.title} ${op.bookingNumber ? `• ${op.bookingNumber}` : ""} ${op.customerName ? `(${op.customerName})` : ""}` : val;
+                  }}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="bg-white border-slate-200">
-                {operations.map((op) => (
-                  <SelectItem key={op.tripId} value={op.tripId}>
-                    {op.title} • {op.bookingNumber} ({op.customerSnapshot.name})
+                {operationList.map((op) => (
+                  <SelectItem key={op.id} value={op.id}>
+                    {op.title} {op.bookingNumber ? `• ${op.bookingNumber}` : ""} {op.customerName ? `(${op.customerName})` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -125,84 +153,87 @@ export function CreateIssueModal({
         {/* Form */}
         <form onSubmit={formik.handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* Category Type */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">
-                Issue Category <span className="text-red-500">*</span>
-              </label>
-              <Select
-                value={formik.values.type}
-                onValueChange={(val) => formik.setFieldValue("type", val)}
-              >
-                <SelectTrigger className="h-9.5 text-xs font-medium">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-slate-200">
-                  <SelectItem value="Hotel">Hotel / Resort Room Issue</SelectItem>
-                  <SelectItem value="Transport">Transport / Chauffeur Issue</SelectItem>
-                  <SelectItem value="Activity">Activity / Excursion Issue</SelectItem>
-                  <SelectItem value="Customer">Customer Request / Change</SelectItem>
-                  <SelectItem value="Payment">Payment & Billing</SelectItem>
-                  <SelectItem value="Itinerary">Itinerary Modification</SelectItem>
-                  <SelectItem value="Supplier">DMC / Supplier Delay</SelectItem>
-                  <SelectItem value="Other">Other Operational Issue</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Priority */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">
-                Urgency Priority <span className="text-red-500">*</span>
+                Priority Level <span className="text-red-500">*</span>
               </label>
               <Select
                 value={formik.values.priority}
                 onValueChange={(val) => formik.setFieldValue("priority", val)}
               >
-                <SelectTrigger className="h-9.5 text-xs font-medium">
+                <SelectTrigger className="h-9.5 text-xs font-bold">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-slate-200">
-                  <SelectItem value="Critical">🔴 Critical (Immediate Action Required)</SelectItem>
-                  <SelectItem value="High">🟠 High Priority</SelectItem>
-                  <SelectItem value="Medium">🟡 Medium Priority</SelectItem>
-                  <SelectItem value="Low">⚪ Low Priority</SelectItem>
+                  <SelectItem value={IssuePriority.CRITICAL} className="text-rose-700 font-bold">
+                    🔴 CRITICAL (Immediate Blocker)
+                  </SelectItem>
+                  <SelectItem value={IssuePriority.HIGH} className="text-rose-600 font-bold">
+                    🟠 HIGH (Urgent Resolution)
+                  </SelectItem>
+                  <SelectItem value={IssuePriority.MEDIUM} className="text-amber-600 font-semibold">
+                    🟡 MEDIUM (Normal Attention)
+                  </SelectItem>
+                  <SelectItem value={IssuePriority.LOW} className="text-slate-600 font-medium">
+                    ⚪ LOW (Minor Note)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Assigned To */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">
+                Assigned Team Member
+              </label>
+              <Input
+                placeholder="e.g. Operations Manager"
+                {...formik.getFieldProps("assignedTo")}
+                className="h-9.5 text-xs font-medium"
+              />
+            </div>
           </div>
 
-          {/* Title */}
+          {/* Issue Title */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700">
-              Issue Summary Title <span className="text-red-500">*</span>
+              Issue Summary / Headline <span className="text-red-500">*</span>
             </label>
             <Input
-              placeholder="e.g. Hotel room not ready upon guest check-in"
+              placeholder="e.g. Flight delayed by 2 hours / Hotel room upgrade requested"
               {...formik.getFieldProps("title")}
               className="h-9.5 text-xs font-semibold"
             />
+            {formik.touched.title && formik.errors.title && (
+              <p className="text-[11px] text-red-500">{formik.errors.title}</p>
+            )}
           </div>
 
           {/* Description */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700">
-              Detailed Description <span className="text-red-500">*</span>
+              Detailed Description & Action Plan <span className="text-red-500">*</span>
             </label>
             <Textarea
               rows={3}
-              placeholder="Provide exact details, room number, guest complaint, or supplier remarks..."
+              placeholder="Describe the operational issue, impact on guests, and actions being taken..."
               {...formik.getFieldProps("description")}
-              className="text-xs min-h-[70px]"
+              className="text-xs min-h-[80px]"
             />
+            {formik.touched.description && formik.errors.description && (
+              <p className="text-[11px] text-red-500">{formik.errors.description}</p>
+            )}
           </div>
 
-          {/* Assigned Support Desk */}
+          {/* Reported By */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">Resolution Desk / Department</label>
+            <label className="text-xs font-bold text-slate-700">
+              Reported By
+            </label>
             <Input
-              placeholder="e.g. Operations Support Desk"
-              {...formik.getFieldProps("assignedTo")}
+              placeholder="e.g. Chauffeur / Guest WhatsApp / Front Desk"
+              {...formik.getFieldProps("reportedBy")}
               className="h-9.5 text-xs font-medium"
             />
           </div>
@@ -213,15 +244,24 @@ export function CreateIssueModal({
               type="button"
               variant="outline"
               onClick={onClose}
+              disabled={loading}
               className="text-xs font-semibold h-9 px-4 cursor-pointer"
             >
               Cancel
             </Button>
             <Button
               type="submit"
+              disabled={loading}
               className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold h-9 px-5 cursor-pointer shadow-xs"
             >
-              Log Issue
+              {loading ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Create Issue Ticket"
+              )}
             </Button>
           </div>
         </form>

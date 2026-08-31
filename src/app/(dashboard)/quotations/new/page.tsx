@@ -121,7 +121,13 @@ export default function NewQuotationPage() {
                   ) : (
                     <Select value={selectedTripId} onValueChange={(val) => val && setSelectedTripId(val)}>
                       <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
-                        <SelectValue placeholder="Choose a trip..." />
+                        <SelectValue placeholder="Choose a trip...">
+                          {(val: string | null) => {
+                            if (!val) return undefined;
+                            const t = trips.find((item) => item.id === val);
+                            return t ? `${t.tripNumber} — ${t.title} (${t.customer?.name || "Customer"})` : val;
+                          }}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
                         {trips.map((t) => (

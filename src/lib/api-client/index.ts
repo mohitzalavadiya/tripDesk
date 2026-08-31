@@ -16,3 +16,6 @@ export * from "./supplier-client";
 export * from "./rate-sheet-client";
 export * from "./dashboard-client";
 export * from "./public-client";
+export * from "./operations-client";
+export * from "./finance-client";
+export * from "./customer-portal-client";

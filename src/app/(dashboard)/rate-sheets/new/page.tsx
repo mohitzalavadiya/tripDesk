@@ -295,7 +295,13 @@ function NewRateSheetForm() {
                     <label className="font-bold text-slate-700">Hotel Property *</label>
                     <Select value={hotelId} onValueChange={(val) => val && setHotelId(val)}>
                       <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
-                        <SelectValue placeholder="Select hotel" />
+                        <SelectValue placeholder="Select hotel">
+                        {(val: string | null) => {
+                          if (!val) return undefined;
+                          const h = hotels.find((item) => item.id === val);
+                          return h ? `${h.name} ${h.city ? `(${h.city})` : ""}` : val;
+                        }}
+                      </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
                         {hotels.map((h) => (
@@ -384,7 +390,13 @@ function NewRateSheetForm() {
                     <label className="font-bold text-slate-700">Vehicle Model *</label>
                     <Select value={vehicleId} onValueChange={(val) => val && setVehicleId(val)}>
                       <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
-                        <SelectValue placeholder="Select vehicle" />
+                        <SelectValue placeholder="Select vehicle">
+                        {(val: string | null) => {
+                          if (!val) return undefined;
+                          const v = vehicles.find((item) => item.id === val);
+                          return v ? `${v.name} (${v.type} - ${v.capacity} seats)` : val;
+                        }}
+                      </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
                         {vehicles.map((v) => (
@@ -524,7 +536,13 @@ function NewRateSheetForm() {
                   <label className="font-bold text-slate-700">Activity / Tour *</label>
                   <Select value={activityId} onValueChange={(val) => val && setActivityId(val)}>
                     <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
-                      <SelectValue placeholder="Select activity" />
+                      <SelectValue placeholder="Select activity">
+                      {(val: string | null) => {
+                        if (!val) return undefined;
+                        const a = activities.find((item) => item.id === val);
+                        return a ? `${a.name} ${a.location ? `(${a.location})` : ""}` : val;
+                      }}
+                    </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200">
                       {activities.map((a) => (
@@ -597,7 +615,13 @@ function NewRateSheetForm() {
                   <label className="font-bold text-slate-700">Supplier / Vendor Partner</label>
                   <Select value={supplierId || "DIRECT"} onValueChange={(val) => setSupplierId(val === "DIRECT" ? "" : (val || ""))}>
                     <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
-                      <SelectValue placeholder="Direct / In-house" />
+                      <SelectValue placeholder="Direct / In-house">
+                      {(val: string | null) => {
+                        if (!val || val === "DIRECT") return "Direct / In-house";
+                        const s = suppliers.find((item) => item.id === val);
+                        return s ? `${s.name} ${s.supplierCode ? `(${s.supplierCode})` : ""}` : val;
+                      }}
+                    </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200">
                       <SelectItem value="DIRECT">Direct / In-house</SelectItem>

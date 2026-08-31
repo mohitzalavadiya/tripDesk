@@ -31,7 +31,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const pdfBuffer = await quotationPdfService.generateQuotationPdf({
       quotationNumber: quotation.quotationNumber,
       version: quotation.version,
-      title: quotation.title,
+      title: quotation.title || `Proposal for ${quotation.trip.title}`,
       proposalSubtitle: quotation.proposalSubtitle,
       currency: quotation.currency,
       finalAmount: quotation.finalAmount,
@@ -45,7 +45,43 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       terms: quotation.terms,
       agency: quotation.agency,
       customer: quotation.customer,
-      trip: quotation.trip,
+      trip: {
+        title: quotation.trip.title,
+        tripNumber: quotation.trip.tripNumber,
+        startDate: quotation.trip.startDate,
+        endDate: quotation.trip.endDate,
+        travelers: quotation.trip.travelers,
+        itineraryItems: quotation.trip.itineraryItems,
+        hotels: quotation.trip.tripHotels?.map((th) => ({
+          id: th.id,
+          name: th.hotel?.name || "Selected Hotel",
+          city: th.hotel?.city || null,
+          roomType: th.roomType,
+          mealPlan: th.mealPlan || null,
+          checkIn: th.checkIn,
+          checkOut: th.checkOut,
+          nights: Math.max(1, Math.round((new Date(th.checkOut).getTime() - new Date(th.checkIn).getTime()) / (1000 * 60 * 60 * 24))),
+          rooms: th.rooms || 1,
+          notes: th.notes || null,
+        })),
+        vehicles: quotation.trip.tripVehicles?.map((tv) => ({
+          id: tv.id,
+          name: tv.vehicleName || tv.vehicle?.name || "Private Transport",
+          type: tv.vehicleType || tv.vehicle?.type || null,
+          capacity: tv.vehicle?.capacity || null,
+          startDate: tv.startDate || null,
+          endDate: tv.endDate || null,
+          notes: tv.notes || null,
+        })),
+        activities: quotation.trip.tripActivities?.map((ta) => ({
+          id: ta.id,
+          name: ta.name || ta.activity?.name || "Sightseeing Excursion",
+          city: ta.activity?.location || null,
+          date: ta.date || null,
+          description: ta.description || null,
+          notes: ta.notes || null,
+        })),
+      },
       packageOptions: quotation.packageOptions,
       selectedPackageOptionId: quotation.selectedPackageOptionId,
       selectedPackageOption: quotation.selectedPackageOption,
@@ -53,7 +89,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       paymentMilestones: quotation.paymentMilestones,
     });
 
-    const filename = `${quotation.quotationNumber}-v${quotation.version}.pdf`;
+    const safeRef = quotation.quotationNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const filename = `TripDesk-Proposal-${safeRef}-v${quotation.version}.pdf`;
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,
