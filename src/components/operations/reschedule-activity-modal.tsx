@@ -3,65 +3,75 @@
 import * as React from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { DailyActivityOperation } from "@/types";
-import { useOperations } from "@/context/operations-context";
+import { ConfirmationStatus } from "@prisma/client";
+import { operationsClient, ActivityConfirmationWithDetails } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { X, CalendarClock, Calendar, Clock } from "lucide-react";
+import { X, CalendarClock, Loader2 } from "lucide-react";
 
 interface RescheduleActivityModalProps {
-  tripId: string;
-  dayNumber: number;
-  activity: DailyActivityOperation | null;
+  operationId: string;
+  activityConfirmation: ActivityConfirmationWithDetails | null;
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 const rescheduleSchema = Yup.object({
-  newDate: Yup.string().required("New date is required"),
-  newTime: Yup.string().required("New time is required"),
-  reason: Yup.string().required("Please state the reason for rescheduling"),
+  supplierNotes: Yup.string().required("Please state the reason/notes for rescheduling"),
+  confirmationNumber: Yup.string().optional(),
+  ticketNumber: Yup.string().optional(),
 });
 
 export function RescheduleActivityModal({
-  tripId,
-  dayNumber,
-  activity,
+  operationId,
+  activityConfirmation,
   isOpen,
   onClose,
+  onSuccess,
 }: RescheduleActivityModalProps) {
-  const { rescheduleActivity } = useOperations();
+  const [loading, setLoading] = React.useState(false);
 
   const formik = useFormik({
     initialValues: {
-      newDate: activity?.date || new Date().toISOString().split("T")[0],
-      newTime: activity?.time || "10:00 AM",
-      reason: "Customer requested postponement due to weather",
+      confirmationNumber: activityConfirmation?.confirmationNumber || "",
+      ticketNumber: activityConfirmation?.ticketNumber || "",
+      supplierNotes: activityConfirmation?.supplierNotes || "Rescheduled due to guest request / weather condition",
     },
     validationSchema: rescheduleSchema,
     enableReinitialize: true,
-    onSubmit: (values) => {
-      if (!activity) return;
+    onSubmit: async (values) => {
+      if (!activityConfirmation || !operationId) return;
 
-      rescheduleActivity(
-        tripId,
-        dayNumber,
-        activity.id,
-        values.newDate,
-        values.newTime,
-        values.reason.trim()
-      );
+      try {
+        setLoading(true);
+        await operationsClient.updateActivityConfirmation(
+          operationId,
+          activityConfirmation.id,
+          {
+            confirmationNumber: values.confirmationNumber?.trim() || undefined,
+            ticketNumber: values.ticketNumber?.trim() || undefined,
+            supplierNotes: values.supplierNotes.trim(),
+            status: ConfirmationStatus.AMENDED,
+          }
+        );
 
-      toast.success(
-        `${activity.title} rescheduled to ${values.newDate} (${values.newTime})`
-      );
-      onClose();
+        toast.success(
+          `Activity status updated to Amended with revised schedule notes.`
+        );
+        if (onSuccess) onSuccess();
+        onClose();
+      } catch (err: any) {
+        toast.error(err.message || "Failed to update activity. Please try again.");
+      } finally {
+        setLoading(false);
+      }
     },
   });
 
-  if (!isOpen || !activity) return null;
+  if (!isOpen || !activityConfirmation) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
@@ -73,9 +83,9 @@ export function RescheduleActivityModal({
               <CalendarClock className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">Reschedule Activity</h3>
+              <h3 className="text-base font-bold text-slate-900">Reschedule / Amend Activity</h3>
               <p className="text-xs text-slate-500 font-medium truncate max-w-[280px]">
-                {activity.title}
+                {activityConfirmation.tripActivity?.name || activityConfirmation.activity?.name || "Activity"}
               </p>
             </div>
           </div>
@@ -88,72 +98,66 @@ export function RescheduleActivityModal({
           </button>
         </div>
 
-        {/* Current Schedule */}
-        <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs text-slate-600 space-y-1">
-          <div className="flex justify-between">
-            <span className="font-semibold text-slate-500">Currently Scheduled:</span>
-            <span className="font-bold text-slate-800">{activity.date} at {activity.time || "Scheduled"}</span>
-          </div>
-        </div>
-
         {/* Form */}
         <form onSubmit={formik.handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">
-                New Target Date <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <Input
-                  type="date"
-                  {...formik.getFieldProps("newDate")}
-                  className="pl-9 h-9.5 text-xs font-medium"
-                />
-              </div>
+              <label className="text-xs font-bold text-slate-700">Confirmation / Voucher #</label>
+              <Input
+                placeholder="e.g. ACT-CONF-9812"
+                {...formik.getFieldProps("confirmationNumber")}
+                className="h-9.5 text-xs font-mono font-bold"
+              />
             </div>
-
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">
-                New Time Slot <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Clock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="e.g. 02:30 PM"
-                  {...formik.getFieldProps("newTime")}
-                  className="pl-9 h-9.5 text-xs font-medium"
-                />
-              </div>
+              <label className="text-xs font-bold text-slate-700">Ticket / Pass #</label>
+              <Input
+                placeholder="e.g. TKT-2026-0012"
+                {...formik.getFieldProps("ticketNumber")}
+                className="h-9.5 text-xs font-mono font-bold"
+              />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700">
-              Reason for Reschedule & Audit Notes <span className="text-red-500">*</span>
+              Reschedule Details & Supplier Notes <span className="text-red-500">*</span>
             </label>
             <Textarea
               rows={3}
-              placeholder="e.g. Rain in Munnar; shifted afternoon boat ride to next morning per guest preference"
-              {...formik.getFieldProps("reason")}
-              className="text-xs min-h-[70px]"
+              placeholder="e.g. Moved from 10:00 AM to 03:30 PM slot with tour guide approval..."
+              {...formik.getFieldProps("supplierNotes")}
+              className="text-xs min-h-[80px]"
             />
+            {formik.touched.supplierNotes && formik.errors.supplierNotes && (
+              <p className="text-[11px] text-red-500">{formik.errors.supplierNotes}</p>
+            )}
           </div>
 
+          {/* Action Buttons */}
           <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
+              disabled={loading}
               className="text-xs font-semibold h-9 px-4 cursor-pointer"
             >
               Cancel
             </Button>
             <Button
               type="submit"
+              disabled={loading}
               className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold h-9 px-5 cursor-pointer shadow-xs"
             >
-              Confirm Reschedule
+              {loading ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Amendments"
+              )}
             </Button>
           </div>
         </form>

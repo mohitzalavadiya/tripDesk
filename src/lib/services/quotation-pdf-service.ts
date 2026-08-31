@@ -47,6 +47,35 @@ export interface QuotationPdfData {
       description?: string | null;
       location?: string | null;
     }>;
+    hotels?: Array<{
+      id: string;
+      name: string;
+      city?: string | null;
+      roomType: string;
+      mealPlan?: string | null;
+      checkIn: Date | string;
+      checkOut: Date | string;
+      nights?: number;
+      rooms?: number;
+      notes?: string | null;
+    }>;
+    vehicles?: Array<{
+      id: string;
+      name: string;
+      type?: string | null;
+      capacity?: number | null;
+      startDate?: Date | string | null;
+      endDate?: Date | string | null;
+      notes?: string | null;
+    }>;
+    activities?: Array<{
+      id: string;
+      name: string;
+      city?: string | null;
+      date?: Date | string | null;
+      description?: string | null;
+      notes?: string | null;
+    }>;
   } | null;
 
   packageOptions?: Array<{
@@ -108,7 +137,7 @@ export class QuotationPdfService {
           bufferPages: true,
           compress: false,
           info: {
-            Title: `${data.title} - ${data.quotationNumber}`,
+            Title: `${data.title || "Travel Proposal"} - ${data.quotationNumber}`,
             Author: data.agency?.name || "TripDesk Travel Agency",
             Subject: `Official Travel Proposal ${data.quotationNumber} v${data.version}`,
             Keywords: `Proposal: ${data.quotationNumber}, Customer: ${data.customer?.name || "Valued Traveler"}`,
@@ -129,7 +158,6 @@ export class QuotationPdfService {
         // Color Palette
         const primaryColor = "#4338CA"; // Indigo 700
         const primaryDark = "#1E1B4B"; // Indigo 950
-        const accentColor = "#0D9488"; // Teal 600
         const textDark = "#0F172A"; // Slate 900
         const textMuted = "#475569"; // Slate 600
         const textLight = "#94A3B8"; // Slate 400
@@ -140,27 +168,28 @@ export class QuotationPdfService {
         const roseBg = "#FFF1F2"; // Rose 50
         const roseText = "#9F1239"; // Rose 800
 
-        // Helpers
+        // Helper: Check Page Break with margin bottom
         const checkPageBreak = (neededHeight: number) => {
-          if (doc.y + neededHeight > pageHeight - 60) {
+          if (doc.y + neededHeight > pageHeight - 55) {
             doc.addPage();
             return true;
           }
           return false;
         };
 
+        // Helper: Section Headers
         const drawSectionHeader = (title: string, subtitle?: string) => {
           checkPageBreak(50);
           doc.moveDown(0.8);
           doc
-            .fontSize(14)
+            .fontSize(13)
             .font("Helvetica-Bold")
             .fillColor(primaryDark)
             .text(title.toUpperCase());
 
           if (subtitle) {
             doc
-              .fontSize(9)
+              .fontSize(8.5)
               .font("Helvetica")
               .fillColor(textMuted)
               .text(subtitle);
@@ -187,7 +216,7 @@ export class QuotationPdfService {
         // ═════════════════════════════════════════════════════════════════════
         // 1. COVER / HEADER BANNER
         // ═════════════════════════════════════════════════════════════════════
-        const headerHeight = 90;
+        const headerHeight = 85;
         doc
           .rect(margin, margin, contentWidth, headerHeight)
           .fill(primaryDark);
@@ -198,7 +227,7 @@ export class QuotationPdfService {
         // Agency Branding
         doc
           .fillColor("#FFFFFF")
-          .fontSize(18)
+          .fontSize(17)
           .font("Helvetica-Bold")
           .text(agencyName, margin + 20, margin + 18, {
             width: contentWidth - 180,
@@ -207,15 +236,15 @@ export class QuotationPdfService {
 
         doc
           .fillColor("#A5B4FC")
-          .fontSize(9)
+          .fontSize(8.5)
           .font("Helvetica")
-          .text("Official Itinerary & Travel Proposal", margin + 20, margin + 42);
+          .text("Official Travel Itinerary & Proposal", margin + 20, margin + 40);
 
         // Quotation Badge (Top Right)
         const badgeWidth = 140;
-        const badgeHeight = 50;
+        const badgeHeight = 48;
         const badgeX = margin + contentWidth - badgeWidth - 20;
-        const badgeY = margin + 20;
+        const badgeY = margin + 18;
 
         doc
           .roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 6)
@@ -223,7 +252,7 @@ export class QuotationPdfService {
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(11)
+          .fontSize(10.5)
           .font("Helvetica-Bold")
           .text(data.quotationNumber, badgeX, badgeY + 10, {
             width: badgeWidth,
@@ -234,12 +263,12 @@ export class QuotationPdfService {
           .fillColor("#C7D2FE")
           .fontSize(8)
           .font("Helvetica")
-          .text(`Version ${data.version}  •  ${data.currency}`, badgeX, badgeY + 28, {
+          .text(`Version ${data.version}  •  ${data.currency}`, badgeX, badgeY + 26, {
             width: badgeWidth,
             align: "center",
           });
 
-        doc.y = margin + headerHeight + 15;
+        doc.y = margin + headerHeight + 14;
 
         // ═════════════════════════════════════════════════════════════════════
         // 2. TRIP TITLE & OVERVIEW CARD
@@ -251,7 +280,7 @@ export class QuotationPdfService {
 
         doc
           .fillColor(textDark)
-          .fontSize(16)
+          .fontSize(15)
           .font("Helvetica-Bold")
           .text(data.title || "Travel Proposal", margin + 16, titleCardY + 12, {
             width: contentWidth - 32,
@@ -260,7 +289,7 @@ export class QuotationPdfService {
         if (data.proposalSubtitle) {
           doc
             .fillColor(primaryColor)
-            .fontSize(9)
+            .fontSize(8.5)
             .font("Helvetica-Bold")
             .text(data.proposalSubtitle, margin + 16, doc.y + 2, {
               width: contentWidth - 32,
@@ -279,7 +308,7 @@ export class QuotationPdfService {
           .text("PREPARED FOR", margin + 16, metaY);
         doc
           .fillColor(textDark)
-          .fontSize(9)
+          .fontSize(8.5)
           .font("Helvetica-Bold")
           .text(customerName, margin + 16, metaY + 10, { width: colW - 5, ellipsis: true });
 
@@ -310,7 +339,7 @@ export class QuotationPdfService {
         const travelerCount = data.trip?.travelers?.length || 1;
         doc
           .fillColor(textDark)
-          .fontSize(9)
+          .fontSize(8.5)
           .font("Helvetica-Bold")
           .text(`${travelerCount} Person(s)`, margin + 16 + colW * 2, metaY + 10);
 
@@ -320,7 +349,9 @@ export class QuotationPdfService {
           .fontSize(7)
           .font("Helvetica-Bold")
           .text("VALID UNTIL", margin + 16 + colW * 3, metaY);
-        const validStr = data.validUntil ? new Date(data.validUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Upon confirmation";
+        const validStr = data.validUntil
+          ? new Date(data.validUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+          : "Upon confirmation";
         doc
           .fillColor(primaryColor)
           .fontSize(8.5)
@@ -330,31 +361,31 @@ export class QuotationPdfService {
         doc.y = titleCardY + 85;
 
         // ═════════════════════════════════════════════════════════════════════
-        // 3. EXECUTIVE INTRODUCTION / GREETING
+        // 3. EXECUTIVE GREETING / CONSULTANT MESSAGE
         // ═════════════════════════════════════════════════════════════════════
         if (data.customerMessage) {
-          checkPageBreak(70);
+          checkPageBreak(65);
           const msgY = doc.y;
           doc
-            .roundedRect(margin, msgY, contentWidth, 50, 6)
+            .roundedRect(margin, msgY, contentWidth, 48, 6)
             .fillAndStroke("#EEF2FF", "#C7D2FE");
 
           doc
             .fillColor(primaryDark)
-            .fontSize(8)
+            .fontSize(7.5)
             .font("Helvetica-Bold")
             .text("GREETING FROM YOUR TRAVEL CONSULTANT", margin + 12, msgY + 8);
 
           doc
             .fillColor(textDark)
-            .fontSize(8.5)
+            .fontSize(8)
             .font("Helvetica")
-            .text(data.customerMessage, margin + 12, msgY + 20, {
+            .text(data.customerMessage, margin + 12, msgY + 19, {
               width: contentWidth - 24,
-              lineGap: 2,
+              lineGap: 1.5,
             });
 
-          doc.y = msgY + 58;
+          doc.y = msgY + 56;
         }
 
         // ═════════════════════════════════════════════════════════════════════
@@ -366,15 +397,13 @@ export class QuotationPdfService {
           drawSectionHeader("Package Options & Tier Selection", "Compare hotel grades, vehicles and inclusions");
 
           const numPackages = activePackages.length;
-          const pkgCardGap = 10;
+          const pkgCardGap = 8;
           const pkgCardWidth = (contentWidth - pkgCardGap * (numPackages - 1)) / numPackages;
 
-          // Determine selected option
           const selectedId = data.selectedPackageOptionId;
           const cardStartY = doc.y;
-          let maxCardHeight = 150;
+          const maxCardHeight = 145;
 
-          // Check if we need page break
           checkPageBreak(maxCardHeight + 20);
 
           activePackages.forEach((pkg, index) => {
@@ -386,89 +415,89 @@ export class QuotationPdfService {
               .roundedRect(cardX, cardStartY, pkgCardWidth, maxCardHeight, 6)
               .fillAndStroke(isSelected ? "#F5F3FF" : bgLight, isSelected ? primaryColor : borderLight);
 
-            // Recommended or Selected Badge
+            // Recommended / Selected Badge
             if (isSelected) {
               doc
-                .roundedRect(cardX + 8, cardStartY + 8, pkgCardWidth - 16, 16, 3)
+                .roundedRect(cardX + 6, cardStartY + 6, pkgCardWidth - 12, 14, 3)
                 .fill(primaryColor);
               doc
                 .fillColor("#FFFFFF")
-                .fontSize(7.5)
+                .fontSize(7)
                 .font("Helvetica-Bold")
-                .text("SELECTED PACKAGE", cardX + 8, cardStartY + 12, {
-                  width: pkgCardWidth - 16,
+                .text("SELECTED PACKAGE", cardX + 6, cardStartY + 9, {
+                  width: pkgCardWidth - 12,
                   align: "center",
                 });
             } else if (pkg.isRecommended) {
               doc
-                .roundedRect(cardX + 8, cardStartY + 8, pkgCardWidth - 16, 16, 3)
+                .roundedRect(cardX + 6, cardStartY + 6, pkgCardWidth - 12, 14, 3)
                 .fill("#059669");
               doc
                 .fillColor("#FFFFFF")
-                .fontSize(7.5)
+                .fontSize(7)
                 .font("Helvetica-Bold")
-                .text("★ RECOMMENDED", cardX + 8, cardStartY + 12, {
-                  width: pkgCardWidth - 16,
+                .text("★ RECOMMENDED", cardX + 6, cardStartY + 9, {
+                  width: pkgCardWidth - 12,
                   align: "center",
                 });
             }
 
-            const contentTop = isSelected || pkg.isRecommended ? cardStartY + 30 : cardStartY + 12;
+            const contentTop = isSelected || pkg.isRecommended ? cardStartY + 25 : cardStartY + 10;
 
             // Package Title
             doc
               .fillColor(textDark)
-              .fontSize(11)
+              .fontSize(10.5)
               .font("Helvetica-Bold")
-              .text(pkg.name, cardX + 8, contentTop, {
-                width: pkgCardWidth - 16,
+              .text(pkg.name, cardX + 6, contentTop, {
+                width: pkgCardWidth - 12,
                 align: "center",
               });
 
             if (pkg.subtitle) {
               doc
                 .fillColor(textMuted)
-                .fontSize(7.5)
+                .fontSize(7)
                 .font("Helvetica")
-                .text(pkg.subtitle, cardX + 8, doc.y + 1, {
-                  width: pkgCardWidth - 16,
+                .text(pkg.subtitle, cardX + 6, doc.y + 1, {
+                  width: pkgCardWidth - 12,
                   align: "center",
                 });
             }
 
             // Price Box inside Card
-            const priceBoxY = cardStartY + 62;
+            const priceBoxY = cardStartY + 56;
             doc
-              .roundedRect(cardX + 8, priceBoxY, pkgCardWidth - 16, 28, 4)
+              .roundedRect(cardX + 6, priceBoxY, pkgCardWidth - 12, 26, 4)
               .fill("#FFFFFF");
 
             doc
               .fillColor(primaryColor)
-              .fontSize(12)
+              .fontSize(11.5)
               .font("Helvetica-Bold")
-              .text(formatCurrency(Number(pkg.finalAmount)), cardX + 8, priceBoxY + 5, {
-                width: pkgCardWidth - 16,
+              .text(formatCurrency(Number(pkg.finalAmount)), cardX + 6, priceBoxY + 4, {
+                width: pkgCardWidth - 12,
                 align: "center",
               });
 
             doc
               .fillColor(textLight)
-              .fontSize(6.5)
+              .fontSize(6)
               .font("Helvetica")
-              .text("Taxes included", cardX + 8, priceBoxY + 18, {
-                width: pkgCardWidth - 16,
+              .text("Taxes included", cardX + 6, priceBoxY + 16, {
+                width: pkgCardWidth - 12,
                 align: "center",
               });
 
-            // Specs
-            let specsY = priceBoxY + 34;
+            // Specs Notes
+            let specsY = priceBoxY + 32;
             if (pkg.hotelNotes) {
               doc
                 .fillColor(textDark)
-                .fontSize(7)
+                .fontSize(6.5)
                 .font("Helvetica")
-                .text(`• Hotel: ${pkg.hotelNotes}`, cardX + 8, specsY, {
-                  width: pkgCardWidth - 16,
+                .text(`• Hotel: ${pkg.hotelNotes}`, cardX + 6, specsY, {
+                  width: pkgCardWidth - 12,
                 });
               specsY = doc.y + 2;
             }
@@ -476,15 +505,15 @@ export class QuotationPdfService {
             if (pkg.vehicleNotes) {
               doc
                 .fillColor(textDark)
-                .fontSize(7)
+                .fontSize(6.5)
                 .font("Helvetica")
-                .text(`• Transport: ${pkg.vehicleNotes}`, cardX + 8, specsY, {
-                  width: pkgCardWidth - 16,
+                .text(`• Transport: ${pkg.vehicleNotes}`, cardX + 6, specsY, {
+                  width: pkgCardWidth - 12,
                 });
             }
           });
 
-          doc.y = cardStartY + maxCardHeight + 15;
+          doc.y = cardStartY + maxCardHeight + 14;
         }
 
         // ═════════════════════════════════════════════════════════════════════
@@ -492,28 +521,30 @@ export class QuotationPdfService {
         // ═════════════════════════════════════════════════════════════════════
         const itineraryItems = data.trip?.itineraryItems || [];
         if (itineraryItems.length > 0) {
-          drawSectionHeader("Day-by-Day Itinerary Schedule", "Planned sightseeing, hotel stays and experiences");
+          drawSectionHeader("Day-by-Day Itinerary Schedule", "Planned sightseeing, route and experiences");
 
           itineraryItems.forEach((item) => {
             doc.fontSize(8);
-            const descHeight = item.description ? Math.min(doc.heightOfString(item.description, { width: contentWidth - 80 }), 100) : 0;
-            const itemBoxHeight = Math.max(40, 26 + descHeight);
+            const descHeight = item.description
+              ? Math.min(doc.heightOfString(item.description, { width: contentWidth - 80 }), 90)
+              : 0;
+            const itemBoxHeight = Math.max(38, 24 + descHeight);
 
-            checkPageBreak(itemBoxHeight + 10);
+            checkPageBreak(itemBoxHeight + 8);
 
             const itemY = doc.y;
 
             // Day Badge
             doc
-              .roundedRect(margin, itemY, 50, 22, 4)
+              .roundedRect(margin, itemY, 48, 20, 4)
               .fill(primaryDark);
 
             doc
               .fillColor("#FFFFFF")
-              .fontSize(8)
+              .fontSize(7.5)
               .font("Helvetica-Bold")
               .text(`DAY ${item.dayNumber}`, margin, itemY + 6, {
-                width: 50,
+                width: 48,
                 align: "center",
               });
 
@@ -522,29 +553,31 @@ export class QuotationPdfService {
                 .fillColor(textLight)
                 .fontSize(6.5)
                 .font("Helvetica")
-                .text(new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }), margin, itemY + 24, {
-                  width: 50,
-                  align: "center",
-                });
+                .text(
+                  new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                  margin,
+                  itemY + 22,
+                  { width: 48, align: "center" }
+                );
             }
 
             // Title & Location
-            const contentX = margin + 62;
+            const contentX = margin + 58;
             doc
               .fillColor(textDark)
-              .fontSize(9.5)
+              .fontSize(9)
               .font("Helvetica-Bold")
               .text(item.title, contentX, itemY + 2, {
-                width: contentWidth - 140,
+                width: contentWidth - 130,
               });
 
             if (item.location) {
               doc
                 .fillColor(primaryColor)
-                .fontSize(8)
+                .fontSize(7.5)
                 .font("Helvetica-Bold")
-                .text(`📍 ${item.location}`, margin + contentWidth - 85, itemY + 2, {
-                  width: 85,
+                .text(`📍 ${item.location}`, margin + contentWidth - 80, itemY + 2, {
+                  width: 80,
                   align: "right",
                 });
             }
@@ -552,10 +585,10 @@ export class QuotationPdfService {
             if (item.description) {
               doc
                 .fillColor(textMuted)
-                .fontSize(8)
+                .fontSize(7.5)
                 .font("Helvetica")
-                .text(item.description, contentX, itemY + 16, {
-                  width: contentWidth - 75,
+                .text(item.description, contentX, itemY + 15, {
+                  width: contentWidth - 70,
                   lineGap: 1.5,
                 });
             }
@@ -564,167 +597,322 @@ export class QuotationPdfService {
             doc
               .strokeColor(borderLight)
               .lineWidth(0.5)
-              .moveTo(margin + 62, doc.y + 6)
-              .lineTo(margin + contentWidth, doc.y + 6)
+              .moveTo(margin + 58, doc.y + 5)
+              .lineTo(margin + contentWidth, doc.y + 5)
               .stroke();
 
-            doc.y += 12;
+            doc.y += 10;
           });
         }
 
         // ═════════════════════════════════════════════════════════════════════
-        // 6. INCLUSIONS & EXCLUSIONS (PHASE 10.11A)
+        // 6. HOTEL ACCOMMODATIONS (IF PRESENT)
+        // ═════════════════════════════════════════════════════════════════════
+        const hotels = data.trip?.hotels || [];
+        if (hotels.length > 0) {
+          drawSectionHeader("Hotel Accommodations", "Confirmed and recommended hotel stays");
+
+          hotels.forEach((h) => {
+            checkPageBreak(45);
+            const boxY = doc.y;
+
+            doc
+              .roundedRect(margin, boxY, contentWidth, 38, 4)
+              .fillAndStroke(bgLight, borderLight);
+
+            // Hotel Icon & Name
+            doc
+              .fillColor(textDark)
+              .fontSize(9)
+              .font("Helvetica-Bold")
+              .text(`🏨  ${h.name}`, margin + 10, boxY + 8, { width: contentWidth - 140, ellipsis: true });
+
+            const cityStr = h.city ? `Destination: ${h.city}` : "";
+            const roomStr = [h.roomType, h.mealPlan].filter(Boolean).join("  •  ");
+
+            doc
+              .fillColor(textMuted)
+              .fontSize(7.5)
+              .font("Helvetica")
+              .text([cityStr, roomStr].filter(Boolean).join("  |  "), margin + 10, boxY + 22, {
+                width: contentWidth - 140,
+                ellipsis: true,
+              });
+
+            // Dates & Nights (Right Side)
+            let dateStr = "";
+            if (h.checkIn && h.checkOut) {
+              const inStr = new Date(h.checkIn).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              const outStr = new Date(h.checkOut).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              dateStr = `${inStr} – ${outStr}`;
+            }
+
+            doc
+              .fillColor(primaryColor)
+              .fontSize(8)
+              .font("Helvetica-Bold")
+              .text(dateStr, margin + contentWidth - 130, boxY + 8, { width: 120, align: "right" });
+
+            if (h.nights) {
+              doc
+                .fillColor(textLight)
+                .fontSize(7)
+                .font("Helvetica")
+                .text(`${h.nights} Night(s)  •  ${h.rooms || 1} Room(s)`, margin + contentWidth - 130, boxY + 22, {
+                  width: 120,
+                  align: "right",
+                });
+            }
+
+            doc.y = boxY + 44;
+          });
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // 7. VEHICLE & TRANSPORTATION DETAILS (IF PRESENT)
+        // ═════════════════════════════════════════════════════════════════════
+        const vehicles = data.trip?.vehicles || [];
+        if (vehicles.length > 0) {
+          drawSectionHeader("Transportation & Transfers", "Private transfers and dedicated chauffeur service");
+
+          vehicles.forEach((v) => {
+            checkPageBreak(40);
+            const vY = doc.y;
+
+            doc
+              .roundedRect(margin, vY, contentWidth, 34, 4)
+              .fillAndStroke(bgLight, borderLight);
+
+            doc
+              .fillColor(textDark)
+              .fontSize(9)
+              .font("Helvetica-Bold")
+              .text(`🚗  ${v.name}`, margin + 10, vY + 8, { width: contentWidth - 150, ellipsis: true });
+
+            const typeDetails = [
+              v.type ? `Type: ${v.type}` : "",
+              v.capacity ? `Capacity: ${v.capacity} Passengers` : "",
+              v.notes || "Dedicated private transport",
+            ]
+              .filter(Boolean)
+              .join("  •  ");
+
+            doc
+              .fillColor(textMuted)
+              .fontSize(7.5)
+              .font("Helvetica")
+              .text(typeDetails, margin + 10, vY + 20, { width: contentWidth - 20, ellipsis: true });
+
+            doc.y = vY + 40;
+          });
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // 8. ACTIVITIES & EXPERIENCES (IF PRESENT)
+        // ═════════════════════════════════════════════════════════════════════
+        const activities = data.trip?.activities || [];
+        if (activities.length > 0) {
+          drawSectionHeader("Activities & Sightseeing", "Included passes, excursions and tour experiences");
+
+          activities.forEach((act) => {
+            checkPageBreak(38);
+            const actY = doc.y;
+
+            doc
+              .roundedRect(margin, actY, contentWidth, 32, 4)
+              .fillAndStroke(bgLight, borderLight);
+
+            doc
+              .fillColor(textDark)
+              .fontSize(8.5)
+              .font("Helvetica-Bold")
+              .text(`🎟  ${act.name}`, margin + 10, actY + 7, { width: contentWidth - 140, ellipsis: true });
+
+            if (act.date) {
+              doc
+                .fillColor(primaryColor)
+                .fontSize(7.5)
+                .font("Helvetica-Bold")
+                .text(
+                  new Date(act.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                  margin + contentWidth - 130,
+                  actY + 7,
+                  { width: 120, align: "right" }
+                );
+            }
+
+            if (act.description || act.city) {
+              const sub = [act.city, act.description].filter(Boolean).join("  •  ");
+              doc
+                .fillColor(textMuted)
+                .fontSize(7)
+                .font("Helvetica")
+                .text(sub, margin + 10, actY + 19, { width: contentWidth - 20, ellipsis: true });
+            }
+
+            doc.y = actY + 38;
+          });
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // 9. INCLUSIONS & EXCLUSIONS (PHASE 10.11A)
         // ═════════════════════════════════════════════════════════════════════
         const inclusions = data.proposalItems?.filter((p) => p.type === "INCLUSION") || [];
         const exclusions = data.proposalItems?.filter((p) => p.type === "EXCLUSION") || [];
 
         if (inclusions.length > 0 || exclusions.length > 0) {
-          drawSectionHeader("Package Inclusions & Exclusions", "Clear transparent breakdown of coverage");
+          drawSectionHeader("Package Inclusions & Exclusions", "Transparent breakdown of tour coverage");
 
-          const halfWidth = (contentWidth - 12) / 2;
-          checkPageBreak(120);
+          const halfWidth = (contentWidth - 10) / 2;
+          checkPageBreak(110);
           const boxY = doc.y;
 
           // Inclusions Box (Left)
           doc
-            .roundedRect(margin, boxY, halfWidth, 110, 6)
+            .roundedRect(margin, boxY, halfWidth, 105, 6)
             .fillAndStroke(greenBg, "#A7F3D0");
 
           doc
             .fillColor(greenText)
-            .fontSize(9)
+            .fontSize(8.5)
             .font("Helvetica-Bold")
             .text("✔ WHAT IS INCLUDED", margin + 10, boxY + 8);
 
-          let incY = boxY + 24;
+          let incY = boxY + 22;
           inclusions.slice(0, 5).forEach((inc) => {
             doc
               .fillColor(textDark)
-              .fontSize(7.5)
+              .fontSize(7)
               .font("Helvetica-Bold")
               .text(`• ${inc.title}`, margin + 10, incY, { width: halfWidth - 20 });
             incY = doc.y + 2;
           });
 
           // Exclusions Box (Right)
-          const rightX = margin + halfWidth + 12;
+          const rightX = margin + halfWidth + 10;
           doc
-            .roundedRect(rightX, boxY, halfWidth, 110, 6)
+            .roundedRect(rightX, boxY, halfWidth, 105, 6)
             .fillAndStroke(roseBg, "#FECDD3");
 
           doc
             .fillColor(roseText)
-            .fontSize(9)
+            .fontSize(8.5)
             .font("Helvetica-Bold")
             .text("✖ WHAT IS EXCLUDED", rightX + 10, boxY + 8);
 
-          let excY = boxY + 24;
+          let excY = boxY + 22;
           exclusions.slice(0, 5).forEach((exc) => {
             doc
               .fillColor(textDark)
-              .fontSize(7.5)
+              .fontSize(7)
               .font("Helvetica-Bold")
               .text(`• ${exc.title}`, rightX + 10, excY, { width: halfWidth - 20 });
             excY = doc.y + 2;
           });
 
-          doc.y = boxY + 120;
+          doc.y = boxY + 115;
         }
 
         // ═════════════════════════════════════════════════════════════════════
-        // 7. PAYMENT MILESTONE SCHEDULE
+        // 10. PAYMENT MILESTONE SCHEDULE
         // ═════════════════════════════════════════════════════════════════════
         const milestones = data.paymentMilestones || [];
-        const effectiveFinalAmount = data.selectedPackageOption ? Number(data.selectedPackageOption.finalAmount) : data.finalAmount;
+        const effectiveFinalAmount = data.selectedPackageOption
+          ? Number(data.selectedPackageOption.finalAmount)
+          : data.finalAmount;
 
         if (milestones.length > 0) {
           drawSectionHeader("Payment Milestone Schedule", "Staged timeline and deposit structure");
 
           const mWidth = (contentWidth - (milestones.length - 1) * 8) / milestones.length;
-          checkPageBreak(65);
+          checkPageBreak(60);
           const mBoxY = doc.y;
 
           milestones.forEach((m, idx) => {
             const mX = margin + idx * (mWidth + 8);
-            const amt = m.percentage ? Math.round((effectiveFinalAmount * Number(m.percentage)) / 100) : Number(m.amount || 0);
+            const amt = m.percentage
+              ? Math.round((effectiveFinalAmount * Number(m.percentage)) / 100)
+              : Number(m.amount || 0);
 
             doc
-              .roundedRect(mX, mBoxY, mWidth, 54, 4)
+              .roundedRect(mX, mBoxY, mWidth, 50, 4)
               .fillAndStroke(bgLight, borderLight);
 
             doc
               .fillColor(primaryColor)
-              .fontSize(7.5)
+              .fontSize(7)
               .font("Helvetica-Bold")
               .text(m.percentage ? `STAGE ${idx + 1} (${Number(m.percentage)}%)` : `STAGE ${idx + 1}`, mX + 6, mBoxY + 6);
 
             doc
               .fillColor(textDark)
-              .fontSize(8)
+              .fontSize(7.5)
               .font("Helvetica-Bold")
-              .text(m.title, mX + 6, mBoxY + 18, { width: mWidth - 12, ellipsis: true });
+              .text(m.title, mX + 6, mBoxY + 17, { width: mWidth - 12, ellipsis: true });
 
             doc
               .fillColor(primaryDark)
-              .fontSize(10)
+              .fontSize(9.5)
               .font("Helvetica-Bold")
-              .text(formatCurrency(amt), mX + 6, mBoxY + 34, { width: mWidth - 12, align: "right" });
+              .text(formatCurrency(amt), mX + 6, mBoxY + 32, { width: mWidth - 12, align: "right" });
           });
 
-          doc.y = mBoxY + 64;
+          doc.y = mBoxY + 58;
         }
 
         // ═════════════════════════════════════════════════════════════════════
-        // 8. COMMERCIAL TOTAL INVESTMENT CARD
+        // 11. COMMERCIAL TOTAL INVESTMENT CARD
         // ═════════════════════════════════════════════════════════════════════
-        checkPageBreak(70);
+        checkPageBreak(65);
         const totalCardY = doc.y;
         doc
-          .roundedRect(margin, totalCardY, contentWidth, 54, 6)
+          .roundedRect(margin, totalCardY, contentWidth, 50, 6)
           .fill(primaryDark);
 
-        const chosenPkg = data.selectedPackageOption || data.packageOptions?.find((p) => p.id === data.selectedPackageOptionId);
+        const chosenPkg =
+          data.selectedPackageOption ||
+          data.packageOptions?.find((p) => p.id === data.selectedPackageOptionId);
 
         doc
           .fillColor("#A5B4FC")
-          .fontSize(8)
+          .fontSize(7.5)
           .font("Helvetica-Bold")
-          .text("TOTAL PROPOSAL INVESTMENT", margin + 16, totalCardY + 12);
+          .text("TOTAL PROPOSAL INVESTMENT", margin + 16, totalCardY + 10);
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(12)
+          .fontSize(11)
           .font("Helvetica-Bold")
-          .text(chosenPkg ? `${chosenPkg.name} Package` : "Complete Tour Price", margin + 16, totalCardY + 26);
+          .text(chosenPkg ? `${chosenPkg.name} Package` : "Complete Tour Price", margin + 16, totalCardY + 24);
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(20)
+          .fontSize(18)
           .font("Helvetica-Bold")
-          .text(formatCurrency(effectiveFinalAmount), margin + 200, totalCardY + 16, {
+          .text(formatCurrency(effectiveFinalAmount), margin + 200, totalCardY + 14, {
             width: contentWidth - 216,
             align: "right",
           });
 
-        doc.y = totalCardY + 66;
+        doc.y = totalCardY + 60;
 
         // ═════════════════════════════════════════════════════════════════════
-        // 9. IMPORTANT POLICIES & ADVISORIES
+        // 12. IMPORTANT POLICIES & ADVISORIES
         // ═════════════════════════════════════════════════════════════════════
         if (data.cancellationPolicy || data.terms || data.importantNotes) {
           drawSectionHeader("Important Policies & Terms", "Terms of service and cancellation schedule");
 
           if (data.cancellationPolicy) {
-            checkPageBreak(40);
+            checkPageBreak(35);
             doc
               .fillColor(textDark)
-              .fontSize(8)
+              .fontSize(7.5)
               .font("Helvetica-Bold")
               .text("Cancellation Policy:", margin, doc.y);
 
             doc
               .fillColor(textMuted)
-              .fontSize(7.5)
+              .fontSize(7)
               .font("Helvetica")
               .text(data.cancellationPolicy, margin, doc.y + 2, {
                 width: contentWidth,
@@ -734,16 +922,16 @@ export class QuotationPdfService {
           }
 
           if (data.terms) {
-            checkPageBreak(40);
+            checkPageBreak(35);
             doc
               .fillColor(textDark)
-              .fontSize(8)
+              .fontSize(7.5)
               .font("Helvetica-Bold")
               .text("Terms & Conditions:", margin, doc.y);
 
             doc
               .fillColor(textMuted)
-              .fontSize(7.5)
+              .fontSize(7)
               .font("Helvetica")
               .text(data.terms, margin, doc.y + 2, {
                 width: contentWidth,
@@ -753,15 +941,15 @@ export class QuotationPdfService {
         }
 
         // ═════════════════════════════════════════════════════════════════════
-        // 10. PAGE NUMBERS & FOOTER STAMP ON ALL PAGES
+        // 13. GLOBAL HEADER / FOOTER & PAGE NUMBERING ON ALL PAGES
         // ═════════════════════════════════════════════════════════════════════
         const range = doc.bufferedPageRange();
         for (let i = range.start; i < range.start + range.count; i++) {
           doc.switchToPage(i);
 
-          const footerY = pageHeight - 32;
+          const footerY = pageHeight - 30;
 
-          // Top line
+          // Top footer line
           doc
             .strokeColor(borderLight)
             .lineWidth(0.5)
@@ -780,17 +968,17 @@ export class QuotationPdfService {
 
           doc
             .fillColor(textLight)
-            .fontSize(7)
+            .fontSize(6.5)
             .font("Helvetica")
             .text(agencyContact, margin, footerY + 6, {
-              width: contentWidth - 100,
+              width: contentWidth - 90,
               ellipsis: true,
             });
 
           // Right: Page number
           doc
             .fillColor(textLight)
-            .fontSize(7)
+            .fontSize(6.5)
             .font("Helvetica")
             .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 80, footerY + 6, {
               width: 80,

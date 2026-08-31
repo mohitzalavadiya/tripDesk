@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import {
+  requireReadAccess,
   requireWriteAccess,
   apiSuccess,
   handleApiError,
@@ -19,6 +20,30 @@ const paramsSchema = z.object({
 
 interface RouteProps {
   params: Promise<{ id: string; confirmationId: string }>;
+}
+
+/**
+ * GET /api/operations/[id]/activities/[confirmationId]
+ * Retrieves single activity confirmation details.
+ */
+export async function GET(request: NextRequest, props: RouteProps) {
+  try {
+    const context = await requireReadAccess();
+    const { id, confirmationId } = validateRouteParams(
+      paramsSchema,
+      await props.params
+    );
+
+    const confirmation = await operationsService.getActivityConfirmation(
+      context.agencyId,
+      id,
+      confirmationId
+    );
+
+    return apiSuccess(confirmation);
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
 
 /**

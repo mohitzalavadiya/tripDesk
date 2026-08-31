@@ -216,7 +216,13 @@ function NewTripForm() {
                         placeholder={
                           loadingCustomers ? "Loading customers..." : "Select a customer..."
                         }
-                      />
+                      >
+                        {(val: string | null) => {
+                          if (!val) return undefined;
+                          const c = customers.find((item) => item.id === val);
+                          return c ? `${c.name} (${c.phone})` : val;
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200">
                       {customers.map((c) => (

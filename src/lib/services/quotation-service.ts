@@ -78,6 +78,47 @@ export type QuotationWithRelations = Quotation & {
       endTime?: string | null;
       sortOrder: number;
     }>;
+    tripHotels?: Array<{
+      id: string;
+      checkIn: Date;
+      checkOut: Date;
+      roomType: string;
+      mealPlan?: string | null;
+      rooms: number;
+      notes?: string | null;
+      hotel?: {
+        id: string;
+        name: string;
+        city?: string | null;
+        category?: string | null;
+      } | null;
+    }>;
+    tripVehicles?: Array<{
+      id: string;
+      vehicleName: string;
+      vehicleType?: string | null;
+      startDate?: Date | null;
+      endDate?: Date | null;
+      notes?: string | null;
+      vehicle?: {
+        id: string;
+        name: string;
+        type: string;
+        capacity?: number | null;
+      } | null;
+    }>;
+    tripActivities?: Array<{
+      id: string;
+      name: string;
+      date?: Date | null;
+      description?: string | null;
+      notes?: string | null;
+      activity?: {
+        id: string;
+        name: string;
+        location?: string | null;
+      } | null;
+    }>;
   };
   items: QuotationItem[];
   proposalItems: QuotationProposalItem[];
@@ -253,6 +294,62 @@ export const quotationService = {
                 sortOrder: true,
               },
               orderBy: { sortOrder: "asc" },
+            },
+            tripHotels: {
+              select: {
+                id: true,
+                checkIn: true,
+                checkOut: true,
+                roomType: true,
+                mealPlan: true,
+                rooms: true,
+                notes: true,
+                hotel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    city: true,
+                    category: true,
+                  },
+                },
+              },
+              orderBy: { checkIn: "asc" },
+            },
+            tripVehicles: {
+              select: {
+                id: true,
+                vehicleName: true,
+                vehicleType: true,
+                startDate: true,
+                endDate: true,
+                notes: true,
+                vehicle: {
+                  select: {
+                    id: true,
+                    name: true,
+                    type: true,
+                    capacity: true,
+                  },
+                },
+              },
+              orderBy: { startDate: "asc" },
+            },
+            tripActivities: {
+              select: {
+                id: true,
+                name: true,
+                date: true,
+                description: true,
+                notes: true,
+                activity: {
+                  select: {
+                    id: true,
+                    name: true,
+                    location: true,
+                  },
+                },
+              },
+              orderBy: { date: "asc" },
             },
           },
         },
@@ -2102,6 +2199,62 @@ export const quotationService = {
               },
               orderBy: { sortOrder: "asc" },
             },
+            tripHotels: {
+              select: {
+                id: true,
+                checkIn: true,
+                checkOut: true,
+                roomType: true,
+                mealPlan: true,
+                rooms: true,
+                notes: true,
+                hotel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    city: true,
+                    category: true,
+                  },
+                },
+              },
+              orderBy: { checkIn: "asc" },
+            },
+            tripVehicles: {
+              select: {
+                id: true,
+                vehicleName: true,
+                vehicleType: true,
+                startDate: true,
+                endDate: true,
+                notes: true,
+                vehicle: {
+                  select: {
+                    id: true,
+                    name: true,
+                    type: true,
+                    capacity: true,
+                  },
+                },
+              },
+              orderBy: { startDate: "asc" },
+            },
+            tripActivities: {
+              select: {
+                id: true,
+                name: true,
+                date: true,
+                description: true,
+                notes: true,
+                activity: {
+                  select: {
+                    id: true,
+                    name: true,
+                    location: true,
+                  },
+                },
+              },
+              orderBy: { date: "asc" },
+            },
           },
         },
         items: {
@@ -2194,7 +2347,6 @@ export const quotationService = {
       currency: quotation.currency,
       validUntil: quotation.validUntil,
       isExpired,
-      subtotal: Number(quotation.subtotal),
       discountAmount: Number(quotation.discountAmount),
       taxAmount: Number(quotation.taxAmount),
       finalAmount: Number(quotation.finalAmount),

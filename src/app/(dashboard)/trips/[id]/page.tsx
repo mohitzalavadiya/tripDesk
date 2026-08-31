@@ -2083,7 +2083,13 @@ export default function TripDetailPage() {
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Select Hotel Property *</label>
                   <Select value={hotelFormHotelId} onValueChange={(val) => val && setHotelFormHotelId(val)}>
                     <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
-                      <SelectValue placeholder="Choose hotel..." />
+                      <SelectValue placeholder="Choose hotel...">
+                        {(val: string | null) => {
+                          if (!val) return undefined;
+                          const h = masterHotels.find((item) => item.id === val);
+                          return h ? `${h.name} ${h.city ? `(${h.city})` : ""}` : val;
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200">
                       {masterHotels.map((h) => (
@@ -2336,7 +2342,13 @@ export default function TripDetailPage() {
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Pre-fill from Agency Fleet</label>
                     <Select value={vehicleFormVehicleId} onValueChange={(val) => handleSelectMasterVehicle(val)}>
                       <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
-                        <SelectValue placeholder="Choose vehicle model..." />
+                        <SelectValue placeholder="Choose vehicle model...">
+                          {(val: string | null) => {
+                            if (!val) return undefined;
+                            const v = masterVehicles.find((item) => item.id === val);
+                            return v ? `${v.name} (${v.type} • ${v.capacity} Seats)` : val;
+                          }}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
                         {masterVehicles.map((v) => (
@@ -2588,7 +2600,13 @@ export default function TripDetailPage() {
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Pre-fill from Inventory</label>
                     <Select value={activityFormActivityId} onValueChange={(val) => handleSelectMasterActivity(val)}>
                       <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
-                        <SelectValue placeholder="Choose activity..." />
+                        <SelectValue placeholder="Choose activity...">
+                          {(val: string | null) => {
+                            if (!val) return undefined;
+                            const a = masterActivities.find((item) => item.id === val);
+                            return a ? `${a.name} (${a.type})` : val;
+                          }}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
                         {masterActivities.map((a) => (

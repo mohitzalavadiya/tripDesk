@@ -483,6 +483,13 @@ export default function QuotationsPage() {
                                     <Eye className="mr-2 h-3.5 w-3.5 text-slate-400" />
                                     Preview Proposal
                                   </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => window.open(`/api/quotations/${encodeURIComponent(q.id)}/pdf`, "_blank")}
+                                    className="text-xs cursor-pointer rounded-md font-medium text-indigo-600"
+                                  >
+                                    <Download className="mr-2 h-3.5 w-3.5 text-indigo-500" />
+                                    Download PDF Proposal
+                                  </DropdownMenuItem>
                                   {q.shareToken && (
                                     <DropdownMenuItem
                                       onClick={() => window.open(`/q/${q.shareToken}`, "_blank")}

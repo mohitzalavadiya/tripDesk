@@ -65,6 +65,35 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         endDate: quotation.trip.endDate,
         travelers: quotation.trip.travelers,
         itineraryItems: quotation.trip.itineraryItems,
+        hotels: quotation.trip.tripHotels?.map((th) => ({
+          id: th.id,
+          name: th.hotel?.name || "Selected Hotel",
+          city: th.hotel?.city || null,
+          roomType: th.roomType,
+          mealPlan: th.mealPlan || null,
+          checkIn: th.checkIn,
+          checkOut: th.checkOut,
+          nights: Math.max(1, Math.round((new Date(th.checkOut).getTime() - new Date(th.checkIn).getTime()) / (1000 * 60 * 60 * 24))),
+          rooms: th.rooms || 1,
+          notes: th.notes || null,
+        })),
+        vehicles: quotation.trip.tripVehicles?.map((tv) => ({
+          id: tv.id,
+          name: tv.vehicleName || tv.vehicle?.name || "Private Transport",
+          type: tv.vehicleType || tv.vehicle?.type || null,
+          capacity: tv.vehicle?.capacity || null,
+          startDate: tv.startDate || null,
+          endDate: tv.endDate || null,
+          notes: tv.notes || null,
+        })),
+        activities: quotation.trip.tripActivities?.map((ta) => ({
+          id: ta.id,
+          name: ta.name || ta.activity?.name || "Sightseeing Excursion",
+          city: ta.activity?.location || null,
+          date: ta.date || null,
+          description: ta.description || null,
+          notes: ta.notes || null,
+        })),
       },
       packageOptions: quotation.packageOptions.map((opt) => ({
         id: opt.id,
@@ -80,19 +109,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         exclusions: opt.exclusions,
       })),
       selectedPackageOptionId: quotation.selectedPackageOptionId,
-      selectedPackageOption: quotation.selectedPackageOption ? {
-        id: quotation.selectedPackageOption.id,
-        name: quotation.selectedPackageOption.name,
-        subtitle: quotation.selectedPackageOption.subtitle,
-        description: quotation.selectedPackageOption.description,
-        isRecommended: quotation.selectedPackageOption.isRecommended,
-        finalAmount: Number(quotation.selectedPackageOption.finalAmount),
-        hotelNotes: quotation.selectedPackageOption.hotelNotes,
-        vehicleNotes: quotation.selectedPackageOption.vehicleNotes,
-        activityNotes: quotation.selectedPackageOption.activityNotes,
-        inclusions: quotation.selectedPackageOption.inclusions,
-        exclusions: quotation.selectedPackageOption.exclusions,
-      } : null,
+      selectedPackageOption: quotation.selectedPackageOption
+        ? {
+            id: quotation.selectedPackageOption.id,
+            name: quotation.selectedPackageOption.name,
+            subtitle: quotation.selectedPackageOption.subtitle,
+            description: quotation.selectedPackageOption.description,
+            isRecommended: quotation.selectedPackageOption.isRecommended,
+            finalAmount: Number(quotation.selectedPackageOption.finalAmount),
+            hotelNotes: quotation.selectedPackageOption.hotelNotes,
+            vehicleNotes: quotation.selectedPackageOption.vehicleNotes,
+            activityNotes: quotation.selectedPackageOption.activityNotes,
+            inclusions: quotation.selectedPackageOption.inclusions,
+            exclusions: quotation.selectedPackageOption.exclusions,
+          }
+        : null,
       proposalItems: quotation.proposalItems.map((p) => ({
         id: p.id,
         type: p.type as any,
@@ -109,7 +140,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       })),
     });
 
-    const filename = `${quotation.quotationNumber}-v${quotation.version}.pdf`;
+    const safeRef = quotation.quotationNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const filename = `TripDesk-Proposal-${safeRef}-v${quotation.version}.pdf`;
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,
