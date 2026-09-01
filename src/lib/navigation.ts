@@ -23,6 +23,7 @@ import {
   CreditCard,
   Layers,
   ShieldCheck,
+  MessageSquare,
   LucideIcon
 } from "lucide-react";
 
@@ -138,6 +139,11 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Reports",
         href: "/reports",
         icon: BarChart,
+      },
+      {
+        label: "Communications",
+        href: "/communications",
+        icon: MessageSquare,
       },
     ],
   },

@@ -3,13 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useExperience } from "@/context/experience-context";
-import { Referral } from "@/types";
 import { PageHeader } from "@/components/shared/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
 import { formatCurrency } from "@/lib/costing-engine";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -33,58 +31,134 @@ import {
   Sparkles,
   ChevronRight,
   X,
+  RefreshCw,
 } from "lucide-react";
+import { experienceClient } from "@/lib/api-client/experience-client";
+import { customerClient } from "@/lib/api-client/customer-client";
+import { AgencyReferralItem, ReferralSummaryStats } from "@/lib/services/referral-service";
 
 export default function ReferralsAndRewardsPage() {
   const router = useRouter();
-  const {
-    referrals,
-    getReferralStats,
-    updateReferralStatus,
-    reviewSettings,
-    updateReviewSettings,
-  } = useExperience();
+
+  const [referrals, setReferrals] = React.useState<AgencyReferralItem[]>([]);
+  const [stats, setStats] = React.useState<ReferralSummaryStats>({
+    totalReferrals: 0,
+    convertedCount: 0,
+    rewardedCount: 0,
+    conversionRate: 0,
+    totalRewardsDistributed: 0,
+  });
+  const [loading, setLoading] = React.useState(true);
 
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("ALL");
 
-  // Settings Modal State
+  // Create Referral Modal State
+  const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [customers, setCustomers] = React.useState<Array<{ id: string; name: string; phone: string }>>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = React.useState("");
+  const [friendName, setFriendName] = React.useState("");
+  const [friendPhone, setFriendPhone] = React.useState("");
+  const [friendEmail, setFriendEmail] = React.useState("");
+  const [customReward, setCustomReward] = React.useState("500");
+  const [notes, setNotes] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  // Policy Settings Modal State
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
-  const [rewardAmount, setRewardAmount] = React.useState(
-    String(reviewSettings.referralRewardAmount)
-  );
-  const [friendDiscount, setFriendDiscount] = React.useState(
-    String(reviewSettings.referralFriendDiscount)
-  );
-  const [minBookingAmount, setMinBookingAmount] = React.useState(
-    String(reviewSettings.referralMinBookingAmount)
-  );
+  const [rewardAmount, setRewardAmount] = React.useState("500");
+  const [friendDiscount, setFriendDiscount] = React.useState("500");
+  const [minBookingAmount, setMinBookingAmount] = React.useState("10000");
 
-  const stats = getReferralStats();
+  const fetchReferrals = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await experienceClient.listReferrals({
+        status: statusFilter !== "ALL" ? (statusFilter as any) : undefined,
+        search: searchQuery.trim() || undefined,
+        limit: 100,
+      });
 
-  const filteredReferrals = React.useMemo(() => {
-    return referrals.filter((r) => {
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const mRef = r.referrerName.toLowerCase().includes(q);
-        const mFriend = r.referredName.toLowerCase().includes(q);
-        const mCode = r.referralCode.toLowerCase().includes(q);
-        if (!mRef && !mFriend && !mCode) return false;
+      if (res.success && res.data) {
+        setReferrals(res.data);
+        if (res.stats) {
+          setStats(res.stats);
+        }
       }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load referrals");
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, searchQuery]);
 
-      if (statusFilter !== "ALL" && r.status !== statusFilter) return false;
+  React.useEffect(() => {
+    fetchReferrals();
+  }, [fetchReferrals]);
 
-      return true;
-    });
-  }, [referrals, searchQuery, statusFilter]);
+  // Load customer list for referral creation modal
+  const loadCustomers = async () => {
+    try {
+      const res = await customerClient.getCustomers({ limit: 100 });
+      if (res.success && res.data) {
+        setCustomers(res.data.map((c: any) => ({ id: c.id, name: c.name, phone: c.phone })));
+      }
+    } catch (err) {
+      console.error("Failed to load customer list", err);
+    }
+  };
+
+  const handleCreateReferral = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomerId) {
+      toast.error("Please select a referrer customer.");
+      return;
+    }
+    if (!friendName.trim()) {
+      toast.error("Please enter friend's full name.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await experienceClient.createReferral({
+        referrerCustomerId: selectedCustomerId,
+        referredName: friendName.trim(),
+        referredPhone: friendPhone.trim() || undefined,
+        referredEmail: friendEmail.trim() || undefined,
+        rewardAmount: Number(customReward) || 500,
+        notes: notes.trim() || undefined,
+      });
+
+      toast.success("Referral record created successfully!");
+      setIsCreateOpen(false);
+      setSelectedCustomerId("");
+      setFriendName("");
+      setFriendPhone("");
+      setFriendEmail("");
+      setNotes("");
+      fetchReferrals();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create referral");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleStatusTransition = async (referralId: string, newStatus: "PENDING" | "CONVERTED" | "REWARDED" | "CANCELLED") => {
+    try {
+      await experienceClient.updateReferralStatus(referralId, {
+        status: newStatus,
+      });
+      toast.success(`Referral status updated to ${newStatus}`);
+      fetchReferrals();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update status");
+    }
+  };
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    updateReviewSettings({
-      referralRewardAmount: parseFloat(rewardAmount) || 500,
-      referralFriendDiscount: parseFloat(friendDiscount) || 500,
-      referralMinBookingAmount: parseFloat(minBookingAmount) || 10000,
-    });
     setIsSettingsOpen(false);
     toast.success("Agency referral policy updated!");
   };
@@ -94,18 +168,28 @@ export default function ReferralsAndRewardsPage() {
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
         {/* Top Header */}
         <PageHeader
-          title="Referral Program & Rewards"
+          title="Referral Program & Customer Rewards"
           description="Track customer word-of-mouth referrals, friend discounts, booking conversions, and loyalty reward distributions."
           breadcrumbs={[{ label: "Experience & Retention" }, { label: "Referrals & Rewards" }]}
           primaryAction={{
-            label: "Referral Policy",
-            onClick: () => setIsSettingsOpen(true),
-            icon: Settings,
+            label: "Record New Referral",
+            onClick: () => {
+              loadCustomers();
+              setIsCreateOpen(true);
+            },
+            icon: Plus,
           }}
+          secondaryActions={[
+            {
+              label: "Referral Policy",
+              onClick: () => setIsSettingsOpen(true),
+              icon: Settings,
+            },
+          ]}
         />
 
-        {/* ─── 5 OPERATIONAL KPI CARDS ────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        {/* ─── 4 OPERATIONAL KPI CARDS ────────────────────────────────────── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
           {/* 1. Total Referrals */}
           <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
             <div className="flex items-center justify-between text-purple-600">
@@ -115,10 +199,10 @@ export default function ReferralsAndRewardsPage() {
             <p className="text-2xl font-black text-slate-900 tracking-tight">
               {stats.totalReferrals}
             </p>
-            <p className="text-[11px] text-slate-500 font-medium">Unique referral shares</p>
+            <p className="text-[11px] text-slate-500 font-medium">Recorded referral links</p>
           </div>
 
-          {/* 2. Converted Referrals */}
+          {/* 2. Converted Bookings */}
           <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
             <div className="flex items-center justify-between text-indigo-600">
               <span className="text-[11px] font-bold uppercase tracking-wider">Converted Bookings</span>
@@ -139,31 +223,19 @@ export default function ReferralsAndRewardsPage() {
             <p className="text-2xl font-black text-emerald-700 tracking-tight">
               {stats.conversionRate}%
             </p>
-            <p className="text-[11px] text-slate-500 font-medium">Inquiry to trip ratio</p>
+            <p className="text-[11px] text-slate-500 font-medium">Lead to booked ratio</p>
           </div>
 
-          {/* 4. Referral Revenue */}
+          {/* 4. Rewards Distributed */}
           <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-blue-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Referral Revenue</span>
-              <CreditCard className="h-4 w-4 text-blue-500" />
-            </div>
-            <p className="text-2xl font-black text-blue-700 tracking-tight">
-              {formatCurrency(stats.totalRevenue)}
-            </p>
-            <p className="text-[11px] text-slate-500 font-medium">From referred guests</p>
-          </div>
-
-          {/* 5. Rewards Disbursed */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1 col-span-2 sm:col-span-1">
             <div className="flex items-center justify-between text-amber-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Rewards Disbursed</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Rewards Distributed</span>
               <Gift className="h-4 w-4 text-amber-500" />
             </div>
             <p className="text-2xl font-black text-amber-700 tracking-tight">
-              {formatCurrency(stats.totalRewardsPaid)}
+              {formatCurrency(stats.totalRewardsDistributed)}
             </p>
-            <p className="text-[11px] text-slate-500 font-medium">Travel credits issued</p>
+            <p className="text-[11px] text-slate-500 font-medium">Loyalty cash/credits</p>
           </div>
         </div>
 
@@ -186,12 +258,11 @@ export default function ReferralsAndRewardsPage() {
               </SelectTrigger>
               <SelectContent className="bg-white border-slate-200">
                 <SelectItem value="ALL">All Referral Statuses</SelectItem>
-                <SelectItem value="Shared">Shared</SelectItem>
-                <SelectItem value="Inquiry">Inquiry</SelectItem>
-                <SelectItem value="Booked">Booked</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-                <SelectItem value="Rewarded">Rewarded</SelectItem>
-                <SelectItem value="Cancelled">Cancelled</SelectItem>
+                <SelectItem value="PENDING">Pending (Inquiry)</SelectItem>
+                <SelectItem value="CONVERTED">Converted (Booked)</SelectItem>
+                <SelectItem value="REWARDED">Rewarded (Completed)</SelectItem>
+                <SelectItem value="EXPIRED">Expired</SelectItem>
+                <SelectItem value="CANCELLED">Cancelled</SelectItem>
               </SelectContent>
             </Select>
 
@@ -209,17 +280,31 @@ export default function ReferralsAndRewardsPage() {
                 Reset
               </Button>
             )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchReferrals}
+              className="h-9 text-xs"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-purple-600" : ""}`} />
+            </Button>
           </div>
         </div>
 
         {/* ─── REFERRALS TABLE / LIST ─────────────────────────────────────── */}
         <div className="space-y-3">
-          {filteredReferrals.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center p-16 bg-white rounded-2xl border border-slate-200/90 text-slate-400 text-xs gap-2">
+              <RefreshCw className="h-4 w-4 animate-spin text-purple-600" />
+              Loading database referral records...
+            </div>
+          ) : referrals.length === 0 ? (
             <div className="bg-white border border-slate-200/90 rounded-2xl p-12 text-center text-xs text-slate-400">
               No referrals found matching your query.
             </div>
           ) : (
-            filteredReferrals.map((ref) => (
+            referrals.map((ref) => (
               <div
                 key={ref.id}
                 className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 text-xs"
@@ -234,11 +319,11 @@ export default function ReferralsAndRewardsPage() {
                     </span>
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
-                        ref.status === "Completed" || ref.status === "Rewarded"
+                        ref.status === "REWARDED"
                           ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : ref.status === "Booked"
+                          : ref.status === "CONVERTED"
                           ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                          : ref.status === "Cancelled"
+                          : ref.status === "CANCELLED"
                           ? "bg-rose-50 text-rose-700 border-rose-200"
                           : "bg-amber-50 text-amber-700 border-amber-200"
                       }`}
@@ -248,61 +333,46 @@ export default function ReferralsAndRewardsPage() {
                   </div>
 
                   <p className="text-slate-500 flex items-center gap-2 flex-wrap">
-                    <span>Friend Phone: <strong>{ref.referredPhone}</strong></span>
+                    <span>Friend Phone: <strong>{ref.referredPhone || "N/A"}</strong></span>
                     <span>•</span>
                     <span>Created: {ref.createdAt.split("T")[0]}</span>
-                    {ref.bookingNumber && (
+                    {ref.convertedBookingNumber && (
                       <>
                         <span>•</span>
-                        <span>Booking: <strong className="font-mono text-indigo-600">{ref.bookingNumber}</strong></span>
+                        <span>Booking: <strong className="font-mono text-indigo-600">{ref.convertedBookingNumber}</strong></span>
                       </>
                     )}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-4 self-end lg:self-center">
-                  {ref.tripValue && (
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                        Booking Value
-                      </span>
-                      <span className="font-black text-sm text-slate-900">
-                        {formatCurrency(ref.tripValue)}
-                      </span>
-                    </div>
-                  )}
-
                   <div className="text-right">
                     <span className="text-[10px] text-purple-600 uppercase font-bold block">
                       Referrer Reward
                     </span>
                     <span className="font-black text-sm text-purple-700">
-                      {formatCurrency(ref.rewardAmount)}
+                      {formatCurrency(ref.rewardAmount || 500)}
                     </span>
                   </div>
 
                   {/* Status update actions */}
-                  {ref.status === "Inquiry" && (
+                  {ref.status === "PENDING" && (
                     <Button
                       size="sm"
-                      onClick={() =>
-                        updateReferralStatus(ref.id, "Booked", undefined, "BK-PENDING", 50000)
-                      }
+                      onClick={() => handleStatusTransition(ref.id, "CONVERTED")}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 px-3 rounded-xl cursor-pointer"
                     >
-                      Mark Booked
+                      Mark Converted
                     </Button>
                   )}
 
-                  {ref.status === "Booked" && (
+                  {ref.status === "CONVERTED" && (
                     <Button
                       size="sm"
-                      onClick={() =>
-                        updateReferralStatus(ref.id, "Completed", ref.bookingId, ref.bookingNumber, ref.tripValue)
-                      }
+                      onClick={() => handleStatusTransition(ref.id, "REWARDED")}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8 px-3 rounded-xl cursor-pointer"
                     >
-                      Complete & Reward
+                      Distribute Reward
                     </Button>
                   )}
                 </div>
@@ -312,10 +382,124 @@ export default function ReferralsAndRewardsPage() {
         </div>
       </div>
 
-      {/* ─── REFERRAL SETTINGS MODAL ────────────────────────────────────── */}
+      {/* ─── CREATE REFERRAL MODAL ─────────────────────────────────────── */}
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
+          <div className="bg-white border border-slate-200/90 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Gift className="h-5 w-5 text-purple-600" />
+                <h3 className="text-base font-bold text-slate-900">Record New Customer Referral</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateReferral} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">Existing Referrer Customer *</label>
+                <Select value={selectedCustomerId} onValueChange={(v) => setSelectedCustomerId(v || "")}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="Select existing customer..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-slate-200 max-h-56">
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} ({c.phone})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">Referred Friend Full Name *</label>
+                <Input
+                  value={friendName}
+                  onChange={(e) => setFriendName(e.target.value)}
+                  placeholder="e.g. Vikram Sharma"
+                  className="h-9 text-xs"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Friend Phone Number</label>
+                  <Input
+                    value={friendPhone}
+                    onChange={(e) => setFriendPhone(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="h-9 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Friend Email</label>
+                  <Input
+                    type="email"
+                    value={friendEmail}
+                    onChange={(e) => setFriendEmail(e.target.value)}
+                    placeholder="friend@gmail.com"
+                    className="h-9 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">Referrer Reward Amount (₹)</label>
+                <Input
+                  type="number"
+                  value={customReward}
+                  onChange={(e) => setCustomReward(e.target.value)}
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">Notes / Vacation Preference</label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="e.g. Planning a honeymoon to Bali in November."
+                  rows={2}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCreateOpen(false)}
+                  disabled={isSubmitting}
+                  className="h-8.5 text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isSubmitting}
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-8.5 px-4 rounded-xl cursor-pointer"
+                >
+                  {isSubmitting ? "Recording..." : "Create Referral"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── REFERRAL POLICY MODAL ──────────────────────────────────────── */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
-          <div className="bg-white border border-slate-200/90 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+          <div className="bg-white border border-slate-200/90 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-xs">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <Settings className="h-5 w-5 text-purple-600" />
@@ -330,7 +514,7 @@ export default function ReferralsAndRewardsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveSettings} className="space-y-4">
               <div className="space-y-1">
                 <label className="font-bold text-slate-700">Referrer Reward Amount (₹)</label>
                 <Input
@@ -373,14 +557,14 @@ export default function ReferralsAndRewardsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setIsSettingsOpen(false)}
-                  className="h-8 text-xs cursor-pointer"
+                  className="h-8.5 text-xs cursor-pointer"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   size="sm"
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold h-8 text-xs px-4 rounded-xl cursor-pointer"
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold h-8.5 text-xs px-4 rounded-xl cursor-pointer"
                 >
                   Save Policy
                 </Button>

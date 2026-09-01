@@ -4,6 +4,10 @@ import {
   PlanUpdateInput,
   AnnouncementCreateInput,
   AnnouncementUpdateInput,
+  SubscriptionPaymentFilterInput,
+  SubscriptionPaymentCreateInput,
+  SubscriptionPaymentVerifyInput,
+  SubscriptionPaymentRejectInput,
 } from "@/lib/validation/admin-schema";
 
 export const adminClient = {
@@ -229,4 +233,73 @@ export const adminClient = {
     }
     return res.json();
   },
+
+  async listSubscriptionPayments(filter?: SubscriptionPaymentFilterInput) {
+    const params = new URLSearchParams();
+    if (filter?.status) params.set("status", filter.status);
+    if (filter?.agencyId) params.set("agencyId", filter.agencyId);
+    if (filter?.subscriptionId) params.set("subscriptionId", filter.subscriptionId);
+    if (filter?.planId) params.set("planId", filter.planId);
+    if (filter?.search) params.set("search", filter.search);
+    if (filter?.startDate) params.set("startDate", filter.startDate);
+    if (filter?.endDate) params.set("endDate", filter.endDate);
+    if (filter?.page) params.set("page", filter.page.toString());
+    if (filter?.limit) params.set("limit", filter.limit.toString());
+
+    const res = await fetch(`/api/admin/subscription-payments?${params.toString()}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to fetch subscription payments");
+    }
+    return res.json();
+  },
+
+  async getSubscriptionPayment(id: string) {
+    const res = await fetch(`/api/admin/subscription-payments/${id}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to fetch subscription payment");
+    }
+    return res.json();
+  },
+
+  async createSubscriptionPayment(input: SubscriptionPaymentCreateInput) {
+    const res = await fetch("/api/admin/subscription-payments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to record subscription payment");
+    }
+    return res.json();
+  },
+
+  async verifySubscriptionPayment(id: string, input?: SubscriptionPaymentVerifyInput) {
+    const res = await fetch(`/api/admin/subscription-payments/${id}/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input || {}),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to verify subscription payment");
+    }
+    return res.json();
+  },
+
+  async rejectSubscriptionPayment(id: string, reason: string) {
+    const res = await fetch(`/api/admin/subscription-payments/${id}/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to reject subscription payment");
+    }
+    return res.json();
+  },
 };
+
