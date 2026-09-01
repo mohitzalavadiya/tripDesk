@@ -55,8 +55,8 @@ export function PipelineView({ pipeline = [], loading = false }: PipelineViewPro
 
           return (
             <div
-              key={stage.status}
-              onClick={() => router.push(`/enquiries?status=${stage.status}`)}
+              key={stage.stage || stage.status || idx}
+              onClick={() => router.push(`/enquiries${stage.status || stage.stage ? `?status=${stage.status || stage.stage}` : ""}`)}
               className="relative flex flex-col justify-between rounded-lg border border-slate-100 bg-slate-50/50 p-3 hover:border-indigo-200 hover:bg-indigo-50/20 transition-all group cursor-pointer"
             >
               <div className="space-y-1">

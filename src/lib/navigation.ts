@@ -81,6 +81,11 @@ export const agencyNavigationConfig: NavigationSection[] = [
         badgeVariant: "travel",
       },
       {
+        label: "Documents",
+        href: "/documents",
+        icon: FileText,
+      },
+      {
         label: "Operations",
         href: "/operations",
         icon: Activity,
@@ -171,15 +176,11 @@ export const adminNavigationConfig: NavigationSection[] = [
         label: "Agencies",
         href: "/admin/agencies",
         icon: Building,
-        badge: "24",
-        badgeVariant: "info",
       },
       {
         label: "Subscriptions",
         href: "/admin/subscriptions",
         icon: CreditCard,
-        badge: "Active",
-        badgeVariant: "success",
       },
       {
         label: "Plans & Pricing",
@@ -187,15 +188,25 @@ export const adminNavigationConfig: NavigationSection[] = [
         icon: Layers,
       },
       {
-        label: "SaaS Payments",
-        href: "/admin/payments",
-        icon: IndianRupee,
+        label: "Usage & Analytics",
+        href: "/admin/analytics",
+        icon: TrendingUp,
       },
     ],
   },
   {
-    title: "SYSTEM",
+    title: "GOVERNANCE & SYSTEM",
     items: [
+      {
+        label: "Audit Logs",
+        href: "/admin/audit-logs",
+        icon: Activity,
+      },
+      {
+        label: "Announcements",
+        href: "/admin/announcements",
+        icon: Star,
+      },
       {
         label: "Platform Settings",
         href: "/admin/settings",

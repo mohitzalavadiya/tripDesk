@@ -177,6 +177,23 @@ export default function SuppliersPage() {
     }
   };
 
+  // Handle Reactivate
+  const handleReactivate = async (id: string, name: string, code?: string | null) => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Read-only mode is active.");
+      return;
+    }
+
+    const ref = code ? `${code} (${name})` : name;
+    try {
+      await supplierClient.reactivateSupplier(id);
+      toast.success(`Supplier ${ref} reactivated successfully.`);
+      await fetchSuppliers();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to reactivate supplier.");
+    }
+  };
+
   // Telemetry Aggregates
   const totalSuppliers = pagination.total;
   const activeSuppliers = React.useMemo(
@@ -513,7 +530,16 @@ export default function SuppliersPage() {
                                     Add Rate Sheet
                                   </DropdownMenuItem>
 
-                                  {!isArchived && (
+                                  {isArchived || s.status === "INACTIVE" ? (
+                                    <DropdownMenuItem
+                                      onClick={() => handleReactivate(s.id, s.name, s.supplierCode)}
+                                      disabled={isReadOnly}
+                                      className="text-xs text-emerald-600 hover:bg-emerald-50 cursor-pointer rounded-md"
+                                    >
+                                      <RotateCcw className="mr-2 h-3.5 w-3.5 text-emerald-500" />
+                                      Reactivate Supplier
+                                    </DropdownMenuItem>
+                                  ) : (
                                     <DropdownMenuItem
                                       onClick={() => handleArchive(s.id, s.name, s.supplierCode)}
                                       disabled={isReadOnly}

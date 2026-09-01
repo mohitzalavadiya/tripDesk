@@ -135,6 +135,32 @@ export interface UnifiedTransactionItem {
   description?: string | null;
 }
 
+export interface BookingPaymentMilestoneScheduleItem {
+  id: string;
+  title: string;
+  percentage: number;
+  plannedAmount: number;
+  allocatedAmount: number;
+  remainingAmount: number;
+  dueDate: string | null;
+  status: "PENDING" | "PARTIALLY_PAID" | "PAID";
+  isOverdue: boolean;
+}
+
+export interface BookingPaymentScheduleResult {
+  bookingId: string;
+  bookingNumber: string;
+  totalBookingAmount: number;
+  netReceivedAmount: number;
+  outstandingBalance: number;
+  paymentStatus: BookingPaymentStatus;
+  milestones: BookingPaymentMilestoneScheduleItem[];
+  totalMilestonesPlanned: number;
+  totalMilestonesAllocated: number;
+  overdueMilestonesCount: number;
+  overdueMilestonesAmount: number;
+}
+
 export interface BookingFinanceBreakdown {
   bookingId: string;
   bookingNumber: string;
@@ -147,6 +173,11 @@ export interface BookingFinanceBreakdown {
   customerRefunded: number;
   customerOutstanding: number;
   paymentStatus: BookingPaymentStatus;
+  paymentSchedule: BookingPaymentMilestoneScheduleItem[];
+  totalMilestonesPlanned: number;
+  totalMilestonesAllocated: number;
+  overdueMilestonesCount: number;
+  overdueMilestonesAmount: number;
   supplierCostPlanned: number;
   supplierCostActual: number;
   supplierPaid: number;
@@ -379,7 +410,25 @@ export const financeService = {
       await this.verifyOperationNotFinalized(agencyId, booking.tripOperation.id);
     }
 
-    // 3. Generate sequential payment number
+    // 3. Idempotency Check: if referenceNumber or idempotencyKey provided, prevent double recording
+    if (input.referenceNumber || input.idempotencyKey) {
+      const existingPayment = await prisma.payment.findFirst({
+        where: {
+          agencyId,
+          bookingId: input.bookingId,
+          archivedAt: null,
+          ...(input.referenceNumber ? { referenceNumber: input.referenceNumber } : {}),
+          ...(input.idempotencyKey
+            ? { notes: { contains: `[idempotency:${input.idempotencyKey}]` } }
+            : {}),
+        },
+      });
+      if (existingPayment) {
+        return existingPayment;
+      }
+    }
+
+    // 4. Generate sequential payment number
     const year = new Date().getFullYear();
     const prefix = `PAY-${year}-`;
     const last = await prisma.payment.findFirst({
@@ -394,6 +443,10 @@ export const financeService = {
       if (!isNaN(num)) seq = num + 1;
     }
     const paymentNumber = `${prefix}${String(seq).padStart(5, "0")}`;
+
+    const notesWithIdempotency = input.idempotencyKey
+      ? `${input.notes || ""} [idempotency:${input.idempotencyKey}]`.trim()
+      : input.notes;
 
     const payment = await prisma.$transaction(async (tx) => {
       const p = await tx.payment.create({
@@ -412,7 +465,7 @@ export const financeService = {
           referenceNumber: input.referenceNumber,
           receiptNumber: input.receiptNumber,
           receivedBy: input.receivedBy,
-          notes: input.notes,
+          notes: notesWithIdempotency,
         },
       });
 
@@ -483,8 +536,16 @@ export const financeService = {
       await this.verifyOperationNotFinalized(agencyId, payment.booking.tripOperation.id);
     }
 
+    // Check for idempotency on refund
+    if (input.idempotencyKey && payment.notes?.includes(`[refund-idempotency:${input.idempotencyKey}]`)) {
+      return payment;
+    }
+
     const newRefundedAmount = currentRefunded + input.amount;
     const isFullyRefunded = Math.abs(newRefundedAmount - Number(payment.amount)) < 0.01;
+
+    const refundNoteTag = input.idempotencyKey ? ` [refund-idempotency:${input.idempotencyKey}]` : "";
+    const refundNoteText = `Refund: ₹${input.amount} (${input.reason})${refundNoteTag}`;
 
     const updated = await prisma.$transaction(async (tx) => {
       const p = await tx.payment.update({
@@ -494,8 +555,8 @@ export const financeService = {
           refundedAt: input.refundDate ? new Date(input.refundDate) : new Date(),
           status: isFullyRefunded ? PaymentStatus.REFUNDED : PaymentStatus.COMPLETED,
           notes: payment.notes
-            ? `${payment.notes} | Refund: ₹${input.amount} (${input.reason})`
-            : `Refund: ₹${input.amount} (${input.reason})`,
+            ? `${payment.notes} | ${refundNoteText}`
+            : refundNoteText,
         },
       });
 
@@ -517,6 +578,7 @@ export const financeService = {
               paymentNumber: payment.paymentNumber,
               refundAmount: input.amount,
               reason: input.reason,
+              idempotencyKey: input.idempotencyKey,
             },
             createdBy: userId,
           },
@@ -568,8 +630,25 @@ export const financeService = {
       if (!trip) throw new Error("Trip not found or does not belong to your agency.");
     }
 
+    // Idempotency check for supplier payable
+    if (input.idempotencyKey) {
+      const existing = await prisma.supplierPayable.findFirst({
+        where: {
+          agencyId,
+          supplierId: input.supplierId,
+          archivedAt: null,
+          notes: { contains: `[idempotency:${input.idempotencyKey}]` },
+        },
+      });
+      if (existing) return existing;
+    }
+
     const payableNumber = await this.generateNextPayableNumber(agencyId);
     const actual = input.actualAmount > 0 ? input.actualAmount : input.plannedAmount;
+
+    const notesWithIdempotency = input.idempotencyKey
+      ? `${input.notes || ""} [idempotency:${input.idempotencyKey}]`.trim()
+      : input.notes;
 
     return prisma.supplierPayable.create({
       data: {
@@ -589,7 +668,7 @@ export const financeService = {
         outstandingAmount: new Prisma.Decimal(actual),
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
         status: SupplierPayableStatus.PENDING,
-        notes: input.notes,
+        notes: notesWithIdempotency,
       },
     });
   },
@@ -618,7 +697,27 @@ export const financeService = {
       }
     }
 
+    // Idempotency check for supplier payment
+    if (input.referenceNumber || input.idempotencyKey) {
+      const existing = await prisma.supplierPayment.findFirst({
+        where: {
+          agencyId,
+          supplierId: input.supplierId,
+          archivedAt: null,
+          ...(input.referenceNumber ? { referenceNumber: input.referenceNumber } : {}),
+          ...(input.idempotencyKey
+            ? { notes: { contains: `[idempotency:${input.idempotencyKey}]` } }
+            : {}),
+        },
+      });
+      if (existing) return existing;
+    }
+
     const paymentNumber = await this.generateNextSupplierPaymentNumber(agencyId);
+
+    const notesWithIdempotency = input.idempotencyKey
+      ? `${input.notes || ""} [idempotency:${input.idempotencyKey}]`.trim()
+      : input.notes;
 
     return prisma.$transaction(async (tx) => {
       const payment = await tx.supplierPayment.create({
@@ -634,7 +733,7 @@ export const financeService = {
           paymentDate: input.paymentDate ? new Date(input.paymentDate) : new Date(),
           referenceNumber: input.referenceNumber,
           status: SupplierPaymentStatus.COMPLETED,
-          notes: input.notes,
+          notes: notesWithIdempotency,
           paidBy: input.paidBy,
         },
       });
@@ -1323,6 +1422,9 @@ export const financeService = {
     const netReceived = Math.max(0, customerPaid - customerRefunded);
     const customerOutstanding = Math.max(0, totalBookingAmount - netReceived);
 
+    // Fetch live booking payment schedule with waterfall milestone allocation
+    const schedule = await this.getBookingPaymentSchedule(agencyId, bookingId);
+
     let supplierCostPlanned = 0;
     let supplierCostActual = 0;
     let supplierPaid = 0;
@@ -1364,6 +1466,11 @@ export const financeService = {
       customerRefunded,
       customerOutstanding,
       paymentStatus: booking.paymentStatus,
+      paymentSchedule: schedule.milestones,
+      totalMilestonesPlanned: schedule.totalMilestonesPlanned,
+      totalMilestonesAllocated: schedule.totalMilestonesAllocated,
+      overdueMilestonesCount: schedule.overdueMilestonesCount,
+      overdueMilestonesAmount: schedule.overdueMilestonesAmount,
       supplierCostPlanned,
       supplierCostActual,
       supplierPaid,
@@ -1377,6 +1484,159 @@ export const financeService = {
       supplierPayables: booking.supplierPayables,
       supplierPayments: booking.supplierPayments,
       expenses: booking.expenses,
+    };
+  },
+
+  /**
+   * Get payment milestone schedule and waterfall allocation for a Booking
+   */
+  async getBookingPaymentSchedule(
+    agencyId: string,
+    bookingId: string
+  ): Promise<BookingPaymentScheduleResult> {
+    const booking = await prisma.booking.findFirst({
+      where: { id: bookingId, agencyId, archivedAt: null },
+      include: {
+        quotation: {
+          include: {
+            paymentMilestones: { orderBy: { sortOrder: "asc" } },
+          },
+        },
+        payments: {
+          where: { archivedAt: null },
+          orderBy: { paymentDate: "asc" },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new Error("Booking not found.");
+    }
+
+    const totalBookingAmount = Number(booking.totalAmount);
+    let netReceivedAmount = 0;
+
+    for (const p of booking.payments) {
+      if (p.status === PaymentStatus.COMPLETED || p.status === PaymentStatus.REFUNDED) {
+        netReceivedAmount += Number(p.amount) - Number(p.refundedAmount || 0);
+      }
+    }
+    netReceivedAmount = Math.max(0, netReceivedAmount);
+    const outstandingBalance = Math.max(0, totalBookingAmount - netReceivedAmount);
+
+    let rawMilestones = (booking.quotation?.paymentMilestones || []).map((m) => ({
+      id: m.id,
+      title: m.title,
+      description: m.description,
+      percentage: m.percentage ? Number(m.percentage) : null,
+      amount: m.amount ? Number(m.amount) : null,
+      dueDate: m.dueDate,
+      sortOrder: m.sortOrder,
+    }));
+
+    // If no quotation milestones exist, generate standard default schedule
+    if (rawMilestones.length === 0 && totalBookingAmount > 0) {
+      const advanceAmt = Math.round(totalBookingAmount * 0.3 * 100) / 100;
+      const finalAmt = Math.round((totalBookingAmount - advanceAmt) * 100) / 100;
+
+      const departureDate = booking.travelStartDate ? new Date(booking.travelStartDate) : null;
+      let finalDueDate: Date | null = null;
+      if (departureDate) {
+        const d = new Date(departureDate);
+        d.setDate(d.getDate() - 7);
+        finalDueDate = d;
+      }
+
+      rawMilestones = [
+        {
+          id: `default-milestone-1-${booking.id}`,
+          title: "Advance Booking Deposit",
+          description: "Initial booking confirmation deposit",
+          percentage: 30,
+          amount: advanceAmt,
+          dueDate: booking.bookingDate || new Date(),
+          sortOrder: 1,
+        },
+        {
+          id: `default-milestone-2-${booking.id}`,
+          title: "Final Tour Balance",
+          description: "Remaining balance prior to tour commencement",
+          percentage: 70,
+          amount: finalAmt,
+          dueDate: finalDueDate,
+          sortOrder: 2,
+        },
+      ];
+    }
+
+    // Process deterministic waterfall allocation across milestones
+    let remainingNetPaid = netReceivedAmount;
+    const now = new Date();
+    const milestoneItems: BookingPaymentMilestoneScheduleItem[] = [];
+
+    let totalMilestonesPlanned = 0;
+    let totalMilestonesAllocated = 0;
+    let overdueMilestonesCount = 0;
+    let overdueMilestonesAmount = 0;
+
+    for (let i = 0; i < rawMilestones.length; i++) {
+      const m = rawMilestones[i];
+      let plannedAmount = m.amount ? m.amount : 0;
+      if (plannedAmount === 0 && m.percentage) {
+        plannedAmount = (m.percentage / 100) * totalBookingAmount;
+      }
+      plannedAmount = Math.round(plannedAmount * 100) / 100;
+      totalMilestonesPlanned += plannedAmount;
+
+      const allocated = Math.min(plannedAmount, Math.max(0, remainingNetPaid));
+      remainingNetPaid = Math.max(0, remainingNetPaid - allocated);
+      const remainingMilestone = Math.max(0, plannedAmount - allocated);
+      totalMilestonesAllocated += allocated;
+
+      let status: "PENDING" | "PARTIALLY_PAID" | "PAID" = "PENDING";
+      if (allocated >= plannedAmount && plannedAmount > 0) {
+        status = "PAID";
+      } else if (allocated > 0) {
+        status = "PARTIALLY_PAID";
+      }
+
+      const isOverdue = Boolean(m.dueDate && new Date(m.dueDate) < now && remainingMilestone > 0);
+      if (isOverdue) {
+        overdueMilestonesCount++;
+        overdueMilestonesAmount += remainingMilestone;
+      }
+
+      const percentage = m.percentage
+        ? m.percentage
+        : totalBookingAmount > 0
+        ? Math.round((plannedAmount / totalBookingAmount) * 100 * 10) / 10
+        : 0;
+
+      milestoneItems.push({
+        id: m.id,
+        title: m.title,
+        percentage,
+        plannedAmount,
+        allocatedAmount: allocated,
+        remainingAmount: remainingMilestone,
+        dueDate: m.dueDate ? new Date(m.dueDate).toISOString() : null,
+        status,
+        isOverdue,
+      });
+    }
+
+    return {
+      bookingId: booking.id,
+      bookingNumber: booking.bookingNumber,
+      totalBookingAmount,
+      netReceivedAmount,
+      outstandingBalance,
+      paymentStatus: booking.paymentStatus,
+      milestones: milestoneItems,
+      totalMilestonesPlanned,
+      totalMilestonesAllocated,
+      overdueMilestonesCount,
+      overdueMilestonesAmount,
     };
   },
 

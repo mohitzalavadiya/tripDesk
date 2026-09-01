@@ -75,6 +75,7 @@ export interface CustomerDetails360 extends Customer {
   quotations: any[];
   bookings: any[];
   payments: any[];
+  isRepeatCustomer?: boolean;
   financials: {
     totalEnquiries: number;
     totalTrips: number;

@@ -62,6 +62,8 @@ export const recordCustomerPaymentSchema = z.object({
   referenceNumber: z.string().max(100).optional().nullable(),
   receiptNumber: z.string().max(100).optional().nullable(),
   receivedBy: z.string().max(150).optional().nullable(),
+  milestoneId: z.string().optional().nullable(),
+  idempotencyKey: z.string().max(128).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
 });
 
@@ -72,6 +74,7 @@ export const refundCustomerPaymentSchema = z.object({
   reason: z.string().min(3, "Refund reason is required (min 3 characters)"),
   referenceNumber: z.string().max(100).optional().nullable(),
   refundDate: z.string().datetime().or(z.string().min(10)).optional(),
+  idempotencyKey: z.string().max(128).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
 });
 
@@ -93,6 +96,7 @@ export const createSupplierPayableSchema = z.object({
   plannedAmount: z.coerce.number().min(0, "Planned amount cannot be negative").default(0),
   actualAmount: z.coerce.number().min(0, "Actual amount cannot be negative").default(0),
   dueDate: z.string().datetime().or(z.string().min(10)).optional().nullable(),
+  idempotencyKey: z.string().max(128).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
 });
 
@@ -122,6 +126,7 @@ export const recordSupplierPaymentSchema = z.object({
   paymentMethod: z.nativeEnum(PaymentMethod).default(PaymentMethod.BANK_TRANSFER),
   paymentDate: z.string().datetime().or(z.string().min(10)).optional(),
   referenceNumber: z.string().max(100).optional().nullable(),
+  idempotencyKey: z.string().max(128).optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
   paidBy: z.string().max(150).optional().nullable(),
 });

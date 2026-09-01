@@ -54,6 +54,7 @@ export interface CustomerDetails360 extends Customer {
   quotations: any[];
   bookings: any[];
   payments: any[];
+  isRepeatCustomer: boolean;
   financials: {
     totalEnquiries: number;
     totalTrips: number;
@@ -253,6 +254,7 @@ export const customerService = {
           take: 50,
           include: {
             convertedTrip: { select: { id: true, tripNumber: true, title: true } },
+            followUps: { where: { archivedAt: null } },
           },
         },
         trips: {
@@ -312,6 +314,12 @@ export const customerService = {
       totalOutstandingBalance += Number(b.balanceAmount || 0);
     }
 
+    // Derive server-authoritative repeat customer status
+    const isRepeatCustomer =
+      customer.trips.some((t) => t.status === "COMPLETED" || t.status === "ONGOING" || t.status === "BOOKED") ||
+      customer.bookings.some((b) => b.status === "CONFIRMED" || b.status === "COMPLETED" || b.status === "ONGOING") ||
+      customer.enquiries.some((e) => e.status === "CONVERTED");
+
     // Derive unified CRM activity timeline
     const timeline: CustomerActivityEvent[] = [];
 
@@ -335,6 +343,23 @@ export const customerService = {
         statusBadge: enq.status,
         amount: enq.budget ? Number(enq.budget) : undefined,
       });
+
+      if (enq.followUps) {
+        for (const fu of enq.followUps) {
+          if (fu.status === "COMPLETED" && fu.completedAt) {
+            timeline.push({
+              id: `fu-comp-${fu.id}`,
+              type: "ENQUIRY_CREATED",
+              title: `${fu.type} Follow-up Completed`,
+              description: fu.outcome ? `Outcome: ${fu.outcome}` : `Follow-up completed for ${enq.destination} lead.`,
+              timestamp: fu.completedAt,
+              referenceId: enq.id,
+              referenceUrl: `/enquiries/${enq.id}`,
+              statusBadge: "COMPLETED",
+            });
+          }
+        }
+      }
 
       if (enq.status === "CONVERTED" && enq.closedAt) {
         timeline.push({
@@ -409,6 +434,7 @@ export const customerService = {
 
     return {
       ...customer,
+      isRepeatCustomer,
       financials: {
         totalEnquiries: customer.enquiries.length,
         totalTrips: customer.trips.length,
@@ -420,6 +446,16 @@ export const customerService = {
       },
       timeline,
     };
+  },
+
+  /**
+   * Alias for getCustomerDetails
+   */
+  async getCustomerDetails360(
+    agencyId: string,
+    customerId: string
+  ): Promise<CustomerDetails360 | null> {
+    return this.getCustomerDetails(agencyId, customerId);
   },
 
   /**

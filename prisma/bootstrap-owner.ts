@@ -14,8 +14,8 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function bootstrapPlatformOwner() {
-  const email = process.env.BOOTSTRAP_OWNER_EMAIL || "owner@tripdesk.io";
-  const password = process.env.BOOTSTRAP_OWNER_PASSWORD || "ChangeMeTripDesk2026!";
+  const email = process.env.BOOTSTRAP_OWNER_EMAIL;
+  const password = process.env.BOOTSTRAP_OWNER_PASSWORD;
   const name = process.env.BOOTSTRAP_OWNER_NAME || "TripDesk Platform Owner";
 
   console.log(`🔐 Bootstrapping Platform Owner: ${email}`);

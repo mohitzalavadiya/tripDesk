@@ -28,6 +28,8 @@ import {
   Plus,
   Loader2,
   Globe,
+  AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 
 export default function NewSupplierPage() {
@@ -52,8 +54,41 @@ export default function NewSupplierPage() {
   const [notes, setNotes] = React.useState("");
   const [internalNotes, setInternalNotes] = React.useState("");
 
+  const [duplicateMatches, setDuplicateMatches] = React.useState<any[]>([]);
+  const [checkingDuplicates, setCheckingDuplicates] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
+
+  // Debounced duplicate detection
+  React.useEffect(() => {
+    if (!name.trim() || name.trim().length < 2) {
+      setDuplicateMatches([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setCheckingDuplicates(true);
+        const res = await supplierClient.checkDuplicate({
+          name: name.trim(),
+          phone: phone.trim() || undefined,
+          email: email.trim() || undefined,
+        });
+
+        if (res.success && res.data?.isDuplicate) {
+          setDuplicateMatches(res.data.matches);
+        } else {
+          setDuplicateMatches([]);
+        }
+      } catch (err) {
+        // Non-blocking duplicate check error
+      } finally {
+        setCheckingDuplicates(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [name, phone, email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,7 +152,42 @@ export default function NewSupplierPage() {
           ]}
         />
 
-        <div className="max-w-4xl mx-auto w-full">
+        <div className="max-w-4xl mx-auto w-full space-y-4">
+          {duplicateMatches.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 text-xs space-y-2">
+              <div className="flex items-center gap-2 text-amber-800 font-bold">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <span>Potential Duplicate Suppliers Found ({duplicateMatches.length})</span>
+              </div>
+              <p className="text-slate-600 text-[11px]">
+                A supplier with matching details is already registered under your agency. You can review existing records before creating a duplicate.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                {duplicateMatches.map((match) => (
+                  <div
+                    key={match.id}
+                    className="bg-white p-2.5 rounded-xl border border-amber-200/60 flex items-center justify-between gap-2"
+                  >
+                    <div>
+                      <h4 className="font-bold text-slate-900">{match.name}</h4>
+                      <p className="text-[10px] text-slate-500 font-mono">
+                        {match.supplierCode || "SUP"} • {match.phone || match.email || match.type || "Vendor"}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/suppliers/${match.id}`}
+                      target="_blank"
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 shrink-0"
+                    >
+                      <span>View</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* 1. Identity & Business Type */}
             <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">

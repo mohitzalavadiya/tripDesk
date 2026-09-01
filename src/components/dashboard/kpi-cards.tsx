@@ -8,24 +8,26 @@ import {
   Compass,
   IndianRupee,
   ArrowUpRight,
-  Hotel,
-  Car,
-  Ticket,
-  Building2,
-  ChevronRight,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Send,
+  ShieldCheck,
   CreditCard,
+  Building,
 } from "lucide-react";
-import { DashboardSummary } from "@/lib/services/dashboard-service";
+import { DashboardExecutiveSummary } from "@/lib/services/dashboard-service";
+import { Badge } from "@/components/ui/badge";
 
 interface KpiCardsProps {
-  summary?: DashboardSummary | null;
+  summary?: DashboardExecutiveSummary | null;
   loading?: boolean;
 }
 
 export function KpiCards({ summary, loading = false }: KpiCardsProps) {
-  const formatRupees = (valStr?: string) => {
-    const val = Number(valStr || "0");
-    if (isNaN(val)) return "₹0";
+  const formatRupees = (val?: number) => {
+    if (val === undefined || val === null || isNaN(val)) return "₹0";
     if (val >= 10000000) {
       return `₹${(val / 10000000).toFixed(2)}Cr`;
     }
@@ -35,188 +37,184 @@ export function KpiCards({ summary, loading = false }: KpiCardsProps) {
     return `₹${val.toLocaleString("en-IN")}`;
   };
 
-  const newEnquiriesCount = summary?.enquiries.new ?? 0;
-  const activeQuotationsCount = summary?.quotations.total ?? 0;
-  const confirmedBookingsCount = summary?.bookings.confirmed ?? 0;
-  const totalCollected = summary?.payments.collected ?? "0.00";
-  const totalOutstanding = summary?.payments.outstanding ?? "0.00";
-
-  const kpiItems = [
-    {
-      title: "New Enquiries",
-      value: String(newEnquiriesCount).padStart(2, "0"),
-      subtext: `${summary?.enquiries.total ?? 0} total lifetime`,
-      icon: Inbox,
-      href: "/enquiries?status=NEW",
-    },
-    {
-      title: "Active Quotations",
-      value: String(activeQuotationsCount).padStart(2, "0"),
-      subtext: `${summary?.quotations.accepted ?? 0} accepted`,
-      icon: FileText,
-      href: "/quotations",
-    },
-    {
-      title: "Confirmed Bookings",
-      value: String(confirmedBookingsCount).padStart(2, "0"),
-      subtext: `${summary?.bookings.total ?? 0} total bookings`,
-      icon: Compass,
-      href: "/bookings",
-    },
-    {
-      title: "Payments Collected",
-      value: formatRupees(totalCollected),
-      subtext: `₹${Number(totalOutstanding).toLocaleString("en-IN")} balance due`,
-      icon: IndianRupee,
-      href: "/payments",
-    },
-  ];
-
-  const activeHotels = summary?.inventory.activeHotels ?? 0;
-  const activeVehicles = summary?.inventory.activeVehicles ?? 0;
-  const activeActivities = summary?.inventory.activeActivities ?? 0;
-  const activeSuppliers = summary?.inventory.activeSuppliers ?? 0;
-  const activeRateSheets = summary?.inventory.activeRateSheets ?? 0;
-
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="h-32 rounded-xl border border-slate-100 bg-white p-5 animate-pulse shadow-2xs"
-            >
-              <div className="flex justify-between items-center">
-                <div className="h-3 w-24 bg-slate-200 rounded" />
-                <div className="h-8 w-8 bg-slate-100 rounded-lg" />
-              </div>
-              <div className="h-7 w-16 bg-slate-200 rounded mt-4" />
-              <div className="h-3 w-32 bg-slate-100 rounded mt-2" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="h-36 rounded-2xl border border-slate-100 bg-white p-5 animate-pulse shadow-2xs"
+          >
+            <div className="flex justify-between items-center">
+              <div className="h-3 w-24 bg-slate-200 rounded" />
+              <div className="h-8 w-8 bg-slate-100 rounded-xl" />
             </div>
-          ))}
-        </div>
+            <div className="h-8 w-28 bg-slate-200 rounded-lg mt-4" />
+            <div className="h-3 w-36 bg-slate-100 rounded mt-2" />
+          </div>
+        ))}
       </div>
     );
   }
 
+  const fin = summary?.financial;
+  const sales = summary?.sales;
+  const ops = summary?.operations;
+  const crm = summary?.crm;
+
   return (
     <div className="space-y-4">
-      {/* 4 Core Sales KPIs */}
+      {/* 4 Primary Executive KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {kpiItems.map((kpi, idx) => {
-          const Icon = kpi.icon;
-          return (
-            <Link
-              key={idx}
-              href={kpi.href}
-              className="rounded-xl border border-slate-200/80 bg-white p-5 transition-all hover:shadow-xs hover:border-indigo-200 group/card animate-in fade-in duration-200 slide-in-from-bottom-2 cursor-pointer"
-              style={{ animationDelay: `${idx * 40}ms` }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  {kpi.title}
-                </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-slate-600 group-hover/card:bg-indigo-50 group-hover/card:text-indigo-600 transition-colors">
-                  <Icon className="h-4 w-4 stroke-[1.8]" />
-                </div>
+        {/* 1. Total Booking Value & Revenue */}
+        <Link
+          href="/bookings"
+          className="group relative flex flex-col justify-between p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all duration-200"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Booking Value
+              </span>
+              <div className="h-8 w-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <IndianRupee className="h-4 w-4" />
               </div>
-
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
-                  {kpi.value}
-                </span>
-              </div>
-
-              <div className="mt-2 flex items-center justify-between text-xs">
-                <span className="text-slate-400 font-medium">{kpi.subtext}</span>
-                <span className="flex items-center font-semibold text-indigo-600 group-hover/card:translate-x-0.5 transition-transform">
-                  View <ChevronRight className="h-3 w-3 ml-0.5" />
-                </span>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Inventory & Supplier Live Quick Strip */}
-      <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Travel Inventory & B2B Rates Network
-            </h4>
+            </div>
+            <div className="text-2xl font-black text-slate-900 tracking-tight mt-2">
+              {formatRupees(fin?.totalBookingValue)}
+            </div>
           </div>
-          <span className="text-[11px] text-slate-400 font-medium">
-            {activeRateSheets} Active Supplier Tariffs Loaded
-          </span>
+          <div className="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-50 mt-3">
+            <span>Collected: <strong className="text-emerald-700 font-bold">{formatRupees(fin?.amountCollected)}</strong></span>
+            <span className="text-indigo-600 font-semibold flex items-center group-hover:translate-x-0.5 transition-transform">
+              Bookings <ArrowUpRight className="h-3 w-3 ml-0.5" />
+            </span>
+          </div>
+        </Link>
+
+        {/* 2. Outstanding Receivables & Balance */}
+        <Link
+          href="/payments"
+          className="group relative flex flex-col justify-between p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-rose-300 transition-all duration-200"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Customer Receivables
+              </span>
+              <div className="h-8 w-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <CreditCard className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-rose-700 tracking-tight mt-2">
+              {formatRupees(fin?.outstandingReceivables)}
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-50 mt-3">
+            <span>Payables: <strong className="text-slate-700 font-bold">{formatRupees(fin?.supplierOutstanding)}</strong></span>
+            <span className="text-rose-600 font-semibold flex items-center group-hover:translate-x-0.5 transition-transform">
+              Ledger <ArrowUpRight className="h-3 w-3 ml-0.5" />
+            </span>
+          </div>
+        </Link>
+
+        {/* 3. Estimated Profit & Margin */}
+        <div className="flex flex-col justify-between p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Gross Profit & Margin
+              </span>
+              <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <TrendingUp className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-2xl font-black text-emerald-700 tracking-tight">
+                {formatRupees(fin?.grossProfit)}
+              </span>
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                {fin?.grossMarginPercent ?? 0}% Margin
+              </Badge>
+            </div>
+          </div>
+          <div className="text-xs text-slate-500 pt-3 border-t border-slate-50 mt-3">
+            <span>Cost: <strong className="text-slate-700 font-bold">{formatRupees(fin?.supplierPayable)}</strong></span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
-          <Link
-            href="/hotels"
-            className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50/75 hover:bg-indigo-50/60 border border-slate-100 transition-colors group"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-white border border-slate-200/80 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                <Hotel className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-[11px] text-slate-500 font-semibold">Hotels</div>
-                <div className="text-sm font-bold text-slate-900">{activeHotels} Active</div>
+        {/* 4. Sales Conversion & Funnel Won */}
+        <Link
+          href="/enquiries"
+          className="group relative flex flex-col justify-between p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-purple-300 transition-all duration-200"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Booking Conversion
+              </span>
+              <div className="h-8 w-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <ShieldCheck className="h-4 w-4" />
               </div>
             </div>
-            <ChevronRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-indigo-600" />
-          </Link>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-2xl font-black text-purple-900 tracking-tight">
+                {sales?.bookingConversionRate ?? 0}%
+              </span>
+              <span className="text-xs font-bold text-slate-500">
+                ({sales?.confirmedBookings ?? 0} Won)
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-50 mt-3">
+            <span>Enquiries: <strong className="text-slate-700 font-bold">{sales?.newEnquiries ?? 0} new</strong></span>
+            <span className="text-purple-600 font-semibold flex items-center group-hover:translate-x-0.5 transition-transform">
+              CRM <ArrowUpRight className="h-3 w-3 ml-0.5" />
+            </span>
+          </div>
+        </Link>
+      </div>
 
-          <Link
-            href="/vehicles"
-            className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50/75 hover:bg-blue-50/60 border border-slate-100 transition-colors group"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-white border border-slate-200/80 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                <Car className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-[11px] text-slate-500 font-semibold">Vehicles</div>
-                <div className="text-sm font-bold text-slate-900">{activeVehicles} Fleet</div>
-              </div>
-            </div>
-            <ChevronRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-blue-600" />
-          </Link>
+      {/* Secondary Operations & CRM Fast Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Compass className="h-4 w-4 text-indigo-600" />
+            <span className="text-xs font-bold text-slate-700">Upcoming Trips</span>
+          </div>
+          <Badge variant="outline" className="bg-white text-indigo-700 font-bold text-xs">
+            {ops?.upcomingTripsCount ?? 0}
+          </Badge>
+        </div>
 
-          <Link
-            href="/activities"
-            className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50/75 hover:bg-emerald-50/60 border border-slate-100 transition-colors group"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-white border border-slate-200/80 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                <Ticket className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-[11px] text-slate-500 font-semibold">Activities</div>
-                <div className="text-sm font-bold text-slate-900">{activeActivities} Tours</div>
-              </div>
-            </div>
-            <ChevronRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-emerald-600" />
-          </Link>
+        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <span className="text-xs font-bold text-slate-700">Ready Trips</span>
+          </div>
+          <Badge variant="outline" className="bg-white text-emerald-700 font-bold text-xs">
+            {ops?.operationallyReadyTripsCount ?? 0}
+          </Badge>
+        </div>
 
-          <Link
-            href="/suppliers"
-            className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50/75 hover:bg-purple-50/60 border border-slate-100 transition-colors group"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-white border border-slate-200/80 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                <Building2 className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-[11px] text-slate-500 font-semibold">Suppliers</div>
-                <div className="text-sm font-bold text-slate-900">{activeSuppliers} Vendors</div>
-              </div>
-            </div>
-            <ChevronRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-purple-600" />
-          </Link>
+        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-amber-600" />
+            <span className="text-xs font-bold text-slate-700">Due Follow-ups</span>
+          </div>
+          <Badge variant="outline" className="bg-white text-amber-700 font-bold text-xs">
+            {crm?.followUpsDueTodayCount ?? 0}
+          </Badge>
+        </div>
+
+        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-rose-600" />
+            <span className="text-xs font-bold text-slate-700">Overdue Leads</span>
+          </div>
+          <Badge variant="outline" className="bg-white text-rose-700 font-bold text-xs">
+            {crm?.overdueFollowUpsCount ?? 0}
+          </Badge>
         </div>
       </div>
     </div>

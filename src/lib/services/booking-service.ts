@@ -5,8 +5,14 @@ import {
   BookingStatus,
   BookingPaymentStatus,
   QuotationStatus,
+  TripStatus,
   Payment,
   Prisma,
+  HotelConfirmation,
+  VehicleDispatch,
+  ActivityConfirmation,
+  OperationalIssue,
+  OperationEvent,
 } from "@prisma/client";
 import {
   CreateBookingInput,
@@ -14,6 +20,12 @@ import {
   BookingQueryInput,
   ConvertQuotationToBookingInput,
 } from "@/lib/validation/booking-schema";
+import {
+  operationsService,
+  ReadinessSummary,
+} from "@/lib/services/operations-service";
+import { customerNotificationService } from "@/lib/services/customer-notification-service";
+import { communicationService } from "@/lib/services/communication-service";
 
 export type BookingWithRelations = Booking & {
   customer: {
@@ -34,6 +46,33 @@ export type BookingWithRelations = Booking & {
       name: string;
       type: string;
     }>;
+    tripHotels?: Array<{
+      id: string;
+      hotel: { id: string; name: string; city: string | null; category: string | null };
+      checkIn: Date;
+      checkOut: Date;
+      roomType: string;
+      mealPlan?: string | null;
+      rooms: number;
+    }>;
+    tripVehicles?: Array<{
+      id: string;
+      vehicle?: { id: string; name: string; type: string; capacity: number } | null;
+      vehicleName: string;
+      vehicleType: string;
+      startDate?: Date | null;
+      endDate?: Date | null;
+      pickupLocation?: string | null;
+      dropLocation?: string | null;
+    }>;
+    tripActivities?: Array<{
+      id: string;
+      activity?: { id: string; name: string; location: string | null } | null;
+      name: string;
+      date?: Date | null;
+      time?: string | null;
+      location?: string | null;
+    }>;
   };
   quotation?: {
     id: string;
@@ -44,6 +83,18 @@ export type BookingWithRelations = Booking & {
     status: QuotationStatus;
   } | null;
   payments: Payment[];
+  tripOperation?: {
+    id: string;
+    status: string;
+    operationStartDate?: Date | null;
+    operationEndDate?: Date | null;
+    hotelConfirmations: Array<HotelConfirmation & { supplier?: { id: string; name: string } | null; tripHotel?: any }>;
+    vehicleDispatches: Array<VehicleDispatch & { vehicle?: any }>;
+    activityConfirmations: Array<ActivityConfirmation & { supplier?: { id: string; name: string } | null; activity?: any; tripActivity?: any }>;
+    issues: OperationalIssue[];
+    events: OperationEvent[];
+  } | null;
+  operationalReadiness?: ReadinessSummary | null;
 };
 
 export const bookingService = {
@@ -166,7 +217,7 @@ export const bookingService = {
   },
 
   /**
-   * Get single booking by ID
+   * Get single booking by ID with full operational relations and readiness score
    */
   async getBooking(agencyId: string, bookingId: string): Promise<BookingWithRelations | null> {
     const booking = await prisma.booking.findFirst({
@@ -184,6 +235,18 @@ export const bookingService = {
             endDate: true,
             status: true,
             travelers: { select: { id: true, name: true, type: true } },
+            tripHotels: {
+              include: { hotel: { select: { id: true, name: true, city: true, category: true } } },
+              orderBy: { checkIn: "asc" },
+            },
+            tripVehicles: {
+              include: { vehicle: { select: { id: true, name: true, type: true, capacity: true } } },
+              orderBy: { startDate: "asc" },
+            },
+            tripActivities: {
+              include: { activity: { select: { id: true, name: true, location: true } } },
+              orderBy: { date: "asc" },
+            },
           },
         },
         quotation: {
@@ -200,10 +263,59 @@ export const bookingService = {
           where: { archivedAt: null },
           orderBy: { paymentDate: "desc" },
         },
+        tripOperation: {
+          include: {
+            hotelConfirmations: {
+              include: {
+                supplier: { select: { id: true, name: true } },
+                tripHotel: { include: { hotel: true } },
+              },
+              orderBy: { createdAt: "asc" },
+            },
+            vehicleDispatches: {
+              include: {
+                vehicle: true,
+              },
+              orderBy: { createdAt: "asc" },
+            },
+            activityConfirmations: {
+              include: {
+                activity: true,
+                tripActivity: true,
+              },
+              orderBy: { createdAt: "asc" },
+            },
+            issues: {
+              orderBy: { createdAt: "desc" },
+            },
+            events: {
+              orderBy: { createdAt: "desc" },
+            },
+          },
+        },
       },
     });
 
-    return booking as BookingWithRelations | null;
+    if (!booking) return null;
+
+    // Attach calculated readiness summary if tripOperation exists
+    let operationalReadiness: ReadinessSummary | null = null;
+    if (booking.tripOperation?.id) {
+      try {
+        operationalReadiness = await operationsService.calculateReadiness(
+          agencyId,
+          booking.tripOperation.id
+        );
+      } catch {
+        // Safe fallback if readiness computation is unavailable
+        operationalReadiness = null;
+      }
+    }
+
+    return {
+      ...booking,
+      operationalReadiness,
+    } as BookingWithRelations;
   },
 
   /**
@@ -265,32 +377,15 @@ export const bookingService = {
           notes: data.notes,
           internalNotes: data.internalNotes,
         },
-        include: {
-          customer: { select: { id: true, name: true, phone: true, email: true } },
-          trip: {
-            select: {
-              id: true,
-              title: true,
-              tripNumber: true,
-              startDate: true,
-              endDate: true,
-              status: true,
-              travelers: { select: { id: true, name: true, type: true } },
-            },
-          },
-          quotation: {
-            select: {
-              id: true,
-              quotationNumber: true,
-              version: true,
-              title: true,
-              finalAmount: true,
-              status: true,
-            },
-          },
-          payments: true,
-        },
       });
+
+      // Update Trip status to BOOKED if not already in execution
+      if (trip.status === "DRAFT" || trip.status === "PLANNING" || trip.status === "QUOTED") {
+        await tx.trip.update({
+          where: { id: data.tripId },
+          data: { status: TripStatus.BOOKED },
+        });
+      }
 
       // If initial paidAmount provided, create matching payment record
       if (paidAmount > 0) {
@@ -329,11 +424,36 @@ export const bookingService = {
       return b;
     });
 
-    return booking as BookingWithRelations;
+    // Auto-initialize operations and dispatch notifications outside transaction
+    try {
+      const operation = await operationsService.initializeOperation(agencyId, {
+        tripId: data.tripId,
+        bookingId: booking.id,
+      });
+
+      await operationsService.logEvent(agencyId, operation.id, {
+        eventType: "BOOKING_CREATED",
+        description: `Booking ${booking.bookingNumber} created for trip ${trip.title}. Initial status: ${booking.status}.`,
+      });
+
+      await customerNotificationService.notifyTripStatusChange(
+        agencyId,
+        data.tripId,
+        "CONFIRMED"
+      );
+
+      communicationService.notifyBookingConfirmed(agencyId, booking.id).catch((err) => {
+        console.warn("[Communication Non-blocking Notice] Failed to notify booking confirmed:", err?.message || err);
+      });
+    } catch {
+      // Non-blocking operations synchronization
+    }
+
+    return (await this.getBooking(agencyId, booking.id))!;
   },
 
   /**
-   * Convert an accepted Quotation into a Booking
+   * Convert an accepted Quotation into a Booking (Idempotent & Transaction-Safe)
    */
   async convertQuotationToBooking(
     agencyId: string,
@@ -353,12 +473,21 @@ export const bookingService = {
       throw new Error("Quotation not found or does not belong to this agency.");
     }
 
-    // Check if booking already exists for this quotation
+    // Idempotent duplicate check: If booking already exists, return it cleanly
     const existingBooking = await prisma.booking.findFirst({
       where: { agencyId, quotationId, archivedAt: null },
     });
     if (existingBooking) {
-      throw new Error(`Quotation already converted to Booking ${existingBooking.bookingNumber}.`);
+      // Ensure operations are linked
+      try {
+        await operationsService.initializeOperation(agencyId, {
+          tripId: quotation.tripId,
+          bookingId: existingBooking.id,
+        });
+      } catch {
+        // Safe fallback
+      }
+      return (await this.getBooking(agencyId, existingBooking.id))!;
     }
 
     const bookingNumber = await this.generateNextBookingNumber(agencyId);
@@ -386,34 +515,13 @@ export const bookingService = {
           totalAmount: new Prisma.Decimal(totalAmount),
           paidAmount: new Prisma.Decimal(0),
           balanceAmount: new Prisma.Decimal(totalAmount),
-          notes: data?.notes || (packageOptionName ? `Converted from Proposal ${quotation.quotationNumber} (${packageOptionName}).` : `Converted from Proposal ${quotation.quotationNumber}.`),
+          notes:
+            data?.notes ||
+            (packageOptionName
+              ? `Converted from Proposal ${quotation.quotationNumber} (${packageOptionName}).`
+              : `Converted from Proposal ${quotation.quotationNumber}.`),
           internalNotes: data?.internalNotes,
           confirmedAt: new Date(),
-        },
-        include: {
-          customer: { select: { id: true, name: true, phone: true, email: true } },
-          trip: {
-            select: {
-              id: true,
-              title: true,
-              tripNumber: true,
-              startDate: true,
-              endDate: true,
-              status: true,
-              travelers: { select: { id: true, name: true, type: true } },
-            },
-          },
-          quotation: {
-            select: {
-              id: true,
-              quotationNumber: true,
-              version: true,
-              title: true,
-              finalAmount: true,
-              status: true,
-            },
-          },
-          payments: true,
         },
       });
 
@@ -428,10 +536,43 @@ export const bookingService = {
         });
       }
 
+      // 3. Update Trip status to BOOKED
+      await tx.trip.update({
+        where: { id: quotation.tripId },
+        data: {
+          status: TripStatus.BOOKED,
+        },
+      });
+
       return b;
     });
 
-    return booking as BookingWithRelations;
+    // 4. Initialize Operations & Timeline Events outside tx
+    try {
+      const operation = await operationsService.initializeOperation(agencyId, {
+        tripId: quotation.tripId,
+        bookingId: booking.id,
+      });
+
+      await operationsService.logEvent(agencyId, operation.id, {
+        eventType: "BOOKING_CREATED",
+        description: `Booking ${booking.bookingNumber} confirmed from proposal ${quotation.quotationNumber} (${packageOptionName || "Standard"}).`,
+      });
+
+      await customerNotificationService.notifyTripStatusChange(
+        agencyId,
+        quotation.tripId,
+        "CONFIRMED"
+      );
+
+      communicationService.notifyBookingConfirmed(agencyId, booking.id).catch((err) => {
+        console.warn("[Communication Non-blocking Notice] Failed to notify booking confirmed:", err?.message || err);
+      });
+    } catch {
+      // Non-blocking operations sync
+    }
+
+    return (await this.getBooking(agencyId, booking.id))!;
   },
 
   /**
@@ -480,7 +621,7 @@ export const bookingService = {
   },
 
   /**
-   * Update booking fields
+   * Update booking fields with state machine validation and immutability protection
    */
   async updateBooking(
     agencyId: string,
@@ -489,10 +630,37 @@ export const bookingService = {
   ): Promise<BookingWithRelations> {
     const booking = await prisma.booking.findFirst({
       where: { id: bookingId, agencyId, archivedAt: null },
+      include: {
+        tripOperation: {
+          include: {
+            events: {
+              where: { eventType: "OPERATION_FINALIZED" },
+            },
+          },
+        },
+      },
     });
 
     if (!booking) {
       throw new Error("Booking not found.");
+    }
+
+    // Verify operations finalization lock
+    if (
+      booking.tripOperation?.status === "COMPLETED" &&
+      booking.tripOperation.events.length > 0
+    ) {
+      throw new Error("Cannot modify booking: Tour operation is financially finalized and locked.");
+    }
+
+    // State machine transitions validation
+    if (data.status !== undefined && data.status !== booking.status) {
+      if (booking.status === BookingStatus.COMPLETED && data.status !== BookingStatus.COMPLETED) {
+        throw new Error("Completed booking cannot be reverted without formal reopening.");
+      }
+      if (booking.status === BookingStatus.CANCELLED && data.status !== BookingStatus.CANCELLED) {
+        throw new Error("Cancelled booking cannot be directly reactivated.");
+      }
     }
 
     const updateData: Prisma.BookingUpdateInput = {};
@@ -538,40 +706,112 @@ export const bookingService = {
       }
     }
 
-    const updated = await prisma.booking.update({
+    await prisma.booking.update({
       where: { id: bookingId },
       data: updateData,
+    });
+
+    // Record audit event and notifications on status change
+    if (data.status && data.status !== booking.status && booking.tripOperation?.id) {
+      try {
+        await operationsService.logEvent(agencyId, booking.tripOperation.id, {
+          eventType: "BOOKING_STATUS_CHANGED",
+          description: `Booking status transitioned from ${booking.status} to ${data.status}.`,
+        });
+
+        await customerNotificationService.notifyTripStatusChange(
+          agencyId,
+          booking.tripId,
+          data.status
+        );
+      } catch {
+        // Non-blocking event logging
+      }
+    }
+
+    return (await this.getBooking(agencyId, bookingId))!;
+  },
+
+  /**
+   * Controlled Booking Cancellation
+   */
+  async cancelBooking(
+    agencyId: string,
+    bookingId: string,
+    reason: string
+  ): Promise<BookingWithRelations> {
+    const booking = await prisma.booking.findFirst({
+      where: { id: bookingId, agencyId, archivedAt: null },
       include: {
-        customer: { select: { id: true, name: true, phone: true, email: true } },
-        trip: {
-          select: {
-            id: true,
-            title: true,
-            tripNumber: true,
-            startDate: true,
-            endDate: true,
-            status: true,
-            travelers: { select: { id: true, name: true, type: true } },
+        tripOperation: {
+          include: {
+            events: { where: { eventType: "OPERATION_FINALIZED" } },
           },
-        },
-        quotation: {
-          select: {
-            id: true,
-            quotationNumber: true,
-            version: true,
-            title: true,
-            finalAmount: true,
-            status: true,
-          },
-        },
-        payments: {
-          where: { archivedAt: null },
-          orderBy: { paymentDate: "desc" },
         },
       },
     });
 
-    return updated as BookingWithRelations;
+    if (!booking) {
+      throw new Error("Booking not found.");
+    }
+
+    if (
+      booking.tripOperation?.status === "COMPLETED" &&
+      booking.tripOperation.events.length > 0
+    ) {
+      throw new Error("Cannot cancel booking: Tour operation is finalized.");
+    }
+
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: BookingStatus.CANCELLED,
+        cancelledAt: new Date(),
+        cancellationReason: reason.trim() || "Cancelled by agency coordinator.",
+      },
+    });
+
+    if (booking.tripOperation?.id) {
+      try {
+        await operationsService.logEvent(agencyId, booking.tripOperation.id, {
+          eventType: "BOOKING_CANCELLED",
+          description: `Booking was cancelled. Reason: ${reason}`,
+        });
+
+        await customerNotificationService.notifyTripStatusChange(
+          agencyId,
+          booking.tripId,
+          "CANCELLED"
+        );
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    return (await this.getBooking(agencyId, bookingId))!;
+  },
+
+  /**
+   * Initialize or sync Operations for an existing Booking
+   */
+  async initializeOperationsForBooking(
+    agencyId: string,
+    bookingId: string
+  ): Promise<BookingWithRelations> {
+    const booking = await prisma.booking.findFirst({
+      where: { id: bookingId, agencyId, archivedAt: null },
+    });
+
+    if (!booking) {
+      throw new Error("Booking not found.");
+    }
+
+    await operationsService.initializeOperation(agencyId, {
+      tripId: booking.tripId,
+      bookingId: booking.id,
+    });
+
+    return (await this.getBooking(agencyId, bookingId))!;
   },
 
   /**

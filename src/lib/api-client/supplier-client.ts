@@ -108,4 +108,55 @@ export const supplierClient = {
 
     return handleResponse<SingleResponse<{ message: string; supplier: Supplier }>>(res);
   },
+
+  /**
+   * Reactivates an archived or inactive supplier.
+   */
+  async reactivateSupplier(
+    id: string
+  ): Promise<SingleResponse<{ message: string; supplier: Supplier }>> {
+    const res = await fetch(`/api/suppliers/${encodeURIComponent(id)}/reactivate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    return handleResponse<SingleResponse<{ message: string; supplier: Supplier }>>(res);
+  },
+
+  /**
+   * Checks for potential duplicate suppliers under the same agency.
+   */
+  async checkDuplicate(params: {
+    name: string;
+    phone?: string;
+    email?: string;
+    excludeId?: string;
+  }): Promise<
+    SingleResponse<{
+      isDuplicate: boolean;
+      matches: Array<{
+        id: string;
+        name: string;
+        supplierCode: string | null;
+        phone: string | null;
+        email: string | null;
+        type: string | null;
+        status: string;
+      }>;
+    }>
+  > {
+    const searchParams = new URLSearchParams();
+    searchParams.set("name", params.name);
+    if (params.phone) searchParams.set("phone", params.phone);
+    if (params.email) searchParams.set("email", params.email);
+    if (params.excludeId) searchParams.set("excludeId", params.excludeId);
+
+    const res = await fetch(`/api/suppliers/check-duplicate?${searchParams.toString()}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+
+    return handleResponse(res);
+  },
 };

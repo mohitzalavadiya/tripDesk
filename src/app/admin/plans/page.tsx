@@ -1,224 +1,282 @@
 "use client";
 
 import * as React from "react";
-import { useSaaS } from "@/context/saas-context";
 import { PageHeader } from "@/components/shared/page-header";
-import { formatCurrency } from "@/lib/costing-engine";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Edit2, X, Sparkles, Layers, ShieldCheck } from "lucide-react";
-import { SaaSPlan } from "@/data/saas-data";
+import { toast } from "sonner";
+import {
+  Sparkles,
+  Layers,
+  Edit2,
+  Plus,
+  CheckCircle2,
+  RefreshCw,
+  IndianRupee,
+  Calendar,
+} from "lucide-react";
+import { adminClient } from "@/lib/api-client/admin-client";
 
 export default function AdminPlansPage() {
-  const { plans, updatePlan, subscriptions } = useSaaS();
+  const [plans, setPlans] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
-  // Edit Plan Modal State
-  const [editingPlan, setEditingPlan] = React.useState<SaaSPlan | null>(null);
-  const [editMonthlyPrice, setEditMonthlyPrice] = React.useState("");
-  const [editYearlyPrice, setEditYearlyPrice] = React.useState("");
-  const [editTagline, setEditTagline] = React.useState("");
-  const [editFeatures, setEditFeatures] = React.useState("");
+  // Edit / Create Modal State
+  const [modalMode, setModalMode] = React.useState<"CREATE" | "EDIT" | null>(null);
+  const [targetPlanId, setTargetPlanId] = React.useState<string | null>(null);
+  const [planName, setPlanName] = React.useState("");
+  const [planDesc, setPlanDesc] = React.useState("");
+  const [planPrice, setPlanPrice] = React.useState("2999");
+  const [planDuration, setPlanDuration] = React.useState("30");
+  const [saving, setSaving] = React.useState(false);
 
-  const handleOpenEdit = (plan: SaaSPlan) => {
-    setEditingPlan(plan);
-    setEditMonthlyPrice(String(plan.monthlyPrice));
-    setEditYearlyPrice(String(plan.yearlyPrice));
-    setEditTagline(plan.tagline);
-    setEditFeatures(plan.features.join("\n"));
+  const fetchPlans = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminClient.listPlans();
+      if (res.success && res.data) {
+        setPlans(res.data);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load plans");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchPlans();
+  }, [fetchPlans]);
+
+  const handleOpenEdit = (plan: any) => {
+    setModalMode("EDIT");
+    setTargetPlanId(plan.id);
+    setPlanName(plan.name);
+    setPlanDesc(plan.description || "");
+    setPlanPrice(String(plan.price));
+    setPlanDuration(String(plan.durationDays));
   };
 
-  const handleSavePlan = (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setModalMode("CREATE");
+    setTargetPlanId(null);
+    setPlanName("");
+    setPlanDesc("");
+    setPlanPrice("3999");
+    setPlanDuration("30");
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingPlan) return;
-
-    const featureList = editFeatures
-      .split("\n")
-      .map((f) => f.trim())
-      .filter(Boolean);
-
-    updatePlan(editingPlan.id, {
-      monthlyPrice: parseFloat(editMonthlyPrice) || 0,
-      yearlyPrice: parseFloat(editYearlyPrice) || 0,
-      tagline: editTagline.trim(),
-      features: featureList,
-    });
-
-    setEditingPlan(null);
+    setSaving(true);
+    try {
+      if (modalMode === "CREATE") {
+        await adminClient.createPlan({
+          name: planName.trim(),
+          description: planDesc.trim() || undefined,
+          price: parseFloat(planPrice) || 0,
+          durationDays: parseInt(planDuration) || 30,
+          isActive: true,
+        });
+        toast.success("Subscription plan created successfully");
+      } else if (modalMode === "EDIT" && targetPlanId) {
+        await adminClient.updatePlan(targetPlanId, {
+          name: planName.trim(),
+          description: planDesc.trim() || undefined,
+          price: parseFloat(planPrice) || 0,
+          durationDays: parseInt(planDuration) || 30,
+        });
+        toast.success("Subscription plan updated successfully");
+      }
+      setModalMode(null);
+      fetchPlans();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save plan");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">
+    <div className="min-h-screen bg-slate-50/50 pb-20">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
         {/* Top Header */}
         <PageHeader
           title="SaaS Plans & Pricing"
-          description="Manage TripDesk V1 subscription tiers, placeholder pricing parameters, and plan entitlements."
-          breadcrumbs={[{ label: "SaaS Platform" }, { label: "Plans & Pricing" }]}
+          description="Manage subscription tiers, pricing parameters, billing frequencies, and active agency quotas."
+          breadcrumbs={[{ label: "SaaS Platform", href: "/admin" }, { label: "Plans & Pricing" }]}
+          primaryAction={{
+            label: "+ Create Plan",
+            onClick: handleOpenCreate,
+            icon: Plus,
+          }}
         />
 
-        {/* Notice on V1 Pricing */}
-        <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-4 flex items-center gap-3 text-xs text-purple-900">
+        {/* Informational Banner */}
+        <div className="bg-purple-50/80 border border-purple-200/80 rounded-2xl p-4 flex items-center gap-3 text-xs text-purple-900 shadow-2xs">
           <Sparkles className="h-5 w-5 text-purple-600 shrink-0" />
           <span>
-            <strong>V1 Plan Structure:</strong> TripDesk features two subscription tiers: <strong>Starter</strong> and <strong>Professional</strong>. All prices shown are placeholder values for preview and mock administration.
+            <strong>TripDesk Subscription Engine:</strong> Pricing plans define agency billing cycles, renewal frequencies, and trial defaults. Existing subscribed agencies retain their pricing tiers upon renewal.
           </span>
         </div>
 
-        {/* ─── 2 PLANS GRID ───────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch max-w-4xl mx-auto">
-          {plans.map((p) => {
-            const activeCount = subscriptions.filter(
-              (s) => s.planId === p.id && (s.status === "ACTIVE" || s.status === "TRIAL")
-            ).length;
-            const isPro = p.id === "professional";
-
-            return (
+        {/* ─── PLANS CARDS GRID ────────────────────────────────────────────── */}
+        {loading ? (
+          <div className="flex items-center justify-center p-12 text-slate-400 text-xs gap-2">
+            <RefreshCw className="h-4 w-4 animate-spin text-purple-600" />
+            Loading subscription plans...
+          </div>
+        ) : plans.length === 0 ? (
+          <div className="text-center p-12 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+            <Layers className="h-10 w-10 text-slate-300 mx-auto" />
+            <p className="text-sm font-semibold text-slate-600">No subscription plans found in database.</p>
+            <Button size="sm" onClick={handleOpenCreate} className="bg-purple-600 text-white text-xs">
+              + Create First Plan
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl">
+            {plans.map((p, idx) => (
               <div
                 key={p.id}
-                className={`bg-white rounded-3xl p-6 sm:p-8 shadow-2xs border flex flex-col justify-between space-y-6 relative ${
-                  isPro
-                    ? "border-2 border-purple-600 ring-4 ring-purple-50"
-                    : "border-slate-200/90"
-                }`}
+                className="bg-white rounded-3xl p-6 shadow-2xs border border-slate-200/90 flex flex-col justify-between space-y-6 relative hover:border-purple-200 transition-all"
               >
-                {isPro && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-[10px] font-black uppercase px-3.5 py-1 rounded-full tracking-wider shadow-sm">
-                    Recommended Tier
-                  </span>
-                )}
-
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-black text-xl text-slate-900">{p.name} Plan</h3>
-                      <p className="text-xs text-slate-500 mt-0.5">{p.tagline}</p>
+                      <h3 className="font-black text-xl text-slate-900">{p.name}</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">{p.description || "Full platform features"}</p>
                     </div>
-                    <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100 shrink-0">
-                      {activeCount} Subscribed
+                    <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100 shrink-0">
+                      {p.subscriptionsCount} Active
                     </span>
                   </div>
 
-                  <div className="space-y-0.5 py-2">
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Pricing & Duration</span>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-3xl font-black text-slate-900 font-mono">
-                        {formatCurrency(p.monthlyPrice)}
-                      </span>
-                      <span className="text-xs text-slate-500 font-medium">/ month</span>
+                      <span className="text-3xl font-black text-slate-900">₹{p.price.toLocaleString("en-IN")}</span>
+                      <span className="text-xs text-slate-500 font-medium">/ {p.durationDays} days</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 font-medium font-mono">
-                      or {formatCurrency(p.yearlyPrice)} billed annually
-                    </p>
                   </div>
 
-                  <div className="space-y-2 pt-3 border-t border-slate-100 text-xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Included Features
-                    </span>
-                    {p.features.map((feat, idx) => (
-                      <div key={idx} className="flex items-start gap-2.5 text-slate-700">
-                        <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <span>{feat}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-2 text-xs text-slate-600">
+                    <p className="font-semibold text-slate-700 uppercase tracking-wider text-[10px]">Tier Entitlements</p>
+                    <ul className="space-y-1.5 text-slate-600">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Complete Travel Agency CRM
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> PDF Proposals & Vouchers
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> WhatsApp & Email Gateway
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Multi-Currency Ledger
+                      </li>
+                    </ul>
                   </div>
                 </div>
 
-                <Button
-                  variant={isPro ? "default" : "outline"}
-                  onClick={() => handleOpenEdit(p)}
-                  className={`w-full text-xs font-bold h-9 rounded-xl cursor-pointer ${
-                    isPro ? "bg-purple-600 hover:bg-purple-700 text-white shadow-xs" : "bg-white"
-                  }`}
-                >
-                  <Edit2 className="h-3.5 w-3.5 mr-1.5" />
-                  Edit Plan & Features
-                </Button>
+                <div className="border-t border-slate-100 pt-4 flex items-center justify-between">
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      p.isActive
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {p.isActive ? "Active Plan" : "Archived"}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleOpenEdit(p)}
+                    className="h-8 text-xs font-semibold hover:border-purple-300"
+                  >
+                    <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit Tier
+                  </Button>
+                </div>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* ─── EDIT PLAN MODAL ──────────────────────────────────────────────── */}
-      {editingPlan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
-          <div className="bg-white border border-slate-200/90 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-4 text-xs animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-purple-600" />
-                <h3 className="text-base font-bold text-slate-900">
-                  Edit {editingPlan.name} Plan
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingPlan(null)}
-                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      {/* ─── CREATE / EDIT MODAL ────────────────────────────────────────── */}
+      {modalMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <h3 className="text-base font-bold text-slate-900">
+              {modalMode === "CREATE" ? "Create Subscription Plan" : "Edit Plan Parameters"}
+            </h3>
 
-            <form onSubmit={handleSavePlan} className="space-y-3.5">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Monthly Price (₹)</label>
-                  <Input
-                    type="number"
-                    value={editMonthlyPrice}
-                    onChange={(e) => setEditMonthlyPrice(e.target.value)}
-                    className="h-8.5 text-xs font-mono"
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Yearly Price (₹)</label>
-                  <Input
-                    type="number"
-                    value={editYearlyPrice}
-                    onChange={(e) => setEditYearlyPrice(e.target.value)}
-                    className="h-8.5 text-xs font-mono"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700">Plan Tagline</label>
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Plan Name</label>
                 <Input
-                  value={editTagline}
-                  onChange={(e) => setEditTagline(e.target.value)}
-                  className="h-8.5 text-xs"
+                  value={planName}
+                  onChange={(e) => setPlanName(e.target.value)}
+                  placeholder="e.g. Starter, Professional, Enterprise"
+                  className="text-xs"
+                  required
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700">Features (One per line)</label>
-                <Textarea
-                  value={editFeatures}
-                  onChange={(e) => setEditFeatures(e.target.value)}
-                  rows={6}
-                  className="text-xs font-sans leading-relaxed"
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Description / Tagline</label>
+                <Input
+                  value={planDesc}
+                  onChange={(e) => setPlanDesc(e.target.value)}
+                  placeholder="e.g. Ideal for growing travel agencies"
+                  className="text-xs"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Price (INR)</label>
+                  <Input
+                    type="number"
+                    value={planPrice}
+                    onChange={(e) => setPlanPrice(e.target.value)}
+                    placeholder="2999"
+                    className="text-xs"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Duration (Days)</label>
+                  <Input
+                    type="number"
+                    value={planDuration}
+                    onChange={(e) => setPlanDuration(e.target.value)}
+                    placeholder="30"
+                    className="text-xs"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setEditingPlan(null)}
-                  className="h-8 text-xs cursor-pointer"
+                  onClick={() => setModalMode(null)}
+                  disabled={saving}
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   size="sm"
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-8 px-4 rounded-xl cursor-pointer"
+                  disabled={saving}
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
                 >
-                  Save Plan
+                  {saving ? "Saving..." : "Save Plan"}
                 </Button>
               </div>
             </form>

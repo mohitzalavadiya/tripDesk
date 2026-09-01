@@ -284,3 +284,15 @@ export type SupplierQueryParams = z.infer<typeof supplierQuerySchema>;
 export const supplierIdParamSchema = z.object({
   id: z.string().trim().min(1, "Supplier ID is required."),
 });
+
+/**
+ * Query schema for duplicate supplier checking.
+ */
+export const checkDuplicateSupplierSchema = z.object({
+  name: z.string().trim().min(1, "Supplier name is required."),
+  phone: z.string().trim().optional(),
+  email: z.string().trim().optional(),
+  excludeId: z.string().trim().optional(),
+});
+
+export type CheckDuplicateSupplierQuery = z.infer<typeof checkDuplicateSupplierSchema>;

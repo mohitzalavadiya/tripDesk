@@ -14,6 +14,10 @@ import {
   ConvertEnquiryToTripInput,
   CreateFollowUpInput,
   UpdateFollowUpInput,
+  TransitionStageInput,
+  MarkEnquiryLostInput,
+  MarkEnquiryWonInput,
+  CheckDuplicateEnquiryQuery,
 } from "@/lib/validation/enquiry-schema";
 import {
   PaginatedResponse,
@@ -60,6 +64,52 @@ export type EnquiryWithRelations = Enquiry & {
   } | null;
   followUps: EnquiryFollowUp[];
 };
+
+export interface CrmTimelineEvent {
+  id: string;
+  type:
+    | "ENQUIRY_CREATED"
+    | "STAGE_CHANGED"
+    | "FOLLOW_UP_SCHEDULED"
+    | "FOLLOW_UP_COMPLETED"
+    | "FOLLOW_UP_RESCHEDULED"
+    | "QUOTATION_CREATED"
+    | "QUOTATION_ACCEPTED"
+    | "BOOKING_CREATED"
+    | "ENQUIRY_CONVERTED"
+    | "ENQUIRY_LOST";
+  title: string;
+  description: string;
+  timestamp: Date | string;
+  referenceId?: string;
+  referenceUrl?: string;
+  statusBadge?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface EnquiryDetails360 extends EnquiryWithRelations {
+  isRepeatCustomer: boolean;
+  timeline: CrmTimelineEvent[];
+}
+
+export interface CrmDashboardStats {
+  pipelineSummary: Record<string, { count: number; totalBudget: number }>;
+  followUpSummary: {
+    overdueCount: number;
+    todayCount: number;
+    upcomingCount: number;
+    completedCount: number;
+    totalPending: number;
+  };
+  salesSummary: {
+    totalLeads: number;
+    activeLeads: number;
+    wonLeads: number;
+    lostLeads: number;
+    conversionRate: number;
+  };
+  sourcesSummary: { source: string; count: number }[];
+}
 
 export const enquiryClient = {
   /**
@@ -224,5 +274,85 @@ export const enquiryClient = {
     );
 
     return handleResponse<{ success: boolean; message: string }>(res);
+  },
+
+  /**
+   * Check for potential duplicate active enquiries
+   */
+  async checkDuplicate(
+    params: CheckDuplicateEnquiryQuery
+  ): Promise<SingleResponse<{ duplicates: EnquiryWithRelations[]; matchCount: number }>> {
+    const searchParams = new URLSearchParams();
+    searchParams.set("customerId", params.customerId);
+    if (params.destination) searchParams.set("destination", params.destination);
+    if (params.startDate) searchParams.set("startDate", params.startDate);
+    if (params.endDate) searchParams.set("endDate", params.endDate);
+    if (params.excludeId) searchParams.set("excludeId", params.excludeId);
+
+    const res = await fetch(`/api/enquiries/check-duplicate?${searchParams.toString()}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+
+    return handleResponse<SingleResponse<{ duplicates: EnquiryWithRelations[]; matchCount: number }>>(res);
+  },
+
+  /**
+   * Transition pipeline stage
+   */
+  async transitionStage(
+    id: string,
+    data: TransitionStageInput
+  ): Promise<SingleResponse<EnquiryWithRelations>> {
+    const res = await fetch(`/api/enquiries/${encodeURIComponent(id)}/stage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    return handleResponse<SingleResponse<EnquiryWithRelations>>(res);
+  },
+
+  /**
+   * Mark lead as LOST with mandatory structured reason
+   */
+  async markLost(
+    id: string,
+    data: MarkEnquiryLostInput
+  ): Promise<SingleResponse<EnquiryWithRelations>> {
+    const res = await fetch(`/api/enquiries/${encodeURIComponent(id)}/lost`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    return handleResponse<SingleResponse<EnquiryWithRelations>>(res);
+  },
+
+  /**
+   * Get chronological CRM activity timeline for a lead
+   */
+  async getTimeline(id: string): Promise<SingleResponse<CrmTimelineEvent[]>> {
+    const res = await fetch(`/api/enquiries/${encodeURIComponent(id)}/timeline`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+
+    return handleResponse<SingleResponse<CrmTimelineEvent[]>>(res);
+  },
+
+  /**
+   * Get CRM dashboard telemetry and pipeline metrics
+   */
+  async getCrmDashboard(): Promise<SingleResponse<CrmDashboardStats>> {
+    const res = await fetch("/api/crm/dashboard", {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+
+    return handleResponse<SingleResponse<CrmDashboardStats>>(res);
   },
 };
