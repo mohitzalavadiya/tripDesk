@@ -1,18 +1,28 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { Bell, Inbox, FileText, Clock, IndianRupee, Check } from "lucide-react"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { mockNotifications as initialNotifications } from "@/data/demo"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
+export interface NotificationItem {
+  id: string
+  title: string
+  description: string
+  time: string
+  read: boolean
+  category: string
+}
+
 export function NotificationsPopover() {
-  const [notifications, setNotifications] = React.useState(initialNotifications)
+  const router = useRouter()
+  const [notifications, setNotifications] = React.useState<NotificationItem[]>([])
 
   const unreadCount = React.useMemo(() => {
     return notifications.filter((n) => !n.read).length
@@ -76,8 +86,9 @@ export function NotificationsPopover() {
         
         <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-50">
           {notifications.length === 0 ? (
-            <div className="py-8 text-center text-xs text-muted-foreground">
-              No notifications yet.
+            <div className="py-8 text-center text-xs text-muted-foreground space-y-1">
+              <p className="font-medium text-slate-600">No new notifications</p>
+              <p className="text-[11px] text-slate-400">You are all caught up!</p>
             </div>
           ) : (
             notifications.map((notif) => (
@@ -115,10 +126,10 @@ export function NotificationsPopover() {
         
         <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-2 text-center">
           <button 
-            onClick={() => toast("Viewed all notifications (Placeholder)")} 
-            className="text-[10px] font-medium text-slate-500 hover:text-slate-700 cursor-pointer"
+            onClick={() => router.push("/communications")} 
+            className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 cursor-pointer"
           >
-            View all updates
+            View communication logs
           </button>
         </div>
       </PopoverContent>

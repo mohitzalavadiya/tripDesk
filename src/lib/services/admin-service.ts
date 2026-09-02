@@ -715,7 +715,7 @@ export const adminService = {
    */
   async listPlans() {
     const plans = await prisma.subscriptionPlan.findMany({
-      orderBy: { price: "asc" },
+      orderBy: [{ displayOrder: "asc" }, { price: "asc" }],
       include: {
         _count: {
           select: { subscriptions: true },
@@ -728,7 +728,11 @@ export const adminService = {
       name: p.name,
       description: p.description,
       price: Number(p.price),
+      yearlyPrice: p.yearlyPrice ? Number(p.yearlyPrice) : null,
       durationDays: p.durationDays,
+      features: p.features ? (Array.isArray(p.features) ? p.features : (p.features as any)) : [],
+      isPopular: p.isPopular,
+      displayOrder: p.displayOrder,
       isActive: p.isActive,
       subscriptionsCount: p._count.subscriptions,
       createdAt: p.createdAt.toISOString(),
@@ -742,7 +746,11 @@ export const adminService = {
         name: input.name,
         description: input.description,
         price: new Prisma.Decimal(input.price),
-        durationDays: input.durationDays,
+        yearlyPrice: input.yearlyPrice !== undefined && input.yearlyPrice !== null ? new Prisma.Decimal(input.yearlyPrice) : null,
+        durationDays: input.durationDays ?? 30,
+        features: input.features ?? [],
+        isPopular: input.isPopular ?? false,
+        displayOrder: input.displayOrder ?? 0,
         isActive: input.isActive ?? true,
       },
     });
@@ -753,7 +761,7 @@ export const adminService = {
         action: "PLAN_CREATED",
         entityType: "SUBSCRIPTION_PLAN",
         entityId: plan.id,
-        metadata: { name: plan.name, price: input.price },
+        metadata: { name: plan.name, price: input.price, yearlyPrice: input.yearlyPrice },
       },
     });
 
@@ -767,10 +775,15 @@ export const adminService = {
         name: input.name,
         description: input.description,
         price: input.price !== undefined ? new Prisma.Decimal(input.price) : undefined,
+        yearlyPrice: input.yearlyPrice !== undefined ? (input.yearlyPrice !== null ? new Prisma.Decimal(input.yearlyPrice) : null) : undefined,
         durationDays: input.durationDays,
+        features: input.features !== undefined ? (input.features ?? Prisma.JsonNull) : undefined,
+        isPopular: input.isPopular,
+        displayOrder: input.displayOrder,
         isActive: input.isActive,
       },
     });
+
 
     await prisma.platformAuditLog.create({
       data: {
@@ -784,6 +797,7 @@ export const adminService = {
 
     return plan;
   },
+
 
   /**
    * 8. Subscriptions List
@@ -1436,6 +1450,8 @@ export const adminService = {
       data: {
         agencyId: input.agencyId,
         subscriptionId: input.subscriptionId,
+        planId: input.planId || sub.planId,
+        billingCycle: input.billingCycle || "MONTHLY",
         amount: new Prisma.Decimal(input.amount),
         currency: input.currency || "INR",
         paymentMethod: input.paymentMethod || "UPI",
@@ -1461,6 +1477,7 @@ export const adminService = {
         metadata: {
           amount: input.amount,
           utrNumber: input.utrNumber,
+          billingCycle: input.billingCycle || "MONTHLY",
           paymentMethod: input.paymentMethod,
           subscriptionId: input.subscriptionId,
           planName: sub.plan.name,
@@ -1493,8 +1510,10 @@ export const adminService = {
     }
 
     const now = new Date();
-    const durationDays = payment.subscription.plan.durationDays || 30;
+    const isYearly = payment.billingCycle === "YEARLY";
+    const durationDays = isYearly ? 365 : (payment.subscription.plan.durationDays || 30);
     const subEnd = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    const targetPlanId = payment.planId || payment.subscription.planId;
 
     // Update payment to VERIFIED
     const updatedPayment = await prisma.subscriptionPayment.update({
@@ -1507,10 +1526,12 @@ export const adminService = {
       },
     });
 
-    // Update subscription to ACTIVE with new validity dates
+    // Update subscription to ACTIVE with new validity dates and plan
     await prisma.subscription.update({
       where: { id: payment.subscriptionId },
       data: {
+        planId: targetPlanId,
+        billingCycle: payment.billingCycle || "MONTHLY",
         status: SubscriptionStatus.ACTIVE,
         subscriptionStart: now,
         subscriptionEnd: subEnd,
@@ -1535,6 +1556,8 @@ export const adminService = {
         metadata: {
           amount: Number(payment.amount),
           utrNumber: payment.utrNumber,
+          billingCycle: payment.billingCycle,
+          planId: targetPlanId,
           verifiedBy: actorUserId,
           activatedUntil: subEnd.toISOString(),
         },
@@ -1543,6 +1566,7 @@ export const adminService = {
 
     return updatedPayment;
   },
+
 
 
   async rejectSubscriptionPayment(

@@ -31,7 +31,11 @@ export const planCreateSchema = z.object({
   name: z.string().min(2, "Plan name must be at least 2 characters").max(100),
   description: z.string().max(500).optional().nullable(),
   price: z.number().min(0, "Price must be non-negative"),
-  durationDays: z.number().int().min(1, "Duration must be at least 1 day"),
+  yearlyPrice: z.number().min(0, "Yearly price must be non-negative").optional().nullable(),
+  durationDays: z.number().int().min(1, "Duration must be at least 1 day").default(30),
+  features: z.array(z.string()).or(z.record(z.string(), z.any())).optional().nullable(),
+  isPopular: z.boolean().default(false),
+  displayOrder: z.number().int().default(0),
   isActive: z.boolean().default(true),
 });
 
@@ -41,7 +45,11 @@ export const planUpdateSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   description: z.string().max(500).optional().nullable(),
   price: z.number().min(0).optional(),
+  yearlyPrice: z.number().min(0).optional().nullable(),
   durationDays: z.number().int().min(1).optional(),
+  features: z.array(z.string()).or(z.record(z.string(), z.any())).optional().nullable(),
+  isPopular: z.boolean().optional(),
+  displayOrder: z.number().int().optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -99,10 +107,13 @@ export type SubscriptionPaymentFilterInput = z.input<typeof subscriptionPaymentF
 export const subscriptionPaymentCreateSchema = z.object({
   agencyId: z.string().min(1, "Agency ID is required"),
   subscriptionId: z.string().min(1, "Subscription ID is required"),
+  planId: z.string().optional().nullable(),
+  billingCycle: z.enum(["MONTHLY", "YEARLY"]).default("MONTHLY").optional(),
   amount: z.number().positive("Amount must be greater than 0"),
   currency: z.string().default("INR"),
   paymentMethod: z.enum(["UPI", "BANK_TRANSFER", "CASH", "CARD", "CHEQUE", "OTHER"]).default("UPI"),
   paymentReference: z.string().max(200).optional().nullable(),
+
   utrNumber: z.string().max(100).optional().nullable(),
   paymentDate: z.string().or(z.date()).optional(),
   notes: z.string().max(1000).optional().nullable(),
@@ -121,4 +132,5 @@ export const subscriptionPaymentRejectSchema = z.object({
 });
 
 export type SubscriptionPaymentRejectInput = z.infer<typeof subscriptionPaymentRejectSchema>;
+
 

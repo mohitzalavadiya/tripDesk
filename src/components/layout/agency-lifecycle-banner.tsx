@@ -4,45 +4,33 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
-import { useSaaS } from "@/context/saas-context";
 import { Clock, AlertTriangle, ShieldAlert, Lock, Phone, CreditCard, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AgencyLifecycleBanner() {
   const router = useRouter();
-  const { currentUser, isPlatformOwner } = useAuth();
-  const { agencies, subscriptions } = useSaaS();
+  const { currentUser, currentAgency, subscriptionAccess, isPlatformOwner } = useAuth();
 
-  // If user is Platform Owner, lifecycle banner is not applicable
-  if (isPlatformOwner || !currentUser.agencyId) {
+  // If user is Platform Owner or has no subscription context, banner is not applicable
+  if (isPlatformOwner || !currentUser.agencyId || !subscriptionAccess) {
     return null;
   }
 
-  const currentAgency = agencies.find((a) => a.id === currentUser.agencyId);
-  const currentSub = subscriptions.find((s) => s.agencyId === currentUser.agencyId);
-
-  if (!currentAgency) return null;
-
-  // Calculate days remaining if in trial
-  let trialDaysRemaining = 5;
-  if (currentSub?.trialEnd) {
-    const end = new Date(currentSub.trialEnd).getTime();
-    const now = new Date().getTime();
-    const diffDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-    trialDaysRemaining = Math.max(0, diffDays);
-  }
+  const agencyName = currentAgency.name || currentUser.agencyName || "Agency";
+  const status = subscriptionAccess.status;
+  const trialDaysRemaining = subscriptionAccess.trialDaysRemaining ?? 0;
 
   const handleContactSupport = () => {
     window.open(
       `https://wa.me/919847099000?text=${encodeURIComponent(
-        `Hi TripDesk Support! I am ${currentUser.name} from ${currentAgency.name}. I need assistance with our SaaS account status.`
+        `Hi TripDesk Support! I am ${currentUser.name} from ${agencyName}. I need assistance with our SaaS account status.`
       )}`,
       "_blank"
     );
   };
 
   // 1. Account Suspended State Banner
-  if (currentAgency.status === "SUSPENDED") {
+  if (status === "SUSPENDED") {
     return (
       <div className="bg-rose-600 text-white px-4 py-2.5 shadow-md sticky top-16 z-30 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2 font-medium">
@@ -66,7 +54,7 @@ export function AgencyLifecycleBanner() {
   }
 
   // 2. Read Only Mode Banner
-  if (currentAgency.status === "READ_ONLY") {
+  if (status === "READ_ONLY" || subscriptionAccess.isReadOnly) {
     return (
       <div className="bg-blue-600 text-white px-4 py-2.5 shadow-md sticky top-16 z-30 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2 font-medium">
@@ -97,13 +85,13 @@ export function AgencyLifecycleBanner() {
   }
 
   // 3. Trial Expiring Tomorrow Banner
-  if (currentAgency.status === "TRIAL" && trialDaysRemaining <= 1) {
+  if (status === "TRIAL" && trialDaysRemaining <= 1) {
     return (
       <div className="bg-amber-600 text-white px-4 py-2.5 shadow-md sticky top-16 z-30 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2 font-medium">
           <AlertTriangle className="h-4 w-4 shrink-0 text-amber-200" />
           <span>
-            <strong>Trial Expiring Tomorrow:</strong> Your 7-day TripDesk free trial ends tomorrow. Contact TripDesk to activate your full plan.
+            <strong>Trial Expiring {trialDaysRemaining === 0 ? "Today" : "Tomorrow"}:</strong> Your 7-day TripDesk free trial ends {trialDaysRemaining === 0 ? "today" : "tomorrow"}. Upgrade your plan to prevent service interruption.
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -127,13 +115,13 @@ export function AgencyLifecycleBanner() {
   }
 
   // 4. Standard 7-Day Free Trial Banner
-  if (currentAgency.status === "TRIAL") {
+  if (status === "TRIAL") {
     return (
       <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-900 text-white px-4 py-2 shadow-xs sticky top-16 z-30 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs border-b border-indigo-700/50">
         <div className="flex items-center gap-2 font-medium">
           <Clock className="h-3.5 w-3.5 shrink-0 text-amber-300" />
           <span>
-            You are currently on your <strong>7-day free trial</strong> ({trialDaysRemaining} days remaining).
+            You are currently on your <strong>7-day free trial</strong> ({trialDaysRemaining} {trialDaysRemaining === 1 ? "day" : "days"} remaining).
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
