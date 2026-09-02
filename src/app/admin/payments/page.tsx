@@ -159,6 +159,7 @@ export default function AdminPaymentsPage() {
       await adminClient.createSubscriptionPayment({
         agencyId: selectedAgencyId,
         subscriptionId: selectedSubId,
+        billingCycle: "MONTHLY",
         amount: amt,
         currency: "INR",
         paymentMethod: createMethod as any,
@@ -166,6 +167,7 @@ export default function AdminPaymentsPage() {
         paymentDate: createDate,
         notes: createNotes.trim() || undefined,
       });
+
 
 
       toast.success("SaaS subscription payment recorded successfully (Status: PENDING).");

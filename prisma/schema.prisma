@@ -412,7 +412,11 @@ model SubscriptionPlan {
   name         String   @unique
   description  String?
   price        Decimal  @db.Decimal(10, 2)
-  durationDays Int
+  yearlyPrice  Decimal? @db.Decimal(10, 2)
+  durationDays Int      @default(30)
+  features     Json?
+  isPopular    Boolean  @default(false)
+  displayOrder Int      @default(0)
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -431,6 +435,7 @@ model Subscription {
   agencyId          String
   planId            String
   status            SubscriptionStatus @default(TRIAL)
+  billingCycle      String?            @default("MONTHLY") // "MONTHLY" | "YEARLY"
   trialStart        DateTime?
   trialEnd          DateTime?
   subscriptionStart DateTime?
@@ -455,6 +460,8 @@ model SubscriptionPayment {
   id               String                    @id @default(cuid())
   agencyId         String
   subscriptionId   String
+  planId           String?
+  billingCycle     String?                   @default("MONTHLY") // "MONTHLY" | "YEARLY"
   amount           Decimal                   @db.Decimal(10, 2)
   currency         String                    @default("INR")
   paymentMethod    PaymentMethod             @default(UPI)
@@ -480,6 +487,7 @@ model SubscriptionPayment {
   @@index([paymentDate])
   @@map("subscription_payments")
 }
+
 
 
 // ═════════════════════════════════════════════════════════════════════

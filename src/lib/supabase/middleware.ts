@@ -59,7 +59,9 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/quotations/public") || // Public quotation endpoints
     pathname.startsWith("/api/bookings/public") || // Public booking endpoints
     pathname.startsWith("/api/customer/") || // Customer authenticated API
+    pathname === "/api/subscription/plans" || // Public subscription plans catalog
     pathname.startsWith("/api/webhooks/"); // Webhook endpoints
+
 
   // Handle unauthenticated requests
   if (!user && !isPublicRoute) {

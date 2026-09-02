@@ -159,8 +159,6 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Subscription",
         href: "/subscription",
         icon: CreditCard,
-        badge: "Active",
-        badgeVariant: "success",
       },
     ],
   },
@@ -189,6 +187,11 @@ export const adminNavigationConfig: NavigationSection[] = [
         icon: CreditCard,
       },
       {
+        label: "Payment Requests",
+        href: "/admin/payments",
+        icon: IndianRupee,
+      },
+      {
         label: "Plans & Pricing",
         href: "/admin/plans",
         icon: Layers,
@@ -200,6 +203,7 @@ export const adminNavigationConfig: NavigationSection[] = [
       },
     ],
   },
+
   {
     title: "GOVERNANCE & SYSTEM",
     items: [
