@@ -58,6 +58,7 @@ import {
   MoreVertical,
   Loader2,
   IndianRupee,
+  RotateCcw,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
@@ -99,7 +100,7 @@ export default function SupplierDetailPage() {
 
   // Active Tab state
   const [activeTab, setActiveTab] = React.useState<
-    "overview" | "activeRates" | "expiredRates" | "hotels" | "vehicles" | "activities"
+    "overview" | "confirmations" | "payables" | "activeRates" | "expiredRates" | "hotels" | "vehicles" | "activities"
   >("overview");
 
   // Edit Supplier Modal State
@@ -220,6 +221,23 @@ export default function SupplierDetailPage() {
       router.push("/suppliers");
     } catch (err: any) {
       toast.error(err?.message || "Failed to archive supplier.");
+    }
+  };
+
+  const handleReactivate = async () => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Read-only mode is active.");
+      return;
+    }
+
+    if (!supplier) return;
+
+    try {
+      await supplierClient.reactivateSupplier(id);
+      toast.success(`Supplier ${supplier.name} reactivated.`);
+      await loadSupplier();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to reactivate supplier.");
     }
   };
 
@@ -358,6 +376,19 @@ export default function SupplierDetailPage() {
 
             {/* Actions */}
             <div className="flex items-center gap-2.5">
+              {supplier.status === "INACTIVE" || supplier.archivedAt ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReactivate}
+                  disabled={isReadOnly}
+                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 text-xs font-semibold h-9 rounded-xl shadow-2xs cursor-pointer gap-1.5"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reactivate Supplier
+                </Button>
+              ) : null}
+
               <Button
                 variant="outline"
                 size="sm"
@@ -392,14 +423,25 @@ export default function SupplierDetailPage() {
                 />
                 <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 rounded-xl p-1 text-xs">
                   <DropdownMenuGroup>
-                    <DropdownMenuItem
-                      onClick={handleArchive}
-                      disabled={isReadOnly}
-                      className="text-rose-600 hover:bg-rose-50 cursor-pointer"
-                    >
-                      <Trash2 className="h-3.5 w-3.5 mr-2 text-rose-500" />
-                      Archive Supplier
-                    </DropdownMenuItem>
+                    {supplier.status === "INACTIVE" || supplier.archivedAt ? (
+                      <DropdownMenuItem
+                        onClick={handleReactivate}
+                        disabled={isReadOnly}
+                        className="text-emerald-600 hover:bg-emerald-50 cursor-pointer"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 mr-2 text-emerald-500" />
+                        Reactivate
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        onClick={handleArchive}
+                        disabled={isReadOnly}
+                        className="text-rose-600 hover:bg-rose-50 cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-2 text-rose-500" />
+                        Archive Supplier
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -408,44 +450,68 @@ export default function SupplierDetailPage() {
         </div>
 
         {/* Telemetry KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-              <Sparkles className="h-5 w-5" />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
+              <Hotel className="h-4.5 w-4.5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Active Rate Sheets</span>
-              <h4 className="text-lg font-black text-slate-900">{supplier.activeRateSheets.length}</h4>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-              <Hotel className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Contracted Hotels</span>
-              <h4 className="text-lg font-black text-slate-900">{supplier.hotels.length}</h4>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 uppercase truncate block">Hotels</span>
+              <h4 className="text-base font-black text-slate-900">{supplier.hotels.length}</h4>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-              <Car className="h-5 w-5" />
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+              <Car className="h-4.5 w-4.5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Assigned Fleet</span>
-              <h4 className="text-lg font-black text-slate-900">{supplier.vehicles.length}</h4>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 uppercase truncate block">Fleet</span>
+              <h4 className="text-base font-black text-slate-900">{supplier.vehicles.length}</h4>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-              <Ticket className="h-5 w-5" />
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold shrink-0">
+              <Sparkles className="h-4.5 w-4.5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Activities / Tours</span>
-              <h4 className="text-lg font-black text-slate-900">{supplier.activities.length}</h4>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 uppercase truncate block">Rate Sheets</span>
+              <h4 className="text-base font-black text-slate-900">{supplier.activeRateSheets.length}</h4>
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
+              <CheckCircle2 className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 uppercase truncate block">Confirmations</span>
+              <h4 className="text-base font-black text-slate-900">{supplier.hotelConfirmations?.length || 0}</h4>
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
+              <IndianRupee className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 uppercase truncate block">Total Invoiced</span>
+              <h4 className="text-sm font-black text-slate-900 truncate">
+                {formatCurrency(supplier.financialSummary?.totalPayableAmount || 0)}
+              </h4>
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold shrink-0">
+              <CreditCard className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 uppercase truncate block">Outstanding</span>
+              <h4 className="text-sm font-black text-rose-700 truncate">
+                {formatCurrency(supplier.financialSummary?.totalOutstandingAmount || 0)}
+              </h4>
             </div>
           </div>
         </div>
@@ -454,6 +520,8 @@ export default function SupplierDetailPage() {
         <div className="flex items-center gap-1.5 border-b border-slate-200/80 pb-px overflow-x-auto text-xs no-scrollbar">
           {[
             { id: "overview", label: "Commercial Profile" },
+            { id: "confirmations", label: `Confirmations (${supplier.hotelConfirmations?.length || 0})` },
+            { id: "payables", label: `Payables & Finance (${supplier.payables?.length || 0})` },
             { id: "activeRates", label: `Active Rates (${supplier.activeRateSheets.length})` },
             { id: "expiredRates", label: `Expired Rates (${supplier.expiredRateSheets.length})` },
             { id: "hotels", label: `Hotels (${supplier.hotels.length})` },
@@ -548,7 +616,165 @@ export default function SupplierDetailPage() {
           </div>
         )}
 
-        {/* Tab 2: Active Rate Sheets */}
+        {/* Tab: Operational Confirmations */}
+        {activeTab === "confirmations" && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <span>Operational Confirmations & Tours ({supplier.hotelConfirmations?.length || 0})</span>
+              </h3>
+            </div>
+
+            {!supplier.hotelConfirmations || supplier.hotelConfirmations.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500">
+                No operational confirmations linked to this supplier yet.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader className="bg-slate-50 text-[11px] uppercase font-bold text-slate-500">
+                  <TableRow>
+                    <TableHead>Confirmation #</TableHead>
+                    <TableHead>Trip / Tour</TableHead>
+                    <TableHead>Booking #</TableHead>
+                    <TableHead>Stay / Service Window</TableHead>
+                    <TableHead>Room / Details</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {supplier.hotelConfirmations.map((c: any) => (
+                    <TableRow key={c.id} className="hover:bg-slate-50 text-xs">
+                      <TableCell className="font-mono font-bold text-slate-800">
+                        {c.confirmationNumber || "CONF-PENDING"}
+                      </TableCell>
+                      <TableCell className="font-semibold text-slate-900">
+                        {c.tripOperation?.trip?.title || c.tripOperation?.trip?.tripNumber || "Tour"}
+                      </TableCell>
+                      <TableCell className="font-mono text-slate-600">
+                        {c.tripOperation?.booking?.bookingNumber || "—"}
+                      </TableCell>
+                      <TableCell className="text-slate-600">
+                        {c.checkIn ? `${formatDateDisplay(c.checkIn)} → ${formatDateDisplay(c.checkOut)}` : "—"}
+                      </TableCell>
+                      <TableCell className="text-slate-700">
+                        {c.roomDetails || c.tripHotel?.roomType || "Standard"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] font-bold ${
+                            c.status === "CONFIRMED"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : c.status === "REQUESTED"
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : c.status === "CANCELLED"
+                              ? "bg-rose-50 text-rose-700 border-rose-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}
+                        >
+                          {c.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {c.tripOperation?.tripId && (
+                          <Link
+                            href={`/operations/${c.tripOperation.tripId}`}
+                            className="text-indigo-600 font-semibold hover:underline"
+                          >
+                            Open Operations
+                          </Link>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        )}
+
+        {/* Tab: Payables & Finance */}
+        {activeTab === "payables" && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <IndianRupee className="h-4 w-4 text-indigo-600" />
+                <span>Supplier Payables & Disbursements ({supplier.payables?.length || 0})</span>
+              </h3>
+            </div>
+
+            {!supplier.payables || supplier.payables.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500">
+                No financial payables recorded for this supplier yet.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader className="bg-slate-50 text-[11px] uppercase font-bold text-slate-500">
+                  <TableRow>
+                    <TableHead>Payable #</TableHead>
+                    <TableHead>Booking #</TableHead>
+                    <TableHead>Invoiced Amount</TableHead>
+                    <TableHead>Paid Amount</TableHead>
+                    <TableHead>Outstanding Balance</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {supplier.payables.map((p: any) => (
+                    <TableRow key={p.id} className="hover:bg-slate-50 text-xs">
+                      <TableCell className="font-mono font-bold text-slate-800">
+                        {p.payableNumber || "PAYABLE"}
+                      </TableCell>
+                      <TableCell className="font-mono text-slate-600">
+                        {p.booking?.bookingNumber || "—"}
+                      </TableCell>
+                      <TableCell className="font-bold text-slate-900">
+                        {formatCurrency(Number(p.actualAmount || p.plannedAmount || 0))}
+                      </TableCell>
+                      <TableCell className="font-extrabold text-emerald-700">
+                        {formatCurrency(Number(p.paidAmount || 0))}
+                      </TableCell>
+                      <TableCell className="font-extrabold text-rose-700">
+                        {formatCurrency(Number(p.outstandingAmount || 0))}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] font-bold ${
+                            p.status === "PAID"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : p.status === "PARTIALLY_PAID"
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : p.status === "CANCELLED"
+                              ? "bg-slate-50 text-slate-700 border-slate-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}
+                        >
+                          {p.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {p.bookingId && (
+                          <Link
+                            href={`/bookings/${p.bookingId}`}
+                            className="text-indigo-600 font-semibold hover:underline"
+                          >
+                            View Booking
+                          </Link>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        )}
+
+        {/* Tab: Active Rate Sheets */}
         {activeTab === "activeRates" && (
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
             <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">

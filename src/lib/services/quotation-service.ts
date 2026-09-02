@@ -12,6 +12,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { tripCostingService } from "./trip-costing-service";
+import { communicationService } from "./communication-service";
 import {
   CreateQuotationInput,
   UpdateQuotationInput,
@@ -2439,6 +2440,11 @@ export const quotationService = {
         viewedAt: new Date(),
         status: quotation.status === QuotationStatus.SENT ? QuotationStatus.VIEWED : quotation.status,
       },
+    });
+
+    // Non-blocking communication trigger
+    communicationService.notifyQuotationViewed(quotation.agencyId, quotation.id).catch((err) => {
+      console.warn("[Communication Non-blocking Notice] Failed to notify quotation viewed:", err?.message || err);
     });
 
     return true;

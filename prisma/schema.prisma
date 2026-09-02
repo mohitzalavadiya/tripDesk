@@ -146,6 +146,12 @@ enum EnquiryStatus {
 }
 
 enum CustomerNotificationType {
+  ENQUIRY_CREATED
+  QUOTATION_CREATED
+  QUOTATION_SENT
+  QUOTATION_VIEWED
+  QUOTATION_ACCEPTED
+  BOOKING_CONFIRMED
   TRIP_CONFIRMED
   TRIP_UPDATED
   HOTEL_CONFIRMED
@@ -160,6 +166,7 @@ enum CustomerNotificationType {
   PAYMENT_RECEIVED
   PAYMENT_DUE
   PAYMENT_REFUNDED
+  TRIP_UPCOMING
   TRIP_DEPARTING
   TRIP_STARTED
   TRIP_COMPLETED
@@ -167,6 +174,7 @@ enum CustomerNotificationType {
   TRIP_DELAY
   OPERATIONS_ALERT
   FEEDBACK_REQUEST
+  REVIEW_REQUEST
 }
 
 enum NotificationChannel {
@@ -177,11 +185,32 @@ enum NotificationChannel {
 }
 
 enum NotificationDeliveryStatus {
+  QUEUED
   PENDING
   SENT
   DELIVERED
   FAILED
   READ
+  CANCELLED
+}
+
+enum TravelDocumentType {
+  HOTEL_VOUCHER
+  VEHICLE_VOUCHER
+  ACTIVITY_VOUCHER
+  CUSTOMER_ITINERARY
+  BOOKING_CONFIRMATION
+  PAYMENT_RECEIPT
+  TRAVEL_SUMMARY
+  SUPPLIER_VOUCHER
+}
+
+enum TravelDocumentStatus {
+  DRAFT
+  GENERATED
+  ISSUED
+  REVOKED
+  SUPERSEDED
 }
 
 enum EnquiryPriority {
@@ -215,6 +244,7 @@ enum FollowUpType {
 enum FollowUpStatus {
   PENDING
   COMPLETED
+  SKIPPED
   CANCELLED
 }
 
@@ -325,6 +355,8 @@ model Agency {
   customerFeedbacks     CustomerFeedback[]
   customerNotifications CustomerNotification[]
   customerNotificationPreferences CustomerNotificationPreference[]
+  communicationSetting  AgencyCommunicationSetting?
+  travelDocuments       TravelDocument[]
 
   @@map("agencies")
 }
@@ -430,6 +462,7 @@ model Customer {
   feedbacks  CustomerFeedback[]
   notifications CustomerNotification[]
   notificationPreference CustomerNotificationPreference?
+  travelDocuments TravelDocument[]
 
   @@index([agencyId])
   @@index([agencyId, customerNumber])
@@ -474,6 +507,7 @@ model Trip {
   expenses         OperationalExpense[]
   feedbacks        CustomerFeedback[]
   notifications    CustomerNotification[]
+  travelDocuments  TravelDocument[]
 
   @@unique([agencyId, tripNumber])
   @@index([agencyId])
@@ -783,6 +817,7 @@ model Quotation {
   packageOptions        QuotationPackageOption[]    @relation("QuotationPackageOptions")
   bookings              Booking[]
   publicShareLinks      PublicShareLink[]
+  customerNotifications CustomerNotification[]
 
   @@unique([agencyId, quotationNumber, version])
   @@index([agencyId])
@@ -950,6 +985,7 @@ model Booking {
   expenses         OperationalExpense[]
   feedbacks        CustomerFeedback[]
   notifications    CustomerNotification[]
+  travelDocuments  TravelDocument[]
 
   @@unique([agencyId, bookingNumber])
   @@index([agencyId])
@@ -988,10 +1024,11 @@ model Payment {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  agency   Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  booking  Booking   @relation(fields: [bookingId], references: [id], onDelete: Restrict)
-  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  trip     Trip?     @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  agency          Agency          @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  booking         Booking         @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  customer        Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  trip            Trip?           @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  travelDocuments TravelDocument[]
 
   @@index([agencyId])
   @@index([bookingId])
@@ -1063,6 +1100,7 @@ model Enquiry {
   convertedTripId     String?
   convertedQuotationId String?
   lostReason          String?
+  lostExplanation     String?
   closedAt            DateTime?
   archivedAt          DateTime?
   createdAt           DateTime        @default(now())
@@ -1073,6 +1111,7 @@ model Enquiry {
   convertedTrip      Trip?             @relation(fields: [convertedTripId], references: [id], onDelete: SetNull)
   convertedQuotation Quotation?        @relation(fields: [convertedQuotationId], references: [id], onDelete: SetNull)
   followUps          EnquiryFollowUp[]
+  customerNotifications CustomerNotification[]
 
   @@unique([agencyId, enquiryNumber])
   @@index([agencyId])
@@ -1092,17 +1131,20 @@ model Enquiry {
 // ═════════════════════════════════════════════════════════════════════
 
 model EnquiryFollowUp {
-  id          String         @id @default(cuid())
+  id          String          @id @default(cuid())
   agencyId    String
   enquiryId   String
-  type        FollowUpType   @default(CALL)
-  status      FollowUpStatus @default(PENDING)
+  type        FollowUpType    @default(CALL)
+  priority    EnquiryPriority @default(MEDIUM)
+  status      FollowUpStatus  @default(PENDING)
   scheduledAt DateTime
+  outcome     String?
   notes       String?
   completedAt DateTime?
+  completedBy String?
   archivedAt  DateTime?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
   agency  Agency  @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   enquiry Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
@@ -1111,6 +1153,7 @@ model EnquiryFollowUp {
   @@index([enquiryId])
   @@index([agencyId, scheduledAt])
   @@index([agencyId, status])
+  @@index([agencyId, status, scheduledAt])
   @@map("enquiry_follow_ups")
 }
 
@@ -1152,6 +1195,7 @@ model Supplier {
   hotelConfirmations HotelConfirmation[]
   payables           SupplierPayable[]
   payments           SupplierPayment[]
+  travelDocuments    TravelDocument[]
 
   @@index([agencyId])
   @@index([agencyId, supplierCode])
@@ -1298,6 +1342,7 @@ model HotelConfirmation {
   tripOperation TripOperation @relation(fields: [tripOperationId], references: [id], onDelete: Cascade)
   tripHotel     TripHotel?    @relation(fields: [tripHotelId], references: [id], onDelete: SetNull)
   supplier      Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  travelDocuments TravelDocument[]
 
   @@index([agencyId])
   @@index([tripOperationId])
@@ -1333,6 +1378,7 @@ model VehicleDispatch {
   tripOperation TripOperation @relation(fields: [tripOperationId], references: [id], onDelete: Cascade)
   tripVehicle   TripVehicle?  @relation(fields: [tripVehicleId], references: [id], onDelete: SetNull)
   vehicle       Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  travelDocuments TravelDocument[]
 
   @@index([agencyId])
   @@index([tripOperationId])
@@ -1364,6 +1410,7 @@ model ActivityConfirmation {
   tripOperation TripOperation @relation(fields: [tripOperationId], references: [id], onDelete: Cascade)
   tripActivity  TripActivity? @relation(fields: [tripActivityId], references: [id], onDelete: SetNull)
   activity      Activity?     @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  travelDocuments TravelDocument[]
 
   @@index([agencyId])
   @@index([tripOperationId])
@@ -1582,34 +1629,48 @@ model CustomerFeedback {
 // ═════════════════════════════════════════════════════════════════════
 
 model CustomerNotification {
-  id             String                     @id @default(cuid())
-  agencyId       String
-  customerId     String
-  tripId         String?
-  bookingId      String?
-  type           CustomerNotificationType
-  title          String
-  message        String
-  channel        NotificationChannel        @default(IN_APP)
-  status         NotificationDeliveryStatus @default(SENT)
-  idempotencyKey String?
-  linkUrl        String?
-  metadata       Json?
-  readAt         DateTime?
-  sentAt         DateTime                   @default(now())
-  createdAt      DateTime                   @default(now())
-  updatedAt      DateTime                   @updatedAt
+  id                String                     @id @default(cuid())
+  agencyId          String
+  customerId        String
+  tripId            String?
+  bookingId         String?
+  quotationId       String?
+  enquiryId         String?
+  type              CustomerNotificationType
+  title             String
+  message           String
+  channel           NotificationChannel        @default(IN_APP)
+  status            NotificationDeliveryStatus @default(SENT)
+  recipient         String?
+  subject           String?
+  providerMessageId String?
+  failureReason     String?
+  retryCount        Int                        @default(0)
+  idempotencyKey    String?
+  linkUrl           String?
+  metadata          Json?
+  readAt            DateTime?
+  sentAt            DateTime                   @default(now())
+  deliveredAt       DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
 
-  agency   Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  trip     Trip?     @relation(fields: [tripId], references: [id], onDelete: SetNull)
-  booking  Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  agency    Agency     @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  customer  Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  trip      Trip?      @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  booking   Booking?   @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  quotation Quotation? @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  enquiry   Enquiry?   @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
 
   @@unique([agencyId, idempotencyKey])
   @@index([agencyId])
   @@index([customerId])
   @@index([tripId])
   @@index([bookingId])
+  @@index([quotationId])
+  @@index([enquiryId])
+  @@index([providerMessageId])
   @@index([agencyId, customerId, status])
   @@index([agencyId, customerId, createdAt])
   @@map("customer_notifications")
@@ -1642,5 +1703,155 @@ model CustomerNotificationPreference {
   @@index([agencyId])
   @@index([customerId])
   @@map("customer_notification_preferences")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 34. AGENCY COMMUNICATION SETTING
+// ═════════════════════════════════════════════════════════════════════
+
+model AgencyCommunicationSetting {
+  id                   String   @id @default(cuid())
+  agencyId             String   @unique
+  emailEnabled         Boolean  @default(true)
+  whatsappEnabled      Boolean  @default(true)
+  defaultSenderName    String?
+  defaultSenderEmail   String?
+  autoQuotationSent    Boolean  @default(true)
+  autoBookingConfirmed Boolean  @default(true)
+  autoPaymentReminders Boolean  @default(true)
+  autoTravelReminders  Boolean  @default(true)
+  autoFeedbackRequests Boolean  @default(true)
+  paymentReminderDays  Int      @default(3)
+  travelReminderDays   Int      @default(3)
+  whatsappProvider     String   @default("MOCK")
+  emailProvider        String   @default("MOCK")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@map("agency_communication_settings")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 35. TRAVEL DOCUMENT (VOUCHERS, ITINERARIES & CONFIRMATIONS)
+// ═════════════════════════════════════════════════════════════════════
+
+model TravelDocument {
+  id                     String               @id @default(cuid())
+  agencyId               String
+  bookingId              String?
+  tripId                 String?
+  customerId             String
+  paymentId              String?
+  supplierId             String?
+  hotelConfirmationId    String?
+  vehicleDispatchId      String?
+  activityConfirmationId String?
+
+  documentNumber         String
+  documentType           TravelDocumentType
+  status                 TravelDocumentStatus @default(GENERATED)
+  title                  String
+  version                Int                  @default(1)
+  isLatest               Boolean              @default(true)
+  supersedesDocumentId   String?
+
+  recipient              String?
+  channel                NotificationChannel?
+  metadata               Json?
+  notes                  String?
+
+  issuedAt               DateTime?
+  revokedAt              DateTime?
+  revokedReason          String?
+  generatedAt            DateTime             @default(now())
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  agency                 Agency                @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  booking                Booking?              @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  trip                   Trip?                 @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  customer               Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  payment                Payment?              @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  supplier               Supplier?             @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  hotelConfirmation      HotelConfirmation?    @relation(fields: [hotelConfirmationId], references: [id], onDelete: SetNull)
+  vehicleDispatch        VehicleDispatch?      @relation(fields: [vehicleDispatchId], references: [id], onDelete: SetNull)
+  activityConfirmation   ActivityConfirmation? @relation(fields: [activityConfirmationId], references: [id], onDelete: SetNull)
+  supersedesDocument     TravelDocument?       @relation("DocumentVersionChain", fields: [supersedesDocumentId], references: [id], onDelete: SetNull)
+  supersededBy           TravelDocument[]      @relation("DocumentVersionChain")
+
+  @@unique([agencyId, documentNumber, version])
+  @@index([agencyId])
+  @@index([bookingId])
+  @@index([tripId])
+  @@index([customerId])
+  @@index([paymentId])
+  @@index([supplierId])
+  @@index([hotelConfirmationId])
+  @@index([vehicleDispatchId])
+  @@index([activityConfirmationId])
+  @@index([documentType])
+  @@index([status])
+  @@index([agencyId, isLatest])
+  @@index([agencyId, documentNumber])
+  @@map("travel_documents")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 36. PLATFORM AUDIT LOG (SAAS LEVEL)
+// ═════════════════════════════════════════════════════════════════════
+
+model PlatformAuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String
+  action      String
+  entityType  String
+  entityId    String?
+  agencyId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([actorUserId])
+  @@index([action])
+  @@index([agencyId])
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@map("platform_audit_logs")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 37. PLATFORM ANNOUNCEMENT (BROADCAST NOTICES)
+// ═════════════════════════════════════════════════════════════════════
+
+model PlatformAnnouncement {
+  id        String    @id @default(cuid())
+  title     String
+  message   String
+  type      String    @default("INFO") // INFO, WARNING, MAINTENANCE, FEATURE
+  status    String    @default("ACTIVE") // ACTIVE, INACTIVE, DRAFT
+  startAt   DateTime  @default(now())
+  endAt     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([status])
+  @@index([startAt, endAt])
+  @@map("platform_announcements")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 38. PLATFORM SETTING (GLOBAL CONFIGURATION)
+// ═════════════════════════════════════════════════════════════════════
+
+model PlatformSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+
+  @@map("platform_settings")
 }
 

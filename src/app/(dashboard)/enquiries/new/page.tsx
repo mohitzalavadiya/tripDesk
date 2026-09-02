@@ -33,6 +33,7 @@ import {
   Sparkles,
   Loader2,
   Plus,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function NewEnquiryPage() {
@@ -82,6 +83,10 @@ export default function NewEnquiryPage() {
   const [internalNotes, setInternalNotes] = React.useState("");
   const [followupDate, setFollowupDate] = React.useState("");
 
+  // Duplicate Enquiry Detection State
+  const [duplicateEnquiries, setDuplicateEnquiries] = React.useState<any[]>([]);
+  const [checkingDuplicates, setCheckingDuplicates] = React.useState(false);
+
   // Load real customers from PostgreSQL API
   React.useEffect(() => {
     async function loadCustomers() {
@@ -104,6 +109,36 @@ export default function NewEnquiryPage() {
     }
     loadCustomers();
   }, []);
+
+  // Debounced Duplicate Lead Detection
+  React.useEffect(() => {
+    if (!selectedCustomerId || customerMode === "new") {
+      setDuplicateEnquiries([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setCheckingDuplicates(true);
+        const res = await enquiryClient.checkDuplicate({
+          customerId: selectedCustomerId,
+          destination: destination.trim() || undefined,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+        });
+
+        if (res.success && res.data) {
+          setDuplicateEnquiries(res.data.duplicates || []);
+        }
+      } catch {
+        // Silently ignore duplicate check errors
+      } finally {
+        setCheckingDuplicates(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [selectedCustomerId, customerMode, destination, startDate, endDate]);
 
   // Duration Helper
   const durationString = React.useMemo(() => {
@@ -277,6 +312,41 @@ export default function NewEnquiryPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                  )}
+
+                  {/* DUPLICATE WARNING BANNER */}
+                  {duplicateEnquiries.length > 0 && (
+                    <div className="mt-2 p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-xs space-y-1.5">
+                      <div className="flex items-center gap-1.5 font-semibold text-amber-900">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                        <span>Existing Active Enquiries Detected ({duplicateEnquiries.length})</span>
+                      </div>
+                      <p className="text-[11px] text-amber-700">
+                        This customer already has active inquiries. You can proceed with a new trip request or update an existing lead:
+                      </p>
+                      <div className="space-y-1 pt-1">
+                        {duplicateEnquiries.map((dup) => (
+                          <div
+                            key={dup.id}
+                            className="flex items-center justify-between bg-white/80 p-2 rounded border border-amber-100 text-[11px]"
+                          >
+                            <div>
+                              <strong className="text-slate-800">{dup.enquiryNumber}</strong> •{" "}
+                              <span className="text-slate-600">{dup.destination}</span>{" "}
+                              <span className="text-slate-400">({dup.status})</span>
+                            </div>
+                            <a
+                              href={`/enquiries/${dup.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-indigo-600 hover:text-indigo-800 font-medium underline"
+                            >
+                              View Lead ↗
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               ) : (

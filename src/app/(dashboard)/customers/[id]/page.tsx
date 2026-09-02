@@ -61,9 +61,13 @@ import {
   DollarSign,
   Cake,
   Globe,
+  MessageSquare,
+  Send,
+  RotateCw,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+import { communicationClient, CommunicationLogItem } from "@/lib/api-client/communication-client";
 
 const AVATAR_GRADIENTS = [
   "from-indigo-500 to-violet-600",
@@ -101,10 +105,19 @@ export default function CustomerDetailPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
 
-  // Active Tab state ("overview" | "enquiries" | "trips" | "quotations" | "bookings" | "travelers")
+  // Active Tab state
   const [activeTab, setActiveTab] = React.useState<
-    "overview" | "enquiries" | "trips" | "quotations" | "bookings" | "travelers"
+    "overview" | "enquiries" | "trips" | "quotations" | "bookings" | "travelers" | "communications"
   >("overview");
+
+  // Communication states
+  const [communications, setCommunications] = React.useState<CommunicationLogItem[]>([]);
+  const [loadingComms, setLoadingComms] = React.useState(false);
+  const [isMsgModalOpen, setIsMsgModalOpen] = React.useState(false);
+  const [msgChannel, setMsgChannel] = React.useState<"EMAIL" | "WHATSAPP">("WHATSAPP");
+  const [msgTitle, setMsgTitle] = React.useState("");
+  const [msgBody, setMsgBody] = React.useState("");
+  const [sendingMsg, setSendingMsg] = React.useState(false);
 
   // Edit Customer Modal State
   const [isEditOpen, setIsEditOpen] = React.useState(false);
@@ -122,6 +135,18 @@ export default function CustomerDetailPage() {
   const [editNotes, setEditNotes] = React.useState("");
   const [editInternalNotes, setEditInternalNotes] = React.useState("");
   const [savingEdit, setSavingEdit] = React.useState(false);
+
+  const loadCommunications = React.useCallback(async () => {
+    try {
+      setLoadingComms(true);
+      const res = await communicationClient.listLogs({ customerId: id, limit: 50 });
+      setCommunications(res.data);
+    } catch {
+      // safe fallback
+    } finally {
+      setLoadingComms(false);
+    }
+  }, [id]);
 
   // Load real customer 360 profile from PostgreSQL API
   const loadCustomer = React.useCallback(async () => {
@@ -162,8 +187,55 @@ export default function CustomerDetailPage() {
   }, [id]);
 
   React.useEffect(() => {
-    if (id) loadCustomer();
-  }, [id, loadCustomer]);
+    if (id) {
+      loadCustomer();
+      loadCommunications();
+    }
+  }, [id, loadCustomer, loadCommunications]);
+
+  const handleSendCustomMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!msgTitle.trim() || !msgBody.trim()) {
+      toast.error("Please enter a subject and message body.");
+      return;
+    }
+
+    try {
+      setSendingMsg(true);
+      await communicationClient.sendManual({
+        customerId: id,
+        channel: msgChannel,
+        title: msgTitle.trim(),
+        message: msgBody.trim(),
+      });
+      toast.success("Message dispatched successfully", {
+        description: `Sent via ${msgChannel} to customer.`,
+      });
+      setIsMsgModalOpen(false);
+      setMsgTitle("");
+      setMsgBody("");
+      loadCommunications();
+    } catch (err: any) {
+      toast.error("Failed to send message", {
+        description: err?.message || "Please check recipient details and retry.",
+      });
+    } finally {
+      setSendingMsg(false);
+    }
+  };
+
+  const handleResendMsg = async (commsId: string) => {
+    try {
+      toast.info("Retrying message dispatch...");
+      await communicationClient.resend(commsId);
+      toast.success("Message resent successfully");
+      loadCommunications();
+    } catch (err: any) {
+      toast.error("Failed to resend message", {
+        description: err?.message || "Error resending.",
+      });
+    }
+  };
 
   // Handle Edit Submit
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -332,8 +404,17 @@ export default function CustomerDetailPage() {
               </div>
 
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <h1 className="text-2xl font-black text-slate-900 tracking-tight">{customer.name}</h1>
+                  {customer.isRepeatCustomer ? (
+                    <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-[11px] font-bold">
+                      Repeat Client
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-slate-100 text-slate-700 border-slate-200 text-[11px] font-medium">
+                      New Client
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
@@ -493,6 +574,7 @@ export default function CustomerDetailPage() {
             { id: "quotations", label: `Quotations (${customer.quotations.length})` },
             { id: "bookings", label: `Bookings & Payments (${customer.bookings.length})` },
             { id: "travelers", label: `Travelers (${allTravelers.length})` },
+            { id: "communications", label: `Communications (${communications.length})` },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -921,6 +1003,219 @@ export default function CustomerDetailPage() {
             )}
           </div>
         )}
+
+        {/* Tab 7: Communications & Outbound History */}
+        {activeTab === "communications" && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Communication History</h3>
+                <p className="text-xs text-slate-500">
+                  Automated proposals, reminders, and manual messages sent to {customer.name}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={loadCommunications}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8 px-2.5 text-slate-600 gap-1.5 cursor-pointer"
+                >
+                  <RotateCw className={`h-3 w-3 ${loadingComms ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
+                <Button
+                  onClick={() => setIsMsgModalOpen(true)}
+                  disabled={isReadOnly}
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 px-3 rounded-lg gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Send className="h-3 w-3" />
+                  Send Direct Message
+                </Button>
+              </div>
+            </div>
+
+            {loadingComms ? (
+              <div className="p-8 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                <RotateCw className="h-4 w-4 animate-spin text-indigo-600" />
+                Loading communications...
+              </div>
+            ) : communications.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                No communications dispatched to this customer yet.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="text-xs text-slate-400 font-bold uppercase bg-slate-50/50">
+                    <TableHead>Channel & Event</TableHead>
+                    <TableHead>Subject / Title</TableHead>
+                    <TableHead>Recipient</TableHead>
+                    <TableHead>Delivery Status</TableHead>
+                    <TableHead>Dispatched At</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {communications.map((comm) => (
+                    <TableRow key={comm.id} className="text-xs hover:bg-slate-50/80">
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] font-bold ${
+                              comm.channel === "WHATSAPP"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : comm.channel === "EMAIL"
+                                ? "bg-blue-50 text-blue-700 border-blue-200"
+                                : "bg-purple-50 text-purple-700 border-purple-200"
+                            }`}
+                          >
+                            {comm.channel}
+                          </Badge>
+                          <span className="text-[11px] font-medium text-slate-600">{comm.type}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-[240px]">
+                        <p className="font-bold text-slate-900 truncate">{comm.title}</p>
+                        <p className="text-[11px] text-slate-500 line-clamp-1">{comm.message}</p>
+                      </TableCell>
+                      <TableCell className="text-slate-600 font-mono text-[11px]">
+                        {comm.recipient || "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] font-bold ${
+                            comm.status === "DELIVERED" || comm.status === "SENT"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : comm.status === "FAILED"
+                              ? "bg-rose-50 text-rose-700 border-rose-200"
+                              : "bg-slate-100 text-slate-600 border-slate-200"
+                          }`}
+                        >
+                          {comm.status}
+                        </Badge>
+                        {comm.failureReason && (
+                          <p className="text-[10px] text-rose-600 mt-0.5 max-w-[160px] truncate" title={comm.failureReason}>
+                            {comm.failureReason}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-slate-500">
+                        {new Date(comm.sentAt).toLocaleString([], {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          onClick={() => handleResendMsg(comm.id)}
+                          disabled={isReadOnly}
+                          variant="ghost"
+                          size="sm"
+                          className="text-[11px] h-7 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 font-bold cursor-pointer"
+                        >
+                          Retry / Resend
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        )}
+
+        {/* ─── SEND DIRECT MESSAGE MODAL ─── */}
+        <Dialog open={isMsgModalOpen} onOpenChange={setIsMsgModalOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
+            <form onSubmit={handleSendCustomMessage}>
+              <DialogHeader>
+                <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
+                  <Send className="h-4 w-4 text-indigo-600" />
+                  <span>Send Direct Message to {customer.name}</span>
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-1">
+                  Dispatch an ad-hoc WhatsApp message or Email directly to the customer.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3.5 mt-4 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Channel *</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMsgChannel("WHATSAPP")}
+                      className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        msgChannel === "WHATSAPP"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-300 shadow-2xs"
+                          : "bg-slate-50 text-slate-600 border-slate-200"
+                      }`}
+                    >
+                      WhatsApp ({customer.phone})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMsgChannel("EMAIL")}
+                      className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        msgChannel === "EMAIL"
+                          ? "bg-indigo-50 text-indigo-700 border-indigo-300 shadow-2xs"
+                          : "bg-slate-50 text-slate-600 border-slate-200"
+                      }`}
+                    >
+                      Email ({customer.email || "No email on file"})
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Subject / Title *</label>
+                  <Input
+                    value={msgTitle}
+                    onChange={(e) => setMsgTitle(e.target.value)}
+                    placeholder="e.g. Flight schedule update"
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Message Body *</label>
+                  <Textarea
+                    value={msgBody}
+                    onChange={(e) => setMsgBody(e.target.value)}
+                    rows={4}
+                    placeholder="Enter message content for traveler..."
+                    className="bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={sendingMsg || isReadOnly}
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl gap-1.5"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  {sendingMsg ? "Sending..." : "Dispatch Message"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* ─── EDIT CUSTOMER MODAL ─── */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

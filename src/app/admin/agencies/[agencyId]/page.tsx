@@ -3,11 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useSaaS } from "@/context/saas-context";
-import { formatCurrency } from "@/lib/costing-engine";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -23,530 +20,450 @@ import {
   Phone,
   Mail,
   MapPin,
-  Globe,
   FileText,
-  Edit2,
-  Check,
-  X,
   History,
   IndianRupee,
+  RefreshCw,
+  Ban,
+  Activity,
+  Users,
+  Compass,
+  Sparkles,
 } from "lucide-react";
-import { AgencyStatus, SaaSSubscriptionPayment } from "@/data/saas-data";
+import { adminClient } from "@/lib/api-client/admin-client";
+import { Agency360Details } from "@/lib/services/admin-service";
 
 export default function AgencyDetailsPage() {
   const params = useParams();
   const agencyId = params.agencyId as string;
   const router = useRouter();
 
-  const {
-    getAgencyDetails,
-    updateAgencyStatus,
-    updateAgency,
-    verifyPayment,
-    rejectPayment,
-  } = useSaaS();
+  const [details, setDetails] = React.useState<Agency360Details | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [activeTab, setActiveTab] = React.useState<"overview" | "subscription" | "usage" | "audit">("overview");
 
-  const details = getAgencyDetails(agencyId);
-  const { agency, owner, subscription, plan, payments, activities } = details;
+  // Extend Trial Modal
+  const [isExtendOpen, setIsExtendOpen] = React.useState(false);
+  const [extendDays, setExtendDays] = React.useState(7);
+  const [extendReason, setExtendReason] = React.useState("Promotional trial extension");
+  const [extending, setExtending] = React.useState(false);
 
-  // Active Tab
-  const [activeTab, setActiveTab] = React.useState<"overview" | "subscription" | "payments" | "activity">("overview");
+  // Suspend Modal
+  const [isSuspendOpen, setIsSuspendOpen] = React.useState(false);
+  const [suspendReason, setSuspendReason] = React.useState("");
+  const [suspending, setSuspending] = React.useState(false);
 
-  // Status Change Confirmation Modal State
-  const [statusModalOpen, setStatusModalOpen] = React.useState(false);
-  const [targetStatus, setTargetStatus] = React.useState<AgencyStatus | null>(null);
-  const [statusReason, setStatusReason] = React.useState("");
-
-  // Payment Review Modal State
-  const [selectedPayment, setSelectedPayment] = React.useState<SaaSSubscriptionPayment | null>(null);
-  const [isRejecting, setIsRejecting] = React.useState(false);
-  const [rejectionReason, setRejectionReason] = React.useState("");
-
-  // Quick Edit Agency Modal State
-  const [isEditOpen, setIsEditOpen] = React.useState(false);
-  const [editName, setEditName] = React.useState("");
-  const [editEmail, setEditEmail] = React.useState("");
-  const [editPhone, setEditPhone] = React.useState("");
-  const [editAddress, setEditAddress] = React.useState("");
-  const [editCity, setEditCity] = React.useState("");
-  const [editWebsite, setEditWebsite] = React.useState("");
-  const [editGstin, setEditGstin] = React.useState("");
-  const [editNotes, setEditNotes] = React.useState("");
+  const fetchAgency = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminClient.getAgency(agencyId);
+      if (res.success && res.data) {
+        setDetails(res.data);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load agency details");
+    } finally {
+      setLoading(false);
+    }
+  }, [agencyId]);
 
   React.useEffect(() => {
-    if (agency) {
-      setEditName(agency.name);
-      setEditEmail(agency.email);
-      setEditPhone(agency.phone);
-      setEditAddress(agency.address || "");
-      setEditCity(agency.city);
-      setEditWebsite(agency.website || "");
-      setEditGstin(agency.gstin || "");
-      setEditNotes(agency.internalNotes || "");
-    }
-  }, [agency]);
+    fetchAgency();
+  }, [fetchAgency]);
 
-  if (!agency) {
+  const handleExtendTrial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setExtending(true);
+    try {
+      await adminClient.extendTrial(agencyId, extendDays, extendReason);
+      toast.success(`Trial extended by ${extendDays} days`);
+      setIsExtendOpen(false);
+      fetchAgency();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to extend trial");
+    } finally {
+      setExtending(false);
+    }
+  };
+
+  const handleSuspend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!suspendReason.trim()) {
+      toast.error("Please provide a suspension reason");
+      return;
+    }
+    setSuspending(true);
+    try {
+      await adminClient.suspendAgency(agencyId, suspendReason);
+      toast.success("Agency suspended successfully");
+      setIsSuspendOpen(false);
+      setSuspendReason("");
+      fetchAgency();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to suspend agency");
+    } finally {
+      setSuspending(false);
+    }
+  };
+
+  const handleReactivate = async () => {
+    try {
+      await adminClient.reactivateAgency(agencyId);
+      toast.success("Agency reactivated successfully");
+      fetchAgency();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reactivate agency");
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-[400px] flex flex-col items-center justify-center p-8 text-center space-y-4">
+      <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-8">
+        <div className="text-center space-y-3">
+          <RefreshCw className="h-8 w-8 text-purple-600 animate-spin mx-auto" />
+          <p className="text-sm font-semibold text-slate-600">Loading Agency 360 Workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!details) {
+    return (
+      <div className="min-h-screen bg-slate-50/50 flex flex-col items-center justify-center p-8 text-center space-y-4">
         <Building2 className="h-12 w-12 text-slate-300" />
         <h2 className="text-lg font-bold text-slate-800">Agency Not Found</h2>
         <Link href="/admin/agencies">
           <Button variant="outline" size="sm" className="bg-white">
-            Return to Agencies Directory
+            Return to Agency Directory
           </Button>
         </Link>
       </div>
     );
   }
 
-  const handleOpenStatusModal = (status: AgencyStatus) => {
-    setTargetStatus(status);
-    setStatusReason("");
-    setStatusModalOpen(true);
-  };
-
-  const handleConfirmStatusChange = () => {
-    if (!targetStatus) return;
-    updateAgencyStatus(agency.id, targetStatus, statusReason);
-    setStatusModalOpen(false);
-    setTargetStatus(null);
-  };
-
-  const handleSaveEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateAgency(agency.id, {
-      name: editName.trim(),
-      email: editEmail.trim(),
-      phone: editPhone.trim(),
-      address: editAddress.trim() || undefined,
-      city: editCity.trim(),
-      website: editWebsite.trim() || undefined,
-      gstin: editGstin.trim() || undefined,
-      internalNotes: editNotes.trim() || undefined,
-    });
-    setIsEditOpen(false);
-  };
-
-  const handleVerify = (payment: SaaSSubscriptionPayment) => {
-    verifyPayment(payment.id);
-    setSelectedPayment(null);
-    setIsRejecting(false);
-    setRejectionReason("");
-  };
-
-  const handleReject = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPayment) return;
-    if (!rejectionReason.trim()) {
-      toast.error("Please provide a rejection reason.");
-      return;
-    }
-    rejectPayment(selectedPayment.id, rejectionReason);
-    setSelectedPayment(null);
-    setIsRejecting(false);
-    setRejectionReason("");
-  };
+  const { identity, owner, subscription, usageTelemetry, auditLogs } = details;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">
+    <div className="min-h-screen bg-slate-50/50 pb-20">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        {/* Top Header Navigation */}
-        <div className="space-y-1">
+        {/* Back Link */}
+        <div className="flex items-center justify-between">
           <Link
             href="/admin/agencies"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-purple-600 transition-colors"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-purple-700 transition-colors"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to Agencies Directory
+            <ArrowLeft className="h-4 w-4" /> Back to Agencies
           </Link>
-        </div>
-
-        {/* ─── AGENCY HERO BANNER ─────────────────────────────────────────── */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-2xs space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                  {agency.name}
-                </h1>
-                <span
-                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full border uppercase ${
-                    agency.status === "ACTIVE"
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : agency.status === "TRIAL"
-                      ? "bg-amber-50 text-amber-700 border-amber-200"
-                      : agency.status === "PAST_DUE"
-                      ? "bg-orange-50 text-orange-700 border-orange-200"
-                      : agency.status === "READ_ONLY"
-                      ? "bg-blue-50 text-blue-700 border-blue-200"
-                      : "bg-rose-50 text-rose-700 border-rose-200"
-                  }`}
-                >
-                  {agency.status === "PAST_DUE" ? "Payment Required" : agency.status.replace("_", " ")}
-                </span>
-                <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
-                  {plan?.name || "Starter"} Plan ({subscription?.billingCycle || "Monthly"})
-                </span>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                <span className="font-semibold text-slate-700">
-                  Owner: <strong>{owner?.name || "Agency Owner"}</strong>
-                </span>
-                <span>•</span>
-                <span>{agency.phone}</span>
-                <span>•</span>
-                <span>{agency.email}</span>
-                <span>•</span>
-                <span>{agency.city}, {agency.state || agency.country}</span>
-                <span>•</span>
-                <span>Onboarded: {agency.createdAt}</span>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2 flex-wrap self-end lg:self-center">
+          <div className="flex items-center gap-2">
+            {identity.status === "ACTIVE" ? (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setIsEditOpen(true)}
-                className="text-xs font-semibold h-9 px-3.5 rounded-xl cursor-pointer bg-white"
+                onClick={() => setIsSuspendOpen(true)}
+                className="h-8 text-xs font-semibold border-rose-200 text-rose-700 hover:bg-rose-50"
               >
-                <Edit2 className="h-3.5 w-3.5 mr-1 text-slate-400" />
-                Edit Profile
+                <Ban className="h-3.5 w-3.5 mr-1" /> Suspend Agency
               </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReactivate}
+                className="h-8 text-xs font-semibold border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Reactivate Agency
+              </Button>
+            )}
 
-              {agency.status === "ACTIVE" && (
-                <Button
-                  size="sm"
-                  onClick={() => handleOpenStatusModal("SUSPENDED")}
-                  className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-9 px-4 rounded-xl cursor-pointer"
-                >
-                  Suspend Agency
-                </Button>
-              )}
-
-              {agency.status === "SUSPENDED" && (
-                <Button
-                  size="sm"
-                  onClick={() => handleOpenStatusModal("ACTIVE")}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-4 rounded-xl cursor-pointer"
-                >
-                  Reactivate Agency
-                </Button>
-              )}
-
-              {agency.status === "TRIAL" && (
-                <Button
-                  size="sm"
-                  onClick={() => handleOpenStatusModal("ACTIVE")}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-4 rounded-xl cursor-pointer"
-                >
-                  Activate Account
-                </Button>
-              )}
-
-              {agency.status === "READ_ONLY" && (
-                <Button
-                  size="sm"
-                  onClick={() => handleOpenStatusModal("ACTIVE")}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-4 rounded-xl cursor-pointer"
-                >
-                  Reactivate Account
-                </Button>
-              )}
-            </div>
+            <Button
+              size="sm"
+              onClick={() => setIsExtendOpen(true)}
+              className="h-8 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              <Clock className="h-3.5 w-3.5 mr-1" /> Extend Trial
+            </Button>
           </div>
         </div>
 
-        {/* ─── 4 DETAILS TABS ─────────────────────────────────────────────── */}
-        <div className="flex items-center gap-1 border-b border-slate-200 pb-px">
-          {[
-            { id: "overview", label: "Overview" },
-            { id: "subscription", label: "Subscription" },
-            { id: "payments", label: `Payments (${payments.length})` },
-            { id: "activity", label: `Activity (${activities.length})` },
-          ].map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
+        {/* ─── AGENCY 360 HERO HEADER ─────────────────────────────────────── */}
+        <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-2xl bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-black text-xl shrink-0">
+                {identity.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h1 className="text-xl font-black text-slate-900 tracking-tight">{identity.name}</h1>
+                  <span
+                    className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                      identity.status === "ACTIVE"
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : identity.status === "SUSPENDED"
+                        ? "bg-rose-50 text-rose-700 border border-rose-200"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {identity.status}
+                  </span>
+                  {subscription && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                      Plan: {subscription.plan?.name || "Standard"} ({subscription.status})
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <Mail className="h-3.5 w-3.5 text-slate-400" /> {identity.email}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Phone className="h-3.5 w-3.5 text-slate-400" /> {identity.phone}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5 text-slate-400" /> Joined{" "}
+                    {new Date(identity.createdAt).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick telemetry summary */}
+            <div className="flex items-center gap-4 bg-slate-50 px-4 py-2.5 rounded-2xl border border-slate-100">
+              <div className="text-center">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Customers</p>
+                <p className="text-base font-black text-slate-900">{usageTelemetry.customers}</p>
+              </div>
+              <div className="h-6 w-px bg-slate-200" />
+              <div className="text-center">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Bookings</p>
+                <p className="text-base font-black text-indigo-600">{usageTelemetry.bookings}</p>
+              </div>
+              <div className="h-6 w-px bg-slate-200" />
+              <div className="text-center">
+                <p className="text-[10px] uppercase font-bold text-slate-400">Vouchers</p>
+                <p className="text-base font-black text-purple-600">{usageTelemetry.documents}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* ─── TABS HEADER ──────────────────────────────────────────────── */}
+          <div className="flex items-center gap-2 border-t border-slate-100 mt-6 pt-3">
+            {[
+              { id: "overview", label: "Agency Overview & Owner" },
+              { id: "subscription", label: "Subscription & Trial Lifecycle" },
+              { id: "usage", label: "Live Usage Telemetry" },
+              { id: "audit", label: `Platform Audit Logs (${auditLogs.length})` },
+            ].map((tab) => (
               <button
                 key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 cursor-pointer ${
-                  isActive
-                    ? "border-purple-600 text-purple-700 bg-purple-50/40 rounded-t-xl"
-                    : "border-transparent text-slate-500 hover:text-slate-900"
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                  activeTab === tab.id
+                    ? "bg-purple-600 text-white shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                 }`}
               >
                 {tab.label}
               </button>
-            );
-          })}
+            ))}
+          </div>
         </div>
 
-        {/* ─── TAB 1: OVERVIEW ────────────────────────────────────────────── */}
+        {/* ─── TAB CONTENT ───────────────────────────────────────────────── */}
+
+        {/* TAB 1: OVERVIEW */}
         {activeTab === "overview" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in-0">
-            <div className="lg:col-span-8 bg-white border border-slate-200/90 rounded-3xl p-6 shadow-2xs space-y-4 text-xs">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-3">
-                Agency Information
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Identity & Details */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3">
+                Agency Identity
               </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 text-xs">
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Agency Name</span>
-                  <span className="font-bold text-slate-900 text-sm">{agency.name}</span>
+                  <span className="text-slate-400 block font-medium">Agency Name</span>
+                  <span className="font-semibold text-slate-800">{identity.name}</span>
                 </div>
-
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Unique Slug</span>
-                  <span className="font-mono text-slate-700">{agency.slug}</span>
+                  <span className="text-slate-400 block font-medium">Agency ID</span>
+                  <span className="font-mono text-slate-600 text-[11px]">{identity.id}</span>
                 </div>
-
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Email</span>
-                  <span className="text-slate-800">{agency.email}</span>
+                  <span className="text-slate-400 block font-medium">Primary Email</span>
+                  <span className="font-semibold text-slate-800">{identity.email}</span>
                 </div>
-
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Phone</span>
-                  <span className="text-slate-800">{agency.phone}</span>
+                  <span className="text-slate-400 block font-medium">Phone Number</span>
+                  <span className="font-semibold text-slate-800">{identity.phone}</span>
                 </div>
-
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Location</span>
-                  <span className="text-slate-800">
-                    {agency.address ? `${agency.address}, ` : ""}
-                    {agency.city}, {agency.state || agency.country}
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Website</span>
-                  {agency.website ? (
-                    <a
-                      href={agency.website}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-purple-600 hover:underline inline-flex items-center gap-1"
-                    >
-                      {agency.website}
-                    </a>
-                  ) : (
-                    <span className="text-slate-400">Not provided</span>
-                  )}
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">GSTIN / Tax ID</span>
-                  <span className="font-mono font-bold text-slate-800">
-                    {agency.gstin || "Not provided"}
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Created On</span>
-                  <span className="text-slate-800 font-mono">{agency.createdAt}</span>
+                <div className="col-span-2">
+                  <span className="text-slate-400 block font-medium">Physical Address</span>
+                  <span className="text-slate-700">{identity.address || "No address provided"}</span>
                 </div>
               </div>
+            </div>
 
-              {agency.internalNotes && (
-                <div className="pt-3 border-t border-slate-100">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                    Internal Admin Remarks
-                  </span>
-                  <p className="text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100 italic">
-                    {agency.internalNotes}
-                  </p>
+            {/* Owner Profile */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3">
+                Agency Owner Profile
+              </h3>
+              {owner ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 font-bold">
+                      <User className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-slate-900">{owner.name}</p>
+                      <p className="text-xs text-slate-500">{owner.email}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs border-t border-slate-100 pt-3">
+                    <div>
+                      <span className="text-slate-400 block font-medium">Internal Role</span>
+                      <span className="font-semibold text-purple-700">{owner.role}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block font-medium">Contact Phone</span>
+                      <span className="font-semibold text-slate-800">{owner.phone || "Not set"}</span>
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                <p className="text-xs text-slate-400 py-6 text-center">No Agency Owner assigned.</p>
               )}
             </div>
-
-            <div className="lg:col-span-4 space-y-6">
-              {/* Agency Owner Card */}
-              <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-2xs space-y-3 text-xs">
-                <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                  <User className="h-4 w-4 text-indigo-600" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                    Agency Owner Profile
-                  </h3>
-                </div>
-
-                <div className="space-y-2">
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Full Name</span>
-                    <span className="font-bold text-slate-900 text-sm">{owner?.name || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Email</span>
-                    <span className="text-slate-700">{owner?.email || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Mobile</span>
-                    <span className="text-slate-700">{owner?.phone || "—"}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
-        {/* ─── TAB 2: SUBSCRIPTION ────────────────────────────────────────── */}
+        {/* TAB 2: SUBSCRIPTION */}
         {activeTab === "subscription" && (
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-2xs space-y-6 animate-in fade-in-0 text-xs">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-3">
-              Subscription Entitlements & Billing Schedule
-            </h3>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Current Plan</span>
-                <span className="font-black text-sm text-purple-700 mt-1 block">
-                  {plan?.name || "Starter"} Plan
-                </span>
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-2xs space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                  Subscription & Billing Lifecycle
+                </h3>
+                <p className="text-xs text-slate-500">Plan details, free trial tracking, and renewals</p>
               </div>
-
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Billing Cycle</span>
-                <span className="font-bold text-slate-900 text-sm mt-1 block">
-                  {subscription?.billingCycle || "Monthly"}
-                </span>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Subscription Status</span>
-                <span className="font-bold text-emerald-700 text-sm mt-1 block">
-                  {subscription?.status || "ACTIVE"}
-                </span>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-                <span className="text-[10px] font-bold text-slate-400 uppercase block">Subscription Fee</span>
-                <span className="font-black text-sm text-slate-900 font-mono mt-1 block">
-                  {formatCurrency(subscription?.amount || 1999)}
-                </span>
-              </div>
+              <Button
+                size="sm"
+                onClick={() => setIsExtendOpen(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
+              >
+                + Extend Trial
+              </Button>
             </div>
 
-            {subscription?.status === "TRIAL" && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-900 space-y-1">
-                <p className="font-bold flex items-center gap-1.5">
-                  <Clock className="h-4 w-4 text-amber-600" />
-                  7-Day Free Trial Active
-                </p>
-                <p className="text-xs text-amber-800">
-                  Trial Window: <strong>{subscription.trialStart}</strong> to <strong>{subscription.trialEnd}</strong>.
-                </p>
-              </div>
-            )}
+            {subscription ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-4 rounded-xl bg-purple-50/60 border border-purple-100 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-purple-600">Current Plan</span>
+                  <p className="text-lg font-black text-slate-900">{subscription.plan?.name || "Standard"}</p>
+                  <p className="text-xs text-slate-500">₹{subscription.plan?.price || 0} / month</p>
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <div className="space-y-1">
-                <span className="text-slate-500 font-medium">Subscription Start Date:</span>
-                <p className="font-mono font-bold text-slate-800">{subscription?.startDate}</p>
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-500">Status</span>
+                  <p className="text-lg font-black text-slate-900">{subscription.status}</p>
+                  <p className="text-xs text-slate-500">
+                    {subscription.status === "TRIAL"
+                      ? `${subscription.daysRemaining} days remaining`
+                      : "Active Subscription"}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-500">Trial Period</span>
+                  <p className="text-xs font-semibold text-slate-800">
+                    {subscription.trialStart ? new Date(subscription.trialStart).toLocaleDateString() : "N/A"}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    to {subscription.trialEnd ? new Date(subscription.trialEnd).toLocaleDateString() : "N/A"}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-500">Paid Period</span>
+                  <p className="text-xs font-semibold text-slate-800">
+                    {subscription.subscriptionStart ? new Date(subscription.subscriptionStart).toLocaleDateString() : "Not active"}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    to {subscription.subscriptionEnd ? new Date(subscription.subscriptionEnd).toLocaleDateString() : "N/A"}
+                  </p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <span className="text-slate-500 font-medium">Next Renewal / Expiry Date:</span>
-                <p className="font-mono font-bold text-slate-800">{subscription?.renewalDate}</p>
-              </div>
+            ) : (
+              <p className="text-xs text-slate-400 py-6 text-center">No active subscription record.</p>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: USAGE TELEMETRY */}
+        {activeTab === "usage" && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3">
+              Platform Usage Telemetry
+            </h3>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+              {[
+                { label: "Total Customers", count: usageTelemetry.customers, icon: "👥" },
+                { label: "Trips / Itineraries", count: usageTelemetry.trips, icon: "🧭" },
+                { label: "Quotations Issued", count: usageTelemetry.quotations, icon: "📄" },
+                { label: "Confirmed Bookings", count: usageTelemetry.bookings, icon: "📅" },
+                { label: "Enquiries & Leads", count: usageTelemetry.enquiries, icon: "💬" },
+                { label: "Suppliers Configured", count: usageTelemetry.suppliers, icon: "🏢" },
+                { label: "Official Documents", count: usageTelemetry.documents, icon: "📜" },
+                { label: "Comms & Notifications", count: usageTelemetry.communications, icon: "🔔" },
+                { label: "Payment Transactions", count: usageTelemetry.payments, icon: "💳" },
+              ].map((m) => (
+                <div key={m.label} className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase">{m.label}</span>
+                    <span className="text-sm">{m.icon}</span>
+                  </div>
+                  <p className="text-2xl font-black text-slate-900">{m.count}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* ─── TAB 3: PAYMENTS ────────────────────────────────────────────── */}
-        {activeTab === "payments" && (
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-2xs space-y-4 animate-in fade-in-0 text-xs">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-3">
-              B2B Subscription Payments Ledger
+        {/* TAB 4: AUDIT LOGS */}
+        {activeTab === "audit" && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-2xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3">
+              Platform Governance & Audit Trail
             </h3>
 
-            {payments.length === 0 ? (
-              <p className="text-slate-400 py-8 text-center">No payment transactions recorded yet.</p>
+            {auditLogs.length === 0 ? (
+              <p className="text-xs text-slate-400 py-6 text-center">No platform audit events logged for this agency.</p>
             ) : (
               <div className="divide-y divide-slate-100">
-                {payments.map((p) => (
-                  <div
-                    key={p.id}
-                    className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                  >
-                    <div className="space-y-1">
+                {auditLogs.map((log) => (
+                  <div key={log.id} className="py-3 flex items-center justify-between text-xs">
+                    <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
-                          {p.id}
-                        </span>
-                        <span className="font-bold text-slate-900">{formatCurrency(p.amount)}</span>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
-                            p.status === "Verified"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : p.status === "Pending"
-                              ? "bg-amber-50 text-amber-700 border-amber-200"
-                              : "bg-rose-50 text-rose-700 border-rose-200"
-                          }`}
-                        >
-                          {p.status}
+                        <span className="font-bold text-slate-900">{log.action}</span>
+                        <span className="text-[10px] font-mono bg-purple-50 text-purple-700 px-1.5 py-0.2 rounded border border-purple-100">
+                          {log.entityType}
                         </span>
                       </div>
-
-                      <p className="text-slate-500 flex items-center gap-2">
-                        <span>Method: <strong>{p.method}</strong></span>
-                        <span>•</span>
-                        <span className="font-mono text-indigo-600">Ref: {p.reference}</span>
-                        <span>•</span>
-                        <span>Date: {p.paymentDate}</span>
-                      </p>
-                      {p.notes && <p className="text-[11px] text-slate-600 italic">{p.notes}</p>}
-                      {p.rejectionReason && (
-                        <p className="text-[11px] text-rose-600 font-medium">
-                          Rejection: {p.rejectionReason}
+                      {log.metadata && (
+                        <p className="text-[11px] text-slate-500 font-mono">
+                          {JSON.stringify(log.metadata)}
                         </p>
                       )}
                     </div>
-
-                    {p.status === "Pending" && (
-                      <Button
-                        size="sm"
-                        onClick={() => setSelectedPayment(p)}
-                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-8 px-3 rounded-xl cursor-pointer"
-                      >
-                        Review Payment
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ─── TAB 4: ACTIVITY TIMELINE ───────────────────────────────────── */}
-        {activeTab === "activity" && (
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-2xs space-y-4 animate-in fade-in-0 text-xs">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-3">
-              Agency Activity & Audit History
-            </h3>
-
-            {activities.length === 0 ? (
-              <p className="text-slate-400 py-8 text-center">No activity history recorded.</p>
-            ) : (
-              <div className="space-y-4">
-                {activities.map((act) => (
-                  <div key={act.id} className="flex items-start gap-3">
-                    <div className="h-7 w-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
-                      <History className="h-3.5 w-3.5" />
-                    </div>
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">{act.title}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {act.date} {act.time}
-                        </span>
-                      </div>
-                      <p className="text-slate-600">{act.description}</p>
-                      <p className="text-[10px] text-purple-700 font-semibold">By: {act.actor}</p>
-                    </div>
+                    <span className="text-slate-400 text-[11px]">
+                      {new Date(log.createdAt).toLocaleString("en-IN")}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -555,166 +472,61 @@ export default function AgencyDetailsPage() {
         )}
       </div>
 
-      {/* ─── STATUS CHANGE CONFIRMATION MODAL ─────────────────────────────── */}
-      {statusModalOpen && targetStatus && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
-          <div className="bg-white border border-slate-200/90 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 text-xs animate-in zoom-in-95 duration-150">
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-                <ShieldCheck className="h-5 w-5" />
+      {/* ─── EXTEND TRIAL MODAL ─────────────────────────────────────────── */}
+      {isExtendOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <h3 className="text-base font-bold text-slate-900">Extend Trial Access</h3>
+
+            <form onSubmit={handleExtendTrial} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Days to Add</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[7, 14, 30, 60].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setExtendDays(d)}
+                      className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                        extendDays === d
+                          ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+                          : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      +{d} Days
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  {targetStatus === "SUSPENDED" ? "Suspend Agency Account?" : "Update Agency Status?"}
-                </h3>
-                <p className="text-xs text-slate-500">Target State: {targetStatus}</p>
-              </div>
-            </div>
 
-            <p className="text-slate-600 leading-relaxed">
-              Are you sure you want to change the status of <strong>{agency.name}</strong> to{" "}
-              <strong>{targetStatus}</strong>?
-            </p>
-
-            <div className="space-y-1.5">
-              <label className="font-bold text-slate-700">Reason / Notes (Optional)</label>
-              <Textarea
-                placeholder="e.g. Requested temporary hold on operations..."
-                value={statusReason}
-                onChange={(e) => setStatusReason(e.target.value)}
-                rows={2}
-                className="text-xs"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setStatusModalOpen(false)}
-                className="h-8.5 text-xs cursor-pointer"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleConfirmStatusChange}
-                className={`font-bold text-xs h-8.5 px-4 rounded-xl cursor-pointer ${
-                  targetStatus === "SUSPENDED"
-                    ? "bg-rose-600 hover:bg-rose-700 text-white"
-                    : "bg-purple-600 hover:bg-purple-700 text-white"
-                }`}
-              >
-                Confirm Status Change
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── QUICK EDIT PROFILE MODAL ─────────────────────────────────────── */}
-      {isEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
-          <div className="bg-white border border-slate-200/90 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 text-xs animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-purple-600" />
-                <h3 className="text-base font-bold text-slate-900">Edit Agency Profile</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsEditOpen(false)}
-                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className="space-y-3">
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700">Agency Name</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Reason</label>
                 <Input
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="h-8.5 text-xs font-semibold"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Email</label>
-                  <Input
-                    value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    className="h-8.5 text-xs"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Phone</label>
-                  <Input
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    className="h-8.5 text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">City</label>
-                  <Input
-                    value={editCity}
-                    onChange={(e) => setEditCity(e.target.value)}
-                    className="h-8.5 text-xs"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Website</label>
-                  <Input
-                    value={editWebsite}
-                    onChange={(e) => setEditWebsite(e.target.value)}
-                    className="h-8.5 text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700">GSTIN</label>
-                <Input
-                  value={editGstin}
-                  onChange={(e) => setEditGstin(e.target.value)}
-                  className="h-8.5 text-xs font-mono"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700">Internal Remarks</label>
-                <Textarea
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  rows={2}
+                  value={extendReason}
+                  onChange={(e) => setExtendReason(e.target.value)}
+                  placeholder="e.g. Sales accommodation or VIP evaluation"
                   className="text-xs"
+                  required
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsEditOpen(false)}
-                  className="h-8.5 text-xs cursor-pointer"
+                  onClick={() => setIsExtendOpen(false)}
+                  disabled={extending}
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   size="sm"
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-8.5 px-4 rounded-xl cursor-pointer"
+                  disabled={extending}
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
                 >
-                  Save Profile
+                  {extending ? "Extending..." : "Confirm Extension"}
                 </Button>
               </div>
             </form>
@@ -722,102 +534,48 @@ export default function AgencyDetailsPage() {
         </div>
       )}
 
-      {/* ─── PAYMENT REVIEW MODAL ─────────────────────────────────────────── */}
-      {selectedPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
-          <div className="bg-white border border-slate-200/90 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-xs">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-                  <CreditCard className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Review Subscription Payment</h3>
-                  <p className="text-xs text-slate-500">Transaction ID: {selectedPayment.id}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedPayment(null);
-                  setIsRejecting(false);
-                }}
-                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      {/* ─── SUSPEND MODAL ─────────────────────────────────────────────── */}
+      {isSuspendOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <h3 className="text-base font-bold text-slate-900 text-rose-600">Suspend Agency Access</h3>
 
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Amount:</span>
-                <strong className="text-emerald-700 font-mono text-sm">
-                  {formatCurrency(selectedPayment.amount)}
-                </strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Method:</span>
-                <strong className="text-slate-800">{selectedPayment.method}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Reference (UTR):</span>
-                <strong className="font-mono text-purple-700">{selectedPayment.reference}</strong>
-              </div>
-            </div>
+            <p className="text-xs text-slate-600">
+              Are you sure you want to suspend this agency? This blocks login and operations while preserving historical data.
+            </p>
 
-            {isRejecting ? (
-              <form onSubmit={handleReject} className="space-y-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-rose-700">Rejection Reason</label>
-                  <Textarea
-                    placeholder="e.g. Payment reference UTR not found..."
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    rows={2}
-                    className="text-xs"
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsRejecting(false)}
-                    className="h-8 text-xs"
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    type="submit"
-                    size="sm"
-                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-8 px-4 rounded-xl"
-                  >
-                    Confirm Rejection
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+            <form onSubmit={handleSuspend} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Reason for Suspension</label>
+                <Input
+                  value={suspendReason}
+                  onChange={(e) => setSuspendReason(e.target.value)}
+                  placeholder="e.g. Subscription lapsed or policy violation"
+                  className="text-xs"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsRejecting(true)}
-                  className="text-rose-600 hover:bg-rose-50 border-rose-200 text-xs font-semibold h-9 px-4 rounded-xl cursor-pointer"
+                  onClick={() => setIsSuspendOpen(false)}
+                  disabled={suspending}
                 >
-                  Reject Payment
+                  Cancel
                 </Button>
                 <Button
-                  type="button"
+                  type="submit"
                   size="sm"
-                  onClick={() => handleVerify(selectedPayment)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-5 rounded-xl cursor-pointer"
+                  disabled={suspending}
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold"
                 >
-                  <Check className="h-4 w-4 mr-1.5" />
-                  Verify & Activate
+                  {suspending ? "Suspending..." : "Confirm Suspension"}
                 </Button>
               </div>
-            )}
+            </form>
           </div>
         </div>
       )}

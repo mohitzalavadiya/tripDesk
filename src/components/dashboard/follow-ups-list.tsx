@@ -36,7 +36,7 @@ export function FollowUpsList({
     }
   };
 
-  const getDueDateLabel = (date: Date) => {
+  const getDueDateLabel = (date: Date | string) => {
     const today = new Date();
     const d = new Date(date);
     const todayStr = today.toISOString().split("T")[0];
@@ -62,25 +62,28 @@ export function FollowUpsList({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "COMPLETED" }),
       });
-      const json = await res.json();
-      if (json.success) {
-        toast.success("Follow-up marked as completed.");
-        if (onRefresh) onRefresh();
-      } else {
-        toast.error(json.error || "Failed to update follow-up.");
+
+      if (!res.ok) {
+        throw new Error("Failed to complete follow up");
       }
+
+      toast.success("Follow-up marked as completed");
+      if (onRefresh) onRefresh();
     } catch {
-      toast.error("Failed to complete follow-up.");
+      toast.error("Failed to complete follow up task");
     }
   };
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-slate-200/80 bg-white p-5 animate-pulse shadow-2xs h-full flex flex-col justify-between">
-        <div className="h-4 w-32 bg-slate-200 rounded mb-4" />
+      <div className="rounded-xl border border-slate-200/80 bg-white p-5 animate-pulse shadow-2xs h-full">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+          <div className="h-4 w-36 bg-slate-200 rounded" />
+          <div className="h-4 w-12 bg-slate-100 rounded-full" />
+        </div>
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-slate-100 rounded-lg" />
+            <div key={i} className="h-14 bg-slate-50 rounded-lg" />
           ))}
         </div>
       </div>
@@ -88,14 +91,14 @@ export function FollowUpsList({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white p-5 transition-all hover:shadow-xs flex flex-col h-full animate-in fade-in duration-200">
+    <div className="rounded-xl border border-slate-200/80 bg-white p-5 flex flex-col transition-all hover:shadow-xs animate-in fade-in duration-200">
       <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
         <div>
           <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
-            Today&apos;s Follow-ups
+            Pending Follow-ups
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Key client communications required
+            Tasks requiring immediate agent outreach
           </p>
         </div>
         <span className="text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full select-none">
@@ -110,9 +113,9 @@ export function FollowUpsList({
           </div>
         ) : (
           followUps.map((item) => {
-            const customerName = item.enquiry.customer.name;
-            const destination = item.enquiry.destination;
-            const phone = item.enquiry.customer.phone;
+            const customerName = item.customerName || item.enquiry?.customer?.name || "Client";
+            const destination = item.destination || item.enquiry?.destination || "-";
+            const phone = item.customerPhone || item.enquiry?.customer?.phone || "";
             const dueLabel = getDueDateLabel(item.scheduledAt);
             const isOverdue = dueLabel === "Overdue";
             const isToday = dueLabel === "Today";

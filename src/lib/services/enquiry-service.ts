@@ -17,8 +17,14 @@ import {
   ConvertEnquiryToTripInput,
   CreateFollowUpInput,
   UpdateFollowUpInput,
+  TransitionStageInput,
+  MarkEnquiryLostInput,
+  MarkEnquiryWonInput,
+  CheckDuplicateEnquiryQuery,
 } from "@/lib/validation/enquiry-schema";
 import { tripService } from "./trip-service";
+import { followUpService } from "./follow-up-service";
+import { communicationService } from "./communication-service";
 
 export type EnquiryWithRelations = Enquiry & {
   customer: {
@@ -48,6 +54,52 @@ export type EnquiryWithRelations = Enquiry & {
     followUps: number;
   };
 };
+
+export interface CrmTimelineEvent {
+  id: string;
+  type:
+    | "ENQUIRY_CREATED"
+    | "STAGE_CHANGED"
+    | "FOLLOW_UP_SCHEDULED"
+    | "FOLLOW_UP_COMPLETED"
+    | "FOLLOW_UP_RESCHEDULED"
+    | "QUOTATION_CREATED"
+    | "QUOTATION_ACCEPTED"
+    | "BOOKING_CREATED"
+    | "ENQUIRY_CONVERTED"
+    | "ENQUIRY_LOST";
+  title: string;
+  description: string;
+  timestamp: Date;
+  referenceId?: string;
+  referenceUrl?: string;
+  statusBadge?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface EnquiryDetails360 extends EnquiryWithRelations {
+  isRepeatCustomer: boolean;
+  timeline: CrmTimelineEvent[];
+}
+
+export interface CrmDashboardStats {
+  pipelineSummary: Record<string, { count: number; totalBudget: number }>;
+  followUpSummary: {
+    overdueCount: number;
+    todayCount: number;
+    upcomingCount: number;
+    completedCount: number;
+    totalPending: number;
+  };
+  salesSummary: {
+    totalLeads: number;
+    activeLeads: number;
+    wonLeads: number;
+    lostLeads: number;
+    conversionRate: number;
+  };
+  sourcesSummary: { source: string; count: number }[];
+}
 
 export const enquiryService = {
   /**
@@ -248,6 +300,11 @@ export const enquiryService = {
       }
 
       return e;
+    });
+
+    // Non-blocking communication trigger
+    communicationService.notifyEnquiryCreated(agencyId, enquiry.id).catch((err) => {
+      console.warn("[Communication Non-blocking Notice] Failed to notify enquiry created:", err?.message || err);
     });
 
     return enquiry as EnquiryWithRelations;
@@ -583,6 +640,395 @@ export const enquiryService = {
       converted,
       lost,
       cancelled,
+    };
+  },
+
+  /**
+   * Check for potential duplicate active enquiries under the agency
+   */
+  async checkDuplicateEnquiry(
+    agencyId: string,
+    params: CheckDuplicateEnquiryQuery
+  ): Promise<{ duplicates: EnquiryWithRelations[]; matchCount: number }> {
+    const activeStatuses = [
+      EnquiryStatus.NEW,
+      EnquiryStatus.CONTACTED,
+      EnquiryStatus.QUALIFIED,
+      EnquiryStatus.QUOTATION_SENT,
+      EnquiryStatus.NEGOTIATION,
+    ];
+
+    const where: Prisma.EnquiryWhereInput = {
+      agencyId,
+      customerId: params.customerId,
+      archivedAt: null,
+      status: { in: activeStatuses },
+      ...(params.excludeId ? { id: { not: params.excludeId } } : {}),
+    };
+
+    // If destination provided, check destination match or generic customer active leads
+    const duplicates = await prisma.enquiry.findMany({
+      where,
+      include: {
+        customer: { select: { id: true, name: true, phone: true, email: true, address: true } },
+        convertedTrip: { select: { id: true, title: true, tripNumber: true, startDate: true, endDate: true, status: true } },
+        convertedQuotation: { select: { id: true, quotationNumber: true, version: true, finalAmount: true, status: true } },
+        followUps: { where: { archivedAt: null } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    });
+
+    return {
+      duplicates: duplicates as EnquiryWithRelations[],
+      matchCount: duplicates.length,
+    };
+  },
+
+  /**
+   * Transition pipeline stage with strict guardrails
+   */
+  async transitionStage(
+    agencyId: string,
+    enquiryId: string,
+    data: TransitionStageInput
+  ): Promise<EnquiryWithRelations> {
+    const enquiry = await prisma.enquiry.findFirst({
+      where: { id: enquiryId, agencyId, archivedAt: null },
+    });
+
+    if (!enquiry) {
+      throw new Error("Enquiry not found.");
+    }
+
+    if (data.status === EnquiryStatus.LOST && !data.lostReason) {
+      throw new Error("A structured lostReason is required when marking an enquiry as LOST.");
+    }
+
+    const updateData: Prisma.EnquiryUpdateInput = {
+      status: data.status,
+    };
+
+    if (data.status === EnquiryStatus.LOST) {
+      updateData.lostReason = data.lostReason;
+      updateData.lostExplanation = data.lostExplanation || null;
+      updateData.closedAt = new Date();
+    } else if (data.status === EnquiryStatus.CONVERTED) {
+      updateData.closedAt = new Date();
+      if (data.convertedTripId) updateData.convertedTrip = { connect: { id: data.convertedTripId } };
+      if (data.convertedQuotationId) updateData.convertedQuotation = { connect: { id: data.convertedQuotationId } };
+    } else {
+      // Reopened or active progression
+      if (enquiry.status === EnquiryStatus.LOST || enquiry.status === EnquiryStatus.CANCELLED) {
+        updateData.closedAt = null;
+        updateData.lostReason = null;
+        updateData.lostExplanation = null;
+      }
+    }
+
+    if (data.notes) {
+      const existingNotes = enquiry.notes ? `${enquiry.notes}\n` : "";
+      updateData.notes = `${existingNotes}[Stage changed to ${data.status}]: ${data.notes}`;
+    }
+
+    const updated = await prisma.enquiry.update({
+      where: { id: enquiryId },
+      data: updateData,
+      include: {
+        customer: { select: { id: true, name: true, phone: true, email: true, address: true } },
+        convertedTrip: { select: { id: true, title: true, tripNumber: true, startDate: true, endDate: true, status: true } },
+        convertedQuotation: { select: { id: true, quotationNumber: true, version: true, finalAmount: true, status: true } },
+        followUps: { where: { archivedAt: null }, orderBy: { scheduledAt: "desc" } },
+      },
+    });
+
+    return updated as EnquiryWithRelations;
+  },
+
+  /**
+   * Mark lead as LOST with required reason
+   */
+  async markEnquiryLost(
+    agencyId: string,
+    enquiryId: string,
+    data: MarkEnquiryLostInput
+  ): Promise<EnquiryWithRelations> {
+    return this.transitionStage(agencyId, enquiryId, {
+      status: EnquiryStatus.LOST,
+      lostReason: data.lostReason,
+      lostExplanation: data.lostExplanation,
+      notes: data.notes,
+    });
+  },
+
+  /**
+   * Mark lead as WON / CONVERTED
+   */
+  async markEnquiryWon(
+    agencyId: string,
+    enquiryId: string,
+    data?: MarkEnquiryWonInput
+  ): Promise<EnquiryWithRelations> {
+    return this.transitionStage(agencyId, enquiryId, {
+      status: EnquiryStatus.CONVERTED,
+      convertedTripId: data?.tripId,
+      convertedQuotationId: data?.quotationId,
+      notes: data?.notes,
+    });
+  },
+
+  /**
+   * Check if customer is a repeat customer based on historical converted bookings or completed trips
+   */
+  async isCustomerRepeat(agencyId: string, customerId: string): Promise<boolean> {
+    const [completedTripsCount, confirmedBookingsCount, convertedEnquiriesCount] = await Promise.all([
+      prisma.trip.count({
+        where: {
+          agencyId,
+          customerId,
+          archivedAt: null,
+          status: { in: ["COMPLETED", "ONGOING", "BOOKED"] },
+        },
+      }),
+      prisma.booking.count({
+        where: {
+          agencyId,
+          customerId,
+          archivedAt: null,
+          status: { in: ["CONFIRMED", "COMPLETED", "ONGOING"] },
+        },
+      }),
+      prisma.enquiry.count({
+        where: {
+          agencyId,
+          customerId,
+          archivedAt: null,
+          status: EnquiryStatus.CONVERTED,
+        },
+      }),
+    ]);
+
+    return completedTripsCount > 0 || confirmedBookingsCount > 0 || convertedEnquiriesCount > 0;
+  },
+
+  /**
+   * Extract chronological CRM Activity Timeline for an Enquiry
+   */
+  async getEnquiryTimeline(agencyId: string, enquiryId: string): Promise<CrmTimelineEvent[]> {
+    const enquiry = await prisma.enquiry.findFirst({
+      where: { id: enquiryId, agencyId, archivedAt: null },
+      include: {
+        customer: true,
+        followUps: { where: { archivedAt: null }, orderBy: { createdAt: "asc" } },
+        convertedTrip: {
+          include: {
+            quotations: { where: { archivedAt: null } },
+            bookings: { where: { archivedAt: null } },
+          },
+        },
+        convertedQuotation: true,
+      },
+    });
+
+    if (!enquiry) {
+      return [];
+    }
+
+    const events: CrmTimelineEvent[] = [];
+
+    // 1. Lead Created
+    events.push({
+      id: `enq-create-${enquiry.id}`,
+      type: "ENQUIRY_CREATED",
+      title: `Lead ${enquiry.enquiryNumber} Captured`,
+      description: `Inquiry registered for ${enquiry.destination} via ${enquiry.source} (${enquiry.adults} Adults, ${enquiry.children} Children).`,
+      timestamp: enquiry.createdAt,
+      statusBadge: enquiry.status,
+      metadata: { source: enquiry.source, priority: enquiry.priority },
+    });
+
+    // 2. Follow-ups
+    for (const f of enquiry.followUps) {
+      events.push({
+        id: `fu-sched-${f.id}`,
+        type: "FOLLOW_UP_SCHEDULED",
+        title: `${f.type} Follow-up Scheduled`,
+        description: `Target: ${new Date(f.scheduledAt).toLocaleString("en-IN")}${f.notes ? ` • "${f.notes}"` : ""}`,
+        timestamp: f.createdAt,
+        statusBadge: f.status,
+      });
+
+      if (f.status === FollowUpStatus.COMPLETED && f.completedAt) {
+        events.push({
+          id: `fu-comp-${f.id}`,
+          type: "FOLLOW_UP_COMPLETED",
+          title: `${f.type} Follow-up Completed`,
+          description: f.outcome ? `Outcome: ${f.outcome}` : `Completed interaction on ${new Date(f.completedAt).toLocaleDateString("en-IN")}`,
+          timestamp: f.completedAt,
+          statusBadge: "COMPLETED",
+        });
+      }
+    }
+
+    // 3. Converted Trip & Quotations
+    if (enquiry.convertedTrip) {
+      const trip = enquiry.convertedTrip;
+      events.push({
+        id: `trip-conv-${trip.id}`,
+        type: "STAGE_CHANGED",
+        title: `Converted to Trip Workspace: ${trip.title}`,
+        description: `Trip Number: ${trip.tripNumber} (${new Date(trip.startDate).toLocaleDateString("en-IN")} - ${new Date(trip.endDate).toLocaleDateString("en-IN")}).`,
+        timestamp: trip.createdAt,
+        referenceId: trip.id,
+        referenceUrl: `/trips/${trip.id}`,
+        statusBadge: trip.status,
+      });
+
+      for (const q of trip.quotations) {
+        events.push({
+          id: `quot-${q.id}`,
+          type: q.status === "ACCEPTED" ? "QUOTATION_ACCEPTED" : "QUOTATION_CREATED",
+          title: `Proposal ${q.quotationNumber} (v${q.version}) ${q.status}`,
+          description: `Quoted Amount: ₹${Number(q.finalAmount).toLocaleString("en-IN")}.`,
+          timestamp: q.createdAt,
+          referenceId: q.id,
+          referenceUrl: `/trips/${trip.id}/quotation`,
+          statusBadge: q.status,
+        });
+      }
+
+      for (const b of trip.bookings) {
+        events.push({
+          id: `book-${b.id}`,
+          type: "BOOKING_CREATED",
+          title: `Booking ${b.bookingNumber} Confirmed (Lead WON)`,
+          description: `Total contract value: ₹${Number(b.totalAmount).toLocaleString("en-IN")}.`,
+          timestamp: b.createdAt,
+          referenceId: b.id,
+          referenceUrl: `/bookings/${b.id}`,
+          statusBadge: b.status,
+        });
+      }
+    }
+
+    // 4. Lost / Won final closure events
+    if (enquiry.status === EnquiryStatus.LOST && enquiry.closedAt) {
+      events.push({
+        id: `enq-lost-${enquiry.id}`,
+        type: "ENQUIRY_LOST",
+        title: `Lead Closed as LOST`,
+        description: `Reason: ${enquiry.lostReason || "Unspecified"}${enquiry.lostExplanation ? ` • ${enquiry.lostExplanation}` : ""}`,
+        timestamp: enquiry.closedAt,
+        statusBadge: "LOST",
+      });
+    } else if (enquiry.status === EnquiryStatus.CONVERTED && enquiry.closedAt) {
+      events.push({
+        id: `enq-won-${enquiry.id}`,
+        type: "ENQUIRY_CONVERTED",
+        title: `Lead Successfully CONVERTED (WON)`,
+        description: `Lead closed as won and transitioned to active booking.`,
+        timestamp: enquiry.closedAt,
+        statusBadge: "WON",
+      });
+    }
+
+    // Sort descending by timestamp
+    events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return events;
+  },
+
+  /**
+   * Get 360-degree enquiry details with repeat customer identification and CRM timeline
+   */
+  async getEnquiryDetails360(agencyId: string, enquiryId: string): Promise<EnquiryDetails360 | null> {
+    const enquiry = await this.getEnquiry(agencyId, enquiryId);
+    if (!enquiry) {
+      return null;
+    }
+
+    const [isRepeatCustomer, timeline] = await Promise.all([
+      this.isCustomerRepeat(agencyId, enquiry.customerId),
+      this.getEnquiryTimeline(agencyId, enquiryId),
+    ]);
+
+    return {
+      ...enquiry,
+      isRepeatCustomer,
+      timeline,
+    };
+  },
+
+  /**
+   * Get comprehensive CRM Dashboard statistics
+   */
+  async getCrmDashboardStats(agencyId: string): Promise<CrmDashboardStats> {
+    const [enquiries, followUpSummary] = await Promise.all([
+      prisma.enquiry.findMany({
+        where: { agencyId, archivedAt: null },
+        select: {
+          id: true,
+          status: true,
+          source: true,
+          budget: true,
+        },
+      }),
+      followUpService.getFollowUpSummary(agencyId),
+    ]);
+
+    const pipelineSummary: Record<string, { count: number; totalBudget: number }> = {
+      NEW: { count: 0, totalBudget: 0 },
+      CONTACTED: { count: 0, totalBudget: 0 },
+      QUALIFIED: { count: 0, totalBudget: 0 },
+      QUOTATION_SENT: { count: 0, totalBudget: 0 },
+      NEGOTIATION: { count: 0, totalBudget: 0 },
+      CONVERTED: { count: 0, totalBudget: 0 },
+      LOST: { count: 0, totalBudget: 0 },
+      CANCELLED: { count: 0, totalBudget: 0 },
+    };
+
+    const sourcesCount: Record<string, number> = {};
+    let wonLeads = 0;
+    let lostLeads = 0;
+
+    for (const e of enquiries) {
+      const budgetNum = Number(e.budget || 0);
+      if (pipelineSummary[e.status]) {
+        pipelineSummary[e.status].count++;
+        pipelineSummary[e.status].totalBudget += budgetNum;
+      }
+      if (e.status === EnquiryStatus.CONVERTED) wonLeads++;
+      if (e.status === EnquiryStatus.LOST) lostLeads++;
+
+      sourcesCount[e.source] = (sourcesCount[e.source] || 0) + 1;
+    }
+
+    const totalLeads = enquiries.length;
+    const activeLeads =
+      pipelineSummary.NEW.count +
+      pipelineSummary.CONTACTED.count +
+      pipelineSummary.QUALIFIED.count +
+      pipelineSummary.QUOTATION_SENT.count +
+      pipelineSummary.NEGOTIATION.count;
+
+    const closedLeads = wonLeads + lostLeads;
+    const conversionRate = closedLeads > 0 ? Math.round((wonLeads / closedLeads) * 1000) / 10 : 0;
+
+    const sourcesSummary = Object.entries(sourcesCount)
+      .map(([source, count]) => ({ source, count }))
+      .sort((a, b) => b.count - a.count);
+
+    return {
+      pipelineSummary,
+      followUpSummary,
+      salesSummary: {
+        totalLeads,
+        activeLeads,
+        wonLeads,
+        lostLeads,
+        conversionRate,
+      },
+      sourcesSummary,
     };
   },
 };

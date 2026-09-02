@@ -19,3 +19,7 @@ export * from "./public-client";
 export * from "./operations-client";
 export * from "./finance-client";
 export * from "./customer-portal-client";
+export * from "./follow-up-client";
+export * from "./communication-client";
+export * from "./document-client";
+export * from "./admin-client";

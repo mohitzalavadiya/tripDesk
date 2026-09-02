@@ -3,9 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSaaS } from "@/context/saas-context";
 import { PageHeader } from "@/components/shared/page-header";
-import { formatCurrency } from "@/lib/costing-engine";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,108 +14,144 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { toast } from "sonner";
+import {
   CreditCard,
   CheckCircle2,
   Clock,
   AlertTriangle,
   Search,
-  RotateCcw,
+  RefreshCw,
   Eye,
   Calendar,
   IndianRupee,
   Layers,
+  Ban,
 } from "lucide-react";
+import { adminClient } from "@/lib/api-client/admin-client";
 
 export default function AdminSubscriptionsPage() {
   const router = useRouter();
-  const { subscriptions, agencies, agencyOwners, plans, getPlatformStats } = useSaaS();
-
+  const [subscriptions, setSubscriptions] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("ALL");
 
-  const stats = getPlatformStats();
+  // Extend Trial Modal State
+  const [extendSub, setExtendSub] = React.useState<{ agencyId: string; agencyName: string } | null>(null);
+  const [extendDays, setExtendDays] = React.useState(7);
+  const [extendReason, setExtendReason] = React.useState("Promotional trial extension");
+  const [extending, setExtending] = React.useState(false);
+
+  const fetchSubscriptions = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminClient.listSubscriptions({
+        status: statusFilter !== "ALL" ? statusFilter : undefined,
+      });
+      if (res.success && res.data) {
+        setSubscriptions(res.data);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load subscriptions");
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter]);
+
+  React.useEffect(() => {
+    fetchSubscriptions();
+  }, [fetchSubscriptions]);
 
   const filteredSubscriptions = React.useMemo(() => {
-    return subscriptions.filter((sub) => {
-      const agency = agencies.find((a) => a.id === sub.agencyId);
-      const owner = agencyOwners.find((o) => o.agencyId === sub.agencyId);
+    if (!searchQuery.trim()) return subscriptions;
+    const q = searchQuery.toLowerCase();
+    return subscriptions.filter(
+      (s) =>
+        s.agencyName.toLowerCase().includes(q) ||
+        s.agencyEmail.toLowerCase().includes(q) ||
+        s.planName.toLowerCase().includes(q)
+    );
+  }, [subscriptions, searchQuery]);
 
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const mAgency = agency?.name.toLowerCase().includes(q);
-        const mOwner = owner?.name.toLowerCase().includes(q);
-        if (!mAgency && !mOwner) return false;
-      }
+  const handleExtendTrial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!extendSub) return;
+    setExtending(true);
+    try {
+      await adminClient.extendTrial(extendSub.agencyId, extendDays, extendReason);
+      toast.success(`Trial extended for ${extendSub.agencyName}`);
+      setExtendSub(null);
+      fetchSubscriptions();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to extend trial");
+    } finally {
+      setExtending(false);
+    }
+  };
 
-      if (statusFilter !== "ALL" && sub.status !== statusFilter) return false;
-
-      return true;
-    });
-  }, [subscriptions, agencies, agencyOwners, searchQuery, statusFilter]);
+  const activeCount = subscriptions.filter((s) => s.status === "ACTIVE").length;
+  const trialCount = subscriptions.filter((s) => s.status === "TRIAL").length;
+  const expiredCount = subscriptions.filter((s) => s.status === "EXPIRED" || s.isTrialExpired).length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-screen bg-slate-50/50 pb-20">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
         {/* Top Header */}
         <PageHeader
-          title="Subscriptions"
-          description="Track agency subscription lifecycles, billing cycles, renewals, and recurring revenue."
-          breadcrumbs={[{ label: "SaaS Platform" }, { label: "Subscriptions" }]}
+          title="Subscription Management"
+          description="Monitor subscribed agencies, track free trial countdowns, inspect pricing tiers, and manage renewals."
+          breadcrumbs={[{ label: "SaaS Platform", href: "/admin" }, { label: "Subscriptions" }]}
+          primaryAction={{
+            label: "Refresh Subscriptions",
+            onClick: fetchSubscriptions,
+            icon: RefreshCw,
+          }}
         />
 
-        {/* ─── 4 HEALTH CARDS ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+        {/* ─── 3 KPI TILES ────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
             <div className="flex items-center justify-between text-emerald-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Active Subscriptions</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Active Paid Plans</span>
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             </div>
-            <p className="text-2xl font-black text-emerald-700 tracking-tight">
-              {subscriptions.filter((s) => s.status === "ACTIVE").length}
-            </p>
-            <p className="text-[11px] text-slate-500 font-medium">Paying subscriber accounts</p>
+            <p className="text-2xl font-black text-emerald-700 tracking-tight">{activeCount}</p>
+            <p className="text-xs text-slate-500 font-medium">Paying subscriber agencies</p>
           </div>
 
           <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
             <div className="flex items-center justify-between text-amber-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">In 7-Day Trial</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Active Free Trials</span>
               <Clock className="h-4 w-4 text-amber-500" />
             </div>
-            <p className="text-2xl font-black text-amber-700 tracking-tight">
-              {subscriptions.filter((s) => s.status === "TRIAL").length}
-            </p>
-            <p className="text-[11px] text-slate-500 font-medium">Free evaluation stage</p>
+            <p className="text-2xl font-black text-amber-700 tracking-tight">{trialCount}</p>
+            <p className="text-xs text-slate-500 font-medium">Under 7-day evaluation</p>
           </div>
 
           <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-orange-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Past Due</span>
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
+            <div className="flex items-center justify-between text-rose-600">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Expired / Past Due</span>
+              <AlertTriangle className="h-4 w-4 text-rose-500" />
             </div>
-            <p className="text-2xl font-black text-orange-700 tracking-tight">
-              {subscriptions.filter((s) => s.status === "PAST_DUE").length}
-            </p>
-            <p className="text-[11px] text-slate-500 font-medium">Payment verification pending</p>
-          </div>
-
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-purple-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Monthly MRR</span>
-              <IndianRupee className="h-4 w-4 text-purple-500" />
-            </div>
-            <p className="text-2xl font-black text-purple-700 tracking-tight">
-              {formatCurrency(stats.mrr)}
-            </p>
-            <p className="text-[11px] text-slate-500 font-medium">ARR: {formatCurrency(stats.arr)}</p>
+            <p className="text-2xl font-black text-rose-700 tracking-tight">{expiredCount}</p>
+            <p className="text-xs text-slate-500 font-medium">Requires renewal or conversion</p>
           </div>
         </div>
 
-        {/* ─── SEARCH & FILTER CONTROLS ───────────────────────────────────── */}
+        {/* ─── FILTER CONTROLS ────────────────────────────────────────────── */}
         <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row gap-3 items-center justify-between">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Search by Agency or Owner Name..."
+              placeholder="Search Agency Name, Email, Plan..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 h-9 text-xs"
@@ -125,120 +159,213 @@ export default function AdminSubscriptionsPage() {
           </div>
 
           <div className="flex items-center gap-2.5 w-full sm:w-auto">
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v || "ALL")}>
-              <SelectTrigger className="h-9 text-xs w-44">
-                <SelectValue placeholder="Subscription Status" />
+            <Select
+              value={statusFilter}
+              onValueChange={(val) => {
+                if (val) setStatusFilter(val);
+              }}
+            >
+              <SelectTrigger className="h-9 text-xs w-[160px]">
+                <SelectValue placeholder="Filter Status" />
               </SelectTrigger>
-              <SelectContent className="bg-white border-slate-200">
-                <SelectItem value="ALL">All Subscriptions</SelectItem>
-                <SelectItem value="TRIAL">Trial</SelectItem>
-                <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="PAST_DUE">Past Due</SelectItem>
+              <SelectContent>
+                <SelectItem value="ALL">All Statuses</SelectItem>
+                <SelectItem value="TRIAL">In Free Trial</SelectItem>
+                <SelectItem value="ACTIVE">Paid Active</SelectItem>
                 <SelectItem value="EXPIRED">Expired</SelectItem>
+                <SelectItem value="CANCELLED">Cancelled</SelectItem>
               </SelectContent>
             </Select>
 
-            {(searchQuery || statusFilter !== "ALL") && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSearchQuery("");
-                  setStatusFilter("ALL");
-                }}
-                className="h-9 text-xs font-semibold text-slate-500 hover:text-slate-900 cursor-pointer"
-              >
-                <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                Reset
-              </Button>
-            )}
+            <span className="text-xs text-slate-500 font-medium">
+              ({filteredSubscriptions.length} Records)
+            </span>
           </div>
         </div>
 
         {/* ─── SUBSCRIPTIONS TABLE ────────────────────────────────────────── */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              Subscription Records ({filteredSubscriptions.length})
-            </span>
-          </div>
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+          <Table>
+            <TableHeader className="bg-slate-50/80">
+              <TableRow>
+                <TableHead className="text-xs font-bold uppercase text-slate-600">Agency</TableHead>
+                <TableHead className="text-xs font-bold uppercase text-slate-600">Plan & Pricing</TableHead>
+                <TableHead className="text-xs font-bold uppercase text-slate-600">Subscription Status</TableHead>
+                <TableHead className="text-xs font-bold uppercase text-slate-600">Trial / Billing Dates</TableHead>
+                <TableHead className="text-xs font-bold uppercase text-slate-600 text-right pr-6">Controls</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-32 text-center text-xs text-slate-400">
+                    Loading subscriptions...
+                  </TableCell>
+                </TableRow>
+              ) : filteredSubscriptions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-32 text-center text-xs text-slate-400">
+                    No subscriptions found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredSubscriptions.map((sub) => (
+                  <TableRow
+                    key={sub.id}
+                    onClick={() => router.push(`/admin/agencies/${sub.agencyId}`)}
+                    className="hover:bg-purple-50/30 transition-colors cursor-pointer group"
+                  >
+                    <TableCell className="py-3.5">
+                      <div className="space-y-0.5">
+                        <span className="font-bold text-sm text-slate-900 group-hover:text-purple-700 transition-colors">
+                          {sub.agencyName}
+                        </span>
+                        <p className="text-xs text-slate-500">{sub.agencyEmail}</p>
+                      </div>
+                    </TableCell>
 
-          <div className="divide-y divide-slate-100 text-xs">
-            {filteredSubscriptions.map((sub) => {
-              const agency = agencies.find((a) => a.id === sub.agencyId);
-              const owner = agencyOwners.find((o) => o.agencyId === sub.agencyId);
-              const plan = plans.find((p) => p.id === sub.planId);
+                    <TableCell>
+                      <div className="space-y-0.5 text-xs">
+                        <span className="font-bold text-slate-900">{sub.planName}</span>
+                        <p className="text-slate-500 font-semibold">₹{sub.planPrice} / month</p>
+                      </div>
+                    </TableCell>
 
-              return (
-                <div
-                  key={sub.id}
-                  className="py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm text-slate-900">
-                        {agency?.name || "Unknown Agency"}
-                      </span>
+                    <TableCell>
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                        className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
                           sub.status === "ACTIVE"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                             : sub.status === "TRIAL"
-                            ? "bg-amber-50 text-amber-700 border-amber-200"
-                            : sub.status === "PAST_DUE"
-                            ? "bg-orange-50 text-orange-700 border-orange-200"
-                            : "bg-rose-50 text-rose-700 border-rose-200"
+                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                            : "bg-slate-100 text-slate-600 border border-slate-200"
                         }`}
                       >
-                        {sub.status === "PAST_DUE" ? "Payment Required" : sub.status}
+                        {sub.status === "ACTIVE" && <CheckCircle2 className="h-3 w-3" />}
+                        {sub.status === "TRIAL" && <Clock className="h-3 w-3" />}
+                        {sub.status}
                       </span>
-                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
-                        {plan?.name || "Starter"} Plan ({sub.billingCycle})
-                      </span>
-                    </div>
+                    </TableCell>
 
-                    <p className="text-slate-500 flex items-center gap-2 flex-wrap">
-                      <span>Owner: <strong>{owner?.name || "Agency Owner"}</strong></span>
-                      <span>•</span>
-                      <span>Started: {sub.startDate}</span>
-                    </p>
-                  </div>
+                    <TableCell>
+                      <div className="space-y-0.5 text-xs">
+                        {sub.status === "TRIAL" ? (
+                          <>
+                            <p className="text-slate-700 font-medium">
+                              Trial End: {sub.trialEnd ? new Date(sub.trialEnd).toLocaleDateString() : "N/A"}
+                            </p>
+                            <p className="text-[11px] text-amber-700 font-bold">
+                              {sub.daysRemaining > 0 ? `${sub.daysRemaining} days left` : "Expired"}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-slate-700 font-medium">
+                              Period: {sub.subscriptionStart ? new Date(sub.subscriptionStart).toLocaleDateString() : "Active"}
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              Renews: {sub.subscriptionEnd ? new Date(sub.subscriptionEnd).toLocaleDateString() : "Monthly"}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
 
-                  <div className="flex items-center gap-5 self-end lg:self-center shrink-0">
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                        Amount
-                      </span>
-                      <span className="font-black text-sm text-slate-900 font-mono">
-                        {formatCurrency(sub.amount)}
-                      </span>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                        Renewal / Expiry
-                      </span>
-                      <span className="font-bold text-slate-800 font-mono">
-                        {sub.renewalDate}
-                      </span>
-                    </div>
-
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => router.push(`/admin/agencies/${sub.agencyId}`)}
-                      className="h-8.5 text-xs font-semibold cursor-pointer bg-white"
-                    >
-                      <Eye className="h-3.5 w-3.5 mr-1 text-slate-400" />
-                      View Agency
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                    <TableCell className="text-right pr-6" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {sub.status === "TRIAL" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setExtendSub({ agencyId: sub.agencyId, agencyName: sub.agencyName })
+                            }
+                            className="h-7 text-[11px] font-semibold border-amber-300 text-amber-800 hover:bg-amber-50"
+                          >
+                            + Trial
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          onClick={() => router.push(`/admin/agencies/${sub.agencyId}`)}
+                          className="h-7 text-[11px] font-semibold bg-purple-600 hover:bg-purple-700 text-white"
+                        >
+                          360°
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
       </div>
+
+      {/* ─── EXTEND TRIAL MODAL ─────────────────────────────────────────── */}
+      {extendSub && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <h3 className="text-base font-bold text-slate-900">Extend Trial Access</h3>
+            <p className="text-xs text-slate-500">
+              Agency: <span className="font-semibold text-purple-700">{extendSub.agencyName}</span>
+            </p>
+
+            <form onSubmit={handleExtendTrial} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Days to Add</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[7, 14, 30, 60].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setExtendDays(d)}
+                      className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                        extendDays === d
+                          ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+                          : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      +{d} Days
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Reason</label>
+                <Input
+                  value={extendReason}
+                  onChange={(e) => setExtendReason(e.target.value)}
+                  placeholder="e.g. Sales accommodation"
+                  className="text-xs"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setExtendSub(null)}
+                  disabled={extending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={extending}
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
+                >
+                  {extending ? "Extending..." : "Confirm Extension"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

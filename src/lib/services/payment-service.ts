@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { Payment, PaymentMethod, PaymentStatus, Prisma } from "@prisma/client";
 import { bookingService } from "./booking-service";
+import { communicationService } from "./communication-service";
 import {
   CreatePaymentInput,
   UpdatePaymentInput,
@@ -228,6 +229,11 @@ export const paymentService = {
       await bookingService.recalculateBookingPaymentTotals(booking.id, tx);
 
       return p;
+    });
+
+    // Non-blocking communication trigger
+    communicationService.notifyPaymentReceived(agencyId, payment.id).catch((err) => {
+      console.warn("[Communication Non-blocking Notice] Failed to notify payment received:", err?.message || err);
     });
 
     return payment as PaymentWithRelations;

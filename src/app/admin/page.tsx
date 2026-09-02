@@ -3,12 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSaaS } from "@/context/saas-context";
 import { PageHeader } from "@/components/shared/page-header";
-import { formatCurrency } from "@/lib/costing-engine";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   Building2,
@@ -24,195 +21,280 @@ import {
   Layers,
   IndianRupee,
   Activity,
-  Sparkles,
-  Check,
-  X,
-  QrCode,
+  Search,
+  RefreshCw,
   ExternalLink,
-  Eye,
+  Compass,
+  CalendarCheck,
+  FileText,
+  Sparkles,
 } from "lucide-react";
-import { SaaSSubscriptionPayment } from "@/data/saas-data";
+import { adminClient } from "@/lib/api-client/admin-client";
+import { PlatformOverviewStats, GlobalSearchResult } from "@/lib/services/admin-service";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const {
-    agencies,
-    agencyOwners,
-    subscriptions,
-    plans,
-    getPlatformStats,
-    getPendingPayments,
-    verifyPayment,
-    rejectPayment,
-  } = useSaaS();
+  const [stats, setStats] = React.useState<PlatformOverviewStats | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [searchResults, setSearchResults] = React.useState<GlobalSearchResult[]>([]);
+  const [searching, setSearching] = React.useState(false);
 
-  const stats = getPlatformStats();
-  const pendingPayments = getPendingPayments();
+  // Extend Trial Modal State
+  const [extendModalAgency, setExtendModalAgency] = React.useState<{ id: string; name: string } | null>(null);
+  const [extendDays, setExtendDays] = React.useState(7);
+  const [extendReason, setExtendReason] = React.useState("Promotional trial extension");
+  const [extending, setExtending] = React.useState(false);
 
-  // Payment Review Modal State
-  const [selectedPayment, setSelectedPayment] = React.useState<SaaSSubscriptionPayment | null>(null);
-  const [isRejecting, setIsRejecting] = React.useState(false);
-  const [rejectionReason, setRejectionReason] = React.useState("");
+  const fetchOverview = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminClient.getOverview();
+      if (res.success && res.data) {
+        setStats(res.data);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load platform stats");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleVerify = (payment: SaaSSubscriptionPayment) => {
-    verifyPayment(payment.id);
-    setSelectedPayment(null);
-    setIsRejecting(false);
-    setRejectionReason("");
-  };
+  React.useEffect(() => {
+    fetchOverview();
+  }, [fetchOverview]);
 
-  const handleReject = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPayment) return;
-    if (!rejectionReason.trim()) {
-      toast.error("Please provide a rejection reason.");
+  // Handle Search
+  React.useEffect(() => {
+    if (!searchQuery.trim() || searchQuery.trim().length < 2) {
+      setSearchResults([]);
       return;
     }
-    rejectPayment(selectedPayment.id, rejectionReason);
-    setSelectedPayment(null);
-    setIsRejecting(false);
-    setRejectionReason("");
+
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await adminClient.globalSearch(searchQuery.trim());
+        if (res.success && res.data) {
+          setSearchResults(res.data);
+        }
+      } catch (err) {
+        console.error("Search error:", err);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleExtendTrial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!extendModalAgency) return;
+    setExtending(true);
+    try {
+      await adminClient.extendTrial(extendModalAgency.id, extendDays, extendReason);
+      toast.success(`Trial extended by ${extendDays} days for ${extendModalAgency.name}`);
+      setExtendModalAgency(null);
+      fetchOverview();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to extend trial");
+    } finally {
+      setExtending(false);
+    }
   };
 
+  const formatRupees = (val: number) => `₹${val.toLocaleString("en-IN")}`;
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        {/* Top Header */}
+    <div className="min-h-screen bg-slate-50/50 pb-20">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+        {/* Header */}
         <PageHeader
           title="TripDesk Platform Administration"
-          description="SaaS Overview — Manage subscribed travel agencies, billing renewals, plans, and platform revenue."
-          breadcrumbs={[{ label: "SaaS Platform" }, { label: "Admin Dashboard" }]}
+          description="SaaS Control Center — Executive metrics, agency governance, trial lifecycles, and cross-tenant intelligence."
+          breadcrumbs={[{ label: "SaaS Platform" }, { label: "Admin Control Center" }]}
           primaryAction={{
-            label: "Create Agency",
-            onClick: () => router.push("/admin/agencies/new"),
-            icon: Plus,
+            label: "Refresh Telemetry",
+            onClick: fetchOverview,
+            icon: RefreshCw,
           }}
         />
 
-        {/* ─── 6 PLATFORM KPI CARDS ───────────────────────────────────────── */}
+        {/* Global Platform Search */}
+        <div className="relative">
+          <div className="flex items-center bg-white rounded-2xl border border-slate-200/90 shadow-2xs px-4 py-2.5 gap-3 focus-within:ring-2 focus-within:ring-purple-500/20 focus-within:border-purple-500 transition-all">
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <Input
+              type="text"
+              placeholder="Global Search across all tenants (Agencies, Owners, Customers, Bookings, Enquiries)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="border-0 focus-visible:ring-0 text-sm shadow-none p-0 h-auto placeholder:text-slate-400"
+            />
+            {searching && <RefreshCw className="h-4 w-4 text-purple-500 animate-spin shrink-0" />}
+          </div>
+
+          {/* Search Dropdown Results */}
+          {searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 overflow-hidden divide-y divide-slate-100 max-h-[380px] overflow-y-auto">
+              <div className="p-2.5 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                <span>Matching Cross-Tenant Records ({searchResults.length})</span>
+                <span className="text-[10px] text-purple-600 font-semibold">Live Index</span>
+              </div>
+              {searchResults.map((item) => (
+                <div
+                  key={`${item.type}-${item.id}`}
+                  onClick={() => {
+                    router.push(item.url);
+                    setSearchQuery("");
+                    setSearchResults([]);
+                  }}
+                  className="p-3.5 hover:bg-purple-50/40 transition-all cursor-pointer flex items-center justify-between group"
+                >
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+                        {item.type}
+                      </span>
+                      <span className="font-semibold text-sm text-slate-900 truncate">
+                        {item.title}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 truncate">{item.subtitle}</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-purple-600 transition-colors shrink-0 ml-3" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ─── 6 PRIMARY EXECUTIVE KPI CARDS ──────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-          {/* 1. Total Agencies */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
+          {/* Total Agencies */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1 hover:border-purple-200 transition-all">
             <div className="flex items-center justify-between text-purple-600">
               <span className="text-[11px] font-bold uppercase tracking-wider">Total Agencies</span>
               <Building2 className="h-4 w-4 text-purple-500" />
             </div>
-            <p className="text-2xl font-black text-slate-900 tracking-tight">{stats.totalAgencies}</p>
-            <p className="text-[11px] text-slate-500 font-medium">Registered businesses</p>
+            <p className="text-2xl font-black text-slate-900 tracking-tight">
+              {loading ? "-" : stats?.totalAgencies || 0}
+            </p>
+            <p className="text-[11px] text-slate-500 flex items-center gap-1 font-medium">
+              <span className="text-emerald-600 font-bold">{stats?.activeAgencies || 0}</span> active
+            </p>
           </div>
 
-          {/* 2. Active Agencies */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-emerald-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Active</span>
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            </div>
-            <p className="text-2xl font-black text-emerald-700 tracking-tight">{stats.activeAgencies}</p>
-            <p className="text-[11px] text-slate-500 font-medium">Full paid access</p>
-          </div>
-
-          {/* 3. Trial Agencies */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
+          {/* Active Free Trials */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1 hover:border-amber-200 transition-all">
             <div className="flex items-center justify-between text-amber-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Trial</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Active Trials</span>
               <Clock className="h-4 w-4 text-amber-500" />
             </div>
-            <p className="text-2xl font-black text-amber-700 tracking-tight">{stats.trialAgencies}</p>
-            <p className="text-[11px] text-slate-500 font-medium">7-day evaluations</p>
+            <p className="text-2xl font-black text-slate-900 tracking-tight">
+              {loading ? "-" : stats?.trialAgencies || 0}
+            </p>
+            <p className="text-[11px] text-slate-500 flex items-center gap-1 font-medium">
+              <span className="text-amber-600 font-bold">{stats?.expiringTrials?.length || 0}</span> expiring soon
+            </p>
           </div>
 
-          {/* 4. Suspended */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
+          {/* Expired / Suspended */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1 hover:border-rose-200 transition-all">
             <div className="flex items-center justify-between text-rose-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Suspended</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">Expired / Suspended</span>
               <AlertTriangle className="h-4 w-4 text-rose-500" />
             </div>
-            <p className="text-2xl font-black text-rose-700 tracking-tight">{stats.suspendedAgencies}</p>
-            <p className="text-[11px] text-slate-500 font-medium">Overdue renewals</p>
+            <p className="text-2xl font-black text-slate-900 tracking-tight">
+              {loading ? "-" : (stats?.expiredTrialAgencies || 0) + (stats?.suspendedAgencies || 0)}
+            </p>
+            <p className="text-[11px] text-slate-500 font-medium">
+              {stats?.suspendedAgencies || 0} suspended accounts
+            </p>
           </div>
 
-          {/* 5. Active Subscriptions */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-indigo-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Subscriptions</span>
-              <CreditCard className="h-4 w-4 text-indigo-500" />
+          {/* SaaS Monthly MRR */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1 hover:border-emerald-200 transition-all">
+            <div className="flex items-center justify-between text-emerald-600">
+              <span className="text-[11px] font-bold uppercase tracking-wider">SaaS MRR</span>
+              <IndianRupee className="h-4 w-4 text-emerald-500" />
             </div>
-            <p className="text-2xl font-black text-indigo-700 tracking-tight">{stats.activeSubscriptions}</p>
-            <p className="text-[11px] text-slate-500 font-medium">Active billing accounts</p>
+            <p className="text-2xl font-black text-emerald-700 tracking-tight">
+              {loading ? "-" : formatRupees(stats?.mrr || 0)}
+            </p>
+            <p className="text-[11px] text-slate-500 font-medium">
+              ARR: {loading ? "-" : formatRupees(stats?.arr || 0)}
+            </p>
           </div>
 
-          {/* 6. Pending Payments */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1 col-span-2 sm:col-span-1">
+          {/* Total Agency Customers */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1 hover:border-blue-200 transition-all">
             <div className="flex items-center justify-between text-blue-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Pending Payments</span>
-              <IndianRupee className="h-4 w-4 text-blue-500" />
+              <span className="text-[11px] font-bold uppercase tracking-wider">SaaS Customers</span>
+              <Users className="h-4 w-4 text-blue-500" />
             </div>
-            <p className="text-2xl font-black text-blue-700 tracking-tight">{stats.pendingPaymentsCount}</p>
-            <p className="text-[11px] text-slate-500 font-medium">Awaiting verification</p>
+            <p className="text-2xl font-black text-slate-900 tracking-tight">
+              {loading ? "-" : stats?.totalCustomers || 0}
+            </p>
+            <p className="text-[11px] text-slate-500 font-medium">Across all travel agencies</p>
+          </div>
+
+          {/* Total SaaS Bookings Volume */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1 hover:border-indigo-200 transition-all">
+            <div className="flex items-center justify-between text-indigo-600">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Agency GMV</span>
+              <CalendarCheck className="h-4 w-4 text-indigo-500" />
+            </div>
+            <p className="text-2xl font-black text-indigo-700 tracking-tight">
+              {loading ? "-" : formatRupees(stats?.agencyBookingVolume || 0)}
+            </p>
+            <p className="text-[11px] text-slate-500 font-medium">
+              {stats?.totalBookings || 0} confirmed trips
+            </p>
           </div>
         </div>
 
-        {/* ─── PENDING PAYMENTS SECTION ───────────────────────────────────── */}
-        {pendingPayments.length > 0 && (
-          <div className="bg-amber-50/70 border border-amber-200 rounded-3xl p-6 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between border-b border-amber-200/80 pb-3">
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-amber-600" />
-                <h3 className="text-sm font-bold text-amber-900 uppercase tracking-wider">
-                  Pending B2B Subscription Payments ({pendingPayments.length})
-                </h3>
+        {/* ─── EXPIRING TRIALS BANNER (ACTIONABLE) ────────────────────────── */}
+        {stats?.expiringTrials && stats.expiringTrials.length > 0 && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <span>{stats.expiringTrials.length} Agencies with Expiring Free Trials (Action Required)</span>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push("/admin/payments")}
-                className="text-xs font-bold text-amber-800 hover:text-amber-950 cursor-pointer"
-              >
-                View All Payments →
-              </Button>
+              <span className="text-xs text-amber-700 font-semibold">Needs Renewal or Extension</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pendingPayments.map((p) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {stats.expiringTrials.map((agency) => (
                 <div
-                  key={p.id}
-                  className="bg-white border border-amber-200 rounded-2xl p-4.5 shadow-xs flex flex-col justify-between space-y-3"
+                  key={agency.id}
+                  className="bg-white p-3.5 rounded-xl border border-amber-200/80 shadow-2xs flex items-center justify-between"
                 >
-                  <div className="space-y-1 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm text-slate-900">{p.agencyName}</span>
-                      <span className="font-mono font-bold text-slate-900 text-sm">
-                        {formatCurrency(p.amount)}
-                      </span>
-                    </div>
-                    <p className="text-slate-500 flex items-center gap-2 flex-wrap">
-                      <span>Plan: <strong>{p.planName}</strong></span>
-                      <span>•</span>
-                      <span>Method: <strong>{p.method}</strong></span>
-                      <span>•</span>
-                      <span className="font-mono text-indigo-600 font-bold">{p.reference}</span>
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="font-bold text-sm text-slate-900 truncate">{agency.name}</p>
+                    <p className="text-xs text-slate-500">{agency.email}</p>
+                    <p className="text-[11px] text-amber-600 font-bold">
+                      {agency.daysRemaining === 0 ? "Expires Today" : `${agency.daysRemaining} days left`}
                     </p>
-                    {p.notes && <p className="text-[11px] text-slate-600 italic">{p.notes}</p>}
                   </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/admin/agencies/${p.agencyId}`)}
-                      className="text-xs font-semibold text-slate-600 hover:text-indigo-600 cursor-pointer"
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs font-semibold border-amber-300 text-amber-800 hover:bg-amber-50 cursor-pointer"
+                      onClick={() => setExtendModalAgency({ id: agency.id, name: agency.name })}
                     >
-                      View Agency →
-                    </button>
-
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => setSelectedPayment(p)}
-                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-8 px-3 rounded-xl cursor-pointer"
-                      >
-                        Review Payment
-                      </Button>
-                    </div>
+                      + Extend
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white cursor-pointer"
+                      onClick={() => router.push(`/admin/agencies/${agency.id}`)}
+                    >
+                      360°
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -220,210 +302,251 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* ─── RECENT AGENCIES DIRECTORY ───────────────────────────────────── */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                Recent Travel Agencies
-              </h3>
-              <p className="text-xs text-slate-500">
-                Subscribed travel management agencies on the platform.
-              </p>
+        {/* ─── SPLIT SECTION: RECENT SIGNUPS & QUICK ACTIONS ─────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left 2 Cols: Recent Agency Signups */}
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                  Recent Agency Onboardings
+                </h3>
+                <p className="text-xs text-slate-500">Newly created travel agency workspaces</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 text-xs font-semibold cursor-pointer"
+                onClick={() => router.push("/admin/agencies")}
+              >
+                View Directory ({stats?.totalAgencies || 0}) <ArrowRight className="h-3.5 w-3.5 ml-1" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push("/admin/agencies")}
-              className="text-xs font-bold text-purple-600 hover:text-purple-700 cursor-pointer"
-            >
-              Manage All Agencies ({agencies.length}) →
-            </Button>
-          </div>
 
-          <div className="divide-y divide-slate-100 text-xs">
-            {agencies.slice(0, 5).map((agency) => {
-              const owner = agencyOwners.find((o) => o.agencyId === agency.id);
-              const sub = subscriptions.find((s) => s.agencyId === agency.id);
-
-              return (
+            <div className="divide-y divide-slate-100">
+              {stats?.recentSignups?.map((agency) => (
                 <div
                   key={agency.id}
-                  className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  onClick={() => router.push(`/admin/agencies/${agency.id}`)}
+                  className="py-3 px-2 flex items-center justify-between hover:bg-slate-50/80 rounded-xl transition-all cursor-pointer group"
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm text-slate-900">{agency.name}</span>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
-                          agency.status === "ACTIVE"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : agency.status === "TRIAL"
-                            ? "bg-amber-50 text-amber-700 border-amber-200"
-                            : agency.status === "PAST_DUE"
-                            ? "bg-orange-50 text-orange-700 border-orange-200"
-                            : agency.status === "READ_ONLY"
-                            ? "bg-blue-50 text-blue-700 border-blue-200"
-                            : "bg-rose-50 text-rose-700 border-rose-200"
-                        }`}
-                      >
-                        {agency.status.replace("_", " ")}
-                      </span>
-                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
-                        {sub?.planId === "professional" ? "Professional" : "Starter"} Plan
-                      </span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-9 w-9 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 font-black text-sm shrink-0">
+                      {agency.name.charAt(0).toUpperCase()}
                     </div>
-
-                    <p className="text-slate-500 flex items-center gap-2 flex-wrap">
-                      <span>Owner: <strong>{owner?.name || "Agency Owner"}</strong></span>
-                      <span>•</span>
-                      <span>{agency.city}, {agency.state || agency.country}</span>
-                      <span>•</span>
-                      <span>Joined: {agency.createdAt}</span>
-                    </p>
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-slate-900 truncate group-hover:text-purple-700 transition-colors">
+                          {agency.name}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            agency.status === "ACTIVE"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : agency.status === "SUSPENDED"
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {agency.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 truncate">
+                        Owner: {agency.ownerName} ({agency.ownerEmail})
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-4 self-end sm:self-center">
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                        Renewal / Expiry
-                      </span>
-                      <span className="font-bold text-slate-900 font-mono">
-                        {sub?.renewalDate || "—"}
-                      </span>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="text-right hidden sm:block">
+                      <p className="text-xs font-semibold text-slate-800">{agency.planName}</p>
+                      <p className="text-[11px] text-slate-400">
+                        {new Date(agency.createdAt).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                        })}
+                      </p>
                     </div>
-
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => router.push(`/admin/agencies/${agency.id}`)}
-                      className="h-8 text-xs font-semibold cursor-pointer bg-white"
-                    >
-                      <Eye className="h-3.5 w-3.5 mr-1 text-slate-400" />
-                      View
-                    </Button>
+                    <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-purple-600 transition-colors" />
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+
+          {/* Right Col: Admin Shortcuts & Platform Governance */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-2xs space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3">
+                SaaS Control Plane
+              </h3>
+
+              <div className="space-y-2">
+                <Link
+                  href="/admin/agencies"
+                  className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/30 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
+                      <Building2 className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Agency Directory</p>
+                      <p className="text-[11px] text-slate-500">Search, filter & manage tenants</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-purple-600" />
+                </Link>
+
+                <Link
+                  href="/admin/subscriptions"
+                  className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/30 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                      <CreditCard className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Subscriptions & Trials</p>
+                      <p className="text-[11px] text-slate-500">Renewal tracking & trial controls</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-purple-600" />
+                </Link>
+
+                <Link
+                  href="/admin/plans"
+                  className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/30 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                      <Layers className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Plans & Pricing</p>
+                      <p className="text-[11px] text-slate-500">Tier pricing and duration rules</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-purple-600" />
+                </Link>
+
+                <Link
+                  href="/admin/analytics"
+                  className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/30 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                      <TrendingUp className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Platform Analytics</p>
+                      <p className="text-[11px] text-slate-500">Tenant growth & product telemetry</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-purple-600" />
+                </Link>
+
+                <Link
+                  href="/admin/audit-logs"
+                  className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/30 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
+                      <Activity className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Audit Logs</p>
+                      <p className="text-[11px] text-slate-500">Governance & administrative actions</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-purple-600" />
+                </Link>
+
+                <Link
+                  href="/admin/announcements"
+                  className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-purple-200 hover:bg-purple-50/30 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                      <Sparkles className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Announcements</p>
+                      <p className="text-[11px] text-slate-500">Platform broadcasts & maintenance</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-purple-600" />
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ─── PAYMENT REVIEW MODAL ─────────────────────────────────────────── */}
-      {selectedPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
-          <div className="bg-white border border-slate-200/90 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-                  <CreditCard className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Review Subscription Payment</h3>
-                  <p className="text-xs text-slate-500">Transaction ID: {selectedPayment.id}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedPayment(null);
-                  setIsRejecting(false);
-                }}
-                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
+      {/* ─── EXTEND TRIAL MODAL ─────────────────────────────────────────── */}
+      {extendModalAgency && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Extend Free Trial Period</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Extend trial access for <span className="font-semibold text-purple-700">{extendModalAgency.name}</span>
+              </p>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2.5 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Subscribing Agency:</span>
-                <strong className="text-slate-900">{selectedPayment.agencyName}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Plan Tier:</span>
-                <strong className="text-indigo-600">{selectedPayment.planName} Plan</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Amount:</span>
-                <strong className="text-emerald-700 text-sm font-mono">
-                  {formatCurrency(selectedPayment.amount)}
-                </strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Payment Method:</span>
-                <strong className="text-slate-800">{selectedPayment.method}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Payment Reference (UTR):</span>
-                <strong className="font-mono text-purple-700">{selectedPayment.reference}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Submission Date:</span>
-                <span className="text-slate-700">{selectedPayment.paymentDate}</span>
-              </div>
-              {selectedPayment.notes && (
-                <div className="pt-1 border-t border-slate-200/60">
-                  <span className="text-[11px] text-slate-400 block font-medium">Notes / Remarks:</span>
-                  <p className="text-slate-700 italic">{selectedPayment.notes}</p>
+            <form onSubmit={handleExtendTrial} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Days to Add</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[7, 14, 30, 60].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setExtendDays(d)}
+                      className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                        extendDays === d
+                          ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+                          : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      +{d} Days
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
+              </div>
 
-            {isRejecting ? (
-              <form onSubmit={handleReject} className="space-y-3 text-xs">
-                <div className="space-y-1">
-                  <label className="font-bold text-rose-700">Rejection Reason</label>
-                  <Textarea
-                    placeholder="e.g. Payment reference UTR not found in bank statement..."
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    rows={2}
-                    className="text-xs"
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsRejecting(false)}
-                    className="h-8 text-xs cursor-pointer"
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    type="submit"
-                    size="sm"
-                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-8 px-4 rounded-xl cursor-pointer"
-                  >
-                    Confirm Rejection
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Administrative Reason</label>
+                <Input
+                  value={extendReason}
+                  onChange={(e) => setExtendReason(e.target.value)}
+                  placeholder="e.g. Requested additional onboarding evaluation time"
+                  className="text-xs"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsRejecting(true)}
-                  className="text-rose-600 hover:bg-rose-50 border-rose-200 text-xs font-semibold h-9 px-4 rounded-xl cursor-pointer"
+                  onClick={() => setExtendModalAgency(null)}
+                  disabled={extending}
+                  className="text-xs"
                 >
-                  Reject Payment
+                  Cancel
                 </Button>
                 <Button
-                  type="button"
+                  type="submit"
                   size="sm"
-                  onClick={() => handleVerify(selectedPayment)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-5 rounded-xl cursor-pointer shadow-xs"
+                  disabled={extending}
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
                 >
-                  <Check className="h-4 w-4 mr-1.5" />
-                  Verify & Activate Agency
+                  {extending ? "Extending..." : "Confirm Extension"}
                 </Button>
               </div>
-            )}
+            </form>
           </div>
         </div>
       )}

@@ -21,8 +21,26 @@ export interface SupplierDetails360 extends Supplier {
   hotels: any[];
   vehicles: any[];
   activities: any[];
+  rateSheets: any[];
   activeRateSheets: any[];
   expiredRateSheets: any[];
+  hotelConfirmations: any[];
+  payables: any[];
+  payments: any[];
+  financialSummary: {
+    totalPayableAmount: number;
+    totalPaidAmount: number;
+    totalOutstandingAmount: number;
+    pendingPayablesCount: number;
+  };
+  operationalSummary: {
+    totalConfirmationsCount: number;
+    activeConfirmationsCount: number;
+    completedConfirmationsCount: number;
+    linkedHotelsCount: number;
+    linkedVehiclesCount: number;
+    linkedActivitiesCount: number;
+  };
 }
 
 export const supplierService = {
@@ -108,6 +126,9 @@ export const supplierService = {
               vehicles: true,
               activities: true,
               rateSheets: true,
+              hotelConfirmations: true,
+              payables: true,
+              payments: true,
             },
           },
         },
@@ -137,6 +158,9 @@ export const supplierService = {
             vehicles: true,
             activities: true,
             rateSheets: true,
+            hotelConfirmations: true,
+            payables: true,
+            payments: true,
           },
         },
       },
@@ -144,7 +168,7 @@ export const supplierService = {
   },
 
   /**
-   * Retrieves Supplier 360 profile with linked inventories and rate sheets.
+   * Retrieves Supplier 360 profile with linked inventories, rate sheets, operational confirmations, and financial payables.
    */
   async getSupplierDetails(agencyId: string, id: string): Promise<SupplierDetails360 | null> {
     const supplier = await prisma.supplier.findFirst({
@@ -171,6 +195,51 @@ export const supplierService = {
           },
           orderBy: [{ validFrom: "desc" }, { createdAt: "desc" }],
         },
+        hotelConfirmations: {
+          include: {
+            tripHotel: { include: { hotel: true } },
+            tripOperation: {
+              include: {
+                trip: {
+                  select: {
+                    id: true,
+                    tripNumber: true,
+                    title: true,
+                    status: true,
+                    startDate: true,
+                    endDate: true,
+                  },
+                },
+                booking: {
+                  select: {
+                    id: true,
+                    bookingNumber: true,
+                    status: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 50,
+        },
+        payables: {
+          include: {
+            booking: {
+              select: {
+                id: true,
+                bookingNumber: true,
+              },
+            },
+            payments: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 50,
+        },
+        payments: {
+          orderBy: { createdAt: "desc" },
+          take: 50,
+        },
       },
     });
 
@@ -186,10 +255,57 @@ export const supplierService = {
       (rs) => rs.status === "EXPIRED" || new Date(rs.validTo) < now
     );
 
+    // Compute live financial summary
+    let totalPayableAmount = 0;
+    let totalPaidAmount = 0;
+    let totalOutstandingAmount = 0;
+    let pendingPayablesCount = 0;
+
+    for (const p of supplier.payables) {
+      const actual = Number(p.actualAmount || p.plannedAmount || 0);
+      const paid = Number(p.paidAmount || 0);
+      const outstanding = Number(p.outstandingAmount || 0);
+
+      totalPayableAmount += actual;
+      totalPaidAmount += paid;
+      totalOutstandingAmount += outstanding;
+
+      if (p.status === "PENDING" || p.status === "PARTIALLY_PAID") {
+        pendingPayablesCount++;
+      }
+    }
+
+    // Compute operational summary
+    const totalConfirmationsCount = supplier.hotelConfirmations.length;
+    let activeConfirmationsCount = 0;
+    let completedConfirmationsCount = 0;
+
+    for (const c of supplier.hotelConfirmations) {
+      if (c.status === "CONFIRMED" || c.status === "REQUESTED") {
+        activeConfirmationsCount++;
+      } else if (c.status === "AMENDED") {
+        completedConfirmationsCount++;
+      }
+    }
+
     return {
       ...supplier,
       activeRateSheets,
       expiredRateSheets,
+      financialSummary: {
+        totalPayableAmount: Number(totalPayableAmount.toFixed(2)),
+        totalPaidAmount: Number(totalPaidAmount.toFixed(2)),
+        totalOutstandingAmount: Number(totalOutstandingAmount.toFixed(2)),
+        pendingPayablesCount,
+      },
+      operationalSummary: {
+        totalConfirmationsCount,
+        activeConfirmationsCount,
+        completedConfirmationsCount,
+        linkedHotelsCount: supplier.hotels.length,
+        linkedVehiclesCount: supplier.vehicles.length,
+        linkedActivitiesCount: supplier.activities.length,
+      },
     };
   },
 
@@ -268,7 +384,7 @@ export const supplierService = {
   },
 
   /**
-   * Soft archives a supplier.
+   * Deactivates / soft archives a supplier.
    */
   async archiveSupplier(agencyId: string, id: string): Promise<Supplier> {
     const existing = await prisma.supplier.findFirst({
@@ -288,4 +404,140 @@ export const supplierService = {
       },
     });
   },
+
+  /**
+   * Reactivates an archived or inactive supplier.
+   */
+  async reactivateSupplier(agencyId: string, id: string): Promise<Supplier> {
+    const existing = await prisma.supplier.findFirst({
+      where: { id, agencyId },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundError("Supplier");
+    }
+
+    return prisma.supplier.update({
+      where: { id },
+      data: {
+        archivedAt: null,
+        status: "ACTIVE",
+      },
+    });
+  },
+
+  /**
+   * Deletes a supplier permanently ONLY if no historical dependencies exist.
+   * If historical records exist (bookings, payables, confirmations), throws an error to protect audit history.
+   */
+  async deleteSupplier(agencyId: string, id: string): Promise<Supplier> {
+    const supplier = await prisma.supplier.findFirst({
+      where: { id, agencyId },
+      include: {
+        _count: {
+          select: {
+            hotels: true,
+            vehicles: true,
+            activities: true,
+            rateSheets: true,
+            hotelConfirmations: true,
+            payables: true,
+            payments: true,
+          },
+        },
+      },
+    });
+
+    if (!supplier) {
+      throw new NotFoundError("Supplier");
+    }
+
+    const counts = supplier._count;
+    const hasHistoricalRecords =
+      (counts?.payables ?? 0) > 0 ||
+      (counts?.payments ?? 0) > 0 ||
+      (counts?.hotelConfirmations ?? 0) > 0 ||
+      (counts?.hotels ?? 0) > 0 ||
+      (counts?.vehicles ?? 0) > 0 ||
+      (counts?.activities ?? 0) > 0 ||
+      (counts?.rateSheets ?? 0) > 0;
+
+    if (hasHistoricalRecords) {
+      throw new Error(
+        "Cannot permanently delete supplier with linked inventory, operations, or financial records. Deactivate or archive the supplier instead to maintain audit integrity."
+      );
+    }
+
+    return prisma.supplier.delete({
+      where: { id },
+    });
+  },
+
+  /**
+   * Checks for potential duplicate suppliers under the same agency.
+   */
+  async checkDuplicateSupplier(
+    agencyId: string,
+    params: { name: string; phone?: string; email?: string; excludeId?: string }
+  ): Promise<{
+    isDuplicate: boolean;
+    matches: Array<{
+      id: string;
+      name: string;
+      supplierCode: string | null;
+      phone: string | null;
+      email: string | null;
+      type: string | null;
+      status: string;
+    }>;
+  }> {
+    const { name, phone, email, excludeId } = params;
+    const targetName = name?.trim().toLowerCase();
+    const targetEmail = email?.trim().toLowerCase();
+    const targetPhoneDigits = phone?.replace(/\D/g, "");
+
+    if (!targetName && !targetEmail && !targetPhoneDigits) {
+      return { isDuplicate: false, matches: [] };
+    }
+
+    const candidates = await prisma.supplier.findMany({
+      where: {
+        agencyId,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        supplierCode: true,
+        phone: true,
+        email: true,
+        type: true,
+        status: true,
+      },
+      take: 200,
+    });
+
+    const matches = candidates.filter((c) => {
+      if (targetName && c.name.trim().toLowerCase() === targetName) return true;
+      if (targetEmail && c.email?.trim().toLowerCase() === targetEmail) return true;
+      if (targetPhoneDigits && targetPhoneDigits.length >= 6) {
+        const candidateDigits = (c.phone || "").replace(/\D/g, "");
+        if (
+          candidateDigits.length >= 6 &&
+          (candidateDigits.endsWith(targetPhoneDigits.slice(-10)) ||
+            targetPhoneDigits.endsWith(candidateDigits.slice(-10)))
+        ) {
+          return true;
+        }
+      }
+      return false;
+    }).slice(0, 5);
+
+    return {
+      isDuplicate: matches.length > 0,
+      matches,
+    };
+  },
 };
+

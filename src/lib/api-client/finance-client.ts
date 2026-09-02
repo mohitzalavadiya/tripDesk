@@ -31,6 +31,8 @@ import {
   SupplierOutstandingItem,
   UnifiedTransactionItem,
   BookingFinanceBreakdown,
+  BookingPaymentMilestoneScheduleItem,
+  BookingPaymentScheduleResult,
 } from "@/lib/services/finance-service";
 import {
   PaginatedResponse,
@@ -281,6 +283,19 @@ export const financeClient = {
   },
 
   /**
+   * Get Booking Payment Milestone Schedule with Waterfall Allocation
+   */
+  async getBookingPaymentSchedule(
+    bookingId: string
+  ): Promise<SingleResponse<BookingPaymentScheduleResult>> {
+    const res = await fetch(`/api/finance/bookings/${bookingId}/schedule`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    return handleResponse<SingleResponse<BookingPaymentScheduleResult>>(res);
+  },
+
+  /**
    * Get Export CSV URL
    */
   getFinanceExportUrl(filters?: FinanceFilterInput): string {
@@ -311,4 +326,6 @@ export type {
   SupplierOutstandingItem,
   UnifiedTransactionItem,
   BookingFinanceBreakdown,
+  BookingPaymentMilestoneScheduleItem,
+  BookingPaymentScheduleResult,
 };

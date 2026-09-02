@@ -8,6 +8,7 @@ import {
   OperationStatus,
 } from "@prisma/client";
 import { operationsDocumentService } from "@/lib/services/operations-document-service";
+import { travelDocumentService } from "@/lib/services/travel-document-service";
 
 // ═════════════════════════════════════════════════════════════════════
 // CUSTOMER-SAFE DTOs / VIEW MODELS (STRICT WHITELIST)
@@ -615,6 +616,22 @@ export class CustomerPortalService {
     docType: string,
     docId: string
   ): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
+    // Check if docId is a persistent TravelDocument record
+    if (docType === "TRAVEL_DOCUMENT" || docId.startsWith("cm") || docId.length > 20) {
+      const persistentDoc = await prisma.travelDocument.findFirst({
+        where: {
+          id: docId,
+          customerId,
+          agencyId,
+          status: "ISSUED",
+        },
+      });
+
+      if (persistentDoc) {
+        return travelDocumentService.renderDocumentPdf(agencyId, persistentDoc.id);
+      }
+    }
+
     // 1. Verify trip ownership
     const trip = await prisma.trip.findFirst({
       where: {

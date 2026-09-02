@@ -44,6 +44,33 @@ export type BookingWithRelations = Booking & {
       name: string;
       type: string;
     }>;
+    tripHotels?: Array<{
+      id: string;
+      hotel: { id: string; name: string; city: string | null; category: string | null };
+      checkIn: Date | string;
+      checkOut: Date | string;
+      roomType: string;
+      mealPlan?: string | null;
+      rooms: number;
+    }>;
+    tripVehicles?: Array<{
+      id: string;
+      vehicle?: { id: string; name: string; type: string; capacity: number } | null;
+      vehicleName: string;
+      vehicleType: string;
+      startDate?: Date | string | null;
+      endDate?: Date | string | null;
+      pickupLocation?: string | null;
+      dropLocation?: string | null;
+    }>;
+    tripActivities?: Array<{
+      id: string;
+      activity?: { id: string; name: string; location: string | null } | null;
+      name: string;
+      date?: Date | string | null;
+      time?: string | null;
+      location?: string | null;
+    }>;
   };
   quotation?: {
     id: string;
@@ -54,6 +81,79 @@ export type BookingWithRelations = Booking & {
     status: string;
   } | null;
   payments: Payment[];
+  tripOperation?: {
+    id: string;
+    status: string;
+    operationStartDate?: Date | string | null;
+    operationEndDate?: Date | string | null;
+    hotelConfirmations: Array<{
+      id: string;
+      confirmationNumber: string | null;
+      status: string;
+      confirmedAt: string | null;
+      checkIn: string | null;
+      checkOut: string | null;
+      roomDetails: string | null;
+      mealPlan: string | null;
+      supplier?: { id: string; name: string } | null;
+      tripHotel?: any;
+    }>;
+    vehicleDispatches: Array<{
+      id: string;
+      driverName: string | null;
+      driverPhone: string | null;
+      vehicleNumber: string | null;
+      pickupDate: string | null;
+      pickupTime: string | null;
+      pickupLocation: string | null;
+      dropLocation: string | null;
+      status: string;
+      vehicle?: any;
+    }>;
+    activityConfirmations: Array<{
+      id: string;
+      passNumber: string | null;
+      status: string;
+      confirmedAt: string | null;
+      activityDate: string | null;
+      activityTime: string | null;
+      activityLocation: string | null;
+      supplier?: { id: string; name: string } | null;
+      activity?: any;
+    }>;
+    issues: Array<{
+      id: string;
+      title: string;
+      priority: string;
+      status: string;
+      category: string;
+    }>;
+    events: Array<{
+      id: string;
+      eventType: string;
+      title: string;
+      description: string | null;
+      createdAt: string;
+    }>;
+  } | null;
+  operationalReadiness?: {
+    score: number;
+    isReady: boolean;
+    totalHotels: number;
+    confirmedHotels: number;
+    totalVehicles: number;
+    confirmedVehicles: number;
+    totalActivities: number;
+    confirmedActivities: number;
+    openIssuesCount: number;
+    criticalIssuesCount: number;
+    checks: Array<{
+      key: string;
+      label: string;
+      passed: boolean;
+      details?: string;
+    }>;
+  } | null;
 };
 
 export const bookingClient = {
@@ -143,6 +243,36 @@ export const bookingClient = {
   },
 
   /**
+   * Cancel booking with mandatory reason
+   */
+  async cancelBooking(
+    id: string,
+    reason: string
+  ): Promise<SingleResponse<BookingWithRelations>> {
+    const res = await fetch(`/api/bookings/${encodeURIComponent(id)}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
+
+    return handleResponse<SingleResponse<BookingWithRelations>>(res);
+  },
+
+  /**
+   * Initialize or sync operations for booking
+   */
+  async initializeOperations(
+    id: string
+  ): Promise<SingleResponse<BookingWithRelations>> {
+    const res = await fetch(`/api/bookings/${encodeURIComponent(id)}/initialize-operations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    return handleResponse<SingleResponse<BookingWithRelations>>(res);
+  },
+
+  /**
    * Soft delete / archive booking
    */
   async deleteBooking(id: string): Promise<{ success: boolean; message: string }> {
@@ -154,3 +284,4 @@ export const bookingClient = {
     return handleResponse<{ success: boolean; message: string }>(res);
   },
 };
+

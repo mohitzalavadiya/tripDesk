@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { logger } from "@/lib/logger";
 
 /**
  * Standard base class for all API domain and HTTP errors.
@@ -140,7 +141,7 @@ export function handleApiError(error: unknown): NextResponse {
   }
 
   // 4. Unexpected / Unknown Server Error (Safe fallback)
-  console.error("❌ Unhandled Internal API Error:", error instanceof Error ? error.message : error);
+  logger.error("Unhandled Internal API Error", error);
 
   return NextResponse.json(
     {

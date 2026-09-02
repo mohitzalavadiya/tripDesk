@@ -27,6 +27,7 @@ import {
   CreditCard,
   Phone,
   IndianRupee,
+  Layers,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
@@ -441,10 +442,17 @@ export default function BookingsDashboardPage() {
                                   View Booking Workspace
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                  onClick={() => router.push(`/operations/${b.tripId}`)}
+                                  className="text-xs cursor-pointer rounded-md text-indigo-600 font-medium"
+                                >
+                                  <Compass className="mr-2 h-3.5 w-3.5 text-indigo-500" />
+                                  Operations Workspace
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
                                   onClick={() => router.push(`/trips/${b.tripId}`)}
                                   className="text-xs cursor-pointer rounded-md"
                                 >
-                                  <Compass className="mr-2 h-3.5 w-3.5 text-slate-400" />
+                                  <Layers className="mr-2 h-3.5 w-3.5 text-slate-400" />
                                   Open Trip Workspace
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
