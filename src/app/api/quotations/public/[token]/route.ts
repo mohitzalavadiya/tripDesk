@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { apiSuccess, handleApiError } from "@/lib/api";
+import { apiSuccess, handleApiError, ApiError } from "@/lib/api";
 import { quotationService } from "@/lib/services/quotation-service";
 
 export const dynamic = "force-dynamic";
@@ -18,11 +18,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const quotation = await quotationService.getPublicQuotationByToken(token);
     if (!quotation) {
-      return handleApiError({
-        statusCode: 404,
-        code: "NOT_FOUND",
-        message: "Quotation proposal not found or link has expired.",
-      });
+      return handleApiError(
+        new ApiError(404, "NOT_FOUND", "Quotation proposal not found or link has expired.")
+      );
     }
 
     return apiSuccess(quotation);

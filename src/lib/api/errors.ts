@@ -70,7 +70,7 @@ export class InternalServerError extends ApiError {
  * Strictly prevents database connection strings, passwords, or Prisma stack traces from leaking.
  */
 export function handleApiError(error: unknown): NextResponse {
-  // 1. Domain ApiError
+  // 1. Domain ApiError (class instance or duck-typed descriptor)
   if (error instanceof ApiError) {
     return NextResponse.json(
       {
@@ -82,6 +82,26 @@ export function handleApiError(error: unknown): NextResponse {
         },
       },
       { status: error.statusCode }
+    );
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "statusCode" in error &&
+    typeof (error as any).statusCode === "number"
+  ) {
+    const errObj = error as { statusCode: number; code?: string; message?: string; details?: any };
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: errObj.code || "API_ERROR",
+          message: errObj.message || "An error occurred.",
+          ...(errObj.details ? { details: errObj.details } : {}),
+        },
+      },
+      { status: errObj.statusCode }
     );
   }
 
