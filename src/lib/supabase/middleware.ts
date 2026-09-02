@@ -53,7 +53,13 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/q/") || // Public quotation link
     pathname.startsWith("/trip/") || // Public trip portal
     pathname.startsWith("/b/") || // Public booking token
-    pathname.startsWith("/api/auth"); // Auth callbacks
+    pathname.startsWith("/customer/") || // Customer self-service portal
+    pathname.startsWith("/api/auth") || // Auth callbacks
+    pathname.startsWith("/api/trips/public") || // Public trip & feedback endpoints
+    pathname.startsWith("/api/quotations/public") || // Public quotation endpoints
+    pathname.startsWith("/api/bookings/public") || // Public booking endpoints
+    pathname.startsWith("/api/customer/") || // Customer authenticated API
+    pathname.startsWith("/api/webhooks/"); // Webhook endpoints
 
   // Handle unauthenticated requests
   if (!user && !isPublicRoute) {

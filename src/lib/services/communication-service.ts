@@ -19,6 +19,7 @@ import { WhatsAppTemplateEngine, WhatsAppTemplateVariables } from "@/lib/communi
 import { whatsappDispatcher } from "@/lib/communication/whatsapp/whatsapp-provider";
 import {
   ListCommunicationLogsInput,
+  ListPublicNotificationsInput,
   SendManualMessageInput,
   UpdateCommunicationSettingsInput,
 } from "@/lib/validation/communication-schema";
@@ -1088,6 +1089,233 @@ export class CommunicationService {
   }
 
   /**
+   * Summary scorecards for Agency Communication Center
+   */
+  async getCommunicationSummary(agencyId: string) {
+    const [total, delivered, pending, failed, unread] = await Promise.all([
+      prisma.customerNotification.count({ where: { agencyId } }),
+      prisma.customerNotification.count({
+        where: {
+          agencyId,
+          status: {
+            in: [
+              NotificationDeliveryStatus.DELIVERED,
+              NotificationDeliveryStatus.SENT,
+              NotificationDeliveryStatus.READ,
+            ],
+          },
+        },
+      }),
+      prisma.customerNotification.count({
+        where: {
+          agencyId,
+          status: {
+            in: [
+              NotificationDeliveryStatus.PENDING,
+              NotificationDeliveryStatus.QUEUED,
+            ],
+          },
+        },
+      }),
+      prisma.customerNotification.count({
+        where: {
+          agencyId,
+          status: {
+            in: [
+              NotificationDeliveryStatus.FAILED,
+              NotificationDeliveryStatus.CANCELLED,
+            ],
+          },
+        },
+      }),
+      prisma.customerNotification.count({
+        where: {
+          agencyId,
+          readAt: null,
+          status: { not: NotificationDeliveryStatus.READ },
+        },
+      }),
+    ]);
+
+    return {
+      totalCommunications: total,
+      deliveredCount: delivered,
+      pendingCount: pending,
+      failedCount: failed,
+      unreadCount: unread,
+    };
+  }
+
+  /**
+   * Resolves a public token to trip, customer, and agency context
+   */
+  async resolveTripByToken(token: string) {
+    if (!token || typeof token !== "string" || token.trim().length === 0) {
+      return null;
+    }
+
+    // 1. Try public share link
+    const shareLink = await prisma.publicShareLink.findFirst({
+      where: {
+        tokenHash: token,
+        status: "ACTIVE",
+      },
+      include: {
+        trip: {
+          include: {
+            customer: true,
+            agency: true,
+          },
+        },
+      },
+    });
+
+    if (shareLink?.trip) {
+      return {
+        trip: shareLink.trip,
+        customer: shareLink.trip.customer,
+        agency: shareLink.trip.agency,
+      };
+    }
+
+    // 2. Direct tripNumber fallback
+    const trip = await prisma.trip.findFirst({
+      where: { tripNumber: token },
+      include: { customer: true, agency: true },
+    });
+
+    if (trip) {
+      return {
+        trip,
+        customer: trip.customer,
+        agency: trip.agency,
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Queries public customer notifications safely scoped to trip token
+   */
+  async getPublicNotifications(
+    token: string,
+    query: Partial<ListPublicNotificationsInput> = {}
+  ) {
+    const resolved = await this.resolveTripByToken(token);
+    if (!resolved) {
+      throw new Error("INVALID_TOKEN: Trip link is invalid or expired.");
+    }
+
+    const { trip, customer, agency } = resolved;
+    const { unreadOnly, type, page = 1, limit = 20 } = query;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.CustomerNotificationWhereInput = {
+      agencyId: trip.agencyId,
+      customerId: trip.customerId,
+      OR: [
+        { tripId: trip.id },
+        { tripId: null },
+      ],
+      ...(type && { type }),
+      ...(unreadOnly && { readAt: null, status: { not: NotificationDeliveryStatus.READ } }),
+    };
+
+    const [items, total, unreadCount] = await Promise.all([
+      prisma.customerNotification.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.customerNotification.count({ where }),
+      prisma.customerNotification.count({
+        where: {
+          agencyId: trip.agencyId,
+          customerId: trip.customerId,
+          OR: [{ tripId: trip.id }, { tripId: null }],
+          readAt: null,
+          status: { not: NotificationDeliveryStatus.READ },
+        },
+      }),
+    ]);
+
+    const notifications = items.map((item) => ({
+      id: item.id,
+      type: item.type,
+      title: item.title,
+      message: item.message,
+      channel: item.channel,
+      status: item.status,
+      linkUrl: item.linkUrl,
+      isRead: !!item.readAt || item.status === NotificationDeliveryStatus.READ,
+      readAt: item.readAt ? item.readAt.toISOString() : null,
+      createdAt: item.createdAt.toISOString(),
+    }));
+
+    return {
+      notifications,
+      unreadCount,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+      trip: {
+        id: trip.id,
+        title: trip.title,
+        tripNumber: trip.tripNumber,
+        status: trip.status,
+      },
+      customer: {
+        name: customer.name,
+      },
+      agency: {
+        name: agency.name,
+      },
+    };
+  }
+
+  /**
+   * Marks a public notification as read
+   */
+  async markPublicNotificationRead(token: string, notificationId: string) {
+    const resolved = await this.resolveTripByToken(token);
+    if (!resolved) {
+      throw new Error("INVALID_TOKEN: Trip link is invalid or expired.");
+    }
+
+    const { trip } = resolved;
+
+    const notification = await prisma.customerNotification.findFirst({
+      where: {
+        id: notificationId,
+        agencyId: trip.agencyId,
+        customerId: trip.customerId,
+      },
+    });
+
+    if (!notification) {
+      throw new Error("NOTIFICATION_NOT_FOUND: Notification not found or unauthorized.");
+    }
+
+    const updated = await prisma.customerNotification.update({
+      where: { id: notification.id },
+      data: {
+        readAt: new Date(),
+        status: NotificationDeliveryStatus.READ,
+      },
+    });
+
+    return {
+      id: updated.id,
+      isRead: true,
+      readAt: updated.readAt?.toISOString() || null,
+      status: updated.status,
+    };
+  }
+
+  /**
    * Maps internal database record to safe item view
    */
   private mapToItemView(item: any): CommunicationLogItemView {
@@ -1127,3 +1355,4 @@ export class CommunicationService {
 }
 
 export const communicationService = new CommunicationService();
+

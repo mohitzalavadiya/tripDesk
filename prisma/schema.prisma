@@ -28,6 +28,23 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+enum SubscriptionPaymentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  REFUNDED
+}
+
+enum ReferralStatus {
+  PENDING
+  CONVERTED
+  REWARDED
+  EXPIRED
+  CANCELLED
+}
+
+
+
 enum TripStatus {
   DRAFT
   PLANNING
@@ -357,9 +374,12 @@ model Agency {
   customerNotificationPreferences CustomerNotificationPreference[]
   communicationSetting  AgencyCommunicationSetting?
   travelDocuments       TravelDocument[]
+  subscriptionPayments  SubscriptionPayment[]
+  referrals             Referral[]
 
   @@map("agencies")
 }
+
 
 // ═════════════════════════════════════════════════════════════════════
 // 2. USER
@@ -418,13 +438,49 @@ model Subscription {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
-  agency Agency           @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  plan   SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  agency   Agency                @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  plan     SubscriptionPlan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  payments SubscriptionPayment[]
 
   @@index([agencyId])
   @@index([status])
   @@map("subscriptions")
 }
+
+// ═════════════════════════════════════════════════════════════════════
+// 4B. SAAS SUBSCRIPTION PAYMENT (B2B: Agency -> TripDesk Platform)
+// ═════════════════════════════════════════════════════════════════════
+
+model SubscriptionPayment {
+  id               String                    @id @default(cuid())
+  agencyId         String
+  subscriptionId   String
+  amount           Decimal                   @db.Decimal(10, 2)
+  currency         String                    @default("INR")
+  paymentMethod    PaymentMethod             @default(UPI)
+  paymentReference String?
+  utrNumber        String?
+  paymentDate      DateTime                  @default(now())
+  status           SubscriptionPaymentStatus @default(PENDING)
+  notes            String?
+  verifiedAt       DateTime?
+  verifiedBy       String?
+  rejectedAt       DateTime?
+  rejectionReason  String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  agency       Agency       @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([utrNumber])
+  @@index([paymentDate])
+  @@map("subscription_payments")
+}
+
 
 // ═════════════════════════════════════════════════════════════════════
 // 5. CUSTOMER
@@ -463,6 +519,7 @@ model Customer {
   notifications CustomerNotification[]
   notificationPreference CustomerNotificationPreference?
   travelDocuments TravelDocument[]
+  referrals       Referral[]
 
   @@index([agencyId])
   @@index([agencyId, customerNumber])
@@ -986,6 +1043,7 @@ model Booking {
   feedbacks        CustomerFeedback[]
   notifications    CustomerNotification[]
   travelDocuments  TravelDocument[]
+  referrals        Referral[]
 
   @@unique([agencyId, bookingNumber])
   @@index([agencyId])
@@ -1598,19 +1656,27 @@ model OperationalExpense {
 // ═════════════════════════════════════════════════════════════════════
 
 model CustomerFeedback {
-  id              String   @id @default(cuid())
-  agencyId        String
-  customerId      String
-  tripId          String
-  bookingId       String?
-  rating          Int      @default(5)
-  serviceRating   Int?     @default(5)
-  hotelRating     Int?     @default(5)
-  driverRating    Int?     @default(5)
-  comments        String?
-  source          String   @default("PORTAL")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  agencyId              String
+  customerId            String
+  tripId                String
+  bookingId             String?
+  rating                Int      @default(5)
+  serviceRating         Int?     @default(5)
+  hotelRating           Int?     @default(5)
+  vehicleRating         Int?     @default(5)
+  driverRating          Int?     @default(5)
+  activityRating        Int?     @default(5)
+  supportRating         Int?     @default(5)
+  positiveComment       String?
+  improvementComment    String?
+  travelAgain           String?  @default("Yes")
+  serviceRecoveryStatus String?  @default("Not Needed")
+  serviceRecoveryNotes  String?
+  comments              String?
+  source                String   @default("PORTAL")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   agency   Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -1623,6 +1689,37 @@ model CustomerFeedback {
   @@index([bookingId])
   @@map("customer_feedbacks")
 }
+
+// ═════════════════════════════════════════════════════════════════════
+// 31B. REFERRAL & REWARDS
+// ═════════════════════════════════════════════════════════════════════
+
+model Referral {
+  id                 String         @id @default(cuid())
+  agencyId           String
+  referrerCustomerId String
+  referredName       String
+  referredEmail      String?
+  referredPhone      String?
+  referralCode       String
+  status             ReferralStatus @default(PENDING)
+  rewardAmount       Decimal?       @db.Decimal(10, 2)
+  notes              String?
+  convertedBookingId String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  agency           Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  referrerCustomer Customer  @relation(fields: [referrerCustomerId], references: [id], onDelete: Cascade)
+  convertedBooking Booking?  @relation(fields: [convertedBookingId], references: [id], onDelete: SetNull)
+
+  @@unique([agencyId, referralCode])
+  @@index([agencyId])
+  @@index([referrerCustomerId])
+  @@index([status])
+  @@map("referrals")
+}
+
 
 // ═════════════════════════════════════════════════════════════════════
 // 32. CUSTOMER NOTIFICATION

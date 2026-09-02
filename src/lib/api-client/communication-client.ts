@@ -218,4 +218,68 @@ export const communicationClient = {
       };
     };
   },
+
+  /**
+   * Alias methods conforming to standard naming conventions
+   */
+  async getCommunications(params: ListCommunicationLogsParams = {}) {
+    const searchParams = new URLSearchParams();
+    if (params.channel) searchParams.set("channel", params.channel);
+    if (params.status) searchParams.set("status", params.status);
+    if (params.type) searchParams.set("type", params.type);
+    if (params.customerId) searchParams.set("customerId", params.customerId);
+    if (params.bookingId) searchParams.set("bookingId", params.bookingId);
+    if (params.quotationId) searchParams.set("quotationId", params.quotationId);
+    if (params.tripId) searchParams.set("tripId", params.tripId);
+    if (params.enquiryId) searchParams.set("enquiryId", params.enquiryId);
+    if (params.search) searchParams.set("search", params.search);
+    if (params.page) searchParams.set("page", params.page.toString());
+    if (params.limit) searchParams.set("limit", params.limit.toString());
+
+    const res = await fetch(`/api/communications?${searchParams.toString()}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || "Failed to fetch communications");
+    }
+    const json = await res.json();
+    return json.data as {
+      data: CommunicationLogItem[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      summary?: {
+        totalCommunications: number;
+        deliveredCount: number;
+        pendingCount: number;
+        failedCount: number;
+        unreadCount: number;
+      };
+    };
+  },
+
+  async createCommunication(input: SendManualMessageParams) {
+    const res = await fetch("/api/communications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || "Failed to create communication");
+    }
+    const json = await res.json();
+    return json.data as CommunicationLogItem;
+  },
+
+  async getCommunication(id: string) {
+    const res = await fetch(`/api/communications/${encodeURIComponent(id)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || "Failed to fetch communication");
+    }
+    const json = await res.json();
+    return json.data as CommunicationLogItem;
+  },
 };
+

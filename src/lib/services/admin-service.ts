@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import {
   AgencyStatus,
   SubscriptionStatus,
+  SubscriptionPaymentStatus,
+  PaymentMethod,
   UserRole,
   Prisma,
 } from "@prisma/client";
@@ -12,7 +14,47 @@ import {
   PlanUpdateInput,
   AnnouncementCreateInput,
   AnnouncementUpdateInput,
+  SubscriptionPaymentFilterInput,
+  SubscriptionPaymentCreateInput,
+  SubscriptionPaymentVerifyInput,
+  SubscriptionPaymentRejectInput,
 } from "@/lib/validation/admin-schema";
+
+export interface SubscriptionPaymentSummaryStats {
+  totalExpected: number;
+  totalVerified: number;
+  pendingCount: number;
+  pendingAmount: number;
+  outstandingAmount: number;
+  currentMonthCollections: number;
+}
+
+export interface AdminSubscriptionPaymentItem {
+  id: string;
+  agencyId: string;
+  agencyName: string;
+  agencyEmail: string;
+  agencyPhone: string;
+  subscriptionId: string;
+  planId: string;
+  planName: string;
+  planPrice: number;
+  amount: number;
+  currency: string;
+  paymentMethod: PaymentMethod;
+  paymentReference: string | null;
+  utrNumber: string | null;
+  paymentDate: string;
+  status: SubscriptionPaymentStatus;
+  notes: string | null;
+  verifiedAt: string | null;
+  verifiedBy: string | null;
+  rejectedAt: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 // ═════════════════════════════════════════════════════════════════════
 // 1. DATA CONTRACTS & INTERFACES
@@ -1186,4 +1228,368 @@ export const adminService = {
 
     return results.slice(0, limit);
   },
+
+  /**
+   * 12. SaaS Subscription Payments & Billing Reconciliation
+   */
+  async listSubscriptionPayments(filter?: SubscriptionPaymentFilterInput) {
+    const where: Prisma.SubscriptionPaymentWhereInput = {};
+
+    if (filter?.status) {
+      where.status = filter.status as SubscriptionPaymentStatus;
+    }
+    if (filter?.agencyId) {
+      where.agencyId = filter.agencyId;
+    }
+    if (filter?.subscriptionId) {
+      where.subscriptionId = filter.subscriptionId;
+    }
+    if (filter?.planId) {
+      where.subscription = { planId: filter.planId };
+    }
+    if (filter?.startDate || filter?.endDate) {
+      where.paymentDate = {
+        gte: filter.startDate ? new Date(filter.startDate) : undefined,
+        lte: filter.endDate ? new Date(filter.endDate) : undefined,
+      };
+    }
+    if (filter?.search) {
+      const q = filter.search.trim();
+      where.OR = [
+        { agency: { name: { contains: q, mode: "insensitive" } } },
+        { utrNumber: { contains: q, mode: "insensitive" } },
+        { paymentReference: { contains: q, mode: "insensitive" } },
+        { id: { contains: q, mode: "insensitive" } },
+      ];
+    }
+
+    const pageNum = Number(filter?.page) || 1;
+    const limitNum = Number(filter?.limit) || 50;
+    const skip = (pageNum - 1) * limitNum;
+
+    const [payments, totalCount, allPayments, allActiveSubs] = await Promise.all([
+      prisma.subscriptionPayment.findMany({
+        where,
+        orderBy: { paymentDate: "desc" },
+        skip,
+        take: limitNum,
+        include: {
+          agency: {
+            select: { id: true, name: true, email: true, phone: true },
+          },
+          subscription: {
+            include: { plan: true },
+          },
+        },
+      }),
+      prisma.subscriptionPayment.count({ where }),
+      prisma.subscriptionPayment.findMany({
+        select: {
+          amount: true,
+          status: true,
+          paymentDate: true,
+        },
+      }),
+      prisma.subscription.findMany({
+        where: { status: { in: ["ACTIVE", "TRIAL"] } },
+        include: { plan: true },
+      }),
+    ]);
+
+    // Compute Summary Stats
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let totalVerified = 0;
+    let pendingCount = 0;
+    let pendingAmount = 0;
+    let currentMonthCollections = 0;
+
+    for (const p of allPayments) {
+      const amt = Number(p.amount);
+      if (p.status === "VERIFIED") {
+        totalVerified += amt;
+        const pDate = new Date(p.paymentDate);
+        if (pDate.getMonth() === currentMonth && pDate.getFullYear() === currentYear) {
+          currentMonthCollections += amt;
+        }
+      } else if (p.status === "PENDING") {
+        pendingCount += 1;
+        pendingAmount += amt;
+      }
+    }
+
+    const totalExpected = allActiveSubs.reduce(
+      (sum, s) => sum + Number(s.plan.price),
+      0
+    );
+    const outstandingAmount = Math.max(0, totalExpected - currentMonthCollections);
+
+    const items: AdminSubscriptionPaymentItem[] = payments.map((p: any) => ({
+      id: p.id,
+      agencyId: p.agencyId,
+      agencyName: p.agency.name,
+      agencyEmail: p.agency.email,
+      agencyPhone: p.agency.phone,
+      subscriptionId: p.subscriptionId,
+      planId: p.subscription.planId,
+      planName: p.subscription.plan.name,
+      planPrice: Number(p.subscription.plan.price),
+      amount: Number(p.amount),
+      currency: p.currency,
+      paymentMethod: p.paymentMethod,
+      paymentReference: p.paymentReference,
+      utrNumber: p.utrNumber,
+      paymentDate: p.paymentDate.toISOString(),
+      status: p.status,
+      notes: p.notes,
+      verifiedAt: p.verifiedAt ? p.verifiedAt.toISOString() : null,
+      verifiedBy: p.verifiedBy,
+      rejectedAt: p.rejectedAt ? p.rejectedAt.toISOString() : null,
+      rejectionReason: p.rejectionReason,
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+    }));
+
+    const stats: SubscriptionPaymentSummaryStats = {
+      totalExpected,
+      totalVerified,
+      pendingCount,
+      pendingAmount,
+      outstandingAmount,
+      currentMonthCollections,
+    };
+
+    return {
+      items,
+      pagination: {
+        total: totalCount,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(totalCount / limitNum),
+      },
+      stats,
+    };
+
+  },
+
+  async getSubscriptionPayment(paymentId: string): Promise<AdminSubscriptionPaymentItem | null> {
+    const p: any = await prisma.subscriptionPayment.findUnique({
+      where: { id: paymentId },
+      include: {
+        agency: { select: { id: true, name: true, email: true, phone: true } },
+        subscription: { include: { plan: true } },
+      },
+    });
+
+    if (!p) return null;
+
+    return {
+      id: p.id,
+      agencyId: p.agencyId,
+      agencyName: p.agency.name,
+      agencyEmail: p.agency.email,
+      agencyPhone: p.agency.phone,
+      subscriptionId: p.subscriptionId,
+      planId: p.subscription.planId,
+      planName: p.subscription.plan.name,
+      planPrice: Number(p.subscription.plan.price),
+      amount: Number(p.amount),
+      currency: p.currency,
+      paymentMethod: p.paymentMethod,
+      paymentReference: p.paymentReference,
+      utrNumber: p.utrNumber,
+      paymentDate: p.paymentDate.toISOString(),
+      status: p.status,
+      notes: p.notes,
+      verifiedAt: p.verifiedAt ? p.verifiedAt.toISOString() : null,
+      verifiedBy: p.verifiedBy,
+      rejectedAt: p.rejectedAt ? p.rejectedAt.toISOString() : null,
+      rejectionReason: p.rejectionReason,
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+    };
+  },
+
+  async createSubscriptionPayment(input: SubscriptionPaymentCreateInput, actorUserId: string) {
+    const agency = await prisma.agency.findUnique({
+      where: { id: input.agencyId },
+      include: {
+        subscriptions: {
+          where: { id: input.subscriptionId },
+          include: { plan: true },
+        },
+      },
+    });
+
+    if (!agency) {
+      throw new Error(`Agency not found with ID: ${input.agencyId}`);
+    }
+
+    const sub = agency.subscriptions[0];
+    if (!sub) {
+      throw new Error(`Subscription not found with ID: ${input.subscriptionId}`);
+    }
+
+    const payment = await prisma.subscriptionPayment.create({
+      data: {
+        agencyId: input.agencyId,
+        subscriptionId: input.subscriptionId,
+        amount: new Prisma.Decimal(input.amount),
+        currency: input.currency || "INR",
+        paymentMethod: input.paymentMethod || "UPI",
+        paymentReference: input.paymentReference,
+        utrNumber: input.utrNumber,
+        paymentDate: input.paymentDate ? new Date(input.paymentDate) : new Date(),
+        status: SubscriptionPaymentStatus.PENDING,
+        notes: input.notes,
+      },
+      include: {
+        agency: true,
+        subscription: { include: { plan: true } },
+      },
+    });
+
+    await prisma.platformAuditLog.create({
+      data: {
+        actorUserId,
+        action: "SUBSCRIPTION_PAYMENT_CREATED",
+        entityType: "SUBSCRIPTION_PAYMENT",
+        entityId: payment.id,
+        agencyId: input.agencyId,
+        metadata: {
+          amount: input.amount,
+          utrNumber: input.utrNumber,
+          paymentMethod: input.paymentMethod,
+          subscriptionId: input.subscriptionId,
+          planName: sub.plan.name,
+        },
+      },
+    });
+
+    return payment;
+  },
+
+  async verifySubscriptionPayment(
+    paymentId: string,
+    input: SubscriptionPaymentVerifyInput,
+    actorUserId: string
+  ) {
+    const payment: any = await prisma.subscriptionPayment.findUnique({
+      where: { id: paymentId },
+      include: {
+        subscription: { include: { plan: true } },
+        agency: true,
+      },
+    });
+
+    if (!payment) {
+      throw new Error("Subscription payment record not found.");
+    }
+
+    if (payment.status === SubscriptionPaymentStatus.VERIFIED) {
+      throw new Error("This payment is already verified.");
+    }
+
+    const now = new Date();
+    const durationDays = payment.subscription.plan.durationDays || 30;
+    const subEnd = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+    // Update payment to VERIFIED
+    const updatedPayment = await prisma.subscriptionPayment.update({
+      where: { id: paymentId },
+      data: {
+        status: SubscriptionPaymentStatus.VERIFIED,
+        verifiedAt: now,
+        verifiedBy: actorUserId,
+        notes: input.notes ? `${payment.notes ? payment.notes + " | " : ""}${input.notes}` : payment.notes,
+      },
+    });
+
+    // Update subscription to ACTIVE with new validity dates
+    await prisma.subscription.update({
+      where: { id: payment.subscriptionId },
+      data: {
+        status: SubscriptionStatus.ACTIVE,
+        subscriptionStart: now,
+        subscriptionEnd: subEnd,
+      },
+    });
+
+    // If agency was suspended due to lapsed payment, ensure status remains ACTIVE
+    if (payment.agency.status === AgencyStatus.SUSPENDED) {
+      await prisma.agency.update({
+        where: { id: payment.agencyId },
+        data: { status: AgencyStatus.ACTIVE },
+      });
+    }
+
+    await prisma.platformAuditLog.create({
+      data: {
+        actorUserId,
+        action: "SUBSCRIPTION_PAYMENT_VERIFIED",
+        entityType: "SUBSCRIPTION_PAYMENT",
+        entityId: payment.id,
+        agencyId: payment.agencyId,
+        metadata: {
+          amount: Number(payment.amount),
+          utrNumber: payment.utrNumber,
+          verifiedBy: actorUserId,
+          activatedUntil: subEnd.toISOString(),
+        },
+      },
+    });
+
+    return updatedPayment;
+  },
+
+
+  async rejectSubscriptionPayment(
+    paymentId: string,
+    input: SubscriptionPaymentRejectInput,
+    actorUserId: string
+  ) {
+    const payment = await prisma.subscriptionPayment.findUnique({
+      where: { id: paymentId },
+    });
+
+    if (!payment) {
+      throw new Error("Subscription payment record not found.");
+    }
+
+    if (payment.status === SubscriptionPaymentStatus.VERIFIED) {
+      throw new Error("A verified payment cannot be rejected directly without explicit refund flow.");
+    }
+
+    const now = new Date();
+
+    const updatedPayment = await prisma.subscriptionPayment.update({
+      where: { id: paymentId },
+      data: {
+        status: SubscriptionPaymentStatus.REJECTED,
+        rejectedAt: now,
+        rejectionReason: input.reason,
+      },
+    });
+
+    await prisma.platformAuditLog.create({
+      data: {
+        actorUserId,
+        action: "SUBSCRIPTION_PAYMENT_REJECTED",
+        entityType: "SUBSCRIPTION_PAYMENT",
+        entityId: payment.id,
+        agencyId: payment.agencyId,
+        metadata: {
+          amount: Number(payment.amount),
+          utrNumber: payment.utrNumber,
+          rejectionReason: input.reason,
+          rejectedBy: actorUserId,
+        },
+      },
+    });
+
+    return updatedPayment;
+  },
 };
+

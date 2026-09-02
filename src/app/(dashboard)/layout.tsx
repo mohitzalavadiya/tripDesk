@@ -6,7 +6,6 @@ import { CostingProvider } from "@/context/costing-context";
 import { QuotationProvider } from "@/context/quotation-context";
 import { BookingProvider } from "@/context/booking-context";
 import { OperationsProvider } from "@/context/operations-context";
-import { ExperienceProvider } from "@/context/experience-context";
 import { requireAgencyOwner } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -25,9 +24,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
           <QuotationProvider>
             <BookingProvider>
               <OperationsProvider>
-                <ExperienceProvider>
-                  <AppShell>{children}</AppShell>
-                </ExperienceProvider>
+                <AppShell>{children}</AppShell>
               </OperationsProvider>
             </BookingProvider>
           </QuotationProvider>

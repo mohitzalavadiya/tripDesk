@@ -81,3 +81,44 @@ export const globalSearchSchema = z.object({
 });
 
 export type GlobalSearchInput = z.infer<typeof globalSearchSchema>;
+
+export const subscriptionPaymentFilterSchema = z.object({
+  status: z.enum(["PENDING", "VERIFIED", "REJECTED", "REFUNDED"]).optional(),
+  agencyId: z.string().optional(),
+  subscriptionId: z.string().optional(),
+  planId: z.string().optional(),
+  search: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+export type SubscriptionPaymentFilterInput = z.input<typeof subscriptionPaymentFilterSchema>;
+
+export const subscriptionPaymentCreateSchema = z.object({
+  agencyId: z.string().min(1, "Agency ID is required"),
+  subscriptionId: z.string().min(1, "Subscription ID is required"),
+  amount: z.number().positive("Amount must be greater than 0"),
+  currency: z.string().default("INR"),
+  paymentMethod: z.enum(["UPI", "BANK_TRANSFER", "CASH", "CARD", "CHEQUE", "OTHER"]).default("UPI"),
+  paymentReference: z.string().max(200).optional().nullable(),
+  utrNumber: z.string().max(100).optional().nullable(),
+  paymentDate: z.string().or(z.date()).optional(),
+  notes: z.string().max(1000).optional().nullable(),
+});
+
+export type SubscriptionPaymentCreateInput = z.infer<typeof subscriptionPaymentCreateSchema>;
+
+export const subscriptionPaymentVerifySchema = z.object({
+  notes: z.string().max(1000).optional(),
+});
+
+export type SubscriptionPaymentVerifyInput = z.infer<typeof subscriptionPaymentVerifySchema>;
+
+export const subscriptionPaymentRejectSchema = z.object({
+  reason: z.string().min(3, "Please provide a rejection reason (min 3 chars)").max(500),
+});
+
+export type SubscriptionPaymentRejectInput = z.infer<typeof subscriptionPaymentRejectSchema>;
+

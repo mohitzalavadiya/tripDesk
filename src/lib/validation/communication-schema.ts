@@ -63,3 +63,21 @@ export const runAutomationSchema = z.object({
 });
 
 export type RunAutomationInput = z.infer<typeof runAutomationSchema>;
+
+export const listPublicNotificationsSchema = z.object({
+  unreadOnly: z
+    .preprocess((val) => val === "true" || val === true, z.boolean())
+    .optional(),
+  type: z.nativeEnum(CustomerNotificationType).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export type ListPublicNotificationsInput = z.infer<typeof listPublicNotificationsSchema>;
+
+export const publicReadNotificationSchema = z.object({
+  notificationId: z.string().min(1, "Notification ID is required"),
+});
+
+export type PublicReadNotificationInput = z.infer<typeof publicReadNotificationSchema>;
+
