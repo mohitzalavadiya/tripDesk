@@ -31,8 +31,17 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
   const isPlatform = isPlatformOwner || pathname.startsWith("/admin");
   const navSections = isPlatform ? adminNavigationConfig : agencyNavigationConfig;
 
+  interface BottomNavItem {
+    label: string;
+    href?: string;
+    onClick?: () => void;
+    icon: React.ComponentType<{ className?: string }>;
+    isCreate?: boolean;
+    badge?: string;
+  }
+
   // Bottom navigation items for mobile
-  const bottomNavItems = isPlatform
+  const bottomNavItems: BottomNavItem[] = isPlatform
     ? [
         { label: "Admin", href: "/admin", icon: Home },
         { label: "Agencies", href: "/admin/agencies", icon: Building },
@@ -48,7 +57,7 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
           icon: Plus,
           isCreate: true,
         },
-        { label: "Trips", href: "/trips", icon: Compass, badge: "9" },
+        { label: "Trips", href: "/trips", icon: Compass },
         { label: "More", onClick: () => setOpen(true), icon: Menu },
       ];
 

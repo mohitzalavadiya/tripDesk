@@ -162,61 +162,63 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
         </div>
 
         {/* Footer Support section */}
-        <div className="p-3 border-t border-sidebar-border/30 shrink-0">
-          {secondaryNavigation.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
+        {(secondaryNavigation.length > 0 || collapsed) && (
+          <div className="p-3 border-t border-sidebar-border/30 shrink-0">
+            {secondaryNavigation.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
 
-            return (
-              <Tooltip key={item.label} disabled={!collapsed}>
-                <TooltipTrigger
-                  render={
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group relative",
-                        isActive
-                          ? "bg-indigo-600/10 text-white"
-                          : "text-slate-400 hover:text-white hover:bg-sidebar-accent/50"
-                      )}
-                    >
-                      {isActive && (
-                        <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-indigo-500" />
-                      )}
-                      <Icon
+              return (
+                <Tooltip key={item.label} disabled={!collapsed}>
+                  <TooltipTrigger
+                    render={
+                      <Link
+                        href={item.href}
                         className={cn(
-                          "h-5 w-5 shrink-0 transition-colors",
-                          isActive ? "text-indigo-400" : "text-slate-400 group-hover:text-white"
+                          "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group relative",
+                          isActive
+                            ? "bg-indigo-600/10 text-white"
+                            : "text-slate-400 hover:text-white hover:bg-sidebar-accent/50"
                         )}
-                      />
-                      {!collapsed && (
-                        <span className="truncate flex-1 animate-in fade-in duration-150">
-                          {item.label}
-                        </span>
-                      )}
-                    </Link>
-                  }
-                />
-                <TooltipContent
-                  side="right"
-                  className="bg-slate-900 border border-slate-800 text-white px-2 py-1 text-xs rounded-md"
-                >
-                  {item.label}
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
+                      >
+                        {isActive && (
+                          <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-indigo-500" />
+                        )}
+                        <Icon
+                          className={cn(
+                            "h-5 w-5 shrink-0 transition-colors",
+                            isActive ? "text-indigo-400" : "text-slate-400 group-hover:text-white"
+                          )}
+                        />
+                        {!collapsed && (
+                          <span className="truncate flex-1 animate-in fade-in duration-150">
+                            {item.label}
+                          </span>
+                        )}
+                      </Link>
+                    }
+                  />
+                  <TooltipContent
+                    side="right"
+                    className="bg-slate-900 border border-slate-800 text-white px-2 py-1 text-xs rounded-md"
+                  >
+                    {item.label}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
 
-          {collapsed && (
-            <button
-              onClick={() => setCollapsed(false)}
-              className="flex h-10 w-full items-center justify-center rounded-lg hover:bg-sidebar-accent text-slate-400 hover:text-white transition-colors cursor-pointer mt-2"
-              aria-label="Expand sidebar"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+            {collapsed && (
+              <button
+                onClick={() => setCollapsed(false)}
+                className="flex h-10 w-full items-center justify-center rounded-lg hover:bg-sidebar-accent text-slate-400 hover:text-white transition-colors cursor-pointer"
+                aria-label="Expand sidebar"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
       </aside>
     </TooltipProvider>
   );

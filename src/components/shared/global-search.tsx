@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { Search, Compass, Users, Inbox, FileText, Hotel, ArrowRight } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Search, Compass, Users, Inbox, FileText, Hotel, Truck, CalendarCheck, ArrowRight } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -9,28 +10,27 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { toast } from "sonner"
 
-interface SearchResult {
+interface QuickNavItem {
   id: string
   title: string
-  category: "customers" | "trips" | "enquiries" | "quotations" | "hotels"
+  category: "customers" | "trips" | "enquiries" | "quotations" | "hotels" | "bookings" | "suppliers"
   subtitle: string
   href: string
 }
 
-const mockSearchData: SearchResult[] = [
-  { id: "1", title: "Rahul Patel", category: "customers", subtitle: "Customer • Kerala Enquiry Active", href: "/customers" },
-  { id: "2", title: "Priya Shah", category: "customers", subtitle: "Customer • Goa Enquiry Active", href: "/customers" },
-  { id: "3", title: "Kerala Holiday", category: "trips", subtitle: "Trip • Confirmed • 01 Sep", href: "/trips" },
-  { id: "4", title: "Goa Beach Getaway", category: "trips", subtitle: "Trip • Confirmed • 12 Sep", href: "/trips" },
-  { id: "5", title: "Dubai Luxury Experience", category: "trips", subtitle: "Trip • Pending • 20 Sep", href: "/trips" },
-  { id: "6", title: "Enquiry from Amit Shah", category: "enquiries", subtitle: "Enquiry • New • Dubai", href: "/enquiries" },
-  { id: "7", title: "Kerala Holiday Quote", category: "quotations", subtitle: "Quotation • Sent • ₹1,20,000", href: "/quotations" },
-  { id: "8", title: "The Leela Kovalam", category: "hotels", subtitle: "Hotel • Partner • Kerala", href: "/hotels" },
+const quickNavModules: QuickNavItem[] = [
+  { id: "nav-enquiries", title: "Enquiries", category: "enquiries", subtitle: "CRM Leads, follow-ups & pipeline", href: "/enquiries" },
+  { id: "nav-customers", title: "Customers", category: "customers", subtitle: "Customer directory & profile history", href: "/customers" },
+  { id: "nav-trips", title: "Trips", category: "trips", subtitle: "Active trips & itinerary planner", href: "/trips" },
+  { id: "nav-quotations", title: "Quotations", category: "quotations", subtitle: "Proposals, pricing & client versions", href: "/quotations" },
+  { id: "nav-bookings", title: "Bookings", category: "bookings", subtitle: "Confirmed bookings & vouchers", href: "/bookings" },
+  { id: "nav-hotels", title: "Hotels", category: "hotels", subtitle: "Hotel directory & room inventories", href: "/hotels" },
+  { id: "nav-suppliers", title: "Suppliers", category: "suppliers", subtitle: "Vendors, cabs & activity providers", href: "/suppliers" },
 ]
 
 export function GlobalSearch() {
+  const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
 
@@ -46,8 +46,8 @@ export function GlobalSearch() {
   }, [])
 
   const filteredResults = React.useMemo(() => {
-    if (!query) return mockSearchData.slice(0, 5)
-    return mockSearchData.filter(
+    if (!query) return quickNavModules
+    return quickNavModules.filter(
       (item) =>
         item.title.toLowerCase().includes(query.toLowerCase()) ||
         item.category.toLowerCase().includes(query.toLowerCase()) ||
@@ -55,10 +55,10 @@ export function GlobalSearch() {
     )
   }, [query])
 
-  const handleSelect = (item: SearchResult) => {
-    toast.success(`Navigating to ${item.title} (${item.category})`)
+  const handleSelect = (item: QuickNavItem) => {
     setOpen(false)
     setQuery("")
+    router.push(item.href)
   }
 
   const getCategoryIcon = (category: string) => {
@@ -71,8 +71,12 @@ export function GlobalSearch() {
         return <Inbox className="h-4 w-4" />
       case "quotations":
         return <FileText className="h-4 w-4" />
+      case "bookings":
+        return <CalendarCheck className="h-4 w-4" />
       case "hotels":
         return <Hotel className="h-4 w-4" />
+      case "suppliers":
+        return <Truck className="h-4 w-4" />
       default:
         return <Search className="h-4 w-4" />
     }

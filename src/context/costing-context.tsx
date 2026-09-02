@@ -645,7 +645,7 @@ export function CostingProvider({ children }: { children: React.ReactNode }) {
             ...existing,
             status: "Locked",
             lockedAt: new Date().toISOString(),
-            lockedBy: "Senior Travel Agent",
+            lockedBy: "Agency Owner",
             updatedAt: new Date().toISOString(),
           },
         }

@@ -58,6 +58,11 @@ export const agencyNavigationConfig: NavigationSection[] = [
     title: "TRAVEL MANAGEMENT",
     items: [
       {
+        label: "Enquiries",
+        href: "/enquiries",
+        icon: Inbox,
+      },
+      {
         label: "Customers",
         href: "/customers",
         icon: Users,
@@ -66,8 +71,6 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Trips",
         href: "/trips",
         icon: Compass,
-        badge: "9",
-        badgeVariant: "success",
       },
       {
         label: "Quotations",
@@ -78,8 +81,6 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Bookings",
         href: "/bookings",
         icon: CalendarCheck,
-        badge: "7",
-        badgeVariant: "travel",
       },
       {
         label: "Documents",
@@ -104,6 +105,21 @@ export const agencyNavigationConfig: NavigationSection[] = [
         icon: Hotel,
       },
       {
+        label: "Suppliers",
+        href: "/suppliers",
+        icon: Truck,
+      },
+      {
+        label: "Vehicles",
+        href: "/vehicles",
+        icon: Car,
+      },
+      {
+        label: "Activities",
+        href: "/activities",
+        icon: Ticket,
+      },
+      {
         label: "Rate Sheets",
         href: "/rate-sheets",
         icon: FileSpreadsheet,
@@ -114,16 +130,24 @@ export const agencyNavigationConfig: NavigationSection[] = [
     title: "FINANCE & RETENTION",
     items: [
       {
+        label: "Finance",
+        href: "/finance",
+        icon: IndianRupee,
+      },
+      {
         label: "Payments",
         href: "/payments",
-        icon: IndianRupee,
+        icon: CreditCard,
+      },
+      {
+        label: "Follow-ups",
+        href: "/follow-ups",
+        icon: Clock,
       },
       {
         label: "Feedback & Reviews",
         href: "/feedback",
         icon: Star,
-        badge: "4.8 ★",
-        badgeVariant: "travel",
       },
       {
         label: "Referrals & Rewards",
@@ -229,10 +253,4 @@ export const adminNavigationConfig: NavigationSection[] = [
 // Default export alias for backward compatibility
 export const navigationConfig = agencyNavigationConfig;
 
-export const secondaryNavigation = [
-  {
-    label: "Help & Support",
-    href: "/help",
-    icon: HelpCircle,
-  },
-];
+export const secondaryNavigation: NavigationItem[] = [];
