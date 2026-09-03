@@ -343,12 +343,112 @@ export const rateSheetService = {
   // ═════════════════════════════════════════════════════════════════════
 
   /**
-   * Resolves the applicable Hotel purchase rate for a travel date.
-   * Priority rule:
-   * 1. Exact roomType + mealPlan match
+   * Resolves applicable Hotel purchase rates in a single batch query.
+   * Deterministic priority rule:
+   * 1. Exact roomType (+2000) & mealPlan (+1000) match
    * 2. Highest priority number
    * 3. Narrowest validity window (validTo - validFrom)
    * 4. Most recently created
+   */
+  async getApplicableHotelRatesBatch(
+    agencyId: string,
+    items: Array<{
+      id: string;
+      hotelId: string;
+      travelDate: Date | string;
+      roomType?: string | null;
+      mealPlan?: string | null;
+    }>
+  ): Promise<Map<string, MatchedRateResult>> {
+    const resultMap = new Map<string, MatchedRateResult>();
+    if (!items || items.length === 0) return resultMap;
+
+    const validHotelIds = Array.from(new Set(items.map((i) => i.hotelId).filter(Boolean)));
+    if (validHotelIds.length === 0) {
+      for (const item of items) {
+        resultMap.set(item.id, { matched: false, currency: "INR", costPrice: 0, priority: 0 });
+      }
+      return resultMap;
+    }
+
+    const timestamps = items.map((i) => new Date(i.travelDate).getTime()).filter((t) => !isNaN(t));
+    const minDate = timestamps.length > 0 ? new Date(Math.min(...timestamps)) : new Date();
+    const maxDate = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : new Date();
+
+    const candidates = await prisma.rateSheet.findMany({
+      where: {
+        agencyId,
+        hotelId: { in: validHotelIds },
+        inventoryType: "HOTEL",
+        status: "ACTIVE",
+        archivedAt: null,
+        validFrom: { lte: maxDate },
+        validTo: { gte: minDate },
+      },
+      include: {
+        supplier: { select: { id: true, name: true } },
+      },
+      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+    });
+
+    for (const item of items) {
+      const itemDate = new Date(item.travelDate);
+      const itemCandidates = candidates.filter(
+        (c) =>
+          c.hotelId === item.hotelId &&
+          new Date(c.validFrom) <= itemDate &&
+          new Date(c.validTo) >= itemDate
+      );
+
+      if (itemCandidates.length === 0) {
+        resultMap.set(item.id, { matched: false, currency: "INR", costPrice: 0, priority: 0 });
+        continue;
+      }
+
+      const ranked = itemCandidates.map((c) => {
+        let score = (c.priority || 0) * 10000;
+        if (item.roomType && c.roomType && c.roomType.toLowerCase() === item.roomType.toLowerCase()) {
+          score += 2000;
+        }
+        if (item.mealPlan && c.mealPlan && c.mealPlan.toLowerCase() === item.mealPlan.toLowerCase()) {
+          score += 1000;
+        }
+        const daysSpan = Math.max(
+          1,
+          (new Date(c.validTo).getTime() - new Date(c.validFrom).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        score -= Math.min(500, daysSpan);
+
+        return { candidate: c, score };
+      });
+
+      ranked.sort((a, b) => b.score - a.score);
+      const selected = ranked[0].candidate;
+
+      resultMap.set(item.id, {
+        matched: true,
+        rateSheetId: selected.id,
+        rateSheetNumber: selected.rateSheetNumber,
+        rateName: selected.name,
+        seasonName: selected.seasonName,
+        supplierId: selected.supplierId,
+        supplierName: selected.supplier?.name,
+        currency: selected.currency,
+        costPrice: Number(selected.costPrice),
+        extraAdultRate: selected.extraAdultRate ? Number(selected.extraAdultRate) : null,
+        extraChildRate: selected.extraChildRate ? Number(selected.extraChildRate) : null,
+        taxPercentage: selected.taxPercentage ? Number(selected.taxPercentage) : null,
+        priority: selected.priority,
+        validFrom: selected.validFrom,
+        validTo: selected.validTo,
+      });
+    }
+
+    return resultMap;
+  },
+
+  /**
+   * Resolves the applicable Hotel purchase rate for a travel date.
    */
   async getApplicableHotelRate(
     agencyId: string,
@@ -357,17 +457,48 @@ export const rateSheetService = {
     roomType?: string | null,
     mealPlan?: string | null
   ): Promise<MatchedRateResult> {
-    const dateObj = new Date(travelDate);
+    const map = await this.getApplicableHotelRatesBatch(agencyId, [
+      { id: "single", hotelId, travelDate, roomType, mealPlan },
+    ]);
+    return map.get("single") || { matched: false, currency: "INR", costPrice: 0, priority: 0 };
+  },
+
+  /**
+   * Resolves applicable Vehicle purchase rates in a single batch query.
+   */
+  async getApplicableVehicleRatesBatch(
+    agencyId: string,
+    items: Array<{
+      id: string;
+      vehicleId: string;
+      travelDate: Date | string;
+      pricingType?: string | null;
+    }>
+  ): Promise<Map<string, MatchedRateResult>> {
+    const resultMap = new Map<string, MatchedRateResult>();
+    if (!items || items.length === 0) return resultMap;
+
+    const validVehicleIds = Array.from(new Set(items.map((i) => i.vehicleId).filter(Boolean)));
+    if (validVehicleIds.length === 0) {
+      for (const item of items) {
+        resultMap.set(item.id, { matched: false, currency: "INR", costPrice: 0, priority: 0 });
+      }
+      return resultMap;
+    }
+
+    const timestamps = items.map((i) => new Date(i.travelDate).getTime()).filter((t) => !isNaN(t));
+    const minDate = timestamps.length > 0 ? new Date(Math.min(...timestamps)) : new Date();
+    const maxDate = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : new Date();
 
     const candidates = await prisma.rateSheet.findMany({
       where: {
         agencyId,
-        hotelId,
-        inventoryType: "HOTEL",
+        vehicleId: { in: validVehicleIds },
+        inventoryType: "VEHICLE",
         status: "ACTIVE",
         archivedAt: null,
-        validFrom: { lte: dateObj },
-        validTo: { gte: dateObj },
+        validFrom: { lte: maxDate },
+        validTo: { gte: minDate },
       },
       include: {
         supplier: { select: { id: true, name: true } },
@@ -375,52 +506,61 @@ export const rateSheetService = {
       orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
     });
 
-    if (candidates.length === 0) {
-      return { matched: false, currency: "INR", costPrice: 0, priority: 0 };
+    for (const item of items) {
+      const itemDate = new Date(item.travelDate);
+      const itemCandidates = candidates.filter(
+        (c) =>
+          c.vehicleId === item.vehicleId &&
+          new Date(c.validFrom) <= itemDate &&
+          new Date(c.validTo) >= itemDate
+      );
+
+      if (itemCandidates.length === 0) {
+        resultMap.set(item.id, { matched: false, currency: "INR", costPrice: 0, priority: 0 });
+        continue;
+      }
+
+      const ranked = itemCandidates.map((c) => {
+        let score = (c.priority || 0) * 10000;
+        if (item.pricingType && c.vehiclePricingType === item.pricingType) {
+          score += 2000;
+        }
+        const daysSpan = Math.max(
+          1,
+          (new Date(c.validTo).getTime() - new Date(c.validFrom).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        score -= Math.min(500, daysSpan);
+
+        return { candidate: c, score };
+      });
+
+      ranked.sort((a, b) => b.score - a.score);
+      const selected = ranked[0].candidate;
+
+      resultMap.set(item.id, {
+        matched: true,
+        rateSheetId: selected.id,
+        rateSheetNumber: selected.rateSheetNumber,
+        rateName: selected.name,
+        seasonName: selected.seasonName,
+        supplierId: selected.supplierId,
+        supplierName: selected.supplier?.name,
+        currency: selected.currency,
+        costPrice: Number(selected.costPrice),
+        ratePerKm: selected.ratePerKm ? Number(selected.ratePerKm) : null,
+        minimumKm: selected.minimumKm ? Number(selected.minimumKm) : null,
+        totalRate: selected.totalRate ? Number(selected.totalRate) : null,
+        extraKmRate: selected.extraKmRate ? Number(selected.extraKmRate) : null,
+        driverAllowance: selected.driverAllowance ? Number(selected.driverAllowance) : null,
+        nightAllowance: selected.nightAllowance ? Number(selected.nightAllowance) : null,
+        taxPercentage: selected.taxPercentage ? Number(selected.taxPercentage) : null,
+        priority: selected.priority,
+        validFrom: selected.validFrom,
+        validTo: selected.validTo,
+      });
     }
 
-    // Deterministic ranking score:
-    // +1000 points if roomType matches exactly
-    // +500 points if mealPlan matches exactly
-    // - (validity window in days) as tie-breaker (narrower window is preferred)
-    const ranked = candidates.map((c) => {
-      let score = (c.priority || 0) * 10000;
-      if (roomType && c.roomType && c.roomType.toLowerCase() === roomType.toLowerCase()) {
-        score += 2000;
-      }
-      if (mealPlan && c.mealPlan && c.mealPlan.toLowerCase() === mealPlan.toLowerCase()) {
-        score += 1000;
-      }
-      const daysSpan = Math.max(
-        1,
-        (new Date(c.validTo).getTime() - new Date(c.validFrom).getTime()) / (1000 * 60 * 60 * 24)
-      );
-      // Small deduction for broader spans to favor narrow date promotions
-      score -= Math.min(500, daysSpan);
-
-      return { candidate: c, score };
-    });
-
-    ranked.sort((a, b) => b.score - a.score);
-    const selected = ranked[0].candidate;
-
-    return {
-      matched: true,
-      rateSheetId: selected.id,
-      rateSheetNumber: selected.rateSheetNumber,
-      rateName: selected.name,
-      seasonName: selected.seasonName,
-      supplierId: selected.supplierId,
-      supplierName: selected.supplier?.name,
-      currency: selected.currency,
-      costPrice: Number(selected.costPrice),
-      extraAdultRate: selected.extraAdultRate ? Number(selected.extraAdultRate) : null,
-      extraChildRate: selected.extraChildRate ? Number(selected.extraChildRate) : null,
-      taxPercentage: selected.taxPercentage ? Number(selected.taxPercentage) : null,
-      priority: selected.priority,
-      validFrom: selected.validFrom,
-      validTo: selected.validTo,
-    };
+    return resultMap;
   },
 
   /**
@@ -432,17 +572,47 @@ export const rateSheetService = {
     travelDate: Date | string,
     pricingType?: string | null
   ): Promise<MatchedRateResult> {
-    const dateObj = new Date(travelDate);
+    const map = await this.getApplicableVehicleRatesBatch(agencyId, [
+      { id: "single", vehicleId, travelDate, pricingType },
+    ]);
+    return map.get("single") || { matched: false, currency: "INR", costPrice: 0, priority: 0 };
+  },
+
+  /**
+   * Resolves applicable Activity purchase rates in a single batch query.
+   */
+  async getApplicableActivityRatesBatch(
+    agencyId: string,
+    items: Array<{
+      id: string;
+      activityId: string;
+      travelDate: Date | string;
+    }>
+  ): Promise<Map<string, MatchedRateResult>> {
+    const resultMap = new Map<string, MatchedRateResult>();
+    if (!items || items.length === 0) return resultMap;
+
+    const validActivityIds = Array.from(new Set(items.map((i) => i.activityId).filter(Boolean)));
+    if (validActivityIds.length === 0) {
+      for (const item of items) {
+        resultMap.set(item.id, { matched: false, currency: "INR", costPrice: 0, priority: 0 });
+      }
+      return resultMap;
+    }
+
+    const timestamps = items.map((i) => new Date(i.travelDate).getTime()).filter((t) => !isNaN(t));
+    const minDate = timestamps.length > 0 ? new Date(Math.min(...timestamps)) : new Date();
+    const maxDate = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : new Date();
 
     const candidates = await prisma.rateSheet.findMany({
       where: {
         agencyId,
-        vehicleId,
-        inventoryType: "VEHICLE",
+        activityId: { in: validActivityIds },
+        inventoryType: "ACTIVITY",
         status: "ACTIVE",
         archivedAt: null,
-        validFrom: { lte: dateObj },
-        validTo: { gte: dateObj },
+        validFrom: { lte: maxDate },
+        validTo: { gte: minDate },
       },
       include: {
         supplier: { select: { id: true, name: true } },
@@ -450,48 +620,55 @@ export const rateSheetService = {
       orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
     });
 
-    if (candidates.length === 0) {
-      return { matched: false, currency: "INR", costPrice: 0, priority: 0 };
+    for (const item of items) {
+      const itemDate = new Date(item.travelDate);
+      const itemCandidates = candidates.filter(
+        (c) =>
+          c.activityId === item.activityId &&
+          new Date(c.validFrom) <= itemDate &&
+          new Date(c.validTo) >= itemDate
+      );
+
+      if (itemCandidates.length === 0) {
+        resultMap.set(item.id, { matched: false, currency: "INR", costPrice: 0, priority: 0 });
+        continue;
+      }
+
+      const ranked = itemCandidates.map((c) => {
+        let score = (c.priority || 0) * 10000;
+        const daysSpan = Math.max(
+          1,
+          (new Date(c.validTo).getTime() - new Date(c.validFrom).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        score -= Math.min(500, daysSpan);
+
+        return { candidate: c, score };
+      });
+
+      ranked.sort((a, b) => b.score - a.score);
+      const selected = ranked[0].candidate;
+
+      resultMap.set(item.id, {
+        matched: true,
+        rateSheetId: selected.id,
+        rateSheetNumber: selected.rateSheetNumber,
+        rateName: selected.name,
+        seasonName: selected.seasonName,
+        supplierId: selected.supplierId,
+        supplierName: selected.supplier?.name,
+        currency: selected.currency,
+        costPrice: Number(selected.costPrice),
+        adultCost: selected.adultCost ? Number(selected.adultCost) : null,
+        childCost: selected.childCost ? Number(selected.childCost) : null,
+        infantCost: selected.infantCost ? Number(selected.infantCost) : null,
+        taxPercentage: selected.taxPercentage ? Number(selected.taxPercentage) : null,
+        priority: selected.priority,
+        validFrom: selected.validFrom,
+        validTo: selected.validTo,
+      });
     }
 
-    const ranked = candidates.map((c) => {
-      let score = (c.priority || 0) * 10000;
-      if (pricingType && c.vehiclePricingType === pricingType) {
-        score += 2000;
-      }
-      const daysSpan = Math.max(
-        1,
-        (new Date(c.validTo).getTime() - new Date(c.validFrom).getTime()) / (1000 * 60 * 60 * 24)
-      );
-      score -= Math.min(500, daysSpan);
-
-      return { candidate: c, score };
-    });
-
-    ranked.sort((a, b) => b.score - a.score);
-    const selected = ranked[0].candidate;
-
-    return {
-      matched: true,
-      rateSheetId: selected.id,
-      rateSheetNumber: selected.rateSheetNumber,
-      rateName: selected.name,
-      seasonName: selected.seasonName,
-      supplierId: selected.supplierId,
-      supplierName: selected.supplier?.name,
-      currency: selected.currency,
-      costPrice: Number(selected.costPrice),
-      ratePerKm: selected.ratePerKm ? Number(selected.ratePerKm) : null,
-      minimumKm: selected.minimumKm ? Number(selected.minimumKm) : null,
-      totalRate: selected.totalRate ? Number(selected.totalRate) : null,
-      extraKmRate: selected.extraKmRate ? Number(selected.extraKmRate) : null,
-      driverAllowance: selected.driverAllowance ? Number(selected.driverAllowance) : null,
-      nightAllowance: selected.nightAllowance ? Number(selected.nightAllowance) : null,
-      taxPercentage: selected.taxPercentage ? Number(selected.taxPercentage) : null,
-      priority: selected.priority,
-      validFrom: selected.validFrom,
-      validTo: selected.validTo,
-    };
+    return resultMap;
   },
 
   /**
@@ -502,59 +679,9 @@ export const rateSheetService = {
     activityId: string,
     travelDate: Date | string
   ): Promise<MatchedRateResult> {
-    const dateObj = new Date(travelDate);
-
-    const candidates = await prisma.rateSheet.findMany({
-      where: {
-        agencyId,
-        activityId,
-        inventoryType: "ACTIVITY",
-        status: "ACTIVE",
-        archivedAt: null,
-        validFrom: { lte: dateObj },
-        validTo: { gte: dateObj },
-      },
-      include: {
-        supplier: { select: { id: true, name: true } },
-      },
-      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
-    });
-
-    if (candidates.length === 0) {
-      return { matched: false, currency: "INR", costPrice: 0, priority: 0 };
-    }
-
-    const ranked = candidates.map((c) => {
-      let score = (c.priority || 0) * 10000;
-      const daysSpan = Math.max(
-        1,
-        (new Date(c.validTo).getTime() - new Date(c.validFrom).getTime()) / (1000 * 60 * 60 * 24)
-      );
-      score -= Math.min(500, daysSpan);
-
-      return { candidate: c, score };
-    });
-
-    ranked.sort((a, b) => b.score - a.score);
-    const selected = ranked[0].candidate;
-
-    return {
-      matched: true,
-      rateSheetId: selected.id,
-      rateSheetNumber: selected.rateSheetNumber,
-      rateName: selected.name,
-      seasonName: selected.seasonName,
-      supplierId: selected.supplierId,
-      supplierName: selected.supplier?.name,
-      currency: selected.currency,
-      costPrice: Number(selected.costPrice),
-      adultCost: selected.adultCost ? Number(selected.adultCost) : null,
-      childCost: selected.childCost ? Number(selected.childCost) : null,
-      infantCost: selected.infantCost ? Number(selected.infantCost) : null,
-      taxPercentage: selected.taxPercentage ? Number(selected.taxPercentage) : null,
-      priority: selected.priority,
-      validFrom: selected.validFrom,
-      validTo: selected.validTo,
-    };
+    const map = await this.getApplicableActivityRatesBatch(agencyId, [
+      { id: "single", activityId, travelDate },
+    ]);
+    return map.get("single") || { matched: false, currency: "INR", costPrice: 0, priority: 0 };
   },
 };

@@ -107,204 +107,215 @@ export const tripCostingService = {
     const childrenCount = trip.travelers.filter((t) => t.type === "CHILD").length;
     const travelersCount = trip.travelers.length || 1;
 
-    // 1. Calculate Hotel Costings with Rate Sheet Resolution
+    // 1. Prepare Batch Items for Rate Sheet Resolution
+    const hotelBatchItems = trip.tripHotels.map((th) => ({
+      id: th.id,
+      hotelId: th.hotelId,
+      travelDate: th.checkIn,
+      roomType: th.roomType,
+      mealPlan: th.mealPlan,
+    }));
+
+    const vehicleBatchItems = trip.tripVehicles
+      .filter((tv) => tv.vehicleId)
+      .map((tv) => ({
+        id: tv.id,
+        vehicleId: tv.vehicleId!,
+        travelDate: tv.startDate || trip.startDate,
+        pricingType: tv.pricingType,
+      }));
+
+    const activityBatchItems = trip.tripActivities
+      .filter((ta) => ta.activityId)
+      .map((ta) => ({
+        id: ta.id,
+        activityId: ta.activityId!,
+        travelDate: ta.date || trip.startDate,
+      }));
+
+    // 2. Fetch Rate Resolutions in Concurrent Batch Queries (0 if category empty)
+    const [hotelRateMap, vehicleRateMap, activityRateMap] = await Promise.all([
+      rateSheetService.getApplicableHotelRatesBatch(agencyId, hotelBatchItems),
+      rateSheetService.getApplicableVehicleRatesBatch(agencyId, vehicleBatchItems),
+      rateSheetService.getApplicableActivityRatesBatch(agencyId, activityBatchItems),
+    ]);
+
+    // 3. Calculate Hotel Costings from Pre-Fetched Batch Rates
     let hotelsTotal = 0;
-    const hotels: HotelCostItem[] = await Promise.all(
-      trip.tripHotels.map(async (th) => {
-        const checkInTime = new Date(th.checkIn).getTime();
-        const checkOutTime = new Date(th.checkOut).getTime();
-        const diffDays = Math.max(1, Math.ceil((checkOutTime - checkInTime) / (1000 * 60 * 60 * 24)));
-        const rooms = th.rooms || 1;
+    const hotels: HotelCostItem[] = trip.tripHotels.map((th) => {
+      const checkInTime = new Date(th.checkIn).getTime();
+      const checkOutTime = new Date(th.checkOut).getTime();
+      const diffDays = Math.max(1, Math.ceil((checkOutTime - checkInTime) / (1000 * 60 * 60 * 24)));
+      const rooms = th.rooms || 1;
 
-        // Query Rate Sheet Engine
-        const matchedRate = await rateSheetService.getApplicableHotelRate(
-          agencyId,
-          th.hotelId,
-          th.checkIn,
-          th.roomType,
-          th.mealPlan
-        );
+      const matchedRate = hotelRateMap.get(th.id) || { matched: false, currency: "INR", costPrice: 0, priority: 0 };
 
-        let nightlyRate = th.nightlyRate ? Number(th.nightlyRate) : 0;
-        let totalCost = th.totalAmount ? Number(th.totalAmount) : 0;
-        let rateSource: "RATE_SHEET" | "TRIP_SNAPSHOT" = "TRIP_SNAPSHOT";
-        let rateSheetId: string | undefined = undefined;
-        let rateSheetNumber: string | null | undefined = undefined;
-        let supplierName: string | null | undefined = undefined;
-        let seasonName: string | null | undefined = undefined;
+      let nightlyRate = th.nightlyRate ? Number(th.nightlyRate) : 0;
+      let totalCost = th.totalAmount ? Number(th.totalAmount) : 0;
+      let rateSource: "RATE_SHEET" | "TRIP_SNAPSHOT" = "TRIP_SNAPSHOT";
+      let rateSheetId: string | undefined = undefined;
+      let rateSheetNumber: string | null | undefined = undefined;
+      let supplierName: string | null | undefined = undefined;
+      let seasonName: string | null | undefined = undefined;
 
-        if (matchedRate.matched && matchedRate.costPrice > 0) {
-          rateSource = "RATE_SHEET";
-          nightlyRate = matchedRate.costPrice;
+      if (matchedRate.matched && matchedRate.costPrice > 0) {
+        rateSource = "RATE_SHEET";
+        nightlyRate = matchedRate.costPrice;
+        totalCost = nightlyRate * rooms * diffDays;
+        rateSheetId = matchedRate.rateSheetId;
+        rateSheetNumber = matchedRate.rateSheetNumber;
+        supplierName = matchedRate.supplierName;
+        seasonName = matchedRate.seasonName;
+      } else {
+        // Fallback to manual trip assignment snapshot
+        if (totalCost === 0 && nightlyRate > 0) {
           totalCost = nightlyRate * rooms * diffDays;
+        }
+      }
+
+      hotelsTotal += totalCost;
+
+      return {
+        id: th.id,
+        hotelId: th.hotelId,
+        hotelName: th.hotel?.name || "Contracted Hotel",
+        roomType: th.roomType,
+        rooms,
+        checkIn: th.checkIn,
+        checkOut: th.checkOut,
+        nights: diffDays,
+        nightlyRate,
+        mealPlan: th.mealPlan,
+        totalCost: Math.round(totalCost * 100) / 100,
+        rateSource,
+        rateSheetId,
+        rateSheetNumber,
+        supplierName,
+        seasonName,
+      };
+    });
+
+    // 4. Calculate Vehicle Costings from Pre-Fetched Batch Rates
+    let vehiclesTotal = 0;
+    const vehicles: VehicleCostItem[] = trip.tripVehicles.map((tv) => {
+      let ratePerKm = tv.ratePerKm ? Number(tv.ratePerKm) : 0;
+      const estimatedKm = tv.estimatedKm ? Number(tv.estimatedKm) : 0;
+      let totalCost = tv.totalRate ? Number(tv.totalRate) : 0;
+      let rateSource: "RATE_SHEET" | "TRIP_SNAPSHOT" = "TRIP_SNAPSHOT";
+      let rateSheetId: string | undefined = undefined;
+      let rateSheetNumber: string | null | undefined = undefined;
+      let supplierName: string | null | undefined = undefined;
+      let seasonName: string | null | undefined = undefined;
+
+      if (tv.vehicleId) {
+        const matchedRate = vehicleRateMap.get(tv.id) || { matched: false, currency: "INR", costPrice: 0, priority: 0 };
+
+        if (matchedRate.matched) {
+          rateSource = "RATE_SHEET";
           rateSheetId = matchedRate.rateSheetId;
           rateSheetNumber = matchedRate.rateSheetNumber;
           supplierName = matchedRate.supplierName;
           seasonName = matchedRate.seasonName;
-        } else {
-          // Fallback to manual trip assignment snapshot
-          if (totalCost === 0 && nightlyRate > 0) {
-            totalCost = nightlyRate * rooms * diffDays;
+
+          if (tv.pricingType === "PER_KM" && matchedRate.ratePerKm) {
+            ratePerKm = matchedRate.ratePerKm;
+            totalCost = ratePerKm * (estimatedKm || matchedRate.minimumKm || 0);
+          } else if (matchedRate.totalRate) {
+            totalCost = matchedRate.totalRate;
+          } else if (matchedRate.costPrice > 0) {
+            totalCost = matchedRate.costPrice;
+          }
+
+          if (matchedRate.driverAllowance) {
+            totalCost += matchedRate.driverAllowance;
           }
         }
+      }
 
-        hotelsTotal += totalCost;
-
-        return {
-          id: th.id,
-          hotelId: th.hotelId,
-          hotelName: th.hotel?.name || "Contracted Hotel",
-          roomType: th.roomType,
-          rooms,
-          checkIn: th.checkIn,
-          checkOut: th.checkOut,
-          nights: diffDays,
-          nightlyRate,
-          mealPlan: th.mealPlan,
-          totalCost: Math.round(totalCost * 100) / 100,
-          rateSource,
-          rateSheetId,
-          rateSheetNumber,
-          supplierName,
-          seasonName,
-        };
-      })
-    );
-
-    // 2. Calculate Vehicle Costings with Rate Sheet Resolution
-    let vehiclesTotal = 0;
-    const vehicles: VehicleCostItem[] = await Promise.all(
-      trip.tripVehicles.map(async (tv) => {
-        let ratePerKm = tv.ratePerKm ? Number(tv.ratePerKm) : 0;
-        const estimatedKm = tv.estimatedKm ? Number(tv.estimatedKm) : 0;
-        let totalCost = tv.totalRate ? Number(tv.totalRate) : 0;
-        let rateSource: "RATE_SHEET" | "TRIP_SNAPSHOT" = "TRIP_SNAPSHOT";
-        let rateSheetId: string | undefined = undefined;
-        let rateSheetNumber: string | null | undefined = undefined;
-        let supplierName: string | null | undefined = undefined;
-        let seasonName: string | null | undefined = undefined;
-
-        if (tv.vehicleId) {
-          const matchedRate = await rateSheetService.getApplicableVehicleRate(
-            agencyId,
-            tv.vehicleId,
-            tv.startDate || trip.startDate,
-            tv.pricingType
-          );
-
-          if (matchedRate.matched) {
-            rateSource = "RATE_SHEET";
-            rateSheetId = matchedRate.rateSheetId;
-            rateSheetNumber = matchedRate.rateSheetNumber;
-            supplierName = matchedRate.supplierName;
-            seasonName = matchedRate.seasonName;
-
-            if (tv.pricingType === "PER_KM" && matchedRate.ratePerKm) {
-              ratePerKm = matchedRate.ratePerKm;
-              totalCost = ratePerKm * (estimatedKm || matchedRate.minimumKm || 0);
-            } else if (matchedRate.totalRate) {
-              totalCost = matchedRate.totalRate;
-            } else if (matchedRate.costPrice > 0) {
-              totalCost = matchedRate.costPrice;
-            }
-
-            if (matchedRate.driverAllowance) {
-              totalCost += matchedRate.driverAllowance;
-            }
-          }
+      if (rateSource === "TRIP_SNAPSHOT") {
+        if (tv.pricingType === "PER_KM" && ratePerKm > 0 && estimatedKm > 0 && totalCost === 0) {
+          totalCost = ratePerKm * estimatedKm;
         }
+      }
 
-        if (rateSource === "TRIP_SNAPSHOT") {
-          if (tv.pricingType === "PER_KM" && ratePerKm > 0 && estimatedKm > 0 && totalCost === 0) {
-            totalCost = ratePerKm * estimatedKm;
-          }
-        }
+      vehiclesTotal += totalCost;
 
-        vehiclesTotal += totalCost;
+      return {
+        id: tv.id,
+        vehicleId: tv.vehicleId,
+        vehicleName: tv.vehicleName,
+        vehicleType: tv.vehicleType,
+        pricingType: tv.pricingType,
+        ratePerKm,
+        estimatedKm,
+        totalCost: Math.round(totalCost * 100) / 100,
+        rateSource,
+        rateSheetId,
+        rateSheetNumber,
+        supplierName,
+        seasonName,
+      };
+    });
 
-        return {
-          id: tv.id,
-          vehicleId: tv.vehicleId,
-          vehicleName: tv.vehicleName,
-          vehicleType: tv.vehicleType,
-          pricingType: tv.pricingType,
-          ratePerKm,
-          estimatedKm,
-          totalCost: Math.round(totalCost * 100) / 100,
-          rateSource,
-          rateSheetId,
-          rateSheetNumber,
-          supplierName,
-          seasonName,
-        };
-      })
-    );
-
-    // 3. Calculate Activity Costings with Rate Sheet Resolution
+    // 5. Calculate Activity Costings from Pre-Fetched Batch Rates
     let activitiesTotal = 0;
-    const activities: ActivityCostItem[] = await Promise.all(
-      trip.tripActivities.map(async (ta) => {
-        let adultPrice = ta.adultPrice ? Number(ta.adultPrice) : 0;
-        let childPrice = ta.childPrice ? Number(ta.childPrice) : 0;
-        const participants = ta.numberOfParticipants || travelersCount;
-        let totalCost = ta.totalPrice ? Number(ta.totalPrice) : 0;
-        let rateSource: "RATE_SHEET" | "TRIP_SNAPSHOT" = "TRIP_SNAPSHOT";
-        let rateSheetId: string | undefined = undefined;
-        let rateSheetNumber: string | null | undefined = undefined;
-        let supplierName: string | null | undefined = undefined;
-        let seasonName: string | null | undefined = undefined;
+    const activities: ActivityCostItem[] = trip.tripActivities.map((ta) => {
+      let adultPrice = ta.adultPrice ? Number(ta.adultPrice) : 0;
+      let childPrice = ta.childPrice ? Number(ta.childPrice) : 0;
+      const participants = ta.numberOfParticipants || travelersCount;
+      let totalCost = ta.totalPrice ? Number(ta.totalPrice) : 0;
+      let rateSource: "RATE_SHEET" | "TRIP_SNAPSHOT" = "TRIP_SNAPSHOT";
+      let rateSheetId: string | undefined = undefined;
+      let rateSheetNumber: string | null | undefined = undefined;
+      let supplierName: string | null | undefined = undefined;
+      let seasonName: string | null | undefined = undefined;
 
-        if (ta.activityId) {
-          const matchedRate = await rateSheetService.getApplicableActivityRate(
-            agencyId,
-            ta.activityId,
-            ta.date || trip.startDate
-          );
+      if (ta.activityId) {
+        const matchedRate = activityRateMap.get(ta.id) || { matched: false, currency: "INR", costPrice: 0, priority: 0 };
 
-          if (matchedRate.matched) {
-            rateSource = "RATE_SHEET";
-            rateSheetId = matchedRate.rateSheetId;
-            rateSheetNumber = matchedRate.rateSheetNumber;
-            supplierName = matchedRate.supplierName;
-            seasonName = matchedRate.seasonName;
+        if (matchedRate.matched) {
+          rateSource = "RATE_SHEET";
+          rateSheetId = matchedRate.rateSheetId;
+          rateSheetNumber = matchedRate.rateSheetNumber;
+          supplierName = matchedRate.supplierName;
+          seasonName = matchedRate.seasonName;
 
-            if (matchedRate.adultCost !== null || matchedRate.childCost !== null) {
-              adultPrice = matchedRate.adultCost ?? 0;
-              childPrice = matchedRate.childCost ?? 0;
-              const effectiveAdults = adultsCount > 0 ? adultsCount : participants;
-              totalCost = (adultPrice * effectiveAdults) + (childPrice * childrenCount);
-            } else if (matchedRate.costPrice > 0) {
-              totalCost = matchedRate.costPrice;
-            }
-          }
-        }
-
-        if (rateSource === "TRIP_SNAPSHOT" && totalCost === 0) {
-          if (adultPrice > 0 || childPrice > 0) {
+          if (matchedRate.adultCost !== null || matchedRate.childCost !== null) {
+            adultPrice = matchedRate.adultCost ?? 0;
+            childPrice = matchedRate.childCost ?? 0;
             const effectiveAdults = adultsCount > 0 ? adultsCount : participants;
             totalCost = (adultPrice * effectiveAdults) + (childPrice * childrenCount);
+          } else if (matchedRate.costPrice > 0) {
+            totalCost = matchedRate.costPrice;
           }
         }
+      }
 
-        activitiesTotal += totalCost;
+      if (rateSource === "TRIP_SNAPSHOT" && totalCost === 0) {
+        if (adultPrice > 0 || childPrice > 0) {
+          const effectiveAdults = adultsCount > 0 ? adultsCount : participants;
+          totalCost = (adultPrice * effectiveAdults) + (childPrice * childrenCount);
+        }
+      }
 
-        return {
-          id: ta.id,
-          activityId: ta.activityId,
-          activityName: ta.name,
-          type: ta.type,
-          numberOfParticipants: participants,
-          adultPrice,
-          childPrice,
-          totalCost: Math.round(totalCost * 100) / 100,
-          rateSource,
-          rateSheetId,
-          rateSheetNumber,
-          supplierName,
-          seasonName,
-        };
-      })
-    );
+      activitiesTotal += totalCost;
+
+      return {
+        id: ta.id,
+        activityId: ta.activityId,
+        activityName: ta.name,
+        type: ta.type,
+        numberOfParticipants: participants,
+        adultPrice,
+        childPrice,
+        totalCost: Math.round(totalCost * 100) / 100,
+        rateSource,
+        rateSheetId,
+        rateSheetNumber,
+        supplierName,
+        seasonName,
+      };
+    });
 
     const subtotal = Math.round((hotelsTotal + vehiclesTotal + activitiesTotal) * 100) / 100;
 

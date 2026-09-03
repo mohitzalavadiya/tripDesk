@@ -302,7 +302,15 @@ export default function NewEnquiryPage() {
                       onValueChange={(val) => val && setSelectedCustomerId(val)}
                     >
                       <SelectTrigger className="h-10 text-xs bg-slate-50/50 border-slate-200 rounded-xl">
-                        <SelectValue placeholder="Choose existing client..." />
+                        <SelectValue placeholder="Choose existing client...">
+                          {(val: string | null) => {
+                            if (!val) return undefined;
+                            const c = customers.find((item) => item.id === val);
+                            return c
+                              ? `${c.name}${c.phone ? ` (${c.phone})` : ""}${c.email ? ` • ${c.email}` : ""}`
+                              : val;
+                          }}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
                         {customers.map((c) => (
