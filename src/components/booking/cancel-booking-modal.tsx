@@ -62,7 +62,16 @@ export function CancelBookingModal({
     },
   });
 
-  if (!isOpen) return null;
+  const getFieldError = (field: keyof typeof formik.values) => {
+    return formik.touched[field] && formik.errors[field]
+      ? formik.errors[field]
+      : undefined;
+  };
+
+  const inputCls = (field: keyof typeof formik.values, base: string = "h-9.5 text-xs") => {
+    const err = getFieldError(field);
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
+  };
 
   const charges = Number(formik.values.cancellationCharges) || 0;
   const calculatedRefund = Math.max(0, booking.paidAmount - charges);
@@ -123,8 +132,11 @@ export function CancelBookingModal({
             <Input
               placeholder="e.g. Customer cancelled trip due to emergency"
               {...formik.getFieldProps("reason")}
-              className="h-9.5 text-xs font-medium"
+              className={inputCls("reason", "h-9.5 text-xs font-medium")}
             />
+            {getFieldError("reason") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("reason")}</p>
+            )}
           </div>
 
           {/* Cancellation Charges */}
@@ -138,9 +150,12 @@ export function CancelBookingModal({
                 type="number"
                 placeholder="0"
                 {...formik.getFieldProps("cancellationCharges")}
-                className="pl-9 h-9.5 text-xs font-semibold"
+                className={inputCls("cancellationCharges", "pl-9 h-9.5 text-xs font-semibold")}
               />
             </div>
+            {getFieldError("cancellationCharges") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("cancellationCharges")}</p>
+            )}
             <p className="text-[11px] text-slate-400">
               Enter hotel/supplier retention fees to be deducted from customer payments.
             </p>
@@ -153,8 +168,11 @@ export function CancelBookingModal({
               placeholder="e.g. Flight cancelled, DMC agreed to 50% waiver"
               rows={2}
               {...formik.getFieldProps("notes")}
-              className="text-xs min-h-[60px]"
+              className={`text-xs min-h-[60px] ${getFieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
+            {getFieldError("notes") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("notes")}</p>
+            )}
           </div>
 
           {/* Action Buttons */}

@@ -6,10 +6,12 @@ import { useActionState } from "react";
 import { resetPasswordAction } from "@/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Compass, Lock, AlertCircle, ArrowLeft } from "lucide-react";
+import { Compass, Lock, AlertCircle, ArrowLeft, Eye, EyeOff } from "lucide-react";
 
 export default function ResetPasswordPage() {
   const [state, formAction, isPending] = useActionState(resetPasswordAction, {});
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-4 text-slate-900">
@@ -37,28 +39,52 @@ export default function ResetPasswordPage() {
           <div className="space-y-1.5">
             <label className="font-bold text-slate-700">New Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
               <Input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 name="password"
                 placeholder="Minimum 6 characters"
                 required
-                className="pl-9 h-9.5 text-xs font-medium"
+                className="pl-9 pr-9 h-9.5 text-xs font-medium"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors cursor-pointer"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="font-bold text-slate-700">Confirm New Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
               <Input
-                type="password"
+                type={showConfirmPassword ? "text" : "password"}
                 name="confirmPassword"
                 placeholder="Re-enter new password"
                 required
-                className="pl-9 h-9.5 text-xs font-medium"
+                className="pl-9 pr-9 h-9.5 text-xs font-medium"
               />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors cursor-pointer"
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
             </div>
           </div>
 

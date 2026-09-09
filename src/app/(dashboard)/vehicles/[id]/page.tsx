@@ -135,6 +135,17 @@ export default function VehicleProfilePage() {
     },
   });
 
+  const getFieldError = (field: string) => {
+    const touched = editVehicleFormik.touched[field as keyof typeof editVehicleFormik.touched];
+    const error = editVehicleFormik.errors[field as keyof typeof editVehicleFormik.errors];
+    return touched && error ? (error as string) : undefined;
+  };
+
+  const inputCls = (field: string, base: string = "h-9 bg-slate-50/50 border-slate-200 text-xs") => {
+    const err = getFieldError(field);
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
+  };
+
   // Archive action
   const handleArchive = async () => {
     if (!confirm(`Are you sure you want to archive "${vehicle?.name}"?`)) return;
@@ -322,9 +333,12 @@ export default function VehicleProfilePage() {
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Vehicle Name *</label>
                   <Input
                     {...editVehicleFormik.getFieldProps("name")}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    className={inputCls("name")}
                     required
                   />
+                  {getFieldError("name") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("name")}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -334,7 +348,9 @@ export default function VehicleProfilePage() {
                       value={editVehicleFormik.values.type}
                       onValueChange={(val) => editVehicleFormik.setFieldValue("type", val)}
                     >
-                      <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
+                      <SelectTrigger className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${
+                        getFieldError("type") ? "border-red-500 focus:ring-red-500" : ""
+                      }`}>
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -348,6 +364,9 @@ export default function VehicleProfilePage() {
                         <SelectItem value="Luxury">Luxury</SelectItem>
                       </SelectContent>
                     </Select>
+                    {getFieldError("type") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("type")}</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Capacity (Seats) *</label>
@@ -356,9 +375,12 @@ export default function VehicleProfilePage() {
                       min={1}
                       max={100}
                       {...editVehicleFormik.getFieldProps("capacity")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className={inputCls("capacity")}
                       required
                     />
+                    {getFieldError("capacity") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("capacity")}</p>
+                    )}
                   </div>
                 </div>
 
@@ -366,8 +388,11 @@ export default function VehicleProfilePage() {
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Registration Number</label>
                   <Input
                     {...editVehicleFormik.getFieldProps("registrationNumber")}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    className={inputCls("registrationNumber")}
                   />
+                  {getFieldError("registrationNumber") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("registrationNumber")}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -375,15 +400,21 @@ export default function VehicleProfilePage() {
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Driver Name</label>
                     <Input
                       {...editVehicleFormik.getFieldProps("driverName")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className={inputCls("driverName")}
                     />
+                    {getFieldError("driverName") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("driverName")}</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Driver Phone</label>
                     <Input
                       {...editVehicleFormik.getFieldProps("driverPhone")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className={inputCls("driverPhone")}
                     />
+                    {getFieldError("driverPhone") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("driverPhone")}</p>
+                    )}
                   </div>
                 </div>
 
@@ -394,7 +425,9 @@ export default function VehicleProfilePage() {
                       value={editVehicleFormik.values.pricingType}
                       onValueChange={(val) => editVehicleFormik.setFieldValue("pricingType", val)}
                     >
-                      <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
+                      <SelectTrigger className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${
+                        getFieldError("pricingType") ? "border-red-500 focus:ring-red-500" : ""
+                      }`}>
                         <SelectValue placeholder="Pricing type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -404,6 +437,9 @@ export default function VehicleProfilePage() {
                         <SelectItem value="INCLUDED">Included</SelectItem>
                       </SelectContent>
                     </Select>
+                    {getFieldError("pricingType") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("pricingType")}</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Rate per KM (₹)</label>
@@ -411,8 +447,11 @@ export default function VehicleProfilePage() {
                       type="number"
                       step="0.01"
                       {...editVehicleFormik.getFieldProps("ratePerKm")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className={inputCls("ratePerKm")}
                     />
+                    {getFieldError("ratePerKm") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("ratePerKm")}</p>
+                    )}
                   </div>
                 </div>
 
@@ -421,8 +460,13 @@ export default function VehicleProfilePage() {
                   <Textarea
                     {...editVehicleFormik.getFieldProps("notes")}
                     rows={3}
-                    className="bg-slate-50/50 border-slate-200 text-xs"
+                    className={`bg-slate-50/50 border-slate-200 text-xs ${
+                      getFieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""
+                    }`}
                   />
+                  {getFieldError("notes") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("notes")}</p>
+                  )}
                 </div>
               </div>
 

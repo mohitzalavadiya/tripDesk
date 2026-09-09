@@ -250,12 +250,12 @@ export function ActivityConfirmationDialog({
                   onBlur={formik.handleBlur}
                   className={`text-xs font-mono ${
                     formik.touched.confirmationNumber && formik.errors.confirmationNumber
-                      ? "border-rose-400 focus:ring-rose-200"
+                      ? "border-red-500 focus-visible:ring-red-500"
                       : ""
                   }`}
                 />
                 {formik.touched.confirmationNumber && formik.errors.confirmationNumber && (
-                  <p className="text-[11px] text-rose-600 font-medium">
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">
                     {formik.errors.confirmationNumber}
                   </p>
                 )}
@@ -272,8 +272,17 @@ export function ActivityConfirmationDialog({
                   value={formik.values.ticketNumber}
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
-                  className="text-xs font-mono"
+                  className={`text-xs font-mono ${
+                    formik.touched.ticketNumber && formik.errors.ticketNumber
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : ""
+                  }`}
                 />
+                {formik.touched.ticketNumber && formik.errors.ticketNumber && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                    {formik.errors.ticketNumber}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -291,8 +300,18 @@ export function ActivityConfirmationDialog({
                   name="date"
                   value={formik.values.date}
                   onChange={formik.handleChange}
-                  className="text-xs"
+                  onBlur={formik.handleBlur}
+                  className={`text-xs ${
+                    formik.touched.date && formik.errors.date
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : ""
+                  }`}
                 />
+                {formik.touched.date && formik.errors.date && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                    {formik.errors.date}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -305,8 +324,18 @@ export function ActivityConfirmationDialog({
                   placeholder="e.g. 09:30 AM - 01:00 PM"
                   value={formik.values.time}
                   onChange={formik.handleChange}
-                  className="text-xs"
+                  onBlur={formik.handleBlur}
+                  className={`text-xs ${
+                    formik.touched.time && formik.errors.time
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : ""
+                  }`}
                 />
+                {formik.touched.time && formik.errors.time && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                    {formik.errors.time}
+                  </p>
+                )}
               </div>
 
               <div className="sm:col-span-2 space-y-1.5">
@@ -319,8 +348,18 @@ export function ActivityConfirmationDialog({
                   placeholder="e.g. Main Palace Ticket Gate / Hotel Lobby"
                   value={formik.values.location}
                   onChange={formik.handleChange}
-                  className="text-xs"
+                  onBlur={formik.handleBlur}
+                  className={`text-xs ${
+                    formik.touched.location && formik.errors.location
+                      ? "border-red-500 focus-visible:ring-red-500"
+                      : ""
+                  }`}
                 />
+                {formik.touched.location && formik.errors.location && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                    {formik.errors.location}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -346,12 +385,12 @@ export function ActivityConfirmationDialog({
               onBlur={formik.handleBlur}
               className={`text-xs ${
                 formik.touched.supplierNotes && formik.errors.supplierNotes
-                  ? "border-rose-400 focus:ring-rose-200"
+                  ? "border-red-500 focus-visible:ring-red-500"
                   : ""
               }`}
             />
             {formik.touched.supplierNotes && formik.errors.supplierNotes && (
-              <p className="text-[11px] text-rose-600 font-medium">
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">
                 {formik.errors.supplierNotes}
               </p>
             )}

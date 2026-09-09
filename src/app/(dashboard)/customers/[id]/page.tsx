@@ -135,6 +135,26 @@ export default function CustomerDetailPage() {
   const [editNotes, setEditNotes] = React.useState("");
   const [editInternalNotes, setEditInternalNotes] = React.useState("");
   const [savingEdit, setSavingEdit] = React.useState(false);
+  const [editTouched, setEditTouched] = React.useState<Record<string, boolean>>({});
+  const [editSubmitted, setEditSubmitted] = React.useState(false);
+
+  const editErrors = React.useMemo(() => {
+    const errs: Record<string, string> = {};
+    if (!editName.trim()) {
+      errs.name = "Customer name is required.";
+    }
+    if (!editPhone.trim()) {
+      errs.phone = "Phone number is required.";
+    }
+    return errs;
+  }, [editName, editPhone]);
+
+  const getEditFieldError = (field: string) => {
+    if ((editTouched[field] || editSubmitted) && editErrors[field]) {
+      return editErrors[field];
+    }
+    return null;
+  };
 
   const loadCommunications = React.useCallback(async () => {
     try {
@@ -175,6 +195,8 @@ export default function CustomerDetailPage() {
         setEditPostalCode(res.data.postalCode || "");
         setEditNotes(res.data.notes || "");
         setEditInternalNotes(res.data.internalNotes || "");
+        setEditTouched({});
+        setEditSubmitted(false);
       }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
@@ -240,8 +262,13 @@ export default function CustomerDetailPage() {
   // Handle Edit Submit
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setEditSubmitted(true);
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
+      return;
+    }
+
+    if (editErrors.name || editErrors.phone) {
       return;
     }
 
@@ -1220,7 +1247,7 @@ export default function CustomerDetailPage() {
         {/* ─── EDIT CUSTOMER MODAL ─── */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
-            <form onSubmit={handleEditSubmit}>
+            <form onSubmit={handleEditSubmit} noValidate>
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
                   <Edit2 className="h-4 w-4 text-indigo-600" />
@@ -1238,18 +1265,28 @@ export default function CustomerDetailPage() {
                     <Input
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold"
-                      required
+                      onBlur={() => setEditTouched((prev) => ({ ...prev, name: true }))}
+                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold ${getEditFieldError("name") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                     />
+                    {getEditFieldError("name") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                        {getEditFieldError("name")}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Primary Phone *</label>
                     <Input
                       value={editPhone}
                       onChange={(e) => setEditPhone(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold"
-                      required
+                      onBlur={() => setEditTouched((prev) => ({ ...prev, phone: true }))}
+                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold ${getEditFieldError("phone") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                     />
+                    {getEditFieldError("phone") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                        {getEditFieldError("phone")}
+                      </p>
+                    )}
                   </div>
                 </div>
 

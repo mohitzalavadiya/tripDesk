@@ -80,6 +80,17 @@ export function AssignDriverModal({
     },
   });
 
+  const getFieldError = (field: string) => {
+    const touched = formik.touched[field as keyof typeof formik.touched];
+    const error = formik.errors[field as keyof typeof formik.errors];
+    return touched && error ? (error as string) : undefined;
+  };
+
+  const inputCls = (field: string, base: string = "h-9.5 text-xs") => {
+    const err = getFieldError(field);
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
+  };
+
   if (!isOpen || !dispatch) return null;
 
   return (
@@ -140,10 +151,10 @@ export function AssignDriverModal({
               <Input
                 placeholder="e.g. Rajesh Kumar"
                 {...formik.getFieldProps("driverName")}
-                className="h-9.5 text-xs font-semibold"
+                className={inputCls("driverName", "h-9.5 text-xs font-semibold")}
               />
-              {formik.touched.driverName && formik.errors.driverName && (
-                <p className="text-[11px] text-red-500">{formik.errors.driverName}</p>
+              {getFieldError("driverName") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("driverName")}</p>
               )}
             </div>
 
@@ -155,10 +166,10 @@ export function AssignDriverModal({
               <Input
                 placeholder="e.g. +91 94471 22334"
                 {...formik.getFieldProps("driverPhone")}
-                className="h-9.5 text-xs font-semibold"
+                className={inputCls("driverPhone", "h-9.5 text-xs font-semibold")}
               />
-              {formik.touched.driverPhone && formik.errors.driverPhone && (
-                <p className="text-[11px] text-red-500">{formik.errors.driverPhone}</p>
+              {getFieldError("driverPhone") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("driverPhone")}</p>
               )}
             </div>
           </div>
@@ -172,8 +183,11 @@ export function AssignDriverModal({
               <Input
                 placeholder="e.g. KL 07 CC 9812"
                 {...formik.getFieldProps("vehicleNumber")}
-                className="h-9.5 text-xs font-mono font-bold uppercase"
+                className={inputCls("vehicleNumber", "h-9.5 text-xs font-mono font-bold uppercase")}
               />
+              {getFieldError("vehicleNumber") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("vehicleNumber")}</p>
+              )}
             </div>
 
             {/* Pickup Time */}
@@ -182,8 +196,11 @@ export function AssignDriverModal({
               <Input
                 placeholder="e.g. 09:30 AM"
                 {...formik.getFieldProps("pickupTime")}
-                className="h-9.5 text-xs font-semibold"
+                className={inputCls("pickupTime", "h-9.5 text-xs font-semibold")}
               />
+              {getFieldError("pickupTime") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("pickupTime")}</p>
+              )}
             </div>
           </div>
 
@@ -194,8 +211,11 @@ export function AssignDriverModal({
               <Input
                 placeholder="e.g. Kochi Airport (COK)"
                 {...formik.getFieldProps("pickupLocation")}
-                className="h-9.5 text-xs"
+                className={inputCls("pickupLocation", "h-9.5 text-xs")}
               />
+              {getFieldError("pickupLocation") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("pickupLocation")}</p>
+              )}
             </div>
 
             {/* Drop Location */}
@@ -204,8 +224,11 @@ export function AssignDriverModal({
               <Input
                 placeholder="e.g. Munnar Resort"
                 {...formik.getFieldProps("dropLocation")}
-                className="h-9.5 text-xs"
+                className={inputCls("dropLocation", "h-9.5 text-xs")}
               />
+              {getFieldError("dropLocation") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("dropLocation")}</p>
+              )}
             </div>
           </div>
 
@@ -217,8 +240,11 @@ export function AssignDriverModal({
             <Input
               placeholder="e.g. Meet guests with name board outside Arrival Gate 2"
               {...formik.getFieldProps("notes")}
-              className="h-9.5 text-xs"
+              className={inputCls("notes", "h-9.5 text-xs")}
             />
+            {getFieldError("notes") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("notes")}</p>
+            )}
           </div>
 
           {/* Action Buttons */}

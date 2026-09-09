@@ -87,6 +87,51 @@ export default function NewEnquiryPage() {
   const [duplicateEnquiries, setDuplicateEnquiries] = React.useState<any[]>([]);
   const [checkingDuplicates, setCheckingDuplicates] = React.useState(false);
 
+  // Form state tracking for validation
+  const [touched, setTouched] = React.useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = React.useState(false);
+
+  const errors = React.useMemo(() => {
+    const errs: Record<string, string> = {};
+    if (customerMode === "existing") {
+      if (!selectedCustomerId) {
+        errs.selectedCustomerId = "Please select a customer.";
+      }
+    } else {
+      if (!newCustomerName.trim()) {
+        errs.newCustomerName = "Customer name is required.";
+      }
+      if (!newCustomerPhone.trim()) {
+        errs.newCustomerPhone = "Customer phone number is required.";
+      }
+    }
+
+    if (!destination.trim()) {
+      errs.destination = "Destination is required.";
+    }
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end < start) {
+        errs.endDate = "End date cannot be before start date.";
+      }
+    }
+
+    if (!adults || adults < 1) {
+      errs.adults = "At least 1 adult is required.";
+    }
+
+    return errs;
+  }, [customerMode, selectedCustomerId, newCustomerName, newCustomerPhone, destination, startDate, endDate, adults]);
+
+  const getFieldError = (field: string) => {
+    if ((touched[field] || submitted) && errors[field]) {
+      return errors[field];
+    }
+    return null;
+  };
+
   // Load real customers from PostgreSQL API
   React.useEffect(() => {
     async function loadCustomers() {
@@ -155,13 +200,13 @@ export default function NewEnquiryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
     }
 
-    if (!destination.trim()) {
-      toast.error("Destination is required.");
+    if (Object.keys(errors).length > 0) {
       return;
     }
 
@@ -171,15 +216,6 @@ export default function NewEnquiryPage() {
 
       // 1. If new customer mode, create customer first via real API
       if (customerMode === "new") {
-        if (!newCustomerName.trim()) {
-          toast.error("Customer name is required.");
-          return;
-        }
-        if (!newCustomerPhone.trim()) {
-          toast.error("Customer phone number is required.");
-          return;
-        }
-
         const custRes = await customerClient.createCustomer({
           name: newCustomerName.trim(),
           phone: newCustomerPhone.trim(),
@@ -250,7 +286,7 @@ export default function NewEnquiryPage() {
         />
 
         <div className="max-w-4xl mx-auto w-full">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} noValidate className="space-y-6">
             {/* 1. Customer Selection Card */}
             <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -297,29 +333,41 @@ export default function NewEnquiryPage() {
                       No customers found. Switch to Quick Add Customer to create one.
                     </div>
                   ) : (
-                    <Select
-                      value={selectedCustomerId}
-                      onValueChange={(val) => val && setSelectedCustomerId(val)}
-                    >
-                      <SelectTrigger className="h-10 text-xs bg-slate-50/50 border-slate-200 rounded-xl">
-                        <SelectValue placeholder="Choose existing client...">
-                          {(val: string | null) => {
-                            if (!val) return undefined;
-                            const c = customers.find((item) => item.id === val);
-                            return c
-                              ? `${c.name}${c.phone ? ` (${c.phone})` : ""}${c.email ? ` • ${c.email}` : ""}`
-                              : val;
-                          }}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-slate-200">
-                        {customers.map((c) => (
-                          <SelectItem key={c.id} value={c.id} className="text-xs">
-                            {c.name} ({c.phone}) {c.email ? `• ${c.email}` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <>
+                      <Select
+                        value={selectedCustomerId}
+                        onValueChange={(val) => {
+                          if (val) {
+                            setSelectedCustomerId(val);
+                            setTouched((prev) => ({ ...prev, selectedCustomerId: true }));
+                          }
+                        }}
+                      >
+                        <SelectTrigger className={`h-10 text-xs bg-slate-50/50 border-slate-200 rounded-xl ${getFieldError("selectedCustomerId") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}>
+                          <SelectValue placeholder="Choose existing client...">
+                            {(val: string | null) => {
+                              if (!val) return undefined;
+                              const c = customers.find((item) => item.id === val);
+                              return c
+                                ? `${c.name}${c.phone ? ` (${c.phone})` : ""}${c.email ? ` • ${c.email}` : ""}`
+                                : val;
+                            }}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-slate-200">
+                          {customers.map((c) => (
+                            <SelectItem key={c.id} value={c.id} className="text-xs">
+                              {c.name} ({c.phone}) {c.email ? `• ${c.email}` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {getFieldError("selectedCustomerId") && (
+                        <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                          {getFieldError("selectedCustomerId")}
+                        </p>
+                      )}
+                    </>
                   )}
 
                   {/* DUPLICATE WARNING BANNER */}
@@ -364,20 +412,30 @@ export default function NewEnquiryPage() {
                     <Input
                       value={newCustomerName}
                       onChange={(e) => setNewCustomerName(e.target.value)}
+                      onBlur={() => setTouched((prev) => ({ ...prev, newCustomerName: true }))}
                       placeholder="e.g. Ananya Sharma"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                      required={customerMode === "new"}
+                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${getFieldError("newCustomerName") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                     />
+                    {getFieldError("newCustomerName") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                        {getFieldError("newCustomerName")}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700">Phone Number *</label>
                     <Input
                       value={newCustomerPhone}
                       onChange={(e) => setNewCustomerPhone(e.target.value)}
+                      onBlur={() => setTouched((prev) => ({ ...prev, newCustomerPhone: true }))}
                       placeholder="+91 98765 43210"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                      required={customerMode === "new"}
+                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${getFieldError("newCustomerPhone") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                     />
+                    {getFieldError("newCustomerPhone") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                        {getFieldError("newCustomerPhone")}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700">Email Address (Optional)</label>
@@ -413,10 +471,15 @@ export default function NewEnquiryPage() {
                   <Input
                     value={destination}
                     onChange={(e) => setDestination(e.target.value)}
+                    onBlur={() => setTouched((prev) => ({ ...prev, destination: true }))}
                     placeholder="e.g. Kerala, Bali, Kashmir..."
-                    className="h-9.5 bg-slate-50/50 border-slate-200 text-xs font-semibold"
-                    required
+                    className={`h-9.5 bg-slate-50/50 border-slate-200 text-xs font-semibold ${getFieldError("destination") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
+                  {getFieldError("destination") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("destination")}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <label className="font-bold text-slate-700">Departure City / Origin</label>
@@ -436,6 +499,7 @@ export default function NewEnquiryPage() {
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
+                    onBlur={() => setTouched((prev) => ({ ...prev, startDate: true }))}
                     className="h-9.5 bg-slate-50/50 border-slate-200 text-xs"
                   />
                 </div>
@@ -445,8 +509,14 @@ export default function NewEnquiryPage() {
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="h-9.5 bg-slate-50/50 border-slate-200 text-xs"
+                    onBlur={() => setTouched((prev) => ({ ...prev, endDate: true }))}
+                    className={`h-9.5 bg-slate-50/50 border-slate-200 text-xs ${getFieldError("endDate") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
+                  {getFieldError("endDate") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("endDate")}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -465,10 +535,15 @@ export default function NewEnquiryPage() {
                     type="number"
                     min={1}
                     value={adults}
-                    onChange={(e) => setAdults(parseInt(e.target.value) || 1)}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs font-bold"
-                    required
+                    onChange={(e) => setAdults(parseInt(e.target.value) || 0)}
+                    onBlur={() => setTouched((prev) => ({ ...prev, adults: true }))}
+                    className={`h-9 bg-slate-50/50 border-slate-200 text-xs font-bold ${getFieldError("adults") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
+                  {getFieldError("adults") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("adults")}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <label className="font-bold text-slate-700">Children (2-11 yrs)</label>

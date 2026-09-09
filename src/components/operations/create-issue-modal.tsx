@@ -98,6 +98,17 @@ export function CreateIssueModal({
     },
   });
 
+  const getFieldError = (field: string) => {
+    const touched = formik.touched[field as keyof typeof formik.touched];
+    const error = formik.errors[field as keyof typeof formik.errors];
+    return touched && error ? (error as string) : undefined;
+  };
+
+  const inputCls = (field: string, base: string = "h-9.5 text-xs font-semibold") => {
+    const err = getFieldError(field);
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -160,9 +171,14 @@ export function CreateIssueModal({
               </label>
               <Select
                 value={formik.values.priority}
-                onValueChange={(val) => formik.setFieldValue("priority", val)}
+                onValueChange={(val) => {
+                  if (val) {
+                    formik.setFieldValue("priority", val);
+                    formik.setFieldTouched("priority", true);
+                  }
+                }}
               >
-                <SelectTrigger className="h-9.5 text-xs font-bold">
+                <SelectTrigger className={`h-9.5 text-xs font-bold ${getFieldError("priority") ? "border-red-500 focus:ring-red-500" : ""}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-slate-200">
@@ -180,6 +196,9 @@ export function CreateIssueModal({
                   </SelectItem>
                 </SelectContent>
               </Select>
+              {getFieldError("priority") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("priority")}</p>
+              )}
             </div>
 
             {/* Assigned To */}
@@ -190,8 +209,11 @@ export function CreateIssueModal({
               <Input
                 placeholder="e.g. Operations Manager"
                 {...formik.getFieldProps("assignedTo")}
-                className="h-9.5 text-xs font-medium"
+                className={inputCls("assignedTo", "h-9.5 text-xs font-medium")}
               />
+              {getFieldError("assignedTo") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("assignedTo")}</p>
+              )}
             </div>
           </div>
 
@@ -203,10 +225,10 @@ export function CreateIssueModal({
             <Input
               placeholder="e.g. Flight delayed by 2 hours / Hotel room upgrade requested"
               {...formik.getFieldProps("title")}
-              className="h-9.5 text-xs font-semibold"
+              className={inputCls("title")}
             />
-            {formik.touched.title && formik.errors.title && (
-              <p className="text-[11px] text-red-500">{formik.errors.title}</p>
+            {getFieldError("title") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("title")}</p>
             )}
           </div>
 
@@ -219,10 +241,10 @@ export function CreateIssueModal({
               rows={3}
               placeholder="Describe the operational issue, impact on guests, and actions being taken..."
               {...formik.getFieldProps("description")}
-              className="text-xs min-h-[80px]"
+              className={`text-xs min-h-[80px] ${getFieldError("description") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
-            {formik.touched.description && formik.errors.description && (
-              <p className="text-[11px] text-red-500">{formik.errors.description}</p>
+            {getFieldError("description") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("description")}</p>
             )}
           </div>
 
@@ -234,8 +256,11 @@ export function CreateIssueModal({
             <Input
               placeholder="e.g. Chauffeur / Guest WhatsApp / Front Desk"
               {...formik.getFieldProps("reportedBy")}
-              className="h-9.5 text-xs font-medium"
+              className={inputCls("reportedBy", "h-9.5 text-xs font-medium")}
             />
+            {getFieldError("reportedBy") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("reportedBy")}</p>
+            )}
           </div>
 
           {/* Action Buttons */}

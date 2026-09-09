@@ -84,6 +84,11 @@ export function AddPaymentModal({
       : undefined;
   };
 
+  const inputCls = (field: keyof typeof formik.values, base: string = "h-9.5 text-xs") => {
+    const err = fieldError(field);
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
       <div className="bg-white border border-slate-200/90 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
@@ -139,13 +144,11 @@ export function AddPaymentModal({
                   type="number"
                   placeholder="e.g. 20000"
                   {...formik.getFieldProps("amount")}
-                  className={`pl-9 h-9.5 text-xs font-semibold ${
-                    fieldError("amount") ? "border-rose-500" : ""
-                  }`}
+                  className={inputCls("amount", "pl-9 h-9.5 text-xs font-semibold")}
                 />
               </div>
               {fieldError("amount") && (
-                <p className="text-[11px] text-rose-500 font-medium">{fieldError("amount")}</p>
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("amount")}</p>
               )}
             </div>
 
@@ -159,9 +162,12 @@ export function AddPaymentModal({
                 <Input
                   type="date"
                   {...formik.getFieldProps("date")}
-                  className="pl-9 h-9.5 text-xs font-medium"
+                  className={inputCls("date", "pl-9 h-9.5 text-xs font-medium")}
                 />
               </div>
+              {fieldError("date") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("date")}</p>
+              )}
             </div>
           </div>
 
@@ -173,9 +179,14 @@ export function AddPaymentModal({
               </label>
               <Select
                 value={formik.values.method}
-                onValueChange={(val) => formik.setFieldValue("method", val)}
+                onValueChange={(val) => {
+                  if (val) {
+                    formik.setFieldValue("method", val);
+                    formik.setFieldTouched("method", true);
+                  }
+                }}
               >
-                <SelectTrigger className="h-9.5 text-xs font-medium">
+                <SelectTrigger className={`h-9.5 text-xs font-medium ${fieldError("method") ? "border-red-500 focus:ring-red-500" : ""}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-slate-200">
@@ -186,6 +197,9 @@ export function AddPaymentModal({
                   <SelectItem value="Other">Other Mode</SelectItem>
                 </SelectContent>
               </Select>
+              {fieldError("method") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("method")}</p>
+              )}
             </div>
 
             {/* Transaction ID */}
@@ -198,9 +212,12 @@ export function AddPaymentModal({
                 <Input
                   placeholder="e.g. UPI/2026/8812903"
                   {...formik.getFieldProps("transactionId")}
-                  className="pl-9 h-9.5 text-xs font-mono"
+                  className={inputCls("transactionId", "pl-9 h-9.5 text-xs font-mono")}
                 />
               </div>
+              {fieldError("transactionId") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("transactionId")}</p>
+              )}
             </div>
           </div>
 
@@ -211,8 +228,11 @@ export function AddPaymentModal({
               placeholder="e.g. Advance deposit for flight & hotel confirmation"
               rows={2}
               {...formik.getFieldProps("notes")}
-              className="text-xs min-h-[60px]"
+              className={`text-xs min-h-[60px] ${fieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
+            {fieldError("notes") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("notes")}</p>
+            )}
           </div>
 
           {/* Action Buttons */}

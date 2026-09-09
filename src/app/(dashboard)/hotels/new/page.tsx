@@ -159,6 +159,9 @@ export default function NewHotelPage() {
                     {...formik.getFieldProps("category")}
                     className={inputCls("category")}
                   />
+                  {getFieldError("category") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("category")}</p>
+                  )}
                 </div>
               </div>
 
@@ -173,6 +176,9 @@ export default function NewHotelPage() {
                     {...formik.getFieldProps("address")}
                     className={inputCls("address")}
                   />
+                  {getFieldError("address") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("address")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -182,6 +188,9 @@ export default function NewHotelPage() {
                     {...formik.getFieldProps("city")}
                     className={inputCls("city")}
                   />
+                  {getFieldError("city") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("city")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -191,6 +200,9 @@ export default function NewHotelPage() {
                     {...formik.getFieldProps("state")}
                     className={inputCls("state")}
                   />
+                  {getFieldError("state") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("state")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -200,6 +212,9 @@ export default function NewHotelPage() {
                     {...formik.getFieldProps("country")}
                     className={inputCls("country")}
                   />
+                  {getFieldError("country") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("country")}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -218,6 +233,9 @@ export default function NewHotelPage() {
                     {...formik.getFieldProps("phone")}
                     className={inputCls("phone")}
                   />
+                  {getFieldError("phone") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("phone")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -240,6 +258,9 @@ export default function NewHotelPage() {
                     {...formik.getFieldProps("website")}
                     className={inputCls("website")}
                   />
+                  {getFieldError("website") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("website")}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -251,8 +272,13 @@ export default function NewHotelPage() {
                 placeholder="Contract notes, point of contact, check-in policies, special instructions..."
                 rows={3}
                 {...formik.getFieldProps("notes")}
-                className="text-xs bg-slate-50/50 border-slate-200"
+                className={`text-xs bg-slate-50/50 border-slate-200 ${
+                  getFieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""
+                }`}
               />
+              {getFieldError("notes") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("notes")}</p>
+              )}
             </div>
 
             {/* Actions Panel */}

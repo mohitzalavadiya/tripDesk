@@ -59,6 +59,27 @@ export default function NewSupplierPage() {
   const [submitting, setSubmitting] = React.useState(false);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
 
+  const [touched, setTouched] = React.useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = React.useState(false);
+
+  const errors = React.useMemo(() => {
+    const errs: Record<string, string> = {};
+    if (!name.trim()) {
+      errs.name = "Supplier name is required.";
+    }
+    if (!type.trim()) {
+      errs.type = "Supplier category is required.";
+    }
+    return errs;
+  }, [name, type]);
+
+  const getFieldError = (field: string) => {
+    if ((touched[field] || submitted) && errors[field]) {
+      return errors[field];
+    }
+    return null;
+  };
+
   // Debounced duplicate detection
   React.useEffect(() => {
     if (!name.trim() || name.trim().length < 2) {
@@ -92,13 +113,13 @@ export default function NewSupplierPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
     }
 
-    if (!name.trim()) {
-      toast.error("Supplier name is required.");
+    if (errors.name || errors.type) {
       return;
     }
 
@@ -188,7 +209,7 @@ export default function NewSupplierPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} noValidate className="space-y-6">
             {/* 1. Identity & Business Type */}
             <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
               <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
@@ -202,16 +223,29 @@ export default function NewSupplierPage() {
                   <Input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
                     placeholder="e.g. WGH Hotels & Resorts"
-                    className="h-9.5 bg-slate-50/50 border-slate-200 font-semibold text-xs"
-                    required
+                    className={`h-9.5 bg-slate-50/50 border-slate-200 font-semibold text-xs ${getFieldError("name") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
+                  {getFieldError("name") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("name")}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
                   <label className="font-bold text-slate-700">Supplier Category / Service Type</label>
-                  <Select value={type} onValueChange={(val) => val && setType(val)}>
-                    <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
+                  <Select
+                    value={type}
+                    onValueChange={(val) => {
+                      if (val) {
+                        setType(val);
+                        setTouched((prev) => ({ ...prev, type: true }));
+                      }
+                    }}
+                  >
+                    <SelectTrigger className={`h-9.5 text-xs bg-slate-50/50 border-slate-200 ${getFieldError("type") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200">
