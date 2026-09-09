@@ -130,6 +130,17 @@ export default function HotelProfilePage() {
     },
   });
 
+  const getFieldError = (field: string) => {
+    const touched = editHotelFormik.touched[field as keyof typeof editHotelFormik.touched];
+    const error = editHotelFormik.errors[field as keyof typeof editHotelFormik.errors];
+    return touched && error ? (error as string) : undefined;
+  };
+
+  const inputCls = (field: string, base: string = "h-9 bg-slate-50/50 border-slate-200 text-xs") => {
+    const err = getFieldError(field);
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
+  };
+
   // Archive action
   const handleArchive = async () => {
     if (!confirm(`Are you sure you want to archive "${hotel?.name}"?`)) return;
@@ -325,17 +336,23 @@ export default function HotelProfilePage() {
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Hotel Name *</label>
                   <Input
                     {...editHotelFormik.getFieldProps("name")}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    className={inputCls("name")}
                     required
                   />
+                  {getFieldError("name") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("name")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Category</label>
                   <Input
                     {...editHotelFormik.getFieldProps("category")}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    className={inputCls("category")}
                   />
+                  {getFieldError("category") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("category")}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -343,15 +360,21 @@ export default function HotelProfilePage() {
                     <label className="text-[10px] font-bold text-slate-500 uppercase">City</label>
                     <Input
                       {...editHotelFormik.getFieldProps("city")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className={inputCls("city")}
                     />
+                    {getFieldError("city") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("city")}</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">State</label>
                     <Input
                       {...editHotelFormik.getFieldProps("state")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className={inputCls("state")}
                     />
+                    {getFieldError("state") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("state")}</p>
+                    )}
                   </div>
                 </div>
 
@@ -359,8 +382,11 @@ export default function HotelProfilePage() {
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Address</label>
                   <Input
                     {...editHotelFormik.getFieldProps("address")}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    className={inputCls("address")}
                   />
+                  {getFieldError("address") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("address")}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -368,16 +394,22 @@ export default function HotelProfilePage() {
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Phone</label>
                     <Input
                       {...editHotelFormik.getFieldProps("phone")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className={inputCls("phone")}
                     />
+                    {getFieldError("phone") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("phone")}</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Email</label>
                     <Input
                       type="email"
                       {...editHotelFormik.getFieldProps("email")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className={inputCls("email")}
                     />
+                    {getFieldError("email") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("email")}</p>
+                    )}
                   </div>
                 </div>
 
@@ -385,8 +417,11 @@ export default function HotelProfilePage() {
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Website</label>
                   <Input
                     {...editHotelFormik.getFieldProps("website")}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    className={inputCls("website")}
                   />
+                  {getFieldError("website") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("website")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -394,8 +429,13 @@ export default function HotelProfilePage() {
                   <Textarea
                     {...editHotelFormik.getFieldProps("notes")}
                     rows={3}
-                    className="bg-slate-50/50 border-slate-200 text-xs"
+                    className={`bg-slate-50/50 border-slate-200 text-xs ${
+                      getFieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""
+                    }`}
                   />
+                  {getFieldError("notes") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("notes")}</p>
+                  )}
                 </div>
               </div>
 

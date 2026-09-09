@@ -157,9 +157,14 @@ export default function NewActivityPage() {
                   <label className="text-xs font-bold text-slate-700">Inclusion Category</label>
                   <Select
                     value={formik.values.type}
-                    onValueChange={(val) => val && formik.setFieldValue("type", val)}
+                    onValueChange={(val) => {
+                      if (val) {
+                        formik.setFieldValue("type", val);
+                        formik.setFieldTouched("type", true);
+                      }
+                    }}
                   >
-                    <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
+                    <SelectTrigger className={`h-9.5 text-xs bg-slate-50/50 border-slate-200 ${getFieldError("type") ? "border-red-500 focus:ring-red-500" : ""}`}>
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -167,6 +172,9 @@ export default function NewActivityPage() {
                       <SelectItem value={ActivityType.OPTIONAL}>Optional / Add-on</SelectItem>
                     </SelectContent>
                   </Select>
+                  {getFieldError("type") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("type")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -176,6 +184,9 @@ export default function NewActivityPage() {
                     {...formik.getFieldProps("duration")}
                     className={inputCls("duration")}
                   />
+                  {getFieldError("duration") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("duration")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
@@ -185,6 +196,9 @@ export default function NewActivityPage() {
                     {...formik.getFieldProps("location")}
                     className={inputCls("location")}
                   />
+                  {getFieldError("location") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("location")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
@@ -193,8 +207,11 @@ export default function NewActivityPage() {
                     placeholder="Overview of the experience, inclusions, itinerary highlights..."
                     rows={3}
                     {...formik.getFieldProps("description")}
-                    className="text-xs bg-slate-50/50 border-slate-200"
+                    className={`text-xs bg-slate-50/50 border-slate-200 ${getFieldError("description") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                   />
+                  {getFieldError("description") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("description")}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -215,6 +232,9 @@ export default function NewActivityPage() {
                     {...formik.getFieldProps("adultPrice")}
                     className={inputCls("adultPrice")}
                   />
+                  {getFieldError("adultPrice") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("adultPrice")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -226,6 +246,9 @@ export default function NewActivityPage() {
                     {...formik.getFieldProps("childPrice")}
                     className={inputCls("childPrice")}
                   />
+                  {getFieldError("childPrice") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("childPrice")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -237,6 +260,9 @@ export default function NewActivityPage() {
                     {...formik.getFieldProps("price")}
                     className={inputCls("price")}
                   />
+                  {getFieldError("price") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("price")}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -248,8 +274,11 @@ export default function NewActivityPage() {
                 placeholder="Vendor terms, cancellation policy, timing recommendations..."
                 rows={3}
                 {...formik.getFieldProps("notes")}
-                className="text-xs bg-slate-50/50 border-slate-200"
+                className={`text-xs bg-slate-50/50 border-slate-200 ${getFieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
               />
+              {getFieldError("notes") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("notes")}</p>
+              )}
             </div>
 
             {/* Actions Panel */}

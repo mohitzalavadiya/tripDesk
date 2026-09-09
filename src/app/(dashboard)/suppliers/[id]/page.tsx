@@ -122,6 +122,26 @@ export default function SupplierDetailPage() {
   const [editNotes, setEditNotes] = React.useState("");
   const [editInternalNotes, setEditInternalNotes] = React.useState("");
   const [savingEdit, setSavingEdit] = React.useState(false);
+  const [editTouched, setEditTouched] = React.useState<Record<string, boolean>>({});
+  const [editSubmitted, setEditSubmitted] = React.useState(false);
+
+  const editErrors = React.useMemo(() => {
+    const errs: Record<string, string> = {};
+    if (!editName.trim()) {
+      errs.name = "Supplier name is required";
+    }
+    if (!editType.trim()) {
+      errs.type = "Supplier category type is required";
+    }
+    return errs;
+  }, [editName, editType]);
+
+  const getEditFieldError = (field: string) => {
+    if ((editTouched[field] || editSubmitted) && editErrors[field]) {
+      return editErrors[field];
+    }
+    return null;
+  };
 
   // Load supplier details
   const loadSupplier = React.useCallback(async () => {
@@ -166,6 +186,10 @@ export default function SupplierDetailPage() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setEditSubmitted(true);
+    if (Object.keys(editErrors).length > 0) {
+      return;
+    }
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
@@ -1033,7 +1057,7 @@ export default function SupplierDetailPage() {
         {/* ─── EDIT SUPPLIER MODAL ─── */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
-            <form onSubmit={handleEditSubmit}>
+            <form onSubmit={handleEditSubmit} noValidate>
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
                   <Edit2 className="h-4 w-4 text-indigo-600" />
@@ -1050,18 +1074,43 @@ export default function SupplierDetailPage() {
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Supplier Name *</label>
                     <Input
                       value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold"
-                      required
+                      onChange={(e) => {
+                        setEditName(e.target.value);
+                        if (!editTouched.name) setEditTouched((prev) => ({ ...prev, name: true }));
+                      }}
+                      onBlur={() => setEditTouched((prev) => ({ ...prev, name: true }))}
+                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold ${
+                        getEditFieldError("name")
+                          ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20"
+                          : ""
+                      }`}
                     />
+                    {getEditFieldError("name") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                        {getEditFieldError("name")}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Category Type</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Category Type *</label>
                     <Input
                       value={editType}
-                      onChange={(e) => setEditType(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      onChange={(e) => {
+                        setEditType(e.target.value);
+                        if (!editTouched.type) setEditTouched((prev) => ({ ...prev, type: true }));
+                      }}
+                      onBlur={() => setEditTouched((prev) => ({ ...prev, type: true }))}
+                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${
+                        getEditFieldError("type")
+                          ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20"
+                          : ""
+                      }`}
                     />
+                    {getEditFieldError("type") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                        {getEditFieldError("type")}
+                      </p>
+                    )}
                   </div>
                 </div>
 

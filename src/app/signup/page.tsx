@@ -18,10 +18,14 @@ import {
   AlertCircle,
   Sparkles,
   ArrowRight,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export default function SignupPage() {
   const [state, formAction, isPending] = useActionState(signupAgencyOwnerAction, {});
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-4 sm:p-8 text-slate-900">
@@ -187,26 +191,54 @@ export default function SignupPage() {
                 <label className="font-bold text-slate-700">
                   Password <span className="text-red-500">*</span>
                 </label>
-                <Input
-                  type="password"
-                  name="password"
-                  placeholder="Minimum 6 characters"
-                  required
-                  className="h-9 text-xs"
-                />
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    placeholder="Minimum 6 characters"
+                    required
+                    className="pr-9 h-9 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors cursor-pointer"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-1">
                 <label className="font-bold text-slate-700">
                   Confirm Password <span className="text-red-500">*</span>
                 </label>
-                <Input
-                  type="password"
-                  name="confirmPassword"
-                  placeholder="Confirm password"
-                  required
-                  className="h-9 text-xs"
-                />
+                <div className="relative">
+                  <Input
+                    type={showConfirmPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    placeholder="Confirm password"
+                    required
+                    className="pr-9 h-9 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors cursor-pointer"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

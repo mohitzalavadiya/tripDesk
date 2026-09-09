@@ -170,7 +170,9 @@ export default function NewVehiclePage() {
                     value={formik.values.type}
                     onValueChange={(val) => formik.setFieldValue("type", val)}
                   >
-                    <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
+                    <SelectTrigger className={`h-9.5 text-xs bg-slate-50/50 border-slate-200 ${
+                      getFieldError("type") ? "border-red-500 focus:ring-red-500" : ""
+                    }`}>
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -184,6 +186,9 @@ export default function NewVehiclePage() {
                       <SelectItem value="Luxury">Luxury</SelectItem>
                     </SelectContent>
                   </Select>
+                  {getFieldError("type") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("type")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -210,6 +215,9 @@ export default function NewVehiclePage() {
                     {...formik.getFieldProps("registrationNumber")}
                     className={inputCls("registrationNumber")}
                   />
+                  {getFieldError("registrationNumber") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("registrationNumber")}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -228,6 +236,9 @@ export default function NewVehiclePage() {
                     {...formik.getFieldProps("driverName")}
                     className={inputCls("driverName")}
                   />
+                  {getFieldError("driverName") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("driverName")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -237,6 +248,9 @@ export default function NewVehiclePage() {
                     {...formik.getFieldProps("driverPhone")}
                     className={inputCls("driverPhone")}
                   />
+                  {getFieldError("driverPhone") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("driverPhone")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -245,7 +259,9 @@ export default function NewVehiclePage() {
                     value={formik.values.pricingType}
                     onValueChange={(val) => formik.setFieldValue("pricingType", val)}
                   >
-                    <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
+                    <SelectTrigger className={`h-9.5 text-xs bg-slate-50/50 border-slate-200 ${
+                      getFieldError("pricingType") ? "border-red-500 focus:ring-red-500" : ""
+                    }`}>
                       <SelectValue placeholder="Select pricing model" />
                     </SelectTrigger>
                     <SelectContent>
@@ -255,6 +271,9 @@ export default function NewVehiclePage() {
                       <SelectItem value="INCLUDED">Included in Package</SelectItem>
                     </SelectContent>
                   </Select>
+                  {getFieldError("pricingType") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("pricingType")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -266,6 +285,9 @@ export default function NewVehiclePage() {
                     {...formik.getFieldProps("ratePerKm")}
                     className={inputCls("ratePerKm")}
                   />
+                  {getFieldError("ratePerKm") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("ratePerKm")}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -277,8 +299,13 @@ export default function NewVehiclePage() {
                 placeholder="Vehicle condition, permit areas, fuel policy, luggage guidance..."
                 rows={3}
                 {...formik.getFieldProps("notes")}
-                className="text-xs bg-slate-50/50 border-slate-200"
+                className={`text-xs bg-slate-50/50 border-slate-200 ${
+                  getFieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""
+                }`}
               />
+              {getFieldError("notes") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("notes")}</p>
+              )}
             </div>
 
             {/* Actions Panel */}

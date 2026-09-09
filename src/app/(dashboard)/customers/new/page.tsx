@@ -61,6 +61,27 @@ export default function NewCustomerPage() {
   const [duplicateMatches, setDuplicateMatches] = React.useState<Customer[]>([]);
   const [checkingDuplicates, setCheckingDuplicates] = React.useState(false);
 
+  const [touched, setTouched] = React.useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = React.useState(false);
+
+  const errors = React.useMemo(() => {
+    const errs: Record<string, string> = {};
+    if (!name.trim()) {
+      errs.name = "Customer name is required.";
+    }
+    if (!phone.trim()) {
+      errs.phone = "Phone number is required.";
+    }
+    return errs;
+  }, [name, phone]);
+
+  const getFieldError = (field: string) => {
+    if ((touched[field] || submitted) && errors[field]) {
+      return errors[field];
+    }
+    return null;
+  };
+
   // Debounced duplicate checker
   React.useEffect(() => {
     if (!phone.trim() && !email.trim()) {
@@ -91,17 +112,13 @@ export default function NewCustomerPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
     }
 
-    if (!name.trim()) {
-      toast.error("Customer name is required.");
-      return;
-    }
-    if (!phone.trim()) {
-      toast.error("Phone number is required.");
+    if (errors.name || errors.phone) {
       return;
     }
 
@@ -182,7 +199,7 @@ export default function NewCustomerPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} noValidate className="space-y-6">
             {/* 1. Identity & Contact */}
             <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
               <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
@@ -196,10 +213,15 @@ export default function NewCustomerPage() {
                   <Input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
                     placeholder="e.g. Rajesh Kumar"
-                    className="h-9.5 bg-slate-50/50 border-slate-200 font-semibold text-xs"
-                    required
+                    className={`h-9.5 bg-slate-50/50 border-slate-200 font-semibold text-xs ${getFieldError("name") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
+                  {getFieldError("name") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("name")}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -207,10 +229,15 @@ export default function NewCustomerPage() {
                   <Input
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
+                    onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
                     placeholder="+91 98765 43210"
-                    className="h-9.5 bg-slate-50/50 border-slate-200 font-semibold text-xs"
-                    required
+                    className={`h-9.5 bg-slate-50/50 border-slate-200 font-semibold text-xs ${getFieldError("phone") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
+                  {getFieldError("phone") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("phone")}
+                    </p>
+                  )}
                 </div>
               </div>
 

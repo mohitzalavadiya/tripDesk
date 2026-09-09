@@ -139,6 +139,17 @@ export function HotelConfirmationDialog({
     },
   });
 
+  const getFieldError = (field: string) => {
+    const touched = formik.touched[field as keyof typeof formik.touched];
+    const error = formik.errors[field as keyof typeof formik.errors];
+    return touched && error ? (error as string) : undefined;
+  };
+
+  const inputCls = (field: string, base: string = "h-9.5 text-xs") => {
+    const err = getFieldError(field);
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
+  };
+
   if (!isOpen || !hotelConfirmation) return null;
 
   return (
@@ -250,10 +261,10 @@ export function HotelConfirmationDialog({
               <Input
                 placeholder="e.g. HTL-CONF-98124 / TAJ-RES-8821"
                 {...formik.getFieldProps("confirmationNumber")}
-                className="h-9.5 text-xs font-mono font-bold uppercase tracking-wider"
+                className={inputCls("confirmationNumber", "h-9.5 text-xs font-mono font-bold uppercase tracking-wider")}
               />
-              {formik.touched.confirmationNumber && formik.errors.confirmationNumber && (
-                <p className="text-[11px] text-red-500">{formik.errors.confirmationNumber}</p>
+              {getFieldError("confirmationNumber") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("confirmationNumber")}</p>
               )}
             </div>
           )}
@@ -266,8 +277,11 @@ export function HotelConfirmationDialog({
                 <Input
                   placeholder="e.g. Deluxe Lake View Room (1 Room)"
                   {...formik.getFieldProps("roomDetails")}
-                  className="h-9.5 text-xs"
+                  className={inputCls("roomDetails")}
                 />
+                {getFieldError("roomDetails") && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("roomDetails")}</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -275,8 +289,11 @@ export function HotelConfirmationDialog({
                 <Input
                   placeholder="e.g. CP (Breakfast) / MAP (Breakfast + Dinner)"
                   {...formik.getFieldProps("mealPlan")}
-                  className="h-9.5 text-xs"
+                  className={inputCls("mealPlan")}
                 />
+                {getFieldError("mealPlan") && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("mealPlan")}</p>
+                )}
               </div>
             </div>
           )}
@@ -300,10 +317,10 @@ export function HotelConfirmationDialog({
                   : "Add any special requests, early check-in notes, or voucher details..."
               }
               {...formik.getFieldProps("supplierNotes")}
-              className="text-xs min-h-[75px]"
+              className={`text-xs min-h-[75px] ${getFieldError("supplierNotes") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
-            {formik.touched.supplierNotes && formik.errors.supplierNotes && (
-              <p className="text-[11px] text-red-500">{formik.errors.supplierNotes}</p>
+            {getFieldError("supplierNotes") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("supplierNotes")}</p>
             )}
           </div>
 

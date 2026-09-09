@@ -86,6 +86,17 @@ export function ReportDelayModal({
     },
   });
 
+  const getFieldError = (field: string) => {
+    const touched = formik.touched[field as keyof typeof formik.touched];
+    const error = formik.errors[field as keyof typeof formik.errors];
+    return touched && error ? (error as string) : undefined;
+  };
+
+  const inputCls = (field: string, base: string = "h-9.5 text-xs font-semibold") => {
+    const err = getFieldError(field);
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
+  };
+
   if (!isOpen || !dispatch) return null;
 
   return (
@@ -134,10 +145,10 @@ export function ReportDelayModal({
             <Input
               placeholder="e.g. 11:15 AM (Delayed by 25 mins)"
               {...formik.getFieldProps("expectedArrivalTime")}
-              className="h-9.5 text-xs font-semibold"
+              className={inputCls("expectedArrivalTime")}
             />
-            {formik.touched.expectedArrivalTime && formik.errors.expectedArrivalTime && (
-              <p className="text-[11px] text-red-500">{formik.errors.expectedArrivalTime}</p>
+            {getFieldError("expectedArrivalTime") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("expectedArrivalTime")}</p>
             )}
           </div>
 
@@ -149,10 +160,10 @@ export function ReportDelayModal({
               rows={3}
               placeholder="e.g. Heavy highway jam at Aluva bridge due to rain; driver is 6 km away"
               {...formik.getFieldProps("delayReason")}
-              className="text-xs min-h-[70px]"
+              className={`text-xs min-h-[70px] ${getFieldError("delayReason") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
-            {formik.touched.delayReason && formik.errors.delayReason && (
-              <p className="text-[11px] text-red-500">{formik.errors.delayReason}</p>
+            {getFieldError("delayReason") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("delayReason")}</p>
             )}
           </div>
 

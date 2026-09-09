@@ -131,6 +131,17 @@ export default function ActivityProfilePage() {
     },
   });
 
+  const getFieldError = (field: string) => {
+    const touched = editActivityFormik.touched[field as keyof typeof editActivityFormik.touched];
+    const error = editActivityFormik.errors[field as keyof typeof editActivityFormik.errors];
+    return touched && error ? (error as string) : undefined;
+  };
+
+  const inputCls = (field: string, base: string = "h-9 bg-slate-50/50 border-slate-200 text-xs") => {
+    const err = getFieldError(field);
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
+  };
+
   // Archive action
   const handleArchive = async () => {
     if (!confirm(`Are you sure you want to archive "${activity?.name}"?`)) return;
@@ -322,19 +333,26 @@ export default function ActivityProfilePage() {
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Activity Name *</label>
                   <Input
                     {...editActivityFormik.getFieldProps("name")}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    required
+                    className={inputCls("name")}
                   />
+                  {getFieldError("name") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("name")}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Inclusion Type *</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Inclusion Type</label>
                     <Select
                       value={editActivityFormik.values.type}
-                      onValueChange={(val) => val && editActivityFormik.setFieldValue("type", val)}
+                      onValueChange={(val) => {
+                        if (val) {
+                          editActivityFormik.setFieldValue("type", val);
+                          editActivityFormik.setFieldTouched("type", true);
+                        }
+                      }}
                     >
-                      <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
+                      <SelectTrigger className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${getFieldError("type") ? "border-red-500 focus:ring-red-500" : ""}`}>
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -342,13 +360,19 @@ export default function ActivityProfilePage() {
                         <SelectItem value={ActivityType.OPTIONAL}>Optional / Add-on</SelectItem>
                       </SelectContent>
                     </Select>
+                    {getFieldError("type") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("type")}</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Duration</label>
                     <Input
                       {...editActivityFormik.getFieldProps("duration")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className={inputCls("duration")}
                     />
+                    {getFieldError("duration") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("duration")}</p>
+                    )}
                   </div>
                 </div>
 
@@ -356,8 +380,11 @@ export default function ActivityProfilePage() {
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Location</label>
                   <Input
                     {...editActivityFormik.getFieldProps("location")}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    className={inputCls("location")}
                   />
+                  {getFieldError("location") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("location")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -365,8 +392,11 @@ export default function ActivityProfilePage() {
                   <Textarea
                     {...editActivityFormik.getFieldProps("description")}
                     rows={2}
-                    className="bg-slate-50/50 border-slate-200 text-xs"
+                    className={`bg-slate-50/50 border-slate-200 text-xs ${getFieldError("description") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                   />
+                  {getFieldError("description") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("description")}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
@@ -376,8 +406,11 @@ export default function ActivityProfilePage() {
                       type="number"
                       step="0.01"
                       {...editActivityFormik.getFieldProps("adultPrice")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className={inputCls("adultPrice")}
                     />
+                    {getFieldError("adultPrice") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("adultPrice")}</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Child Price (₹)</label>
@@ -385,8 +418,11 @@ export default function ActivityProfilePage() {
                       type="number"
                       step="0.01"
                       {...editActivityFormik.getFieldProps("childPrice")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className={inputCls("childPrice")}
                     />
+                    {getFieldError("childPrice") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("childPrice")}</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Flat Price (₹)</label>
@@ -394,8 +430,11 @@ export default function ActivityProfilePage() {
                       type="number"
                       step="0.01"
                       {...editActivityFormik.getFieldProps("price")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className={inputCls("price")}
                     />
+                    {getFieldError("price") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("price")}</p>
+                    )}
                   </div>
                 </div>
 
@@ -404,8 +443,11 @@ export default function ActivityProfilePage() {
                   <Textarea
                     {...editActivityFormik.getFieldProps("notes")}
                     rows={2}
-                    className="bg-slate-50/50 border-slate-200 text-xs"
+                    className={`bg-slate-50/50 border-slate-200 text-xs ${getFieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                   />
+                  {getFieldError("notes") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("notes")}</p>
+                  )}
                 </div>
               </div>
 

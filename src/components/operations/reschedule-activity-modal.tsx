@@ -71,6 +71,17 @@ export function RescheduleActivityModal({
     },
   });
 
+  const getFieldError = (field: string) => {
+    const touched = formik.touched[field as keyof typeof formik.touched];
+    const error = formik.errors[field as keyof typeof formik.errors];
+    return touched && error ? (error as string) : undefined;
+  };
+
+  const inputCls = (field: string, base: string = "h-9.5 text-xs font-mono font-bold") => {
+    const err = getFieldError(field);
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
+  };
+
   if (!isOpen || !activityConfirmation) return null;
 
   return (
@@ -106,16 +117,22 @@ export function RescheduleActivityModal({
               <Input
                 placeholder="e.g. ACT-CONF-9812"
                 {...formik.getFieldProps("confirmationNumber")}
-                className="h-9.5 text-xs font-mono font-bold"
+                className={inputCls("confirmationNumber")}
               />
+              {getFieldError("confirmationNumber") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("confirmationNumber")}</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">Ticket / Pass #</label>
               <Input
                 placeholder="e.g. TKT-2026-0012"
                 {...formik.getFieldProps("ticketNumber")}
-                className="h-9.5 text-xs font-mono font-bold"
+                className={inputCls("ticketNumber")}
               />
+              {getFieldError("ticketNumber") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("ticketNumber")}</p>
+              )}
             </div>
           </div>
 
@@ -127,10 +144,10 @@ export function RescheduleActivityModal({
               rows={3}
               placeholder="e.g. Moved from 10:00 AM to 03:30 PM slot with tour guide approval..."
               {...formik.getFieldProps("supplierNotes")}
-              className="text-xs min-h-[80px]"
+              className={`text-xs min-h-[80px] ${getFieldError("supplierNotes") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
-            {formik.touched.supplierNotes && formik.errors.supplierNotes && (
-              <p className="text-[11px] text-red-500">{formik.errors.supplierNotes}</p>
+            {getFieldError("supplierNotes") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("supplierNotes")}</p>
             )}
           </div>
 
