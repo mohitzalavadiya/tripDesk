@@ -1,13 +1,13 @@
-show error in every form: like i find in some page missing formik error yet like customers/new. so i want to validation formik error in everypage same as trips/new
+show error in every form: like i find in some page missing formik error yet like customers/new. so i want to validation formik error in everypage same as trips/new  --- Done
+
+page scroll issue: when i scroll any page and then i redirect any other page in this page new page also already have scroll -- Done
+
+Password icon feature : in every password field i want one eye icon for hide and show password --- Done
+
+Excel import and sample download in Hotel and rate sheet : we can add data within excel import also and also sample download from excel format. only those format is applicable. we can discuss for this point --- Done
+
 
 add scroll in table : when lots of data in table in this case add scroll in table not in whole page
-
-Password icon feature : in every password field i want one eye icon for hide and show password
-
-Excel import and sample download in Hotel and rate sheet : we can add data within excel import also and also sample download from excel format. only those format is applicable. we can discuss for this point
-
-
-page scroll issue: when i scroll any page and then i redirect any other page in this page new page also already have scroll
 
 in database i can show password : in database table i want to show password every angency : need to dicuss
 
@@ -27,3 +27,5 @@ error msg change -->
 
 
 when we Archive hotel that time i got localhost alert
+compalate QA. check no static data anywhere
+responsive 320 screen

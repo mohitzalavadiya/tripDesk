@@ -42,6 +42,7 @@ import {
   Layers,
   Sparkles,
   Send,
+  Receipt,
 } from "lucide-react";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
@@ -109,6 +110,28 @@ export default function BookingDetailPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [generatingDocs, setGeneratingDocs] = React.useState(false);
+  const [creatingInvoice, setCreatingInvoice] = React.useState(false);
+
+  const handleOpenInvoice = async () => {
+    setCreatingInvoice(true);
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error?.message || json.message || "Failed to open invoice.");
+      }
+      const inv = json.data || json;
+      router.push(`/invoices/${inv.id}`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to open invoice.");
+    } finally {
+      setCreatingInvoice(false);
+    }
+  };
 
   // Add Payment Modal State
   const [isAddPaymentOpen, setIsAddPaymentOpen] = React.useState(false);
@@ -437,6 +460,23 @@ export default function BookingDetailPage() {
               >
                 <FileText className="h-3.5 w-3.5 mr-1 text-slate-400" />
                 Proposal View
+              </Button>
+            )}
+
+            {booking.status === BookingStatus.CONFIRMED && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenInvoice}
+                disabled={creatingInvoice}
+                className="bg-slate-900 text-white hover:bg-slate-800 border-slate-900 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer gap-1.5"
+              >
+                {creatingInvoice ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Receipt className="h-3.5 w-3.5" />
+                )}
+                Customer Invoice
               </Button>
             )}
 

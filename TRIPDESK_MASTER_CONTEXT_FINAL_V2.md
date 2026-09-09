@@ -7198,5 +7198,169 @@ A comprehensive, independent QA verification was conducted on the completed **DE
 **Current Approved Baseline:** **DEV-03 (Excel Import Foundation, Hotel & Rate Import, Hotel Code) QA COMPLETE & CLOSED**  
 **Next Execution Phase:** **DEV-04 Invoice**
 
+---
+
+# 83. DEV-04A INVOICE DECISION & COMPATIBILITY AUDIT — COMPLETE RECORD
+
+**Phase:** DEV-04A — Invoice Decision & Compatibility Audit  
+**Date:** September 9, 2026  
+**Status:** COMPLETE & APPROVED  
+**Verdict:** **READY FOR DEV-04B** (Zero Blocking Architecture Conflicts)  
+**Deliverable Report:** `DEV-04A_INVOICE_COMPATIBILITY_AUDIT_REPORT.md`
+
+---
+
+## 83.1 Audit Scope & Methodology
+A comprehensive, read-only architectural and compatibility audit was conducted across the existing TripDesk codebase (Next.js 16, React 19, Prisma 7, PostgreSQL, Supabase Auth, PDFKit, and existing service modules) against the finalized **Invoice V1 Business Decisions (#1 through #37)**.
+
+Zero schema changes, zero migrations, and zero production code modifications were made during this audit.
+
+---
+
+## 83.2 Key Findings Summary
+
+1. **Architecture Alignment (100% Compatible):**
+   - The multi-tenant isolation pattern (`requireReadAccess()`, `requireWriteAccess()`), Prisma Decimal handling, server-side transaction management (`prisma.$transaction()`), and reusable PDFKit engine are completely ready to support Invoice V1 without architectural refactoring.
+2. **Booking Integration:**
+   - Confirmed bookings (`BookingStatus.CONFIRMED`) hold all necessary financial, customer, package, and agency references to seed independent, immutable invoice drafts.
+3. **Payment Model Evolution:**
+   - The existing `Payment` model (currently attached directly to `Booking`) will safely evolve in DEV-04B to attach to `Invoice` (`invoiceId String`), support the `VOIDED` state machine transition with mandatory reason tracking, and calculate balances strictly against active payments.
+4. **Sequential Numbering & Concurrency:**
+   - An `InvoiceSequence` table with transactional row updates will guarantee collision-free, gapless `INV-0001`+ numbering per agency upon invoice issuance.
+5. **Decisions Matrix Evaluation (37 Total):**
+   - **Compatible (No Changes Needed):** 13 Decisions (#2, #5, #9, #17, #18, #19, #20, #21, #22, #23, #26, #30, #37)
+   - **New Implementation Required:** 21 Decisions (#1, #3, #6, #7, #8, #10, #11, #12, #14, #15, #16, #24, #25, #27, #28, #29, #31, #32, #33, #34, #35, #36)
+   - **Change / Evolution Required:** 3 Decisions (#4: Relink Payment to Invoice, #13: Add Payment Void Flow, #1: Booking payment total sync)
+   - **Conflicts / Open Blockers:** **0 Conflicts**
+
+---
+
+## 83.3 Readiness for DEV-04B
+- **Verdict:** **READY FOR DEV-04B**
+- **Recommended DEV-04B Implementation Stages:**
+  1. **Stage 1 (Schema & DB Migration):** Add `InvoiceStatus`, `DiscountType`, `Invoice`, `InvoiceItem`, `InvoiceSequence` models; add `invoiceId` and `VOIDED` status to `Payment`.
+  2. **Stage 2 (Backend Services & Numbering):** Implement `invoice-service.ts`, `invoice-sequence-service.ts`, and evolve `payment-service.ts`.
+  3. **Stage 3 (PDFKit Invoice Engine):** Implement `invoice-pdf-service.ts` with watermarks (`DRAFT`, `CANCELLED`) and active payment history.
+  4. **Stage 4 (API Routes & Security):** Implement `/api/invoices`, `/api/invoices/[id]`, `/api/invoices/[id]/issue`, `/api/invoices/[id]/payments`, `/api/invoices/[id]/cancel`, `/api/invoices/[id]/pdf`.
+  5. **Stage 5 (Frontend UI & Navigation):** Implement `/invoices` list, `/invoices/[id]` detail/editor, payment modal, cancellation modal, and navigation links.
+  6. **Stage 6 (QA & Verification):** Automated test suite covering lifecycle, concurrency, voiding, balance calculation, and PDF output.
+
+---
+
+# 84. DEV-04B INVOICE V1 IMPLEMENTATION — COMPLETE RECORD
+
+**Phase:** DEV-04B — Invoice V1 Implementation  
+**Date:** September 9, 2026  
+**Status:** COMPLETE & APPROVED  
+**Verdict:** **DEV-04B COMPLETE** (23/23 Tests Passed, Clean Build)  
+**Deliverable Report:** `DEV-04B_INVOICE_IMPLEMENTATION_REPORT.md`
+
+---
+
+## 84.1 Implementation Scope & Summary
+DEV-04B delivered the complete, production-grade Customer Invoice V1 subsystem, adhering strictly to the 37 finalized business decisions, multi-tenant isolation, server-side authorization, and immutable financial snapshot patterns.
+
+### Key Implemented Components:
+1. **Prisma Schema Additions (`prisma/schema.prisma`):**
+   - Enums: `InvoiceStatus` (`DRAFT`, `ISSUED`, `PARTIALLY_PAID`, `PAID`, `CANCELLED`), `DiscountType` (`FIXED`, `PERCENTAGE`), and updated `PaymentStatus` with `VOIDED`.
+   - Models: `Invoice`, `InvoiceItem`, `InvoiceSequence`.
+   - Evolved `Payment`: added `invoiceId String?`, `voidReason`, `voidedAt`, `voidedBy`, and `@@index([invoiceId])`.
+2. **Backend Services (`src/lib/services/`):**
+   - `invoice-sequence-service.ts`: Atomic per-agency sequence generation (`INV-0001`+).
+   - `invoice-service.ts`: Full lifecycle operations (`createDraftInvoice`, `getInvoice`, `listInvoices`, `updateDraftInvoice`, `issueInvoice`, `deleteDraftInvoice`, `cancelInvoice`, `createReplacementInvoice`, `getInvoiceSummary`).
+   - `payment-service.ts`: Added `recordInvoicePayment` and `voidPayment` with status/balance synchronization.
+   - `invoice-pdf-service.ts`: PDFKit document generator with watermarks (`DRAFT`, `CANCELLED`) and active payment history.
+3. **API Endpoints (`src/app/api/invoices/`):**
+   - `GET /api/invoices` & `POST /api/invoices`
+   - `GET /api/invoices/summary`
+   - `GET /api/invoices/[id]`, `PATCH /api/invoices/[id]`, `DELETE /api/invoices/[id]`
+   - `POST /api/invoices/[id]/issue`
+   - `POST /api/invoices/[id]/cancel`
+   - `POST /api/invoices/[id]/replacement`
+   - `POST /api/invoices/[id]/payments`
+   - `POST /api/invoices/[id]/payments/[paymentId]/void`
+   - `GET /api/invoices/[id]/pdf`
+4. **Frontend Workspaces & UI:**
+   - Added `Invoices` to agency navigation (`src/lib/navigation.ts`).
+   - `/invoices`: List page with summary metrics cards, search, status filters, overdue toggle, and pagination.
+   - `/invoices/[id]`: Dual-mode workspace (Interactive Draft Editor & Immutable Details Viewer).
+   - Action Modals: `RecordPaymentModal`, `VoidPaymentModal`, `CancelInvoiceModal`.
+   - Booking Integration: "Customer Invoice" action button on `/bookings/[id]`.
+
+---
+
+## 84.2 Automated Verification & QA Results
+- **Automated Integration Test Suite (`scratch/test-dev04-invoice.ts`):** **23/23 tests passed (100%)**.
+  - Verified draft creation, quotation item mapping, eligibility rejection (DRAFT bookings), single active invoice constraint, draft editing, fixed/percentage discounts, draft deletion, sequential numbering per agency (`INV-0001`+), cross-tenant sequence isolation, immutability on issue, partial/full payments, overpayment rejection, reason-based payment voiding, cancellation, replacement invoice generation, dynamic overdue calculation, PDF generation, and IDOR protection.
+- **Regression Test Suite (`scratch/test-dev03-excel.ts`):** **23/23 tests passed (100%)**.
+- **TypeScript Compilation (`npx tsc --noEmit`):** **PASS (0 errors across entire workspace)**.
+- **Production Build (`npm run build`):** **PASS (Exit code 0, 190+ API routes and 38+ pages compiled cleanly)**.
+
+---
+
+# 85. DEV-04 QA INVOICE V1 — COMPREHENSIVE QA & REGRESSION AUDIT RECORD
+
+**Phase:** DEV-04 QA — Customer Invoice V1  
+**Date:** September 9, 2026  
+**Status:** COMPLETE & QA APPROVED  
+**Final QA Verdict:** **PASS (100% Verified, 0 Blocking Defects)**  
+**QA Deliverable:** Full QA Audit Report & 60-Test Verification Matrix
+
+---
+
+## 85.1 QA Execution Summary & Results
+A comprehensive, read-only QA audit was conducted on the Customer Invoice V1 implementation across schema integrity, lifecycle operations, immutable snapshot behavior, sequential numbering, concurrency safety, payments, payment voiding, cancellation, replacement, overdue calculation, PDFKit document generation, and multi-tenant security.
+
+### Test Suites Executed:
+1. **DEV-04 Complete Matrix (`scratch/test-dev04-complete-matrix.ts`):** **60/60 PASSED (100%)**
+   - Business Lifecycle (T01–T22): 22/22 Passed
+   - Payment & Voiding (T23–T34): 12/12 Passed
+   - Cancellation & Replacement (T35–T43): 9/9 Passed
+   - Overdue & PDF Snapshots (T44–T51): 8/8 Passed
+   - Multi-Tenant Isolation & Concurrency (T52–T57): 6/6 Passed
+   - Regressions (T58–T60): 3/3 Passed
+2. **DEV-03 Excel Import Regression Suite (`scratch/test-dev03-excel.ts`):** **23/23 PASSED (100%)**
+3. **TypeScript Compilation (`npx tsc --noEmit`):** **PASS (0 errors)**
+4. **Production Build (`npm run build`):** **PASS (Exit code 0, 190+ API routes and 38+ pages compiled cleanly)**
+
+---
+
+## 85.2 Decision #1–#37 Compliance Audit
+All 37 finalized business decisions for Customer Invoice V1 were verified:
+- **Decision #1 (Relationship):** Confirmed `Booking → Invoice → Payments` relationship. Exactly 1 active invoice per booking; cancelled historical invoices preserved.
+- **Decision #2 (Creation):** Manual creation only by `AGENCY_OWNER`. Only `BookingStatus.CONFIRMED` eligible.
+- **Decision #3 (Lifecycle):** Strict transitions (`DRAFT → ISSUED → PARTIALLY_PAID → PAID`). `ISSUED` and `PARTIALLY_PAID` can transition to `CANCELLED`. `PAID` cannot be cancelled.
+- **Decision #4 & #20 (Payments):** All new customer payments belong to an `Invoice` via `invoiceId`. Historical booking payments without `invoiceId` remain 100% backward-compatible.
+- **Decision #5 & #32 (Access Boundary):** Internal TripDesk + PDF download only. Zero public invoice URLs, portals, or pay-now gateways.
+- **Decision #6 & #14 (Status & Overdue):** Stored statuses strictly match enum; overdue is calculated dynamically (`balanceDue > 0 && today > dueDate`) without database cron.
+- **Decision #7 & #15-#16 (Numbering & Concurrency):** Per-agency sequential numbering (`INV-0001`+), concurrency-safe transaction increments, numbers allocated only on issue; cancelled numbers permanently consumed.
+- **Decision #8 & #29 (Snapshots & Immutability):** Independent Customer, Booking, Agency, and Financial snapshots copied upon draft creation; strictly immutable after issue.
+- **Decision #9 (Due Date):** Required before issue, must be `>= invoiceDate`, immutable after issue.
+- **Decision #10 (Line Items):** Server-calculated (`Quantity × Rate`), editable in draft, immutable after issue.
+- **Decision #11 (Discount):** Invoice-level `FIXED` or `PERCENTAGE`, non-negative total, server-calculated.
+- **Decision #12 (Currency):** Strict `INR` (`₹`) only; no multi-currency or foreign exchange.
+- **Decision #21, #22, #24 (Payment Immutability & Void):** Payment records immutable; voiding requires mandatory reason, marks `VOIDED`, and recalculates balance/status. Overpayments and future dates rejected.
+- **Decision #27 & #28 (Cancellation & Replacement):** Cancellation requires reason; replacement creates a new Draft with a fresh ID and new sequential number upon issue.
+- **Decision #30 & #31 (PDF & Watermarks):** PDFKit generator with snapshot data, `DRAFT — NOT AN ISSUED INVOICE` / `CANCELLED` watermarks, internal notes & voided payments omitted.
+- **Decision #33–#37 (UI & Booking Integration):** `/invoices` list with filters/summary cards, `/invoices/[id]` dual-mode workspace, and `/bookings/[id]` "Customer Invoice" integration.
+
+---
+
+## 85.3 Security, Multi-Tenancy & Integrity Verification
+- **Tenant Isolation:** Verified Agency A cannot view, retrieve, modify, issue, cancel, void payments, or download PDFs belonging to Agency B.
+- **Server-Side Authorization:** Enforced via `requireWriteAccess()` / `requireReadAccess()` across all `/api/invoices/` route handlers; client-supplied `agencyId` is never trusted.
+- **IDOR Protection:** Compound query filters `{ id, agencyId }` prevent cross-tenant tampering.
+- **Scope Compliance:** Zero introduction of GST/Tax, Credit/Debit Notes, Supplier Invoices, Public Portals, or Multi-Currency.
+
+---
+
+# END OF MASTER HANDOVER
+
+**Current Approved Baseline:** **DEV-04 QA (Customer Invoice V1 Comprehensive QA & Regression Audit) COMPLETE — VERDICT: PASS**  
+**Next Recommended Phase:** **Deployment / Beta Readiness**
+
+
+
+
 
 

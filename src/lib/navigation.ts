@@ -24,6 +24,7 @@ import {
   Layers,
   ShieldCheck,
   MessageSquare,
+  Receipt,
   LucideIcon
 } from "lucide-react";
 
@@ -81,6 +82,11 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Bookings",
         href: "/bookings",
         icon: CalendarCheck,
+      },
+      {
+        label: "Invoices",
+        href: "/invoices",
+        icon: Receipt,
       },
       {
         label: "Documents",
