@@ -137,4 +137,56 @@ export const rateSheetClient = {
 
     return handleResponse<SingleResponse<{ message: string; rateSheet: RateSheet }>>(res);
   },
+
+  /**
+   * Previews an Excel file for Hotel Rate import without writing to the database.
+   */
+  async previewImport(file: File, mode: "SKIP" | "UPDATE" | "REJECT" = "SKIP"): Promise<SingleResponse<any>> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("mode", mode);
+
+    const res = await fetch("/api/rate-sheets/import?action=preview", {
+      method: "POST",
+      body: formData,
+    });
+
+    return handleResponse<SingleResponse<any>>(res);
+  },
+
+  /**
+   * Executes the Hotel Rate Excel import.
+   */
+  async executeImport(file: File, mode: "SKIP" | "UPDATE" | "REJECT" = "SKIP"): Promise<SingleResponse<any>> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("mode", mode);
+
+    const res = await fetch("/api/rate-sheets/import?action=execute", {
+      method: "POST",
+      body: formData,
+    });
+
+    return handleResponse<SingleResponse<any>>(res);
+  },
+
+  /**
+   * Triggers download of the official sample Hotel_Rates.xlsx template with tenant reference.
+   */
+  async downloadSample(): Promise<void> {
+    const res = await fetch("/api/rate-sheets/sample", { method: "GET" });
+    if (!res.ok) {
+      throw new Error("Failed to download sample file.");
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Hotel_Rates.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
 };
+

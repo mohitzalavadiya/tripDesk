@@ -61,6 +61,8 @@ import {
 import { rateSheetClient, RateSheetWithRelations, MatchedRateResult } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+import { ExcelImportModal } from "@/components/excel/excel-import-modal";
+import { Download } from "lucide-react";
 
 export default function RateSheetsPage() {
   const router = useRouter();
@@ -70,6 +72,8 @@ export default function RateSheetsPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [importModalOpen, setImportModalOpen] = React.useState(false);
+  const [downloadingSample, setDownloadingSample] = React.useState(false);
 
   // Search & Filter states
   const [search, setSearch] = React.useState("");
@@ -222,7 +226,43 @@ export default function RateSheetsPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
+          <div className="flex flex-wrap items-center gap-2.5 z-10 self-start lg:self-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  setDownloadingSample(true);
+                  await rateSheetClient.downloadSample();
+                  toast.success("Hotel Rate sample template downloaded.");
+                } catch (err: any) {
+                  toast.error(err?.message || "Failed to download sample file.");
+                } finally {
+                  setDownloadingSample(false);
+                }
+              }}
+              disabled={downloadingSample}
+              className="bg-white border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs h-9.5 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all"
+            >
+              {downloadingSample ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5 text-slate-500" />
+              )}
+              Download Sample
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setImportModalOpen(true)}
+              disabled={isReadOnly}
+              className="bg-white border-indigo-200 hover:bg-indigo-50 text-indigo-700 font-semibold text-xs h-9.5 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
+              Import Excel
+            </Button>
+
             <Button
               onClick={() => router.push("/rate-sheets/new")}
               disabled={isReadOnly}
@@ -630,6 +670,18 @@ export default function RateSheetsPage() {
           </div>
         </div>
       </div>
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        importType="rate-sheets"
+        title="Import Hotel Rates from Excel"
+        onSuccess={() => fetchRateSheets()}
+        onDownloadSample={() => rateSheetClient.downloadSample()}
+        onPreview={(file, mode) => rateSheetClient.previewImport(file, mode)}
+        onExecute={(file, mode) => rateSheetClient.executeImport(file, mode)}
+      />
     </div>
   );
 }

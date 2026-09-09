@@ -76,6 +76,7 @@ export const createHotelSchema = z.object({
 });
 
 export type CreateHotelInput = z.infer<typeof createHotelSchema>;
+export type CreateHotelPayload = z.input<typeof createHotelSchema>;
 
 /**
  * Zod validation schema for updating an existing Hotel master record (PATCH).

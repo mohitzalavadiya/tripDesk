@@ -616,6 +616,7 @@ model Traveler {
 model Hotel {
   id         String    @id @default(cuid())
   agencyId   String
+  hotelCode  String?
   supplierId String?
   name       String
   category   String?
@@ -637,6 +638,7 @@ model Hotel {
   rateSheets RateSheet[]
 
   @@index([agencyId])
+  @@index([agencyId, hotelCode])
   @@index([supplierId])
   @@index([agencyId, city])
   @@map("hotels")

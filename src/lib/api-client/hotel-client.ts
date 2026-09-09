@@ -103,4 +103,56 @@ export const hotelClient = {
 
     return handleResponse<SingleResponse<{ message: string; hotel: Hotel }>>(res);
   },
+
+  /**
+   * Previews an Excel file for Hotel import without writing to the database.
+   */
+  async previewImport(file: File, mode: "SKIP" | "UPDATE" | "REJECT" = "SKIP"): Promise<SingleResponse<any>> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("mode", mode);
+
+    const res = await fetch("/api/hotels/import?action=preview", {
+      method: "POST",
+      body: formData,
+    });
+
+    return handleResponse<SingleResponse<any>>(res);
+  },
+
+  /**
+   * Executes the Hotel Excel import.
+   */
+  async executeImport(file: File, mode: "SKIP" | "UPDATE" | "REJECT" = "SKIP"): Promise<SingleResponse<any>> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("mode", mode);
+
+    const res = await fetch("/api/hotels/import?action=execute", {
+      method: "POST",
+      body: formData,
+    });
+
+    return handleResponse<SingleResponse<any>>(res);
+  },
+
+  /**
+   * Triggers download of the official sample Hotels.xlsx template.
+   */
+  async downloadSample(): Promise<void> {
+    const res = await fetch("/api/hotels/sample", { method: "GET" });
+    if (!res.ok) {
+      throw new Error("Failed to download sample file.");
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Hotels.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
 };
+
