@@ -140,7 +140,7 @@ export default function NewQuotationPage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700">Agency Markup (%)</label>
                     <Input

@@ -945,8 +945,8 @@ export class CustomerPortalService {
   ): Promise<{ customerId: string; agencyId: string; customerName: string } | null> {
     const trimmed = bookingNumberOrToken.trim();
 
-    // 1. Direct booking lookup
-    const booking = await prisma.booking.findFirst({
+    // 1. Direct booking lookup (query candidates to handle multi-agency booking number collisions)
+    const bookings = await prisma.booking.findMany({
       where: {
         OR: [{ id: trimmed }, { bookingNumber: trimmed }],
         archivedAt: null,
@@ -956,21 +956,34 @@ export class CustomerPortalService {
       },
     });
 
-    if (booking?.customer) {
+    if (bookings.length > 0) {
       if (phoneOrEmail) {
         const cleanInput = phoneOrEmail.trim().toLowerCase();
-        const custPhone = booking.customer.phone.trim().toLowerCase();
-        const custEmail = (booking.customer.email || "").trim().toLowerCase();
-        if (custPhone !== cleanInput && custEmail !== cleanInput) {
-          return null; // Phone or email verification failed
+        for (const booking of bookings) {
+          if (booking.customer) {
+            const custPhone = booking.customer.phone.trim().toLowerCase();
+            const custEmail = (booking.customer.email || "").trim().toLowerCase();
+            if (custPhone === cleanInput || custEmail === cleanInput) {
+              return {
+                customerId: booking.customer.id,
+                agencyId: booking.customer.agencyId,
+                customerName: booking.customer.name,
+              };
+            }
+          }
+        }
+        return null; // Phone or email verification failed for all matching booking candidates
+      } else {
+        // Direct ID / unambiguous single booking lookup without secondary contact verification
+        const first = bookings[0];
+        if (bookings.length === 1 && first?.customer) {
+          return {
+            customerId: first.customer.id,
+            agencyId: first.customer.agencyId,
+            customerName: first.customer.name,
+          };
         }
       }
-
-      return {
-        customerId: booking.customer.id,
-        agencyId: booking.customer.agencyId,
-        customerName: booking.customer.name,
-      };
     }
 
     // 2. Public share link lookup
@@ -988,6 +1001,15 @@ export class CustomerPortalService {
     });
 
     if (shareLink?.trip?.customer) {
+      if (phoneOrEmail) {
+        const cleanInput = phoneOrEmail.trim().toLowerCase();
+        const custPhone = shareLink.trip.customer.phone.trim().toLowerCase();
+        const custEmail = (shareLink.trip.customer.email || "").trim().toLowerCase();
+        if (custPhone !== cleanInput && custEmail !== cleanInput) {
+          return null;
+        }
+      }
+
       return {
         customerId: shareLink.trip.customer.id,
         agencyId: shareLink.trip.customer.agencyId,

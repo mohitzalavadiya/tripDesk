@@ -405,7 +405,13 @@ export default function ReferralsAndRewardsPage() {
                 <label className="font-bold text-slate-700">Existing Referrer Customer *</label>
                 <Select value={selectedCustomerId} onValueChange={(v) => setSelectedCustomerId(v || "")}>
                   <SelectTrigger className="h-9 text-xs">
-                    <SelectValue placeholder="Select existing customer..." />
+                    <SelectValue placeholder="Select existing customer...">
+                      {(val: string | null) => {
+                        if (!val) return undefined;
+                        const c = customers.find((item) => item.id === val);
+                        return c ? `${c.name}${c.phone ? ` (${c.phone})` : ""}` : val;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-white border-slate-200 max-h-56">
                     {customers.map((c) => (
