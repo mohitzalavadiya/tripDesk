@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { getErrorMessage } from "@/lib/utils";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
@@ -91,7 +92,7 @@ export function ExcelImportModal({
       await onDownloadSample();
       toast.success("Sample template downloaded.");
     } catch (err: any) {
-      toast.error(err?.message || "Failed to download sample file.");
+      toast.error(getErrorMessage(err, "Failed to download sample file."));
     } finally {
       setDownloadingSample(false);
     }
@@ -110,10 +111,10 @@ export function ExcelImportModal({
         setPreviewResult(res.data);
         setStep(2);
       } else {
-        toast.error(res.error?.message || "Failed to parse Excel file.");
+        toast.error(getErrorMessage(res.error, "Failed to parse Excel file."));
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to process preview.");
+      toast.error(getErrorMessage(err, "Failed to process preview."));
     } finally {
       setLoading(false);
     }
@@ -131,10 +132,10 @@ export function ExcelImportModal({
         toast.success(`Import completed: ${res.data.imported} new, ${res.data.updated} updated.`);
         onSuccess();
       } else {
-        toast.error(res.error?.message || "Failed to execute import.");
+        toast.error(getErrorMessage(res.error, "Failed to execute import."));
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to execute import batch.");
+      toast.error(getErrorMessage(err, "Failed to execute import batch."));
     } finally {
       setLoading(false);
     }

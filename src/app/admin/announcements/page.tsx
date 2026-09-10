@@ -24,6 +24,8 @@ import {
   Info,
   CheckCircle2,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { getErrorMessage } from "@/lib/utils";
 import { adminClient } from "@/lib/api-client/admin-client";
 
 export default function AdminAnnouncementsPage() {
@@ -38,6 +40,16 @@ export default function AdminAnnouncementsPage() {
   const [type, setType] = React.useState<string>("INFO");
   const [status, setStatus] = React.useState<string>("ACTIVE");
   const [saving, setSaving] = React.useState(false);
+
+  // Confirm Dialog state
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const fetchAnnouncements = React.useCallback(async () => {
     setLoading(true);
@@ -105,15 +117,22 @@ export default function AdminAnnouncementsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this broadcast notice?")) return;
-    try {
-      await adminClient.deleteAnnouncement(id);
-      toast.success("Announcement deleted");
-      fetchAnnouncements();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete announcement");
-    }
+  const handleDelete = (id: string, noticeTitle?: string) => {
+    setConfirmAction({
+      title: "Delete announcement?",
+      description: `Delete broadcast notice "${noticeTitle || "this notice"}"? This will remove the notice for all subscribed agencies.`,
+      confirmText: "Delete Announcement",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await adminClient.deleteAnnouncement(id);
+          toast.success("Announcement deleted successfully.");
+          fetchAnnouncements();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to delete announcement. Please try again."));
+        }
+      },
+    });
   };
 
   return (
@@ -207,7 +226,7 @@ export default function AdminAnnouncementsPage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => handleDelete(a.id)}
+                      onClick={() => handleDelete(a.id, a.title)}
                       className="h-7 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                     >
                       <Trash2 className="h-3 w-3 mr-1" /> Delete
@@ -316,6 +335,27 @@ export default function AdminAnnouncementsPage() {
           </div>
         </div>
       )}
+
+      {/* Global Action Confirmation Modal */}
+      <ConfirmDialog
+        open={!!confirmAction}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (!confirmAction) return;
+          setActionLoading(true);
+          try {
+            await confirmAction.action();
+            setConfirmAction(null);
+          } finally {
+            setActionLoading(false);
+          }
+        }}
+      />
     </div>
   );
 }

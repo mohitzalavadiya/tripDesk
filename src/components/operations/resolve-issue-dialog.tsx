@@ -6,6 +6,7 @@ import { operationsClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import { CheckCircle2, X, Loader2, AlertTriangle, ShieldCheck } from "lucide-react";
 import {
   IssuePriorityBadge,
@@ -66,7 +67,7 @@ export function ResolveIssueDialog({
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
-      toast.error(err.message || "Failed to update issue resolution.");
+      toast.error(getErrorMessage(err, "Failed to update issue resolution. Please try again."));
     } finally {
       setLoading(false);
     }

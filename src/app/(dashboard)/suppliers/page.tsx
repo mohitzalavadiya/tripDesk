@@ -30,7 +30,11 @@ import {
   Users,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -134,7 +138,7 @@ export default function SuppliersPage() {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
-      setError(err?.message || "Failed to load suppliers from database.");
+      setError(getErrorMessage(err, "Unable to load supplier directory. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -143,6 +147,15 @@ export default function SuppliersPage() {
   React.useEffect(() => {
     fetchSuppliers();
   }, [fetchSuppliers]);
+
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleClearFilters = () => {
     setSearch("");
@@ -157,24 +170,32 @@ export default function SuppliersPage() {
     search.trim() !== "" || typeFilter !== "all" || statusFilter !== "all" || includeArchived;
 
   // Handle Archive
-  const handleArchive = async (id: string, name: string, code?: string | null) => {
+  const handleArchive = (id: string, name: string, code?: string | null) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
     }
 
     const ref = code ? `${code} (${name})` : name;
-    if (!confirm(`Archive supplier ${ref}? Linked rate sheets and historical records remain intact.`)) {
-      return;
-    }
-
-    try {
-      await supplierClient.archiveSupplier(id);
-      toast.success(`Supplier ${ref} archived successfully.`);
-      await fetchSuppliers();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive supplier.");
-    }
+    setConfirmAction({
+      title: "Archive supplier?",
+      description: `Archive supplier ${ref}? Linked rate sheets and historical records remain intact.`,
+      confirmText: "Archive Supplier",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await supplierClient.archiveSupplier(id);
+          toast.success(`Supplier ${ref} archived successfully.`);
+          setConfirmAction(null);
+          await fetchSuppliers();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the supplier. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Handle Reactivate
@@ -349,27 +370,19 @@ export default function SuppliersPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching supplier directory...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchSuppliers()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load suppliers"
+                description={error}
+                onRetry={() => fetchSuppliers()}
+              />
             </div>
           )}
 
@@ -623,6 +636,24 @@ export default function SuppliersPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
+      />
     </div>
   );
 }

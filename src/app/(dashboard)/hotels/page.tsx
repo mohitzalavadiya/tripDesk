@@ -22,7 +22,11 @@ import {
   Globe,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +61,7 @@ export default function HotelsPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [archivingId, setArchivingId] = React.useState<string | null>(null);
+  const [archiveTarget, setArchiveTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [importModalOpen, setImportModalOpen] = React.useState(false);
   const [downloadingSample, setDownloadingSample] = React.useState(false);
 
@@ -119,20 +124,22 @@ export default function HotelsPage() {
   const isFilterActive = search.trim() !== "";
 
   // Archive Hotel
-  const handleArchive = async (id: string, name: string) => {
+  const handleArchive = (id: string, name: string) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Modifications are restricted to read-only mode.");
       return;
     }
+    setArchiveTarget({ id, name });
+  };
 
-    if (!confirm(`Archive hotel "${name}"? This soft-deletes the record while keeping historical trip reservations safe.`)) {
-      return;
-    }
-
+  const executeArchive = async () => {
+    if (!archiveTarget) return;
+    const { id, name } = archiveTarget;
     try {
       setArchivingId(id);
       await hotelClient.archiveHotel(id);
       toast.success(`Hotel "${name}" archived successfully.`);
+      setArchiveTarget(null);
       await fetchHotels();
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
@@ -281,27 +288,19 @@ export default function HotelsPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching hotels from database...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchHotels()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load hotels"
+                description={error}
+                onRetry={() => fetchHotels()}
+              />
             </div>
           )}
 
@@ -534,6 +533,18 @@ export default function HotelsPage() {
         onDownloadSample={() => hotelClient.downloadSample()}
         onPreview={(file, mode) => hotelClient.previewImport(file, mode)}
         onExecute={(file, mode) => hotelClient.executeImport(file, mode)}
+      />
+
+      {/* Confirm Archive Dialog */}
+      <ConfirmDialog
+        open={!!archiveTarget}
+        onOpenChange={(open) => !open && setArchiveTarget(null)}
+        title="Archive hotel?"
+        description={`Archive hotel "${archiveTarget?.name}"? This soft-deletes the record while keeping historical trip reservations safe.`}
+        confirmText="Archive Hotel"
+        variant="destructive"
+        loading={!!archivingId}
+        onConfirm={executeArchive}
       />
     </div>
   );

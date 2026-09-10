@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supplierClient, SupplierDetails360 } from "@/lib/api-client";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -97,6 +99,14 @@ export default function SupplierDetailPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   // Active Tab state
   const [activeTab, setActiveTab] = React.useState<
@@ -228,24 +238,32 @@ export default function SupplierDetailPage() {
     }
   };
 
-  const handleArchive = async () => {
+  const handleArchive = () => {
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
     }
 
     if (!supplier) return;
-    if (!confirm(`Archive supplier ${supplier.name}? Linked rate sheets will remain safe.`)) {
-      return;
-    }
-
-    try {
-      await supplierClient.archiveSupplier(id);
-      toast.success(`Supplier ${supplier.name} archived.`);
-      router.push("/suppliers");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive supplier.");
-    }
+    setConfirmAction({
+      title: "Archive supplier?",
+      description: `Archive supplier "${supplier.name}"? Linked rate sheets will remain safe.`,
+      confirmText: "Archive Supplier",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await supplierClient.archiveSupplier(id);
+          toast.success(`Supplier ${supplier.name} archived.`);
+          setConfirmAction(null);
+          router.push("/suppliers");
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the supplier. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   const handleReactivate = async () => {
@@ -1222,6 +1240,24 @@ export default function SupplierDetailPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          open={confirmAction !== null}
+          onOpenChange={(open) => {
+            if (!open && !actionLoading) setConfirmAction(null);
+          }}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (confirmAction?.action) {
+              await confirmAction.action();
+            }
+          }}
+        />
       </div>
     </div>
   );

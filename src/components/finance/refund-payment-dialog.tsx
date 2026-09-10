@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { financeClient, PaymentWithRelations } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
 import { Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -82,7 +83,7 @@ export function RefundPaymentDialog({
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      toast.error(err.message || "Failed to process refund.");
+      toast.error(getErrorMessage(err, "Failed to process refund."));
     } finally {
       setLoading(false);
     }

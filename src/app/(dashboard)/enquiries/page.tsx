@@ -3,9 +3,13 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { EnquiryTable } from "@/components/enquiries/enquiry-table";
 import { EnquiryPipeline } from "@/components/enquiries/enquiry-pipeline";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -112,7 +116,7 @@ export default function EnquiriesPage() {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
-      setError(err?.message || "Failed to load enquiries from database.");
+      setError(getErrorMessage(err, "Unable to load enquiries. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -121,6 +125,15 @@ export default function EnquiriesPage() {
   React.useEffect(() => {
     fetchEnquiries();
   }, [fetchEnquiries]);
+
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleClearFilters = () => {
     setSearch("");
@@ -149,7 +162,7 @@ export default function EnquiriesPage() {
       toast.success(`Enquiry status updated to ${status}.`);
       await fetchEnquiries();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to update status.");
+      toast.error(getErrorMessage(err, "Failed to update status."));
     }
   };
 
@@ -167,28 +180,36 @@ export default function EnquiriesPage() {
         router.push(`/trips/${res.data.tripId}`);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to convert enquiry.");
+      toast.error(getErrorMessage(err, "Failed to convert enquiry."));
     }
   };
 
   // Archive Enquiry
-  const handleArchive = async (id: string, enquiryNumber: string) => {
+  const handleArchive = (id: string, enquiryNumber: string) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode active.");
       return;
     }
 
-    if (!confirm(`Archive enquiry ${enquiryNumber}? Converted trips will remain intact.`)) {
-      return;
-    }
-
-    try {
-      await enquiryClient.archiveEnquiry(id);
-      toast.success(`Enquiry ${enquiryNumber} archived.`);
-      await fetchEnquiries();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive enquiry.");
-    }
+    setConfirmAction({
+      title: "Archive enquiry?",
+      description: `Archive enquiry ${enquiryNumber}? Converted trips will remain intact.`,
+      confirmText: "Archive Enquiry",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await enquiryClient.archiveEnquiry(id);
+          toast.success(`Enquiry ${enquiryNumber} archived.`);
+          setConfirmAction(null);
+          await fetchEnquiries();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the enquiry. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // KPI telemetry sums
@@ -443,27 +464,19 @@ export default function EnquiriesPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching enquiries from database...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchEnquiries()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load enquiries"
+                description={error}
+                onRetry={() => fetchEnquiries()}
+              />
             </div>
           )}
 
@@ -541,6 +554,24 @@ export default function EnquiriesPage() {
           )}
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
+      />
     </div>
   );
 }

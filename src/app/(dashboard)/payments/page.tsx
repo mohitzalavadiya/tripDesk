@@ -26,7 +26,11 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -135,7 +139,7 @@ export default function PaymentsPage() {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
-      setError(err?.message || "Failed to load payments from database.");
+      setError(getErrorMessage(err, "Unable to load payments. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -220,24 +224,41 @@ export default function PaymentsPage() {
     }
   };
 
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
+
   // Archive Payment
-  const handleDelete = async (id: string, num: string) => {
+  const handleDelete = (id: string, num: string) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Modifications are restricted.");
       return;
     }
 
-    if (!confirm(`Archive payment ${num}? This will update the corresponding booking balance.`)) {
-      return;
-    }
-
-    try {
-      await paymentClient.deletePayment(id);
-      toast.success(`Payment ${num} archived successfully.`);
-      await fetchPayments();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive payment.");
-    }
+    setConfirmAction({
+      title: "Archive payment transaction?",
+      description: `Archive payment transaction ${num}? This will recalculate the corresponding booking balance.`,
+      confirmText: "Archive Payment",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await paymentClient.deletePayment(id);
+          toast.success(`Payment ${num} archived successfully.`);
+          setConfirmAction(null);
+          await fetchPayments();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the payment. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   const formatDateDisplay = (date: Date | string | null | undefined) => {
@@ -385,27 +406,19 @@ export default function PaymentsPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching payment transactions from database...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchPayments()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load payments"
+                description={error}
+                onRetry={() => fetchPayments()}
+              />
             </div>
           )}
 
@@ -709,6 +722,24 @@ export default function PaymentsPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          open={confirmAction !== null}
+          onOpenChange={(open) => {
+            if (!open && !actionLoading) setConfirmAction(null);
+          }}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (confirmAction?.action) {
+              await confirmAction.action();
+            }
+          }}
+        />
       </div>
     </div>
   );

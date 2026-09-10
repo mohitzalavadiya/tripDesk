@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import { X, Clock, Loader2 } from "lucide-react";
 
 interface ReportDelayModalProps {
@@ -79,7 +80,7 @@ export function ReportDelayModal({
         if (onSuccess) onSuccess();
         onClose();
       } catch (err: any) {
-        toast.error(err.message || "Failed to log delay. Please try again.");
+        toast.error(getErrorMessage(err, "Failed to log delay. Please try again."));
       } finally {
         setLoading(false);
       }

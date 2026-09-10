@@ -8,6 +8,7 @@ import { operationsClient, VehicleDispatchWithDetails } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import { X, UserCheck, Car, Calendar, Clock, Loader2 } from "lucide-react";
 
 interface AssignDriverModalProps {
@@ -73,7 +74,7 @@ export function AssignDriverModal({
         if (onSuccess) onSuccess();
         onClose();
       } catch (err: any) {
-        toast.error(err.message || "Failed to assign driver. Please try again.");
+        toast.error(getErrorMessage(err, "Failed to assign driver. Please try again."));
       } finally {
         setLoading(false);
       }

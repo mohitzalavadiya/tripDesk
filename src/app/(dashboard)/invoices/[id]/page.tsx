@@ -29,6 +29,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { ErrorState } from "@/components/shared/error-state";
+import { getErrorMessage } from "@/lib/utils";
 import { toast } from "sonner";
 import { RecordPaymentModal } from "@/components/invoices/record-payment-modal";
 import { VoidPaymentModal } from "@/components/invoices/void-payment-modal";
@@ -111,6 +115,14 @@ export default function InvoiceDetailPage() {
   const [showPayModal, setShowPayModal] = React.useState(false);
   const [showCancelModal, setShowCancelModal] = React.useState(false);
   const [voidPaymentData, setVoidPaymentData] = React.useState<any | null>(null);
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const fetchInvoice = React.useCallback(async () => {
     setLoading(true);
@@ -266,75 +278,95 @@ export default function InvoiceDetailPage() {
   };
 
   // Issue Invoice
-  const handleIssueInvoice = async () => {
-    const confirmed = confirm(
-      "Are you sure you want to ISSUE this invoice?\n\nOnce issued, this invoice will receive a permanent, sequential invoice number (e.g. INV-0001) and become IMMUTABLE. Corrections will require formal cancellation and replacement."
-    );
-    if (!confirmed) return;
+  const handleIssueInvoice = () => {
+    setConfirmAction({
+      title: "Issue this invoice?",
+      description:
+        "Once issued, this invoice will receive a permanent sequential invoice number and become immutable. Any subsequent changes will require a cancellation and replacement invoice.",
+      confirmText: "Issue Invoice",
+      variant: "default",
+      action: async () => {
+        setIssuing(true);
+        try {
+          await handleSaveDraft();
 
-    setIssuing(true);
-    try {
-      // First save draft state
-      await handleSaveDraft();
+          const res = await fetch(`/api/invoices/${invoiceId}/issue`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ dueDate }),
+          });
 
-      const res = await fetch(`/api/invoices/${invoiceId}/issue`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dueDate }),
-      });
+          const json = await res.json();
+          if (!res.ok) {
+            throw new Error(json.error?.message || json.message || "Failed to issue invoice.");
+          }
 
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error?.message || json.message || "Failed to issue invoice.");
-      }
-
-      toast.success(`Invoice issued successfully as ${json.data?.invoiceNumber || "INV"}`);
-      fetchInvoice();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to issue invoice.");
-    } finally {
-      setIssuing(false);
-    }
+          toast.success(`Invoice issued successfully as ${json.data?.invoiceNumber || "INV"}`);
+          setConfirmAction(null);
+          fetchInvoice();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't issue the invoice. Please try again."));
+        } finally {
+          setIssuing(false);
+        }
+      },
+    });
   };
 
   // Delete Draft
-  const handleDeleteDraft = async () => {
-    if (!confirm("Are you sure you want to permanently delete this draft invoice?")) {
-      return;
-    }
+  const handleDeleteDraft = () => {
+    setConfirmAction({
+      title: "Delete draft invoice?",
+      description: "Are you sure you want to permanently delete this draft invoice? This action cannot be undone.",
+      confirmText: "Delete Draft",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          const res = await fetch(`/api/invoices/${invoiceId}`, { method: "DELETE" });
+          const json = await res.json();
+          if (!res.ok) {
+            throw new Error(json.error?.message || json.message || "Failed to delete draft.");
+          }
 
-    try {
-      const res = await fetch(`/api/invoices/${invoiceId}`, { method: "DELETE" });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error?.message || json.message || "Failed to delete draft.");
-      }
-
-      toast.success("Draft invoice deleted.");
-      router.push("/invoices");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete draft.");
-    }
+          toast.success("Draft invoice deleted.");
+          setConfirmAction(null);
+          router.push("/invoices");
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't delete the draft invoice. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Create Replacement Invoice
-  const handleCreateReplacement = async () => {
-    if (!confirm("Create a new replacement draft invoice for this cancelled invoice?")) {
-      return;
-    }
+  const handleCreateReplacement = () => {
+    setConfirmAction({
+      title: "Create replacement invoice?",
+      description: "Create a new replacement draft invoice for this cancelled invoice? Line items will be copied over.",
+      confirmText: "Create Replacement",
+      variant: "default",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          const res = await fetch(`/api/invoices/${invoiceId}/replacement`, { method: "POST" });
+          const json = await res.json();
+          if (!res.ok) {
+            throw new Error(json.error?.message || json.message || "Failed to create replacement.");
+          }
 
-    try {
-      const res = await fetch(`/api/invoices/${invoiceId}/replacement`, { method: "POST" });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error?.message || json.message || "Failed to create replacement.");
-      }
-
-      toast.success("Replacement draft created.");
-      router.push(`/invoices/${json.data.id}`);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to create replacement.");
-    }
+          toast.success("Replacement draft created.");
+          setConfirmAction(null);
+          router.push(`/invoices/${json.data.id}`);
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't create the replacement invoice. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   if (loading) {
@@ -347,12 +379,12 @@ export default function InvoiceDetailPage() {
 
   if (error || !invoice) {
     return (
-      <div className="flex h-96 flex-col items-center justify-center p-6 text-center">
-        <AlertCircle className="h-8 w-8 text-red-500 mb-2" />
-        <p className="text-sm font-semibold text-slate-900">{error || "Invoice not found."}</p>
-        <Button onClick={() => router.push("/invoices")} variant="outline" size="sm" className="mt-4">
-          Back to Invoices
-        </Button>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <ErrorState
+          title="Invoice not found"
+          description={error || "The requested invoice could not be located or you don't have permission to view it."}
+          onRetry={() => router.push("/invoices")}
+        />
       </div>
     );
   }
@@ -364,135 +396,132 @@ export default function InvoiceDetailPage() {
   const voidedPayments = (invoice.payments || []).filter((p) => p.status === "VOIDED" && !p.archivedAt);
 
   return (
-    <div className="space-y-6 pb-16">
-      {/* Top Breadcrumb & Action Bar */}
-      <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/invoices"
-            className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold font-mono text-slate-900">
-                {invoice.invoiceNumber || "Draft Invoice"}
-              </h1>
-              {invoice.status === "DRAFT" && (
-                <Badge variant="outline" className="bg-slate-100 text-slate-700">
-                  DRAFT
-                </Badge>
-              )}
-              {invoice.status === "ISSUED" && (
-                <Badge className="bg-indigo-600 text-white">ISSUED</Badge>
-              )}
-              {invoice.status === "PARTIALLY_PAID" && (
-                <Badge className="bg-blue-600 text-white">PARTIALLY PAID</Badge>
-              )}
-              {invoice.status === "PAID" && (
-                <Badge className="bg-emerald-600 text-white">PAID</Badge>
-              )}
-              {invoice.status === "CANCELLED" && (
-                <Badge variant="destructive">CANCELLED</Badge>
-              )}
-              {invoice.isOverdue && (
-                <Badge className="bg-amber-500 text-white font-bold animate-pulse">OVERDUE</Badge>
+    <div className="min-h-screen bg-slate-50/50 pb-16">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+        {/* Top Hero Command Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
+
+          {/* Left Title & Telemetry */}
+          <div className="space-y-3 z-10">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <Link
+                href="/invoices"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+              </Link>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
+                <Receipt className="h-3 w-3 text-indigo-500" />
+                Customer Invoice
+              </span>
+              <span className="text-slate-300">•</span>
+              <StatusBadge status={invoice.status} />
+              {invoice.isOverdue && invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
+                <StatusBadge status="OVERDUE" />
               )}
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Booking Ref:{" "}
-              <Link href={`/bookings/${invoice.bookingId}`} className="font-mono text-blue-600 hover:underline">
-                {bookingSnap.bookingNumber || invoice.booking?.bookingNumber}
-              </Link>
-            </p>
+
+            <div className="flex flex-wrap items-baseline gap-3">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 font-mono">
+                {invoice.invoiceNumber || "Draft Invoice"}
+              </h1>
+              <span className="text-xs font-semibold text-slate-500">
+                Booking Ref:{" "}
+                <Link href={`/bookings/${invoice.bookingId}`} className="font-mono text-indigo-600 hover:underline">
+                  {bookingSnap.bookingNumber || invoice.booking?.bookingNumber}
+                </Link>
+                {custSnap.name && ` (${custSnap.name})`}
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* PDF Download / Print */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.open(`/api/invoices/${invoiceId}/pdf`, "_blank")}
-          >
-            <FileDown className="mr-2 h-4 w-4" />
-            {isDraft ? "Preview PDF" : "Download PDF"}
-          </Button>
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2 z-10">
+            {/* PDF Download / Print */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(`/api/invoices/${invoiceId}/pdf`, "_blank")}
+              className="rounded-xl border-slate-200 h-9 font-semibold text-xs cursor-pointer shadow-2xs"
+            >
+              <FileDown className="mr-1.5 h-3.5 w-3.5" />
+              {isDraft ? "Preview PDF" : "Download PDF"}
+            </Button>
 
-          {isDraft ? (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDeleteDraft}
-                className="text-red-600 hover:bg-red-50 hover:text-red-700"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Draft
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSaveDraft}
-                disabled={saving}
-              >
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save Draft
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleIssueInvoice}
-                disabled={issuing || saving}
-                className="bg-slate-900 text-white hover:bg-slate-800 font-semibold"
-              >
-                {issuing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="mr-2 h-4 w-4" />
-                )}
-                Issue Invoice
-              </Button>
-            </>
-          ) : (
-            <>
-              {(invoice.status === "ISSUED" || invoice.status === "PARTIALLY_PAID") && (
-                <>
-                  <Button
-                    size="sm"
-                    onClick={() => setShowPayModal(true)}
-                    className="bg-emerald-600 text-white hover:bg-emerald-700 font-semibold"
-                  >
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Record Payment
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCancelModal(true)}
-                    className="text-red-600 hover:bg-red-50"
-                  >
-                    <AlertOctagon className="mr-2 h-4 w-4" />
-                    Cancel Invoice
-                  </Button>
-                </>
-              )}
-
-              {invoice.status === "CANCELLED" && (
+            {isDraft ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDeleteDraft}
+                  className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-9 font-semibold text-xs cursor-pointer shadow-2xs"
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Delete Draft
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSaveDraft}
+                  disabled={saving}
+                  className="rounded-xl border-slate-200 h-9 font-semibold text-xs cursor-pointer shadow-2xs"
+                >
+                  {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+                  Save Draft
+                </Button>
                 <Button
                   size="sm"
-                  onClick={handleCreateReplacement}
-                  className="bg-blue-600 text-white hover:bg-blue-700"
+                  onClick={handleIssueInvoice}
+                  disabled={issuing || saving}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all"
                 >
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Create Replacement Draft
+                  {issuing ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Send className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Issue Invoice
                 </Button>
-              )}
-            </>
-          )}
+              </>
+            ) : (
+              <>
+                {(invoice.status === "ISSUED" || invoice.status === "PARTIALLY_PAID") && (
+                  <>
+                    <Button
+                      size="sm"
+                      onClick={() => setShowPayModal(true)}
+                      className="bg-emerald-600 text-white hover:bg-emerald-700 font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer"
+                    >
+                      <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                      Record Payment
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowCancelModal(true)}
+                      className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 h-9 font-semibold text-xs cursor-pointer shadow-2xs"
+                    >
+                      <AlertOctagon className="mr-1.5 h-3.5 w-3.5" />
+                      Cancel Invoice
+                    </Button>
+                  </>
+                )}
+
+                {invoice.status === "CANCELLED" && (
+                  <Button
+                    size="sm"
+                    onClick={handleCreateReplacement}
+                    className="bg-blue-600 text-white hover:bg-blue-700 font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                    Create Replacement Draft
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
 
       {/* Warning Notice if Cancelled */}
       {invoice.status === "CANCELLED" && (
@@ -932,6 +961,25 @@ export default function InvoiceDetailPage() {
           onSuccess={fetchInvoice}
         />
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
+      />
+      </div>
     </div>
   );
 }

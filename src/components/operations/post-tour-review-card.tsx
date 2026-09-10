@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Star,
   Sparkles,
@@ -87,7 +88,7 @@ export function PostTourReviewCard({
       toast.success("Post-tour quality review recorded successfully!");
       onSuccess();
     } catch (err: any) {
-      toast.error(err.message || "Failed to save post-tour review.");
+      toast.error(getErrorMessage(err, "Failed to save post-tour review. Please try again."));
     } finally {
       setSaving(false);
     }

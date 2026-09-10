@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { tripClient } from "@/lib/api-client";
 import { TripStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -445,9 +446,8 @@ export default function TripsPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching trips from database...</p>
+            <div className="p-4">
+              <TableSkeleton rows={8} />
             </div>
           )}
 

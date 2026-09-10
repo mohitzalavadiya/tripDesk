@@ -20,7 +20,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -94,7 +98,7 @@ export default function ActivitiesPage() {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
-      setError(err?.message || "Failed to load activities from database.");
+      setError(getErrorMessage(err, "Unable to load activity catalog. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -103,6 +107,15 @@ export default function ActivitiesPage() {
   React.useEffect(() => {
     fetchActivities();
   }, [fetchActivities]);
+
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleClearFilters = () => {
     setSearch("");
@@ -113,31 +126,38 @@ export default function ActivitiesPage() {
   const isFilterActive = search.trim() !== "";
 
   // Archive Activity
-  const handleArchive = async (id: string, name: string) => {
+  const handleArchive = (id: string, name: string) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Modifications are restricted to read-only mode.");
       return;
     }
 
-    if (!confirm(`Archive activity "${name}"? This soft-deletes the record while keeping historical trip assignments safe.`)) {
-      return;
-    }
-
-    try {
-      setArchivingId(id);
-      await activityClient.archiveActivity(id);
-      toast.success(`Activity "${name}" archived successfully.`);
-      await fetchActivities();
-    } catch (err: any) {
-      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-        setIsReadOnly(true);
-        toast.error("Subscription expired. Read-only mode is active.");
-      } else {
-        toast.error(err?.message || "Failed to archive activity.");
-      }
-    } finally {
-      setArchivingId(null);
-    }
+    setConfirmAction({
+      title: "Archive activity?",
+      description: `Archive activity "${name}"? This soft-deletes the record while keeping historical trip assignments safe.`,
+      confirmText: "Archive Activity",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          setArchivingId(id);
+          await activityClient.archiveActivity(id);
+          toast.success(`Activity "${name}" archived successfully.`);
+          setConfirmAction(null);
+          await fetchActivities();
+        } catch (err: any) {
+          if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+            setIsReadOnly(true);
+            toast.error("Subscription expired. Read-only mode is active.");
+          } else {
+            toast.error(getErrorMessage(err, "We couldn't archive the activity. Please try again."));
+          }
+        } finally {
+          setActionLoading(false);
+          setArchivingId(null);
+        }
+      },
+    });
   };
 
   return (
@@ -239,27 +259,19 @@ export default function ActivitiesPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching activities from database...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchActivities()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load activities"
+                description={error}
+                onRetry={() => fetchActivities()}
+              />
             </div>
           )}
 
@@ -443,6 +455,24 @@ export default function ActivitiesPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
+      />
     </div>
   );
 }

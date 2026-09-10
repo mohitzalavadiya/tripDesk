@@ -52,6 +52,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/shared/page-header";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { getErrorMessage } from "@/lib/utils";
 import {
   documentClient,
   DocumentItem,
@@ -110,7 +113,7 @@ export default function DocumentCenterPage() {
       setTotal(res.meta.total);
       setTotalPages(res.meta.totalPages);
     } catch (err: any) {
-      toast.error(err?.message || "Failed to fetch documents.");
+      toast.error(getErrorMessage(err, "Failed to fetch documents."));
     } finally {
       setLoading(false);
     }
@@ -133,7 +136,7 @@ export default function DocumentCenterPage() {
       setIssueDoc(null);
       await fetchDocuments();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to issue document.");
+      toast.error(getErrorMessage(err, "Failed to issue document."));
     } finally {
       setIssuing(false);
     }
@@ -153,7 +156,7 @@ export default function DocumentCenterPage() {
       setRevokeReason("");
       await fetchDocuments();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to revoke document.");
+      toast.error(getErrorMessage(err, "Failed to revoke document."));
     } finally {
       setRevoking(false);
     }
@@ -172,7 +175,7 @@ export default function DocumentCenterPage() {
       setCustomRecipient("");
       await fetchDocuments();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to resend document.");
+      toast.error(getErrorMessage(err, "Failed to resend document."));
     } finally {
       setResending(false);
     }
@@ -226,37 +229,6 @@ export default function DocumentCenterPage() {
     }
   };
 
-  const renderStatusBadge = (status: TravelDocumentStatus, isLatest: boolean) => {
-    switch (status) {
-      case "ISSUED":
-        return (
-          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold gap-1">
-            <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Issued
-          </Badge>
-        );
-      case "GENERATED":
-        return (
-          <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] font-bold gap-1">
-            <Clock className="h-3 w-3 text-amber-600" /> Draft / Generated
-          </Badge>
-        );
-      case "REVOKED":
-        return (
-          <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px] font-bold gap-1">
-            <XCircle className="h-3 w-3 text-rose-600" /> Revoked
-          </Badge>
-        );
-      case "SUPERSEDED":
-        return (
-          <Badge className="bg-slate-100 text-slate-600 border-slate-200 text-[10px] font-bold gap-1">
-            <RotateCcw className="h-3 w-3 text-slate-400" /> Superseded
-          </Badge>
-        );
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
-
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "—";
     try {
@@ -271,19 +243,19 @@ export default function DocumentCenterPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
-      <PageHeader
-        title="Travel Documents & Vouchers"
-        description="Official travel vouchers, booking confirmations, payment receipts, and customer itineraries."
-        breadcrumbs={[{ label: "Documents" }]}
-        primaryAction={{
-          label: "Refresh List",
-          onClick: fetchDocuments,
-          icon: RefreshCw,
-        }}
-      />
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+        <PageHeader
+          title="Travel Documents & Vouchers"
+          description="Official travel vouchers, booking confirmations, payment receipts, and customer itineraries."
+          breadcrumbs={[{ label: "Documents" }]}
+          primaryAction={{
+            label: "Refresh List",
+            onClick: fetchDocuments,
+            icon: RefreshCw,
+          }}
+        />
 
-      <div className="px-4 py-6 md:px-8 max-w-7xl w-full mx-auto space-y-6">
         {/* Filters and Search Bar */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row items-center gap-3 justify-between">
           <div className="flex items-center gap-3 w-full md:w-auto flex-1">
@@ -334,9 +306,8 @@ export default function DocumentCenterPage() {
         {/* Documents Table */}
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
           {loading ? (
-            <div className="py-20 flex flex-col items-center justify-center text-center">
-              <Loader2 className="h-8 w-8 text-indigo-600 animate-spin mb-3" />
-              <p className="text-xs font-bold text-slate-600">Loading travel documents...</p>
+            <div className="p-4">
+              <TableSkeleton rows={8} />
             </div>
           ) : documents.length === 0 ? (
             <div className="py-20 flex flex-col items-center justify-center text-center px-4">
@@ -396,7 +367,7 @@ export default function DocumentCenterPage() {
 
                       {/* Status */}
                       <TableCell className="py-3.5 px-4">
-                        {renderStatusBadge(doc.status, doc.isLatest)}
+                        <StatusBadge status={doc.status} />
                       </TableCell>
 
                       {/* Issue Date */}

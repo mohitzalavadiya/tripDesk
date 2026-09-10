@@ -31,7 +31,11 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -123,7 +127,7 @@ export default function RateSheetsPage() {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
-      setError(err?.message || "Failed to load rate sheets from database.");
+      setError(getErrorMessage(err, "Unable to load rate sheets. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -132,6 +136,15 @@ export default function RateSheetsPage() {
   React.useEffect(() => {
     fetchRateSheets();
   }, [fetchRateSheets]);
+
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleClearFilters = () => {
     setSearch("");
@@ -146,24 +159,32 @@ export default function RateSheetsPage() {
     search.trim() !== "" || typeFilter !== "ALL" || statusFilter !== "ALL" || includeArchived;
 
   // Handle Archive
-  const handleArchive = async (id: string, name: string, number?: string | null) => {
+  const handleArchive = (id: string, name: string, number?: string | null) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
     }
 
     const ref = number ? `${number} (${name})` : name;
-    if (!confirm(`Archive rate sheet ${ref}? Historical quotations will remain intact.`)) {
-      return;
-    }
-
-    try {
-      await rateSheetClient.archiveRateSheet(id);
-      toast.success(`Rate sheet ${ref} archived.`);
-      await fetchRateSheets();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive rate sheet.");
-    }
+    setConfirmAction({
+      title: "Archive rate sheet?",
+      description: `Archive rate sheet ${ref}? Historical quotations will remain intact.`,
+      confirmText: "Archive Rate Sheet",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await rateSheetClient.archiveRateSheet(id);
+          toast.success(`Rate sheet ${ref} archived.`);
+          setConfirmAction(null);
+          await fetchRateSheets();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the rate sheet. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   const formatDateDisplay = (date: Date | string | null | undefined) => {
@@ -393,27 +414,19 @@ export default function RateSheetsPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching rate sheets...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchRateSheets()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load rate sheets"
+                description={error}
+                onRetry={() => fetchRateSheets()}
+              />
             </div>
           )}
 
@@ -681,6 +694,24 @@ export default function RateSheetsPage() {
         onDownloadSample={() => rateSheetClient.downloadSample()}
         onPreview={(file, mode) => rateSheetClient.previewImport(file, mode)}
         onExecute={(file, mode) => rateSheetClient.executeImport(file, mode)}
+      />
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
       />
     </div>
   );

@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import {
   X,
   Hotel,
@@ -132,7 +133,7 @@ export function HotelConfirmationDialog({
         if (onSuccess) onSuccess();
         onClose();
       } catch (err: any) {
-        toast.error(err.message || "Failed to update hotel confirmation.");
+        toast.error(getErrorMessage(err, "Failed to update hotel confirmation. Please try again."));
       } finally {
         setLoading(false);
       }

@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import {
   CheckCircle2,
   XCircle,
@@ -64,7 +65,7 @@ export function FinalizationChecklistCard({
       setFinalizeDialogOpen(false);
       onSuccess();
     } catch (err: any) {
-      toast.error(err.message || "Failed to finalize operation.");
+      toast.error(getErrorMessage(err, "Failed to finalize operation. Please try again."));
     } finally {
       setProcessing(false);
     }
@@ -86,7 +87,7 @@ export function FinalizationChecklistCard({
       setReopenDialogOpen(false);
       onSuccess();
     } catch (err: any) {
-      toast.error(err.message || "Failed to reopen operation.");
+      toast.error(getErrorMessage(err, "Failed to reopen operation. Please try again."));
     } finally {
       setProcessing(false);
     }

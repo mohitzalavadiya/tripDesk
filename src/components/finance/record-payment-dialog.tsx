@@ -26,6 +26,7 @@ import { financeClient, bookingClient, BookingWithRelations } from "@/lib/api-cl
 import { formatCurrency } from "@/lib/costing-engine";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 
 interface RecordPaymentDialogProps {
   open: boolean;
@@ -115,7 +116,7 @@ export function RecordPaymentDialog({
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      toast.error(err.message || "Failed to record payment.");
+      toast.error(getErrorMessage(err, "Failed to record payment. Please try again."));
     } finally {
       setLoading(false);
     }

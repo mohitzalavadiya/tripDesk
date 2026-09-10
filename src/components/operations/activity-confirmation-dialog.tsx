@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import {
   X,
   Compass,
@@ -134,7 +135,7 @@ export function ActivityConfirmationDialog({
         onSuccess?.();
         onClose();
       } catch (err: any) {
-        toast.error(err.message || "Failed to update activity.");
+        toast.error(getErrorMessage(err, "Failed to update activity. Please try again."));
       } finally {
         setLoading(false);
       }

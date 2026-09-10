@@ -41,6 +41,8 @@ import {
 } from "lucide-react";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -104,6 +106,16 @@ export default function TripQuotationEditorPage() {
   const [forkingVersion, setForkingVersion] = React.useState(false);
   const [updatingPricing, setUpdatingPricing] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<ActiveTabType>("pricing");
+
+  // Confirm Dialog state
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   // Modals
   const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
@@ -381,19 +393,25 @@ export default function TripQuotationEditorPage() {
     }
   };
 
-  const handleDeleteItem = async (itemId: string, name: string) => {
+  const handleDeleteItem = (itemId: string, name: string) => {
     if (!activeQuote || isReadOnly) return;
-    if (!confirm(`Delete "${name}" from this quotation?`)) return;
-
-    try {
-      const res = await quotationClient.deleteQuotationItem(activeQuote.id, itemId);
-      if (res.success) {
-        toast.success("Item removed.");
-        await fetchTripQuotationData();
-      }
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete item.");
-    }
+    setConfirmAction({
+      title: "Remove quotation item?",
+      description: `Remove "${name}" from this quotation?`,
+      confirmText: "Remove Item",
+      variant: "destructive",
+      action: async () => {
+        try {
+          const res = await quotationClient.deleteQuotationItem(activeQuote.id, itemId);
+          if (res.success) {
+            toast.success("Item removed.");
+            await fetchTripQuotationData();
+          }
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to delete item. Please try again."));
+        }
+      },
+    });
   };
 
   // Package Option Handlers
@@ -502,17 +520,23 @@ export default function TripQuotationEditorPage() {
     }
   };
 
-  const handleDeletePackage = async (optionId: string, name: string) => {
+  const handleDeletePackage = (optionId: string, name: string) => {
     if (!activeQuote || isReadOnly) return;
-    if (!confirm(`Delete package tier "${name}"?`)) return;
-
-    try {
-      await quotationClient.deletePackageOption(activeQuote.id, optionId);
-      toast.success("Package tier deleted.");
-      await fetchTripQuotationData();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete package tier.");
-    }
+    setConfirmAction({
+      title: "Delete package tier?",
+      description: `Delete package tier "${name}"? This option will no longer be available to the client.`,
+      confirmText: "Delete Package Tier",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await quotationClient.deletePackageOption(activeQuote.id, optionId);
+          toast.success("Package tier deleted.");
+          await fetchTripQuotationData();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to delete package tier. Please try again."));
+        }
+      },
+    });
   };
 
   const handleSelectPackageOption = async (optionId: string) => {
@@ -2023,6 +2047,27 @@ export default function TripQuotationEditorPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Global Action Confirmation Modal */}
+        <ConfirmDialog
+          open={!!confirmAction}
+          onOpenChange={(open) => !open && setConfirmAction(null)}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (!confirmAction) return;
+            setActionLoading(true);
+            try {
+              await confirmAction.action();
+              setConfirmAction(null);
+            } finally {
+              setActionLoading(false);
+            }
+          }}
+        />
       </div>
     </div>
   );

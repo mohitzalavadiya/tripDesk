@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Search, Compass, Users, Inbox, FileText, Hotel, Truck, CalendarCheck, ArrowRight } from "lucide-react"
+import { Search, Compass, Users, Inbox, FileText, Hotel, Truck, CalendarCheck, ArrowRight, Receipt } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input"
 interface QuickNavItem {
   id: string
   title: string
-  category: "customers" | "trips" | "enquiries" | "quotations" | "hotels" | "bookings" | "suppliers"
+  category: "customers" | "trips" | "enquiries" | "quotations" | "hotels" | "bookings" | "suppliers" | "invoices"
   subtitle: string
   href: string
 }
@@ -25,6 +25,7 @@ const quickNavModules: QuickNavItem[] = [
   { id: "nav-trips", title: "Trips", category: "trips", subtitle: "Active trips & itinerary planner", href: "/trips" },
   { id: "nav-quotations", title: "Quotations", category: "quotations", subtitle: "Proposals, pricing & client versions", href: "/quotations" },
   { id: "nav-bookings", title: "Bookings", category: "bookings", subtitle: "Confirmed bookings & vouchers", href: "/bookings" },
+  { id: "nav-invoices", title: "Invoices", category: "invoices", subtitle: "Customer billing, drafts & payments", href: "/invoices" },
   { id: "nav-hotels", title: "Hotels", category: "hotels", subtitle: "Hotel directory & room inventories", href: "/hotels" },
   { id: "nav-suppliers", title: "Suppliers", category: "suppliers", subtitle: "Vendors, cabs & activity providers", href: "/suppliers" },
 ]
@@ -73,6 +74,8 @@ export function GlobalSearch() {
         return <FileText className="h-4 w-4" />
       case "bookings":
         return <CalendarCheck className="h-4 w-4" />
+      case "invoices":
+        return <Receipt className="h-4 w-4" />
       case "hotels":
         return <Hotel className="h-4 w-4" />
       case "suppliers":
@@ -110,7 +113,7 @@ export function GlobalSearch() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search customers, trips, enquiries..."
+              placeholder="Search customers, trips, invoices, bookings..."
               className="w-full bg-slate-50 border-slate-200 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-0 h-10 text-sm"
               autoFocus
             />

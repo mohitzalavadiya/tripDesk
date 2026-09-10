@@ -25,6 +25,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { ErrorState } from "@/components/shared/error-state";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -142,7 +147,7 @@ export default function InvoicesListPage() {
         setTotalCount(json.meta.total || 0);
       }
     } catch (err: any) {
-      setError(err?.message || "Error loading invoices.");
+      setError(getErrorMessage(err, "Unable to load customer invoices. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -156,28 +161,45 @@ export default function InvoicesListPage() {
     fetchInvoices();
   }, [fetchInvoices]);
 
-  const handleDeleteDraft = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this draft invoice? This action cannot be undone.")) {
-      return;
-    }
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
-    setDeletingId(id);
-    try {
-      const res = await fetch(`/api/invoices/${id}`, { method: "DELETE" });
-      const json = await res.json();
+  const handleDeleteDraft = (id: string, invoiceNumber?: string) => {
+    const ref = invoiceNumber ? `draft invoice ${invoiceNumber}` : "this draft invoice";
+    setConfirmAction({
+      title: "Delete draft invoice?",
+      description: `Are you sure you want to permanently delete ${ref}? This action cannot be undone.`,
+      confirmText: "Delete Draft",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          setDeletingId(id);
+          const res = await fetch(`/api/invoices/${id}`, { method: "DELETE" });
+          const json = await res.json();
 
-      if (!res.ok) {
-        throw new Error(json.error?.message || json.message || "Failed to delete draft invoice.");
-      }
+          if (!res.ok) {
+            throw new Error(json.error?.message || json.message || "Failed to delete draft invoice.");
+          }
 
-      toast.success("Draft invoice deleted successfully.");
-      fetchSummary();
-      fetchInvoices();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete draft.");
-    } finally {
-      setDeletingId(null);
-    }
+          toast.success("Draft invoice deleted successfully.");
+          setConfirmAction(null);
+          fetchSummary();
+          fetchInvoices();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't delete the draft invoice. Please try again."));
+        } finally {
+          setActionLoading(false);
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
   const formatINR = (val: number | string | any) => {
@@ -190,180 +212,159 @@ export default function InvoicesListPage() {
     return new Date(dateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   };
 
-  const getStatusBadge = (status: string, isOverdue: boolean) => {
-    if (status === "DRAFT") {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
-          DRAFT
-        </span>
-      );
-    }
-    if (status === "PAID") {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
-          <CheckCircle2 className="h-3 w-3" /> PAID
-        </span>
-      );
-    }
-    if (status === "CANCELLED") {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 border border-rose-200">
-          CANCELLED
-        </span>
-      );
-    }
-    if (status === "PARTIALLY_PAID") {
+  const renderInvoiceStatus = (status: string, isOverdue: boolean) => {
+    if (status === "PARTIALLY_PAID" || status === "ISSUED") {
       return (
         <div className="flex flex-col gap-1 items-start">
-          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
-            PARTIALLY PAID
-          </span>
-          {isOverdue && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.2 text-[10px] font-bold text-amber-700 border border-amber-200">
-              <Clock className="h-2.5 w-2.5" /> OVERDUE
-            </span>
-          )}
+          <StatusBadge status={status} />
+          {isOverdue && <StatusBadge status="OVERDUE" />}
         </div>
       );
     }
-    // ISSUED
-    return (
-      <div className="flex flex-col gap-1 items-start">
-        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 border border-indigo-200">
-          ISSUED
-        </span>
-        {isOverdue && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.2 text-[10px] font-bold text-amber-700 border border-amber-200">
-            <Clock className="h-2.5 w-2.5" /> OVERDUE
-          </span>
-        )}
-      </div>
-    );
+    return <StatusBadge status={status} />;
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* ══════════════════════════════════════════════════ */}
-      {/* 1. PAGE HEADER */}
-      {/* ══════════════════════════════════════════════════ */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <Receipt className="h-6 w-6 text-slate-700" />
-            Customer Invoices
-          </h1>
-          <p className="text-sm text-slate-500">
-            Manage billing snapshots, track customer payments, and issue official travel invoices.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={() => router.push("/bookings")}
-            className="bg-slate-900 text-white hover:bg-slate-800"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Create from Booking
-          </Button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+        {/* ══════════════════════════════════════════════════ */}
+        {/* 1. TOP HERO COMMAND HEADER */}
+        {/* ══════════════════════════════════════════════════ */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
-      {/* ══════════════════════════════════════════════════ */}
-      {/* 2. SUMMARY METRICS CARDS */}
-      {/* ══════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium text-slate-500">Total Invoices</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{summary.totalInvoices}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium text-slate-500">Total Billed</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{formatINR(summary.totalBilled)}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium text-emerald-600">Total Collected</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-700">{formatINR(summary.totalPaid)}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium text-blue-600">Outstanding Balance</p>
-          <p className="mt-1 text-2xl font-bold text-blue-700">{formatINR(summary.totalOutstanding)}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm col-span-2 lg:col-span-1">
-          <p className="text-xs font-medium text-amber-600">Overdue Invoices</p>
-          <p className="mt-1 text-2xl font-bold text-amber-700">{summary.totalOverdue}</p>
-        </div>
-      </div>
+          {/* Left Title & Telemetry */}
+          <div className="space-y-3 z-10">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
+                <Receipt className="h-3 w-3 text-indigo-500" />
+                Billing & Collections
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-xs font-semibold text-slate-500">
+                {totalCount} database invoice records
+              </span>
+            </div>
 
-      {/* ══════════════════════════════════════════════════ */}
-      {/* 3. FILTERS & SEARCH BAR */}
-      {/* ══════════════════════════════════════════════════ */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search by Invoice #, Customer, Phone, Booking #..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-4 text-sm text-slate-900 focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Status filter buttons */}
-          <div className="flex rounded-lg border border-slate-200 p-1 bg-slate-50 text-xs">
-            {["ALL", "DRAFT", "ISSUED", "PARTIALLY_PAID", "PAID", "CANCELLED"].map((st) => (
-              <button
-                key={st}
-                onClick={() => {
-                  setStatusFilter(st);
-                  setOverdueFilter(false);
-                  setPage(1);
-                }}
-                className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
-                  statusFilter === st && !overdueFilter
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                {st === "ALL" ? "All" : st.replace("_", " ")}
-              </button>
-            ))}
+            <div className="flex flex-wrap items-baseline gap-3">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+                Customer Invoices
+              </h1>
+              <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
+                Manage billing snapshots, track customer payments, and issue official travel invoices
+              </span>
+            </div>
           </div>
 
-          <Button
-            variant={overdueFilter ? "destructive" : "outline"}
-            size="sm"
-            onClick={() => {
-              setOverdueFilter(!overdueFilter);
-              setStatusFilter("ALL");
-              setPage(1);
-            }}
-            className="text-xs h-8"
-          >
-            <Clock className="mr-1 h-3.5 w-3.5" />
-            Overdue Only
-          </Button>
+          {/* Right Action Controls */}
+          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
+            <Button
+              onClick={() => router.push("/bookings")}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all"
+            >
+              <Plus className="h-4 w-4" />
+              Create from Booking
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {/* ══════════════════════════════════════════════════ */}
-      {/* 4. INVOICES TABLE */}
-      {/* ══════════════════════════════════════════════════ */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        {/* ══════════════════════════════════════════════════ */}
+        {/* 2. SUMMARY METRICS CARDS */}
+        {/* ══════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
+            <p className="text-xs font-medium text-slate-500">Total Invoices</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900">{summary.totalInvoices}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
+            <p className="text-xs font-medium text-slate-500">Total Billed</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900">{formatINR(summary.totalBilled)}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
+            <p className="text-xs font-medium text-emerald-600">Total Collected</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-700">{formatINR(summary.totalPaid)}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
+            <p className="text-xs font-medium text-blue-600">Outstanding Balance</p>
+            <p className="mt-1 text-2xl font-bold text-blue-700">{formatINR(summary.totalOutstanding)}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs col-span-2 lg:col-span-1">
+            <p className="text-xs font-medium text-amber-600">Overdue Invoices</p>
+            <p className="mt-1 text-2xl font-bold text-amber-700">{summary.totalOverdue}</p>
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════ */}
+        {/* 3. FILTERS & SEARCH BAR */}
+        {/* ══════════════════════════════════════════════════ */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs md:flex-row md:items-center md:justify-between">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by Invoice #, Customer, Phone, Booking #..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-4 text-sm text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Status filter buttons */}
+            <div className="flex rounded-lg border border-slate-200 p-1 bg-slate-50 text-xs">
+              {["ALL", "DRAFT", "ISSUED", "PARTIALLY_PAID", "PAID", "CANCELLED"].map((st) => (
+                <button
+                  key={st}
+                  onClick={() => {
+                    setStatusFilter(st);
+                    setOverdueFilter(false);
+                    setPage(1);
+                  }}
+                  className={`rounded-md px-2.5 py-1 font-medium transition-colors cursor-pointer ${
+                    statusFilter === st && !overdueFilter
+                      ? "bg-white text-slate-900 shadow-sm font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {st === "ALL" ? "All" : st.replace("_", " ")}
+                </button>
+              ))}
+            </div>
+
+            <Button
+              variant={overdueFilter ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => {
+                setOverdueFilter(!overdueFilter);
+                setStatusFilter("ALL");
+                setPage(1);
+              }}
+              className="text-xs h-8 cursor-pointer"
+            >
+              <Clock className="mr-1 h-3.5 w-3.5" />
+              Overdue Only
+            </Button>
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════ */}
+        {/* 4. INVOICES TABLE */}
+        {/* ══════════════════════════════════════════════════ */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
         {loading ? (
-          <div className="flex h-64 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+          <div className="p-4">
+            <TableSkeleton rows={6} />
           </div>
         ) : error ? (
-          <div className="flex h-64 flex-col items-center justify-center p-6 text-center">
-            <AlertCircle className="h-8 w-8 text-red-500 mb-2" />
-            <p className="text-sm font-semibold text-slate-900">{error}</p>
-            <Button onClick={fetchInvoices} variant="outline" size="sm" className="mt-4">
-              Try Again
-            </Button>
+          <div className="p-8">
+            <ErrorState
+              title="Unable to load invoices"
+              description={error}
+              onRetry={fetchInvoices}
+            />
           </div>
         ) : invoices.length === 0 ? (
           <div className="flex h-64 flex-col items-center justify-center p-6 text-center">
@@ -377,7 +378,7 @@ export default function InvoicesListPage() {
             <Button
               onClick={() => router.push("/bookings")}
               size="sm"
-              className="mt-4 bg-slate-900 text-white"
+              className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer"
             >
               Go to Confirmed Bookings
             </Button>
@@ -385,7 +386,7 @@ export default function InvoicesListPage() {
         ) : (
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-slate-50">
+              <TableHeader className="bg-slate-50 text-[11px] uppercase font-bold text-slate-600">
                 <TableRow>
                   <TableHead className="w-[120px] font-bold text-slate-700">Invoice #</TableHead>
                   <TableHead className="font-bold text-slate-700">Customer</TableHead>
@@ -401,7 +402,7 @@ export default function InvoicesListPage() {
               </TableHeader>
               <TableBody>
                 {invoices.map((inv) => (
-                  <TableRow key={inv.id} className="hover:bg-slate-50/80">
+                  <TableRow key={inv.id} className="hover:bg-slate-50/50">
                     <TableCell className="font-semibold text-slate-900">
                       <Link
                         href={`/invoices/${inv.id}`}
@@ -433,7 +434,7 @@ export default function InvoicesListPage() {
                     <TableCell className="text-right font-bold text-slate-900">
                       {formatINR(inv.balanceAmount)}
                     </TableCell>
-                    <TableCell>{getStatusBadge(inv.status, inv.isOverdue)}</TableCell>
+                    <TableCell>{renderInvoiceStatus(inv.status, inv.isOverdue)}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger
@@ -577,6 +578,25 @@ export default function InvoicesListPage() {
           }}
         />
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
+      />
+      </div>
     </div>
   );
 }

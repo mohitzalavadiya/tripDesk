@@ -45,6 +45,8 @@ import {
   Receipt,
 } from "lucide-react";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -111,6 +113,14 @@ export default function BookingDetailPage() {
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [generatingDocs, setGeneratingDocs] = React.useState(false);
   const [creatingInvoice, setCreatingInvoice] = React.useState(false);
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleOpenInvoice = async () => {
     setCreatingInvoice(true);
@@ -262,23 +272,31 @@ export default function BookingDetailPage() {
   };
 
   // Archive / Delete Payment
-  const handleDeletePayment = async (paymentId: string, paymentNumber: string) => {
+  const handleDeletePayment = (paymentId: string, paymentNumber: string) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
     }
 
-    if (!confirm(`Archive payment ${paymentNumber}? This will recalculate booking balance.`)) {
-      return;
-    }
-
-    try {
-      await paymentClient.deletePayment(paymentId);
-      toast.success(`Payment ${paymentNumber} archived.`);
-      await fetchBooking();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive payment.");
-    }
+    setConfirmAction({
+      title: "Archive payment record?",
+      description: `Archive payment ${paymentNumber}? This will recalculate the booking balance.`,
+      confirmText: "Archive Payment",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await paymentClient.deletePayment(paymentId);
+          toast.success(`Payment ${paymentNumber} archived.`);
+          setConfirmAction(null);
+          await fetchBooking();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the payment record. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Generate Booking Documents
@@ -1385,6 +1403,24 @@ export default function BookingDetailPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          open={confirmAction !== null}
+          onOpenChange={(open) => {
+            if (!open && !actionLoading) setConfirmAction(null);
+          }}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (confirmAction?.action) {
+              await confirmAction.action();
+            }
+          }}
+        />
       </div>
     </div>
   );

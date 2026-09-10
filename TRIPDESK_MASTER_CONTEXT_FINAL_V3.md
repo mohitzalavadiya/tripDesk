@@ -1,9 +1,13 @@
-# TRIPDESK — MASTER PROJECT CONTEXT FINAL V2
+# TRIPDESK — MASTER PROJECT CONTEXT FINAL V3
 ## CURRENT AUTHORITATIVE HANDOFF — SEPTEMBER 2026
+
+> **Document Version:** V3 — FINAL HANDOFF AUDITED THROUGH DEV-05 QA PREPARATION
+>
+> **Important:** Sections **98 onward** are the authoritative current-state update layer and supersede any earlier section that conflicts with them. Older sections are intentionally retained as historical reference so project history is not lost.
 
 > **IMPORTANT:** This V2 document is based on the uploaded `TRIPDESK_MASTER_CONTEXT_FINAL.md` plus the subsequent TripDesk development/QA decisions and implementation state available in the current conversation.
 >
-> **Supersession rule:** Sections 61 onward are the authoritative update layer. If an earlier section says Subscription V2 is only planned, or otherwise conflicts with Sections 61+, the later V2 section wins. The older sections are retained below so historical context is not lost.
+> **Supersession rule:** Sections 98 onward are the authoritative V3 update layer. If any earlier section says Subscription V2, DEV-01, DEV-02, DEV-03, DEV-04, or related work is planned/pending, or otherwise conflicts with Sections 98+, the later V3 section wins. The older sections are retained below so historical context is not lost.
 >
 > **Source-of-truth priority:** actual current codebase > FINAL decisions in this document > latest confirmed discussion > older discussion > ideas/examples.
 >
@@ -791,43 +795,66 @@ Do not guess these rules during implementation.
 
 ---
 
-# 67. FORM VALIDATION / FORM UX — DEV-01 COMPLETED
+# 67. FORM VALIDATION / FORM UX — NEW PENDING REQUIREMENT
 
-This requirement was executed and completed across the original 17 Formik files and the approved 6-file DEV-01 Validation UX Extension.
+This requirement was raised after the certified hardening baseline.
 
 Status:
 
-**IMPLEMENTED + EXTENDED + QA VERIFIED — DEV-01 COMPLETE**
+**PENDING DEVELOPMENT**
 
-## 67.1 Problem & Resolution
+## 67.1 Problem
 
-Forms across the application previously had inconsistent error UX (some relying solely on toasts, missing touched state, or showing browser-native tooltips).
+Some forms use Formik/Yup validation but do not consistently display field-level validation errors.
 
-Resolution:
-- Canonical validation UX established in `/trips/new` was standardized across all target forms.
-- Inline errors formatted with `<p className="text-[11px] text-red-500 font-semibold mt-0.5">{error}</p>`.
-- Invalid borders styled with `border-red-500/80 focus:border-red-500 focus:ring-red-500/20`.
-- Blur/touched tracking, submit-attempt validation triggers, and immediate error clearing upon user correction.
+Example discussed:
 
-## 67.2 Architecture Decisions Preserved
+- `customers/new`
 
-- **UX Consistency vs Universal Architecture:** Validation consistency is a UX standard, not a mandate for uniform Formik adoption. React `useState` forms retain their native state architecture.
-- **Legacy Schema Safety:** Incompatible legacy `customerSchema` and `supplierSchema` were not attached to modern Customer/Supplier forms; native React validation matching current entity contracts is enforced.
-- **Enquiry Form Architecture:** `/enquiries/new` retains its rich multi-mode React state architecture without duplicating client schemas.
-- **Deferred Rate Sheets:** Rate-sheet forms remain deferred due to complex dynamic inventory/pricing calculations.
-- **Retained Non-Formik Modules:** Auth Server Actions, Quotation/Booking builders, finance dialogs, public customer portals, and admin flows remain in their existing architectures.
+`trips/new` was treated as the desired UX/reference behavior.
+
+## 67.2 Final desired behavior
+
+Every form must:
+
+- validate according to its existing schema
+- show field-level errors next to the relevant field
+- clearly distinguish touched/invalid fields
+- prevent invalid submission
+- show submit/loading state
+- show server/API errors when applicable
+- show a general form-level error when an error cannot be attached to a field
+- preserve existing validation rules unless there is a real defect
+- use consistent error presentation across the application
+
+Do not weaken validation merely to hide UI problems.
 
 ## 67.3 Validation technology
 
 Current architecture includes:
-- Formik + Yup where existing Formik schemas and forms are utilized.
-- React `useState` with standardized inline validation UX for Customer, Supplier, and Enquiry forms.
-- Zod for server/API validation.
-- Toast notifications preserved for global API/server failures.
 
-## 67.4 Final DEV-01 Status
+- Formik for form state/interaction where already used
+- Yup for existing Formik schemas where already used
+- Zod for server/API validation
 
-**DEV-01 COMPLETE — READY FOR DEV-02**
+Do not replace the entire validation architecture with a new library just to solve error rendering.
+
+## 67.4 Planned development phase
+
+Recommended:
+
+**DEV-01 — Form UX Consistency**
+
+Scope:
+
+- audit all existing forms
+- compare against `trips/new`
+- fix missing Formik error rendering
+- standardize error presentation
+- preserve schemas/business rules
+- test all affected forms
+
+This phase must have its own QA before DEV-02.
 
 ---
 
@@ -1856,18 +1883,14 @@ The following are now explicit beta UX requirements:
 | Hotel master | IMPLEMENTED |
 | RateSheet | IMPLEMENTED |
 | Standalone RoomType model | REJECTED / NOT IMPLEMENTED |
-| Hotel Excel template/import | IMPLEMENTED + VERIFIED (DEV-03B) |
-| RateSheet Excel template/import | IMPLEMENTED + VERIFIED (DEV-03B) |
-| Form validation UI consistency (DEV-01) | IMPLEMENTED + VERIFIED |
-| Table container scrolling (DEV-02) | AUDITED + VERIFIED COMPLIANT (NO CHANGES) |
-| Password show/hide (DEV-02) | IMPLEMENTED + VERIFIED |
+| Hotel Excel template/import | PROPOSED — NOT IMPLEMENTED |
+| RateSheet Excel template/import | PROPOSED — NOT IMPLEMENTED |
+| Form validation UI consistency | PENDING |
+| Table container scrolling | PENDING |
+| Password show/hide | PENDING |
 | Plaintext password display | REJECTED |
-| Page scroll reset (DEV-02) | IMPLEMENTED + VERIFIED |
-| Hotel Excel template/import (DEV-03) | IMPLEMENTED + VERIFIED (DEV-03B) |
-| RateSheet Excel template/import (DEV-03) | IMPLEMENTED + VERIFIED (DEV-03B) |
-| Supplier Excel template/import (DEV-03) | ON HOLD / DEFERRED |
-| Customer Excel template/import (DEV-03) | AUDITED & ARCHITECTURE DECIDED (DEV-03A) |
-| Customer Invoice (DEV-04) | PROPOSED — NOT IMPLEMENTED |
+| Page scroll reset | PENDING |
+| Customer Invoice | PROPOSED — NOT IMPLEMENTED |
 | Automatic Stripe/Razorpay billing | REJECTED/DEFERRED |
 | Tax/GST engine | DEFERRED |
 | AI assistant | FUTURE |
@@ -1927,40 +1950,6 @@ Status:
 
 **FIXED**
 
-### Form validation UI consistency (DEV-01)
-
-Status:
-
-**FIXED + VERIFIED**
-
-Standardized field-level error messages, error typography (`text-[11px] text-red-500 font-semibold mt-0.5`), error borders (`border-red-500`), focus rings (`focus-visible:ring-red-500` / `focus:ring-red-500`), and touched/error wiring across all 17 approved Formik form and modal components, matching the `/trips/new` reference UX standard.
-
-### Global UX Improvements (DEV-02)
-
-Status:
-
-**FIXED + VERIFIED**
-
-- **Password Show/Hide Controls:** Added accessible eye toggle buttons (`Eye`/`EyeOff` from `lucide-react`) across all 5 password fields in `/login`, `/signup`, and `/reset-password` with independent local state, `type="button"`, and right padding (`pr-9`).
-- **Global Page Navigation Scroll Reset:** Created lightweight client component `src/components/layout/scroll-reset.tsx` listening strictly to route pathname changes via `usePathname()` mounted in root `layout.tsx`. Does not reset on query parameters, search filters, modals, or tab interactions.
-- **Table Horizontal Scrolling:** Verified across 34 active table instances in DEV-02A audit as already fully compliant with `overflow-x-auto` wrapper architecture (0 changes needed).
-
-### Hotel & Rate Sheet Excel Import Foundation (DEV-03B)
-
-Status:
-
-**FIXED + VERIFIED**
-
-- Safe staged migration: Added `hotelCode String?` to Prisma `Hotel` model with `@@index([agencyId, hotelCode])`.
-- Safe backfill: Executed `prisma/backfill-hotel-codes.ts` backfilling all 15 existing hotels with deterministic unique `HTL-0001`+ codes (0 nulls remaining).
-- Hotel Code Generation: Concurrency-safe sequence generation with transaction lock & retry logic in `hotel-service.ts`.
-- Immutability: Hotel code explicitly protected from modification during manual update, Excel UPDATE, and API calls.
-- Hotel Import (`Hotels.xlsx`): Supports SKIP (default), UPDATE (blank cells preserve existing data), REJECT modes. Duplicate detection by `agencyId + name + city`.
-- Hotel Rate Import (`Hotel_Rates.xlsx`): Tenant-safe Hotel Code resolution, `DD-MM-YYYY` date parsing, canonical Meal Plans (`EP`, `CP`, `MAP`, `AP`), DB overlap rejection, adjacent dates allowed, same-file duplicate/conflict detection without later-row-wins.
-- Zero-write preview: Server-side preview validates schema, duplicates, overlap, tenant-safety with 0 DB writes.
-- Secure Sample Downloads: Multi-sheet workbooks with Instructions and tenant-scoped Hotels Reference.
-- Accessible 3-Step UI: `ExcelImportModal` mounted on `/hotels` and `/rate-sheets`.
-
 ## DEFERRED / NON-BLOCKING
 
 - rate limiting
@@ -1971,7 +1960,13 @@ Status:
 
 ## OPEN / PENDING DEVELOPMENT
 
-- customer invoice system (DEV-04)
+- consistent Formik validation error display
+- table internal scrolling
+- password show/hide controls
+- global page scroll reset
+- Hotel Excel import
+- Rate Sheet Excel import
+- customer invoice system
 - final deployment configuration
 - real-world beta monitoring
 
@@ -2185,50 +2180,6 @@ Known verified results include:
 - no P0/P1/P2 application blockers confirmed
 - CONDITIONAL GO
 
-### DEV-01 — Form UX Consistency
-
-- 17 approved forms and modals verified
-- TypeScript PASS (`npx tsc --noEmit` — 0 errors)
-- Production build PASS (`npm run build` — 32 routes compiled)
-- Browser QA PASS (blur validation, submit validation, error clearing, select controls, responsive modals)
-- 0 regressions
-- Status: IMPLEMENTATION + QA COMPLETE
-
-### DEV-02 — Global UX Improvements
-
-- 5 approved files modified/created:
-  - `src/components/layout/scroll-reset.tsx` [NEW]
-  - `src/app/layout.tsx` [MODIFY]
-  - `src/app/login/page.tsx` [MODIFY]
-  - `src/app/signup/page.tsx` [MODIFY]
-  - `src/app/reset-password/page.tsx` [MODIFY]
-- Table horizontal scrolling audit (DEV-02A): All 34 table instances verified compliant (0 changes required).
-- TypeScript PASS (`npx tsc --noEmit` — 0 errors)
-- Production build PASS (`npm run build` — exit code 0)
-- Browser QA PASS (password toggles, scroll reset on pathname change, query param preservation)
-- 0 regressions
-- Status: IMPLEMENTATION + QA COMPLETE
-
-### DEV-03A — Excel Import Audit & Architecture Decision
-
-- Scope: Audit and duplicate/update semantics design for bulk Excel import (Hotel Master, RateSheet, Supplier, Customer).
-- Audit Findings:
-  - `xlsx` library is already present in `package.json` (`^0.18.5`).
-  - No Prisma schema or index changes required for V1 (all key indexes exist).
-  - Explicit duplicate matching keys, normalization rules, and update/skip behaviors resolved.
-  - Safe 3-mode duplicate strategy designed: Skip (default), Update (safe non-destructive), Reject.
-  - Multi-tenant security verified: `agencyId` strictly derived from server-side session.
-- Status: AUDIT + DECISION COMPLETE (NO CODE CHANGES IN DEV-03A)
-
-### DEV-03B — Excel Import Foundation & Hotel/Hotel Rate Import Implementation
-
-- Scope: Hotel Master & Hotel Rate Excel Import, Hotel Code auto-generation & backfill, Sample & Template download, 3-mode duplicate handling, zero-write preview, transaction execution.
-- Verification Results:
-  - Automated Integration Tests: 23/23 tests passed (100%) covering Hotel auto-code, existing code retention, immutability on update, duplicate detection, SKIP/UPDATE/REJECT modes, backfill verification, tenant isolation, Rate Hotel Code resolution, date & meal plan validation, rate overlap prevention, adjacent validity allowance, same-file conflict detection, zero-write preview, and sample generation.
-  - TypeScript: `npx tsc --noEmit` passed with 0 errors.
-  - Production Build: `npm run build` passed with exit code 0 (all routes compiled cleanly).
-- Status: IMPLEMENTATION + VERIFICATION COMPLETE
-
 Historical test counts from earlier phases remain useful evidence, but the current repository's test output is authoritative whenever counts have evolved.
 
 ---
@@ -2270,10 +2221,6 @@ Historical test counts from earlier phases remain useful evidence, but the curre
 - customer notifications
 - Subscription V2
 - beta hardening BH-00 → BH-07
-- DEV-01 Form UX Consistency
-- DEV-02 Global UX Improvements
-- DEV-03A Excel Import Audit & Architecture Decision
-- DEV-03B Hotel & Rate Sheet Excel Import Implementation
 
 ## IMPLEMENTED + VERIFIED
 
@@ -2284,13 +2231,16 @@ Historical test counts from earlier phases remain useful evidence, but the curre
 - rate lookup performance remediation
 - accepted responsive/UI fixes
 - TypeScript/build at BH-07
-- DEV-01 Form UX Consistency across 17 approved form and modal components
-- DEV-02 Global UX Improvements (Password visibility toggle, pathname-based scroll reset, table scrolling verified)
-- DEV-03B Hotel & Rate Sheet Excel Import Foundation (Auto Hotel Code, backfill, SKIP/UPDATE/REJECT modes, overlap rejection, sample downloads, zero-write preview, transactional execution)
 
 ## APPROVED BUT NOT IMPLEMENTED
 
-- DEV-04 Customer Invoice System
+- DEV-01 form error consistency
+- DEV-02 table scrolling
+- DEV-02 password visibility
+- DEV-02 page scroll reset
+- DEV-03 Hotel Excel import
+- DEV-03 Rate Sheet Excel import
+- DEV-04 customer invoice
 
 ## OPEN / OPERATIONAL
 
@@ -2312,190 +2262,57 @@ Historical test counts from earlier phases remain useful evidence, but the curre
 
 ---
 
-# 93. DEV-01 — FORM UX CONSISTENCY COMPLETION RECORD
+# 93. EXACT CURRENT DEVELOPMENT STOPPING POINT
 
-## 93.1 Objective
-Standardize field-level error messages, error typography, error borders, focus rings, and touched/error state wiring across all Formik forms in TripDesk, using `/trips/new` as the reference UX standard, without changing any validation schemas or business rules.
+The project is **NOT** stopped at the old "Subscription V2 planned" state.
 
-## 93.2 Final Approved Scope: 17 Files
-### Dashboard Forms (6)
-1. `src/app/(dashboard)/hotels/new/page.tsx`
-2. `src/app/(dashboard)/hotels/[id]/page.tsx`
-3. `src/app/(dashboard)/vehicles/new/page.tsx`
-4. `src/app/(dashboard)/vehicles/[id]/page.tsx`
-5. `src/app/(dashboard)/activities/new/page.tsx`
-6. `src/app/(dashboard)/activities/[id]/page.tsx`
-
-### Operations Modals & Dialogs (6)
-7. `src/components/operations/activity-confirmation-dialog.tsx`
-8. `src/components/operations/assign-driver-modal.tsx`
-9. `src/components/operations/create-issue-modal.tsx`
-10. `src/components/operations/hotel-confirmation-dialog.tsx`
-11. `src/components/operations/report-delay-modal.tsx`
-12. `src/components/operations/reschedule-activity-modal.tsx`
-
-### Booking Modals (3)
-13. `src/components/booking/add-payment-modal.tsx`
-14. `src/components/booking/cancel-booking-modal.tsx`
-15. `src/components/booking/supplier-payment-modal.tsx`
-
-### Costing Modals (2)
-16. `src/components/costing/add-internal-expense-modal.tsx`
-17. `src/components/costing/add-manual-cost-modal.tsx`
-
-## 93.3 Files Intentionally Excluded
-- `src/app/(dashboard)/trips/new/page.tsx` (Reference UX standard)
-- `src/app/(dashboard)/quotations/new/page.tsx` (Already standardized)
-- `src/app/(dashboard)/trips/[id]/page.tsx` (Explicitly excluded — `tripEditSchema` requires fields not present in the current edit trip form; attaching was rejected to prevent submission breakage)
-- `src/components/ui/*` (UI primitives unchanged)
-- `src/app/api/*`, `src/lib/services/*`, `src/lib/auth/*`, `src/middleware.ts`, `prisma/schema.prisma` (Untouched)
-
-## 93.4 Verification & QA Results
-- **TypeScript:** `npx tsc --noEmit` passed with 0 errors.
-- **Production Build:** `npm run build` passed with 0 errors (all 32 routes compiled).
-- **Browser QA:** Blur validation, submit-time validation, error clearing, select dropdown touched wiring, and responsive modal presentation all verified PASS.
-- **Validation Integrity:** All Yup/Zod schemas, custom validators, min/max rules, and backend API routes preserved 100% intact.
-- **Bugs Discovered/Fixed:** Missing error text, inconsistent rose/red styling, and missing error borders were fixed across the 17 files. 0 regressions.
-- **Status:** `DEV-01 IMPLEMENTATION + QA COMPLETE`
-
----
-
-# 94. DEV-02 — GLOBAL UX IMPROVEMENTS COMPLETION RECORD
-
-## 94.1 Objectives
-1. Implement password visibility toggles (`Eye`/`EyeOff`) on all 5 auth password inputs (`/login`, `/signup`, `/reset-password`).
-2. Implement global page navigation scroll reset on route changes without disrupting query parameters, modals, or tab interactions.
-3. Confirm horizontal table scrolling across all active tables (DEV-02A audit confirmed 34/34 compliant; 0 changes needed).
-
-## 94.2 Approved Scope: Exactly 5 Files
-1. `src/components/layout/scroll-reset.tsx` [NEW] — Lightweight client component using `usePathname()` to trigger `window.scrollTo({ top: 0, left: 0, behavior: "instant" })` only on route pathname changes.
-2. `src/app/layout.tsx` [MODIFY] — Mounted `<ScrollReset />` inside RootLayout.
-3. `src/app/login/page.tsx` [MODIFY] — Added `showPassword` state, `Eye`/`EyeOff` button with `type="button"`, `aria-label`, and `pr-9` padding.
-4. `src/app/signup/page.tsx` [MODIFY] — Added independent `showPassword` and `showConfirmPassword` states, `Eye`/`EyeOff` buttons with `type="button"`, `aria-label`, and `pr-9` padding for `password` and `confirmPassword`.
-5. `src/app/reset-password/page.tsx` [MODIFY] — Added independent `showPassword` and `showConfirmPassword` states, `Eye`/`EyeOff` buttons with `type="button"`, `aria-label`, and `pr-9` padding for `password` and `confirmPassword`.
-
-## 94.3 Verification & QA Results
-- **TypeScript:** `npx tsc --noEmit` passed with 0 errors.
-- **Production Build:** `npm run build` passed with exit code 0.
-- **Password Toggle QA:** Verified all 5 fields across `/login`, `/signup`, and `/reset-password`. Independent toggle state verified. Buttons use `type="button"` and do not submit forms or leak plaintext values.
-- **Scroll Reset QA:** Page-to-page navigation (`/trips` → `/hotels` → `/customers` etc.) resets scroll to top. Query parameters, search filters, modals, and tabs do not trigger scroll jumps.
-- **Table Scrolling:** Verified 34 tables compliant in DEV-02A audit. No table modifications made.
-- **Security & Regressions:** 0 backend, auth, Supabase, or API changes. 0 regressions.
-- **Status:** `DEV-02 IMPLEMENTATION + QA COMPLETE`
-
----
-
-# 95. DEV-03A — EXCEL IMPORT AUDIT & ARCHITECTURE DECISION RECORD
-
-## 95.1 Objective
-Establish authoritative business semantics, entity scope, duplicate matching keys, update/skip rules, security guards, relationship resolution mechanisms, and template specifications for bulk Excel Import prior to DEV-03B implementation.
-
-## 95.2 Key Audit Decisions
-1. **Target Entity Scope (Phase 1):**
-   - **Hotel Master (MUST SUPPORT):** Core inventory entity. Key: `name` (trimmed, case-insensitive) + `city` within `agencyId`.
-   - **RateSheet - Hotel Rates (MUST SUPPORT):** Commercial pricing engine. Key: `hotelId` (resolved by Hotel Name + City) + `roomType` + `mealPlan` + `seasonName` + validity date range overlap within `agencyId`.
-   - **Supplier Master (SHOULD SUPPORT):** Master vendor directory. Key: `name` (trimmed, case-insensitive) OR `phone` OR `email` within `agencyId`. (DEFERRED / ON HOLD)
-   - **Customer Master (SHOULD SUPPORT):** Client directory. Key: `phone` (clean 10 digits) OR `email` (lowercase) within `agencyId`.
-2. **Duplicate Handling Strategy:**
-   - User-selectable mode: **SKIP (Default)** vs **UPDATE (Non-destructive upsert)** vs **REJECT (Strict)**.
-   - Non-destructive updates: Blank cells in spreadsheet **never overwrite** existing database values with null.
-   - Same-file duplicates: First row processed; duplicate row in same file flagged with warning.
-3. **Multi-Tenant Security:**
-   - `agencyId` is strictly derived server-side from session auth (`requireAgencyAuth`). Never accept `agencyId` from spreadsheet.
-   - All lookups, matching, and upserts strictly scoped to `agencyId`.
-4. **Excel Security:**
-   - Formula injection sanitization: Strip/escape leading `=`, `+`, `-`, `@`.
-   - File limits: 5MB file size, 1,000 rows max per batch in V1.
-5. **Library:** Reuse `xlsx` (`^0.18.5`) already present in `package.json`.
-6. **Database/Prisma:** Safe staged migration for `Hotel.hotelCode` with `@@index([agencyId, hotelCode])`.
-7. **Status:** `DEV-03A AUDIT COMPLETE — READY FOR DEV-03B IMPLEMENTATION`
-
----
-
-# 96. DEV-03B — EXCEL IMPORT FOUNDATION & HOTEL/RATE IMPORT COMPLETION RECORD
-
-## 96.1 Objective
-Implement a production-quality Excel Import foundation for Hotel Master and Hotel Rates as an additional input method reusing existing business logic, validation, tenant isolation, and transaction safety.
-
-## 96.2 Core Implementation Details
-1. **Hotel Code Architecture:**
-   - Added `hotelCode String?` to `model Hotel` with `@@index([agencyId, hotelCode])`.
-   - Safe backfill script `prisma/backfill-hotel-codes.ts` executed successfully across all existing hotels (0 nulls remaining).
-   - Concurrency-safe sequence generation (`HTL-0001`, `HTL-0002`...) with transactional counter and unique collision retry logic in `src/lib/services/hotel-service.ts`.
-   - Hotel Code immutability strictly enforced across manual updates, Excel updates, and API calls.
-2. **Hotel Import (`Hotels.xlsx`):**
-   - Exact columns: `Hotel Name` (req), `Category`, `Address`, `City` (req), `State`, `Country`, `Phone`, `Email`, `Website`, `Notes`.
-   - Duplicate matching key: `agencyId + lower(trim(name)) + lower(trim(city))`.
-   - Modes supported: `SKIP` (default), `UPDATE` (blank cells preserve existing data, hotel code immutable), `REJECT` (duplicate reports error).
-   - In-file duplicate detection: Flagged as errors/conflicts, preventing race conditions.
-3. **Hotel Rate Import (`Hotel_Rates.xlsx`):**
-   - Exact columns: `Hotel Code` (req), `Room Type` (req), `Meal Plan` (req), `Season`, `Valid From` (req, `DD-MM-YYYY`), `Valid To` (req, `DD-MM-YYYY`), `Cost Price` (req, non-negative numeric), `Extra Adult`, `Extra Child`, `Notes`.
-   - Hotel Code resolution: Scoped strictly to authenticated `agencyId + hotelCode`. Unknown or cross-tenant code is a blocking error.
-   - Meal Plan validation: Strictly canonical `EP`, `CP`, `MAP`, `AP`.
-   - Date validation: Strict `DD-MM-YYYY` parser, ensuring `validFrom <= validTo`.
-   - Overlap validation: Overlapping validity periods for same `Hotel + Room Type + Meal Plan` are strictly rejected. Adjacent periods (`01-Apr-2026` to `30-Jun-2026` and `01-Jul-2026` to `30-Sep-2026`) are allowed. Different meal plans on same room/dates are allowed.
-   - Same-file conflict detection: Inter-row rate overlap within same workbook detected and reported.
-4. **Sample & Template Downloads:**
-   - Hotel Sample (`/api/hotels/sample`): Includes `Instructions` and `Hotels` sheets with realistic example rows.
-   - Hotel Rate Sample (`/api/rate-sheets/sample`): Includes `Instructions`, `Rates`, and tenant-scoped `Hotels Reference` sheet (only contains authenticated agency's hotels).
-5. **Zero-Write Preview & Server-Side Re-validation:**
-   - Preview API (`POST ?action=preview`): Parses file, performs schema validation, duplicate detection, DB lookups, rate overlap checks with **0 database writes**.
-   - Execute API (`POST ?action=execute`): Fully re-authenticates, re-derives tenant, re-validates data server-side, and commits valid rows inside `prisma.$transaction`.
-6. **Accessible UI (`ExcelImportModal`):**
-   - 3-step accessible dialog: Step 1 (Upload & Mode Selection) -> Step 2 (KPI Summary & Row-level Preview Table) -> Step 3 (Execution Results & Error Report Download).
-   - Integrated into `/hotels` and `/rate-sheets` pages with "Download Sample" and "Import Excel" buttons.
-
-## 96.3 Files Created (7)
-1. `src/lib/excel/hotel-excel-service.ts` [NEW] — Hotel workbook generation, parsing, zero-write preview, and transactional execution.
-2. `src/lib/excel/rate-excel-service.ts` [NEW] — Rate workbook generation, parsing, date formatting, meal plan validation, overlap checking, zero-write preview, and execution.
-3. `src/app/api/hotels/sample/route.ts` [NEW] — Hotel sample workbook download endpoint.
-4. `src/app/api/hotels/import/route.ts` [NEW] — Hotel preview and execution import endpoint.
-5. `src/app/api/rate-sheets/sample/route.ts` [NEW] — Rate sample workbook download endpoint with tenant-scoped reference sheet.
-6. `src/app/api/rate-sheets/import/route.ts` [NEW] — Rate preview and execution import endpoint.
-7. `src/components/excel/excel-import-modal.tsx` [NEW] — Reusable 3-step accessible import dialog.
-
-## 96.4 Files Modified (6)
-1. `prisma/schema.prisma` [MODIFY] — Added `hotelCode String?` and `@@index([agencyId, hotelCode])` to `Hotel`.
-2. `src/lib/services/hotel-service.ts` [MODIFY] — Added concurrency-safe `generateNextHotelCode`, code immutability protection in `updateHotel`, and duplicate lookup helpers.
-3. `src/lib/validation/hotel-schema.ts` [MODIFY] — Exported `CreateHotelPayload`.
-4. `src/lib/api-client/hotel-client.ts` [MODIFY] — Added `previewImport`, `executeImport`, and `downloadSample`.
-5. `src/lib/api-client/rate-sheet-client.ts` [MODIFY] — Added `previewImport`, `executeImport`, and `downloadSample`.
-6. `src/app/(dashboard)/hotels/page.tsx` [MODIFY] — Added sample download, import action, and hotelCode badge.
-7. `src/app/(dashboard)/rate-sheets/page.tsx` [MODIFY] — Added sample download and import action.
-
-## 96.5 Verification & QA Results
-- **Automated Tests:** 23/23 tests passed (100%) in `scratch/test-dev03-excel.ts`.
-- **TypeScript:** `npx tsc --noEmit` passed with 0 errors.
-- **Production Build:** `npm run build` passed with exit code 0.
-- **Status:** `DEV-03B IMPLEMENTATION + VERIFICATION COMPLETE`
-
----
-
-# 97. EXACT CURRENT DEVELOPMENT STOPPING POINT
-
-The current development stopping point is:
+The current state is:
 
 ```text
 Phase 21-F
    ↓
 Subscription V2
    ↓
-BH-00 → BH-07 (Beta Hardening Baseline: CONDITIONAL GO)
+BH-00
    ↓
-DEV-01 (Form UX Consistency) — COMPLETE
+BH-01
    ↓
-DEV-02 (Global UX Improvements) — COMPLETE
+BH-02 / BH-02B
    ↓
-DEV-03A (Excel Import Audit & Architecture Decision) — COMPLETE
+BH-03 / BH-03B
    ↓
-DEV-03B (Hotel & Rate Sheet Excel Import Implementation) — COMPLETE
+BH-04 / BH-04C / BH-04D
    ↓
-NEXT APPROVED PHASE: DEV-04 (Customer Invoice System) — NOT STARTED
+BH-05
+   ↓
+BH-06
+   ↓
+BH-07
+   ↓
+CURRENT ACCEPTED BETA-HARDENED BASELINE
+   ↓
+NEXT: DEV-01
 ```
+
+## Immediate next development task
+
+**DEV-01 — Form UX Consistency**
+
+Before writing code:
+
+1. audit all Formik forms
+2. identify fields where validation exists but errors are not rendered
+3. use `trips/new` as the reference UX
+4. preserve existing schemas
+5. implement consistent error presentation
+6. test all affected forms
+7. run TypeScript/build
+8. perform browser QA
+9. stop and report before moving to DEV-02
 
 ---
 
-# 98. NEW CHAT — START HERE
+# 94. NEW CHAT — START HERE
 
 You are continuing an existing TripDesk project.
 
@@ -2504,58 +2321,6 @@ Do NOT restart architecture or redesign the product.
 TripDesk is a multi-tenant Travel Agency SaaS / Travel Agency Operating System using:
 
 - Next.js 16
-- React 19
-- TypeScript
-- PostgreSQL/Supabase
-- Prisma 7
-- Supabase Auth + SSR cookies
-- service-layer backend
-- Zod
-- Tailwind/UI
-- PDFKit
-- xlsx
-
-There are exactly two internal roles:
-
-- `PLATFORM_OWNER`
-- `AGENCY_OWNER`
-
-Customer is an external business record using secure token-based public access. Customer is not a `User`, not an auth role, and must never be converted into one.
-
-The current database has 45 models. The Hotel architecture is:
-
-```text
-Hotel (with immutable hotelCode)
-  ↓
-RateSheet
-  ├─ roomType string
-  ├─ mealPlan (EP, CP, MAP, AP)
-  ├─ season
-  ├─ validity
-  └─ rates
-```
-
-There is **NO standalone RoomType model**.
-
-Excel Import Foundation (DEV-03B) is **IMPLEMENTED + VERIFIED**:
-- Hotel & Hotel Rate import
-- Auto-generated immutable Hotel Code (`HTL-0001`...)
-- Existing data safely backfilled
-- SKIP, UPDATE, REJECT duplicate modes
-- Strict rate overlap rejection & adjacent date allowance
-- Tenant-isolated lookups and sample reference sheets
-- 3-step accessible preview and transactional execution UI
-- 23/23 automated tests passed, TypeScript 0 errors, build exit code 0.
-
-Supplier module remains explicitly **ON HOLD / DEFERRED**.
-
-### CURRENT NEXT TASK
-
-Start:
-
-**DEV-04 — Customer Invoice System**
-
----
 - React 19
 - TypeScript
 - PostgreSQL/Supabase
@@ -2610,9 +2375,18 @@ BH-07 result:
 
 No confirmed P0/P1/P2 application blockers were found.
 
-DEV-01 (Form UX Consistency) is COMPLETE and verified.
-DEV-02 (Global UX Improvements: Password toggles, scroll reset, table scroll audit) is COMPLETE and verified.
-DEV-03A (Excel Import Audit & Architecture Decision) is COMPLETE and verified.
+Important accepted fixes include:
+
+- customer cross-agency booking lookup protection
+- public quotation commercial-data redaction
+- customer duplicate detection
+- rate lookup batching/performance improvement
+- responsive customer dropdown
+- responsive quotation form grid
+- mobile global search
+- referral customer presentation
+
+Current accepted Git changes are documented in Section 64.
 
 ### DO NOT CHANGE
 
@@ -2631,12 +2405,20 @@ DEV-03A (Excel Import Audit & Architecture Decision) is COMPLETE and verified.
 
 Start:
 
-**DEV-03B — Hotel & Rate Sheet Excel Import Implementation**
+**DEV-01 — Form UX Consistency**
 
-After DEV-03B:
+Goal:
+
+Make validation errors consistently visible on every existing form, using `trips/new` as the UX reference.
+
+After DEV-01:
 
 ```text
-DEV-03B QA
+DEV-01 QA
+→ DEV-02 Global UX
+→ DEV-02 QA
+→ DEV-03 Excel Import
+→ DEV-03 QA
 → DEV-04 Invoice
 → DEV-04 QA
 → Deployment / Beta readiness
@@ -6871,554 +6653,994 @@ These uncertainties do not block continuation because the document explicitly di
 - **Missing information:** No known material product decision is missing. Remaining uncertainties are explicitly identified above rather than fabricated.
 - **Conflicting decisions found:** Historical conflicts existed around paid-plan selection at signup, internal roles, and future feature scope.
 - **Resolved conflicts:** Final architecture now wins: two internal roles only; Customer is external/token-based; no plan/payment at signup; 7-day trial; beta hardening before expansion. Historic 21-G/21-A uncertainty is explicitly marked.
-- **Current development starting point:** DEV-01 (including 17-file baseline + 6-file Validation UX Extension) is 100% COMPLETE and QA verified.
-- **Next task:** Proceed to DEV-02 Global UX Improvements (table container scrolling, password show/hide toggle, and page navigation scroll reset).
-
----
-
-# 79. DEV-01: FORM VALIDATION UX STANDARDIZATION & EXTENSION — COMPLETE RECORD
-
-## 79.1 Complete Execution Sequence
-
-1. **Original DEV-01 17-File Implementation:** Standardized Formik validation UX across 17 confirmed files across Dashboard (Hotels, Vehicles, Activities), Operations (confirmations, assignments, delays, issues), Costing modals, and Booking modals.
-2. **Original DEV-01 QA Completion:** Zero TypeScript errors, zero build errors, all 17 files verified.
-3. **Discovery of Inconsistent Non-Formik Forms:** Real-world testing revealed remaining forms (`/customers/new`, `/enquiries/new`, etc.) that were either using raw HTML5 tooltips, toast-only error reporting, or lacked touched tracking.
-4. **Repository-Wide 38-Form Inventory:** Comprehensive audit mapped all 38 form surfaces across the application into Formik, React `useState`, dynamic builders, and Server Action forms.
-5. **Final Validation Architecture Audit:** Determined that universal Formik migration was unnecessary and risky; standardizing the validation *user experience* across React state forms aligns with TripDesk UX guidelines without invasive architectural churn.
-6. **Legacy Schema Incompatibility Discovery:** Legacy `customerSchema` and `supplierSchema` in `src/lib/validation-schemas.ts` contained fields incompatible with the active Prisma database schema and API contracts. The decision was formalized NOT to attach these legacy schemas.
-7. **Approved 6-File Extension Scope:**
-   - `src/components/booking/confirm-item-modal.tsx` (Formik)
-   - `src/app/(dashboard)/customers/new/page.tsx` (React `useState`)
-   - `src/app/(dashboard)/customers/[id]/page.tsx` (React `useState`)
-   - `src/app/(dashboard)/enquiries/new/page.tsx` (React `useState`)
-   - `src/app/(dashboard)/suppliers/new/page.tsx` (React `useState`)
-   - `src/app/(dashboard)/suppliers/[id]/page.tsx` (React `useState`)
-8. **Implementation Execution:** Applied canonical `/trips/new` UX tokens:
-   - Error typography: `<p className="text-[11px] text-red-500 font-semibold mt-0.5">{error}</p>`
-   - Invalid border styles: `border-red-500/80 focus:border-red-500 focus:ring-red-500/20`
-   - Touched/blur tracking, submit-attempt error triggering, and immediate error clearing upon user input.
-   - Replaced browser-native tooltips by adding `noValidate` attributes.
-9. **Deferred Forms:** `/rate-sheets/new` and `/rate-sheets/[id]` remain deferred due to complex dynamic inventory/seasonal pricing architecture.
-10. **Retained Non-Formik Architectures:** Auth Server Actions, booking/quotation builders, finance dialogs, public guest flows, and admin flow retain their existing patterns.
-11. **TypeScript Verification:** `npx tsc --noEmit` — PASS (0 errors).
-12. **Production Build Verification:** `npm run build` — PASS (Exit Code 0, 32/32 routes generated).
-13. **Manual Browser QA:** All 6 forms verified for touched tracking, inline errors, red focus rings, submit prevention on invalid state, instant correction clearing, and clean submission.
-
-## 79.2 Final DEV-01 Status
-
-**DEV-01 EXTENSION COMPLETE — READY FOR DEV-02**
-
----
-
-# 80. DEV-03: EXCEL IMPORT ARCHITECTURE & FINAL DECISION LOCK (DEV-03A AUDIT)
-
-## 80.1 Status & Purpose
-- **Phase:** DEV-03A Decision Lock & Compatibility Audit
-- **Status:** **LOCKED & CONFIRMED (READY FOR DEV-03B IMPLEMENTATION)**
-- **Purpose:** Provide an Excel import and sample download system for Hotel Master and Hotel Rate Sheets without creating a parallel business logic system or compromising multi-tenant security.
-
-## 80.2 Binding Architectural Rules & Constraints
-1. **Tenant Isolation:** Client `agencyId` is never trusted. The server derives the authenticated agency strictly from the session (`requireWriteAccess()` / `requireReadAccess()`). Every lookup and write is tenant-scoped.
-2. **Roles:** Exactly two internal roles (`PLATFORM_OWNER`, `AGENCY_OWNER`). Customer is an external business entity.
-3. **Supplier ON HOLD:** Supplier functionality remains on hold. Supplier is NOT required for Hotel or Hotel Rate creation, is NOT included in Excel import columns, and is not auto-created. Existing Supplier models, services, and routes remain intact.
-4. **No Standalone RoomType Model:** Room Types and Room Rates are co-managed inside the Hotel Rate Excel. No separate Room Type import or Prisma model is introduced.
-5. **Tax/GST Exclusion:** No GST/tax columns (`taxPercentage`) in V1 Excel import formats.
-6. **Execution Pipeline:** Two-step import workflow:
-   - `Parse & Preview`: Parses file, executes full validation, detects duplicates/overlaps, returns stats + row errors/warnings. **ZERO DATABASE WRITES**.
-   - `Execute`: Server re-validates data, executes database batch inside a Prisma transaction according to selected import mode (`SKIP`, `UPDATE`, `REJECT`).
-7. **Limits:** `.xlsx` only, max 5 MB, max 1,000 data rows.
-
-## 80.3 Final Hotel Master Excel Specification (`Hotels.xlsx`)
-- **Target Sheet:** `Hotels`
-- **Columns:**
-  1. `Hotel Name` — REQUIRED
-  2. `Category` — OPTIONAL
-  3. `Address` — OPTIONAL
-  4. `City` — REQUIRED
-  5. `State` — OPTIONAL
-  6. `Country` — OPTIONAL (defaults to "India")
-  7. `Phone` — OPTIONAL
-  8. `Email` — OPTIONAL
-  9. `Website` — OPTIONAL
-  10. `Notes` — OPTIONAL
-- **Hotel Code:** Auto-generated by TripDesk upon creation (stable, immutable). Not provided in the Excel sheet.
-- **Duplicate Identity:** Tenant-scoped matching on `agencyId + normalized(Hotel Name) + normalized(City)`.
-- **Import Modes:**
-  - `SKIP` (Default): Leave existing matching hotel unchanged.
-  - `UPDATE`: Update existing matching record; blank optional Excel cells leave existing database values unchanged; Hotel Code remains unchanged.
-  - `REJECT`: Reject row if matching hotel exists.
-
-## 80.4 Final Hotel Rate Excel Specification (`Hotel_Rates.xlsx`)
-- **Target Sheet:** `Rates`
-- **Columns:**
-  1. `Hotel Code` — REQUIRED (references stable agency Hotel Code)
-  2. `Room Type` — REQUIRED
-  3. `Meal Plan` — REQUIRED (controlled values: `EP`, `CP`, `MAP`, `AP`)
-  4. `Season` — OPTIONAL (free text, informational only, dates are authoritative)
-  5. `Valid From` — REQUIRED (`DD-MM-YYYY`, e.g. `01-04-2026`)
-  6. `Valid To` — REQUIRED (`DD-MM-YYYY`, e.g. `30-06-2026`)
-  7. `Cost Price` — REQUIRED (numeric, non-negative, raw numbers like `4500`)
-  8. `Extra Adult` — OPTIONAL (numeric, non-negative)
-  9. `Extra Child` — OPTIONAL (numeric, non-negative)
-  10. `Notes` — OPTIONAL
-- **Hotel Code Lookup:** Tenant-scoped. Unknown Hotel Code is a **BLOCKING ERROR**. Hotels are never auto-created from Rate Excel.
-- **Meal Plan Canonical Set:** `EP` (Room Only), `CP` (Bed & Breakfast), `MAP` (Half Board / Breakfast + One Meal), `AP` (Full Board / All Meals).
-- **Date Rules:** `DD-MM-YYYY` format strictly parsed. `Valid From <= Valid To`.
-- **Rate Overlap Rule:** For same `Hotel Code + Room Type + Meal Plan`, overlapping validity periods are disallowed. Adjacent periods (`01-Apr to 30-Jun` and `01-Jul to 30-Sep`) are valid.
-- **Rate Update & Conflict Rules:**
-  - `Exact Match` (`hotelId + roomType + mealPlan + validFrom + validTo` identical):
-    - `SKIP`: Row skipped, existing unchanged.
-    - `UPDATE`: Existing record updated with new pricing/notes.
-    - `REJECT`: Row rejected.
-  - `Overlapping Non-Identical Rate`: Immediate **REJECTION** (no silent date truncation, splitting, or merging).
-  - `Same-File Duplicates/Conflicts`: Detected during preview and flagged with row-level error.
-
-## 80.5 Sample Download Specification
-- **Hotel Sample (`Hotels.xlsx`):** Sheet `Hotels` with production headers, realistic example rows, and column instructions.
-- **Hotel Rate Sample (`Hotel_Rates.xlsx`):** Multi-sheet workbook:
-  1. `Instructions`: Field requirements, date format (`DD-MM-YYYY`), meal plan codes (`EP`, `CP`, `MAP`, `AP`), rate formatting, immutable hotel code rules.
-  2. `Rates`: Import data sheet with production structure and example rows.
-  3. `Hotels Reference`: Informational sheet listing the agency's current Hotels (`Hotel Code`, `Hotel Name`, `City`, `Category`).
-
-## 80.6 Database Schema Alignment
-- **Prisma Schema Update:** Add `hotelCode String?` to `Hotel` model with `@@index([agencyId, hotelCode])` and `generateNextHotelCode(agencyId)` in `hotelService` (e.g. `HTL-2026-00001` or `HTL-0001`).
-- All other models (`RateSheet`, `TripHotel`, `Supplier`) are already 100% compatible.
-
----
-
-# 81. DEV-03B: EXCEL IMPORT FOUNDATION & HOTEL / HOTEL RATE IMPORT — COMPLETE RECORD
-
-## 81.1 Overview & Scope Execution
-- **Phase:** DEV-03B Excel Import Foundation & Hotel/Hotel Rate Import
-- **Status:** **IMPLEMENTED, VERIFIED & PRODUCTION-READY**
-- **Executed Scope:**
-  1. **Hotel Master Excel Importer & Preview:** Schema validation, canonical headers, duplicate detection via `agencyId + normalized(Hotel Name) + normalized(City)`, import modes (`SKIP`, `UPDATE`, `REJECT`), and transaction-safe batch insertion.
-  2. **Hotel Rate Excel Importer & Preview:** Hotel Code resolution strictly scoped to current agency, canonical meal plans (`EP`, `CP`, `MAP`, `AP`), strict `DD-MM-YYYY` date parsing, non-identical overlap blocking, exact match handling, and in-file conflict detection.
-  3. **Automated Hotel Code System:** Added `hotelCode String?` to `Hotel` with composite index `@@index([agencyId, hotelCode])`. Implemented concurrency-safe sequence generator `hotelService.generateNextHotelCode(agencyId)` using format `HTL-0001`, `HTL-0002` with safe retries on conflict.
-  4. **Hotel Code Immutability & Backfill:** Protected `hotelCode` against mutation in manual edits, Excel UPDATE, and API calls. Backfilled existing hotel records (`prisma/backfill-hotel-codes.ts`) resulting in 0 null hotel codes.
-  5. **Sample Workbook Downloads:** Implemented `/api/hotels/sample` (`Hotels.xlsx` with Instructions + Hotels) and `/api/rate-sheets/sample` (`Hotel_Rates.xlsx` with Instructions + Rates + tenant-scoped Hotels Reference sheet).
-  6. **Import UI & Modal:** Implemented reusable 3-step `ExcelImportModal` (`Upload & Options` → `Preview & Validation` → `Import Results`) and integrated into `/hotels` and `/rate-sheets` pages.
-  7. **Tenant Isolation & Security:** Server-derived agency context enforced across all routes via `requireReadAccess()` and `requireWriteAccess()`. Zero trust in client-supplied `agencyId`. No public exposure.
-
-## 81.2 Hotel Master Excel Specification (`Hotels.xlsx`)
-- **Target Sheet:** `Hotels`
-- **Columns:** `Hotel Name` (Req), `Category`, `Address`, `City` (Req), `State`, `Country` (default: India), `Phone`, `Email`, `Website`, `Notes`.
-- **Hotel Code:** Not entered in Excel. Auto-generated as `HTL-XXXX` on creation.
-- **Duplicate Logic:** Matching on `agencyId + normalized(Hotel Name) + normalized(City)`.
-- **Modes:**
-  - `SKIP` (Default): Leaves existing hotel unchanged.
-  - `UPDATE`: Updates non-empty cells, preserves untouched fields and Hotel Code.
-  - `REJECT`: Flags existing record as row error.
-
-## 81.3 Hotel Rate Excel Specification (`Hotel_Rates.xlsx`)
-- **Target Sheet:** `Rates`
-- **Columns:** `Hotel Code` (Req), `Room Type` (Req), `Meal Plan` (Req: `EP`|`CP`|`MAP`|`AP`), `Season`, `Valid From` (Req: `DD-MM-YYYY`), `Valid To` (Req: `DD-MM-YYYY`), `Cost Price` (Req: numeric >= 0), `Extra Adult` (numeric >= 0), `Extra Child` (numeric >= 0), `Notes`.
-- **Hotel Code Lookup:** Scoped to `agencyId + hotelCode`. Unknown or cross-tenant hotel codes immediately produce blocking row errors.
-- **Overlap Rules:** Overlapping non-identical dates for same `Hotel Code + Room Type + Meal Plan` are strictly rejected. Adjacent periods and overlapping periods across different meal plans are permitted.
-- **Modes:** Exact match supports `SKIP`, `UPDATE` (prices/notes), `REJECT`.
-
-## 81.4 Sample Workbook Structure
-1. `Hotels.xlsx`:
-   - `Instructions`: Field requirements, descriptions, allowed formats, rules.
-   - `Hotels`: Realistic sample properties matching parser.
-2. `Hotel_Rates.xlsx`:
-   - `Instructions`: Meal plan definitions, date format, overlap rules.
-   - `Rates`: Sample tariffs for different room types and meal plans.
-   - `Hotels Reference`: Live list of authenticated agency's hotels (`Hotel Code`, `Hotel Name`, `City`, `Category`). Never leaks cross-agency data.
-
-## 81.5 Files Created & Modified
-- **Created Files:**
-  - `src/lib/excel/hotel-excel-service.ts`
-  - `src/lib/excel/rate-excel-service.ts`
-  - `src/app/api/hotels/import/route.ts`
-  - `src/app/api/hotels/sample/route.ts`
-  - `src/app/api/rate-sheets/import/route.ts`
-  - `src/app/api/rate-sheets/sample/route.ts`
-  - `src/components/excel/excel-import-modal.tsx`
-  - `prisma/backfill-hotel-codes.ts`
-  - `scratch/test-dev03-excel.ts`
-- **Modified Files:**
-  - `prisma/schema.prisma` (Added `hotelCode String?` and `@@index([agencyId, hotelCode])`)
-  - `src/lib/services/hotel-service.ts` (Added `generateNextHotelCode`, `getHotelByCode`, `findExistingHotelByNameAndCity`, `checkDuplicateHotel`, immutable code protection)
-  - `src/lib/validation/hotel-schema.ts` (Updated validation and type definitions)
-  - `src/lib/api-client/hotel-client.ts` (Added `previewImport`, `executeImport`, `downloadSample`)
-  - `src/lib/api-client/rate-sheet-client.ts` (Added `previewImport`, `executeImport`, `downloadSample`)
-  - `src/app/(dashboard)/hotels/page.tsx` (Integrated Import Modal, Download Sample, Hotel Code badges)
-  - `src/app/(dashboard)/rate-sheets/page.tsx` (Integrated Import Modal, Download Sample)
-
-## 81.6 Verification & Test Results
-- **TypeScript Check (`npx tsc --noEmit`):** PASS (0 errors).
-- **Production Build (`npm run build`):** PASS (Exit Code 0, all dynamic and static routes generated).
-- **DEV-03B Automated Suite (`scratch/test-dev03-excel.ts`):** 23/23 tests passed (100% assertions passed).
-  - Hotel sequential code generation & uniqueness: PASS
-  - Hotel code immutability: PASS
-  - Hotel duplicate detection: PASS
-  - Multi-tenant isolation for hotels & hotel codes: PASS
-  - Hotel preview zero writes & validation: PASS
-  - Hotel SKIP and UPDATE execution modes: PASS
-  - Rate preview zero writes & unknown hotel code blocking: PASS
-  - Rate meal plan validation (`EP`, `CP`, `MAP`, `AP`): PASS
-  - Rate in-file overlap detection: PASS
-  - Rate exact duplicate SKIP and UPDATE modes: PASS
-  - Non-identical rate overlap rejection against database: PASS
-  - Cross-tenant rate import rejection: PASS
-  - Sample workbook generation with Instructions and tenant Hotels Reference: PASS
----
-
-# SECTION 82: DEV-03 QA — EXCEL IMPORT FUNCTIONAL, SECURITY, DATA INTEGRITY, CONCURRENCY & REGRESSION VERIFICATION
-
-**QA Phase Name:** DEV-03 QA (Excel Import Functional, Security, Data Integrity & Regression Verification)  
-**Verification Date:** September 9, 2026  
-**Status:** **DEV-03 QA — PASS WITH LOW-RISK FINDINGS (OFFICIALLY QA-CLOSED)**  
-**Next Phase Authorized:** **DEV-04 Invoice**
-
----
-
-## 82.1 Executive Summary & Scope
-
-A comprehensive, independent QA verification was conducted on the completed **DEV-03B Excel Import Foundation & Hotel/Hotel Rate Import** implementation. Testing covered:
-1. **Hotel Master Import (`Hotels.xlsx`):** Format validation, required/optional fields, normalized duplicate detection (`Hotel Name + City`), `SKIP`, `UPDATE`, and `REJECT` modes, formula-injection protection, batch insertion performance.
-2. **Hotel Rate Import (`Hotel_Rates.xlsx`):** Format validation, `Hotel Code` resolution, canonical meal plans (`EP`, `CP`, `MAP`, `AP`), strict date validation (`DD-MM-YYYY`, `Valid From <= Valid To`), pricing validation, overlap prevention (`validFrom <= targetEnd && validTo >= targetStart`), adjacent validity handling, and distinct meal plan / room type concurrency.
-3. **Hotel Code Architecture (`HTL-XXXX`):** Format conformity, automatic generation, tenant isolation, immutability across manual updates/Excel updates/API calls, database backfill verification, and race condition analysis under concurrency.
-4. **Excel Sample Downloads:** Workbook schema structure (`Instructions`, `Hotels`, `Rates`, `Hotels Reference`), zero cross-tenant reference data leakage, absence of private/financial/supplier fields.
-5. **Security & Tenant Isolation:** Session-derived `agencyId` context across all preview/execute/sample routes, rejection of foreign agency hotel codes, zero-write preview guarantees, and formula-injection string escaping.
-6. **Transaction Safety & Performance:** Multi-row batch transaction safety, server-side authoritative revalidation on execution, and elimination of O(N^2) roundtrips via `createMany` batch insertions.
-7. **Regression Testing:** TypeScript zero errors (`npx tsc --noEmit`), production compilation (`npm run build` exit code 0), and legacy test suite preservation.
-
----
-
-## 82.2 Full 60-Point QA Test Matrix Results
-
-| ID | Test Scenario | Category | Result | Evidence / Notes |
-|---|---|---|---|---|
-| T01 | Valid single hotel import | Hotel Import | **PASS** | Successfully created hotel with auto-generated `HTL-0001`. |
-| T02 | Valid multiple hotels import | Hotel Import | **PASS** | Created multiple hotels sequentially incrementing `HTL-0002`, `HTL-0003`. |
-| T03 | Missing Hotel Name | Validation | **PASS** | Flagged as validation error: `'Hotel Name is required.'` |
-| T04 | Missing City | Validation | **PASS** | Flagged as validation error: `'City is required.'` |
-| T05 | Duplicate hotel in database | Duplicate | **PASS** | Matching `Name + City` under same agency recognized; flagged as `SKIP` in SKIP mode. |
-| T06 | Duplicate hotel in same file | Same-File Conflict | **PASS** | Row 2 flagged as blocking error: `'Duplicate row in this file (matches Row 2)...'` |
-| T07 | Case variation duplicate detection | Normalization | **PASS** | Uppercase `ALPHA GRAND HOTEL` matched `Alpha Grand Hotel` as duplicate. |
-| T08 | Whitespace variation duplicate | Normalization | **PASS** | Leading/trailing whitespace normalized (`  Alpha Grand Hotel  ` matched). |
-| T09 | Same hotel name, different city | Distinct Matching | **PASS** | `Alpha Grand Hotel` in `Jaipur` created as new distinct record from `Goa`. |
-| T10 | Invalid / missing required headers | Header Validation | **PASS** | Missing required columns rejected with actionable template error message. |
-| T11 | Missing standard sheet name | Parser Fallback | **PASS** | Non-standard sheet name with valid headers safely parsed via fallback. |
-| T12 | Empty file / sheet with no rows | Edge Case | **PASS** | Gracefully rejected with `'The selected sheet is completely empty.'` |
-| T13 | Corrupted workbook buffer | Security / Robustness | **PASS** | Corrupted stream caught gracefully without server crash. |
-| T14 | Optional blank fields | Data Integrity | **PASS** | Blank category/phone/email safely stored as `null`. |
-| T15 | UPDATE existing hotel | Import Mode | **PASS** | Existing hotel updated with non-blank Excel fields. |
-| T16 | SKIP existing hotel | Import Mode | **PASS** | Existing hotel preserved in database without modification. |
-| T17 | REJECT existing hotel | Import Mode | **PASS** | Duplicate row flagged with blocking error in REJECT mode. |
-| T18 | Hotel Code preserved during update | Immutability | **PASS** | `hotelCode` remained `HTL-0001` across all update operations. |
-| T19 | Formula-like text in text cells | Security | **PASS** | `=SUM(1,2)`, `@State`, `+91` safely escaped with leading single quote. |
-| T20 | 100+ row batch import | Performance | **PASS** | 105 rows batch-created in 925ms using `createMany` transaction. |
-| T21 | Unauthorized / empty agency request | Security | **PASS** | Empty `agencyId` immediately rejected with error. |
-| T22 | Cross-tenant hotel duplicate isolation | Multi-Tenancy | **PASS** | Agency B created same hotel name + city with isolated `HTL-0001` under Agency B. |
-| T23 | Valid single rate import | Rate Import | **PASS** | Created rate sheet with valid cost price, validity dates, and meal plan. |
-| T24 | Valid multiple rates import | Rate Import | **PASS** | Created multiple rates across different meal plans and room types. |
-| T25 | Unknown Hotel Code | Resolution | **PASS** | `HTL-9999` blocked with `'Unknown Hotel Code HTL-9999'`. |
-| T26 | Cross-tenant Hotel Code usage | Tenant Isolation | **PASS** | Agency A cannot reference Agency B's hotel code; rejected as unknown. |
-| T27 | Invalid Meal Plan | Validation | **PASS** | `FULL_BOARD` rejected; only `EP`, `CP`, `MAP`, `AP` permitted. |
-| T28 | Impossible date (e.g. 31-02-2026) | Date Validation | **PASS** | Impossible calendar date rejected. |
-| T29 | Wrong date format | Date Validation | **PASS** | Non-DD-MM-YYYY format rejected. |
-| T30 | Valid From > Valid To | Date Validation | **PASS** | Rejected: `'Valid From date cannot be after Valid To date.'` |
-| T31 | Negative Cost Price | Pricing Validation | **PASS** | Negative number rejected: `'Value cannot be negative'`. |
-| T32 | Negative Extra Adult | Pricing Validation | **PASS** | Negative extra adult rate rejected. |
-| T33 | Negative Extra Child | Pricing Validation | **PASS** | Negative extra child rate rejected. |
-| T34 | Existing exact matching rate | Duplicate | **PASS** | Exact rate sheet match flagged as `SKIP` in SKIP mode. |
-| T35 | Overlapping non-identical rate | Overlap Rule | **PASS** | Overlapping dates for same Hotel + Room + Meal Plan flagged as `ERROR`. |
-| T36 | Adjacent rate validity period | Overlap Rule | **PASS** | `01-06-2026` immediately following `31-05-2026` allowed without conflict. |
-| T37 | Different Meal Plan overlap | Business Rule | **PASS** | `MAP` and `CP` allowed to share exact same validity dates. |
-| T38 | Different Room Type overlap | Business Rule | **PASS** | `Executive Suite` and `Deluxe Room` allowed to share exact same validity dates. |
-| T39 | Same-file exact duplicate | In-File Conflict | **PASS** | Conflicting rows in same workbook flagged with blocking error. |
-| T40 | Same-file overlapping period | In-File Conflict | **PASS** | Overlapping periods in same workbook flagged with blocking error. |
-| T41 | Rate SKIP mode | Import Mode | **PASS** | Existing rate sheet pricing left untouched. |
-| T42 | Rate UPDATE mode | Import Mode | **PASS** | Cost price and extra occupant rates updated on exact match. |
-| T43 | Rate REJECT mode | Import Mode | **PASS** | Duplicate rate rejected with error. |
-| T44 | Blank optional fields during UPDATE | Data Integrity | **PASS** | Non-blank fields updated; record integrity maintained. |
-| T45 | Execute after DB state change | Revalidation | **PASS** | Execute authoritatively revalidates against DB state; blocks new overlap. |
-| T46 | Repeated execution idempotency | Transaction | **PASS** | Re-executing same workbook in SKIP mode produces identical idempotent skips. |
-| T47 | Rate preview with empty agencyId | Security | **PASS** | Preview with empty `agencyId` rejected. |
-| T48 | Agency B executing rate for Agency A | Tenant Isolation | **PASS** | Agency B execution blocked from attaching rate to Agency A hotel. |
-| T49 | New Hotel generates code | Hotel Code | **PASS** | Service creation automatically assigns sequential `HTL-XXXX`. |
-| T50 | Sequential Hotels increment code | Hotel Code | **PASS** | `HTL-0111` -> `HTL-0112` sequential increment verified. |
-| T51 | Hotel Code preserved during update | Immutability | **PASS** | Manual service update strictly preserves `hotelCode`. |
-| T52 | Backfill verification across DB | Database Integrity | **PASS** | **0 null codes, 0 malformed codes across 367 total existing hotels**. |
-| T53 | Duplicate code check within agency | Database Integrity | **PASS** | 0 duplicate codes found within agency. |
-| T54 | Concurrency & Race Condition Analysis | Architecture / DB | **INFO / PASS** | Analyzed `generateNextHotelCode` under concurrent `Promise.all`. Documented `@@index` behavior (Finding F-01). |
-| T55 | Manual/API code immutability | Security | **PASS** | Direct payload attempts to override `hotelCode` ignored by service. |
-| T56 | Excel code immutability | Security | **PASS** | Excel parser ignores injected hotel code columns. |
-| T57 | Hotel sample workbook structure | Sample Download | **PASS** | Contains `Instructions` and `Hotels` sheets with correct columns. |
-| T58 | Rate sample workbook structure | Sample Download | **PASS** | Contains `Instructions`, `Rates`, and `Hotels Reference` sheets. |
-| T59 | Tenant-specific Hotels Reference | Tenant Isolation | **PASS** | Sheet contains ONLY authenticated agency's hotels; 0 cross-tenant records. |
-| T60 | Sample data privacy & safety | Security | **PASS** | 0 customer, supplierId, or tax leaks in generated sample files. |
-
----
-
-## 82.3 Code & Security Findings
-
-### Finding F-01: Hotel Code Database Constraint vs Index Under Concurrency (LOW-RISK / ARCHITECTURAL OBSERVATION)
-- **ID:** DEV03-QA-F01
-- **Severity:** LOW
-- **Area:** Database Schema / Hotel Code Concurrency
-- **Status:** Documented (Non-Blocking)
-- **Affected Files:** `prisma/schema.prisma`, `src/lib/services/hotel-service.ts`
-- **Observation:** `Hotel` currently declares `@@index([agencyId, hotelCode])` rather than a composite unique constraint `@@unique([agencyId, hotelCode])`. While sequential hotel creation (and Excel batch imports via in-memory allocation) generate collision-free unique codes with 100% reliability, simultaneous concurrent API hotel creations executed at the exact same millisecond can theoretically compute the same sequential number without triggering a database-level `P2002` conflict.
-- **Root Cause:** The database index is a non-unique B-tree index.
-- **Recommendation for Future Hardening:** In a future planned migration (or during maintenance), consider upgrading `@@index([agencyId, hotelCode])` to `@@unique([agencyId, hotelCode])`.
-- **Verdict Impact:** Non-blocking for DEV-03; operational imports and standard UI interactions are 100% safe.
-
-### Performance Optimization Executed During QA (Batch `createMany`)
-- **Action:** Replaced sequential row-by-row `tx.hotel.create` and `tx.rateSheet.create` inside the transaction with preloaded code lookups and `createMany` batch operations.
-- **Result:** Batch import time for 105 rows reduced from **15,488ms** to **925ms** (<1 second), eliminating transaction timeout risks for workbooks up to 1,000 rows.
-
----
-
-## 82.4 Regression & Build Verification
-
-1. **TypeScript (`npx tsc --noEmit`):** **PASS (0 errors across entire workspace).**
-2. **Production Build (`npm run build`):** **PASS (Exit code 0, 180+ API routes and 35+ pages compiled with Turbopack).**
-3. **Automated Verification Suites:**
-   - `scratch/test-dev03-qa-matrix.ts` — **60/60 tests passed (100%)**.
-   - `scratch/test-dev03-excel.ts` — **23/23 tests passed (100%)**.
-   - `prisma/test-phase21e-feedback.ts` — **100% PASS**.
-   - `prisma/test-phase21f-communications.ts` — **100% PASS**.
-
----
-
-## 82.5 Final QA Verdict
-
-**DEV-03 QA — PASS WITH LOW-RISK FINDINGS**
-
-**DEV-03 is officially QA-closed and approved. The system is ready for DEV-04 Invoice.**
+- **Current development starting point:** Phase 21-F is complete and certified; project is at Beta Release Preparation / Subscription V2.
+- **Next task:** Audit the existing Phase 21-B subscription implementation and execute the approved Subscription V2 / Beta Subscription Management changes only where actual code gaps exist, followed by regression and responsive browser QA.
 
 ---
 
 # END OF MASTER HANDOVER
 
-**Current Approved Baseline:** **DEV-03 (Excel Import Foundation, Hotel & Rate Import, Hotel Code) QA COMPLETE & CLOSED**  
-**Next Execution Phase:** **DEV-04 Invoice**
+**Recommended first action in the new chat:** inspect the current Phase 21-B subscription implementation and execute the approved Subscription V2/Beta Subscription Management changes only where gaps exist. This document has been final consistency-audited; do not restart or redesign the project.
+
 
 ---
 
-# 83. DEV-04A INVOICE DECISION & COMPATIBILITY AUDIT — COMPLETE RECORD
+# 98. V3 CURRENT AUTHORITATIVE STATE — SEPTEMBER 10, 2026
 
-**Phase:** DEV-04A — Invoice Decision & Compatibility Audit  
-**Date:** September 9, 2026  
-**Status:** COMPLETE & APPROVED  
-**Verdict:** **READY FOR DEV-04B** (Zero Blocking Architecture Conflicts)  
-**Deliverable Report:** `DEV-04A_INVOICE_COMPATIBILITY_AUDIT_REPORT.md`
+This section is the current handoff authority for all work completed after the older V2 stopping point.
 
----
+## 98.1 Current stopping point
 
-## 83.1 Audit Scope & Methodology
-A comprehensive, read-only architectural and compatibility audit was conducted across the existing TripDesk codebase (Next.js 16, React 19, Prisma 7, PostgreSQL, Supabase Auth, PDFKit, and existing service modules) against the finalized **Invoice V1 Business Decisions (#1 through #37)**.
+The project has progressed beyond Subscription V2 and the old DEV-01/DEV-02/DEV-03/DEV-04 pending roadmap.
 
-Zero schema changes, zero migrations, and zero production code modifications were made during this audit.
+Current sequence:
 
----
+```text
+BH-07 Conditional Go
+  ↓
+DEV-01 Form UX Consistency — COMPLETE
+  ↓
+DEV-01 QA — COMPLETE
+  ↓
+DEV-02A Global UX Audit — COMPLETE
+  ↓
+DEV-02B Global UX Implementation — COMPLETE
+  ↓
+DEV-02 Final Closeout — COMPLETE
+  ↓
+DEV-03A Final Decision Lock & Compatibility Audit — COMPLETE
+  ↓
+DEV-03B Excel Import — COMPLETE
+  ↓
+DEV-03 QA — PASS WITH LOW-RISK FINDINGS / CLOSED
+  ↓
+DEV-04B Invoice V1 Implementation — COMPLETE
+  ↓
+DEV-04 QA — PASS / CLOSED
+  ↓
+DEV-05A Global UX Consistency & Responsive Audit — COMPLETE
+  ↓
+DEV-05B Global UX Consistency, Professional Messaging & Responsive Implementation — COMPLETE per implementation report
+  ↓
+CURRENT: DEV-05 QA — OPEN
+  ↓
+Next: Global UI Consistency QA / controlled fixes if required
+  ↓
+Pre-Beta Deployment / Operational Readiness
+  ↓
+Controlled Real-Agency Beta
+```
 
-## 83.2 Key Findings Summary
+**No new feature implementation is authorized merely because DEV-05 QA identifies a visual inconsistency.** Audit first; implement only after the findings are reviewed and a controlled implementation task is explicitly started.
 
-1. **Architecture Alignment (100% Compatible):**
-   - The multi-tenant isolation pattern (`requireReadAccess()`, `requireWriteAccess()`), Prisma Decimal handling, server-side transaction management (`prisma.$transaction()`), and reusable PDFKit engine are completely ready to support Invoice V1 without architectural refactoring.
-2. **Booking Integration:**
-   - Confirmed bookings (`BookingStatus.CONFIRMED`) hold all necessary financial, customer, package, and agency references to seed independent, immutable invoice drafts.
-3. **Payment Model Evolution:**
-   - The existing `Payment` model (currently attached directly to `Booking`) will safely evolve in DEV-04B to attach to `Invoice` (`invoiceId String`), support the `VOIDED` state machine transition with mandatory reason tracking, and calculate balances strictly against active payments.
-4. **Sequential Numbering & Concurrency:**
-   - An `InvoiceSequence` table with transactional row updates will guarantee collision-free, gapless `INV-0001`+ numbering per agency upon invoice issuance.
-5. **Decisions Matrix Evaluation (37 Total):**
-   - **Compatible (No Changes Needed):** 13 Decisions (#2, #5, #9, #17, #18, #19, #20, #21, #22, #23, #26, #30, #37)
-   - **New Implementation Required:** 21 Decisions (#1, #3, #6, #7, #8, #10, #11, #12, #14, #15, #16, #24, #25, #27, #28, #29, #31, #32, #33, #34, #35, #36)
-   - **Change / Evolution Required:** 3 Decisions (#4: Relink Payment to Invoice, #13: Add Payment Void Flow, #1: Booking payment total sync)
-   - **Conflicts / Open Blockers:** **0 Conflicts**
+## 98.2 V3 authority rules
 
----
-
-## 83.3 Readiness for DEV-04B
-- **Verdict:** **READY FOR DEV-04B**
-- **Recommended DEV-04B Implementation Stages:**
-  1. **Stage 1 (Schema & DB Migration):** Add `InvoiceStatus`, `DiscountType`, `Invoice`, `InvoiceItem`, `InvoiceSequence` models; add `invoiceId` and `VOIDED` status to `Payment`.
-  2. **Stage 2 (Backend Services & Numbering):** Implement `invoice-service.ts`, `invoice-sequence-service.ts`, and evolve `payment-service.ts`.
-  3. **Stage 3 (PDFKit Invoice Engine):** Implement `invoice-pdf-service.ts` with watermarks (`DRAFT`, `CANCELLED`) and active payment history.
-  4. **Stage 4 (API Routes & Security):** Implement `/api/invoices`, `/api/invoices/[id]`, `/api/invoices/[id]/issue`, `/api/invoices/[id]/payments`, `/api/invoices/[id]/cancel`, `/api/invoices/[id]/pdf`.
-  5. **Stage 5 (Frontend UI & Navigation):** Implement `/invoices` list, `/invoices/[id]` detail/editor, payment modal, cancellation modal, and navigation links.
-  6. **Stage 6 (QA & Verification):** Automated test suite covering lifecycle, concurrency, voiding, balance calculation, and PDF output.
-
----
-
-# 84. DEV-04B INVOICE V1 IMPLEMENTATION — COMPLETE RECORD
-
-**Phase:** DEV-04B — Invoice V1 Implementation  
-**Date:** September 9, 2026  
-**Status:** COMPLETE & APPROVED  
-**Verdict:** **DEV-04B COMPLETE** (23/23 Tests Passed, Clean Build)  
-**Deliverable Report:** `DEV-04B_INVOICE_IMPLEMENTATION_REPORT.md`
-
----
-
-## 84.1 Implementation Scope & Summary
-DEV-04B delivered the complete, production-grade Customer Invoice V1 subsystem, adhering strictly to the 37 finalized business decisions, multi-tenant isolation, server-side authorization, and immutable financial snapshot patterns.
-
-### Key Implemented Components:
-1. **Prisma Schema Additions (`prisma/schema.prisma`):**
-   - Enums: `InvoiceStatus` (`DRAFT`, `ISSUED`, `PARTIALLY_PAID`, `PAID`, `CANCELLED`), `DiscountType` (`FIXED`, `PERCENTAGE`), and updated `PaymentStatus` with `VOIDED`.
-   - Models: `Invoice`, `InvoiceItem`, `InvoiceSequence`.
-   - Evolved `Payment`: added `invoiceId String?`, `voidReason`, `voidedAt`, `voidedBy`, and `@@index([invoiceId])`.
-2. **Backend Services (`src/lib/services/`):**
-   - `invoice-sequence-service.ts`: Atomic per-agency sequence generation (`INV-0001`+).
-   - `invoice-service.ts`: Full lifecycle operations (`createDraftInvoice`, `getInvoice`, `listInvoices`, `updateDraftInvoice`, `issueInvoice`, `deleteDraftInvoice`, `cancelInvoice`, `createReplacementInvoice`, `getInvoiceSummary`).
-   - `payment-service.ts`: Added `recordInvoicePayment` and `voidPayment` with status/balance synchronization.
-   - `invoice-pdf-service.ts`: PDFKit document generator with watermarks (`DRAFT`, `CANCELLED`) and active payment history.
-3. **API Endpoints (`src/app/api/invoices/`):**
-   - `GET /api/invoices` & `POST /api/invoices`
-   - `GET /api/invoices/summary`
-   - `GET /api/invoices/[id]`, `PATCH /api/invoices/[id]`, `DELETE /api/invoices/[id]`
-   - `POST /api/invoices/[id]/issue`
-   - `POST /api/invoices/[id]/cancel`
-   - `POST /api/invoices/[id]/replacement`
-   - `POST /api/invoices/[id]/payments`
-   - `POST /api/invoices/[id]/payments/[paymentId]/void`
-   - `GET /api/invoices/[id]/pdf`
-4. **Frontend Workspaces & UI:**
-   - Added `Invoices` to agency navigation (`src/lib/navigation.ts`).
-   - `/invoices`: List page with summary metrics cards, search, status filters, overdue toggle, and pagination.
-   - `/invoices/[id]`: Dual-mode workspace (Interactive Draft Editor & Immutable Details Viewer).
-   - Action Modals: `RecordPaymentModal`, `VoidPaymentModal`, `CancelInvoiceModal`.
-   - Booking Integration: "Customer Invoice" action button on `/bookings/[id]`.
+- Actual current codebase remains the ultimate implementation authority.
+- Sections 98+ are the latest documented project state.
+- Where a V2 section says a feature is pending but Sections 98+ say it is complete, the V3 status wins.
+- Do not treat agent-reported implementation claims as independently code-verified unless the report explicitly includes executed verification or the current repository is inspected.
+- No destructive DB reset.
+- No unrelated refactor.
+- No architecture restart.
+- Preserve all final business/security decisions.
+- Every successful implementation or QA phase must update this master context with the final result.
 
 ---
 
-## 84.2 Automated Verification & QA Results
-- **Automated Integration Test Suite (`scratch/test-dev04-invoice.ts`):** **23/23 tests passed (100%)**.
-  - Verified draft creation, quotation item mapping, eligibility rejection (DRAFT bookings), single active invoice constraint, draft editing, fixed/percentage discounts, draft deletion, sequential numbering per agency (`INV-0001`+), cross-tenant sequence isolation, immutability on issue, partial/full payments, overpayment rejection, reason-based payment voiding, cancellation, replacement invoice generation, dynamic overdue calculation, PDF generation, and IDOR protection.
-- **Regression Test Suite (`scratch/test-dev03-excel.ts`):** **23/23 tests passed (100%)**.
-- **TypeScript Compilation (`npx tsc --noEmit`):** **PASS (0 errors across entire workspace)**.
-- **Production Build (`npm run build`):** **PASS (Exit code 0, 190+ API routes and 38+ pages compiled cleanly)**.
+# 99. V2 → V3 GAP AUDIT
+
+## 99.1 Missing from V2
+
+The following important post-V2 work was missing or not represented as current:
+
+1. **DEV-01 was implemented and QA-closed.** V2 still listed form UX consistency as pending.
+2. **DEV-02A/02B and final closeout were completed.** V2 still listed table scrolling, password visibility, and page scroll reset as pending.
+3. **DEV-03A/03B were completed.** V2 still described Hotel/Rate Sheet Excel import as proposed/not implemented.
+4. **DEV-03 QA was completed:** PASS WITH LOW-RISK FINDINGS.
+5. **Hotel Code behavior was finalized/implemented:** auto-generated stable code in the `HTL-0001` style, agency-scoped, immutable after creation.
+6. **Hotel/Rate Sheet import validation/preview workflow was implemented.** Manual and Excel workflows share the supported business fields/validation direction.
+7. **DEV-04B Invoice V1 was implemented.** V2 still described invoices as a proposed feature.
+8. **DEV-04 QA was completed:** 60/60 Invoice matrix + 23/23 Excel regression, TypeScript PASS, production build PASS, 0 blocking defects.
+9. **All 37 Invoice V1 decisions were finalized.** V2 contained only unresolved Invoice design questions and must no longer be treated as current.
+10. **The Invoice/Payment financial snapshot and lifecycle architecture is now implemented and verified.**
+11. **DEV-05A global UX consistency audit was completed.** It found 31 native confirmation-dialog usages across 15/20 reviewed page/component files, plus messaging/loading/header/status/responsive inconsistencies.
+12. **DEV-05B was implemented per agent report.** Shared ConfirmDialog, StatusBadge, improved error extraction, standardized loading patterns, PageHeader reuse, responsive hardening, and global-search invoice entry were added.
+13. **DEV-05 QA is now the current open phase.**
+14. A new **Global UI Consistency finding** was identified during manual browser inspection: `/invoices` and `/documents` visibly use different page/header/filter/table/card/button patterns, and `/customers` provides another established pattern. This must be audited across the entire application before DEV-05 is closed.
+
+## 99.2 Outdated in V2
+
+These V2 statements are now stale and must not be used as current state:
+
+- Subscription V2 = planned. **Current: implemented + verified.**
+- DEV-01 = pending. **Current: complete + QA complete.**
+- DEV-02 table scrolling/password visibility/page scroll = pending. **Current: implemented/closed through DEV-02.**
+- DEV-03 Hotel/Rate Sheet Excel import = proposed/not implemented. **Current: implemented + QA closed.**
+- DEV-04 Customer Invoice = proposed/not implemented. **Current: implemented + QA closed.**
+- The old V2 roadmap ending at DEV-04 QA is obsolete.
+- The old V2 current stopping point of Subscription V2 is obsolete.
+- Old V2 statements that invoice design still required decisions are obsolete because all 37 Invoice V1 decisions are now locked.
+- Old V2 statements that sidebar/static UI and broad UX were merely future concerns are superseded by DEV-05A/05B and the current DEV-05 QA findings.
+
+## 99.3 Changed/currently clarified decisions
+
+- Hotel/Rate Sheet Excel import moved from proposed to implemented.
+- Hotel Code is an auto-generated stable agency-scoped identifier; exact persistence implementation must still be treated as code-authoritative.
+- Invoice V1 is no longer a design exercise; its lifecycle, numbering, payments, PDF, cancellation, replacement, and security rules are locked.
+- DEV-05 is now a global UI consistency and professional UX verification phase, not merely a native-dialog replacement exercise.
+- The current product must be responsive down to **320px** for authenticated UI where practical; intentional table horizontal scrolling must remain contained inside the table region.
+
+## 99.4 Newly completed development
+
+### Subscription V2
+- Dynamic DB-backed plan catalog.
+- Monthly/Yearly.
+- 7-day trial.
+- Manual UPI/Bank + UTR.
+- Platform Owner verification/rejection.
+- Historical price snapshot protection.
+- Tenant isolation.
+
+### DEV-01
+- Form validation error rendering consistency.
+- Existing Formik/Yup patterns preserved.
+- Zod server/API validation preserved.
+- Loading/server/form-level errors standardized where required.
+
+### DEV-02
+- Table internal scrolling.
+- Password visibility controls.
+- Page scroll reset behavior.
+- Related global UX fixes discovered during implementation.
+
+### DEV-03
+- Hotel Excel import.
+- Hotel Rate Sheet Excel import.
+- Strict file/column/row/business validation.
+- Preview before confirmation.
+- Safe create/update workflow.
+- Sample Download retained on Hotel and Hotel Rate import screens with production-aligned columns/validation and realistic non-private sample data.
+- Existing hotel records received stable generated Hotel Codes during implementation/backfill.
+
+### DEV-04B
+- Customer Invoice V1 lifecycle.
+- Invoice snapshot model/workflow.
+- Invoice numbering.
+- Invoice line items/discounts.
+- Due dates.
+- Payment recording/partial payments/voiding.
+- Status and overdue calculation.
+- Cancellation/replacement.
+- Invoice PDF.
+- Search/filter/list/detail workspace.
+- Operational history.
+- Tenant/security enforcement.
+
+### DEV-05B
+Per the implementation report supplied during the conversation:
+- Shared `ConfirmDialog` created at `src/components/shared/confirm-dialog.tsx`.
+- Shared `StatusBadge` created at `src/components/shared/status-badge.tsx`.
+- `getErrorMessage` enhanced in `src/lib/utils.ts` to avoid leaking raw Prisma/SQL/internal details.
+- Native confirmation/alert/prompt usages reported at zero after implementation.
+- List/table loading standardized with shared skeleton patterns.
+- Button pending/loading states improved.
+- Shared `PageHeader` reused across core modules.
+- Error/empty states standardized using shared components where applicable.
+- Global Search includes Invoices.
+- TopBar and responsive controls hardened for small widths.
+- Tables/toolbars/filters wrapped or scrolled safely for small screens.
+- No DB migrations/schema changes/auth/RLS changes were reported for DEV-05B.
+
+**Verification qualification:** DEV-05B implementation is currently **agent-reported**, not independently verified in this chat. DEV-05 QA must verify the actual code and browser behavior before the phase can close.
+
+## 99.5 Newly completed QA
+
+### DEV-03 QA
+- Final verdict: **PASS WITH LOW-RISK FINDINGS / CLOSED**.
+- 60-point automated Invoice-related suite was not part of DEV-03; the relevant DEV-03 Excel suite reported **23/23 passed**.
+- TypeScript/build passed.
+- Regression against relevant Phase 21-E/21-F functionality passed.
+- Hotel Code backfill: 367 existing hotels reported with 0 null/malformed codes.
+- Batch import performance improved from approximately 15.48s for 105 rows to approximately 925ms in the representative test.
+- Low-risk finding: Hotel `hotelCode` had an application-level uniqueness/concurrency hardening consideration because the reported schema did not have a DB unique constraint; do not silently change the schema without code/schema verification and an explicit hardening decision.
+
+### DEV-04 QA
+- Final verdict: **PASS — 100% VERIFIED, 0 BLOCKING DEFECTS**.
+- Invoice matrix: **60/60 passed**.
+- DEV-03 Excel regression: **23/23 passed**.
+- `npx tsc --noEmit`: PASS, 0 errors.
+- `npm run build`: PASS.
+- Business decision compliance: **37/37**.
+- Security/tenant isolation: zero confirmed cross-tenant vulnerabilities / IDOR risks in the tested invoice scope.
+- Parallel invoice issuance collision test passed with distinct sequential numbers and no observed sequence collision/gap in the tested scenario.
+- PDF snapshot/watermark behavior verified.
+- Public `/q/*`, `/trip/*`, `/b/*` routes audited with zero invoice exposure.
+- Scope exclusions verified.
+- One test-script TypeScript assertion issue involving a nullable `invoiceNumber` was fixed with a non-null assertion; final TypeScript result was clean.
+
+### DEV-05A
+- Read-only global UX consistency audit completed.
+- Found **31 native `confirm()` / `window.confirm()` usages** across 15/20 reviewed page/component files before DEV-05B.
+- Also identified inconsistent error messaging, loading presentation, page-header/container patterns, status badges, empty/error states, global search coverage, and 320px responsive risks.
+- Verdict: **NEEDS UX POLISH**, with no critical functional/data-loss defects reported.
+
+### DEV-05B
+- Agent report: implementation **COMPLETE / PASS**.
+- `npx tsc --noEmit`: PASS.
+- `npm run build`: PASS.
+- Invoice 60/60 regression: PASS.
+- Excel 23/23 regression: PASS.
+- Responsive code-level verification reported for 320, 360, 375, 390, 414, 768, 1024+.
+- Browser-level DEV-05 QA is **NOT YET CLOSED**.
 
 ---
 
-# 85. DEV-04 QA INVOICE V1 — COMPREHENSIVE QA & REGRESSION AUDIT RECORD
+# 100. INVOICE V1 — FINAL 37-DECISION LOCK
 
-**Phase:** DEV-04 QA — Customer Invoice V1  
-**Date:** September 9, 2026  
-**Status:** COMPLETE & QA APPROVED  
-**Final QA Verdict:** **PASS (100% Verified, 0 Blocking Defects)**  
-**QA Deliverable:** Full QA Audit Report & 60-Test Verification Matrix
+This section supersedes the old V2 Invoice proposal/design sections.
+
+## Decision #1 — Relationship
+One Booking → one active Invoice → multiple Payments. Cancelled historical invoices may remain. One active invoice per booking.
+
+## Decision #2 — Creation timing
+A Confirmed Booking does not automatically create an invoice. Agency Owner manually creates the invoice.
+
+## Decision #3 — Lifecycle / immutability
+- `DRAFT` is editable.
+- `ISSUED`, `PARTIALLY_PAID`, and `PAID` are immutable.
+- `CANCELLED` is terminal.
+- Correction = cancel old invoice + replacement.
+
+## Decision #4 — Payment relationship
+Every customer payment belongs to an Invoice. Partial/advance payments are allowed after invoice creation. No overpayment. No separate advance-payment architecture. No direct booking payment architecture for invoice V1.
+
+## Decision #5 — Customer invoice access
+Internal TripDesk + PDF only. No public invoice URL, customer invoice login, or online Pay Now in V1. Agency may manually send the PDF through its normal communication channels.
+
+## Decision #6 — Invoice statuses
+Exact business statuses:
+- `DRAFT`
+- `ISSUED`
+- `PARTIALLY_PAID`
+- `PAID`
+- `CANCELLED`
+
+No stored `UNPAID`. `OVERDUE` is calculated when balance > 0 and current date > due date.
+
+## Decision #7 — Numbering
+Agency-specific sequential numbers such as `INV-0001`. Number generated on issue, not draft. Unique within agency, immutable, never reused, concurrency-safe. No custom prefix/year in V1.
+
+## Decision #8 — Financial snapshot
+Invoice is an independent financial snapshot seeded from the confirmed booking/quotation. Draft can be edited. After issue, source changes do not silently change the invoice. `Subtotal − Discount = Total`. No GST/tax.
+
+## Decision #9 — Due date
+Agency Owner chooses due date. Required before issue. Due date ≥ invoice date. Same-day allowed. Due date may be after travel date; warning is acceptable. Immutable after issue.
+
+## Decision #10 — Line items / discount
+Multiple editable draft line items. Each line has Description, Quantity, Rate, Amount = Qty × Rate. Invoice-level discount only; fixed or percentage. No negative total. No line-level discount/tax/supplier margin/multi-currency.
+
+## Decision #11 — Draft behavior
+Invoice only from Confirmed Booking. If a draft already exists, continue it. Snapshot customer/booking/billing information. Draft can be edited and deleted. Deleting a draft consumes no number. Issue is explicit and transaction-safe.
+
+## Decision #12 — Cancellation
+Only Agency Owner. `ISSUED`/`PARTIALLY_PAID` can be cancelled; `PAID` cannot. Draft is deleted, not cancelled. Cancellation requires reason/timestamp/user. Payments remain retained. Booking is not auto-cancelled. Invoice cancellation does not auto-cancel booking. No credit-note/refund workflow.
+
+## Decision #13 — Payment recording/correction
+Only Agency Owner. Methods: Cash, UPI, Bank Transfer, Card, Other. Payment date defaults to today; future dates forbidden. Amount > 0 and ≤ remaining balance. Reference and notes optional. No new payment on cancelled invoice. Payments are immutable after creation. Correction uses `ACTIVE → VOIDED` with mandatory reason/user/timestamp. Voided payments are excluded from paid/balance/status and are not restorable.
+
+## Decision #14 — Invoice PDF
+PDF is generated from the stored invoice snapshot, not current booking financial values. Includes agency/customer/booking/invoice data, line items, discount, total, active paid amount, balance, active payment history, and branding/logo where supported. Draft PDF is marked `DRAFT — NOT AN ISSUED INVOICE` and has no invoice number. Issued PDF represents the immutable issued snapshot. Cancelled PDF is marked cancelled and includes cancellation metadata. Filename: `Invoice-{InvoiceNumber}.pdf`; draft uses a booking-based fallback. PDFKit is reused.
+
+## Decision #15 — Notes/instructions
+Optional customer-facing Invoice Notes and Payment Instructions. Internal Notes are separate and agency-only. Draft values are editable; issued values are immutable snapshots. Booking notes do not auto-sync. No new Payment Terms architecture. Reuse existing Agency Settings payment information where appropriate.
+
+## Decision #16 — Access/actions
+Dedicated `/invoices`. Booking links to current active invoice and cancelled history. List search: invoice number, customer name, customer phone, booking number. Filters: status, payment state, overdue, invoice date, due date. Detail is the billing workspace. Actions follow lifecycle: draft edit/preview/issue/delete; issued/partially paid download/print/record payment/cancel; paid download/print; cancelled download/print/create replacement.
+
+## Decision #17 — Eligibility
+**Invoice creation is permitted only from a Booking in the `CONFIRMED` status.** Pending/unconfirmed/cancelled bookings are rejected. The implementation must inspect the exact current Booking status enum before coding and must never invent or rename status values.
+
+## Decision #18 — Snapshot fields
+Final recommended snapshot content: invoice/agency/booking identifiers, invoice number/date/due date/status, customer name/phone/email/address, booking number/trip/package/travel dates, agency branding/contact data, subtotal/discount/total, customer-facing notes/payment instructions, and internal notes. Issued invoice remains correct after source changes.
+
+## Decision #19 — Invoice date
+Draft creation date by default. Agency Owner may edit in draft. Future invoice dates are forbidden. Immutable after issue.
+
+## Decision #20 — Financial validation
+Before issue: at least one line item; quantity > 0; rate ≥ 0; amount = qty × rate; subtotal correct; discount ≥ 0 and ≤ subtotal; valid non-negative total; due date exists; due date ≥ invoice date. Final server-side validation is authoritative.
+
+## Decision #21 — Currency
+INR only. Indian formatting. No conversion/multi-currency.
+
+## Decision #22 — Booking changes
+Booking changes do not automatically update an invoice draft or issued invoice. Booking UI may show a warning where supported.
+
+## Decision #23 — Booking cancellation
+Booking cancellation and invoice cancellation are independent lifecycles. Neither automatically cancels the other.
+
+## Decision #24 — Number concurrency
+Invoice numbering must be DB-safe and concurrency-safe, with no duplicate numbers/gaps/collisions under supported concurrent issuance. Cancelled invoice numbers remain consumed.
+
+## Decision #25 — Payment status
+- DRAFT → DRAFT.
+- Issued + no active payment → ISSUED.
+- Active payment < total → PARTIALLY_PAID.
+- Active payment = total → PAID.
+- Cancelled → CANCELLED.
+Voided payments do not count.
+
+## Decision #26 — Overdue
+Balance > 0 AND current date > due date. UI may show `ISSUED · OVERDUE` or `PARTIALLY_PAID · OVERDUE`. No cron is required.
+
+## Decision #27 — Deletion
+Only DRAFT invoices are deletable. Issued, partially paid, paid, and cancelled invoices are not deletable.
+
+## Decision #28 — Replacement
+Cancelled invoice → replacement draft → new invoice ID → new issue number. Same booking. Old cancelled invoice remains history. Old number is never reused.
+
+## Decision #29 — Audit history
+Basic operational events: Draft Created, Updated, Issued, Payment Recorded, Payment Voided, Cancelled, Replacement Created. Include user/time/reason where applicable. This is not a full accounting audit ledger.
+
+## Decision #30 — Permissions
+`AGENCY_OWNER` performs normal invoice operations. `PLATFORM_OWNER` does not receive normal agency billing workflow. No new invoice-specific role.
+
+## Decision #31 — Server security
+Every invoice/payment operation must authenticate, authorize, derive agency server-side, validate booking agency ownership, validate invoice agency ownership, validate payment ownership, and never trust client-supplied `agencyId`.
+
+## Decision #32 — Performance
+Use server-side pagination/filter/search, minimal list fields, no list-level payment-history loading, no N+1, and justified indexes. Detail loads detailed data.
+
+## Decision #33 — UX states
+Invoice UI must support loading, empty/no-invoice, draft, error, permission denied, not found, payment submission, void, cancellation, PDF generation/download, and other applicable pending states using the established shared UI patterns.
+
+## Decision #34 — Notifications
+Use existing Sonner/toast patterns for invoice creation, issue, payment, void, cancellation, and draft deletion. Errors must be actionable. No automated email/WhatsApp invoice delivery in V1.
+
+## Decision #35 — Search/filter
+Search invoice number, customer name, customer phone, booking number. Filters: status, payment state, overdue, invoice date, due date. Sort: invoice date, due date, invoice number, amount. Server-side. No saved filters/reporting.
+
+## Decision #36 — Reporting
+No dedicated accounting reports. Optional operational totals: Total Invoices, Total Billed, Total Paid, Total Outstanding, filtered by current search/filter. No P&L, balance sheet, GST, supplier payables, ledger, or revenue recognition module added to Invoice V1.
+
+## Decision #37 — Scope
+Included: full invoice lifecycle, numbering, snapshot, line items, discount, due date, PDF, payments/partial/void, balances/statuses, overdue, cancellation/replacement, history, search/filter, security. Excluded: GST/tax, credit/debit notes, refund accounting, supplier invoices/payables, full accounting ledger, P&L, online customer payment, public invoice URL, customer invoice login, automated WhatsApp/email, multi-currency, payment gateway, recurring invoices, and using invoice records as SaaS subscription billing.
 
 ---
 
-## 85.1 QA Execution Summary & Results
-A comprehensive, read-only QA audit was conducted on the Customer Invoice V1 implementation across schema integrity, lifecycle operations, immutable snapshot behavior, sequential numbering, concurrency safety, payments, payment voiding, cancellation, replacement, overdue calculation, PDFKit document generation, and multi-tenant security.
+# 101. HOTEL / RATE SHEET EXCEL — CURRENT STATE
 
-### Test Suites Executed:
-1. **DEV-04 Complete Matrix (`scratch/test-dev04-complete-matrix.ts`):** **60/60 PASSED (100%)**
-   - Business Lifecycle (T01–T22): 22/22 Passed
-   - Payment & Voiding (T23–T34): 12/12 Passed
-   - Cancellation & Replacement (T35–T43): 9/9 Passed
-   - Overdue & PDF Snapshots (T44–T51): 8/8 Passed
-   - Multi-Tenant Isolation & Concurrency (T52–T57): 6/6 Passed
-   - Regressions (T58–T60): 3/3 Passed
-2. **DEV-03 Excel Import Regression Suite (`scratch/test-dev03-excel.ts`):** **23/23 PASSED (100%)**
-3. **TypeScript Compilation (`npx tsc --noEmit`):** **PASS (0 errors)**
-4. **Production Build (`npm run build`):** **PASS (Exit code 0, 190+ API routes and 38+ pages compiled cleanly)**
+## Final architecture
 
----
+- Hotel Master remains hotel-level data.
+- RateSheet remains rate-level data.
+- No standalone `RoomType` model.
+- `roomType` remains a string in the existing architecture.
+- Supplier is **ON HOLD** as a product concept for new redesign work. Existing supplier models/code/routes/data must not be deleted or refactored merely because Hotel/RateSheet flows can work without them.
+- Do not create a Supplier-vs-Hotel split.
 
-## 85.2 Decision #1–#37 Compliance Audit
-All 37 finalized business decisions for Customer Invoice V1 were verified:
-- **Decision #1 (Relationship):** Confirmed `Booking → Invoice → Payments` relationship. Exactly 1 active invoice per booking; cancelled historical invoices preserved.
-- **Decision #2 (Creation):** Manual creation only by `AGENCY_OWNER`. Only `BookingStatus.CONFIRMED` eligible.
-- **Decision #3 (Lifecycle):** Strict transitions (`DRAFT → ISSUED → PARTIALLY_PAID → PAID`). `ISSUED` and `PARTIALLY_PAID` can transition to `CANCELLED`. `PAID` cannot be cancelled.
-- **Decision #4 & #20 (Payments):** All new customer payments belong to an `Invoice` via `invoiceId`. Historical booking payments without `invoiceId` remain 100% backward-compatible.
-- **Decision #5 & #32 (Access Boundary):** Internal TripDesk + PDF download only. Zero public invoice URLs, portals, or pay-now gateways.
-- **Decision #6 & #14 (Status & Overdue):** Stored statuses strictly match enum; overdue is calculated dynamically (`balanceDue > 0 && today > dueDate`) without database cron.
-- **Decision #7 & #15-#16 (Numbering & Concurrency):** Per-agency sequential numbering (`INV-0001`+), concurrency-safe transaction increments, numbers allocated only on issue; cancelled numbers permanently consumed.
-- **Decision #8 & #29 (Snapshots & Immutability):** Independent Customer, Booking, Agency, and Financial snapshots copied upon draft creation; strictly immutable after issue.
-- **Decision #9 (Due Date):** Required before issue, must be `>= invoiceDate`, immutable after issue.
-- **Decision #10 (Line Items):** Server-calculated (`Quantity × Rate`), editable in draft, immutable after issue.
-- **Decision #11 (Discount):** Invoice-level `FIXED` or `PERCENTAGE`, non-negative total, server-calculated.
-- **Decision #12 (Currency):** Strict `INR` (`₹`) only; no multi-currency or foreign exchange.
-- **Decision #21, #22, #24 (Payment Immutability & Void):** Payment records immutable; voiding requires mandatory reason, marks `VOIDED`, and recalculates balance/status. Overpayments and future dates rejected.
-- **Decision #27 & #28 (Cancellation & Replacement):** Cancellation requires reason; replacement creates a new Draft with a fresh ID and new sequential number upon issue.
-- **Decision #30 & #31 (PDF & Watermarks):** PDFKit generator with snapshot data, `DRAFT — NOT AN ISSUED INVOICE` / `CANCELLED` watermarks, internal notes & voided payments omitted.
-- **Decision #33–#37 (UI & Booking Integration):** `/invoices` list with filters/summary cards, `/invoices/[id]` dual-mode workspace, and `/bookings/[id]` "Customer Invoice" integration.
+## Import workflow
 
----
+```text
+Download Template
+  ↓
+Fill Excel
+  ↓
+Upload .xlsx
+  ↓
+Validate file format
+  ↓
+Validate columns
+  ↓
+Validate rows/data types/business rules
+  ↓
+Preview
+  ↓
+User confirms
+  ↓
+Create / Update
+```
 
-## 85.3 Security, Multi-Tenancy & Integrity Verification
-- **Tenant Isolation:** Verified Agency A cannot view, retrieve, modify, issue, cancel, void payments, or download PDFs belonging to Agency B.
-- **Server-Side Authorization:** Enforced via `requireWriteAccess()` / `requireReadAccess()` across all `/api/invoices/` route handlers; client-supplied `agencyId` is never trusted.
-- **IDOR Protection:** Compound query filters `{ id, agencyId }` prevent cross-tenant tampering.
-- **Scope Compliance:** Zero introduction of GST/Tax, Credit/Debit Notes, Supplier Invoices, Public Portals, or Multi-Currency.
+Manual entry and Excel import must use the same supported business fields and business rules.
 
----
+## Hotel import
 
-# 86. DEV-05B — GLOBAL UX CONSISTENCY, PROFESSIONAL MESSAGING & RESPONSIVE IMPLEMENTATION RECORD
+- One row = one Hotel master record.
+- Hotel Code is generated/stable in the application; import handling must not silently create conflicting codes.
+- Sample Download must remain visible and use production-aligned columns/validation with realistic non-private sample data.
 
-**Phase:** DEV-05B — Global UX Consistency & Responsive Implementation  
-**Date:** September 9, 2026  
-**Status:** COMPLETE & PASS  
-**Previous Audit Phase:** DEV-05A — Global UX Consistency & Responsive Audit  
-**Scope:** Global Confirmation Modal Foundation, Native Dialog Replacement, Professional Error & Status Messaging, Loading UX & Skeletons, Page-Header & Layout Consistency, Dialog & Empty/Error States, Status Badges, 320px Responsive Hardening, Global Search Invoice Integration.
+## Rate Sheet import
 
----
+- One row = one hotel rate record.
+- Hotel Code resolves to the Hotel master.
+- Room Type and Meal Plan remain fields, not a RoomType relation.
+- Vehicle/activity-only fields are not part of the Hotel Rate Sheet import.
+- Do not introduce GST/tax behavior merely because a legacy RateSheet field exists.
 
-## 86.1 Implementation Summary
+## Current QA status
 
-DEV-05B successfully addressed and resolved all approved UX, messaging, loading, and responsive findings identified in DEV-05A across the entire TripDesk codebase without changing database schema, Prisma models, backend business workflows, or security boundaries.
-
-### 1. Global Confirmation Modal System (`ConfirmDialog`)
-- **Shared Component:** Created `src/components/shared/confirm-dialog.tsx` built on Base UI Dialog primitives with support for titles, descriptions, custom confirm/cancel text, destructive/warning/default visual variants, and async pending/loading states.
-- **Native Dialogs Replaced:** Eliminated 100% of native browser dialogs (`confirm()`, `window.confirm()`, `alert()`, `prompt()`).
-  - Baseline before DEV-05B: **31 occurrences**
-  - Result after DEV-05B: **0 occurrences** (Zero user-facing native dialogs remain).
-- **Destructive Action Safety:** Confirmation dialogs now enforce disable-on-click, spinner feedback, double-click protection, and stay open during pending network operations until completion or error.
-
-### 2. Professional Error & Status Messaging (`getErrorMessage`)
-- **Safe Extraction Helper:** Enhanced `src/lib/utils.ts` with `getErrorMessage(error, fallback)` which safely unwraps API error structures, suppresses raw PostgreSQL/Prisma exceptions (foreign key failures, unique constraints), prevents credential/stack trace leakage, and supplies contextual, user-friendly fallback messages.
-- **Standardized Feedback:** Replaced developer-centric toasts ("Failed to fetch", "Failed to save") with contextual messaging across all CRUD and operational workflows.
-
-### 3. Loading UX Standardization
-- **Table & Page Skeletons:** Standardized table and list pages (`Customers`, `Trips`, `Quotations`, `Bookings`, `Hotels`, `Hotel Rates`, `Invoices`, `Payments`, `Enquiries`, `Suppliers`, `Vehicles`, `Activities`) to render `TableSkeleton` / `PageSkeleton` from `src/components/shared/loading-skeletons.tsx` inside predictable layout containers rather than large blank layouts or single centered spinners.
-- **Action Buttons:** Standardized async action buttons to display disabled loading state + spinner during submission across forms and dialogs.
-
-### 4. Page Header & Layout Consistency
-- **Shared PageHeader Reuse:** Verified and aligned page headers across all core workspaces using `src/components/shared/page-header.tsx` with responsive action wrapping and breadcrumb hierarchies.
-- **Empty & Error States:** Replaced ad-hoc error blocks with `ErrorState` (supporting safe retry handlers) and `EmptyState` across list pages and sub-tabs.
-
-### 5. Status Badge Centralization (`StatusBadge`)
-- **Universal Component:** Created `src/components/shared/status-badge.tsx` supporting all entity lifecycle states (`PAID`, `ISSUED`, `PARTIALLY_PAID`, `DRAFT`, `CANCELLED`, `VOIDED`, `CONFIRMED`, `PLANNING`, `ACCEPTED`, `REJECTED`, `EXPIRED`, `TRIAL`, `ACTIVE`, `INACTIVE`) while strictly preserving existing business enum values.
-
-### 6. Global Search Invoice Integration
-- **Discoverability:** Added `Invoices` (`/invoices`) with `Receipt` icon to `quickNavModules` in `src/components/shared/global-search.tsx`.
-
-### 7. 320px Responsive Hardening
-- **TopBar Hardening:** Resolved narrow viewport crowding in `src/components/layout/topbar.tsx` by hiding non-critical agency context pills below 360px and tightening padding.
-- **Table & Form Layouts:** Ensured deliberate horizontal scroll containers (`overflow-x-auto`) for data tables and responsive flex wrapping for filter toolbars and action buttons at 320px, 360px, 375px, 390px, 414px, and 768px+.
+DEV-03 and its QA are complete. Any future Excel hardening must preserve strict validation, preview, confirmation, tenant isolation, and safe update/create behavior.
 
 ---
 
-## 86.2 Verification & Regression Results
+# 102. DEV-05 — CURRENT GLOBAL UI CONSISTENCY AUDIT
 
-1. **TypeScript Typecheck (`npx tsc --noEmit`):** **PASS (0 errors)**
-2. **Next.js Production Build (`npm run build`):** **PASS (Exit code 0, 32 static/dynamic routes built cleanly)**
-3. **Customer Invoice V1 Regression Matrix (`scratch/test-dev04-complete-matrix.ts`):** **60/60 PASSED (100%)**
-4. **Excel Import Regression Suite (`scratch/test-dev03-excel.ts`):** **23/23 PASSED (100%)**
-5. **Native Dialog Grep Audit:** **0 user-facing native dialogs found in `src/`**
-6. **Multi-Tenant Security & Role Invariants:** 100% preserved (`PLATFORM_OWNER`, `AGENCY_OWNER` strictly unchanged; tenant isolation verified).
-7. **Database Safety:** Zero migrations, zero schema changes, zero DB resets.
+## 102.1 DEV-05A findings
+
+Before DEV-05B, the read-only audit found:
+
+- 31 native `confirm()` / `window.confirm()` instances across 15/20 reviewed page/component files.
+- Generic/error messages that could be too technical or inconsistent.
+- Some `toast.error(err.message || ...)` patterns with potential internal-error exposure.
+- Inconsistent terminology in some modules.
+- List pages often used centered spinners instead of shared table/page skeletons.
+- Page headers/container widths differed between modules.
+- Status badges were duplicated inline rather than consistently using a shared component.
+- Some ad-hoc error banners existed instead of shared `ErrorState`.
+- Global Search did not include Invoices.
+- TopBar and KPI layouts had 320px crowding risks.
+- Tables generally had horizontal scrolling, but responsive behavior required broader consistency review.
+
+## 102.2 DEV-05B implementation report
+
+Reported completed changes:
+
+- `src/components/shared/confirm-dialog.tsx`
+- `src/components/shared/status-badge.tsx`
+- enhanced `src/lib/utils.ts` `getErrorMessage`
+- shared loading/skeleton patterns
+- PageHeader reuse
+- shared ErrorState/EmptyState usage
+- invoice global-search entry
+- TopBar small-screen hardening
+- toolbar/filter/table responsive improvements
+- confirmation flows migrated across core modules
+
+The implementation report claims zero user-facing native `confirm`, `window.confirm`, `alert`, `window.alert`, `prompt`, and `window.prompt` after the change.
+
+## 102.3 NEW CURRENT FINDING — GLOBAL PAGE UI INCONSISTENCY
+
+Manual browser inspection after DEV-05B found visible structural differences between `/invoices` and `/documents`, with `/customers` also showing another established list-page pattern.
+
+Observed examples:
+
+### `/documents`
+- Large rounded PageHeader card.
+- Breadcrumb/context row.
+- Large title + description.
+- Right-side `Refresh List` action.
+- Separate search/filter card.
+- Large empty-state card.
+
+### `/invoices`
+- Title/description directly on page background rather than the same large header-card pattern.
+- Different title/icon structure.
+- Dark primary `Create from Booking` button instead of the same apparent primary-button treatment used elsewhere.
+- KPI cards before the search/filter area.
+- Separate search/filter card and table card.
+
+### `/customers`
+- Large PageHeader card.
+- KPI cards.
+- Search integrated into the table workspace.
+- Different but polished table/list structure.
+
+### Interpretation
+
+These differences are **not automatically defects** because different modules may legitimately have different information architecture. However, the application should share a consistent TripDesk design language and shared primitives. The current finding indicates that `/invoices`, `/documents`, and other list modules require a systematic consistency audit before DEV-05 can close.
+
+## 102.4 DEV-05 QA required scope
+
+Audit the entire authenticated application, not only `/invoices` and `/documents`.
+
+Review at minimum:
+
+- Dashboard
+- Enquiries
+- Customers
+- Trips
+- Quotations
+- Bookings
+- Invoices
+- Documents
+- Operations
+- Hotels
+- Rate Sheets
+- Suppliers
+- Vehicles
+- Activities
+- Finance
+- Payments
+- Follow-ups
+- Feedback & Reviews
+- Referrals & Rewards
+- Settings
+- Platform Owner/admin pages
+
+Also inspect important create/edit/detail/nested routes.
+
+### Consistency dimensions
+
+- PageHeader structure
+- breadcrumb/context treatment
+- page title/subtitle hierarchy
+- container/max-width/padding
+- primary/secondary/destructive button styles
+- button height/icon alignment/loading state
+- search input dimensions/icon/placeholder
+- filter/select dimensions and wrapping
+- KPI cards
+- ordinary cards
+- tables
+- table header/row/footer/pagination
+- status badges
+- action menus
+- dialogs
+- forms/field labels/errors
+- empty states
+- error states
+- loading skeletons
+- toast terminology
+- typography
+- spacing/radius/borders/shadows
+- icon sizing/alignment
+- responsive behavior
+- terminology consistency
+
+### Important principle
+
+Do **not** force every page to have identical structure. Dashboard, detail, form, quotation-builder, invoice-billing, and document pages may legitimately differ. The objective is:
+
+> **Different information architecture where necessary; one coherent TripDesk visual/design language everywhere.**
+
+### Canonical-pattern rule
+
+Do not assume `/invoices` is the canonical design and do not assume `/documents` is canonical. Inspect the existing shared components and strongest established patterns in the codebase before deciding which implementation should be reused.
+
+## 102.5 DEV-05 QA is read-only unless explicitly authorized
+
+For the current QA task:
+
+- do not patch defects during the audit;
+- do not refactor UI while measuring it;
+- do not redesign the product;
+- report exact route/file/component and severity for each inconsistency;
+- if implementation is later authorized, make the smallest controlled change and regression-test it.
 
 ---
 
-# END OF MASTER HANDOVER
+# 103. CURRENT BUG / ISSUE REGISTER
 
-**Current Approved Baseline:** **DEV-05B (Global UX Consistency, Professional Messaging & Responsive Implementation) COMPLETE — VERDICT: PASS**  
-**Next Recommended Phase:** **Beta Readiness / Production Deployment**
+## FIXED + VERIFIED
 
+1. Public quotation commercial-data exposure — fixed; preserve public DTO redaction.
+2. Customer duplicate detection — fixed and verified.
+3. Customer portal cross-agency booking-number collision — fixed and verified; do not revert agency-safe lookup.
+4. Rate-costing N+1/repeated rate lookup behavior — fixed via batching; do not revert.
+5. Subscription `availablePlans` TypeScript gap — fixed.
+6. DEV-03 Excel import implementation defects — final QA passed with only low-risk findings.
+7. Invoice lifecycle/numbering/payment/PDF/security defects covered by DEV-04 QA — 60/60 passed.
+8. Native confirmation dialogs targeted by DEV-05B — implementation report claims zero remaining user-facing native dialogs.
+9. Error extraction/security messaging improvements — implemented per DEV-05B report; final QA still required.
 
+## LOW-RISK / OPEN HARDENING
 
+1. Hotel Code DB-level uniqueness/concurrency hardening may remain a future low-risk concern depending on the exact current schema. **REQUIRES CODEBASE VERIFICATION** before any schema change.
+2. Rate limiting.
+3. APM/advanced monitoring.
+4. Middleware → proxy naming migration.
+5. Real-world beta performance monitoring.
 
+## CURRENT OPEN UX QA FINDING
 
+**Global UI consistency:** `/invoices`, `/documents`, `/customers`, and other modules may not share sufficiently consistent page/header/search/filter/table/card/button patterns.
 
+Severity: **UX consistency / pre-beta quality**, not currently a known data-loss or security defect.
+
+Status: **OPEN — DEV-05 QA**.
+
+## Important runtime lesson — stale Prisma Client
+
+A prior local development runtime issue caused `prisma.invoice` to be undefined and `/api/invoices`/summary to return 500. Root cause was a long-running Next.js dev process retaining a stale global Prisma client after the Invoice model was added. Fresh test/build processes passed. Restarting the dev server resolved the issue. No DB/code fix was required.
+
+Do not misdiagnose this historic local HMR/global singleton issue as a current schema defect without reproducing it.
+
+---
+
+# 104. CURRENT TEST / BUILD BASELINE
+
+## Subscription V2
+
+- 46 lifecycle/tenant-isolation tests.
+- 118 assertions.
+- 100% passed.
+
+## DEV-03 Excel
+
+- 23/23 DEV-03 Excel assertions/tests reported passed.
+
+## DEV-04 Invoice
+
+- 60/60 Invoice matrix passed.
+- 23/23 Excel regression passed.
+- TypeScript 0 errors.
+- Production build passed.
+- 37/37 Invoice business decisions compliant.
+- 0 blocking defects.
+
+## DEV-05B
+
+Agent-reported:
+- TypeScript PASS.
+- Production build PASS.
+- Invoice 60/60 PASS.
+- Excel 23/23 PASS.
+- Code-level responsive review at 320/360/375/390/414/768/1024+.
+
+**DEV-05 browser QA remains open.** Do not claim DEV-05 complete until actual browser verification is performed.
+
+## Current rule
+
+Historical test counts are evidence, not substitutes for current execution. The actual repository's executed test/build output is authoritative.
+
+---
+
+# 105. CURRENT DATABASE / SCHEMA STATUS AFTER DEV-04
+
+The older V2 document's 45-model inventory predates Invoice V1 and therefore must not be treated as the exact current model count.
+
+Invoice V1 added invoice-related persistence/sequence structures during DEV-04. The exact current Prisma model names/count and all relations must be obtained from the actual current `prisma/schema.prisma`.
+
+**CURRENT EXACT MODEL COUNT: UNKNOWN — REQUIRES CODEBASE VERIFICATION.**
+
+Known DEV-04 database/index facts from the final QA report include:
+
+- Invoice indexes reported for `[agencyId,status]`, `[agencyId,invoiceNumber]`, `[agencyId,invoiceDate]`, `[agencyId,dueDate]`, and `[bookingId]`.
+- Invoice sequence uniqueness reported as agency-scoped (`[agencyId]`).
+- Payment invoice relation/index reported on `[invoiceId]`.
+
+Do not infer additional invoice models/fields beyond what the current schema proves.
+
+---
+
+# 106. CURRENT ROUTE STATUS AFTER DEV-04/DEV-05
+
+Known current application routes include:
+
+- `/invoices`
+- `/invoices/[id]`
+- `/documents`
+- `/customers`
+- `/trips`
+- `/quotations`
+- `/bookings`
+- `/payments`
+- `/operations`
+- `/hotels`
+- `/rate-sheets`
+- `/suppliers`
+- `/vehicles`
+- `/activities`
+- `/enquiries`
+- `/communications`
+- `/reports`
+- `/feedback`
+- `/referrals`
+- `/customer-insights`
+- `/subscription`
+- `/admin/*`
+
+Exact route inventory and nested paths remain code-authoritative. **REQUIRES CODEBASE VERIFICATION** before creating or renaming routes.
+
+Public families remain:
+
+- `/q/*`
+- `/trip/*`
+- `/b/*`
+- `/customer/*` where implemented
+
+Invoice V1 specifically must not expose invoice data through those public routes.
+
+---
+
+# 107. FINAL FEATURE STATUS MATRIX — V3
+
+| Area | Status | Notes |
+|---|---|---|
+| Authentication | COMPLETE | Supabase Auth + SSR |
+| Authorization/RBAC | COMPLETE | Exactly two internal roles |
+| Multi-tenancy | COMPLETE + VERIFIED | Server-derived agency scope |
+| Customer architecture | COMPLETE + VERIFIED | External record, not User/Auth |
+| Customer duplicate detection | FIXED + VERIFIED | Preserve |
+| Public quotation security | FIXED + VERIFIED | Preserve commercial redaction |
+| Subscription V2 | COMPLETE + VERIFIED | 46 tests / 118 assertions |
+| BH-00 → BH-07 | COMPLETE | BH-07 Conditional Go |
+| DEV-01 | COMPLETE | Form UX consistency |
+| DEV-01 QA | COMPLETE | QA closed |
+| DEV-02A | COMPLETE | Global UX audit |
+| DEV-02B | COMPLETE | Global UX implementation |
+| DEV-02 Closeout | COMPLETE | Closed |
+| DEV-03A | COMPLETE | Decision/compatibility audit |
+| DEV-03B | COMPLETE | Hotel/Rate Sheet Excel import |
+| DEV-03 QA | COMPLETE | PASS WITH LOW-RISK FINDINGS |
+| DEV-04B Invoice V1 | COMPLETE | Full lifecycle implemented |
+| DEV-04 QA | COMPLETE | PASS, 60/60 + regressions |
+| DEV-05A | COMPLETE | Global UX consistency audit |
+| DEV-05B | COMPLETE per implementation report | Needs final QA verification |
+| DEV-05 QA | **OPEN / CURRENT** | Global UI consistency + browser verification |
+| Deployment readiness | NOT STARTED AS CURRENT PHASE | Only after DEV-05 QA closes |
+| Controlled real-agency beta | NOT STARTED | After deployment readiness |
+
+---
+
+# 108. FINAL ROADMAP — V3
+
+## Current phase
+
+**DEV-05 QA — Global UI Consistency, Professional Messaging & Responsive Verification**
+
+## Immediate QA objective
+
+Verify that DEV-05B actually produced a coherent, professional TripDesk UI across all major pages, with special attention to the newly observed `/invoices` vs `/documents` vs `/customers` differences.
+
+## Required sequence
+
+```text
+DEV-05 QA
+  ↓
+If PASS
+  ↓
+DEV-05 CLOSEOUT
+  ↓
+Pre-Beta Deployment / Operational Readiness
+  ↓
+Controlled Real-Agency Beta
+```
+
+If DEV-05 QA finds UI defects:
+
+```text
+DEV-05 QA
+  ↓
+Document findings
+  ↓
+Review/authorize controlled fixes
+  ↓
+DEV-05C / targeted UX implementation (name only after explicitly decided)
+  ↓
+Regression + browser QA
+  ↓
+DEV-05 Closeout
+```
+
+Do not create a new phase name merely by assumption.
+
+## Deployment gate
+
+Do not begin real-agency onboarding until:
+
+- DEV-05 QA passes.
+- TypeScript/build are clean after any fixes.
+- Invoice/Excel regressions remain green.
+- Core security/tenant isolation remains intact.
+- Responsive/browser QA is acceptable at the required widths.
+- Production hosting/environment/domain/Auth/backup/integration prerequisites are verified.
+
+---
+
+# 109. DO NOT REINTRODUCE — V3 COMPLETE LIST
+
+The next AI must not reintroduce or resurrect any of the following without an explicit new product decision:
+
+### Roles/auth
+- Travel Agent role.
+- Sales Agent role.
+- Sub-Agent role.
+- Internal Customer role.
+- Customer Supabase Auth account.
+- Customer password/customer signup.
+- Plaintext passwords.
+
+### Data architecture
+- Standalone `RoomType` Prisma model for the current Hotel/RateSheet architecture.
+- Separate Room Types master or separate Room Types Excel sheet.
+- Supplier-vs-Hotel conceptual split that was rejected/on hold.
+- Duplicate subscription architecture.
+- Unnecessary duplicate payment architecture.
+
+### Product scope
+- GST/tax feature in Invoice V1.
+- Lead-source tracking in V1 where it was explicitly excluded.
+- Individual traveler profile system.
+- Flight booking module.
+- Visa assistance.
+- Public invoice URL.
+- Customer invoice login.
+- Online customer invoice Pay Now.
+- Automatic invoice creation on every booking.
+- Credit/debit note workflow.
+- Full invoice accounting ledger/P&L/GST module.
+- Supplier invoice/payables inside Customer Invoice V1.
+- Multi-currency invoice engine.
+- Recurring invoices.
+- Invoice as SaaS subscription billing mechanism.
+- Automatic Stripe/Razorpay recurring SaaS billing in beta.
+- Complex proration/refund engine.
+- Usage-based billing/coupons/seat billing unless separately approved.
+- AI assistant / broad automation / mobile-native app before beta evidence justifies them.
+
+### Security/engineering
+- Client-trusted `agencyId`.
+- Cross-tenant lookup without server-side tenant validation.
+- Public supplier cost/margin/internal notes.
+- Service-role keys/secrets in browser.
+- Destructive DB reset without explicit user authorization.
+- Direct spreadsheet insertion without validation/preview/confirmation.
+- Hard reloads used as a shortcut for application navigation/scroll fixes.
+- Unrelated architecture rewrites.
+- Silent schema changes.
+- Invented enum/status names.
+- Claims of browser QA/tests without actual execution.
+
+### UX
+- Do not force every module into an identical layout.
+- Do not create one-off styling when a shared TripDesk component already exists without justification.
+- Do not choose `/invoices` or `/documents` as the canonical design by assumption; inspect shared patterns first.
+- Do not sacrifice mobile usability for desktop aesthetics.
+
+---
+
+# 110. CURRENT UNKNOWN / REQUIRES CODEBASE VERIFICATION
+
+The following are intentionally not guessed:
+
+1. Exact current Prisma model count after DEV-04 invoice schema additions.
+2. Exact invoice-related Prisma model names/fields/relations beyond what DEV-04 QA explicitly reported.
+3. Exact current route inventory, including all nested invoice/document/admin paths.
+4. Exact current implementation of all DEV-05B changes.
+5. Actual browser result of DEV-05 QA.
+6. Whether every listed shared component is used consistently across every module.
+7. Whether Hotel Code has a DB-level unique constraint in the current live schema.
+8. Exact current Booking status enum spelling; use the codebase before any future invoice eligibility change.
+9. Exact current Subscription route/API inventory.
+10. Exact production environment/deployment state.
+
+When any of these matters, inspect the current repository rather than inferring from this document.
+
+---
+
+# 111. CONTINUATION PROTOCOL — NEW CHAT
+
+When this V3 file is uploaded into a new ChatGPT conversation, the AI must:
+
+1. Read the entire file.
+2. Treat Sections 98+ as the current authoritative update layer.
+3. Inspect the actual current codebase before making implementation claims.
+4. Understand that Subscription V2, DEV-01, DEV-02, DEV-03, and DEV-04 are already completed.
+5. Understand that DEV-05B is reported complete but DEV-05 QA is still open.
+6. Start with the **DEV-05 QA / Global UI Consistency** problem if asked to continue from the current stopping point.
+7. Do not implement fixes during a read-only QA request unless explicitly authorized.
+8. If a UI inconsistency is found, distinguish legitimate module-specific information architecture from inconsistent shared design primitives.
+9. Preserve Invoice V1 Decisions #1–#37 exactly.
+10. Preserve the rule: invoice creation only from `CONFIRMED` Booking status.
+11. Preserve Hotel/RateSheet architecture and Excel import safety.
+12. Preserve all security and tenant-isolation invariants.
+13. Preserve the current two-role system.
+14. Never expose or request secrets unnecessarily.
+15. Do not perform destructive database operations.
+16. After any authorized successful implementation or QA phase, update this master context with the new status and findings.
+
+---
+
+# 112. FINAL V3 CONSISTENCY AUDIT
+
+## A. Missing post-V2 work
+**COVERED.** DEV-01 through DEV-05B and their known QA states are added.
+
+## B. Stale V2 states
+**COVERED.** Subscription V2, DEV-01, DEV-02, DEV-03, and DEV-04 stale pending statements are explicitly superseded.
+
+## C. Invoice decisions
+**COMPLETE.** All 37 Invoice V1 decisions are captured with the confirmed-booking eligibility rule.
+
+## D. Booking → Invoice
+**COMPLETE.** Invoice creation requires Booking status `CONFIRMED`; exact enum must be code-verified before future changes.
+
+## E. Excel import
+**COMPLETE.** DEV-03 implementation and QA status are recorded, including the low-risk Hotel Code uniqueness concern.
+
+## F. UI/UX
+**CURRENT OPEN ITEM.** DEV-05B is recorded as implementation-complete by agent report, while DEV-05 QA remains open because actual cross-page UI consistency has not yet been certified.
+
+## G. Security
+**PRESERVED.** Two-role RBAC, server-derived tenant scope, public token security, commercial redaction, secret handling, and no plaintext passwords remain binding.
+
+## H. Database
+**SAFE WITH EXPLICIT UNCERTAINTY.** Known model/index facts are recorded without inventing invoice model names/count. Exact live schema remains authoritative.
+
+## I. Routes
+**SAFE WITH EXPLICIT UNCERTAINTY.** Major current routes are recorded, but exact inventory remains code-authoritative.
+
+## J. Current roadmap
+**CLEAR.** Current phase is DEV-05 QA. Deployment/beta is gated behind DEV-05 closure and operational readiness.
+
+## K. No reintroduction
+**COVERED.** Rejected roles, models, financial architecture, security shortcuts, and scope expansions are explicitly blocked.
+
+## L. New-chat continuity
+**PASS.** A new AI should understand the current project state without relying on the old conversation, provided it also respects the explicit codebase-verification rules for unknown exact implementation details.
+
+---
+
+# 113. V3 HANDOFF STATUS
+
+**MASTER CONTEXT V3 STATUS: READY FOR NEW-CHAT HANDOFF — CURRENT DEVELOPMENT PHASE IS DEV-05 QA.**
+
+The project is not ready to be called fully beta-ready solely from this document. The remaining application-level gate is the completion of DEV-05 QA, especially the global UI consistency/browser verification now prompted by the `/invoices` vs `/documents` vs `/customers` discrepancy.
+
+The next ChatGPT should **not** restart the project, revisit finalized Invoice decisions, re-plan Subscription V2, or reimplement completed DEV-01/02/03/04 work.
+
+### Exact next action
+
+> **Run DEV-05 QA as a read-only global UI consistency + responsive/browser verification audit. Do not patch until findings are documented and explicitly authorized.**
+
+---
+
+# 114. DEV-05 FINAL CLOSEOUT — VERIFIED SEPTEMBER 2026
+
+## 114.1 Final Certification Status
+**DEV-05 STATUS: CLOSED (VERIFIED & CERTIFIED)**
+
+DEV-05 (Global UI Consistency, Professional Messaging & Responsive Verification) has successfully completed independent final closeout QA following the controlled remediation of DEV05-QA-008.
+
+- **Closeout Date:** 10 September 2026
+- **Final Result:** PASS — DEV-05 CLOSED
+- **Next Checkpoint:** PRE-BETA OPERATIONAL READINESS
+
+## 114.2 Findings Verification Matrix
+All 8 QA findings identified and remediated during DEV-05 have been independently verified in code and the live application:
+
+| ID | Module / Area | Description | Status |
+|---|---|---|---|
+| DEV05-QA-001 | `src/components/shared/status-badge.tsx` | Standardized shared StatusBadge across `/documents`, `/invoices`, `/invoices/[id]` supporting all statuses (OVERDUE, REVOKED, SUPERSEDED, GENERATED, VOIDED, etc.) | **PASS / VERIFIED** |
+| DEV05-QA-002 | `/invoices` | Standard workspace layout, Hero Command Card, Billing & Collections context, Receipt icon, 5 KPI cards, StatusBadge, search/filters | **PASS / VERIFIED** |
+| DEV05-QA-003 | `/documents` | Standard workspace container boundaries matching canonical TripDesk workspace rhythm | **PASS / VERIFIED** |
+| DEV05-QA-004 | `/trips`, `/documents`, `/invoices` | Uniform shared `TableSkeleton` for list view loading states replacing raw spinners | **PASS / VERIFIED** |
+| DEV05-QA-005 | `src/lib/utils.ts` | Centralized `getErrorMessage()` sanitization suppressing raw Prisma/SQL/runtime error leaks | **PASS / VERIFIED** |
+| DEV05-QA-006 | `GlobalSearch` | Placeholder updated to "Search customers, trips, invoices, bookings..." with Invoices quick-navigation link | **PASS / VERIFIED** |
+| DEV05-QA-007 | `/invoices/[id]` | Invoice detail Hero Command Header, back navigation, Customer Invoice context, StatusBadge, Overdue indicator, ErrorState | **PASS / VERIFIED** |
+| DEV05-QA-008 | `/documents` | PageHeader container nesting and spacing disconnect remediated; unified inside canonical `max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6` workspace | **PASS / RESOLVED** |
+
+## 114.3 Automated Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, all static & dynamic routes compiled cleanly)
+- **DEV-04 Invoice Verification Matrix (`test-dev04-complete-matrix.ts`):** 60/60 PASSED (100%)
+- **DEV-03 Excel Ingestion Matrix (`test-dev03-excel.ts`):** 23/23 PASSED (100%)
+- **Native Dialog Audit (`confirm`, `alert`, `prompt`):** PASS (0 instances in `src/`)
+
+## 114.4 Responsive & Browser Verification Matrix
+Live browser inspection verified visual consistency across 1440px, 1280px, 390px, 375px, and 320px viewports:
+
+| Area / Route | 1440px | 1280px | 390px | 375px | 320px | Overall Result |
+|---|---|---|---|---|---|---|
+| `/documents` | PASS | PASS | PASS | PASS | PASS | **PASS** |
+| `/invoices` | PASS | PASS | PASS | PASS | PASS | **PASS** |
+| `/invoices/[id]` | PASS | PASS | PASS | PASS | PASS | **PASS** |
+| `/trips` | PASS | PASS | PASS | PASS | PASS | **PASS** |
+| `/customers` | PASS | PASS | PASS | PASS | PASS | **PASS** |
+| Global Search | PASS | PASS | PASS | PASS | PASS | **PASS** |
+
+## 114.5 Security & Business Rule Invariants
+- Two-role system (`PLATFORM_OWNER`, `AGENCY_OWNER`) preserved.
+- Tenant isolation and server-side `agencyId` scoping verified.
+- Invoice creation strictly enforced only for `CONFIRMED` Booking status.
+- Zero Prisma schema changes, zero database migrations, zero API route contract changes.
+
+## 114.6 Next Step
+- **PRE-BETA OPERATIONAL READINESS**
+
+---
+
+# END OF MASTER HANDOVER V3
+
+**Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
 

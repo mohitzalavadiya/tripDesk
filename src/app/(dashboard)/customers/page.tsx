@@ -4,11 +4,15 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import {
   customerClient,
   CustomerWithCounts,
 } from "@/lib/api-client";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -131,7 +135,7 @@ export default function CustomersPage() {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
-      setError(err?.message || "Failed to load customers from database.");
+      setError(getErrorMessage(err, "Unable to load customer directory. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -140,6 +144,15 @@ export default function CustomersPage() {
   React.useEffect(() => {
     fetchCustomers();
   }, [fetchCustomers]);
+
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleClearFilters = () => {
     setSearch("");
@@ -152,24 +165,32 @@ export default function CustomersPage() {
   const isFilterActive = search.trim() !== "" || cityFilter !== "" || includeArchived;
 
   // Archive Customer
-  const handleArchive = async (id: string, name: string, customerNumber?: string | null) => {
+  const handleArchive = (id: string, name: string, customerNumber?: string | null) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
     }
 
     const ref = customerNumber ? `${customerNumber} (${name})` : name;
-    if (!confirm(`Archive customer ${ref}? Historical trips and bookings will remain intact.`)) {
-      return;
-    }
-
-    try {
-      await customerClient.archiveCustomer(id);
-      toast.success(`Customer ${ref} archived successfully.`);
-      await fetchCustomers();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive customer.");
-    }
+    setConfirmAction({
+      title: "Archive customer?",
+      description: `Archive customer ${ref}? Historical trips, quotations, and bookings will remain intact.`,
+      confirmText: "Archive Customer",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await customerClient.archiveCustomer(id);
+          toast.success(`Customer ${ref} archived successfully.`);
+          setConfirmAction(null);
+          await fetchCustomers();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the customer. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Telemetry Aggregates
@@ -327,27 +348,19 @@ export default function CustomersPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching customer directory...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchCustomers()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load customers"
+                description={error}
+                onRetry={() => fetchCustomers()}
+              />
             </div>
           )}
 
@@ -577,6 +590,24 @@ export default function CustomersPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
+      />
     </div>
   );
 }

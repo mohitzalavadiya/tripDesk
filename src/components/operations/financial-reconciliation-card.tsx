@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import {
   DollarSign,
   Plus,
@@ -115,7 +116,7 @@ export function FinancialReconciliationCard({
       toast.success("Financial cost reconciliation recorded successfully!");
       onSuccess();
     } catch (err: any) {
-      toast.error(err.message || "Failed to save financial reconciliation.");
+      toast.error(getErrorMessage(err, "Failed to save financial reconciliation. Please try again."));
     } finally {
       setSaving(false);
     }

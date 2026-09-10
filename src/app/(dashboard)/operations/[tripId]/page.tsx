@@ -50,6 +50,8 @@ import { OperationsClosureSummary } from "@/lib/api-client";
 import { PageHeader } from "@/components/shared/page-header";
 import { PageSkeleton, CardSkeleton, TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ErrorState } from "@/components/shared/error-state";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { getErrorMessage } from "@/lib/utils";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,6 +110,16 @@ export default function TripOperationsDetailPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [initializing, setInitializing] = React.useState(false);
+
+  // Confirm Dialog state
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   // Active Tab
   const [activeTab, setActiveTab] = React.useState<
@@ -296,25 +308,28 @@ export default function TripOperationsDetailPage() {
     }
   };
 
-  const handleCancelDispatch = async (dispatch: VehicleDispatchWithDetails) => {
+  const handleCancelDispatch = (dispatch: VehicleDispatchWithDetails) => {
     if (!operation) return;
-    const confirmCancel = window.confirm(
-      `Are you sure you want to cancel the dispatch for ${dispatch.tripVehicle?.vehicleName || "this vehicle"}?`
-    );
-    if (!confirmCancel) return;
-
-    try {
-      await operationsClient.updateVehicleDispatch(operation.id, dispatch.id, {
-        status: DispatchStatus.CANCELLED,
-        notes: dispatch.notes
-          ? `${dispatch.notes}\n[CANCELLED]: Cancelled by operations coordinator.`
-          : "[CANCELLED]: Cancelled by operations coordinator.",
-      });
-      toast.success(`Dispatch cancelled.`);
-      fetchOperationData();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to cancel dispatch");
-    }
+    setConfirmAction({
+      title: "Cancel vehicle dispatch?",
+      description: `Are you sure you want to cancel the dispatch for ${dispatch.tripVehicle?.vehicleName || "this vehicle"}?`,
+      confirmText: "Cancel Dispatch",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await operationsClient.updateVehicleDispatch(operation.id, dispatch.id, {
+            status: DispatchStatus.CANCELLED,
+            notes: dispatch.notes
+              ? `${dispatch.notes}\n[CANCELLED]: Cancelled by operations coordinator.`
+              : "[CANCELLED]: Cancelled by operations coordinator.",
+          });
+          toast.success("Dispatch cancelled successfully.");
+          fetchOperationData();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to cancel dispatch. Please try again."));
+        }
+      },
+    });
   };
 
   // Handle Issue Actions
@@ -1503,6 +1518,27 @@ export default function TripOperationsDetailPage() {
           downloadUrl={`/api/operations/${operation.id}/documents/travel-kit/pdf`}
         />
       )}
+
+      {/* Global Action Confirmation Modal */}
+      <ConfirmDialog
+        open={!!confirmAction}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (!confirmAction) return;
+          setActionLoading(true);
+          try {
+            await confirmAction.action();
+            setConfirmAction(null);
+          } finally {
+            setActionLoading(false);
+          }
+        }}
+      />
     </div>
   );
 }

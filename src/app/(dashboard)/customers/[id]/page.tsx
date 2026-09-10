@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { customerClient, CustomerDetails360 } from "@/lib/api-client";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -104,6 +106,14 @@ export default function CustomerDetailPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   // Active Tab state
   const [activeTab, setActiveTab] = React.useState<
@@ -303,28 +313,32 @@ export default function CustomerDetailPage() {
   };
 
   // Handle Archive Customer
-  const handleArchive = async () => {
+  const handleArchive = () => {
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
     }
 
     if (!customer) return;
-    if (
-      !confirm(
-        `Archive customer ${customer.name}? All historical trips, quotations, and bookings remain safe in the database.`
-      )
-    ) {
-      return;
-    }
-
-    try {
-      await customerClient.archiveCustomer(id);
-      toast.success(`Customer ${customer.name} archived.`);
-      router.push("/customers");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive customer.");
-    }
+    setConfirmAction({
+      title: "Archive customer?",
+      description: `Archive customer "${customer.name}"? All historical trips, quotations, and bookings remain safe in the database.`,
+      confirmText: "Archive Customer",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await customerClient.archiveCustomer(id);
+          toast.success(`Customer ${customer.name} archived.`);
+          setConfirmAction(null);
+          router.push("/customers");
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the customer. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   const formatDateDisplay = (date: Date | string | null | undefined) => {
@@ -1380,6 +1394,24 @@ export default function CustomerDetailPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          open={confirmAction !== null}
+          onOpenChange={(open) => {
+            if (!open && !actionLoading) setConfirmAction(null);
+          }}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (confirmAction?.action) {
+              await confirmAction.action();
+            }
+          }}
+        />
       </div>
     </div>
   );

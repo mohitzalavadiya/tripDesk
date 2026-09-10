@@ -29,7 +29,11 @@ import {
   Compass,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -169,7 +173,7 @@ export default function QuotationsPage() {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
-      setError(err?.message || "Failed to load quotations from database.");
+      setError(getErrorMessage(err, "Unable to load quotations. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -178,6 +182,15 @@ export default function QuotationsPage() {
   React.useEffect(() => {
     fetchQuotations();
   }, [fetchQuotations]);
+
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleClearFilters = () => {
     setSearch("");
@@ -189,26 +202,33 @@ export default function QuotationsPage() {
   const isFilterActive = search.trim() !== "" || statusFilter !== "all";
 
   // Soft Archive Quotation
-  const handleDelete = async (id: string, number: string) => {
+  const handleDelete = (id: string, number: string) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Modifications are restricted to read-only mode.");
       return;
     }
 
-    if (!confirm(`Archive quotation ${number}? This keeps historical records safe.`)) {
-      return;
-    }
-
-    try {
-      setDeletingId(id);
-      await quotationClient.deleteQuotation(id);
-      toast.success(`Quotation ${number} archived successfully.`);
-      await fetchQuotations();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive quotation.");
-    } finally {
-      setDeletingId(null);
-    }
+    setConfirmAction({
+      title: "Archive quotation?",
+      description: `Archive quotation ${number}? Historical costing snapshots and client proposals will remain safe.`,
+      confirmText: "Archive Quotation",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          setDeletingId(id);
+          await quotationClient.deleteQuotation(id);
+          toast.success(`Quotation ${number} archived successfully.`);
+          setConfirmAction(null);
+          await fetchQuotations();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the quotation. Please try again."));
+        } finally {
+          setActionLoading(false);
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
   const handleOpenShare = (q: QuotationWithRelations) => {
@@ -335,27 +355,19 @@ export default function QuotationsPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching quotations from database...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchQuotations()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load quotations"
+                description={error}
+                onRetry={() => fetchQuotations()}
+              />
             </div>
           )}
 
@@ -631,6 +643,24 @@ export default function QuotationsPage() {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          open={confirmAction !== null}
+          onOpenChange={(open) => {
+            if (!open && !actionLoading) setConfirmAction(null);
+          }}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (confirmAction?.action) {
+              await confirmAction.action();
+            }
+          }}
+        />
       </div>
     </div>
   );

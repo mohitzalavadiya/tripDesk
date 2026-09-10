@@ -20,7 +20,11 @@ import {
   UserCheck,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -94,7 +98,7 @@ export default function VehiclesPage() {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
-      setError(err?.message || "Failed to load vehicles from database.");
+      setError(getErrorMessage(err, "Unable to load vehicle fleet. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -103,6 +107,15 @@ export default function VehiclesPage() {
   React.useEffect(() => {
     fetchVehicles();
   }, [fetchVehicles]);
+
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleClearFilters = () => {
     setSearch("");
@@ -113,31 +126,38 @@ export default function VehiclesPage() {
   const isFilterActive = search.trim() !== "";
 
   // Archive Vehicle
-  const handleArchive = async (id: string, name: string) => {
+  const handleArchive = (id: string, name: string) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Modifications are restricted to read-only mode.");
       return;
     }
 
-    if (!confirm(`Archive vehicle "${name}"? This soft-deletes the record while keeping historical trip assignments safe.`)) {
-      return;
-    }
-
-    try {
-      setArchivingId(id);
-      await vehicleClient.archiveVehicle(id);
-      toast.success(`Vehicle "${name}" archived successfully.`);
-      await fetchVehicles();
-    } catch (err: any) {
-      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-        setIsReadOnly(true);
-        toast.error("Subscription expired. Read-only mode is active.");
-      } else {
-        toast.error(err?.message || "Failed to archive vehicle.");
-      }
-    } finally {
-      setArchivingId(null);
-    }
+    setConfirmAction({
+      title: "Archive vehicle?",
+      description: `Archive vehicle "${name}"? This soft-deletes the record while keeping historical trip assignments safe.`,
+      confirmText: "Archive Vehicle",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          setArchivingId(id);
+          await vehicleClient.archiveVehicle(id);
+          toast.success(`Vehicle "${name}" archived successfully.`);
+          setConfirmAction(null);
+          await fetchVehicles();
+        } catch (err: any) {
+          if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+            setIsReadOnly(true);
+            toast.error("Subscription expired. Read-only mode is active.");
+          } else {
+            toast.error(getErrorMessage(err, "We couldn't archive the vehicle. Please try again."));
+          }
+        } finally {
+          setActionLoading(false);
+          setArchivingId(null);
+        }
+      },
+    });
   };
 
   return (
@@ -239,27 +259,19 @@ export default function VehiclesPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching vehicles from database...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchVehicles()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load vehicles"
+                description={error}
+                onRetry={() => fetchVehicles()}
+              />
             </div>
           )}
 
@@ -443,6 +455,24 @@ export default function VehiclesPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
+      />
     </div>
   );
 }
