@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   RefreshCw,
   Zap,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,24 @@ import {
   NotificationChannel,
 } from "@prisma/client";
 import { toast } from "sonner";
+
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  ALL: "All",
+  HOTEL_VOUCHER: "Hotel Voucher",
+  VEHICLE_VOUCHER: "Vehicle Voucher",
+  ACTIVITY_VOUCHER: "Activity Pass",
+  BOOKING_CONFIRMATION: "Booking Confirmation",
+  CUSTOMER_ITINERARY: "Travel Itinerary",
+  PAYMENT_RECEIPT: "Payment Receipt",
+};
+
+const DOCUMENT_STATUS_LABELS: Record<string, string> = {
+  ALL: "All",
+  GENERATED: "Draft / Generated",
+  ISSUED: "Officially Issued",
+  REVOKED: "Revoked",
+  SUPERSEDED: "Superseded",
+};
 
 export default function DocumentCenterPage() {
   const [loading, setLoading] = React.useState(true);
@@ -256,55 +275,105 @@ export default function DocumentCenterPage() {
           }}
         />
 
-        {/* Filters and Search Bar */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row items-center gap-3 justify-between">
-          <div className="flex items-center gap-3 w-full md:w-auto flex-1">
-            <div className="relative w-full max-w-md">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search document #, customer, or booking ref..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-9 text-xs bg-slate-50/50 border-slate-200"
-              />
+        {/* Master Workspace Card (Unified Search Toolbar + Table) */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+          {/* Master Toolbar Header */}
+          <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-2xl">
+                <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search document #, customer, or booking ref..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all"
+                />
+                {search && (
+                  <button
+                    onClick={() => {
+                      setSearch("");
+                      setPage(1);
+                    }}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                {/* Type Filter */}
+                <Select
+                  value={typeFilter}
+                  onValueChange={(val) => {
+                    if (val) {
+                      setTypeFilter(val);
+                      setPage(1);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9.5 text-xs w-[160px] rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300">
+                    <SelectValue placeholder="All">
+                      {(val) => DOCUMENT_TYPE_LABELS[val] ?? "All"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All</SelectItem>
+                    <SelectItem value="HOTEL_VOUCHER">Hotel Voucher</SelectItem>
+                    <SelectItem value="VEHICLE_VOUCHER">Vehicle Voucher</SelectItem>
+                    <SelectItem value="ACTIVITY_VOUCHER">Activity Pass</SelectItem>
+                    <SelectItem value="BOOKING_CONFIRMATION">Booking Confirmation</SelectItem>
+                    <SelectItem value="CUSTOMER_ITINERARY">Travel Itinerary</SelectItem>
+                    <SelectItem value="PAYMENT_RECEIPT">Payment Receipt</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Status Filter */}
+                <Select
+                  value={statusFilter}
+                  onValueChange={(val) => {
+                    if (val) {
+                      setStatusFilter(val);
+                      setPage(1);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9.5 text-xs w-[140px] rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300">
+                    <SelectValue placeholder="All">
+                      {(val) => DOCUMENT_STATUS_LABELS[val] ?? "All"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All</SelectItem>
+                    <SelectItem value="GENERATED">Draft / Generated</SelectItem>
+                    <SelectItem value="ISSUED">Officially Issued</SelectItem>
+                    <SelectItem value="REVOKED">Revoked</SelectItem>
+                    <SelectItem value="SUPERSEDED">Superseded</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {(search || typeFilter !== "ALL" || statusFilter !== "ALL") && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearch("");
+                      setTypeFilter("ALL");
+                      setStatusFilter("ALL");
+                      setPage(1);
+                    }}
+                    className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 shrink-0 cursor-pointer font-semibold rounded-lg"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                    Reset
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-
-          <div className="flex items-center gap-2.5 w-full md:w-auto overflow-x-auto">
-            {/* Type Filter */}
-            <Select value={typeFilter} onValueChange={(val) => { if (val) { setTypeFilter(val); setPage(1); } }}>
-              <SelectTrigger className="h-9 text-xs w-[160px] bg-slate-50/50 border-slate-200">
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Document Types</SelectItem>
-                <SelectItem value="HOTEL_VOUCHER">Hotel Voucher</SelectItem>
-                <SelectItem value="VEHICLE_VOUCHER">Vehicle Voucher</SelectItem>
-                <SelectItem value="ACTIVITY_VOUCHER">Activity Pass</SelectItem>
-                <SelectItem value="BOOKING_CONFIRMATION">Booking Confirmation</SelectItem>
-                <SelectItem value="CUSTOMER_ITINERARY">Travel Itinerary</SelectItem>
-                <SelectItem value="PAYMENT_RECEIPT">Payment Receipt</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Status Filter */}
-            <Select value={statusFilter} onValueChange={(val) => { if (val) { setStatusFilter(val); setPage(1); } }}>
-              <SelectTrigger className="h-9 text-xs w-[140px] bg-slate-50/50 border-slate-200">
-                <SelectValue placeholder="All Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Statuses</SelectItem>
-                <SelectItem value="GENERATED">Draft / Generated</SelectItem>
-                <SelectItem value="ISSUED">Officially Issued</SelectItem>
-                <SelectItem value="REVOKED">Revoked</SelectItem>
-                <SelectItem value="SUPERSEDED">Superseded</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Documents Table */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
           {loading ? (
             <div className="p-4">
               <TableSkeleton rows={8} />

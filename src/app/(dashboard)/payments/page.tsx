@@ -71,6 +71,14 @@ import {
 import { PaymentMethod, PaymentStatus } from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+const METHOD_FILTER_LABELS: Record<string, string> = {
+  all: "All",
+  [PaymentMethod.UPI]: "UPI",
+  [PaymentMethod.BANK_TRANSFER]: "Bank Transfer",
+  [PaymentMethod.CASH]: "Cash",
+  [PaymentMethod.CARD]: "Card",
+  [PaymentMethod.CHEQUE]: "Cheque",
+};
 
 export default function PaymentsPage() {
   const router = useRouter();
@@ -369,24 +377,32 @@ export default function PaymentsPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Method:</span>
-                  <select
+                  <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Method:</span>
+                  <Select
                     value={methodFilter}
-                    onChange={(e) => {
-                      setMethodFilter(e.target.value);
-                      setPage(1);
+                    onValueChange={(val) => {
+                      if (val) {
+                        setMethodFilter(val);
+                        setPage(1);
+                      }
                     }}
-                    className="h-8 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
-                    <option value="all">All Methods</option>
-                    <option value={PaymentMethod.UPI}>UPI</option>
-                    <option value={PaymentMethod.BANK_TRANSFER}>Bank Transfer</option>
-                    <option value={PaymentMethod.CASH}>Cash</option>
-                    <option value={PaymentMethod.CARD}>Card</option>
-                    <option value={PaymentMethod.CHEQUE}>Cheque</option>
-                  </select>
+                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[130px] sm:w-[140px]">
+                      <SelectValue placeholder="All">
+                        {(val) => METHOD_FILTER_LABELS[val] ?? "All"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value={PaymentMethod.UPI}>UPI</SelectItem>
+                      <SelectItem value={PaymentMethod.BANK_TRANSFER}>Bank Transfer</SelectItem>
+                      <SelectItem value={PaymentMethod.CASH}>Cash</SelectItem>
+                      <SelectItem value={PaymentMethod.CARD}>Card</SelectItem>
+                      <SelectItem value={PaymentMethod.CHEQUE}>Cheque</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {isFilterActive && (
@@ -494,7 +510,7 @@ export default function PaymentsPage() {
 
                         <TableCell className="py-3.5 px-4">
                           <Badge variant="outline" className="text-[10px] font-bold">
-                            {p.paymentMethod}
+                            {METHOD_FILTER_LABELS[p.paymentMethod] ?? p.paymentMethod}
                           </Badge>
                         </TableCell>
 

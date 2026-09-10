@@ -38,6 +38,12 @@ import { ActivityConfirmationDialog, ActivityDialogMode } from "@/components/ope
 import { RescheduleActivityModal } from "@/components/operations/reschedule-activity-modal";
 import { CreateIssueModal } from "@/components/operations/create-issue-modal";
 import { ResolveIssueDialog } from "@/components/operations/resolve-issue-dialog";
+
+const TRAVELER_TYPE_LABELS: Record<string, string> = {
+  ADULT: "Adult",
+  CHILD: "Child",
+  INFANT: "Infant",
+};
 import { OperationalIssueCard } from "@/components/operations/operational-issue-card";
 import { CompleteTripModal } from "@/components/operations/complete-trip-modal";
 import { CommunicationModal } from "@/components/operations/communication-modal";
@@ -695,7 +701,7 @@ export default function TripOperationsDetailPage() {
                           </span>
                         )}
                       </div>
-                      <span className="text-slate-500 uppercase text-[11px] font-semibold">{trav.type}</span>
+                      <span className="text-slate-500 text-[11px] font-semibold">{TRAVELER_TYPE_LABELS[trav.type] ?? trav.type}</span>
                     </div>
                   ))}
                 </div>

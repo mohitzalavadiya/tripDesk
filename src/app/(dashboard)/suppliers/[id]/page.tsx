@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supplierClient, SupplierDetails360 } from "@/lib/api-client";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -704,20 +705,20 @@ export default function SupplierDetailPage() {
                         {c.roomDetails || c.tripHotel?.roomType || "Standard"}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] font-bold ${
+                        <StatusBadge
+                          status={c.status}
+                          label={
                             c.status === "CONFIRMED"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              ? "Confirmed"
                               : c.status === "REQUESTED"
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              ? "Requested"
                               : c.status === "CANCELLED"
-                              ? "bg-rose-50 text-rose-700 border-rose-200"
-                              : "bg-amber-50 text-amber-700 border-amber-200"
-                          }`}
-                        >
-                          {c.status}
-                        </Badge>
+                              ? "Cancelled"
+                              : c.status === "PENDING"
+                              ? "Pending"
+                              : c.status
+                          }
+                        />
                       </TableCell>
                       <TableCell className="text-right">
                         {c.tripOperation?.tripId && (
@@ -783,20 +784,22 @@ export default function SupplierDetailPage() {
                         {formatCurrency(Number(p.outstandingAmount || 0))}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] font-bold ${
+                        <StatusBadge
+                          status={p.status}
+                          label={
                             p.status === "PAID"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              ? "Paid"
                               : p.status === "PARTIALLY_PAID"
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              ? "Partially Paid"
                               : p.status === "CANCELLED"
-                              ? "bg-slate-50 text-slate-700 border-slate-200"
-                              : "bg-amber-50 text-amber-700 border-amber-200"
-                          }`}
-                        >
-                          {p.status}
-                        </Badge>
+                              ? "Cancelled"
+                              : p.status === "PENDING"
+                              ? "Pending"
+                              : p.status === "OVERDUE"
+                              ? "Overdue"
+                              : p.status
+                          }
+                        />
                       </TableCell>
                       <TableCell className="text-right">
                         {p.bookingId && (

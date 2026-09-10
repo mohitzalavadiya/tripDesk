@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { customerPortalClient } from "@/lib/api-client";
 import { CustomerTripDetailView } from "@/lib/services/customer-portal-service";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { toast } from "sonner";
 import {
   Compass,
@@ -29,6 +30,59 @@ import {
   ArrowLeft,
   Star,
 } from "lucide-react";
+
+/**
+ * Customer-safe human-readable terminology mappings
+ */
+const TRANSFER_STATUS_LABELS: Record<string, string> = {
+  DISPATCHED: "Dispatched",
+  CONFIRMED: "Confirmed",
+  SCHEDULED: "Scheduled",
+  ASSIGNED: "Assigned",
+  ON_DUTY: "On Duty",
+  PENDING_CONFIRMATION: "Pending Confirmation",
+  PENDING: "Pending",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+};
+
+export function formatTransferStatus(status?: string | null): string {
+  if (!status) return "Scheduled";
+  const upper = status.toUpperCase();
+  if (TRANSFER_STATUS_LABELS[upper]) {
+    return TRANSFER_STATUS_LABELS[upper];
+  }
+  return upper.split("_").map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(" ");
+}
+
+const TRAVELER_TYPE_LABELS: Record<string, string> = {
+  ADULT: "Adult",
+  CHILD: "Child",
+  INFANT: "Infant",
+};
+
+export function formatTravelerType(type?: string | null): string {
+  if (!type) return "Traveler";
+  const upper = type.toUpperCase();
+  if (TRAVELER_TYPE_LABELS[upper]) {
+    return TRAVELER_TYPE_LABELS[upper];
+  }
+  return upper.split("_").map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(" ");
+}
+
+const ACTIVITY_TYPE_LABELS: Record<string, string> = {
+  INCLUDED: "Included",
+  OPTIONAL: "Optional",
+};
+
+export function formatActivityType(type?: string | null): string {
+  if (!type) return "Excursion";
+  const upper = type.toUpperCase();
+  if (ACTIVITY_TYPE_LABELS[upper]) {
+    return ACTIVITY_TYPE_LABELS[upper];
+  }
+  return upper.split("_").map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(" ");
+}
 
 export default function CustomerTripDetailPage() {
   const params = useParams();
@@ -321,13 +375,10 @@ export default function CustomerTripDetailPage() {
                 >
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100">
+                      <span className="text-[10px] font-bold tracking-wider text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100">
                         {h.category || "Hotel Accommodation"}
                       </span>
-                      <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Confirmed</span>
-                      </span>
+                      <StatusBadge status={h.status || "CONFIRMED"} label="Confirmed" />
                     </div>
 
                     <h3 className="text-base font-bold text-slate-900">{h.hotelName}</h3>
@@ -390,13 +441,10 @@ export default function CustomerTripDetailPage() {
                   className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs space-y-4"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
+                    <span className="text-[10px] font-bold tracking-wider text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
                       {t.category || "Vehicle Transfer"}
                     </span>
-                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>{t.status}</span>
-                    </span>
+                    <StatusBadge status={t.status} label={formatTransferStatus(t.status)} />
                   </div>
 
                   <h3 className="text-base font-bold text-slate-900">{t.vehicleName}</h3>
@@ -473,10 +521,10 @@ export default function CustomerTripDetailPage() {
                   className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs space-y-3"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-                      {a.type || "Excursion"}
+                    <span className="text-[10px] font-bold tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+                      {formatActivityType(a.type)}
                     </span>
-                    <span className="text-xs font-bold text-emerald-600">Confirmed</span>
+                    <StatusBadge status={a.status || "CONFIRMED"} label="Confirmed" />
                   </div>
 
                   <h3 className="text-base font-bold text-slate-900">{a.activityName}</h3>
@@ -527,8 +575,8 @@ export default function CustomerTripDetailPage() {
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-slate-900">{index + 1}. {t.name}</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
-                    {t.type}
+                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100/80">
+                    {formatTravelerType(t.type)}
                   </span>
                 </div>
                 {t.specialRequirements && (

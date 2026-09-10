@@ -34,6 +34,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -496,16 +497,10 @@ export default function SuppliersPage() {
 
                           {/* Status */}
                           <TableCell className="py-3 px-4">
-                            <Badge
-                              variant="outline"
-                              className={`text-[10px] font-bold ${
-                                s.status === "ACTIVE"
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                  : "bg-slate-100 text-slate-600 border-slate-200"
-                              }`}
-                            >
-                              {s.status}
-                            </Badge>
+                            <StatusBadge
+                              status={s.status}
+                              label={s.status === "ACTIVE" ? "Active" : s.status === "INACTIVE" ? "Inactive" : s.status}
+                            />
                           </TableCell>
 
                           {/* Actions */}
@@ -586,9 +581,10 @@ export default function SuppliersPage() {
                         <h4 className="font-bold text-slate-900 text-xs">{s.name}</h4>
                         <p className="text-[11px] text-slate-500 font-mono">{s.supplierCode || "SUP"} • {s.city || "Vendor"}</p>
                       </div>
-                      <Badge variant="outline" className="text-[10px] font-bold">
-                        {s.status}
-                      </Badge>
+                      <StatusBadge
+                        status={s.status}
+                        label={s.status === "ACTIVE" ? "Active" : s.status === "INACTIVE" ? "Inactive" : s.status}
+                      />
                     </div>
                     <div className="flex items-center gap-2 pt-1 text-xs text-slate-500">
                       <span>{s._count?.rateSheets || 0} Rates</span>

@@ -10,16 +10,18 @@ Excel import and sample download in Hotel and rate sheet : we can add data withi
 
 Invoice generate : i want to add feature for invoice generate
 when we Archive hotel that time i got localhost alert
+consistant UI in all page
+Invoice page UI
 
 
 
 **TODO**
 
-quatation genarate
-add scroll in table : when lots of data in table in this case add scroll in table not in whole page
-compalate QA. 
+Dashboard UI need to check properly.
+finance, follow-ups, /reports, communications, /settings,  UI need to check properly
 check no static data anywhere
-consistant UI in all page
+quatation genarate
+compalate QA. 
 responsive 320 screen
 Invoice pdf format
 clean database
@@ -28,6 +30,7 @@ understand flow
 
 **ONHOLD**
 
+add scroll in table : when lots of data in table in this case add scroll in table not in whole page
 in database i can show password : in database table i want to show password every angency : 
 seperate database for prod and local
 what is change is for producation

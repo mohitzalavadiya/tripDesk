@@ -61,23 +61,46 @@ export function StatusBadge({ status, label, className = "", size = "sm" }: Stat
       case "BOOKED":
       case "COMPLETED":
       case "ACTIVE":
+      case "DISPATCHED":
         return {
           icon: CheckCircle2,
           bg: "bg-emerald-50 text-emerald-700 border-emerald-200",
-          defaultLabel: norm === "PAID" ? "Paid" : norm === "ACTIVE" ? "Active" : norm === "ACCEPTED" ? "Accepted" : norm === "CONFIRMED" || norm === "BOOKED" ? "Confirmed" : "Completed",
+          defaultLabel:
+            norm === "PAID"
+              ? "Paid"
+              : norm === "ACTIVE"
+              ? "Active"
+              : norm === "ACCEPTED"
+              ? "Accepted"
+              : norm === "DISPATCHED"
+              ? "Dispatched"
+              : norm === "CONFIRMED" || norm === "BOOKED"
+              ? "Confirmed"
+              : "Completed",
         };
 
-      // Info / Issued / Sent / Quoted
+      // Info / Issued / Sent / Quoted / Scheduled / Assigned
       case "ISSUED":
       case "SENT":
       case "QUOTED":
+      case "SCHEDULED":
+      case "ASSIGNED":
         return {
           icon: Send,
           bg: "bg-blue-50 text-blue-700 border-blue-200",
-          defaultLabel: norm === "ISSUED" ? "Issued" : norm === "SENT" ? "Sent" : "Quoted",
+          defaultLabel:
+            norm === "ISSUED"
+              ? "Issued"
+              : norm === "SENT"
+              ? "Sent"
+              : norm === "SCHEDULED"
+              ? "Scheduled"
+              : norm === "ASSIGNED"
+              ? "Assigned"
+              : "Quoted",
         };
 
-      // In Progress / Partial / Viewed / Planning / Ongoing
+      // In Progress / Partial / Viewed / Planning / Ongoing / On Duty
       case "PARTIALLY_PAID":
         return {
           icon: Clock,
@@ -93,19 +116,26 @@ export function StatusBadge({ status, label, className = "", size = "sm" }: Stat
       case "PLANNING":
       case "ONGOING":
       case "IN PROGRESS":
+      case "ON_DUTY":
         return {
           icon: Sparkles,
           bg: "bg-teal-50 text-teal-700 border-teal-200",
-          defaultLabel: norm === "PLANNING" ? "Planning" : "In Progress",
+          defaultLabel: norm === "PLANNING" ? "Planning" : norm === "ON_DUTY" ? "On Duty" : "In Progress",
         };
 
-      // Pending / Trial / Expired
+      // Pending / Trial / Expired / Pending Confirmation
       case "PENDING":
       case "TRIAL":
+      case "PENDING_CONFIRMATION":
         return {
           icon: Clock,
           bg: "bg-indigo-50 text-indigo-700 border-indigo-200",
-          defaultLabel: norm === "TRIAL" ? "Trial" : "Pending",
+          defaultLabel:
+            norm === "TRIAL"
+              ? "Trial"
+              : norm === "PENDING_CONFIRMATION"
+              ? "Pending Confirmation"
+              : "Pending",
         };
       case "EXPIRED":
         return {

@@ -33,9 +33,19 @@ import {
   X,
   RefreshCw,
 } from "lucide-react";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { experienceClient } from "@/lib/api-client/experience-client";
 import { customerClient } from "@/lib/api-client/customer-client";
 import { AgencyReferralItem, ReferralSummaryStats } from "@/lib/services/referral-service";
+
+const REFERRAL_STATUS_FILTER_LABELS: Record<string, string> = {
+  ALL: "All",
+  PENDING: "Pending (Inquiry)",
+  CONVERTED: "Converted (Booked)",
+  REWARDED: "Rewarded (Completed)",
+  EXPIRED: "Expired",
+  CANCELLED: "Cancelled",
+};
 
 export default function ReferralsAndRewardsPage() {
   const router = useRouter();
@@ -254,7 +264,9 @@ export default function ReferralsAndRewardsPage() {
           <div className="flex items-center gap-2.5 w-full sm:w-auto">
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v || "ALL")}>
               <SelectTrigger className="h-9 text-xs w-44">
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder="All">
+                  {(val) => REFERRAL_STATUS_FILTER_LABELS[val] ?? "All"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="bg-white border-slate-200">
                 <SelectItem value="ALL">All Referral Statuses</SelectItem>
@@ -317,19 +329,18 @@ export default function ReferralsAndRewardsPage() {
                     <span className="font-bold text-slate-900 text-sm">
                       {ref.referrerName} → {ref.referredName}
                     </span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                    <StatusBadge
+                      status={ref.status}
+                      label={
                         ref.status === "REWARDED"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          ? "Rewarded"
                           : ref.status === "CONVERTED"
-                          ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                          ? "Converted"
                           : ref.status === "CANCELLED"
-                          ? "bg-rose-50 text-rose-700 border-rose-200"
-                          : "bg-amber-50 text-amber-700 border-amber-200"
-                      }`}
-                    >
-                      {ref.status}
-                    </span>
+                          ? "Cancelled"
+                          : "Pending"
+                      }
+                    />
                   </div>
 
                   <p className="text-slate-500 flex items-center gap-2 flex-wrap">

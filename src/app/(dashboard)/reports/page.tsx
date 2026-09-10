@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/shared/status-badge";
 import {
   Select,
   SelectContent,
@@ -42,6 +43,13 @@ import {
 } from "@/lib/services/reporting-service";
 import { ReportPreset, ReportType } from "@/lib/validation/reporting-schema";
 import { toast } from "sonner";
+
+const EXPORT_CSV_LABELS: Record<string, string> = {
+  OVERVIEW: "Overview CSV",
+  RECEIVABLES: "Receivables CSV",
+  PAYABLES: "Payables CSV",
+  DESTINATIONS: "Destinations CSV",
+};
 
 export default function ReportsPage() {
   const [reportData, setReportData] = React.useState<AgencyBIReportResult | null>(null);
@@ -171,11 +179,13 @@ export default function ReportsPage() {
                 }
               }}
             >
-              <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-300 w-[140px]">
+              <SelectTrigger className="h-9 text-xs font-semibold bg-white border-slate-200 hover:border-slate-300 text-slate-800 rounded-xl w-[140px] focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 shadow-2xs">
                 <FileSpreadsheet className="h-3.5 w-3.5 mr-1 text-emerald-600" />
-                <SelectValue placeholder="Export CSV" />
+                <SelectValue placeholder="Export CSV">
+                  {(val) => EXPORT_CSV_LABELS[val] ?? "Export CSV"}
+                </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
                 <SelectItem value="OVERVIEW">Overview CSV</SelectItem>
                 <SelectItem value="RECEIVABLES">Receivables CSV</SelectItem>
                 <SelectItem value="PAYABLES">Payables CSV</SelectItem>
@@ -697,15 +707,7 @@ export default function ReportsPage() {
                         <td className="px-4 py-3 text-emerald-700 font-medium">{formatCurrency(r.paidAmount)}</td>
                         <td className="px-4 py-3 font-bold text-rose-700">{formatCurrency(r.balanceAmount)}</td>
                         <td className="px-4 py-3">
-                          <Badge
-                            className={`text-[10px] font-bold ${
-                              r.isOverdue
-                                ? "bg-rose-100 text-rose-800 border-rose-200"
-                                : "bg-amber-100 text-amber-800 border-amber-200"
-                            }`}
-                          >
-                            {r.isOverdue ? "OVERDUE" : r.paymentStatus}
-                          </Badge>
+                          <StatusBadge status={r.isOverdue ? "OVERDUE" : r.paymentStatus} />
                         </td>
                       </tr>
                     ))}
@@ -754,15 +756,7 @@ export default function ReportsPage() {
                       <td className="px-4 py-3 text-emerald-700 font-medium">{formatCurrency(p.paidAmount)}</td>
                       <td className="px-4 py-3 font-bold text-rose-700">{formatCurrency(p.outstandingAmount)}</td>
                       <td className="px-4 py-3">
-                        <Badge
-                          className={`text-[10px] font-bold ${
-                            p.status === "PAID"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-amber-100 text-amber-800"
-                          }`}
-                        >
-                          {p.status}
-                        </Badge>
+                        <StatusBadge status={p.status} />
                       </td>
                     </tr>
                   ))}

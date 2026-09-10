@@ -7636,11 +7636,423 @@ Live browser inspection verified visual consistency across 1440px, 1280px, 390px
 - Zero Prisma schema changes, zero database migrations, zero API route contract changes.
 
 ## 114.6 Next Step
-- **PRE-BETA OPERATIONAL READINESS**
+- **UI AUDIT BATCH REMEDIATION**
+
+---
+
+# 115. UI AUDIT BATCH 1 — CONTROLLED REMEDIATION (SEPTEMBER 2026)
+
+## 115.1 Remediation Status
+**BATCH 1 STATUS: CLOSED (VERIFIED & CERTIFIED)**
+
+UI Audit Batch 1 (Critical User-Facing UI Issues) has completed controlled remediation and independent verification:
+
+- **Remediation Date:** 10 September 2026
+- **Status:** PASS — BATCH 1 CLOSED
+- **Scope:** Batch 1A (Customer-Facing Raw Enums) & Batch 1B (Dashboard Receivables/Payables 320px Responsive Fix) ONLY.
+
+## 115.2 Remediated Items
+
+### Batch 1A: Customer-Facing Status & Traveler Type Presentation
+- **Issue:** `src/app/customer/trips/[tripId]/page.tsx` exposed raw backend database enums (`DISPATCHED`, `CONFIRMED`, `SCHEDULED`, `PENDING_CONFIRMATION`, `ADULT`, `CHILD`, `INFANT`, `INCLUDED`).
+- **Fix:**
+  - Implemented explicit customer-safe mapping dictionaries:
+    - Transfer statuses: `DISPATCHED` → "Dispatched", `CONFIRMED` → "Confirmed", `SCHEDULED` → "Scheduled", `PENDING_CONFIRMATION` → "Pending Confirmation", `ASSIGNED` → "Assigned", `ON_DUTY` → "On Duty", `COMPLETED` → "Completed", `CANCELLED` → "Cancelled".
+    - Traveler types: `ADULT` → "Adult", `CHILD` → "Child", `INFANT` → "Infant".
+    - Activity types: `INCLUDED` → "Included", `OPTIONAL` → "Optional".
+  - Replaced ad-hoc raw spans with shared `StatusBadge` across hotel, transfer, and activity services.
+  - Enhanced shared `StatusBadge` (`src/components/shared/status-badge.tsx`) to support `DISPATCHED`, `SCHEDULED`, `ASSIGNED`, `ON_DUTY`, and `PENDING_CONFIRMATION` with standard icons, background tints, and borders.
+  - Preserved all underlying database values, API contracts, and Prisma schemas without modification.
+
+### Batch 1B: Dashboard Receivables & Payables Responsive Layout
+- **Issue:** `src/components/dashboard/receivables-payables-card.tsx` used rigid `grid-cols-3` inside a padded card, causing high-value financial amounts (`₹`) and labels to clip or wrap awkwardly at 320px–390px viewports.
+- **Fix:**
+  - Responsive grid structure: `grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3`.
+  - On mobile (<640px): Metrics stack cleanly with `flex items-center justify-between`, placing labels on the left and bold currency amounts on the right with `text-sm`.
+  - On desktop (≥640px): Preserved exact 3-column layout, label-above-value stacking (`sm:block`), and `sm:text-base` font size.
+  - Card container adjusted to `p-4 sm:p-6` providing 8px of extra mobile breathing room.
+  - Card headers updated to `flex items-start sm:items-center gap-2` with `shrink-0` action buttons.
+  - Customer and supplier list items updated with `truncate` and `shrink-0` to eliminate horizontal text overflow.
+
+## 115.3 Files Changed
+1. `src/app/customer/trips/[tripId]/page.tsx` — Added explicit terminology mappers, imported and rendered shared `StatusBadge`, and formatted traveler/activity types.
+2. `src/components/shared/status-badge.tsx` — Extended `StatusBadge` to support operational dispatch statuses (`DISPATCHED`, `SCHEDULED`, `ASSIGNED`, `ON_DUTY`, `PENDING_CONFIRMATION`).
+3. `src/components/dashboard/receivables-payables-card.tsx` — Mobile-responsive layout, flex alignment, and overflow protection.
+
+## 115.4 Automated Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack compiled all static/dynamic routes cleanly)
+- **DEV-04 Invoice Verification Matrix (`test-dev04-complete-matrix.ts`):** 60/60 PASSED (100%)
+- **DEV-03 Excel Ingestion Matrix (`test-dev03-excel.ts`):** 23/23 PASSED (100%)
+
+## 115.5 Browser & Viewport Verification Results
+Verified in live browser across all required viewports:
+- **1440px / 1280px / 1024px:** Desktop 3-column metric cards and layout fully preserved.
+- **768px:** Single-column card stacking with 3-column metric rows rendered cleanly.
+- **390px / 375px:** Stacked metric rows with label-left / amount-right rendered with zero clipping.
+- **320px:** Verified `scrollWidth === innerWidth` (zero horizontal overflow); currency amounts and labels completely visible and unclipped.
+- **Customer Trip Presentation:** Explicit mappers verified for `DISPATCHED`, `CONFIRMED`, `SCHEDULED`, `PENDING_CONFIRMATION`, `ADULT`, `CHILD`, `INFANT`, `INCLUDED`.
+
+## 115.6 Out-of-Scope Confirmations
+- Scrolling audit (ISSUE-001 through ISSUE-008) remains ON HOLD.
+- Batch 2 search consistency (Invoice / Documents toolbar) unchanged.
+- Native `<select>` elements unchanged.
+- Prisma schema, database data, and API contracts untouched.
+- Multi-tenant isolation and RBAC invariants strictly preserved.
+
+# 116. UI AUDIT BATCH 2 — CONTROLLED REMEDIATION (SEARCH & TOOLBAR CONSISTENCY)
+
+## 116.1 Remediation Status
+**BATCH 2 STATUS: CLOSED (VERIFIED & CERTIFIED)**
+
+UI Audit Batch 2 (Search & Toolbar Consistency) has completed controlled remediation and comprehensive verification:
+
+- **Remediation Date:** 10 September 2026
+- **Status:** PASS — BATCH 2 CLOSED
+- **Scope:** `/invoices` search/toolbar integration and `/documents` search/toolbar integration with canonical TripDesk list-page pattern ONLY.
+
+## 116.2 Remediated Items
+
+### Batch 2A: `/invoices` Search & Toolbar Standardization
+- **Issue:** The `/invoices` page used an isolated floating search card with a raw HTML `<input>`, missing clear `X` button, inconsistent height, focus styles, and separation from the table container.
+- **Fix:**
+  - Integrated the search bar directly into the Master Workspace Card (`rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden`).
+  - Implemented the canonical master toolbar header (`p-4 sm:p-5 border-b border-slate-100 bg-white`).
+  - Upgraded raw `<input>` to canonical Shadcn `<Input className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all" />`.
+  - Added standard `<Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />` icon treatment and `max-w-2xl` sizing.
+  - Added dynamic clear `X` button that appears when a query exists and clears search state on click.
+  - Added canonical `Reset` button when search query, non-default status filter, or overdue filter is active.
+  - Standardized status filter pills with rounded-xl border container, horizontal scrolling on mobile, and active indicator.
+  - Preserved all filtering, search query state, pagination, data fetching, RBAC, and tenant isolation invariants.
+
+### Batch 2B: `/documents` Search & Toolbar Standardization
+- **Issue:** The `/documents` page rendered search and category filtering in an isolated floating card outside the document table container.
+- **Fix:**
+  - Moved search and filter controls into the Master Workspace Card (`rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden`) as an integrated toolbar header (`p-4 sm:p-5 border-b border-slate-100 bg-white`).
+  - Standardized search container with canonical `max-w-2xl`, `h-9.5`, `rounded-xl`, soft slate tint, and indigo focus treatment.
+  - Added dynamic clear `X` button to the search input.
+  - Standardized the Category `SelectTrigger` to `h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300`.
+  - Added canonical `Reset` button that appears when either search query or category filter is active.
+  - Preserved document upload modal, table rendering, category filtering, document actions, status badges, RBAC, and tenant isolation invariants.
+
+## 116.3 Files Changed
+1. `src/app/(dashboard)/invoices/page.tsx` — Standardized search and toolbar inside master card, added canonical Input, clear X button, and Reset button.
+2. `src/app/(dashboard)/documents/page.tsx` — Standardized search and toolbar inside master card, added canonical Input, clear X button, styled category select, and Reset button.
+
+## 116.4 Automated Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack compiled all static/dynamic routes cleanly)
+- **DEV-04 Invoice Verification Matrix (`test-dev04-complete-matrix.ts`):** 60/60 PASSED (100%)
+- **DEV-03 Excel Ingestion Matrix (`test-dev03-excel.ts`):** 23/23 PASSED (100%)
+
+## 116.5 Browser & Viewport Verification Matrix
+Recorded live in browser session (`batch2_browser_qa_1789037020030.webp`) across all required viewports:
+
+| Viewport | `/invoices` Result | `/documents` Result | Overflow / Collision Check |
+|---|---|---|---|
+| 1440px | PASS | PASS | Zero overflow; canonical master card toolbar |
+| 1280px | PASS | PASS | Clean horizontal alignment |
+| 1024px | PASS | PASS | Clean wrapping, no clipping |
+| 768px | PASS | PASS | Search flexes cleanly, filters wrap neatly |
+| 390px | PASS | PASS | Stacked controls, clear buttons accessible |
+| 375px | PASS | PASS | No horizontal page scroll, search readable |
+| 320px | PASS | PASS | Zero horizontal overflow (`scrollWidth === innerWidth`) |
+
+### Functional Search QA:
+- `/invoices`: Query typing works (`INV`), clear `X` button clears input and resets page to 1, status filter pills (`PAID`, `UNPAID`, `ALL`) filter properly, Overdue toggle works, Reset button clears all filters.
+- `/documents`: Query typing works (`voucher`), clear `X` button clears input, Category dropdown selects and filters documents, Reset button restores default filters.
+
+## 116.6 Out-of-Scope Confirmations
+- Scrolling audit (ISSUE-001 through ISSUE-008) remains strictly ON HOLD.
+- Batch 3 enum/status terminology cleanup NOT modified.
+- Native `<select>` / dropdown audit NOT modified.
+- Dashboard typography and naming NOT modified.
+- Zero Prisma schema changes, zero migrations, zero API contract changes.
+- Multi-tenant isolation and RBAC invariants strictly preserved.
+
+# 117. UI AUDIT BATCH 3A — CONTROLLED REMEDIATION (SELECTS, SEARCH & CONTROL POLISH)
+
+## 117.1 Remediation Status
+**BATCH 3A STATUS: CLOSED (VERIFIED & CERTIFIED)**
+
+UI Audit Batch 3A (Select / Dropdown + Search / Filter Controls + Responsive Control Polish) has completed controlled remediation and comprehensive automated + visual verification:
+
+- **Implementation Date:** 10 September 2026
+- **Status:** PASS — BATCH 3A CLOSED
+- **Git Branch:** `qa-changes-bug` (Working copy uncommitted per controlled instructions)
+- **Scope:** Standardize native `<select>` controls to TripDesk's shared `<Select>`, standardize search controls with canonical input styling and dynamic clear `X` action, standardize filter heights/radius to `h-9.5 rounded-xl`, and resolve small-screen responsive wrapping without horizontal overflow.
+
+## 117.2 Findings Remediated
+
+### Select / Dropdown Standardization
+- `B3-SELECT-001` (`/bookings`): Replaced Payment filter native `<select>` with shared `<Select>` (`w-[130px] sm:w-[140px]`, `h-9.5`, `rounded-xl`, `bg-slate-50/70`, `border-slate-200`).
+- `B3-SELECT-002` (`/payments`): Replaced Method filter native `<select>` with shared `<Select>` (`w-[130px] sm:w-[140px]`, `h-9.5`, `rounded-xl`).
+- `B3-SELECT-003` (`/enquiries`): Replaced Priority filter native `<select>` with shared `<Select>` (`w-[125px] sm:w-[135px]`, `h-9.5`, `rounded-xl`).
+- `B3-SELECT-004` (`/enquiries`): Replaced Source filter native `<select>` with shared `<Select>` (`w-[125px] sm:w-[135px]`, `h-9.5`, `rounded-xl`).
+- `B3-SELECT-005` (`/invoices/[id]` / `record-payment-modal.tsx`): Replaced Payment Method native `<select>` with shared `<Select>` (`h-9`, `rounded-xl`), standardized date input height/radius.
+- `B3-SELECT-006` (`/invoices/[id]`): Replaced Discount Type native `<select>` with shared `<Select>` (`h-8`, `rounded-lg`).
+- `B3-SELECT-007` (`/communications`): Replaced Channel filter native `<select>` with shared `<Select>` (`w-[130px] sm:w-[140px]`, `h-9.5`, `rounded-xl`).
+- `B3-SELECT-008` (`/communications`): Replaced Type filter native `<select>` with shared `<Select>` (`w-[130px] sm:w-[140px]`, `h-9.5`, `rounded-xl`).
+- `B3-SELECT-009` (`/communications`): Replaced Status filter native `<select>` with shared `<Select>` (`w-[130px] sm:w-[140px]`, `h-9.5`, `rounded-xl`).
+- `B3-SELECT-010` (`/communications`): Replaced Send Customer Message modal native `<select>`s (Customer, Trip, Channel, Type) with shared `<Select>` (`h-9`, `rounded-xl`).
+- `B3-SELECT-012` (`/trips/[id]/costing` / `cost-breakdown-table.tsx`): Replaced Cost breakdown sort native `<select>` with shared `<Select>` (`h-8.5`, `rounded-xl`).
+
+### Legitimate Exception (Preserved Native)
+- `B3-SELECT-011` (`src/components/costing/pricing-control-panel.tsx`): The GST tax rule and rounding controls remain intentionally native `<select>` controls. They are part of a compact financial calculation matrix and were explicitly approved as a legitimate exception. Zero other native selects exist in `src/`.
+
+### Search Standardization
+- `B3-SEARCH-001` (`/follow-ups`): Standardized search input to canonical TripDesk pattern (`pl-10 pr-9 h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200`) with dynamic clear `X` button.
+- `B3-SEARCH-002` (`/finance` / `finance-transaction-table.tsx`): Standardized search input to canonical `pl-10 pr-9 h-9.5 rounded-xl bg-slate-50/70` with dynamic clear `X` button.
+- `B3-SEARCH-003` (`/communications`): Standardized search input to canonical `pl-10 pr-9 h-9.5 rounded-xl bg-slate-50/70` with dynamic clear `X` button.
+
+### Control / Filter Polish
+- `B3-CONTROL-001` (`/follow-ups`): Standardized Priority and Type filter triggers to `h-9.5 rounded-xl bg-slate-50/70 border-slate-200`.
+- `B3-CONTROL-002` (`/finance` / `finance-transaction-table.tsx`): Standardized transaction type filter trigger to canonical `h-9.5 rounded-xl bg-slate-50/70 border-slate-200`.
+- `B3-CONTROL-003` (`/reports`): Softened Export CSV SelectTrigger to `border-slate-200 font-semibold text-slate-800 rounded-xl`.
+
+### Responsive Layout Polish
+- `B3-RESP-001` (`/bookings`): Payment filter wrapped in responsive container with flex-wrap to prevent touch target cramping and clipping.
+- `B3-RESP-002` (`/enquiries`): Priority and Source filters wrapped in responsive container with clean wrapping at 320px/375px.
+- `B3-RESP-003` (`/invoices/[id]` / `record-payment-modal.tsx`): Payment modal form grid converted to `grid-cols-1 sm:grid-cols-2` to prevent clipping at 320px.
+
+## 117.3 Files Changed
+1. `src/app/(dashboard)/bookings/page.tsx` — Replaced Payment native select with shared `<Select>`, responsive wrapping.
+2. `src/app/(dashboard)/payments/page.tsx` — Replaced Method native select with shared `<Select>`.
+3. `src/app/(dashboard)/enquiries/page.tsx` — Replaced Priority and Source native selects with shared `<Select>`, added flex-wrap container.
+4. `src/components/invoices/record-payment-modal.tsx` — Replaced Payment Method native select with shared `<Select>`, responsive grid `grid-cols-1 sm:grid-cols-2`.
+5. `src/app/(dashboard)/invoices/[id]/page.tsx` — Replaced Discount Type native select with shared `<Select>`.
+6. `src/app/(dashboard)/communications/page.tsx` — Standardized search with dynamic clear `X`, replaced toolbar selects (Channel, Type, Status) and modal selects (Customer, Trip, Channel, Type) with shared `<Select>`.
+7. `src/components/costing/cost-breakdown-table.tsx` — Replaced sort native select with shared `<Select>`.
+8. `src/app/(dashboard)/follow-ups/page.tsx` — Standardized search with dynamic clear `X`, standardized Priority/Type filter triggers to `h-9.5 rounded-xl`.
+9. `src/components/finance/finance-transaction-table.tsx` — Standardized search with dynamic clear `X`, standardized Type filter trigger to `h-9.5 rounded-xl`.
+10. `src/app/(dashboard)/reports/page.tsx` — Softened Export CSV SelectTrigger styling to `border-slate-200 font-semibold rounded-xl`.
+
+## 117.4 Automated Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack compiled all routes cleanly)
+- **DEV-04 Invoice Verification Matrix (`test-dev04-complete-matrix.ts`):** 60/60 PASSED (100%)
+- **DEV-03 Excel Ingestion Matrix (`test-dev03-excel.ts`):** 23/23 PASSED (100%)
+
+## 117.5 Browser & Viewport Verification Matrix
+Recorded live in browser session across Desktop (1440px, 1280px, 1024px) and Mobile (768px, 390px, 375px, 320px):
+
+| Route | Desktop (1440px) | Tablet (768px) | Mobile (375px) | Mobile (320px) | Horizontal Overflow |
+|---|---|---|---|---|---|
+| `/bookings` | PASS (shared Select) | PASS | PASS | PASS | Zero |
+| `/payments` | PASS (shared Select) | PASS | PASS | PASS | Zero |
+| `/enquiries` | PASS (shared Selects) | PASS | PASS (clean wrap) | PASS (clean wrap) | Zero |
+| `/communications` | PASS (shared Selects + clear X) | PASS | PASS | PASS | Zero |
+| `/follow-ups` | PASS (h-9.5 filters + clear X) | PASS | PASS | PASS | Zero |
+| `/finance` | PASS (h-9.5 filter + clear X) | PASS | PASS | PASS | Zero |
+| `/reports` | PASS (softened trigger) | PASS | PASS | PASS | Zero |
+
+### Functional & Interaction QA:
+- **Select Interaction:** Dropdowns open, items render, selections update state/filters accurately, keyboard navigation works.
+- **Search & Clear:** Typing in search bar immediately shows clear `X` button; clicking `X` clears the query and resets filter state.
+- **Zero Horizontal Overflow:** Verified across all viewports down to 320px (`scrollWidth === innerWidth`).
+
+## 117.6 Scope Invariants Strictly Maintained
+- **Prisma Schema & Database:** 0 changes, 0 migrations.
+- **API Contracts:** 0 changes.
+- **Authentication & Authorization / RBAC:** Untouched.
+- **Tenant Isolation:** Strictly maintained.
+- **Business Logic:** 100% preserved (all payment, invoice, communication, and enquiry semantics intact).
+- **Scrolling Audit:** Remains strictly ON HOLD (`ISSUE-001` through `ISSUE-008`).
+- **Batch 3B:** Status and enum display standardization remains strictly PENDING for separate controlled execution.
+
+## 117.7 Batch 3A Select Display Label Consistency Correction
+
+### 1. Reason for Correction & Presentation Defect
+During post-Batch 3A final UI review, a presentation defect was identified across shared `<Select>` implementations:
+- Dropdown options were rendered with user-friendly human-readable labels (e.g. `Partially Paid`, `Bank Transfer`, `All`), but the closed `SelectTrigger` rendered raw/internal enum strings (e.g. `PARTIALLY_PAID`, `BANK_TRANSFER`, `ALL`) via `@base-ui/react/select`'s `<SelectValue />` fallback mechanism.
+- In accordance with the required TripDesk UX Rule:
+  > **The value displayed in the closed SelectTrigger must be the same human-readable label that the user sees for that option inside the dropdown.**
+  > **Any filter option representing all records must display "All" (never "ALL", never "all").**
+  > **Underlying filter and enum values must remain 100% unchanged in state, API, and DB.**
+
+### 2. Implementation Approach & Technical Resolution
+- `@base-ui/react/select` supports render functions on `<SelectValue>`: `<SelectValue placeholder="...">{val => LABEL_MAP[val] ?? fallback}</SelectValue>`.
+- Preserved underlying values (`value="all"`, `value="ALL"`, `value="PARTIALLY_PAID"`, etc.) in all state handlers, APIs, and query parameters.
+- Applied explicit label formatters and converted option display text:
+  - `ALL` → `All`
+  - `PARTIALLY_PAID` → `Partially Paid`
+  - `BANK_TRANSFER` → `Bank Transfer`
+  - `UNPAID` → `Unpaid`
+  - `PAID` → `Paid` / `Fully Paid`
+  - `UPI` → `UPI`
+  - `CASH` → `Cash`
+  - `CARD` → `Card`
+  - `CHEQUE` → `Cheque`
+  - `URGENT` → `Urgent`
+  - `HIGH` → `High`
+  - `MEDIUM` → `Medium`
+  - `LOW` → `Low`
+  - `WHATSAPP` → `WhatsApp`
+  - `EMAIL` → `Email`
+  - `PHONE` → `Phone`
+  - `WEBSITE` → `Website`
+  - `PERCENTAGE` → `Percentage (%)`
+  - `FIXED` → `Fixed Amount ($)`
+  - `default` → `Sort: Default`
+  - `high-to-low` → `Highest Cost`
+  - `low-to-high` → `Lowest Cost`
+
+### 3. Affected Selects & Routes Corrected
+1. `/bookings` (`src/app/(dashboard)/bookings/page.tsx`): Payment status filter `all` → `All`, `UNPAID` → `Unpaid`, `PARTIALLY_PAID` → `Partially Paid`, `PAID` → `Fully Paid`.
+2. `/payments` (`src/app/(dashboard)/payments/page.tsx`): Payment method filter `all` → `All`, `BANK_TRANSFER` → `Bank Transfer`, etc.
+3. `/enquiries` (`src/app/(dashboard)/enquiries/page.tsx`): Priority filter (`all` → `All`, `URGENT` → `Urgent`, etc.) and Source filter (`all` → `All`, `WHATSAPP` → `WhatsApp`, etc.).
+4. `/invoices/[id]` (`src/app/(dashboard)/invoices/[id]/page.tsx`): Discount type Select (`PERCENTAGE` → `Percentage (%)`, `FIXED` → `Fixed Amount ($)`).
+5. Record Payment Modal (`src/components/invoices/record-payment-modal.tsx`): Payment method modal Select (`BANK_TRANSFER` → `Bank Transfer`, etc.).
+6. `/communications` (`src/app/(dashboard)/communications/page.tsx`): Channel, Type, Status filter triggers format selection to human labels and "All"; Send Message Modal Selects (Customer, Trip, Channel, Category Type) display human-readable labels upon selection.
+7. `/trips/[id]/costing` (`src/components/costing/cost-breakdown-table.tsx`): Sort Select displays `Sort: Default`, `Highest Cost`, `Lowest Cost`.
+8. `/follow-ups` (`src/app/(dashboard)/follow-ups/page.tsx`): Type and Priority filter SelectTriggers display formatted human labels and "All".
+9. `/finance` (`src/components/finance/finance-transaction-table.tsx`): Transaction type Select displays `All` (preserving `value="ALL"` internally).
+10. `/reports` (`src/app/(dashboard)/reports/page.tsx`): Export CSV Select displays `Export CSV`, `Export Bookings CSV`, `Export Financials CSV`.
+11. `/documents` (`src/app/(dashboard)/documents/page.tsx`): Type and Status filter SelectTriggers display formatted human labels and `All` (preserving `value="ALL"` internally).
+
+### 4. Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0)
+- **DEV-04 Invoice Matrix (`test-dev04-complete-matrix.ts`):** 60/60 PASSED (100%)
+- **DEV-03 Excel Matrix (`test-dev03-excel.ts`):** 23/23 PASSED (100%)
+- **Browser QA Session:** Verified across viewports (1440px down to 320px) in `batch3a_label_fix_qa_1789041179259.webp`. Closed SelectTriggers match dropdown labels exactly; raw enums and uppercase `ALL` eliminated; zero horizontal overflow.
+
+### 5. Scope Boundaries Strictly Maintained
+- **Underlying Values:** 100% preserved (all application logic, filter params, API contracts, state handlers remain identical).
+- **Prisma Schema & Database:** 0 changes, 0 migrations.
+- **Batch 3B:** StatusBadge and global status terminology standardization remains strictly PENDING.
+- **Scrolling Audit:** Remains strictly ON HOLD (`ISSUE-001` through `ISSUE-008`).
+
+---
+
+# 118. UI AUDIT BATCH 3B — STATUS STANDARDIZATION & USER-FACING TERMINOLOGY
+
+## 118.1 Purpose & Execution Overview
+- **Implementation Date:** 2026-09-10
+- **Scope:** Controlled execution of UI Audit Batch 3B (`B3-STATUS-001` through `B3-STATUS-010` and `B3-ENUM-001` through `B3-ENUM-010`).
+- **Core Requirement:** Presentation-layer standardization of user-visible status presentation and elimination of raw/internal uppercase enum values from user-facing UI, replacing them with professional, human-readable terminology.
+- **Core Invariant:** All underlying Prisma enums, database records, API contracts, TypeScript types, state values, filter query parameters, and business logic remain 100% unchanged.
+
+## 118.2 Findings Implementation Summary
+
+### Status Findings (B3-STATUS-001 → B3-STATUS-010)
+- `B3-STATUS-001` (`/reports`): Receivables and Payables status rendering standardized using shared `StatusBadge` (`Pending`, `Paid`, `Overdue`).
+- `B3-STATUS-002` (`/admin/agencies`): Agency status (`Active`, `Suspended`) and Subscription status (`Active`, `Trial`, `Expired`) standardized using shared `StatusBadge`.
+- `B3-STATUS-003` (`/admin/payments`): Verification status standardized with shared `StatusBadge` and friendly terminology (`Pending Audit`, `Approved`, `Rejected`).
+- `B3-STATUS-004` (`/admin/announcements`): Announcement status standardized with shared `StatusBadge` (`Active`, `Scheduled`, `Archived`, `Draft`).
+- `B3-STATUS-005` (`/subscription`): Subscription status and payment verification status standardized using shared `StatusBadge` and human-readable badges (`Trial`, `Active`, `Expired`, `Pending`, `Approved`, `Rejected`).
+- `B3-STATUS-006` (`/referrals`): Referral status standardized with shared `StatusBadge` and human labels (`Pending (Inquiry)`, `Converted (Booked)`, `Rewarded (Completed)`, `Expired`).
+- `B3-STATUS-007` (`/settings`): Audit log channel (`WhatsApp`, `Email`) and delivery status (`Delivered`, `Sent`, `Failed`, `Pending`) standardized with human-readable labels.
+- `B3-STATUS-008` (`/operations/[tripId]` / `service-reconciliation-card.tsx`): Hotel, fleet, and activity delivery status badges converted from raw enums to formatted human labels (`Confirmed`, `Requested`, `Pending Confirmation`, `Pending`, `Cancelled`, `Dispatched`, `On Duty`, `Completed`, `Scheduled`, `Unassigned`).
+- `B3-STATUS-009` (`/operations/[tripId]` / `finalization-checklist-card.tsx`): Finalization summary status formatted to friendly label (`In Progress`, `Planning`, `Confirmed`, `Travelling`, `Completed`, `Cancelled`).
+- `B3-STATUS-010` (`/suppliers` & `/suppliers/[id]`): Supplier status, confirmation status, and payables status standardized using shared `StatusBadge`. Supplier architecture and data models preserved strictly without modification.
+
+### Enum & Terminology Findings (B3-ENUM-001 → B3-ENUM-010)
+- `B3-ENUM-001` (`/customer/trips/[tripId]/payments`): Customer-facing payment methods formatted (`BANK_TRANSFER` → `Bank Transfer`, `UPI` → `UPI / Online`, `CASH` → `Cash`, `CARD` → `Card`, `CHEQUE` → `Cheque`, `OTHER` → `Other`) and customer payment status formatted (`Partially Paid`, `Paid`, etc.).
+- `B3-ENUM-002` (`/admin/payments`): Admin payment methods formatted to friendly labels (`Bank Transfer`, `UPI / Online`, `Cash`, `Card`, `Cheque`, `Other`).
+- `B3-ENUM-003` (`/payments`): Table row payment methods formatted via friendly label mapping (`Bank Transfer`, `UPI`, `Cash`, `Card`, `Cheque`).
+- `B3-ENUM-004` (`/subscription`): Billing cycle formatted (`YEARLY` → `Yearly`, `MONTHLY` → `Monthly`) and payment methods formatted (`Bank Transfer`, `UPI`).
+- `B3-ENUM-005` (`/bookings/[id]`): Payment table method badges formatted to human-readable labels (`Bank Transfer`, `UPI / Online`, `Cash`, `Card`, `Cheque`, `Other`).
+- `B3-ENUM-006` (`/bookings/[id]`): Traveler types formatted (`ADULT` → `Adult`, `CHILD` → `Child`, `INFANT` → `Infant`).
+- `B3-ENUM-007` (`/operations/[tripId]`): Manifest traveler types formatted (`Adult`, `Child`, `Infant`).
+- `B3-ENUM-008` (`/trips/[id]/costing`): Activity types formatted in costing breakdown (`INCLUDED` → `Included`, `OPTIONAL` → `Optional`).
+- `B3-ENUM-009` (`/admin/announcements`): Announcement types explicitly mapped (`MAINTENANCE` → `Maintenance`, `FEATURE` → `Feature`, `WARNING` → `Warning`, `UPDATE` → `Product Update`, `INFO` → `Info`).
+- `B3-ENUM-010` (`/invoices`): Invoice status filter buttons standardized to human-readable labels (`All`, `Draft`, `Issued`, `Partially Paid`, `Paid`, `Cancelled`).
+
+## 118.3 Status Presentation Architecture
+- **Shared StatusBadge Component (`src/components/shared/status-badge.tsx`):** Leveraged across all standard status presentations (`PAID`, `PENDING`, `CANCELLED`, `ACTIVE`, `TRIAL`, `CONFIRMED`, `COMPLETED`, `DISPATCHED`, `OVERDUE`, `DRAFT`, `INACTIVE`, `SCHEDULED`, `REJECTED`, `APPROVED`). Supports `label` override for domain-specific naming (e.g. `Rewarded (Completed)`).
+- **Compact Presentation Contexts:** In dense table cells or specialized operations cards (`service-reconciliation-card.tsx`, `finalization-checklist-card.tsx`, `settings/page.tsx`), domain-specific label mappings (`SERVICE_STATUS_LABELS`, `OPERATION_STATUS_LABELS`) provide compact badges consistent with design system color tokens without breaking layout density.
+
+## 118.4 Explicit Domain Terminology Mappings
+Explicit mappings were used rather than global string replace transforms:
+```typescript
+const PAYMENT_METHOD_LABELS = {
+  BANK_TRANSFER: "Bank Transfer",
+  UPI: "UPI / Online",
+  CASH: "Cash",
+  CARD: "Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other",
+} as const;
+
+const TRAVELER_TYPE_LABELS = {
+  ADULT: "Adult",
+  CHILD: "Child",
+  INFANT: "Infant",
+} as const;
+
+const ANNOUNCEMENT_TYPE_LABELS = {
+  MAINTENANCE: "Maintenance",
+  FEATURE: "Feature",
+  WARNING: "Warning",
+  UPDATE: "Product Update",
+  INFO: "Info",
+} as const;
+```
+
+## 118.5 Files Modified
+1. `src/app/customer/trips/[tripId]/payments/page.tsx` — Customer payment methods and status labels formatted.
+2. `src/app/admin/payments/page.tsx` — Payment methods, verification status badge, and filter labels standardized.
+3. `src/app/(dashboard)/payments/page.tsx` — Payment method badges formatted in table rows.
+4. `src/app/(dashboard)/subscription/page.tsx` — Billing cycles, payment methods, and subscription status badges formatted.
+5. `src/app/(dashboard)/bookings/[id]/page.tsx` — Payment methods, traveler types, and modal Select trigger formatted.
+6. `src/app/(dashboard)/operations/[tripId]/page.tsx` — Traveler types in manifest formatted.
+7. `src/components/operations/service-reconciliation-card.tsx` — Delivery status badges formatted with friendly labels.
+8. `src/components/operations/finalization-checklist-card.tsx` — Finalization summary status formatted to human-readable label.
+9. `src/app/(dashboard)/trips/[id]/costing/page.tsx` — Activity type formatted (`Included` / `Optional`).
+10. `src/app/admin/announcements/page.tsx` — Announcement type (`Product Update`, etc.) and status badges standardized.
+11. `src/app/(dashboard)/invoices/page.tsx` — Invoice status filter buttons standardized (`Partially Paid`, etc.).
+12. `src/app/(dashboard)/reports/page.tsx` — Receivables and Payables tables standardized with shared `StatusBadge`.
+13. `src/app/admin/agencies/page.tsx` — Agency and subscription statuses standardized with shared `StatusBadge`.
+14. `src/app/(dashboard)/referrals/page.tsx` — Referral status badge and filter trigger formatted.
+15. `src/app/(dashboard)/settings/page.tsx` — Dispatch audit log channel and delivery status formatted.
+16. `src/app/(dashboard)/suppliers/page.tsx` — Supplier table and mobile card status badges standardized with `StatusBadge`.
+17. `src/app/(dashboard)/suppliers/[id]/page.tsx` — Confirmation and payables status badges standardized with `StatusBadge`.
+
+## 118.6 Automated Verification Results
+- **TypeScript Type Check (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack optimized build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass)
+
+## 118.7 Browser QA & Viewport Verification
+Recorded in browser session `batch3b_browser_qa_1789042721034.webp` across Desktop (1440px, 1280px, 1024px) and Mobile (768px, 390px, 375px, 320px):
+
+| Route / Component | Desktop (1440px) | Tablet (768px) | Mobile (375px) | Mobile (320px) | Raw Enums | Status |
+|---|---|---|---|---|---|---|
+| `/reports` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/admin/agencies` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/admin/payments` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/admin/announcements` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/subscription` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/referrals` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/settings` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/suppliers` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/suppliers/[id]` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/payments` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/invoices` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/bookings/[id]` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/operations/[tripId]` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/customer/trips/[tripId]/payments` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/trips/[id]/costing` | PASS | PASS | PASS | PASS | 0 | PASS |
+
+- **Raw enum values visibly rendered in Batch 3B scope:** 0
+- **Horizontal page overflow across tested viewports:** 0
+
+## 118.8 Scope Boundaries & Safety
+- **Database Schema & Migrations:** 0 changes.
+- **API Contracts & Route Handlers:** 0 changes.
+- **Authentication & RBAC:** 100% unchanged.
+- **Tenant Isolation:** 100% unchanged and verified.
+- **Business Logic:** 100% preserved.
+- **Batch 3A (Select/Search Controls):** CLOSED and fully preserved.
+- **Scrolling Audit (`ISSUE-001` → `ISSUE-008`):** Strictly ON HOLD.
+- **Supplier Architecture:** Strictly preserved (no models/routes altered).
 
 ---
 
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
 

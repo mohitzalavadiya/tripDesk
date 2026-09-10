@@ -30,6 +30,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   NotificationChannel,
   CustomerNotificationType,
   NotificationDeliveryStatus,
@@ -42,6 +49,50 @@ import {
 import { customerClient } from "@/lib/api-client/customer-client";
 import { tripClient } from "@/lib/api-client/trip-client";
 import { toast } from "sonner";
+const CHANNEL_FILTER_LABELS: Record<string, string> = {
+  ALL: "All",
+  [NotificationChannel.IN_APP]: "In-App Portal",
+  [NotificationChannel.EMAIL]: "Email",
+  [NotificationChannel.WHATSAPP]: "WhatsApp",
+  [NotificationChannel.SMS]: "SMS",
+};
+
+const TYPE_FILTER_LABELS: Record<string, string> = {
+  ALL: "All",
+  [CustomerNotificationType.BOOKING_CONFIRMED]: "Booking Confirmed",
+  [CustomerNotificationType.PAYMENT_RECEIVED]: "Payment Received",
+  [CustomerNotificationType.PAYMENT_DUE]: "Payment Reminder",
+  [CustomerNotificationType.TRIP_CONFIRMED]: "Trip Confirmed",
+  [CustomerNotificationType.TRIP_STARTED]: "Trip Started",
+  [CustomerNotificationType.TRIP_COMPLETED]: "Trip Completed",
+  [CustomerNotificationType.FEEDBACK_REQUEST]: "Feedback Request",
+  [CustomerNotificationType.DOCUMENT_READY]: "Document Ready",
+  [CustomerNotificationType.OPERATIONS_ALERT]: "Operations Alert",
+};
+
+const STATUS_FILTER_LABELS: Record<string, string> = {
+  ALL: "All",
+  [NotificationDeliveryStatus.SENT]: "Sent",
+  [NotificationDeliveryStatus.DELIVERED]: "Delivered",
+  [NotificationDeliveryStatus.READ]: "Read",
+  [NotificationDeliveryStatus.PENDING]: "Pending",
+  [NotificationDeliveryStatus.FAILED]: "Failed",
+  [NotificationDeliveryStatus.CANCELLED]: "Cancelled",
+};
+
+const MODAL_CHANNEL_LABELS: Record<string, string> = {
+  [NotificationChannel.IN_APP]: "In-App Portal",
+  [NotificationChannel.EMAIL]: "Email",
+  [NotificationChannel.WHATSAPP]: "WhatsApp",
+};
+
+const MODAL_CATEGORY_LABELS: Record<string, string> = {
+  [CustomerNotificationType.OPERATIONS_ALERT]: "Operations Alert",
+  [CustomerNotificationType.TRIP_UPDATED]: "Trip Update",
+  [CustomerNotificationType.PAYMENT_DUE]: "Payment Reminder",
+  [CustomerNotificationType.DOCUMENT_READY]: "Document Ready",
+  [CustomerNotificationType.FEEDBACK_REQUEST]: "Feedback Request",
+};
 
 export default function CommunicationsPage() {
   const [loading, setLoading] = useState(true);
@@ -405,75 +456,102 @@ export default function CommunicationsPage() {
         >
           {/* Search */}
           <div className="relative lg:col-span-2">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
             <Input
               type="text"
               placeholder="Search recipient, message, customer name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-9 text-xs rounded-xl bg-slate-50 border-slate-200"
+              className="pl-10 pr-9 h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white transition-all"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           {/* Channel Filter */}
           <div>
-            <select
-              value={selectedChannel}
-              onChange={(e) => {
-                setSelectedChannel(e.target.value as any);
+            <Select
+              value={selectedChannel || "ALL"}
+              onValueChange={(val) => {
+                setSelectedChannel(val === "ALL" ? "" : (val as any));
                 setPage(1);
               }}
-              className="w-full h-9 text-xs font-semibold px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 focus:outline-indigo-600"
             >
-              <option value="">All Channels</option>
-              <option value={NotificationChannel.IN_APP}>In-App Portal</option>
-              <option value={NotificationChannel.EMAIL}>Email</option>
-              <option value={NotificationChannel.WHATSAPP}>WhatsApp</option>
-              <option value={NotificationChannel.SMS}>SMS</option>
-            </select>
+              <SelectTrigger className="w-full h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+                <SelectValue placeholder="All">
+                  {(val) => CHANNEL_FILTER_LABELS[val] ?? "All"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value={NotificationChannel.IN_APP}>In-App Portal</SelectItem>
+                <SelectItem value={NotificationChannel.EMAIL}>Email</SelectItem>
+                <SelectItem value={NotificationChannel.WHATSAPP}>WhatsApp</SelectItem>
+                <SelectItem value={NotificationChannel.SMS}>SMS</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Type Filter */}
           <div>
-            <select
-              value={selectedType}
-              onChange={(e) => {
-                setSelectedType(e.target.value as any);
+            <Select
+              value={selectedType || "ALL"}
+              onValueChange={(val) => {
+                setSelectedType(val === "ALL" ? "" : (val as any));
                 setPage(1);
               }}
-              className="w-full h-9 text-xs font-semibold px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 focus:outline-indigo-600"
             >
-              <option value="">All Event Types</option>
-              <option value={CustomerNotificationType.BOOKING_CONFIRMED}>Booking Confirmed</option>
-              <option value={CustomerNotificationType.PAYMENT_RECEIVED}>Payment Received</option>
-              <option value={CustomerNotificationType.PAYMENT_DUE}>Payment Reminder</option>
-              <option value={CustomerNotificationType.TRIP_CONFIRMED}>Trip Confirmed</option>
-              <option value={CustomerNotificationType.TRIP_STARTED}>Trip Started</option>
-              <option value={CustomerNotificationType.TRIP_COMPLETED}>Trip Completed</option>
-              <option value={CustomerNotificationType.FEEDBACK_REQUEST}>Feedback Request</option>
-              <option value={CustomerNotificationType.DOCUMENT_READY}>Document Ready</option>
-              <option value={CustomerNotificationType.OPERATIONS_ALERT}>Operations Alert</option>
-            </select>
+              <SelectTrigger className="w-full h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+                <SelectValue placeholder="All">
+                  {(val) => TYPE_FILTER_LABELS[val] ?? "All"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value={CustomerNotificationType.BOOKING_CONFIRMED}>Booking Confirmed</SelectItem>
+                <SelectItem value={CustomerNotificationType.PAYMENT_RECEIVED}>Payment Received</SelectItem>
+                <SelectItem value={CustomerNotificationType.PAYMENT_DUE}>Payment Reminder</SelectItem>
+                <SelectItem value={CustomerNotificationType.TRIP_CONFIRMED}>Trip Confirmed</SelectItem>
+                <SelectItem value={CustomerNotificationType.TRIP_STARTED}>Trip Started</SelectItem>
+                <SelectItem value={CustomerNotificationType.TRIP_COMPLETED}>Trip Completed</SelectItem>
+                <SelectItem value={CustomerNotificationType.FEEDBACK_REQUEST}>Feedback Request</SelectItem>
+                <SelectItem value={CustomerNotificationType.DOCUMENT_READY}>Document Ready</SelectItem>
+                <SelectItem value={CustomerNotificationType.OPERATIONS_ALERT}>Operations Alert</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Status Filter */}
           <div>
-            <select
-              value={selectedStatus}
-              onChange={(e) => {
-                setSelectedStatus(e.target.value as any);
+            <Select
+              value={selectedStatus || "ALL"}
+              onValueChange={(val) => {
+                setSelectedStatus(val === "ALL" ? "" : (val as any));
                 setPage(1);
               }}
-              className="w-full h-9 text-xs font-semibold px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 focus:outline-indigo-600"
             >
-              <option value="">All Statuses</option>
-              <option value={NotificationDeliveryStatus.SENT}>Sent</option>
-              <option value={NotificationDeliveryStatus.DELIVERED}>Delivered</option>
-              <option value={NotificationDeliveryStatus.READ}>Read</option>
-              <option value={NotificationDeliveryStatus.PENDING}>Pending</option>
-              <option value={NotificationDeliveryStatus.FAILED}>Failed</option>
-              <option value={NotificationDeliveryStatus.CANCELLED}>Cancelled</option>
-            </select>
+              <SelectTrigger className="w-full h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+                <SelectValue placeholder="All">
+                  {(val) => STATUS_FILTER_LABELS[val] ?? "All"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value={NotificationDeliveryStatus.SENT}>Sent</SelectItem>
+                <SelectItem value={NotificationDeliveryStatus.DELIVERED}>Delivered</SelectItem>
+                <SelectItem value={NotificationDeliveryStatus.READ}>Read</SelectItem>
+                <SelectItem value={NotificationDeliveryStatus.PENDING}>Pending</SelectItem>
+                <SelectItem value={NotificationDeliveryStatus.FAILED}>Failed</SelectItem>
+                <SelectItem value={NotificationDeliveryStatus.CANCELLED}>Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </form>
       </div>
@@ -667,19 +745,26 @@ export default function CommunicationsPage() {
                 <label className="text-xs font-bold text-slate-700 block mb-1">
                   Recipient Customer *
                 </label>
-                <select
-                  required
+                <Select
                   value={formData.customerId}
-                  onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
-                  className="w-full h-9 text-xs font-medium px-3 rounded-xl border border-slate-200 focus:outline-indigo-600"
+                  onValueChange={(val) => val && setFormData({ ...formData, customerId: val })}
                 >
-                  <option value="">Select a Customer...</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.phone || c.email || "No direct phone"})
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-9 text-xs rounded-xl border border-slate-200 bg-white focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500">
+                    <SelectValue placeholder="Select a Customer...">
+                      {(val) => {
+                        const c = customers.find((c) => c.id === val);
+                        return c ? `${c.name} (${c.phone || c.email || "No direct phone"})` : "Select a Customer...";
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50 max-h-60">
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} ({c.phone || c.email || "No direct phone"})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Related Trip (Optional) */}
@@ -687,18 +772,28 @@ export default function CommunicationsPage() {
                 <label className="text-xs font-bold text-slate-700 block mb-1">
                   Related Trip (Optional)
                 </label>
-                <select
-                  value={formData.tripId}
-                  onChange={(e) => setFormData({ ...formData, tripId: e.target.value })}
-                  className="w-full h-9 text-xs font-medium px-3 rounded-xl border border-slate-200 focus:outline-indigo-600"
+                <Select
+                  value={formData.tripId || "NONE"}
+                  onValueChange={(val) => setFormData({ ...formData, tripId: !val || val === "NONE" ? "" : val })}
                 >
-                  <option value="">No specific trip (General Notice)</option>
-                  {trips.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.title} ({t.tripNumber})
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-9 text-xs rounded-xl border border-slate-200 bg-white focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500">
+                    <SelectValue placeholder="No specific trip (General Notice)">
+                      {(val) => {
+                        if (!val || val === "NONE") return "No specific trip (General Notice)";
+                        const t = trips.find((t) => t.id === val);
+                        return t ? `${t.title} (${t.tripNumber})` : "No specific trip (General Notice)";
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50 max-h-60">
+                    <SelectItem value="NONE">No specific trip (General Notice)</SelectItem>
+                    {trips.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.title} ({t.tripNumber})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Channel & Event Type Row */}
@@ -707,39 +802,52 @@ export default function CommunicationsPage() {
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     Channel *
                   </label>
-                  <select
+                  <Select
                     value={formData.channel}
-                    onChange={(e) =>
-                      setFormData({ ...formData, channel: e.target.value as NotificationChannel })
+                    onValueChange={(val) =>
+                      val && setFormData({ ...formData, channel: val as NotificationChannel })
                     }
-                    className="w-full h-9 text-xs font-medium px-3 rounded-xl border border-slate-200 focus:outline-indigo-600"
                   >
-                    <option value={NotificationChannel.IN_APP}>In-App Portal</option>
-                    <option value={NotificationChannel.EMAIL}>Email</option>
-                    <option value={NotificationChannel.WHATSAPP}>WhatsApp</option>
-                  </select>
+                    <SelectTrigger className="w-full h-9 text-xs rounded-xl border border-slate-200 bg-white focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500">
+                      <SelectValue placeholder="Select Channel">
+                        {(val) => MODAL_CHANNEL_LABELS[val] ?? val}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value={NotificationChannel.IN_APP}>In-App Portal</SelectItem>
+                      <SelectItem value={NotificationChannel.EMAIL}>Email</SelectItem>
+                      <SelectItem value={NotificationChannel.WHATSAPP}>WhatsApp</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     Category Type
                   </label>
-                  <select
+                  <Select
                     value={formData.type}
-                    onChange={(e) =>
+                    onValueChange={(val) =>
+                      val &&
                       setFormData({
                         ...formData,
-                        type: e.target.value as CustomerNotificationType,
+                        type: val as CustomerNotificationType,
                       })
                     }
-                    className="w-full h-9 text-xs font-medium px-3 rounded-xl border border-slate-200 focus:outline-indigo-600"
                   >
-                    <option value={CustomerNotificationType.OPERATIONS_ALERT}>Operations Alert</option>
-                    <option value={CustomerNotificationType.TRIP_UPDATED}>Trip Update</option>
-                    <option value={CustomerNotificationType.PAYMENT_DUE}>Payment Reminder</option>
-                    <option value={CustomerNotificationType.DOCUMENT_READY}>Document Ready</option>
-                    <option value={CustomerNotificationType.FEEDBACK_REQUEST}>Feedback Request</option>
-                  </select>
+                    <SelectTrigger className="w-full h-9 text-xs rounded-xl border border-slate-200 bg-white focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500">
+                      <SelectValue placeholder="Select Category">
+                        {(val) => MODAL_CATEGORY_LABELS[val] ?? val}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value={CustomerNotificationType.OPERATIONS_ALERT}>Operations Alert</SelectItem>
+                      <SelectItem value={CustomerNotificationType.TRIP_UPDATED}>Trip Update</SelectItem>
+                      <SelectItem value={CustomerNotificationType.PAYMENT_DUE}>Payment Reminder</SelectItem>
+                      <SelectItem value={CustomerNotificationType.DOCUMENT_READY}>Document Ready</SelectItem>
+                      <SelectItem value={CustomerNotificationType.FEEDBACK_REQUEST}>Feedback Request</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

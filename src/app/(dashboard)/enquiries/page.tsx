@@ -13,6 +13,13 @@ import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Inbox,
   Plus,
   List,
@@ -40,6 +47,26 @@ import {
 import { EnquiryStatus, EnquiryPriority, EnquirySource } from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+
+const PRIORITY_FILTER_LABELS: Record<string, string> = {
+  all: "All",
+  [EnquiryPriority.URGENT]: "Urgent",
+  [EnquiryPriority.HIGH]: "High",
+  [EnquiryPriority.MEDIUM]: "Medium",
+  [EnquiryPriority.LOW]: "Low",
+};
+
+const SOURCE_FILTER_LABELS: Record<string, string> = {
+  all: "All",
+  [EnquirySource.WHATSAPP]: "WhatsApp",
+  [EnquirySource.WEBSITE]: "Website",
+  [EnquirySource.INSTAGRAM]: "Instagram",
+  [EnquirySource.FACEBOOK]: "Facebook",
+  [EnquirySource.PHONE]: "Phone",
+  [EnquirySource.EMAIL]: "Email",
+  [EnquirySource.REFERRAL]: "Referral",
+  [EnquirySource.WALK_IN]: "Walk-in",
+};
 
 export default function EnquiriesPage() {
   const router = useRouter();
@@ -406,45 +433,61 @@ export default function EnquiriesPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Priority:</span>
-                  <select
+                  <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Priority:</span>
+                  <Select
                     value={priorityFilter}
-                    onChange={(e) => {
-                      setPriorityFilter(e.target.value);
-                      setPage(1);
+                    onValueChange={(val) => {
+                      if (val) {
+                        setPriorityFilter(val);
+                        setPage(1);
+                      }
                     }}
-                    className="h-8 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
-                    <option value="all">All Priorities</option>
-                    <option value={EnquiryPriority.URGENT}>Urgent</option>
-                    <option value={EnquiryPriority.HIGH}>High</option>
-                    <option value={EnquiryPriority.MEDIUM}>Medium</option>
-                    <option value={EnquiryPriority.LOW}>Low</option>
-                  </select>
+                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[125px] sm:w-[135px]">
+                      <SelectValue placeholder="All">
+                        {(val) => PRIORITY_FILTER_LABELS[val] ?? "All"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value={EnquiryPriority.URGENT}>Urgent</SelectItem>
+                      <SelectItem value={EnquiryPriority.HIGH}>High</SelectItem>
+                      <SelectItem value={EnquiryPriority.MEDIUM}>Medium</SelectItem>
+                      <SelectItem value={EnquiryPriority.LOW}>Low</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Source:</span>
-                  <select
+                  <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Source:</span>
+                  <Select
                     value={sourceFilter}
-                    onChange={(e) => {
-                      setSourceFilter(e.target.value);
-                      setPage(1);
+                    onValueChange={(val) => {
+                      if (val) {
+                        setSourceFilter(val);
+                        setPage(1);
+                      }
                     }}
-                    className="h-8 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
-                    <option value="all">All Sources</option>
-                    <option value={EnquirySource.WHATSAPP}>WhatsApp</option>
-                    <option value={EnquirySource.WEBSITE}>Website</option>
-                    <option value={EnquirySource.INSTAGRAM}>Instagram</option>
-                    <option value={EnquirySource.FACEBOOK}>Facebook</option>
-                    <option value={EnquirySource.PHONE}>Phone</option>
-                    <option value={EnquirySource.EMAIL}>Email</option>
-                    <option value={EnquirySource.REFERRAL}>Referral</option>
-                    <option value={EnquirySource.WALK_IN}>Walk-in</option>
-                  </select>
+                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[125px] sm:w-[135px]">
+                      <SelectValue placeholder="All">
+                        {(val) => SOURCE_FILTER_LABELS[val] ?? "All"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value={EnquirySource.WHATSAPP}>WhatsApp</SelectItem>
+                      <SelectItem value={EnquirySource.WEBSITE}>Website</SelectItem>
+                      <SelectItem value={EnquirySource.INSTAGRAM}>Instagram</SelectItem>
+                      <SelectItem value={EnquirySource.FACEBOOK}>Facebook</SelectItem>
+                      <SelectItem value={EnquirySource.PHONE}>Phone</SelectItem>
+                      <SelectItem value={EnquirySource.EMAIL}>Email</SelectItem>
+                      <SelectItem value={EnquirySource.REFERRAL}>Referral</SelectItem>
+                      <SelectItem value={EnquirySource.WALK_IN}>Walk-in</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {isFilterActive && (

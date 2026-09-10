@@ -35,6 +35,7 @@ import {
   FileText,
   Calendar,
 } from "lucide-react";
+import { StatusBadge } from "@/components/shared/status-badge";
 import {
   adminClient,
 } from "@/lib/api-client/admin-client";
@@ -42,6 +43,23 @@ import {
   AdminSubscriptionPaymentItem,
   SubscriptionPaymentSummaryStats,
 } from "@/lib/services/admin-service";
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  BANK_TRANSFER: "Bank Transfer",
+  UPI: "UPI / Online",
+  CASH: "Cash",
+  CARD: "Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other",
+};
+
+const ADMIN_PAYMENT_STATUS_FILTER_LABELS: Record<string, string> = {
+  ALL: "All",
+  PENDING: "Pending Verification",
+  VERIFIED: "Verified & Active",
+  REJECTED: "Rejected",
+  REFUNDED: "Refunded",
+};
 
 export default function AdminPaymentsPage() {
   const router = useRouter();
@@ -321,7 +339,9 @@ export default function AdminPaymentsPage() {
           <div className="flex items-center gap-2.5 w-full sm:w-auto">
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v || "ALL")}>
               <SelectTrigger className="h-9 text-xs w-48">
-                <SelectValue placeholder="Payment Status" />
+                <SelectValue placeholder="All">
+                  {(val) => ADMIN_PAYMENT_STATUS_FILTER_LABELS[val] ?? "All"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="bg-white border-slate-200">
                 <SelectItem value="ALL">All Payment Statuses</SelectItem>
@@ -397,26 +417,25 @@ export default function AdminPaymentsPage() {
                         {p.id.slice(0, 14)}...
                       </span>
                       <h4 className="font-bold text-sm text-slate-900">{p.agencyName}</h4>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                      <StatusBadge
+                        status={p.status}
+                        label={
                           p.status === "VERIFIED"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            ? "Verified"
                             : p.status === "PENDING"
-                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                            ? "Pending Audit"
                             : p.status === "REJECTED"
-                            ? "bg-rose-50 text-rose-700 border-rose-200"
-                            : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {p.status}
-                      </span>
+                            ? "Rejected"
+                            : p.status
+                        }
+                      />
                       <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
                         {p.planName} Plan (₹{p.planPrice})
                       </span>
                     </div>
 
                     <p className="text-slate-500 flex items-center gap-2 flex-wrap">
-                      <span>Method: <strong>{p.paymentMethod}</strong></span>
+                      <span>Method: <strong>{PAYMENT_METHOD_LABELS[p.paymentMethod] ?? p.paymentMethod}</strong></span>
                       <span>•</span>
                       <span className="font-mono text-purple-700">
                         UTR / Ref: <strong>{p.utrNumber || p.paymentReference || "N/A"}</strong>
@@ -534,7 +553,7 @@ export default function AdminPaymentsPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Payment Method:</span>
-                <strong className="text-slate-800">{selectedPayment.paymentMethod}</strong>
+                <strong className="text-slate-800">{PAYMENT_METHOD_LABELS[selectedPayment.paymentMethod] ?? selectedPayment.paymentMethod}</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">UTR / Reference:</span>

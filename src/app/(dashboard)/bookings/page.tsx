@@ -39,6 +39,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -62,6 +69,13 @@ import { bookingClient, BookingWithRelations } from "@/lib/api-client";
 import { BookingStatus, BookingPaymentStatus } from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+
+const PAYMENT_FILTER_LABELS: Record<string, string> = {
+  all: "All",
+  [BookingPaymentStatus.UNPAID]: "Unpaid",
+  [BookingPaymentStatus.PARTIALLY_PAID]: "Partially Paid",
+  [BookingPaymentStatus.PAID]: "Fully Paid",
+};
 
 export default function BookingsDashboardPage() {
   const router = useRouter();
@@ -282,22 +296,30 @@ export default function BookingsDashboardPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Payment:</span>
-                  <select
+                  <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Payment:</span>
+                  <Select
                     value={paymentFilter}
-                    onChange={(e) => {
-                      setPaymentFilter(e.target.value);
-                      setPage(1);
+                    onValueChange={(val) => {
+                      if (val) {
+                        setPaymentFilter(val);
+                        setPage(1);
+                      }
                     }}
-                    className="h-8 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
-                    <option value="all">All Statuses</option>
-                    <option value={BookingPaymentStatus.UNPAID}>Unpaid</option>
-                    <option value={BookingPaymentStatus.PARTIALLY_PAID}>Partially Paid</option>
-                    <option value={BookingPaymentStatus.PAID}>Fully Paid</option>
-                  </select>
+                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[130px] sm:w-[140px]">
+                      <SelectValue placeholder="All">
+                        {(val) => PAYMENT_FILTER_LABELS[val] ?? "All"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value={BookingPaymentStatus.UNPAID}>Unpaid</SelectItem>
+                      <SelectItem value={BookingPaymentStatus.PARTIALLY_PAID}>Partially Paid</SelectItem>
+                      <SelectItem value={BookingPaymentStatus.PAID}>Fully Paid</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {isFilterActive && (

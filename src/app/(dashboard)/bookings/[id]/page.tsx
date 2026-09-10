@@ -99,6 +99,30 @@ import {
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  BANK_TRANSFER: "Bank Transfer",
+  UPI: "UPI",
+  CASH: "Cash",
+  CARD: "Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other",
+};
+
+const TRAVELER_TYPE_LABELS: Record<string, string> = {
+  ADULT: "Adult",
+  CHILD: "Child",
+  INFANT: "Infant",
+};
+
+const PAYMENT_METHOD_MODAL_LABELS: Record<string, string> = {
+  UPI: "UPI / GPay / PhonePe",
+  BANK_TRANSFER: "Bank Transfer (NEFT/RTGS)",
+  CASH: "Cash Deposit",
+  CARD: "Credit / Debit Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other Method",
+};
+
 export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -1074,7 +1098,7 @@ export default function BookingDetailPage() {
                           </TableCell>
                           <TableCell className="py-3 px-4">
                             <Badge variant="outline" className="text-[10px] font-bold">
-                              {p.paymentMethod}
+                              {PAYMENT_METHOD_LABELS[p.paymentMethod] ?? p.paymentMethod}
                             </Badge>
                           </TableCell>
                           <TableCell className="py-3 px-4">
@@ -1218,7 +1242,7 @@ export default function BookingDetailPage() {
                       {booking.trip.travelers.map((t) => (
                         <div key={t.id} className="text-slate-600 flex justify-between">
                           <span>{t.name}</span>
-                          <span className="text-slate-400 text-[10px]">{t.type}</span>
+                          <span className="text-slate-400 text-[10px]">{TRAVELER_TYPE_LABELS[t.type] ?? t.type}</span>
                         </div>
                       ))}
                     </div>
@@ -1290,7 +1314,9 @@ export default function BookingDetailPage() {
                       onValueChange={(val) => val && setPaymentMethod(val as PaymentMethod)}
                     >
                       <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
-                        <SelectValue />
+                        <SelectValue placeholder="Payment Method">
+                          {(val) => PAYMENT_METHOD_MODAL_LABELS[val] ?? val}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
                         <SelectItem value={PaymentMethod.UPI}>UPI / GPay / PhonePe</SelectItem>

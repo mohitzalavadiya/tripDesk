@@ -29,6 +29,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ErrorState } from "@/components/shared/error-state";
@@ -89,6 +96,12 @@ interface InvoiceDetail {
     address: string | null;
   };
 }
+
+const DISCOUNT_TYPE_LABELS: Record<string, string> = {
+  NONE: "No Discount",
+  FIXED: "Fixed Amount (₹)",
+  PERCENTAGE: "Percentage (%)",
+};
 
 export default function InvoiceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -691,15 +704,23 @@ export default function InvoiceDetailPage() {
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-t pt-4">
               <div className="flex items-center gap-3">
                 <label className="text-xs font-semibold text-slate-700">Invoice Discount:</label>
-                <select
+                <Select
                   value={discountType}
-                  onChange={(e) => setDiscountType(e.target.value as any)}
-                  className="rounded border border-slate-300 py-1 px-2 text-xs text-slate-900"
+                  onValueChange={(val) => {
+                    if (val) setDiscountType(val as any);
+                  }}
                 >
-                  <option value="NONE">No Discount</option>
-                  <option value="FIXED">Fixed Amount (₹)</option>
-                  <option value="PERCENTAGE">Percentage (%)</option>
-                </select>
+                  <SelectTrigger className="h-8 text-xs rounded-lg bg-white border-slate-200 text-slate-800 font-medium w-36">
+                    <SelectValue placeholder="Discount">
+                      {(val) => DISCOUNT_TYPE_LABELS[val] ?? val}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl bg-white/95 backdrop-blur-md p-1 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                    <SelectItem value="NONE">No Discount</SelectItem>
+                    <SelectItem value="FIXED">Fixed Amount (₹)</SelectItem>
+                    <SelectItem value="PERCENTAGE">Percentage (%)</SelectItem>
+                  </SelectContent>
+                </Select>
 
                 {discountType !== "NONE" && (
                   <input
@@ -709,7 +730,7 @@ export default function InvoiceDetailPage() {
                     value={discountValue}
                     onChange={(e) => setDiscountValue(e.target.value)}
                     placeholder={discountType === "FIXED" ? "Amount in ₹" : "e.g. 10"}
-                    className="w-32 rounded border border-slate-300 py-1 px-2 text-xs text-slate-900"
+                    className="w-32 h-8 rounded-lg border border-slate-200 py-1 px-2.5 text-xs text-slate-900 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                 )}
               </div>

@@ -310,7 +310,7 @@ export default function TripCostingDedicatedPage() {
                         </TableCell>
                         <TableCell className="py-3 px-4">
                           <Badge variant="outline" className="text-[10px] font-bold">
-                            {a.type}
+                            {a.type === "INCLUDED" ? "Included" : a.type === "OPTIONAL" ? "Optional" : a.type}
                           </Badge>
                         </TableCell>
                         <TableCell className="py-3 px-4 text-slate-700">

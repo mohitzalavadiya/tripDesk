@@ -25,8 +25,23 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { getErrorMessage } from "@/lib/utils";
 import { adminClient } from "@/lib/api-client/admin-client";
+
+const ANNOUNCEMENT_TYPE_LABELS: Record<string, string> = {
+  INFO: "Info",
+  WARNING: "Warning",
+  MAINTENANCE: "Maintenance",
+  FEATURE: "Feature",
+  UPDATE: "Product Update",
+};
+
+const ANNOUNCEMENT_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Active",
+  INACTIVE: "Inactive",
+  DRAFT: "Draft",
+};
 
 export default function AdminAnnouncementsPage() {
   const [announcements, setAnnouncements] = React.useState<any[]>([]);
@@ -189,17 +204,12 @@ export default function AdminAnnouncementsPage() {
                               : "bg-blue-100 text-blue-800"
                           }`}
                         >
-                          {a.type}
+                          {ANNOUNCEMENT_TYPE_LABELS[a.type] ?? a.type}
                         </span>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            a.status === "ACTIVE"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : "bg-slate-100 text-slate-500"
-                          }`}
-                        >
-                          {a.status}
-                        </span>
+                        <StatusBadge
+                          status={a.status}
+                          label={ANNOUNCEMENT_STATUS_LABELS[a.status] ?? a.status}
+                        />
                       </div>
                       <span className="text-[11px] text-slate-400">
                         {new Date(a.createdAt).toLocaleDateString("en-IN", {
@@ -269,7 +279,9 @@ export default function AdminAnnouncementsPage() {
                     }}
                   >
                     <SelectTrigger className="h-9 text-xs">
-                      <SelectValue placeholder="Type" />
+                      <SelectValue placeholder="Type">
+                        {(val) => ANNOUNCEMENT_TYPE_LABELS[val] ?? val}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="INFO">Info</SelectItem>
@@ -289,7 +301,9 @@ export default function AdminAnnouncementsPage() {
                     }}
                   >
                     <SelectTrigger className="h-9 text-xs">
-                      <SelectValue placeholder="Status" />
+                      <SelectValue placeholder="Status">
+                        {(val) => ANNOUNCEMENT_STATUS_LABELS[val] ?? val}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ACTIVE">Active</SelectItem>

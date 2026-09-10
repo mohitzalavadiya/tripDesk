@@ -28,6 +28,15 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
+const OPERATION_STATUS_LABELS: Record<string, string> = {
+  PLANNING: "Planning",
+  CONFIRMED: "Confirmed",
+  ONGOING: "In Progress",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+  DRAFT: "Draft",
+};
+
 interface FinalizationChecklistCardProps {
   summary: OperationsClosureSummary;
   onSuccess: () => void;
@@ -170,7 +179,7 @@ export function FinalizationChecklistCard({
                 </span>
               ) : (
                 <span className="flex items-center gap-1 font-bold text-rose-700">
-                  <XCircle className="h-4 w-4 text-rose-600" /> {summary.status}
+                  <XCircle className="h-4 w-4 text-rose-600" /> {OPERATION_STATUS_LABELS[summary.status] ?? summary.status}
                 </span>
               )}
             </div>

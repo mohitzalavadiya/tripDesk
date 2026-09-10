@@ -507,7 +507,7 @@ export default function SettingsPage() {
                                   : "bg-blue-50 text-blue-700 border-blue-200"
                               }`}
                             >
-                              {log.channel}
+                              {log.channel === "WHATSAPP" ? "WhatsApp" : log.channel === "EMAIL" ? "Email" : log.channel}
                             </Badge>
                           </div>
                           <p className="text-[11px] text-slate-500 line-clamp-1">{log.title}</p>
@@ -526,7 +526,7 @@ export default function SettingsPage() {
                                 : "bg-slate-100 text-slate-600 border-slate-200"
                             }`}
                           >
-                            {log.status}
+                            {log.status === "DELIVERED" ? "Delivered" : log.status === "SENT" ? "Sent" : log.status === "FAILED" ? "Failed" : log.status === "PENDING" ? "Pending" : log.status}
                           </Badge>
                           {log.status === "FAILED" && (
                             <button

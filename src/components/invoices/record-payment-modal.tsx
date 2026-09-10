@@ -3,6 +3,13 @@
 import * as React from "react";
 import { X, Loader2, IndianRupee, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 interface RecordPaymentModalProps {
@@ -13,6 +20,15 @@ interface RecordPaymentModalProps {
   balanceAmount: number;
   onSuccess: () => void;
 }
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  UPI: "UPI",
+  BANK_TRANSFER: "Bank Transfer (NEFT/IMPS)",
+  CASH: "Cash",
+  CARD: "Debit / Credit Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other",
+};
 
 export function RecordPaymentModal({
   isOpen,
@@ -148,23 +164,31 @@ export function RecordPaymentModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Payment Method <span className="text-red-500">*</span>
               </label>
-              <select
+              <Select
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 py-2 px-3 text-sm text-slate-900 focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                onValueChange={(val) => {
+                  if (val) setPaymentMethod(val);
+                }}
               >
-                <option value="UPI">UPI</option>
-                <option value="BANK_TRANSFER">Bank Transfer (NEFT/IMPS)</option>
-                <option value="CASH">Cash</option>
-                <option value="CARD">Debit / Credit Card</option>
-                <option value="CHEQUE">Cheque</option>
-                <option value="OTHER">Other</option>
-              </select>
+                <SelectTrigger className="w-full h-9 text-xs rounded-xl bg-slate-50/50 border-slate-200 hover:border-slate-300 text-slate-900 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500">
+                  <SelectValue placeholder="Payment Method">
+                    {(val) => PAYMENT_METHOD_LABELS[val] ?? val}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                  <SelectItem value="UPI">UPI</SelectItem>
+                  <SelectItem value="BANK_TRANSFER">Bank Transfer (NEFT/IMPS)</SelectItem>
+                  <SelectItem value="CASH">Cash</SelectItem>
+                  <SelectItem value="CARD">Debit / Credit Card</SelectItem>
+                  <SelectItem value="CHEQUE">Cheque</SelectItem>
+                  <SelectItem value="OTHER">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -177,7 +201,7 @@ export function RecordPaymentModal({
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
                 required
-                className="w-full rounded-lg border border-slate-300 py-2 px-3 text-sm text-slate-900 focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
+                className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
           </div>

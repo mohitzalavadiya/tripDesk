@@ -18,6 +18,19 @@ import {
   ShieldAlert,
 } from "lucide-react";
 
+const SERVICE_STATUS_LABELS: Record<string, string> = {
+  CONFIRMED: "Confirmed",
+  REQUESTED: "Requested",
+  PENDING_CONFIRMATION: "Pending Confirmation",
+  PENDING: "Pending",
+  CANCELLED: "Cancelled",
+  DISPATCHED: "Dispatched",
+  ON_DUTY: "On Duty",
+  COMPLETED: "Completed",
+  UNASSIGNED: "Unassigned",
+  SCHEDULED: "Scheduled",
+};
+
 interface ServiceReconciliationCardProps {
   summary: OperationsClosureSummary;
 }
@@ -111,7 +124,7 @@ export function ServiceReconciliationCard({
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
-                        <XCircle className="h-3 w-3" /> {h.status}
+                        <XCircle className="h-3 w-3" /> {SERVICE_STATUS_LABELS[h.status] ?? h.status}
                       </span>
                     )}
                   </div>
@@ -166,7 +179,7 @@ export function ServiceReconciliationCard({
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                        <Clock className="h-3 w-3" /> {v.status}
+                        <Clock className="h-3 w-3" /> {SERVICE_STATUS_LABELS[v.status] ?? v.status}
                       </span>
                     )}
                   </div>
@@ -216,7 +229,7 @@ export function ServiceReconciliationCard({
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
-                        <XCircle className="h-3 w-3" /> {a.status}
+                        <XCircle className="h-3 w-3" /> {SERVICE_STATUS_LABELS[a.status] ?? a.status}
                       </span>
                     )}
                   </div>

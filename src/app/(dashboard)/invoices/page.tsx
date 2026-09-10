@@ -22,8 +22,11 @@ import {
   Loader2,
   MoreVertical,
   Filter,
+  X,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
@@ -49,6 +52,15 @@ import {
 import { toast } from "sonner";
 import { RecordPaymentModal } from "@/components/invoices/record-payment-modal";
 import { CancelInvoiceModal } from "@/components/invoices/cancel-invoice-modal";
+
+const INVOICE_STATUS_FILTER_LABELS: Record<string, string> = {
+  ALL: "All",
+  DRAFT: "Draft",
+  ISSUED: "Issued",
+  PARTIALLY_PAID: "Partially Paid",
+  PAID: "Paid",
+  CANCELLED: "Cancelled",
+};
 
 interface InvoiceListItem {
   id: string;
@@ -295,65 +307,92 @@ export default function InvoicesListPage() {
         </div>
 
         {/* ══════════════════════════════════════════════════ */}
-        {/* 3. FILTERS & SEARCH BAR */}
-        {/* ══════════════════════════════════════════════════ */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs md:flex-row md:items-center md:justify-between">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by Invoice #, Customer, Phone, Booking #..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-4 text-sm text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Status filter buttons */}
-            <div className="flex rounded-lg border border-slate-200 p-1 bg-slate-50 text-xs">
-              {["ALL", "DRAFT", "ISSUED", "PARTIALLY_PAID", "PAID", "CANCELLED"].map((st) => (
-                <button
-                  key={st}
-                  onClick={() => {
-                    setStatusFilter(st);
-                    setOverdueFilter(false);
-                    setPage(1);
-                  }}
-                  className={`rounded-md px-2.5 py-1 font-medium transition-colors cursor-pointer ${
-                    statusFilter === st && !overdueFilter
-                      ? "bg-white text-slate-900 shadow-sm font-bold"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  {st === "ALL" ? "All" : st.replace("_", " ")}
-                </button>
-              ))}
-            </div>
-
-            <Button
-              variant={overdueFilter ? "destructive" : "outline"}
-              size="sm"
-              onClick={() => {
-                setOverdueFilter(!overdueFilter);
-                setStatusFilter("ALL");
-                setPage(1);
-              }}
-              className="text-xs h-8 cursor-pointer"
-            >
-              <Clock className="mr-1 h-3.5 w-3.5" />
-              Overdue Only
-            </Button>
-          </div>
-        </div>
-
-        {/* ══════════════════════════════════════════════════ */}
-        {/* 4. INVOICES TABLE */}
+        {/* 3. INVOICES MASTER WORKSPACE CARD (SEARCH + TABLE) */}
         {/* ══════════════════════════════════════════════════ */}
         <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
+          {/* Master Toolbar Header */}
+          <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-2xl">
+                <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+                <Input
+                  type="text"
+                  placeholder="Search by Invoice #, Customer, Phone, Booking #..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all"
+                />
+                {search && (
+                  <button
+                    onClick={() => {
+                      setSearch("");
+                      setPage(1);
+                    }}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Status filter buttons */}
+                <div className="flex rounded-xl border border-slate-200 p-1 bg-slate-50 text-xs overflow-x-auto no-scrollbar">
+                  {["ALL", "DRAFT", "ISSUED", "PARTIALLY_PAID", "PAID", "CANCELLED"].map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => {
+                        setStatusFilter(st);
+                        setOverdueFilter(false);
+                        setPage(1);
+                      }}
+                      className={`rounded-lg px-2.5 py-1 font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                        statusFilter === st && !overdueFilter
+                          ? "bg-white text-slate-900 shadow-sm font-bold"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      {INVOICE_STATUS_FILTER_LABELS[st] ?? st}
+                    </button>
+                  ))}
+                </div>
+
+                <Button
+                  variant={overdueFilter ? "destructive" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setOverdueFilter(!overdueFilter);
+                    setStatusFilter("ALL");
+                    setPage(1);
+                  }}
+                  className="text-xs h-8 cursor-pointer shrink-0 rounded-lg"
+                >
+                  <Clock className="mr-1 h-3.5 w-3.5" />
+                  Overdue Only
+                </Button>
+
+                {(search || statusFilter !== "ALL" || overdueFilter) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearch("");
+                      setStatusFilter("ALL");
+                      setOverdueFilter(false);
+                      setPage(1);
+                    }}
+                    className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 shrink-0 cursor-pointer font-semibold rounded-lg"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                    Reset
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
         {loading ? (
           <div className="p-4">
             <TableSkeleton rows={6} />

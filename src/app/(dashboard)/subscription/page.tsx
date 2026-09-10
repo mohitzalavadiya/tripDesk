@@ -28,7 +28,22 @@ import {
   ChevronRight,
   ExternalLink,
 } from "lucide-react";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { subscriptionClient } from "@/lib/api-client/subscription-client";
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  BANK_TRANSFER: "Bank Transfer",
+  UPI: "UPI",
+  CASH: "Cash",
+  CARD: "Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other",
+};
+
+const BILLING_CYCLE_LABELS: Record<string, string> = {
+  MONTHLY: "Monthly",
+  YEARLY: "Yearly",
+};
 
 interface AgencySubscriptionData {
   agency: {
@@ -264,11 +279,11 @@ export default function AgencySubscriptionPage() {
                       Payment Verification In Progress
                     </span>
                     <span className="text-[10px] font-bold bg-amber-200/60 text-amber-900 px-2 py-0.5 rounded-full">
-                      Status: PENDING
+                      Status: Pending
                     </span>
                   </div>
                   <p className="text-xs text-amber-900/90 mt-1 leading-relaxed">
-                    Your payment request for the <strong>{pendingPayment.planName || "Selected"} Plan</strong> ({pendingPayment.billingCycle}) amounting to <strong>{formatCurrency(pendingPayment.amount)}</strong> has been submitted.
+                    Your payment request for the <strong>{pendingPayment.planName || "Selected"} Plan</strong> ({BILLING_CYCLE_LABELS[pendingPayment.billingCycle] ?? pendingPayment.billingCycle}) amounting to <strong>{formatCurrency(pendingPayment.amount)}</strong> has been submitted.
                   </p>
                   <p className="text-[11px] text-amber-800 font-mono mt-1">
                     UTR / Reference: <strong>{pendingPayment.utrNumber || "N/A"}</strong> • Submitted: {new Date(pendingPayment.createdAt).toLocaleString()}
@@ -344,7 +359,7 @@ export default function AgencySubscriptionPage() {
 
             <div className="text-left sm:text-right shrink-0">
               <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                {isActivePaid ? `Billed ${sub?.billingCycle}` : "Trial Pricing"}
+                {isActivePaid ? `Billed ${BILLING_CYCLE_LABELS[sub?.billingCycle] ?? sub?.billingCycle}` : "Trial Pricing"}
               </span>
               <span className="text-2xl sm:text-3xl font-black text-amber-300 font-mono">
                 {isActivePaid
@@ -368,7 +383,7 @@ export default function AgencySubscriptionPage() {
             <div>
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Status</span>
               <span className="font-bold text-emerald-400 flex items-center gap-1 mt-0.5">
-                <CheckCircle2 className="h-3.5 w-3.5" /> {sub?.status}
+                <CheckCircle2 className="h-3.5 w-3.5" /> {sub?.status === "TRIAL" ? "Trial" : sub?.status === "ACTIVE" ? "Active" : sub?.status === "EXPIRED" ? "Expired" : "Cancelled"}
               </span>
             </div>
 
@@ -617,13 +632,13 @@ export default function AgencySubscriptionPage() {
                   {data?.paymentHistory.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3 pr-4 font-bold text-slate-900">
-                        {p.planName || "SaaS Plan"} ({p.billingCycle})
+                        {p.planName || "SaaS Plan"} ({BILLING_CYCLE_LABELS[p.billingCycle] ?? p.billingCycle})
                       </td>
                       <td className="py-3 px-4 font-bold font-mono text-slate-900">
                         {formatCurrency(p.amount)}
                       </td>
                       <td className="py-3 px-4 text-slate-600">
-                        {p.paymentMethod}
+                        {PAYMENT_METHOD_LABELS[p.paymentMethod] ?? p.paymentMethod}
                       </td>
                       <td className="py-3 px-4 font-mono text-slate-700">
                         {p.utrNumber || "—"}
@@ -636,17 +651,18 @@ export default function AgencySubscriptionPage() {
                         })}
                       </td>
                       <td className="py-3 px-4">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        <StatusBadge
+                          status={p.status}
+                          label={
                             p.status === "VERIFIED"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              ? "Verified"
                               : p.status === "PENDING"
-                              ? "bg-amber-50 text-amber-700 border border-amber-200"
-                              : "bg-rose-50 text-rose-700 border border-rose-200"
-                          }`}
-                        >
-                          {p.status}
-                        </span>
+                              ? "Pending"
+                              : p.status === "REJECTED"
+                              ? "Rejected"
+                              : p.status
+                          }
+                        />
                       </td>
                       <td className="py-3 pl-4 text-right text-slate-500 max-w-xs truncate">
                         {p.rejectionReason ? (
@@ -692,7 +708,7 @@ export default function AgencySubscriptionPage() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-500">Billing Cycle:</span>
-                    <span className="font-bold text-indigo-700 uppercase">{billingCycle}</span>
+                    <span className="font-bold text-indigo-700">{BILLING_CYCLE_LABELS[billingCycle] ?? billingCycle}</span>
                   </div>
                   <div className="flex justify-between items-center border-t border-slate-200/60 pt-2">
                     <span className="text-slate-500">Payable Amount:</span>

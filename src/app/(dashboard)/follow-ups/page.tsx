@@ -67,6 +67,22 @@ import {
 } from "@/lib/api-client";
 import { FollowUpType, FollowUpStatus, EnquiryPriority } from "@prisma/client";
 import { toast } from "sonner";
+const TYPE_FILTER_LABELS: Record<string, string> = {
+  all: "All",
+  CALL: "Call",
+  WHATSAPP: "WhatsApp",
+  EMAIL: "Email",
+  MEETING: "Meeting",
+  OTHER: "Other",
+};
+
+const PRIORITY_FILTER_LABELS: Record<string, string> = {
+  all: "All",
+  URGENT: "Urgent",
+  HIGH: "High",
+  MEDIUM: "Medium",
+  LOW: "Low",
+};
 
 export default function FollowUpsPage() {
   // Data States
@@ -558,19 +574,19 @@ export default function FollowUpsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-            <div className="relative flex-1 md:w-60">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
               <Input
                 placeholder="Search lead or customer..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-9 text-xs border-slate-200 focus-visible:ring-indigo-500"
+                className="pl-10 pr-9 h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white transition-all"
               />
               {search && (
                 <button
                   type="button"
                   onClick={() => setSearch("")}
-                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -584,11 +600,13 @@ export default function FollowUpsPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-9 w-32 text-xs border-slate-200">
-                <SelectValue placeholder="All Types" />
+              <SelectTrigger className="h-9.5 w-32 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+                <SelectValue placeholder="All">
+                  {(val) => TYPE_FILTER_LABELS[val] ?? "All"}
+                </SelectValue>
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
+              <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="CALL">Call</SelectItem>
                 <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
                 <SelectItem value="EMAIL">Email</SelectItem>
@@ -604,11 +622,13 @@ export default function FollowUpsPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-9 w-32 text-xs border-slate-200">
-                <SelectValue placeholder="Priority" />
+              <SelectTrigger className="h-9.5 w-32 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+                <SelectValue placeholder="All">
+                  {(val) => PRIORITY_FILTER_LABELS[val] ?? "All"}
+                </SelectValue>
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priorities</SelectItem>
+              <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="URGENT">Urgent</SelectItem>
                 <SelectItem value="HIGH">High</SelectItem>
                 <SelectItem value="MEDIUM">Medium</SelectItem>
@@ -621,7 +641,7 @@ export default function FollowUpsPage() {
               size="icon"
               onClick={fetchData}
               title="Refresh"
-              className="h-9 w-9 text-slate-600 border-slate-200"
+              className="h-9.5 w-9.5 text-slate-600 border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer"
             >
               <RotateCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </Button>

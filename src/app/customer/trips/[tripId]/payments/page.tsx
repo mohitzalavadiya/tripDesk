@@ -18,6 +18,22 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  BANK_TRANSFER: "Bank Transfer",
+  UPI: "UPI / Online",
+  CASH: "Cash",
+  CARD: "Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other",
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  PAID: "Paid",
+  PARTIALLY_PAID: "Partially Paid",
+  UNPAID: "Unpaid",
+  PENDING: "Pending",
+};
+
 export default function CustomerPaymentsPage() {
   const params = useParams();
   const router = useRouter();
@@ -119,7 +135,7 @@ export default function CustomerPaymentsPage() {
             ₹{Number(paymentSummary.balanceAmount).toLocaleString("en-IN")}
           </div>
           <span className="text-[11px] font-bold text-slate-500">
-            Status: <strong className={paymentSummary.paymentStatus === "PAID" ? "text-emerald-600" : "text-amber-600"}>{paymentSummary.paymentStatus}</strong>
+            Status: <strong className={paymentSummary.paymentStatus === "PAID" ? "text-emerald-600" : "text-amber-600"}>{PAYMENT_STATUS_LABELS[paymentSummary.paymentStatus] ?? paymentSummary.paymentStatus}</strong>
           </span>
         </div>
       </div>
@@ -167,7 +183,7 @@ export default function CustomerPaymentsPage() {
                     </td>
                     <td className="py-3.5">
                       <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px]">
-                        {p.paymentMethod}
+                        {PAYMENT_METHOD_LABELS[p.paymentMethod] ?? p.paymentMethod}
                       </span>
                     </td>
                     <td className="py-3.5">
