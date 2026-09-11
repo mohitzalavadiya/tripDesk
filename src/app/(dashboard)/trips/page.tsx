@@ -329,7 +329,7 @@ export default function TripsPage() {
               </span>
               <span className="text-slate-300">•</span>
               <span className="text-xs font-semibold text-slate-500">
-                {pagination.total} database trip records
+                {pagination.total} total trips
               </span>
             </div>
 
@@ -338,7 +338,7 @@ export default function TripsPage() {
                 Trip Workspaces
               </h1>
               <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
-                PostgreSQL-backed travel itineraries, travelers, and operations
+                Travel itineraries, passenger management, costing, and day-wise schedules
               </span>
             </div>
 
@@ -491,7 +491,7 @@ export default function TripsPage() {
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">
                       <TableHead className="py-3 px-4 font-bold text-slate-600 w-[300px]">Trip & Itinerary</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Customer Client</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">Customer</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Travel Schedule</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Travelers & Items</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Trip Status</TableHead>

@@ -254,7 +254,7 @@ export default function InvoicesListPage() {
               </span>
               <span className="text-slate-300">•</span>
               <span className="text-xs font-semibold text-slate-500">
-                {totalCount} database invoice records
+                {totalCount} customer invoices
               </span>
             </div>
 

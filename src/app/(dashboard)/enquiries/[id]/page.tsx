@@ -1004,7 +1004,7 @@ export default function EnquiryDetailPage() {
 
               <div className="space-y-2 text-xs">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Client Name</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Customer Name</span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <strong className="text-slate-900 block font-bold text-sm">{enquiry.customer?.name}</strong>
                     {isRepeatCustomer ? (

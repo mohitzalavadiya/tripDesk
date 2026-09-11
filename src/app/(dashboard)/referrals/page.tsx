@@ -40,7 +40,7 @@ import { AgencyReferralItem, ReferralSummaryStats } from "@/lib/services/referra
 
 const REFERRAL_STATUS_FILTER_LABELS: Record<string, string> = {
   ALL: "All",
-  PENDING: "Pending (Inquiry)",
+  PENDING: "Pending (Enquiry)",
   CONVERTED: "Converted (Booked)",
   REWARDED: "Rewarded (Completed)",
   EXPIRED: "Expired",
@@ -270,7 +270,7 @@ export default function ReferralsAndRewardsPage() {
               </SelectTrigger>
               <SelectContent className="bg-white border-slate-200">
                 <SelectItem value="ALL">All Referral Statuses</SelectItem>
-                <SelectItem value="PENDING">Pending (Inquiry)</SelectItem>
+                <SelectItem value="PENDING">Pending (Enquiry)</SelectItem>
                 <SelectItem value="CONVERTED">Converted (Booked)</SelectItem>
                 <SelectItem value="REWARDED">Rewarded (Completed)</SelectItem>
                 <SelectItem value="EXPIRED">Expired</SelectItem>

@@ -435,18 +435,19 @@ export default function FollowUpsPage() {
     <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
       {isReadOnly && <ReadOnlyBanner />}
 
-      <PageHeader
-        title="CRM Follow-ups & Callbacks"
-        description="Streamline customer touchpoints, track callbacks, log interaction outcomes, and prevent lost leads."
-        breadcrumbs={[{ label: "CRM" }, { label: "Follow-ups" }]}
-        primaryAction={{
-          label: "Schedule Follow-up",
-          icon: Plus,
-          onClick: handleOpenCreateModal,
-        }}
-      />
+      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+        <PageHeader
+          title="CRM Follow-ups & Callbacks"
+          description="Streamline customer touchpoints, track callbacks, log interaction outcomes, and prevent lost leads."
+          breadcrumbs={[{ label: "CRM" }, { label: "Follow-ups" }]}
+          primaryAction={{
+            label: "Schedule Follow-up",
+            icon: Plus,
+            onClick: handleOpenCreateModal,
+          }}
+        />
 
-      <div className="px-4 py-6 md:px-8 space-y-6 max-w-7xl mx-auto w-full">
+        <div className="space-y-6 max-w-7xl mx-auto w-full">
         {/* KPI TELEMETRY CARDS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <button
@@ -881,6 +882,7 @@ export default function FollowUpsPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
 
       {/* COMPLETE MODAL */}

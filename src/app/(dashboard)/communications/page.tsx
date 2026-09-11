@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/shared/page-header";
 import {
   Select,
   SelectContent,
@@ -290,30 +291,45 @@ export default function CommunicationsPage() {
   const getStatusBadge = (status: NotificationDeliveryStatus) => {
     switch (status) {
       case NotificationDeliveryStatus.DELIVERED:
+        return (
+          <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-none font-bold text-[10px]">
+            <CheckCircle2 className="w-3 h-3 mr-1" /> Delivered
+          </Badge>
+        );
       case NotificationDeliveryStatus.READ:
         return (
           <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-none font-bold text-[10px]">
-            <CheckCircle2 className="w-3 h-3 mr-1" /> {status}
+            <CheckCircle2 className="w-3 h-3 mr-1" /> Read
           </Badge>
         );
       case NotificationDeliveryStatus.SENT:
         return (
           <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 border-none font-bold text-[10px]">
-            <Send className="w-3 h-3 mr-1" /> SENT
+            <Send className="w-3 h-3 mr-1" /> Sent
           </Badge>
         );
       case NotificationDeliveryStatus.PENDING:
+        return (
+          <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-none font-bold text-[10px]">
+            <Clock className="w-3 h-3 mr-1" /> Pending
+          </Badge>
+        );
       case NotificationDeliveryStatus.QUEUED:
         return (
           <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-none font-bold text-[10px]">
-            <Clock className="w-3 h-3 mr-1" /> {status}
+            <Clock className="w-3 h-3 mr-1" /> Queued
           </Badge>
         );
       case NotificationDeliveryStatus.FAILED:
-      case NotificationDeliveryStatus.CANCELLED:
         return (
           <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100 border-none font-bold text-[10px]">
-            <AlertCircle className="w-3 h-3 mr-1" /> {status}
+            <AlertCircle className="w-3 h-3 mr-1" /> Failed
+          </Badge>
+        );
+      case NotificationDeliveryStatus.CANCELLED:
+        return (
+          <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100 border-none font-bold text-[10px]">
+            <AlertCircle className="w-3 h-3 mr-1" /> Cancelled
           </Badge>
         );
       default:
@@ -329,51 +345,29 @@ export default function CommunicationsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* ─── HEADER ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-2xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center font-bold">
-              <MessageSquare className="h-5 w-5" />
-            </div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900">
-              Communication Center
-            </h1>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Real-time traveler communications, automated reminders, and customer portal alert telemetry.
-          </p>
-        </div>
+    <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
+      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+        {/* ─── HEADER ──────────────────────────────────────────────────────── */}
+        <PageHeader
+          title="Communication Center"
+          description="Real-time traveler communications, automated reminders, and customer portal alert telemetry."
+          breadcrumbs={[{ label: "Communications" }]}
+          primaryAction={{
+            label: "Send Customer Message",
+            onClick: () => setIsSendModalOpen(true),
+            icon: Plus,
+          }}
+          secondaryActions={[
+            {
+              label: isAutomating ? "Running Sweeps..." : "Run Automation Sweeps",
+              onClick: handleRunAutomations,
+              icon: isAutomating ? Loader2 : RotateCcw,
+              variant: "outline",
+            },
+          ]}
+        />
 
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRunAutomations}
-            disabled={isAutomating}
-            className="rounded-xl border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 h-9"
-          >
-            {isAutomating ? (
-              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin text-indigo-600" />
-            ) : (
-              <RotateCcw className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
-            )}
-            Run Automation Sweeps
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={() => setIsSendModalOpen(true)}
-            className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 shadow-xs shadow-indigo-600/20 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Send Customer Message
-          </Button>
-        </div>
-      </div>
-
-      {/* ─── 4 KPI SCORECARDS ────────────────────────────────────────────── */}
+        {/* ─── 4 KPI SCORECARDS ────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
@@ -1025,6 +1019,7 @@ export default function CommunicationsPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

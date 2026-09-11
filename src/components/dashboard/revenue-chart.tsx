@@ -57,10 +57,10 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
         <div>
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-emerald-600" />
-            <span>Revenue, Collections & Gross Profit</span>
+            <span>Revenue & Profit</span>
           </h3>
           <p className="text-xs text-slate-500">
-            Financial volume, actual payment collections, and gross margin trends.
+            Booking revenue, payment collections, and gross margin trends.
           </p>
         </div>
 

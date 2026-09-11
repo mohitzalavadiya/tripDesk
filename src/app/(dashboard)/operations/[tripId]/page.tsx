@@ -461,7 +461,7 @@ export default function TripOperationsDetailPage() {
             </div>
 
             <p className="text-xs text-slate-500 flex items-center gap-2 flex-wrap">
-              <span>Client: <strong>{operation.trip.customer.name}</strong> ({operation.trip.customer.phone})</span>
+              <span>Customer: <strong>{operation.trip.customer.name}</strong> ({operation.trip.customer.phone})</span>
               <span>•</span>
               <span className="flex items-center gap-1">
                 <Calendar className="h-3 w-3 text-slate-400" />

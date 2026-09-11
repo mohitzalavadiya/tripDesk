@@ -12,18 +12,21 @@ Invoice generate : i want to add feature for invoice generate
 when we Archive hotel that time i got localhost alert
 consistant UI in all page
 Invoice page UI
+Dashboard UI need to check properly.
+finance, follow-ups, /reports, communications, /settings,  UI need to check properly
 
 
 
 **TODO**
 
-Dashboard UI need to check properly.
-finance, follow-ups, /reports, communications, /settings,  UI need to check properly
+Invoice pdf format and invoice page strucutre
+manage read only from frontend also
+remove usused pages
 check no static data anywhere
 quatation genarate
 compalate QA. 
 responsive 320 screen
-Invoice pdf format
+
 clean database
 understand flow
 

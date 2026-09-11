@@ -8051,8 +8051,255 @@ Recorded in browser session `batch3b_browser_qa_1789042721034.webp` across Deskt
 
 ---
 
+# 119. UI AUDIT BATCH 4A — DASHBOARD UI POLISH, RESPONSIVE TYPOGRAPHY & SECTION NAMING
+
+## 119.1 Purpose & Execution Overview
+- **Implementation Date:** 2026-09-11
+- **Batch Name:** `UI Audit Batch 4A — Dashboard UI Polish`
+- **Status:** **CLOSED** (All automated tests, builds, regression suites, and multi-viewport browser QA passed with 100% success)
+- **Scope:** Controlled UI polish, terminology standardization, and tab redundancy elimination strictly for `/dashboard` and dashboard-specific child components.
+- **Core Objectives Accomplished:**
+  1. Standardized main dashboard page title and concise business-friendly subtitle.
+  2. Completed Tab Redundancy Audit: confirmed `"Sales & Pipeline"` tab was 100% duplicate of Overview content (`SalesFunnelCard`, `TopDestinationsCustomersCard`) with zero unique data or interactions; safely removed redundant tab.
+  3. Dashboard now features exactly 3 focused, intuitive tabs: `Overview`, `Finance & Profit`, `Operations`.
+  4. Standardized all 4 primary KPI card titles (`Total Bookings`, `Receivables`, `Gross Profit`, `Booking Conversion`).
+  5. Streamlined section and card titles/subtitles across Quotation Funnel, Revenue & Profit, Customer Receivables, Supplier Payables, Upcoming Departures, Communications & Delivery, Top Destinations, and Top Customers.
+  6. Preserved 100% of sales content on `Overview` tab without information loss (`SalesFunnelCard` and `TopDestinationsCustomersCard` retained).
+  7. Cleaned up confirmed dead imports (`FollowUpsList`, `RecentEnquiriesTable`, `TrendingUp`) in `page.tsx`.
+  8. Established clean, robust typography hierarchy (`text-xl sm:text-2xl` page title, `text-xs sm:text-sm` subtitle, `text-base sm:text-lg` section titles, `text-sm sm:text-base` card titles) eliminating awkward multi-line wrapping.
+  9. Optimized responsive presentation down to 320px ultra-compact mobile viewports.
+  10. 100% preservation of all underlying data fetching, server actions, API contracts, Prisma queries, chart data, financial calculations, auth/RBAC, and tenant isolation.
+
+## 119.2 Exact Dashboard UI Naming & Tab Structure
+
+| Component / Section | Previous Heading & Subtitle | Approved Batch 4A Standard |
+|---|---|---|
+| **Main Page Header** | `Executive Command Center & Analytics` <br> *(Verbose multi-line analytics subtitle)* | **Title:** `Executive Dashboard`<br>**Subtitle:** `High-level overview of sales, revenue, collections, and operations.` |
+| **Dashboard Tabs** | `Executive Overview` / `Sales & Pipeline` / `Finance & Profitability` / `Operations & Departures` | **3 Tabs:** `Overview` / `Finance & Profit` / `Operations`<br>*(Redundant `Sales & Pipeline` tab removed; internal routing & handlers preserved)* |
+| **KPI 1** | `Booking Value` | `Total Bookings` *(Underlying metric & calculations preserved)* |
+| **KPI 2** | `Customer Receivables` | `Receivables` *(Underlying metric & calculations preserved)* |
+| **KPI 3** | `Gross Profit & Margin` | `Gross Profit` *(Gross margin percentage & data badges preserved)* |
+| **KPI 4** | `Booking Conversion` | `Booking Conversion` *(Preserved)* |
+| **Quotation Funnel** | `Sales & Quotation Conversion Funnel` | **Title:** `Quotation Conversion`<br>**Subtitle:** `Enquiry to confirmed booking conversion pipeline.` |
+| **Revenue & Profit** | `Revenue, Collections & Gross Profit` | **Title:** `Revenue & Profit`<br>**Subtitle:** `Booking revenue, payment collections, and gross margin trends.` |
+| **Customer Receivables** | `Accounts Receivable & Balance Due` | **Title:** `Customer Receivables`<br>**Subtitle:** `Pending customer collections and overdue balances.` |
+| **Supplier Payables** | `Supplier Payables & Vendor Commitments` | **Title:** `Supplier Payables`<br>**Subtitle:** `Hotel, fleet, and activity vendor commitments.` |
+| **Upcoming Departures** | `Upcoming Departures & Operational Command` | **Title:** `Upcoming Departures`<br>**Subtitle:** `Operational readiness, document status, and departures.` |
+| **Communications** | `Multi-Channel Communication Health` | **Title:** `Communications & Delivery`<br>**Subtitle:** `WhatsApp, email, and automated delivery health.` |
+| **Top Destinations** | `Top Destinations by Volume & Revenue` | **Title:** `Top Destinations`<br>**Subtitle:** `Most popular destinations by bookings and revenue.` |
+| **Top Customers** | `Top High-Value Travelers & VIPs` | **Title:** `Top Customers`<br>**Subtitle:** `Leading clients by total spend and booking volume.` |
+
+## 119.3 Typography & Responsive Hierarchy
+- **Page Title:** `text-xl sm:text-2xl font-bold tracking-tight text-slate-900`
+- **Page Subtitle:** `text-xs sm:text-sm text-slate-500`
+- **Section / Card Titles:** `text-base sm:text-lg font-semibold text-slate-900` (or `text-sm sm:text-base` for nested cards)
+- **Supporting / Subtitle Text:** `text-xs text-slate-500`
+- **Card Header Spacing:** Flex wrap responsive layout (`flex-col sm:flex-row sm:items-center sm:justify-between gap-2`) prevents collision or layout clipping.
+- **3-Tab Responsive Navigation:** Navigation tabs render 3 balanced touch targets across all screen sizes with zero horizontal overflow down to 320px.
+
+## 119.4 Files Changed
+1. `src/app/(dashboard)/dashboard/page.tsx` — Main PageHeader title/subtitle, 3-tab navigation, removal of `SALES` tab & state, unused imports cleanup.
+2. `src/components/dashboard/kpi-cards.tsx` — Simplified KPI headings (`Total Bookings`, `Receivables`, `Gross Profit`).
+3. `src/components/dashboard/sales-funnel-card.tsx` — Quotation Conversion title and concise subtitle.
+4. `src/components/dashboard/revenue-chart.tsx` — Revenue & Profit title, concise subtitle, responsive header layout.
+5. `src/components/dashboard/receivables-payables-card.tsx` — Customer Receivables & Supplier Payables titles and subtitles.
+6. `src/components/dashboard/upcoming-trips-list.tsx` — Upcoming Departures title and concise subtitle.
+7. `src/components/dashboard/communication-health-card.tsx` — Communications & Delivery title and concise subtitle.
+8. `src/components/dashboard/top-destinations-customers-card.tsx` — Top Destinations & Top Customers titles and subtitles.
+
+## 119.5 Automated Verification Results
+- **TypeScript Type Check (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack optimized build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass)
+
+## 119.6 Browser QA & Viewport Verification
+Recorded in browser session `batch4a_3tabs_qa_1789107637655.webp` across Desktop, Tablet, and Mobile viewports:
+
+| Viewport | Dimensions | Tabs Rendered | Result | Notes |
+|---|---|---|---|---|
+| **Desktop High-Res** | 1440 × 900 | 3 Tabs | **PASS** | `Overview`, `Finance & Profit`, `Operations` verified; all sales cards present in Overview |
+| **Desktop Standard** | 1280 × 800 | 3 Tabs | **PASS** | Clean spacing, tab switching active, zero layout warping |
+| **Desktop / Tablet Landscape** | 1024 × 768 | 3 Tabs | **PASS** | 2-column card layouts collapse cleanly, zero horizontal overflow |
+| **Tablet Portrait** | 768 × 1024 | 3 Tabs | **PASS** | Tab bar compact, KPI cards 2x2 grid, zero clipping |
+| **Mobile Large** | 390 × 844 | 3 Tabs | **PASS** | Single column cards, concise titles prevent awkward wrapping |
+| **Mobile Standard** | 375 × 812 | 3 Tabs | **PASS** | Clean typography, no button collisions, zero horizontal overflow |
+| **Mobile Ultra-Compact** | 320 × 568 | 3 Tabs | **PASS** | 3 tabs fit cleanly without crowding, `document.documentElement.scrollWidth === window.innerWidth` (320px) |
+
+- **Horizontal Page Overflow:** 0 across all tested viewports (including 320px).
+- **Functional / Visual Regressions:** 0 detected.
+
+## 119.7 Scope Invariants & Protection
+- **Database Schema & Migrations:** 0 changes.
+- **Prisma Queries & Server Actions:** 0 changes.
+- **API Contracts & Route Handlers:** 0 changes.
+- **Authentication, RBAC & Tenant Isolation:** 100% unchanged.
+- **Financial, Profit & Metric Calculations:** 100% unchanged.
+- **Batch 3A (Select Controls) & Batch 3B (Status Standardization):** Remain strictly **CLOSED**.
+- **Scrolling Architecture Audit (`ISSUE-001` → `ISSUE-008`):** Remains strictly **ON HOLD** (no table overflow, max-height, or AppShell changes).
+- **Out-of-Scope Pages:** `/finance`, `/follow-ups`, `/reports`, `/communications`, `/settings` untouched.
+
+## 119.8 Out-of-Scope Findings Recorded Separately
+- Global scrolling audit recommendations (`ISSUE-001` through `ISSUE-008`) remain ON HOLD and were not touched during Batch 4A.
+
+---
+
+# 120. BATCH 4B — GLOBAL UI CONSISTENCY (PAGE HEADER & SPACING STANDARDIZATION) [CLOSED]
+
+## 120.1 Scope & Objective
+Standardized page header structures, outer wrapper containers, top breathing room, and horizontal grid alignment across all six core dashboard pages:
+- `/finance`
+- `/reports`
+- `/communications`
+- `/dashboard`
+- `/follow-ups`
+- `/settings`
+
+Reused the established canonical TripDesk layout pattern (`/customers`, `/bookings`, `/trips`, `/invoices`, `/documents`):
+```tsx
+<div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
+  <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+    <PageHeader ... />
+    <div className="space-y-6">...</div>
+  </div>
+</div>
+```
+
+## 120.2 Page-by-Page Implementation Summary
+1. **`/finance` (`src/app/(dashboard)/finance/page.tsx`):**
+   - Replaced custom unboxed inline header with canonical `<PageHeader title="Finance & Profitability" ... />`.
+   - Adopted canonical outer wrapper container (`max-w-[1550px] pt-6 sm:pt-8 px-4..8 space-y-6`).
+   - Integrated financial period preset selector into a dedicated filter toolbar below the header.
+   - Preserved all dialogs (`RecordPaymentDialog`, `RecordSupplierPaymentDialog`, `CreateExpenseDialog`), charts, tables, and financial calculations.
+2. **`/reports` (`src/app/(dashboard)/reports/page.tsx`):**
+   - Rendered canonical `<PageHeader title="Agency BI & Accounting Reports" ... />` (resolving previously dead import).
+   - Standardized outer container to `max-w-[1550px] pt-6 sm:pt-8 px-4..8`.
+   - Structured Export CSV and Time Horizon filter controls in a clean sub-header toolbar.
+   - Preserved all report calculation logic, BI metrics, and data export endpoints.
+3. **`/communications` (`src/app/(dashboard)/communications/page.tsx`):**
+   - Replaced custom inline header with canonical `<PageHeader title="Communication Center" ... />`.
+   - Adopted canonical container `max-w-[1550px] pt-6 sm:pt-8 px-4..8`.
+   - Standardized status badges via `getStatusBadge` to render friendly title-case labels (`Sent`, `Delivered`, `Read`, `Pending`, `Queued`, `Failed`, `Cancelled`), eliminating raw uppercase enum display.
+   - Preserved message logging, automated retry actions, and search/filter functionality.
+4. **`/dashboard` (`src/app/(dashboard)/dashboard/page.tsx`):**
+   - Wrapped `PageHeader` and main content inside canonical container `max-w-[1550px] pt-6 sm:pt-8 px-4..8 space-y-6`.
+   - Provided standard top breathing room (`pt-6 sm:pt-8`) and aligned header edges with content grid cards.
+   - Preserved 3-tab layout (`Overview`, `Finance & Profit`, `Operations`) and all Batch 4A optimizations.
+5. **`/follow-ups` (`src/app/(dashboard)/follow-ups/page.tsx`):**
+   - Wrapped `PageHeader` inside canonical container `max-w-[1550px] pt-6 sm:pt-8 px-4..8 space-y-6`.
+   - Retained intentional `max-w-7xl mx-auto w-full` inner content width without duplicate horizontal padding.
+   - Preserved CRM follow-up modals, task workflows, and priority filters.
+6. **`/settings` (`src/app/(dashboard)/settings/page.tsx`):**
+   - Wrapped `PageHeader` inside canonical container `max-w-[1550px] pt-6 sm:pt-8 px-4..8 space-y-6`.
+   - Retained intentional `max-w-6xl mx-auto w-full` inner content width without duplicate horizontal padding.
+   - Preserved all settings tabs, channel toggles, and automation sweep functionality.
+
+## 120.3 Preserved Invariants
+- **Shared Component Internals:** `src/components/shared/page-header.tsx` was NOT modified.
+- **Database & Prisma Schema:** 0 changes (no migrations, no schema edits).
+- **Backend APIs & Server Actions:** 0 changes to contracts or logic.
+- **Auth, RBAC & Multi-Tenancy:** 100% untouched.
+- **Financial & Calculation Logic:** 100% intact.
+- **Batch 3A, 3B, and 4A (Sales & Pipeline Removal):** Strictly preserved and closed.
+- **Scrolling Architecture:** Remains strictly **ON HOLD** (no overflow or AppShell changes).
+
+## 120.4 Files Changed
+1. `src/app/(dashboard)/finance/page.tsx` — Replaced custom unboxed header with shared `PageHeader`, canonical outer container, dedicated filter toolbar.
+2. `src/app/(dashboard)/reports/page.tsx` — Rendered shared `PageHeader`, standardized container and controls toolbar.
+3. `src/app/(dashboard)/communications/page.tsx` — Rendered shared `PageHeader`, canonical container, friendly title-case status badges.
+4. `src/app/(dashboard)/dashboard/page.tsx` — Canonical container wrapper for `PageHeader` breathing room and grid alignment.
+5. `src/app/(dashboard)/follow-ups/page.tsx` — Canonical container wrapper for `PageHeader`, preserved inner `max-w-7xl` content width.
+6. `src/app/(dashboard)/settings/page.tsx` — Canonical container wrapper for `PageHeader`, preserved inner `max-w-6xl` content width.
+
+## 120.5 Automated Verification Results
+- **TypeScript Type Check (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack production build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass)
+
+## 120.6 Browser QA & Viewport Verification Matrix
+Tested across Desktop, Tablet, and Mobile viewports for all 6 target pages:
+
+| Viewport | Dimensions | Pages Verified | Header / Spacing | 320px Overflow Check | Result |
+|---|---|---|---|---|---|
+| **Desktop High-Res** | 1440 × 900 | All 6 Pages | Canonical `PageHeader`, 24-32px top gap, edge-aligned | `scrollWidth === 1440` | **PASS** |
+| **Desktop Standard** | 1280 × 800 | All 6 Pages | Consistent elevation, aligned card boundaries | `scrollWidth === 1280` | **PASS** |
+| **Desktop / Tablet Landscape** | 1024 × 768 | All 6 Pages | Clean card column folding, breadcrumbs visible | `scrollWidth === 1024` | **PASS** |
+| **Tablet Portrait** | 768 × 1024 | All 6 Pages | Action buttons wrap gracefully, zero layout shift | `scrollWidth === 768` | **PASS** |
+| **Mobile Large** | 390 × 844 | All 6 Pages | Header stacks vertically, full-width actions, no clipping | `scrollWidth === 390` | **PASS** |
+| **Mobile Standard** | 375 × 812 | All 6 Pages | Clean typography, no clipped elements, uniform padding | `scrollWidth === 375` | **PASS** |
+| **Mobile Ultra-Compact** | 320 × 568 | All 6 Pages | Zero horizontal overflow (`document.documentElement.scrollWidth === window.innerWidth`) | `scrollWidth === 320` | **PASS** |
+
+---
+
+# 121. BATCH 4C — TERMINOLOGY & UX CONSISTENCY CLEANUP [CLOSED]
+
+## 121.1 Scope & Objective
+Addressed confirmed findings from the Batch 4C read-only terminology audit:
+- Replaced backend/database jargon with customer-centric business language in page subtitles and telemetry pills.
+- Standardized all user-facing instances of "Client" to the canonical business term **"Customer"**.
+- Standardized US "Inquiry" occurrences to the canonical British/Commonwealth term **"Enquiry"** (matching Prisma models and routes).
+- Normalized `StatusBadge` default label for `VOIDED` to Title Case (`"Voided"`).
+- Normalized risk distribution badges on the Operations Analytics card to Title Case (`Low Risk`, `Medium Risk`, `High Risk`, `Critical Risk`).
+- Standardized search placeholders in Operations Issues (`"customer, trip"` instead of `"guest, tour"`).
+- `TERM-009` was intentionally skipped as per instruction.
+
+## 121.2 Exact Findings Implemented
+1. **TERM-001 (Trips Subtitle):** `src/app/(dashboard)/trips/page.tsx` subtitle updated from `"PostgreSQL-backed travel itineraries, travelers, and operations"` to `"Travel itineraries, passenger management, costing, and day-wise schedules"`.
+2. **TERM-002 (Trips Table Head):** `src/app/(dashboard)/trips/page.tsx` table column header updated from `"Customer Client"` to `"Customer"`.
+3. **TERM-003 (Database Record Counters):**
+   - `src/app/(dashboard)/trips/page.tsx`: Updated from `"{pagination.total} database trip records"` to `"{pagination.total} total trips"`.
+   - `src/app/(dashboard)/invoices/page.tsx`: Updated from `"{totalCount} database invoice records"` to `"{totalCount} customer invoices"`.
+4. **TERM-004 (Client → Customer):**
+   - `src/app/(dashboard)/customers/page.tsx`: Updated telemetry badge from `"Total Clients"` to `"Total Customers"`.
+   - `src/app/(dashboard)/operations/page.tsx`: Updated search placeholder to `"Search by trip, customer, or booking ref..."`.
+   - `src/app/(dashboard)/operations/[tripId]/page.tsx`: Updated header label from `"Client:"` to `"Customer:"`.
+   - `src/app/(dashboard)/enquiries/[id]/page.tsx`: Updated contact card label from `"Client Name"` to `"Customer Name"`.
+5. **TERM-005 (StatusBadge VOIDED → Voided):** `src/components/shared/status-badge.tsx` updated `defaultLabel` for `VOIDED` from `"VOIDED"` to `"Voided"`.
+6. **TERM-006 (Operations Risk Labels):** `src/components/operations/analytics/operations-risk-card.tsx` normalized risk distribution labels to `"Low Risk"`, `"Medium Risk"`, `"High Risk"`, `"Critical Risk"`.
+7. **TERM-007 (Inquiry → Enquiry):**
+   - `src/app/(dashboard)/customers/page.tsx`: Updated telemetry badge from `"Inquiries Generated"` to `"Enquiries Generated"`.
+   - `src/app/(dashboard)/enquiries/page.tsx`: Updated subtitle to `"Inbound customer enquiries, travel requirements, lead stages, and follow-ups"`.
+   - `src/app/(dashboard)/customers/new/page.tsx`: Updated source dropdown option from `"WhatsApp Inquiry"` to `"WhatsApp Enquiry"`.
+   - `src/app/(dashboard)/referrals/page.tsx`: Updated status filter dictionary and select dropdown from `"Pending (Inquiry)"` to `"Pending (Enquiry)"`.
+8. **TERM-008 (Operations Issues Search Placeholder):** `src/app/(dashboard)/operations/issues/page.tsx` updated placeholder from `"Search by title, description, guest, tour..."` to `"Search by title, description, customer, trip..."`.
+
+## 121.3 Preserved Invariants
+- **Database & Prisma Schema:** 0 modifications (no schema edits, no migrations).
+- **Backend APIs & Server Actions:** 0 modifications to contracts or business logic.
+- **Auth, RBAC & Multi-Tenancy:** 100% untouched.
+- **Financial & Calculation Logic:** 100% intact.
+- **Scrolling Architecture:** Remains strictly **ON HOLD**.
+- **Shared Component Architecture:** Intact and preserved.
+
+## 121.4 Files Changed
+1. `src/app/(dashboard)/trips/page.tsx`
+2. `src/app/(dashboard)/invoices/page.tsx`
+3. `src/app/(dashboard)/customers/page.tsx`
+4. `src/app/(dashboard)/operations/page.tsx`
+5. `src/app/(dashboard)/operations/[tripId]/page.tsx`
+6. `src/app/(dashboard)/enquiries/[id]/page.tsx`
+7. `src/components/shared/status-badge.tsx`
+8. `src/components/operations/analytics/operations-risk-card.tsx`
+9. `src/app/(dashboard)/enquiries/page.tsx`
+10. `src/app/(dashboard)/customers/new/page.tsx`
+11. `src/app/(dashboard)/referrals/page.tsx`
+12. `src/app/(dashboard)/operations/issues/page.tsx`
+13. `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 121.5 Automated Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack production build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass)
+- **Browser QA (7 Viewports across affected pages):** PASS (Zero horizontal overflow at 320px, clean typography and wrapping)
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+
 
 

@@ -68,10 +68,10 @@ export function SalesFunnelCard({ funnel, loading = false }: SalesFunnelCardProp
         <div>
           <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
             <Filter className="h-4 w-4 text-indigo-600" />
-            <span>Sales & Quotation Conversion Funnel</span>
+            <span>Quotation Conversion</span>
           </h3>
           <p className="text-xs text-slate-500">
-            End-to-end pipeline progression from enquiry to won booking.
+            Enquiry to confirmed booking conversion pipeline.
           </p>
         </div>
 

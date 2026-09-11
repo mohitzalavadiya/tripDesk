@@ -292,7 +292,7 @@ export default function EnquiriesPage() {
                 Enquiries & CRM
               </h1>
               <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
-                Inbound customer inquiries, travel requirements, lead stages, and follow-ups
+                Inbound customer enquiries, travel requirements, lead stages, and follow-ups
               </span>
             </div>
 

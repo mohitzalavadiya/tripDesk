@@ -261,7 +261,7 @@ export default function CustomersPage() {
               <Users className="h-5 w-5" />
             </div>
             <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Total Clients</span>
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Total Customers</span>
               <h4 className="text-lg font-black text-slate-900">{totalCustomers}</h4>
             </div>
           </div>
@@ -271,7 +271,7 @@ export default function CustomersPage() {
               <Inbox className="h-5 w-5" />
             </div>
             <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Inquiries Generated</span>
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Enquiries Generated</span>
               <h4 className="text-lg font-black text-slate-900">{totalEnquiries}</h4>
             </div>
           </div>

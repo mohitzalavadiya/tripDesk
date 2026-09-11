@@ -132,34 +132,43 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/60 pb-24">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        {/* ─── PAGE HEADER & EXPORT ACTIONS ─────────────────────────────── */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                Agency BI & Accounting Reports
-              </h1>
-              <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 text-[10px] font-bold">
-                PostgreSQL Live
-              </Badge>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Real-time executive telemetry, sales conversion, profit margins, receivables, and vendor liabilities.
-            </p>
-          </div>
+    <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
+      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+        <PageHeader
+          title="Agency BI & Accounting Reports"
+          description="Real-time executive telemetry, sales conversion, profit margins, receivables, and vendor liabilities."
+          breadcrumbs={[{ label: "Reports" }]}
+          primaryAction={{
+            label: "Export PDF",
+            onClick: () => {
+              window.open(
+                reportingClient.getPdfUrl({
+                  preset,
+                  startDate: preset === "CUSTOM_RANGE" ? customStart : undefined,
+                  endDate: preset === "CUSTOM_RANGE" ? customEnd : undefined,
+                }),
+                "_blank"
+              );
+            },
+            icon: FileText,
+          }}
+          secondaryActions={[
+            {
+              label: loading ? "Refreshing..." : "Refresh",
+              onClick: () => fetchReport(),
+              icon: RefreshCw,
+              variant: "outline",
+            },
+          ]}
+        />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fetchReport()}
-              disabled={loading}
-              className="h-9 text-xs font-bold gap-1.5 cursor-pointer bg-white"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-            </Button>
+        {/* ─── TIME HORIZON & EXPORT TOOLBAR ───────────────────────────────────── */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-slate-600 text-xs font-bold shrink-0">
+              <Clock className="h-4 w-4 text-indigo-600" />
+              <span>Time Horizon:</span>
+            </div>
 
             {/* Export CSV Dropdown */}
             <Select
@@ -179,7 +188,7 @@ export default function ReportsPage() {
                 }
               }}
             >
-              <SelectTrigger className="h-9 text-xs font-semibold bg-white border-slate-200 hover:border-slate-300 text-slate-800 rounded-xl w-[140px] focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 shadow-2xs">
+              <SelectTrigger className="h-8 text-xs font-semibold bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-800 rounded-xl w-[140px] focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 shadow-2xs">
                 <FileSpreadsheet className="h-3.5 w-3.5 mr-1 text-emerald-600" />
                 <SelectValue placeholder="Export CSV">
                   {(val) => EXPORT_CSV_LABELS[val] ?? "Export CSV"}
@@ -192,28 +201,6 @@ export default function ReportsPage() {
                 <SelectItem value="DESTINATIONS">Destinations CSV</SelectItem>
               </SelectContent>
             </Select>
-
-            {/* Export PDF Button */}
-            <a
-              href={reportingClient.getPdfUrl({
-                preset,
-                startDate: preset === "CUSTOM_RANGE" ? customStart : undefined,
-                endDate: preset === "CUSTOM_RANGE" ? customEnd : undefined,
-              })}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center h-9 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-colors gap-1.5 cursor-pointer"
-            >
-              <FileText className="h-3.5 w-3.5" /> Export PDF
-            </a>
-          </div>
-        </div>
-
-        {/* ─── TIME HORIZON DATE FILTER ───────────────────────────────────── */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-          <div className="flex items-center gap-2 text-slate-600 text-xs font-bold shrink-0">
-            <Clock className="h-4 w-4 text-indigo-600" />
-            <span>Time Horizon:</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">

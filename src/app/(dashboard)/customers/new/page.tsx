@@ -376,7 +376,7 @@ export default function NewCustomerPage() {
                   </SelectTrigger>
                   <SelectContent className="bg-white border-slate-200">
                     <SelectItem value="Direct">Direct / Walk-in</SelectItem>
-                    <SelectItem value="WhatsApp">WhatsApp Inquiry</SelectItem>
+                    <SelectItem value="WhatsApp">WhatsApp Enquiry</SelectItem>
                     <SelectItem value="Website">Website Form</SelectItem>
                     <SelectItem value="Instagram">Instagram</SelectItem>
                     <SelectItem value="Facebook">Facebook</SelectItem>

@@ -60,10 +60,10 @@ export function UpcomingTripsList({
         <div>
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <Compass className="h-4 w-4 text-indigo-600" />
-            <span>Upcoming Departures & Operational Command</span>
+            <span>Upcoming Departures</span>
           </h3>
           <p className="text-xs text-slate-500">
-            Real-time operational readiness, payment clearance, and travel document status.
+            Operational readiness, document status, and departures.
           </p>
         </div>
         <Link

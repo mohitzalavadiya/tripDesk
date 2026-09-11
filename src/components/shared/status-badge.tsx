@@ -157,7 +157,7 @@ export function StatusBadge({ status, label, className = "", size = "sm" }: Stat
         return {
           icon: Ban,
           bg: "bg-slate-100 text-slate-700 border-slate-300 font-mono",
-          defaultLabel: "VOIDED",
+          defaultLabel: "Voided",
         };
       case "FAILED":
         return {

@@ -74,7 +74,7 @@ export function KpiCards({ summary, loading = false }: KpiCardsProps) {
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Booking Value
+                Total Bookings
               </span>
               <div className="h-8 w-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <IndianRupee className="h-4 w-4" />
@@ -100,7 +100,7 @@ export function KpiCards({ summary, loading = false }: KpiCardsProps) {
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Customer Receivables
+                Receivables
               </span>
               <div className="h-8 w-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <CreditCard className="h-4 w-4" />
@@ -123,7 +123,7 @@ export function KpiCards({ summary, loading = false }: KpiCardsProps) {
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Gross Profit & Margin
+                Gross Profit
               </span>
               <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                 <TrendingUp className="h-4 w-4" />

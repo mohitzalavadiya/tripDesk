@@ -62,10 +62,10 @@ export function ReceivablesPayablesCard({
             <div className="min-w-0 flex-1">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                 <CreditCard className="h-4 w-4 text-rose-600 shrink-0" />
-                <span className="truncate">Accounts Receivable & Balance Due</span>
+                <span className="truncate">Customer Receivables</span>
               </h3>
               <p className="text-xs text-slate-500 line-clamp-1 sm:line-clamp-none">
-                Pending customer collections and overdue departure balances.
+                Pending customer collections and overdue balances.
               </p>
             </div>
             <Link href="/payments" className="shrink-0">
@@ -139,10 +139,10 @@ export function ReceivablesPayablesCard({
             <div className="min-w-0 flex-1">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                 <Building className="h-4 w-4 text-indigo-600 shrink-0" />
-                <span className="truncate">Supplier Payables & Vendor Commitments</span>
+                <span className="truncate">Supplier Payables</span>
               </h3>
               <p className="text-xs text-slate-500 line-clamp-1 sm:line-clamp-none">
-                Hotel, fleet, and activity vendor payables and settlement status.
+                Hotel, fleet, and activity vendor commitments.
               </p>
             </div>
             <Link href="/suppliers" className="shrink-0">
