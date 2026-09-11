@@ -684,169 +684,171 @@ export default function FollowUpsPage() {
               </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader className="bg-slate-50/80">
-                <TableRow className="border-slate-200">
-                  <TableHead className="w-[180px] text-xs font-semibold text-slate-700">Scheduled Time</TableHead>
-                  <TableHead className="w-[240px] text-xs font-semibold text-slate-700">Customer & Lead</TableHead>
-                  <TableHead className="w-[120px] text-xs font-semibold text-slate-700">Type & Priority</TableHead>
-                  <TableHead className="text-xs font-semibold text-slate-700">Notes / Outcome</TableHead>
-                  <TableHead className="w-[110px] text-xs font-semibold text-slate-700">Status</TableHead>
-                  <TableHead className="w-[180px] text-right text-xs font-semibold text-slate-700">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {followUps.map((fu) => {
-                  const overdue = isOverdue(fu);
-                  const todayTask = isToday(fu);
+            <div className="overflow-x-auto max-h-[620px] overflow-y-auto">
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
+                  <TableRow className="border-slate-200">
+                    <TableHead className="w-[180px] text-xs font-semibold text-slate-700">Scheduled Time</TableHead>
+                    <TableHead className="w-[240px] text-xs font-semibold text-slate-700">Customer & Lead</TableHead>
+                    <TableHead className="w-[120px] text-xs font-semibold text-slate-700">Type & Priority</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-700">Notes / Outcome</TableHead>
+                    <TableHead className="w-[110px] text-xs font-semibold text-slate-700">Status</TableHead>
+                    <TableHead className="w-[180px] text-right text-xs font-semibold text-slate-700">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {followUps.map((fu) => {
+                    const overdue = isOverdue(fu);
+                    const todayTask = isToday(fu);
 
-                  return (
-                    <TableRow
-                      key={fu.id}
-                      className={`hover:bg-slate-50/60 transition-colors border-slate-100 ${
-                        overdue ? "bg-rose-50/20" : todayTask ? "bg-amber-50/20" : ""
-                      }`}
-                    >
-                      <TableCell className="align-top py-3.5">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-xs text-slate-900 flex items-center gap-1.5">
-                            {new Date(fu.scheduledAt).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </span>
-                          <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                            <Clock className="h-3 w-3 text-slate-400" />
-                            {new Date(fu.scheduledAt).toLocaleTimeString("en-IN", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                          {overdue && (
-                            <Badge className="mt-1 w-fit text-[10px] bg-rose-100 text-rose-800 border-rose-200">
-                              Overdue
-                            </Badge>
-                          )}
-                          {todayTask && (
-                            <Badge className="mt-1 w-fit text-[10px] bg-amber-100 text-amber-800 border-amber-200">
-                              Today
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="align-top py-3.5">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-xs text-slate-900">
-                            {fu.enquiry?.customer?.name || "Anonymous Customer"}
-                          </span>
-                          <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
-                            {fu.enquiry?.customer?.phone && (
-                              <a
-                                href={`tel:${fu.enquiry.customer.phone}`}
-                                className="hover:text-indigo-600 flex items-center gap-1"
-                              >
-                                <PhoneCall className="h-2.5 w-2.5 text-slate-400" />
-                                {fu.enquiry.customer.phone}
-                              </a>
+                    return (
+                      <TableRow
+                        key={fu.id}
+                        className={`hover:bg-slate-50/60 transition-colors border-slate-100 ${
+                          overdue ? "bg-rose-50/20" : todayTask ? "bg-amber-50/20" : ""
+                        }`}
+                      >
+                        <TableCell className="align-top py-3.5">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-xs text-slate-900 flex items-center gap-1.5">
+                              {new Date(fu.scheduledAt).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </span>
+                            <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                              <Clock className="h-3 w-3 text-slate-400" />
+                              {new Date(fu.scheduledAt).toLocaleTimeString("en-IN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                            {overdue && (
+                              <Badge className="mt-1 w-fit text-[10px] bg-rose-100 text-rose-800 border-rose-200">
+                                Overdue
+                              </Badge>
+                            )}
+                            {todayTask && (
+                              <Badge className="mt-1 w-fit text-[10px] bg-amber-100 text-amber-800 border-amber-200">
+                                Today
+                              </Badge>
                             )}
                           </div>
-                          <Link
-                            href={`/enquiries/${fu.enquiry?.id}`}
-                            className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 mt-1 group"
-                          >
-                            <span>
-                              {fu.enquiry?.enquiryNumber} • {fu.enquiry?.destination}
+                        </TableCell>
+
+                        <TableCell className="align-top py-3.5">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-xs text-slate-900">
+                              {fu.enquiry?.customer?.name || "Anonymous Customer"}
                             </span>
-                            <ArrowRight className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </Link>
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="align-top py-3.5">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 capitalize">
-                            {getTypeIcon(fu.type)}
-                            <span>{fu.type.toLowerCase()}</span>
-                          </div>
-                          <div>{getPriorityBadge(fu.priority)}</div>
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="align-top py-3.5">
-                        <div className="text-xs text-slate-700 max-w-md">
-                          {fu.notes && (
-                            <p className="line-clamp-2 text-slate-600">{fu.notes}</p>
-                          )}
-                          {fu.outcome && (
-                            <div className="mt-1 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 w-fit">
-                              <strong>Outcome:</strong> {fu.outcome}
+                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
+                              {fu.enquiry?.customer?.phone && (
+                                <a
+                                  href={`tel:${fu.enquiry.customer.phone}`}
+                                  className="hover:text-indigo-600 flex items-center gap-1"
+                                >
+                                  <PhoneCall className="h-2.5 w-2.5 text-slate-400" />
+                                  {fu.enquiry.customer.phone}
+                                </a>
+                              )}
                             </div>
-                          )}
-                          {!fu.notes && !fu.outcome && (
-                            <span className="text-slate-400 italic text-[11px]">No notes recorded</span>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="align-top py-3.5">
-                        {fu.status === "COMPLETED" ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 gap-1">
-                            <Check className="h-3 w-3" />
-                            Done
-                          </Badge>
-                        ) : fu.status === "CANCELLED" ? (
-                          <Badge className="bg-slate-100 text-slate-600 border-slate-200">Cancelled</Badge>
-                        ) : (
-                          <Badge className="bg-blue-50 text-blue-700 border-blue-200">Pending</Badge>
-                        )}
-                      </TableCell>
-
-                      <TableCell className="align-top py-3.5 text-right">
-                        {fu.status === "PENDING" ? (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              size="sm"
-                              onClick={() => handleOpenComplete(fu)}
-                              className="h-7 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 shadow-sm font-medium"
+                            <Link
+                              href={`/enquiries/${fu.enquiry?.id}`}
+                              className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 mt-1 group"
                             >
-                              <Check className="h-3 w-3" />
-                              Complete
-                            </Button>
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenReschedule(fu)}
-                              className="h-7 px-2 text-xs text-slate-700 border-slate-200 hover:bg-slate-50"
-                            >
-                              Reschedule
-                            </Button>
-
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenCancel(fu)}
-                              title="Cancel Task"
-                              className="h-7 w-7 text-slate-400 hover:text-rose-600"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
+                              <span>
+                                {fu.enquiry?.enquiryNumber} • {fu.enquiry?.destination}
+                              </span>
+                              <ArrowRight className="h-2.5 w-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </Link>
                           </div>
-                        ) : (
-                          <span className="text-[11px] text-slate-400 italic">
-                            {fu.completedAt
-                              ? `Completed on ${new Date(fu.completedAt).toLocaleDateString("en-IN")}`
-                              : "Archived"}
-                          </span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        </TableCell>
+
+                        <TableCell className="align-top py-3.5">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 capitalize">
+                              {getTypeIcon(fu.type)}
+                              <span>{fu.type.toLowerCase()}</span>
+                            </div>
+                            <div>{getPriorityBadge(fu.priority)}</div>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="align-top py-3.5">
+                          <div className="text-xs text-slate-700 max-w-md">
+                            {fu.notes && (
+                              <p className="line-clamp-2 text-slate-600">{fu.notes}</p>
+                            )}
+                            {fu.outcome && (
+                              <div className="mt-1 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 w-fit">
+                                <strong>Outcome:</strong> {fu.outcome}
+                              </div>
+                            )}
+                            {!fu.notes && !fu.outcome && (
+                              <span className="text-slate-400 italic text-[11px]">No notes recorded</span>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="align-top py-3.5">
+                          {fu.status === "COMPLETED" ? (
+                            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 gap-1">
+                              <Check className="h-3 w-3" />
+                              Done
+                            </Badge>
+                          ) : fu.status === "CANCELLED" ? (
+                            <Badge className="bg-slate-100 text-slate-600 border-slate-200">Cancelled</Badge>
+                          ) : (
+                            <Badge className="bg-blue-50 text-blue-700 border-blue-200">Pending</Badge>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="align-top py-3.5 text-right">
+                          {fu.status === "PENDING" ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                size="sm"
+                                onClick={() => handleOpenComplete(fu)}
+                                className="h-7 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 shadow-sm font-medium"
+                              >
+                                <Check className="h-3 w-3" />
+                                Complete
+                              </Button>
+
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenReschedule(fu)}
+                                className="h-7 px-2 text-xs text-slate-700 border-slate-200 hover:bg-slate-50"
+                              >
+                                Reschedule
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenCancel(fu)}
+                                title="Cancel Task"
+                                className="h-7 w-7 text-slate-400 hover:text-rose-600"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 italic">
+                              {fu.completedAt
+                                ? `Completed on ${new Date(fu.completedAt).toLocaleDateString("en-IN")}`
+                                : "Archived"}
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
 
           {/* PAGINATION */}

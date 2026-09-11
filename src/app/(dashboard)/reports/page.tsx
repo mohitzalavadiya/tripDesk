@@ -560,9 +560,9 @@ export default function ReportsPage() {
         {activeTab === "REVENUE" && (
           <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
             <h3 className="text-sm font-bold text-slate-900">Revenue & Collections Periodic Ledger</h3>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs text-slate-600 uppercase font-bold border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-3">Time Period</th>
                     <th className="px-4 py-3">Bookings Count</th>
@@ -608,9 +608,9 @@ export default function ReportsPage() {
         {activeTab === "DESTINATIONS" && (
           <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
             <h3 className="text-sm font-bold text-slate-900">Destination Commercial Performance</h3>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs text-slate-600 uppercase font-bold border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-3">Destination</th>
                     <th className="px-4 py-3">Trips Count</th>
@@ -660,9 +660,9 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs text-slate-600 uppercase font-bold border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-3">Booking #</th>
                     <th className="px-4 py-3">Customer</th>
@@ -716,9 +716,9 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs text-slate-600 uppercase font-bold border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-3">Payable #</th>
                     <th className="px-4 py-3">Supplier</th>
@@ -781,9 +781,9 @@ export default function ReportsPage() {
             {/* Top VIP Spenders Table */}
             <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
               <h3 className="text-sm font-bold text-slate-900">Top VIP Customers by Lifetime Value (LTV)</h3>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+                  <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs text-slate-600 uppercase font-bold border-b border-slate-200">
                     <tr>
                       <th className="px-4 py-3">Customer Name</th>
                       <th className="px-4 py-3">Phone</th>

@@ -615,9 +615,9 @@ export default function AgencySubscriptionPage() {
               No previous payment records found. Your free trial is currently active.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[380px] overflow-y-auto">
               <table className="w-full text-xs text-left border-collapse">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm shadow-2xs">
                   <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase text-[10px]">
                     <th className="pb-3 pr-4">Plan & Cycle</th>
                     <th className="pb-3 px-4">Amount</th>

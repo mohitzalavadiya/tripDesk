@@ -587,9 +587,9 @@ export default function CommunicationsPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[620px] overflow-y-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                 <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                   <th className="py-3 px-4">Date & Time</th>
                   <th className="py-3 px-4">Recipient / Customer</th>

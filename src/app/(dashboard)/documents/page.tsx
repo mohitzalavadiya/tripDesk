@@ -387,9 +387,9 @@ export default function DocumentCenterPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[620px] overflow-y-auto">
               <Table>
-                <TableHeader className="bg-slate-50 text-[11px] uppercase font-bold text-slate-600">
+                <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm text-[11px] uppercase font-bold text-slate-600 shadow-2xs">
                   <TableRow>
                     <TableHead className="py-3 px-4">Document #</TableHead>
                     <TableHead className="py-3 px-4">Type</TableHead>

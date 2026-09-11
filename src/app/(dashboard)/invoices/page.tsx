@@ -423,9 +423,9 @@ export default function InvoicesListPage() {
             </Button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[620px] overflow-y-auto">
             <Table>
-              <TableHeader className="bg-slate-50 text-[11px] uppercase font-bold text-slate-600">
+              <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm text-[11px] uppercase font-bold text-slate-600 shadow-2xs">
                 <TableRow>
                   <TableHead className="w-[120px] font-bold text-slate-700">Invoice #</TableHead>
                   <TableHead className="font-bold text-slate-700">Customer</TableHead>

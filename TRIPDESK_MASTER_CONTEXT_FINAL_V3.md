@@ -8605,9 +8605,85 @@ In compliance with the permanent TripDesk workflow rule established in Section 1
 
 ---
 
+# SECTION 126 — DEV-02 TABLE & LIST SCROLLING CONTAINMENT [CLOSED]
+
+## 126.1 Milestone Overview
+- **Milestone Code:** `DEV-02`
+- **Milestone Name:** `DEV-02 — Table & List Scrolling Containment`
+- **Final Verdict:** **VERDICT A — DEV-02 IMPLEMENTATION VERIFIED / FORMALLY CLOSED**
+- **Scope Summary:** Standardized internal table/list scrolling containment across all 6 confirmed unbounded targets. Large datasets now scroll cleanly within their table containers rather than expanding the document, while short datasets preserve natural height. Sticky table headers were introduced with backdrop blur so header labels remain readable while table rows scroll underneath. Page-level/window scrolling and AppShell architecture remain strictly **ON HOLD / UNTOUCHED**.
+
+## 126.2 Table Changes & Implementation Inventory
+1. **Target 1 — Invoices Ledger (`src/app/(dashboard)/invoices/page.tsx`):**
+   - Previous: Unbounded table with horizontal overflow wrapper only.
+   - New: `overflow-x-auto max-h-[620px] overflow-y-auto` container.
+   - Header: Sticky header `<TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">`.
+   - Behavior: Internal vertical scroll on overflow; horizontal scroll intact; filters, pagination, and invoice actions 100% preserved.
+
+2. **Target 2 — Documents Ledger (`src/app/(dashboard)/documents/page.tsx`):**
+   - Previous: Unbounded table with horizontal overflow wrapper only.
+   - New: `overflow-x-auto max-h-[620px] overflow-y-auto` container.
+   - Header: Sticky header `<TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">`.
+   - Behavior: Internal vertical scroll on overflow; horizontal scroll intact; status filters, document cards, and actions 100% preserved.
+
+3. **Target 3 — Communications Log (`src/app/(dashboard)/communications/page.tsx`):**
+   - Previous: Unbounded raw table with horizontal overflow wrapper only.
+   - New: `overflow-x-auto max-h-[620px] overflow-y-auto` container.
+   - Header: Sticky header `<thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">`.
+   - Behavior: Internal vertical scroll for outbound activity log; channel tabs, filters, and stat cards 100% preserved.
+
+4. **Target 4 — Follow-ups Task Ledger (`src/app/(dashboard)/follow-ups/page.tsx`):**
+   - Previous: Direct `<Table>` rendering without vertical containment wrapper.
+   - New: `overflow-x-auto max-h-[620px] overflow-y-auto` container wrapping `<Table>`.
+   - Header: Sticky header `<TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">`.
+   - Behavior: Internal vertical scroll on overflow; timeline scopes, reschedule/complete modals, and task actions 100% preserved.
+
+5. **Target 5 — Reports Data Tables (`src/app/(dashboard)/reports/page.tsx`):**
+   - Previous: 5 report tab tables (Revenue, Destinations, Receivables, Payables, VIP Customers) rendered with unbounded vertical height.
+   - New: `overflow-x-auto max-h-[520px] overflow-y-auto` container across all 5 tab tables.
+   - Headers: Sticky headers `<thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">`.
+   - Behavior: Tab switching, search filtering, KPI summaries, and financial calculations 100% preserved.
+
+6. **Target 6 — Subscription Payment History (`src/app/(dashboard)/subscription/page.tsx`):**
+   - Previous: Payment history table rendered with unbounded vertical height.
+   - New: `overflow-x-auto max-h-[380px] overflow-y-auto` container.
+   - Header: Sticky header `<thead className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm shadow-2xs">`.
+   - Behavior: Payment record log scrolls internally; plan cards, UPI modal, and UTR submission flow 100% preserved.
+
+7. **Pre-Existing Core Listing Tables (Verified & Preserved):**
+   - `/customers`, `/trips`, `/bookings`, `/quotations`, `/hotels`, `/vehicles`, `/activities`, `/suppliers`, `/rate-sheets`, `/payments`, `/enquiries`.
+   - Pre-existing established pattern (`max-h-[620px] overflow-y-auto`) left strictly unchanged.
+
+## 126.3 Page-Scroll Invariant Statement
+> **Page/window scrolling was not intentionally modified. The broader page-scroll milestone remains ON HOLD.**
+- `AppShell` (`src/components/layout/app-shell.tsx`) was NOT modified.
+- Root layout / body overflow / global CSS was NOT modified.
+- Mobile bottom navigation spacing and layout padding were NOT modified.
+- No business logic, APIs, Prisma models, migrations, or RBAC rules were touched.
+
+## 126.4 Verification & QA Evidence
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass Rate)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass Rate)
+- **Browser Responsive QA Matrix:** Tested and verified across all 7 target viewports:
+  - `1440 × 900` (Desktop Large): PASS
+  - `1280 × 800` (Desktop Standard): PASS
+  - `1024 × 768` (Desktop Compact): PASS
+  - `768 × 1024` (Tablet Portrait): PASS
+  - `390 × 844` (Mobile Standard - iPhone 14/15): PASS
+  - `375 × 700` (Mobile Compact): PASS
+  - `320 × 700` (Mobile Narrow): PASS
+
+## 126.5 Milestone Status
+- **DEV-02 (Table & List Scrolling Containment):** **CLOSED / VERIFIED**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
 
 
 
