@@ -3,6 +3,8 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useFormik } from "formik";
+import * as Yup from "yup";
 import { customerClient, CustomerDetails360 } from "@/lib/api-client";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -80,6 +82,29 @@ const AVATAR_GRADIENTS = [
   "from-fuchsia-500 to-purple-600",
 ];
 
+const editCustomerValidationSchema = Yup.object().shape({
+  name: Yup.string()
+    .trim()
+    .required("Customer name is required.")
+    .max(120, "Customer name must be at most 120 characters."),
+  phone: Yup.string()
+    .trim()
+    .required("Phone number is required.")
+    .min(3, "Phone number must have at least 3 characters.")
+    .max(30, "Phone number must be at most 30 characters."),
+  alternatePhone: Yup.string().trim().max(30, "Alternate phone must be at most 30 characters."),
+  email: Yup.string().trim().email("Please provide a valid email address.").max(120, "Email must be at most 120 characters."),
+  dateOfBirth: Yup.string(),
+  gender: Yup.string().trim().max(30),
+  nationality: Yup.string().trim().max(60),
+  address: Yup.string().trim().max(255, "Address must be at most 255 characters."),
+  city: Yup.string().trim().max(100),
+  state: Yup.string().trim().max(100),
+  postalCode: Yup.string().trim().max(20, "Postal code cannot exceed 20 characters."),
+  notes: Yup.string().trim().max(5000, "Notes must be at most 5000 characters."),
+  internalNotes: Yup.string().trim().max(5000, "Internal notes must be at most 5000 characters."),
+});
+
 function getInitials(name: string) {
   if (!name) return "C";
   const parts = name.trim().split(" ");
@@ -129,41 +154,68 @@ export default function CustomerDetailPage() {
   const [msgBody, setMsgBody] = React.useState("");
   const [sendingMsg, setSendingMsg] = React.useState(false);
 
-  // Edit Customer Modal State
+  // Edit Customer Modal State & Formik
   const [isEditOpen, setIsEditOpen] = React.useState(false);
-  const [editName, setEditName] = React.useState("");
-  const [editPhone, setEditPhone] = React.useState("");
-  const [editAlternatePhone, setEditAlternatePhone] = React.useState("");
-  const [editEmail, setEditEmail] = React.useState("");
-  const [editDateOfBirth, setEditDateOfBirth] = React.useState("");
-  const [editGender, setEditGender] = React.useState("");
-  const [editNationality, setEditNationality] = React.useState("");
-  const [editAddress, setEditAddress] = React.useState("");
-  const [editCity, setEditCity] = React.useState("");
-  const [editState, setEditState] = React.useState("");
-  const [editPostalCode, setEditPostalCode] = React.useState("");
-  const [editNotes, setEditNotes] = React.useState("");
-  const [editInternalNotes, setEditInternalNotes] = React.useState("");
-  const [savingEdit, setSavingEdit] = React.useState(false);
-  const [editTouched, setEditTouched] = React.useState<Record<string, boolean>>({});
-  const [editSubmitted, setEditSubmitted] = React.useState(false);
 
-  const editErrors = React.useMemo(() => {
-    const errs: Record<string, string> = {};
-    if (!editName.trim()) {
-      errs.name = "Customer name is required.";
-    }
-    if (!editPhone.trim()) {
-      errs.phone = "Phone number is required.";
-    }
-    return errs;
-  }, [editName, editPhone]);
+  const editFormik = useFormik({
+    initialValues: {
+      name: customer?.name || "",
+      phone: customer?.phone || "",
+      alternatePhone: customer?.alternatePhone || "",
+      email: customer?.email || "",
+      dateOfBirth: customer?.dateOfBirth
+        ? new Date(customer.dateOfBirth).toISOString().split("T")[0]
+        : "",
+      gender: customer?.gender || "",
+      nationality: customer?.nationality || "",
+      address: customer?.address || "",
+      city: customer?.city || "",
+      state: customer?.state || "",
+      postalCode: customer?.postalCode || "",
+      notes: customer?.notes || "",
+      internalNotes: customer?.internalNotes || "",
+    },
+    enableReinitialize: true,
+    validationSchema: editCustomerValidationSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      if (isReadOnly) {
+        toast.error("Subscription expired. Read-only mode is active.");
+        return;
+      }
 
-  const getEditFieldError = (field: string) => {
-    if ((editTouched[field] || editSubmitted) && editErrors[field]) {
-      return editErrors[field];
-    }
-    return null;
+      try {
+        setSubmitting(true);
+        const res = await customerClient.updateCustomer(id, {
+          name: values.name.trim(),
+          phone: values.phone.trim(),
+          alternatePhone: values.alternatePhone.trim() || null,
+          email: values.email.trim() || null,
+          dateOfBirth: values.dateOfBirth ? new Date(values.dateOfBirth) : null,
+          gender: values.gender || null,
+          nationality: values.nationality.trim() || null,
+          address: values.address.trim() || null,
+          city: values.city.trim() || null,
+          state: values.state.trim() || null,
+          postalCode: values.postalCode.trim() || null,
+          notes: values.notes.trim() || null,
+          internalNotes: values.internalNotes.trim() || null,
+        });
+
+        if (res.success) {
+          toast.success("Customer profile updated successfully!");
+          setIsEditOpen(false);
+          await loadCustomer();
+        }
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to update customer.");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
+
+  const getEditFieldError = (field: keyof typeof editFormik.values) => {
+    return editFormik.touched[field] && editFormik.errors[field] ? editFormik.errors[field] : null;
   };
 
   const loadCommunications = React.useCallback(async () => {
@@ -187,26 +239,6 @@ export default function CustomerDetailPage() {
       const res = await customerClient.getCustomer(id);
       if (res.success && res.data) {
         setCustomer(res.data);
-        // Pre-fill edit form
-        setEditName(res.data.name || "");
-        setEditPhone(res.data.phone || "");
-        setEditAlternatePhone(res.data.alternatePhone || "");
-        setEditEmail(res.data.email || "");
-        setEditDateOfBirth(
-          res.data.dateOfBirth
-            ? new Date(res.data.dateOfBirth).toISOString().split("T")[0]
-            : ""
-        );
-        setEditGender(res.data.gender || "");
-        setEditNationality(res.data.nationality || "");
-        setEditAddress(res.data.address || "");
-        setEditCity(res.data.city || "");
-        setEditState(res.data.state || "");
-        setEditPostalCode(res.data.postalCode || "");
-        setEditNotes(res.data.notes || "");
-        setEditInternalNotes(res.data.internalNotes || "");
-        setEditTouched({});
-        setEditSubmitted(false);
       }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
@@ -266,49 +298,6 @@ export default function CustomerDetailPage() {
       toast.error("Failed to resend message", {
         description: err?.message || "Error resending.",
       });
-    }
-  };
-
-  // Handle Edit Submit
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setEditSubmitted(true);
-    if (isReadOnly) {
-      toast.error("Subscription expired. Read-only mode is active.");
-      return;
-    }
-
-    if (editErrors.name || editErrors.phone) {
-      return;
-    }
-
-    try {
-      setSavingEdit(true);
-      const res = await customerClient.updateCustomer(id, {
-        name: editName.trim(),
-        phone: editPhone.trim(),
-        alternatePhone: editAlternatePhone.trim() || null,
-        email: editEmail.trim() || null,
-        dateOfBirth: editDateOfBirth ? new Date(editDateOfBirth) : null,
-        gender: editGender || null,
-        nationality: editNationality.trim() || null,
-        address: editAddress.trim() || null,
-        city: editCity.trim() || null,
-        state: editState.trim() || null,
-        postalCode: editPostalCode.trim() || null,
-        notes: editNotes.trim() || null,
-        internalNotes: editInternalNotes.trim() || null,
-      });
-
-      if (res.success) {
-        toast.success("Customer profile updated successfully!");
-        setIsEditOpen(false);
-        await loadCustomer();
-      }
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to update customer.");
-    } finally {
-      setSavingEdit(false);
     }
   };
 
@@ -1261,7 +1250,7 @@ export default function CustomerDetailPage() {
         {/* ─── EDIT CUSTOMER MODAL ─── */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
-            <form onSubmit={handleEditSubmit} noValidate>
+            <form onSubmit={editFormik.handleSubmit} noValidate>
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
                   <Edit2 className="h-4 w-4 text-indigo-600" />
@@ -1277,9 +1266,7 @@ export default function CustomerDetailPage() {
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Full Name *</label>
                     <Input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onBlur={() => setEditTouched((prev) => ({ ...prev, name: true }))}
+                      {...editFormik.getFieldProps("name")}
                       className={`h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold ${getEditFieldError("name") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                     />
                     {getEditFieldError("name") && (
@@ -1291,9 +1278,7 @@ export default function CustomerDetailPage() {
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Primary Phone *</label>
                     <Input
-                      value={editPhone}
-                      onChange={(e) => setEditPhone(e.target.value)}
-                      onBlur={() => setEditTouched((prev) => ({ ...prev, phone: true }))}
+                      {...editFormik.getFieldProps("phone")}
                       className={`h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold ${getEditFieldError("phone") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                     />
                     {getEditFieldError("phone") && (
@@ -1308,19 +1293,27 @@ export default function CustomerDetailPage() {
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Alternate Phone</label>
                     <Input
-                      value={editAlternatePhone}
-                      onChange={(e) => setEditAlternatePhone(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      {...editFormik.getFieldProps("alternatePhone")}
+                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${getEditFieldError("alternatePhone") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                     />
+                    {getEditFieldError("alternatePhone") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                        {getEditFieldError("alternatePhone")}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Email Address</label>
                     <Input
                       type="email"
-                      value={editEmail}
-                      onChange={(e) => setEditEmail(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      {...editFormik.getFieldProps("email")}
+                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${getEditFieldError("email") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                     />
+                    {getEditFieldError("email") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                        {getEditFieldError("email")}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1329,16 +1322,14 @@ export default function CustomerDetailPage() {
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Date of Birth</label>
                     <Input
                       type="date"
-                      value={editDateOfBirth}
-                      onChange={(e) => setEditDateOfBirth(e.target.value)}
+                      {...editFormik.getFieldProps("dateOfBirth")}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">City</label>
                     <Input
-                      value={editCity}
-                      onChange={(e) => setEditCity(e.target.value)}
+                      {...editFormik.getFieldProps("city")}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
@@ -1347,30 +1338,42 @@ export default function CustomerDetailPage() {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Street Address</label>
                   <Input
-                    value={editAddress}
-                    onChange={(e) => setEditAddress(e.target.value)}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    {...editFormik.getFieldProps("address")}
+                    className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${getEditFieldError("address") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
+                  {getEditFieldError("address") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getEditFieldError("address")}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Client Notes / Preferences</label>
                   <Textarea
-                    value={editNotes}
-                    onChange={(e) => setEditNotes(e.target.value)}
+                    {...editFormik.getFieldProps("notes")}
                     rows={3}
-                    className="bg-slate-50/50 border-slate-200 text-xs"
+                    className={`bg-slate-50/50 border-slate-200 text-xs ${getEditFieldError("notes") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
+                  {getEditFieldError("notes") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getEditFieldError("notes")}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Internal Agency Remarks</label>
                   <Textarea
-                    value={editInternalNotes}
-                    onChange={(e) => setEditInternalNotes(e.target.value)}
+                    {...editFormik.getFieldProps("internalNotes")}
                     rows={3}
-                    className="bg-slate-50/50 border-slate-200 text-xs"
+                    className={`bg-slate-50/50 border-slate-200 text-xs ${getEditFieldError("internalNotes") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
+                  {getEditFieldError("internalNotes") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getEditFieldError("internalNotes")}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1384,11 +1387,11 @@ export default function CustomerDetailPage() {
                 />
                 <Button
                   type="submit"
-                  disabled={savingEdit}
+                  disabled={editFormik.isSubmitting}
                   size="sm"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
                 >
-                  {savingEdit ? "Saving..." : "Save Changes"}
+                  {editFormik.isSubmitting ? "Saving..." : "Save Changes"}
                 </Button>
               </DialogFooter>
             </form>

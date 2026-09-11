@@ -8296,9 +8296,320 @@ Addressed confirmed findings from the Batch 4C read-only terminology audit:
 
 ---
 
+# 122. DEV-01A — CUSTOMER FORM VALIDATION CONSISTENCY [CLOSED]
+
+## 122.1 Scope & Objective
+- **Implementation Date:** 2026-09-11
+- **Batch Name:** `DEV-01A — Customer Form Validation Consistency`
+- **Status:** **CLOSED / VERIFIED** (All automated tests, production build, regression suites, and multi-viewport browser QA passed with 100% success)
+- **Scope:** Standardized client-side form validation on the canonical **Formik + Yup** architecture for Customer Create and Customer Edit forms, aligning them with TripDesk's established form standard (`/trips/new`, `/hotels/new`, `/vehicles/new`) while strictly preserving authoritative server-side **Zod validation**, API contracts, and all business rules.
+
+## 122.2 Customer Create Implementation Summary (`/customers/new`)
+- **Formik Migration:** Replaced 15 manual `useState` variables with `useFormik` hook managing unified form values matching the client-side customer data contract (`name`, `phone`, `alternatePhone`, `email`, `dateOfBirth`, `gender`, `nationality`, `address`, `city`, `state`, `country`, `postalCode`, `source`, `notes`, `internalNotes`).
+- **Yup Schema Validation:** Defined local client schema `createCustomerValidationSchema` enforcing user-facing UX constraints (`name` required, `phone` required with length constraints, valid `email` format, length limits on notes/address) without duplicating server-only business rules.
+- **Error UX & Visual Feedback:** Connected input classes and helper messages to Formik `touched` and `errors` with red borders (`border-red-500/80 focus:border-red-500 focus:ring-red-500/20`) and inline error text (`text-[11px] text-red-500 font-semibold`).
+- **Submission Control:** Submission button tied to `formik.isSubmitting` with loading spinner; invalid submissions are blocked client-side before dispatching network requests.
+- **Duplicate Detection Preservation:** 100% preserved debounced (400ms) duplicate phone/email detection (`customerClient.checkDuplicate`), duplicate alert warning card, matched customer details, link to existing customer profile, and non-blocking submission workflow.
+
+## 122.3 Customer Edit Implementation Summary (`/customers/[id]`)
+- **Formik Migration:** Converted customer edit modal to `useFormik` bound to all modal fields via `editFormik.getFieldProps()`.
+- **`enableReinitialize: true`:** Seamlessly populates initial asynchronously fetched customer values (`customer.name`, `customer.phone`, etc.) into Formik state upon completion of `loadCustomer()`, without race conditions or resetting active user edits.
+- **Yup Schema Validation:** Enforced consistent client-side validation via `editCustomerValidationSchema`.
+- **Error UX & Modal Flow:** Connected inline validation feedback and red border styling; submission button reflects `editFormik.isSubmitting`. On successful update, toast notification is displayed, modal closes, and `loadCustomer()` re-fetches updated customer profile data.
+- **Behavior Preservation:** Preserved customer ID, editable fields, update API payload structure (`customerClient.updateCustomer`), notifications, and modal close/cancel behavior.
+
+## 122.4 Architecture & Invariant Invariants
+- **Validation Architecture:**
+  ```text
+  Client:
+  Formik + Yup (UX validation, touched/errors, inline messages, submit state)
+          ↓
+  Existing API Client / Routes
+          ↓
+  Server:
+  Zod Schema Validation (Authoritative payload validation, tenant safety)
+          ↓
+  Prisma Service Layer & Business Rules
+          ↓
+  PostgreSQL Database
+  ```
+- **Formik/Yup as UX Only:** Formik and Yup serve strictly as a client-side UX/feedback layer and are **NOT** a security boundary.
+- **Server Zod Schemas:** 100% unchanged (`src/lib/validation/customer-schema.ts` untouched).
+- **API Contracts & Routes:** `/api/customers`, `/api/customers/[id]`, and `/api/customers/check-duplicate` contracts untouched.
+- **Database & Prisma Schema:** 0 schema changes, 0 migrations.
+- **Authentication & RBAC:** Supabase Auth session checks and agency ownership authorization strictly preserved.
+- **Tenant Isolation:** Server-derived `agencyId` scoping strictly preserved; client forms cannot supply or override `agencyId`.
+- **Scrolling Architecture:** Remains strictly **ON HOLD** (no overflow or AppShell changes).
+
+## 122.5 Files Changed
+1. `src/app/(dashboard)/customers/new/page.tsx` — Formik + Yup conversion, duplicate detection hook, inline validation feedback.
+2. `src/app/(dashboard)/customers/[id]/page.tsx` — Edit modal Formik + Yup conversion with `enableReinitialize: true`, inline error feedback.
+3. `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` — Section 122 record of DEV-01A closure.
+
+## 122.6 Verified Regression Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Next.js Turbopack build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass)
+- **Browser QA Viewport Matrix (320px, 375px, 390px, 768px, 1024px, 1280px, 1440px):** PASS (Zero horizontal overflow at 320px, inputs/buttons accessible, responsive grid folding).
+
+## 122.7 DEV-01 Milestone Roadmap Status (Updated in Section 123)
+- **DEV-01A (Customer Create & Edit):** **CLOSED / VERIFIED**
+- **DEV-01B (Enquiry Create):** **CLOSED / VERIFIED** (See Section 123)
+- **DEV-01C (Quotation Create & Trip Detail Dead Imports):** **PLANNED** (Future batch — `src/app/(dashboard)/quotations/new/page.tsx` & `src/app/(dashboard)/trips/[id]/page.tsx`)
+- **DEV-01D (Final DEV-01 QA & Milestone Sign-Off):** **PLANNED** (Future batch)
+
+---
+
+# 123. DEV-01B — ENQUIRY CREATE FORM VALIDATION CONSISTENCY [CLOSED]
+
+## 123.1 Purpose & Execution Overview
+- **Implementation Date:** 2026-09-11
+- **Batch Name:** `DEV-01B — Enquiry Create Form Validation Consistency`
+- **Status:** **CLOSED / VERIFIED** (VERDICT A — VERIFIED / READY TO CLOSE; all automated tests, production build, regression suites, and multi-viewport browser QA passed with 100% success)
+- **Scope:** Standardized client-side form validation UX on the canonical **Formik + Yup** architecture strictly for Enquiry Create (`src/app/(dashboard)/enquiries/new/page.tsx`), aligning it with TripDesk's established form standard (`/trips/new`, `/hotels/new`, `/vehicles/new`, `/customers/new`) while preserving authoritative server-side **Zod validation**, API contracts, customer flows, duplicate lead detection, and all business rules.
+
+## 123.2 Permanent Workflow Rule (Locked)
+Starting with Milestone DEV-01, **`TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` must be updated within the same workflow whenever an implementation/QA phase is completed and confirmed.**
+- **Standard Process:**
+  1. Implement strictly within approved batch scope.
+  2. Independently verify/QA across automated test suites, production build, and viewports.
+  3. If verified PASS, update `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` in the same workflow.
+  4. Mark the batch formally **CLOSED**.
+- Do NOT treat V3 updating as a separate future task or defer it to subsequent prompts.
+
+## 123.3 Implementation Summary (`/enquiries/new`)
+- **Formik Migration:** Replaced manual form state management (`useState` hooks and manual `errors` memoization) with `useFormik` hook managing unified values across the entire form lifecycle.
+- **Yup Schema Validation:** Defined local client schema `createEnquiryValidationSchema` using `Yup.object().shape({...})` connected directly to `useFormik({ validationSchema: createEnquiryValidationSchema })`.
+- **Reconciled Complete Field Inventory (26 Fields):**
+  The independent verification audit reconciled the earlier 25-vs-26 counting discrepancy and confirmed that the Enquiry Create form contains exactly **26 fields**:
+  1. `customerMode` (`"existing" | "new"`)
+  2. `selectedCustomerId` (conditional requirement in existing mode)
+  3. `newCustomerName` (conditional requirement in new mode, max 120 chars)
+  4. `newCustomerPhone` (conditional requirement in new mode, min 3, max 30 chars)
+  5. `newCustomerEmail` (optional, valid email format, max 120 chars)
+  6. `title` (optional, max 200 chars)
+  7. `destination` (required, max 200 chars)
+  8. `origin` (optional, max 200 chars)
+  9. `startDate` (tentative start date picker)
+  10. `endDate` (tentative end date picker, validated `endDate >= startDate`)
+  11. `adults` (number, integer >= 1 required)
+  12. `children` (number, integer >= 0)
+  13. `infants` (number, integer >= 0)
+  14. `hotelCategory` (select dropdown, default `"3 Star"`)
+  15. `mealPlan` (select dropdown, default `"MAP"`)
+  16. `vehiclePreference` (select dropdown, default `"Sedan"`)
+  17. `transportRequired` (boolean toggle)
+  18. `budget` (numeric string, validated >= 0)
+  19. `budgetType` (`"total" | "per_person"`)
+  20. `source` (`EnquirySource` enum, default `WHATSAPP`)
+  21. `priority` (`EnquiryPriority` enum, default `MEDIUM`)
+  22. `status` (`EnquiryStatus` enum, default `NEW`)
+  23. `specialRequirements` (optional textarea, max 5000 chars)
+  24. `notes` (optional string, max 5000 chars)
+  25. `internalNotes` (optional textarea, max 5000 chars)
+  26. `followupDate` (optional date, mapped to `nextFollowUpAt`)
+
+## 123.4 Customer Flow & Duplicate Detection
+- **Existing Customer Mode:**
+  - Loads customer directory asynchronously via `customerClient.getCustomers({ limit: 100 })`.
+  - Auto-selects `customers[0].id` when available (confirmed as **pre-existing behavior**).
+  - Enforces `selectedCustomerId` conditionally via Yup.
+  - Triggers debounced (400ms) active lead duplicate detection (`enquiryClient.checkDuplicate`) watching customer ID, destination, and dates.
+  - Displays non-blocking duplicate warning card with lead numbers, destination, status, and direct link to existing lead.
+- **Quick Add Customer Mode:**
+  - Enforces `newCustomerName` and `newCustomerPhone` conditionally via Yup.
+  - On submit, creates the customer first via `customerClient.createCustomer({ name, phone, email })`, gets `customerId`, and links it to `enquiryClient.createEnquiry`.
+
+## 123.5 Date Validation & Edge Cases
+- **Date Range Rule:** `endDate >= startDate` when both are present (confirmed as pre-existing client & server Zod rule).
+- **Same Day Trip (`startDate === endDate`):** Supported and computes `"Same Day Trip"`.
+- **Date Ranges (`startDate < endDate`):** Supported and computes duration string (e.g., `"4 Nights / 5 Days"`).
+- **Invalid Ordering (`startDate > endDate`):** Blocked with inline error `"End date cannot be before start date."`.
+- **Empty / Tentative Dates:** Allowed as optional fields without validation errors.
+- **Timezone:** Preserved direct Date coercion without UTC offset skew.
+
+## 123.6 Architecture & Invariant Invariants
+- **Authoritative Server Layer:** Server Zod schema (`src/lib/validation/enquiry-schema.ts`) remains the authoritative validation and security boundary.
+- **API Contracts:** `/api/enquiries` and `/api/customers` endpoints and payloads remain 100% identical.
+- **Database & Prisma:** 0 schema changes, 0 migrations.
+- **Authentication & RBAC:** Supabase Auth session checks and agency ownership authorization strictly preserved.
+- **Tenant Isolation:** Server-derived `agencyId` scoping strictly preserved; client forms cannot supply or override `agencyId`.
+- **Scrolling Architecture:** Remains strictly **ON HOLD** (no overflow or AppShell changes).
+- **Out of Scope Areas:** Enquiry Edit / CRM action dialogs (`/enquiries/[id]`), Quotation Create (`/quotations/new`), and Trip Detail (`/trips/[id]`) were NOT modified in DEV-01B.
+
+## 123.7 Files Changed
+1. `src/app/(dashboard)/enquiries/new/page.tsx` — Formik + Yup conversion, customer mode validation, duplicate check hook, inline validation feedback.
+2. `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` — Section 123 record of DEV-01B closure and workflow rule.
+
+## 123.8 Verified Regression Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Next.js Turbopack build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass Rate)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass Rate)
+- **Browser QA Viewport Matrix (320px, 375px, 390px, 768px, 1024px, 1280px, 1440px):** PASS (Zero horizontal overflow at 320px, inputs/buttons accessible, responsive grid folding).
+
+## 123.9 DEV-01 Milestone Roadmap Status (Updated in Section 124)
+- **DEV-01A (Customer Create & Edit):** **CLOSED / VERIFIED**
+- **DEV-01B (Enquiry Create):** **CLOSED / VERIFIED**
+- **DEV-01C (Quotation Create & Trip Detail Dead Imports):** **CLOSED / VERIFIED** (See Section 124)
+- **DEV-01D (Final DEV-01 QA & Milestone Sign-Off):** **PLANNED** (Next milestone)
+
+---
+
+# 124. DEV-01C — QUOTATION CREATE FORMIK/YUP + TRIP DETAIL DEAD IMPORT CLEANUP [CLOSED]
+
+## 124.1 Purpose & Execution Overview
+- **Implementation Date:** 2026-09-11
+- **Batch Name:** `DEV-01C — Quotation Create Formik/Yup + Trip Detail Dead Import Cleanup`
+- **Status:** **CLOSED / VERIFIED** (VERDICT A — VERIFIED / READY TO CLOSE; all automated tests, production build, regression suites, and multi-viewport browser QA passed with 100% success)
+- **Scope:** 
+  1. Standardized client-side form validation UX on the canonical **Formik + Yup** architecture for Quotation Create (`src/app/(dashboard)/quotations/new/page.tsx`), aligning it with TripDesk's established form standard (`/trips/new`, `/hotels/new`, `/vehicles/new`, `/customers/new`, `/enquiries/new`) while strictly preserving authoritative server-side **Zod validation**, API contracts, quotation snapshot generation flow, live pricing calculation engine (`costingEngine.calculateQuotationPricing`), and trip selection logic.
+  2. Inspected Trip Detail (`src/app/(dashboard)/trips/[id]/page.tsx`) for dead imports. Verified that `useFormik` is actively used on line 274 for `editTripFormik` (managing the Edit Trip dialog), and confirmed 0 dead imports. Retained active `useFormik` import with 0 runtime or functional modifications.
+
+## 124.2 Permanent Workflow Rule (Applied)
+In compliance with the permanent TripDesk workflow rule established in Section 123.2:
+- DEV-01C was implemented strictly within the approved batch scope.
+- Full verification suite executed: TypeScript (0 errors), Next.js production build (PASS), 60/60 Invoice Matrix (PASS), 23/23 Excel Matrix (PASS), and multi-viewport responsive browser QA (320px to 1440px PASS).
+- Upon confirming VERDICT A (PASS), `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` is updated in the same workflow, and DEV-01C is formally marked **CLOSED**.
+
+## 124.3 Quotation Create Implementation Summary (`/quotations/new`)
+- **Formik Migration:** Replaced manual form state (`selectedTripId`, `markupPct`, `discountPct`, `taxPct`, manual error states) with `useFormik` hook managing unified values:
+  - `selectedTripId: ""`
+  - `markupPct: 10` (preserved default)
+  - `discountPct: 0` (preserved default)
+  - `taxPct: 5` (preserved default)
+- **Yup Schema Validation:** Defined local client validation schema `createQuotationValidationSchema` using `Yup.object().shape({...})` connected directly to `useFormik({ validationSchema: createQuotationValidationSchema })`:
+  - `selectedTripId`: `Yup.string().required("Please select a trip workspace to generate quotation.")`
+  - `markupPct`: `Yup.number().typeError("Markup must be a valid number").min(0, "Markup cannot be negative").max(100, "Markup cannot exceed 100%").required("Markup percentage is required")`
+  - `discountPct`: `Yup.number().typeError("Discount must be a valid number").min(0, "Discount cannot be negative").max(100, "Discount cannot exceed 100%").required("Discount percentage is required")`
+  - `taxPct`: `Yup.number().typeError("Tax must be a valid number").min(0, "Tax cannot be negative").max(100, "Tax cannot exceed 100%").required("Tax percentage is required")`
+- **Reconciled Complete Field Inventory (4 Fields):**
+  1. `selectedTripId` (Trip Workspace selection combobox, required)
+  2. `markupPct` (Agency Markup percentage, default 10%, numeric input)
+  3. `discountPct` (Discount percentage, default 0%, numeric input)
+  4. `taxPct` (Tax / GST percentage, default 5%, numeric input)
+- **Error UX & Visual Feedback:** Connected input classes and helper messages to Formik `touched` and `errors` with red borders (`border-red-500/80 focus:border-red-500 focus:ring-red-500/20`) and inline error text (`text-[11px] text-red-500 font-semibold`).
+- **Submission Control:** Submission button tied to `formik.isSubmitting` with loading spinner (`Generating Snapshot...`); duplicate submissions are prevented client-side.
+- **Pricing & Calculation Preservation:**
+  - Preserved live preview calculations using `costingEngine.calculateQuotationPricing` driven reactively by `formik.values`.
+  - Preserved subtotal, markup amount, discount amount, taxable amount, tax amount, and total client-side quotation calculation.
+- **API Payload Preservation:**
+  - Preserved `quotationClient.generateTripQuotation` endpoint call with exact payload mapping:
+    ```typescript
+    {
+      tripId: values.selectedTripId,
+      markupPct: Number(values.markupPct) || 0,
+      discountPct: Number(values.discountPct) || 0,
+      taxPct: Number(values.taxPct) || 0,
+    }
+    ```
+  - Preserved toast notification on success and redirect to `/trips/${tripId}/quotation`.
+  - Preserved server-side error toast handling with `getErrorMessage(err)`.
+
+## 124.4 Trip Detail Import Audit Summary (`/trips/[id]`)
+- **Import Audit:** Inspected `src/app/(dashboard)/trips/[id]/page.tsx` for unused Formik/Yup imports.
+- **Finding:** Formik import `import { useFormik } from "formik";` is actively required and used at line 274 for `const editTripFormik = useFormik({...})` which manages the Edit Trip dialog. Yup was not imported.
+- **Action:** Retained active `useFormik` import. Zero dead imports found. Zero functional or runtime modifications made to Trip Detail.
+
+## 124.5 Architecture & Invariant Invariants
+- **Authoritative Server Layer:** Server Zod schema (`src/lib/validation/quotation-schema.ts`) remains the authoritative validation and security boundary.
+- **API Contracts:** `/api/trips/[id]/quotation` and `/api/quotations` endpoints and payloads remain 100% identical.
+- **Database & Prisma:** 0 schema changes, 0 migrations.
+- **Authentication & RBAC:** Supabase Auth session checks and agency ownership authorization strictly preserved.
+- **Tenant Isolation:** Server-derived `agencyId` scoping strictly preserved; client forms cannot supply or override `agencyId`.
+- **Scrolling Architecture:** Remains strictly **ON HOLD** (no overflow or AppShell changes).
+- **Completed Batches:** DEV-01A and DEV-01B files were NOT modified.
+
+## 124.6 Files Changed
+1. `src/app/(dashboard)/quotations/new/page.tsx` — Formik + Yup conversion, live costing reactivity, inline validation feedback, submission state.
+2. `src/app/(dashboard)/trips/[id]/page.tsx` — Audited; retained active `useFormik` import for `editTripFormik`.
+3. `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` — Section 124 record of DEV-01C closure and updated DEV-01 roadmap.
+
+## 124.7 Verified Regression Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Next.js Turbopack build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass Rate)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass Rate)
+- **Browser QA Viewport Matrix (320px, 375px, 390px, 768px, 1024px, 1280px, 1440px):** PASS (Zero horizontal overflow at 320px, inputs/buttons accessible, responsive grid folding).
+
+## 124.8 DEV-01 Milestone Roadmap Status (Updated in Section 125)
+- **DEV-01A (Customer Create & Edit):** **CLOSED / VERIFIED**
+- **DEV-01B (Enquiry Create):** **CLOSED / VERIFIED**
+- **DEV-01C (Quotation Create & Trip Detail Dead Imports):** **CLOSED / VERIFIED**
+- **DEV-01D (Final DEV-01 QA & Milestone Sign-Off):** **CLOSED / VERIFIED** (See Section 125)
+- **DEV-01 Milestone (Form Validation Consistency):** **CLOSED**
+
+---
+
+# 125. DEV-01D — FINAL DEV-01 QA & MILESTONE SIGN-OFF [CLOSED]
+
+## 125.1 Milestone Purpose & Executive Summary
+- **Sign-Off Date:** 2026-09-11
+- **Batch Name:** `DEV-01D — Final DEV-01 QA & Milestone Sign-Off`
+- **Milestone Name:** `DEV-01 — Form Validation Consistency`
+- **Final Verdict:** **VERDICT A — DEV-01 MILESTONE READY TO CLOSE / FORMALLY CLOSED**
+- **Scope Summary:** Executed comprehensive, independent, read-only audit across all DEV-01 batches (DEV-01A, DEV-01B, DEV-01C) and broader application forms. Verified canonical client-side **Formik + Yup** validation UX alignment, 100% preservation of authoritative server-side **Zod validation**, API contracts, live costing/pricing calculations, debounced duplicate checks, and multi-tenant isolation.
+
+## 125.2 Independent Verification Results per Batch
+1. **DEV-01A (Customer Create & Edit):** **PASS**
+   - Files: `src/app/(dashboard)/customers/new/page.tsx`, `src/app/(dashboard)/customers/[id]/page.tsx`
+   - Verified genuine Formik (`useFormik`) + Yup schemas (`createCustomerValidationSchema`, `editCustomerValidationSchema`).
+   - Verified 400ms debounced duplicate detection (`customerClient.checkDuplicate`), non-blocking duplicate warnings, `enableReinitialize: true` on edit modal, and exact API contract preservation.
+2. **DEV-01B (Enquiry Create):** **PASS**
+   - File: `src/app/(dashboard)/enquiries/new/page.tsx`
+   - Verified genuine Formik + Yup schema (`createEnquiryValidationSchema`) covering complete 26-field contract.
+   - Verified existing/quick-add customer mode switching, date validation (`endDate >= startDate`), 400ms debounced lead duplicate detection (`enquiryClient.checkDuplicate`), and exact API payload mapping.
+3. **DEV-01C (Quotation Create & Trip Detail Audit):** **PASS**
+   - Files: `src/app/(dashboard)/quotations/new/page.tsx`, `src/app/(dashboard)/trips/[id]/page.tsx`
+   - Verified genuine Formik + Yup schema (`createQuotationValidationSchema`) managing 4 fields (`selectedTripId`, `markupPct`, `discountPct`, `taxPct`).
+   - Verified reactive live pricing engine calculation (`costingEngine.calculateQuotationPricing`), snapshot generation API call (`quotationClient.generateTripQuotation`), and active `useFormik` preservation in Trip Detail (`editTripFormik` at line 274).
+
+## 125.3 Form Validation Architecture & Global Form Landscape
+- **Standardized Architecture:**
+  - **Client-Side UX Layer:** `Formik + Yup` provides real-time field state, touched tracking, inline validation errors, and disabled/loading submission states.
+  - **Authoritative Server Layer:** `Zod` schemas in `src/lib/validation/*` enforce authoritative business rules, type coercion, and multi-tenant safety.
+  - **Formik/Yup as UX Only:** Formik and Yup serve strictly as a client UX enhancement and are never treated as a security boundary.
+- **Completed Forms in Scope:**
+  - Customer Create (`/customers/new`)
+  - Customer Edit (`/customers/[id]` modal)
+  - Enquiry Create (`/enquiries/new`)
+  - Quotation Create (`/quotations/new`)
+  - Trip Create (`/trips/new` — pre-existing Formik+Yup)
+  - Hotel Create (`/hotels/new` — pre-existing Formik+Yup)
+  - Vehicle Create (`/vehicles/new` — pre-existing Formik+Yup)
+  - Trip Detail Edit (`/trips/[id]` dialog — pre-existing Formik)
+- **Deferred / Excluded Forms:**
+  - Enquiry Detail CRM Dialogs (`/enquiries/[id]` — action dialogs/stage transitions, correctly excluded from full form conversion).
+  - Quotation Detail Builder (`/quotations/[id]` — proposal builder actions).
+
+## 125.4 Security, RBAC & Invariant Adherence
+- **Authentication & RBAC:** Supabase Auth session checks and agency ownership authorization strictly preserved.
+- **Tenant Isolation:** Server-derived `agencyId` scoping strictly preserved; client forms cannot supply or override `agencyId`.
+- **Database & Prisma:** 0 schema changes, 0 migrations.
+- **Scrolling Architecture:** Remains strictly **ON HOLD** (no overflow or AppShell changes).
+
+## 125.5 Verified Regression & Build Evidence
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass Rate)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass Rate)
+- **Browser QA Viewport Matrix (320px, 375px, 390px, 768px, 1024px, 1280px, 1440px):** PASS across all target forms.
+
+## 125.6 Milestone Final Sign-Off Status
+- **DEV-01A:** **CLOSED**
+- **DEV-01B:** **CLOSED**
+- **DEV-01C:** **CLOSED**
+- **DEV-01D:** **CLOSED**
+- **DEV-01 Milestone (Form Validation Consistency):** **CLOSED**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+
 
 
 

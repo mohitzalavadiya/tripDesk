@@ -9,7 +9,6 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -20,16 +19,75 @@ import {
 import { tripClient, quotationClient, TripWithRelations } from "@/lib/api-client";
 import { toast } from "sonner";
 
+const createQuotationValidationSchema = Yup.object().shape({
+  selectedTripId: Yup.string()
+    .trim()
+    .required("Please select a trip."),
+  markupPct: Yup.number()
+    .typeError("Markup must be a number.")
+    .min(0, "Markup percentage cannot be negative.")
+    .max(500, "Markup percentage cannot exceed 500%.")
+    .required("Markup percentage is required."),
+  discountPct: Yup.number()
+    .typeError("Discount must be a number.")
+    .min(0, "Discount percentage cannot be negative.")
+    .max(100, "Discount percentage cannot exceed 100%.")
+    .required("Discount percentage is required."),
+  taxPct: Yup.number()
+    .typeError("Tax percentage must be a number.")
+    .min(0, "Tax percentage cannot be negative.")
+    .max(100, "Tax percentage cannot exceed 100%.")
+    .required("Tax percentage is required."),
+});
+
 export default function NewQuotationPage() {
   const router = useRouter();
   const [trips, setTrips] = React.useState<TripWithRelations[]>([]);
   const [loadingTrips, setLoadingTrips] = React.useState(true);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
-  const [selectedTripId, setSelectedTripId] = React.useState<string>("");
-  const [markupPct, setMarkupPct] = React.useState("10");
-  const [discountPct, setDiscountPct] = React.useState("0");
-  const [taxPct, setTaxPct] = React.useState("5");
-  const [generating, setGenerating] = React.useState(false);
+
+  const formik = useFormik({
+    initialValues: {
+      selectedTripId: "",
+      markupPct: 10,
+      discountPct: 0,
+      taxPct: 5,
+    },
+    validationSchema: createQuotationValidationSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      if (isReadOnly) {
+        toast.error("Subscription expired. Read-only mode is active.");
+        return;
+      }
+
+      try {
+        setSubmitting(true);
+        const res = await quotationClient.generateTripQuotation(values.selectedTripId, {
+          markupPercentage: Number(values.markupPct) || 0,
+          discountPercentage: Number(values.discountPct) || 0,
+          taxPercentage: Number(values.taxPct) || 0,
+        });
+
+        if (res.success && res.data) {
+          toast.success(`Quotation ${res.data.quotationNumber} generated successfully!`);
+          router.push(`/trips/${values.selectedTripId}/quotation`);
+        }
+      } catch (err: any) {
+        if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+          setIsReadOnly(true);
+          toast.error("Subscription expired. Read-only mode is active.");
+        } else {
+          toast.error(err?.message || "Failed to generate quotation.");
+        }
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
+
+  const getFieldError = (field: keyof typeof formik.values) => {
+    return formik.touched[field] && formik.errors[field] ? (formik.errors[field] as string) : null;
+  };
 
   // Load active trips
   React.useEffect(() => {
@@ -39,8 +97,8 @@ export default function NewQuotationPage() {
         const res = await tripClient.getTrips({ limit: 100 });
         if (res.success && res.data) {
           setTrips(res.data);
-          if (res.data.length > 0) {
-            setSelectedTripId(res.data[0].id);
+          if (res.data.length > 0 && !formik.values.selectedTripId) {
+            formik.setFieldValue("selectedTripId", res.data[0].id);
           }
         }
       } catch (err: any) {
@@ -53,37 +111,6 @@ export default function NewQuotationPage() {
     }
     loadTrips();
   }, []);
-
-  const handleGenerateQuotation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTripId) {
-      toast.error("Please select a trip.");
-      return;
-    }
-
-    try {
-      setGenerating(true);
-      const res = await quotationClient.generateTripQuotation(selectedTripId, {
-        markupPercentage: Number(markupPct) || 0,
-        discountPercentage: Number(discountPct) || 0,
-        taxPercentage: Number(taxPct) || 0,
-      });
-
-      if (res.success && res.data) {
-        toast.success(`Quotation ${res.data.quotationNumber} generated successfully!`);
-        router.push(`/trips/${selectedTripId}/quotation`);
-      }
-    } catch (err: any) {
-      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-        setIsReadOnly(true);
-        toast.error("Subscription expired. Read-only mode is active.");
-      } else {
-        toast.error(err?.message || "Failed to generate quotation.");
-      }
-    } finally {
-      setGenerating(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
@@ -100,7 +127,7 @@ export default function NewQuotationPage() {
         />
 
         <div className="max-w-2xl mx-auto w-full">
-          <form onSubmit={handleGenerateQuotation} className="space-y-6">
+          <form onSubmit={formik.handleSubmit} noValidate className="space-y-6">
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-5">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-2">
                 <Compass className="h-4 w-4 text-indigo-600" />
@@ -119,24 +146,45 @@ export default function NewQuotationPage() {
                       No active trips found. Please create a trip workspace first.
                     </div>
                   ) : (
-                    <Select value={selectedTripId} onValueChange={(val) => val && setSelectedTripId(val)}>
-                      <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
-                        <SelectValue placeholder="Choose a trip...">
-                          {(val: string | null) => {
-                            if (!val) return undefined;
-                            const t = trips.find((item) => item.id === val);
-                            return t ? `${t.tripNumber} — ${t.title} (${t.customer?.name || "Customer"})` : val;
-                          }}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-slate-200">
-                        {trips.map((t) => (
-                          <SelectItem key={t.id} value={t.id} className="text-xs">
-                            {t.tripNumber} — {t.title} ({t.customer?.name})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <>
+                      <Select
+                        value={formik.values.selectedTripId}
+                        onValueChange={(val) => {
+                          if (val) {
+                            formik.setFieldValue("selectedTripId", val);
+                            formik.setFieldTouched("selectedTripId", true);
+                          }
+                        }}
+                      >
+                        <SelectTrigger
+                          className={`h-9.5 text-xs bg-slate-50/50 border-slate-200 ${
+                            getFieldError("selectedTripId")
+                              ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20"
+                              : ""
+                          }`}
+                        >
+                          <SelectValue placeholder="Choose a trip...">
+                            {(val: string | null) => {
+                              if (!val) return undefined;
+                              const t = trips.find((item) => item.id === val);
+                              return t ? `${t.tripNumber} — ${t.title} (${t.customer?.name || "Customer"})` : val;
+                            }}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-slate-200">
+                          {trips.map((t) => (
+                            <SelectItem key={t.id} value={t.id} className="text-xs">
+                              {t.tripNumber} — {t.title} ({t.customer?.name})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {getFieldError("selectedTripId") && (
+                        <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                          {getFieldError("selectedTripId")}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -145,31 +193,64 @@ export default function NewQuotationPage() {
                     <label className="font-bold text-slate-700">Agency Markup (%)</label>
                     <Input
                       type="number"
-                      value={markupPct}
-                      onChange={(e) => setMarkupPct(e.target.value)}
+                      name="markupPct"
+                      value={formik.values.markupPct}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
                       placeholder="10"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold"
+                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold ${
+                        getFieldError("markupPct")
+                          ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20"
+                          : ""
+                      }`}
                     />
+                    {getFieldError("markupPct") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                        {getFieldError("markupPct")}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700">Discount (%)</label>
                     <Input
                       type="number"
-                      value={discountPct}
-                      onChange={(e) => setDiscountPct(e.target.value)}
+                      name="discountPct"
+                      value={formik.values.discountPct}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
                       placeholder="0"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold"
+                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold ${
+                        getFieldError("discountPct")
+                          ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20"
+                          : ""
+                      }`}
                     />
+                    {getFieldError("discountPct") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                        {getFieldError("discountPct")}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700">Tax / GST (%)</label>
                     <Input
                       type="number"
-                      value={taxPct}
-                      onChange={(e) => setTaxPct(e.target.value)}
+                      name="taxPct"
+                      value={formik.values.taxPct}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
                       placeholder="5"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold"
+                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold ${
+                        getFieldError("taxPct")
+                          ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20"
+                          : ""
+                      }`}
                     />
+                    {getFieldError("taxPct") && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                        {getFieldError("taxPct")}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -187,10 +268,10 @@ export default function NewQuotationPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={generating || isReadOnly || trips.length === 0}
+                disabled={formik.isSubmitting || isReadOnly || trips.length === 0}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-6 cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
               >
-                {generating ? (
+                {formik.isSubmitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Generating Snapshot...

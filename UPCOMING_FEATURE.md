@@ -19,12 +19,19 @@ finance, follow-ups, /reports, communications, /settings,  UI need to check prop
 
 **TODO**
 
+manage scroll in table
 Invoice pdf format and invoice page strucutre
+
 manage read only from frontend also
-remove usused pages
+
+remove usused code, imports and files
+remove all type script error
 check no static data anywhere
+
 quatation genarate
+
 compalate QA. 
+
 responsive 320 screen
 
 clean database
