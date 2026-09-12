@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { QuotationStatus } from "@prisma/client";
+import { QuotationStatus, TaxMode, GstTreatment } from "@prisma/client";
 
 /**
  * Zod schema for creating a new Quotation
@@ -19,6 +19,9 @@ export const createQuotationSchema = z.object({
   discountPercentage: z.number().min(0, "Discount % must be non-negative").max(100, "Discount % cannot exceed 100").default(0).optional(),
   discountAmount: z.number().min(0).default(0).optional(),
   taxPercentage: z.number().min(0, "Tax % must be non-negative").max(100, "Tax % cannot exceed 100").default(0).optional(),
+  taxRate: z.coerce.number().min(0, "Tax rate must be non-negative").max(100, "Tax rate cannot exceed 100").optional(),
+  taxMode: z.nativeEnum(TaxMode).optional(),
+  gstTreatment: z.nativeEnum(GstTreatment).optional(),
   taxAmount: z.number().min(0).default(0).optional(),
   finalAmount: z.number().min(0, "Final amount must be non-negative").default(0).optional(),
   customerMessage: z.string().trim().max(5000).optional().nullable(),
@@ -49,6 +52,9 @@ export const updateQuotationSchema = z
     discountPercentage: z.number().min(0).max(100).optional(),
     discountAmount: z.number().min(0).optional(),
     taxPercentage: z.number().min(0).max(100).optional(),
+    taxRate: z.coerce.number().min(0).max(100).optional(),
+    taxMode: z.nativeEnum(TaxMode).optional(),
+    gstTreatment: z.nativeEnum(GstTreatment).optional(),
     taxAmount: z.number().min(0).optional(),
     finalAmount: z.number().min(0).optional(),
     customerMessage: z.string().trim().max(5000).optional().nullable(),
@@ -91,6 +97,9 @@ export const generateTripQuotationSchema = z.object({
   markupPercentage: z.number().min(0).max(500).default(10).optional(),
   discountPercentage: z.number().min(0).max(100).default(0).optional(),
   taxPercentage: z.number().min(0).max(100).default(0).optional(),
+  taxRate: z.coerce.number().min(0).max(100).optional(),
+  taxMode: z.nativeEnum(TaxMode).optional(),
+  gstTreatment: z.nativeEnum(GstTreatment).optional(),
   proposalSubtitle: z.string().trim().optional(),
   customerMessage: z.string().trim().optional(),
   inclusionsIntro: z.string().trim().optional(),

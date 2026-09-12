@@ -16,19 +16,20 @@ Dashboard UI need to check properly.
 finance, follow-ups, /reports, communications, /settings,  UI need to check properly
 manage scroll in table
 Invoice pdf format and invoice page strucutre
+quatation genarate flow
 
 
 
 **TODO**
 
-quatation genarate
+Tax system impeliment
 manage read only from frontend also
+where i can show Announcements ?
+remove reset or refresh button in near dropdown
 
 remove usused code, imports and files
 remove all type script error
 check no static data anywhere
-where i can show Announcements ?
-remove reset or refresh button in near dropdown
 
 
 compalate QA. 

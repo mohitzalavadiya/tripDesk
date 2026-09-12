@@ -153,7 +153,11 @@ export const invoiceService = {
             },
           },
         },
-        agency: true,
+        agency: {
+          include: {
+            taxProfile: true,
+          },
+        },
         payments: {
           where: { archivedAt: null, status: PaymentStatus.COMPLETED },
         },
@@ -207,6 +211,14 @@ export const invoiceService = {
                   totalAmount: true,
                   paidAmount: true,
                   balanceAmount: true,
+                  taxableAmount: true,
+                  taxAmount: true,
+                  taxRate: true,
+                  taxMode: true,
+                  gstTreatment: true,
+                  cgstAmount: true,
+                  sgstAmount: true,
+                  igstAmount: true,
                   currency: true,
                   travelStartDate: true,
                   travelEndDate: true,
@@ -225,7 +237,7 @@ export const invoiceService = {
               invoiceNumber = await invoiceSequenceService.getNextInvoiceNumber(agencyId, tx);
             }
 
-            // Synchronize latest Booking financial state & payment state onto existing Invoice
+            // Synchronize latest Booking financial state, tax snapshot & payment state onto existing Invoice
             const updated = await tx.invoice.update({
               where: { id: existingActive.id },
               data: {
@@ -233,6 +245,14 @@ export const invoiceService = {
                 totalAmount: new Prisma.Decimal(totalAmount),
                 paidAmount: new Prisma.Decimal(netPaid),
                 balanceAmount: new Prisma.Decimal(balanceAmount),
+                taxableAmount: booking.taxableAmount !== null ? new Prisma.Decimal(booking.taxableAmount) : null,
+                taxAmount: booking.taxAmount !== null ? new Prisma.Decimal(booking.taxAmount) : null,
+                taxRate: booking.taxRate !== null ? new Prisma.Decimal(booking.taxRate) : null,
+                taxMode: booking.taxMode ?? null,
+                gstTreatment: booking.gstTreatment ?? null,
+                cgstAmount: booking.cgstAmount !== null ? new Prisma.Decimal(booking.cgstAmount) : null,
+                sgstAmount: booking.sgstAmount !== null ? new Prisma.Decimal(booking.sgstAmount) : null,
+                igstAmount: booking.igstAmount !== null ? new Prisma.Decimal(booking.igstAmount) : null,
                 status: invoiceStatus,
                 currency: booking.currency || "INR",
               },
@@ -247,6 +267,14 @@ export const invoiceService = {
                     totalAmount: true,
                     paidAmount: true,
                     balanceAmount: true,
+                    taxableAmount: true,
+                    taxAmount: true,
+                    taxRate: true,
+                    taxMode: true,
+                    gstTreatment: true,
+                    cgstAmount: true,
+                    sgstAmount: true,
+                    igstAmount: true,
                     currency: true,
                     travelStartDate: true,
                     travelEndDate: true,
@@ -301,6 +329,7 @@ export const invoiceService = {
             currency: booking.currency || "INR",
           };
 
+          const taxProfile = (booking.agency as any)?.taxProfile || null;
           const agencySnapshot = booking.agency
             ? {
                 id: booking.agency.id,
@@ -308,6 +337,23 @@ export const invoiceService = {
                 email: booking.agency.email,
                 phone: booking.agency.phone,
                 address: booking.agency.address,
+                logo: booking.agency.logo,
+                gstin: taxProfile?.isGstRegistered ? taxProfile.gstin : null,
+                legalName: taxProfile?.legalBusinessName || booking.agency.name || null,
+                registeredAddress: taxProfile?.registeredAddress || null,
+                state: taxProfile?.state || null,
+                stateCode: taxProfile?.stateCode || null,
+                isGstRegistered: Boolean(taxProfile?.isGstRegistered),
+                taxProfile: taxProfile
+                  ? {
+                      isGstRegistered: Boolean(taxProfile.isGstRegistered),
+                      gstin: taxProfile.gstin,
+                      legalName: taxProfile.legalBusinessName || booking.agency.name,
+                      registeredAddress: taxProfile.registeredAddress,
+                      state: taxProfile.state,
+                      stateCode: taxProfile.stateCode,
+                    }
+                  : null,
               }
             : null;
 
@@ -353,6 +399,14 @@ export const invoiceService = {
               discountType: null,
               discountValue: null,
               discountAmount: new Prisma.Decimal(discountAmount || 0),
+              taxableAmount: booking.taxableAmount !== null ? new Prisma.Decimal(booking.taxableAmount) : null,
+              taxAmount: booking.taxAmount !== null ? new Prisma.Decimal(booking.taxAmount) : null,
+              taxRate: booking.taxRate !== null ? new Prisma.Decimal(booking.taxRate) : null,
+              taxMode: booking.taxMode ?? null,
+              gstTreatment: booking.gstTreatment ?? null,
+              cgstAmount: booking.cgstAmount !== null ? new Prisma.Decimal(booking.cgstAmount) : null,
+              sgstAmount: booking.sgstAmount !== null ? new Prisma.Decimal(booking.sgstAmount) : null,
+              igstAmount: booking.igstAmount !== null ? new Prisma.Decimal(booking.igstAmount) : null,
               totalAmount: new Prisma.Decimal(totalAmount),
               paidAmount: new Prisma.Decimal(netPaid),
               balanceAmount: new Prisma.Decimal(balanceAmount),
@@ -384,6 +438,14 @@ export const invoiceService = {
                   totalAmount: true,
                   paidAmount: true,
                   balanceAmount: true,
+                  taxableAmount: true,
+                  taxAmount: true,
+                  taxRate: true,
+                  taxMode: true,
+                  gstTreatment: true,
+                  cgstAmount: true,
+                  sgstAmount: true,
+                  igstAmount: true,
                   notes: true,
                   customer: {
                     select: {
@@ -589,6 +651,14 @@ export const invoiceService = {
             totalAmount: true,
             paidAmount: true,
             balanceAmount: true,
+            taxableAmount: true,
+            taxAmount: true,
+            taxRate: true,
+            taxMode: true,
+            gstTreatment: true,
+            cgstAmount: true,
+            sgstAmount: true,
+            igstAmount: true,
             notes: true,
             customer: {
               select: {

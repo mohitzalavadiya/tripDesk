@@ -367,13 +367,38 @@ export const bookingService = {
       throw new Error("Customer not found or does not belong to this agency.");
     }
 
+    let quoteTax: {
+      taxableAmount: Prisma.Decimal | null;
+      taxAmount: Prisma.Decimal | null;
+      taxRate: Prisma.Decimal | null;
+      taxMode: any;
+      gstTreatment: any;
+      cgstAmount: Prisma.Decimal | null;
+      sgstAmount: Prisma.Decimal | null;
+      igstAmount: Prisma.Decimal | null;
+      packageOptionName?: string | null;
+    } | null = null;
+
     if (data.quotationId) {
       const quotation = await prisma.quotation.findFirst({
         where: { id: data.quotationId, agencyId, archivedAt: null },
+        include: { selectedPackageOption: true },
       });
       if (!quotation) {
         throw new Error("Quotation not found or does not belong to this agency.");
       }
+      const pkg = quotation.selectedPackageOption;
+      quoteTax = {
+        taxableAmount: (pkg?.taxableAmount ?? quotation.taxableAmount) !== null ? new Prisma.Decimal(pkg?.taxableAmount ?? quotation.taxableAmount!) : null,
+        taxAmount: (pkg?.taxAmount ?? quotation.taxAmount) !== null ? new Prisma.Decimal(pkg?.taxAmount ?? quotation.taxAmount!) : null,
+        taxRate: (pkg?.taxRate ?? quotation.taxRate) !== null ? new Prisma.Decimal(pkg?.taxRate ?? quotation.taxRate!) : null,
+        taxMode: pkg?.taxMode ?? quotation.taxMode ?? null,
+        gstTreatment: pkg?.gstTreatment ?? quotation.gstTreatment ?? null,
+        cgstAmount: (pkg?.cgstAmount ?? quotation.cgstAmount) !== null ? new Prisma.Decimal(pkg?.cgstAmount ?? quotation.cgstAmount!) : null,
+        sgstAmount: (pkg?.sgstAmount ?? quotation.sgstAmount) !== null ? new Prisma.Decimal(pkg?.sgstAmount ?? quotation.sgstAmount!) : null,
+        igstAmount: (pkg?.igstAmount ?? quotation.igstAmount) !== null ? new Prisma.Decimal(pkg?.igstAmount ?? quotation.igstAmount!) : null,
+        packageOptionName: pkg?.name || null,
+      };
     }
 
     const bookingNumber = await this.generateNextBookingNumber(agencyId);
@@ -395,6 +420,7 @@ export const bookingService = {
           tripId: data.tripId,
           customerId: data.customerId,
           quotationId: data.quotationId || null,
+          packageOptionName: quoteTax?.packageOptionName || null,
           bookingNumber,
           status: data.status || BookingStatus.CONFIRMED,
           paymentStatus,
@@ -405,6 +431,14 @@ export const bookingService = {
           totalAmount: new Prisma.Decimal(totalAmount),
           paidAmount: new Prisma.Decimal(paidAmount),
           balanceAmount: new Prisma.Decimal(balanceAmount),
+          taxableAmount: quoteTax?.taxableAmount ?? null,
+          taxAmount: quoteTax?.taxAmount ?? null,
+          taxRate: quoteTax?.taxRate ?? null,
+          taxMode: quoteTax?.taxMode ?? null,
+          gstTreatment: quoteTax?.gstTreatment ?? null,
+          cgstAmount: quoteTax?.cgstAmount ?? null,
+          sgstAmount: quoteTax?.sgstAmount ?? null,
+          igstAmount: quoteTax?.igstAmount ?? null,
           notes: data.notes,
           internalNotes: data.internalNotes,
         },
@@ -522,13 +556,24 @@ export const bookingService = {
     }
 
     const bookingNumber = await this.generateNextBookingNumber(agencyId);
-    const totalAmount = quotation.selectedPackageOption
-      ? Number(quotation.selectedPackageOption.finalAmount)
+    const selectedPkg = quotation.selectedPackageOption;
+    const totalAmount = selectedPkg
+      ? Number(selectedPkg.finalAmount)
       : Number(quotation.finalAmount);
-    const packageOptionName = quotation.selectedPackageOption?.name || null;
+    const packageOptionName = selectedPkg?.name || null;
+
+    // Resolve authoritative tax snapshot from selected package option or quotation
+    const taxableAmount = selectedPkg?.taxableAmount ?? quotation.taxableAmount ?? null;
+    const taxAmount = selectedPkg?.taxAmount ?? quotation.taxAmount ?? null;
+    const taxRate = selectedPkg?.taxRate ?? quotation.taxRate ?? null;
+    const taxMode = selectedPkg?.taxMode ?? quotation.taxMode ?? null;
+    const gstTreatment = selectedPkg?.gstTreatment ?? quotation.gstTreatment ?? null;
+    const cgstAmount = selectedPkg?.cgstAmount ?? quotation.cgstAmount ?? null;
+    const sgstAmount = selectedPkg?.sgstAmount ?? quotation.sgstAmount ?? null;
+    const igstAmount = selectedPkg?.igstAmount ?? quotation.igstAmount ?? null;
 
     const booking = await prisma.$transaction(async (tx) => {
-      // 1. Create Booking
+      // 1. Create Booking with full Tax V1 snapshot
       const b = await tx.booking.create({
         data: {
           agencyId,
@@ -546,6 +591,14 @@ export const bookingService = {
           totalAmount: new Prisma.Decimal(totalAmount),
           paidAmount: new Prisma.Decimal(0),
           balanceAmount: new Prisma.Decimal(totalAmount),
+          taxableAmount: taxableAmount !== null ? new Prisma.Decimal(taxableAmount) : null,
+          taxAmount: taxAmount !== null ? new Prisma.Decimal(taxAmount) : null,
+          taxRate: taxRate !== null ? new Prisma.Decimal(taxRate) : null,
+          taxMode,
+          gstTreatment,
+          cgstAmount: cgstAmount !== null ? new Prisma.Decimal(cgstAmount) : null,
+          sgstAmount: sgstAmount !== null ? new Prisma.Decimal(sgstAmount) : null,
+          igstAmount: igstAmount !== null ? new Prisma.Decimal(igstAmount) : null,
           notes:
             data?.notes ||
             (packageOptionName

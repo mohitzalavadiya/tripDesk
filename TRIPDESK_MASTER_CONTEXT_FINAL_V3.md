@@ -9096,9 +9096,468 @@ A controlled batch was executed to align all quotation generation defaults to `0
 
 ---
 
+# 133. TAX V1 — BATCH 1: DATABASE SCHEMA & ADDITIVE PRISMA MIGRATION
+
+## 133.1 Objective & Scope
+Establish the database persistence layer and rate presets catalog for the locked **TripDesk Tax V1 Architecture** in a 100% backward-compatible, additive, non-destructive manner.
+
+Batch 1 strictly covers schema definitions, Prisma migration, seed data initialization, and validation. No application-level tax calculation services, APIs, UI, or PDF changes were introduced in this batch.
+
+## 133.2 Schema Additions & Architecture
+
+### 1. New Enums
+- `TaxMode`: `EXCLUSIVE`, `INCLUSIVE`
+- `GstTreatment`: `INTRA_STATE`, `INTER_STATE`, `NON_GST_EXEMPT`
+
+### 2. New Models
+- **`AgencyTaxProfile` (`agency_tax_profiles`):**
+  - `id`: String (cuid)
+  - `agencyId`: String (unique foreign key to `agencies.id` with `onDelete: Cascade`)
+  - `isGstRegistered`: Boolean (`@default(false)`)
+  - `gstin`: String?
+  - `legalBusinessName`: String?
+  - `registeredAddress`: String?
+  - `state`: String?
+  - `stateCode`: String?
+  - `defaultTaxMode`: TaxMode (`@default(EXCLUSIVE)`)
+  - `defaultGstRate`: Decimal (`@default(0) @db.Decimal(5, 2)`)
+  - `defaultGstTreatment`: GstTreatment (`@default(INTRA_STATE)`)
+  - `createdAt`: DateTime (`@default(now())`)
+  - `updatedAt`: DateTime (`@updatedAt`)
+- **`TaxRate` (`tax_rates`):**
+  - `id`: String (cuid)
+  - `name`: String
+  - `rate`: Decimal (`@unique @db.Decimal(5, 2)`)
+  - `isDefault`: Boolean (`@default(false)`)
+  - `isActive`: Boolean (`@default(true)`)
+  - `displayOrder`: Int (`@default(0)`)
+  - `createdAt`: DateTime (`@default(now())`)
+  - `updatedAt`: DateTime (`@updatedAt`)
+
+### 3. Model Extensions (Additive Snapshots)
+- **`Agency`:** Added 1:1 relation `taxProfile AgencyTaxProfile?`.
+- **`Quotation`:** Added snapshot fields:
+  - `taxableAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `taxRate`: `Decimal? @default(0) @db.Decimal(5, 2)`
+  - `taxMode`: `TaxMode? @default(EXCLUSIVE)`
+  - `gstTreatment`: `GstTreatment? @default(INTRA_STATE)`
+  - `cgstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `sgstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `igstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+- **`QuotationPackageOption`:** Added snapshot fields:
+  - `taxableAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `taxRate`: `Decimal? @default(0) @db.Decimal(5, 2)`
+  - `taxMode`: `TaxMode? @default(EXCLUSIVE)`
+  - `gstTreatment`: `GstTreatment? @default(INTRA_STATE)`
+  - `cgstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `sgstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `igstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+- **`Booking`:** Added snapshot fields:
+  - `taxableAmount`: `Decimal? @db.Decimal(12, 2)`
+  - `taxAmount`: `Decimal? @db.Decimal(12, 2)`
+  - `taxRate`: `Decimal? @db.Decimal(5, 2)`
+  - `taxMode`: `TaxMode?`
+  - `gstTreatment`: `GstTreatment?`
+  - `cgstAmount`: `Decimal? @db.Decimal(12, 2)`
+  - `sgstAmount`: `Decimal? @db.Decimal(12, 2)`
+  - `igstAmount`: `Decimal? @db.Decimal(12, 2)`
+- **`Invoice`:** Added snapshot fields:
+  - `taxableAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `taxAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `taxRate`: `Decimal? @default(0) @db.Decimal(5, 2)`
+  - `taxMode`: `TaxMode? @default(EXCLUSIVE)`
+  - `gstTreatment`: `GstTreatment? @default(INTRA_STATE)`
+  - `cgstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `sgstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `igstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+
+## 133.3 Migration & Historical Safety
+- **Migration Name:** `20260912160000_add_tax_v1_schema`
+- **Additive & Non-Destructive:** 0 tables dropped, 0 columns dropped, 0 existing constraints removed.
+- **Historical Compatibility:** All existing records preserved with defaults/nullability. Historical quotation, booking, and invoice amounts remained 100% frozen and untouched.
+- **Scope Protection:** Zero customer GST fields added, zero item/service-level tax fields added, RateSheet costing architecture preserved.
+
+## 133.4 Seed & Catalog Initialization
+Updated `prisma/seed.ts` to idempotently seed the global commercial rate catalog presets:
+- `0%` (Rate: 0, DisplayOrder: 1, isDefault: true)
+- `5%` (Rate: 5, DisplayOrder: 2, isDefault: false)
+- `12%` (Rate: 12, DisplayOrder: 3, isDefault: false)
+- `18%` (Rate: 18, DisplayOrder: 4, isDefault: false)
+- `28%` (Rate: 28, DisplayOrder: 5, isDefault: false)
+
+## 133.5 Verification & Certification Results
+- **Prisma Validate:** `The schema at prisma\schema.prisma is valid 🚀`
+- **Prisma Migration Status:** `4 migrations found, Database schema is up to date!`
+- **Prisma Client Generation:** `@prisma/client v7.9.1 generated successfully`
+- **Prisma Seed:** `npx tsx prisma/seed.ts` executed with 0 errors (Seeded 5 tax rates)
+- **TypeScript Check (`npx tsc --noEmit`):** `0 errors (PASS)`
+- **Production Build (`npm run build`):** `Compiled successfully in 23.9s, static/dynamic route generation PASS`
+- **Status:** **VERIFIED & CLOSED**
+
+---
+
+# 134. TAX V1 — BATCH 2: DEDICATED TAX CALCULATION SERVICE
+
+## 134.1 Objective & Scope
+Create the pure, deterministic, Decimal-safe calculation service for the locked **TripDesk Tax V1 Architecture**.
+- **Service Path:** `src/lib/services/tax-service.ts`
+- **Unit Test Path:** `prisma/test-tax-service.ts`
+- **Scope Boundary:** Pure calculation layer only. Zero database access. No quotation/booking/invoice UI or service integration in this batch (reserved for Batches 3–7).
+
+## 134.2 Mathematical Formulas & Architecture
+
+### 1. Order of Commercial Operations
+$$\text{Supplier Cost} \longrightarrow \text{Markup} \longrightarrow \text{Selling Price} \longrightarrow \text{Discount} \longrightarrow \text{Taxable/Gross Base} \longrightarrow \text{ONE TAX RATE} \longrightarrow \text{Tax Amount} \longrightarrow \text{Final Customer Price}$$
+
+### 2. Tax Modes
+- **EXCLUSIVE Mode:**
+  $$\text{Taxable Amount} = \text{Selling Price} - \text{Discount Amount}$$
+  $$\text{Tax Amount} = \text{round}\left(\text{Taxable Amount} \times \frac{\text{Tax Rate}}{100}\right)$$
+  $$\text{Final Amount} = \text{Taxable Amount} + \text{Tax Amount}$$
+- **INCLUSIVE Mode:**
+  $$\text{Gross Amount} = \text{Selling Price} - \text{Discount Amount}$$
+  $$\text{Taxable Amount} = \text{round}\left(\frac{\text{Gross Amount}}{1 + \frac{\text{Tax Rate}}{100}}\right)$$
+  $$\text{Tax Amount} = \text{Gross Amount} - \text{Taxable Amount}$$
+  $$\text{Final Amount} = \text{Gross Amount}$$
+  *(Guarantees 100% exact mathematical reconciliation: $\text{Taxable Amount} + \text{Tax Amount} = \text{Gross Amount} = \text{Final Amount}$)*
+
+### 3. GST Treatments
+- **`INTRA_STATE`:**
+  $$\text{CGST} = \text{round}\left(\frac{\text{Tax Amount}}{2}\right)$$
+  $$\text{SGST} = \text{Tax Amount} - \text{CGST}$$
+  $$\text{IGST} = 0$$
+  *(Guarantees exact reconciliation: $\text{CGST} + \text{SGST} = \text{Total Tax Amount}$ even for odd paise amounts like ₹0.75 or ₹15.25)*
+- **`INTER_STATE`:**
+  $$\text{IGST} = \text{Tax Amount}, \quad \text{CGST} = 0, \quad \text{SGST} = 0$$
+- **`NON_GST_EXEMPT`:**
+  $$\text{Tax Amount} = 0, \quad \text{CGST} = 0, \quad \text{SGST} = 0, \quad \text{IGST} = 0, \quad \text{Final Amount} = \text{Taxable Amount}$$
+
+### 4. Zero Rate (0%)
+Returns zero tax for both exclusive and inclusive modes with zero division errors.
+
+## 134.3 Decimal Precision & Validation Policy
+- **Decimal-Safe:** All monetary amounts, rates, discounts, and components use `Prisma.Decimal` with 2-decimal precision (`ROUND_HALF_UP`).
+- **Strict Validation:** Rejects negative amounts, negative rates, negative discounts, discounts exceeding gross amount, invalid tax modes, invalid GST treatments, and NaN/infinite numeric inputs.
+
+## 134.4 Automated Unit Tests & Verification Results
+- **Automated Test Suite (`npx tsx prisma/test-tax-service.ts`):** **27 / 27 Tests PASSED (100%)**
+  - Exclusive Mode (Presets 0%, 5%, 18%, fractional amounts, fractional rates): **PASS**
+  - Inclusive Mode (Presets 0%, 5%, 18%, fractional gross amounts): **PASS**
+  - GST Treatments (INTRA_STATE, INTER_STATE, NON_GST_EXEMPT): **PASS**
+  - Discount-adjusted Calculations (Normal, Zero, 100% full discount): **PASS**
+  - Input Validation (Negative amounts, negative rates, discount > amount, invalid enums, NaN): **PASS**
+  - Section 20 Mandatory Inclusive Rounding (₹100 @ 18% -> Taxable ₹84.75 + Tax ₹15.25 = ₹100.00): **PASS**
+  - Section 21 Mandatory Odd-Paise GST Split (₹15 @ 5% -> Tax ₹0.75 -> CGST ₹0.38 + SGST ₹0.37 = ₹0.75): **PASS**
+  - Multi-value Random Reconciliations (25 exclusive + 25 inclusive variations): **PASS**
+- **TypeScript Check (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Status:** **VERIFIED & CLOSED**
+
+---
+
+# 135. TRIPDESK TAX V1: BATCH 3 — AGENCY TAX PROFILE API + TAX RATE API + MANAGEMENT UI
+
+## 135.1 Objective & Scope
+Implement the full Agency Tax Profile management architecture and Tax Rate catalog query layer for TripDesk Tax V1:
+- **API Routes:**
+  - `GET /api/agency/tax-profile`: Retrieve authenticated agency's tax configuration. Returns neutral defaults (`isGstRegistered: false, defaultGstRate: 0, defaultTaxMode: EXCLUSIVE, defaultGstTreatment: INTRA_STATE`) if unconfigured.
+  - `PUT /api/agency/tax-profile`: Upsert authenticated agency's commercial tax defaults with active catalog referential integrity validation.
+  - `GET /api/tax-rates`: Query DB-backed catalog of active selectable tax rates (0%, 5%, 12%, 18%, 28%) ordered by `displayOrder asc, rate asc`. Read-only catalog for tenants.
+- **Service Layer:** `src/lib/services/tax-profile-service.ts` (`TaxProfileService`)
+- **Validation:** `src/lib/validation/tax-schema.ts` (`updateAgencyTaxProfileSchema`)
+- **API Client:** `src/lib/api-client/tax-client.ts` (`taxClient`)
+- **Management UI:** `src/app/(dashboard)/settings/page.tsx` (Dedicated "Agency Tax & GST Profile" tab with GST registration toggle, business profile inputs, catalog rate selector, tax mode cards, and GST treatment cards).
+- **Scope Protection:** Zero quotation calculation integration in this batch (reserved for Batch 4). Zero schema mutations. No modifications to historical records.
+
+## 135.2 Security & Multi-Tenancy Architecture
+- **Server-Derived Context:** `agencyId` is strictly resolved via `requireAgencyOwnerContext()` from authenticated session. Client-supplied `agencyId` in URL or body is never accepted.
+- **Write Permission Guard:** `PUT /api/agency/tax-profile` enforces `requireWriteAccess()` (read-only for expired trials).
+- **Tenant Isolation:** Agency A cannot read or mutate Agency B's tax profile.
+- **TaxRate Catalog Immutability:** Tenants cannot create, modify, or delete global catalog tax rates.
+
+## 135.3 Core Locked Business Rules Implemented
+- **Defaults for New Quotations:** Agency Tax Profile provides commercial presets for future new quotations. It never modifies or recalculates historical quotations, quotation snapshots, bookings, or invoices.
+- **Referential Integrity:** Validates that configured `defaultGstRate` exists in the active `TaxRate` catalog (or 0% exempt rate).
+- **Unregistered Business Handling:** When `isGstRegistered = false`, `gstin` is sanitized to `null` while preserving commercial pricing rate/mode presets.
+
+## 135.4 Verification Results
+- **Batch 3 Integration Tests (`npx tsx prisma/test-tax-profile.ts`):** **18 / 18 Tests PASSED (100%)**
+  - Active tax rate catalog query (5 seeded rates: 0%, 5%, 12%, 18%, 28%): **PASS**
+  - Catalog sorting by displayOrder asc: **PASS**
+  - Non-existent profile neutral defaults: **PASS**
+  - Zod validation schema bounds & enum enforcement: **PASS**
+  - Referential integrity check (unregistered rate 33% rejected): **PASS**
+  - Idempotent upsert & persistence: **PASS**
+  - Unregistered business transition (gstin cleared to null): **PASS**
+  - Cross-tenant isolation (Agency A vs Agency B): **PASS**
+  - Historical data safety (zero mutations on quotations/bookings/invoices): **PASS**
+- **Batch 2 Regression Tests (`npx tsx prisma/test-tax-service.ts`):** **27 / 27 Tests PASSED (100%)**
+- **TypeScript Check (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Browser QA Verification:** **PASS (Desktop 1440×900, 1280×800, Tablet 768×1024, Mobile 390×844, 375×667)**
+- **Status:** **BATCH 3 — VERIFIED & CLOSED**
+
+# 136. TRIPDESK TAX V1: BATCH 4 — QUOTATION & PACKAGE TAX ENGINE INTEGRATION
+
+## 136.1 Objective & Scope
+Integrate the pure Decimal-safe `TaxService` (`src/lib/services/tax-service.ts`) into Quotation and Package Option creation, update, recalculation, default tier generation, and versioning workflows:
+- **Core Calculation Sequence:** `Supplier Cost -> Markup -> Selling Price -> Discount -> afterDiscount -> TaxService.calculate() -> Final Customer Price`.
+- **Service Integration Points in `src/lib/services/quotation-service.ts`:**
+  - `resolveQuotationTaxConfig`: Resolves and validates effective tax configuration (`taxRate`, `taxMode`, `gstTreatment`) against active `TaxRate` catalog records with fallback to `AgencyTaxProfile` defaults for new quotations.
+  - `createQuotation`: Evaluates commercial amounts, calls `taxService.calculate()`, and persists complete 9-field Tax V1 snapshot + syncs legacy `taxPercentage`.
+  - `updateQuotation`: Recalculates tax snapshot via `taxService.calculate()` on commercial changes, persisting refreshed snapshots.
+  - `generateQuotationFromTrip`: Evaluates aggregated trip costing, resolves agency tax defaults, calls `taxService.calculate()`, and saves full tax snapshot.
+  - `recalculateQuotationTotals`: Internal helper invoked on line-item mutations; recalculates via `taxService.calculate()` and updates tax snapshot.
+  - `createPackageOption`: Tiered package creation resolves package-level tax configuration (with parent quotation / agency profile fallback), invokes `taxService.calculate()`, and persists full snapshot.
+  - `updatePackageOption`: Recalculates package tax snapshot via `taxService.calculate()` and syncs parent quotation `finalAmount` if selected.
+  - `generateDefaultPackageTiers`: Generates Standard (3-Star), Deluxe (4-Star), and Luxury (5-Star) tiers inheriting parent quotation's effective tax configuration, calculated deterministically via `taxService.calculate()`.
+  - `createQuotationVersion` (Fork): Creates independent new quotation version, preserving exact historical tax snapshots without mutating previous versions.
+- **Validation Layer:** Updated `src/lib/validation/quotation-schema.ts` and `src/lib/validation/package-option-schema.ts` with optional `taxRate`, `taxMode`, `gstTreatment`.
+
+## 136.2 Locked Tax V1 Commercial Invariants Enforced
+- **Single Effective Tax Rate:** Exactly one effective tax rate per quotation/package commercial total. No item-level, hotel-level, vehicle-level, or activity-level taxes.
+- **Discount Before Tax:** Discount is deducted before tax calculation (`taxableAmount = sellingPrice - discount`).
+- **Exclusive vs Inclusive Modes:**
+  - `EXCLUSIVE`: `taxAmount = taxableAmount * (taxRate / 100)`, `finalAmount = taxableAmount + taxAmount`.
+  - `INCLUSIVE`: `taxableAmount = grossAmount / (1 + taxRate / 100)`, `taxAmount = grossAmount - taxableAmount`, `finalAmount = grossAmount`.
+- **GST Treatments:**
+  - `INTRA_STATE`: CGST = 50% of tax, SGST = 50% of tax (deterministic half-up odd-paise split reconciliation).
+  - `INTER_STATE`: IGST = 100% of tax, CGST = 0, SGST = 0.
+  - `NON_GST_EXEMPT`: Tax = 0, CGST = 0, SGST = 0, IGST = 0, `finalAmount = taxableAmount`.
+- **Catalog Validation:** Selected tax rates are verified against active DB-backed `TaxRate` catalog records. Non-catalog/inactive rates (e.g. 33%) and negative rates are strictly rejected.
+- **Tenant Isolation:** Agency Tax Profile defaults are loaded strictly per authenticated `agencyId`. If no profile exists, safe neutral defaults (`rate: 0%`, `EXCLUSIVE`, `INTRA_STATE`) apply.
+
+## 136.3 Historical Data Protection & Versioning
+- **Zero Schema Mutations & No Migrations:** Prisma schema is untouched; existing Tax V1 fields created in Batch 1 are fully utilized.
+- **Historical Quotation Freeze:** Changing Agency Tax Profile settings later never mutates or recalculates existing historical quotations or package options.
+- **Version Snapshot Independence:** Forking a quotation version creates an independent snapshot preserving the source version's financial state while allowing new edits.
+
+## 136.4 Verification Results
+- **Batch 4 Integration Test Suite (`prisma/test-quotation-tax.ts`):** **72 / 72 Tests PASSED (100%)**
+  - Exclusive Tax Mode (0%, 5%, 12%, 18%, 28%): **PASS**
+  - Inclusive Tax Mode (0%, 5%, 12%, 18%, 28%): **PASS**
+  - GST Treatments (INTRA_STATE, INTER_STATE, NON_GST_EXEMPT): **PASS**
+  - Discount before tax & odd-paise split reconciliation: **PASS**
+  - Package option tax calculation, default tiers generation & selection: **PASS**
+  - Agency Tax Profile defaults on new quotations: **PASS**
+  - Historical data safety (existing quotations untouched after profile updates): **PASS**
+  - Quotation versioning snapshot preservation: **PASS**
+  - Validation: Non-catalog rates (33%) and negative rates rejected: **PASS**
+- **Batch 2 Tax Service Regression (`prisma/test-tax-service.ts`):** **27 / 27 Tests PASSED (100%)**
+- **Batch 3 Tax Profile Regression (`prisma/test-tax-profile.ts`):** **18 / 18 Tests PASSED (100%)**
+- **TypeScript Check (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Browser Smoke QA:** **PASS (Quotations list, costing studio, proposal workspace, public proposal `/q/[token]` load and calculate cleanly)**
+---
+
+# 137. TRIPDESK TAX V1: BATCH 5 — QUOTATION STUDIO UI TAX CONTROLS
+
+## 137.1 Objective & Scope
+Expose the Tax V1 configuration controls and server-calculated commercial tax summary in the Quotation Studio UI (`src/app/(dashboard)/trips/[id]/quotation/page.tsx`):
+- **Dynamic Tax Rate Catalog:** Loaded via `taxClient.listTaxRates()` (`GET /api/tax-rates`), rendering only active preset rates (0%, 5%, 12%, 18%, 28%) without hardcoding rates in the UI.
+- **Tax Mode Selector:** Allows selecting `EXCLUSIVE` ("Tax Exclusive (+GST)") and `INCLUSIVE` ("Tax Inclusive (Included)").
+- **GST Treatment Selector:** Allows selecting `INTRA_STATE` ("Intra-State (CGST + SGST)"), `INTER_STATE` ("Inter-State (IGST)"), or `NON_GST_EXEMPT` ("Non-GST Exempt (0% Tax)"), accompanied by the required concise explanatory disclaimer note.
+- **Authoritative Server Tax Summary:** Real-time rendering of server-calculated values:
+  - Base Supplier Cost
+  - Agency Markup (% and amount)
+  - Selling Price (Commercial Base)
+  - Special Discount (% and amount)
+  - Taxable Amount (deducting discount before tax)
+  - GST Rate applied & Tax Mode indicator badge
+  - Itemized GST Breakdown based on GST Treatment:
+    - `INTRA_STATE`: CGST (50%) + SGST (50%)
+    - `INTER_STATE`: IGST (100%)
+    - `NON_GST_EXEMPT`: GST Exempt (₹0.00)
+  - Total GST / Tax Amount
+  - Final Customer Price (highlighting inclusive note if gross pricing includes GST)
+- **Package Option Controls & Modals:** Added dynamic Tax Rate selector, Tax Mode selector, and GST Treatment selector into the Package Option add/edit modal (`pkgTaxRate`, `pkgTaxMode`, `pkgGstTreatment`), inheriting active quotation defaults. Package cards in Tab 2 display tax rate badges and tax breakdowns.
+- **Zero Client-Side Math:** All calculations remain 100% owned and calculated by the backend via `taxService.calculate()`. React only selects, submits, and renders server responses.
+- **API Client Layer:** Exported `taxClient` from `src/lib/api-client/index.ts`.
+
+## 137.2 Key Architectural Decisions & Invariants
+- **No Client Tax Math:** Zero duplication of tax arithmetic in React; server remains the sole calculation engine.
+- **No Hardcoded Tax Rates:** Rates loaded dynamically from the active DB-backed `TaxRate` catalog.
+- **Agency Tax Profile Safety:** Profile defaults apply to NEW quotations via Batch 4 backend integration; existing quotations retain their effective configuration without being overwritten.
+- **Unsaved Changes & Save Flow:** Changes to tax configuration persist using existing debounced/blur and action flows (`handleUpdatePricingRules`, `handleSavePackage`), with instant server reconciliation.
+- **Tenant Isolation & Security:** Agency Owner authorization and agency ownership verified across all quotation and package endpoints.
+
+## 137.3 Verification & Test Results
+- **Batch 5 UI Integration Test Suite (`prisma/test-quotation-ui-tax.ts`):** **54 / 54 Tests PASSED (100%)**
+  - Active tax rate catalog verification & filtering: **PASS**
+  - Agency Tax Profile defaults on new quotations: **PASS**
+  - UI Tax Rate & Mode update persistence & server recalculation: **PASS**
+  - GST Treatment breakdown (INTRA_STATE, INTER_STATE, NON_GST_EXEMPT): **PASS**
+  - Discount-before-tax ordering preserved: **PASS**
+  - Package option tax controls, calculation & sync with quotation: **PASS**
+  - Versioning independence (v2 edit does not mutate v1): **PASS**
+- **Batch 4 Quotation Tax Regression (`prisma/test-quotation-tax.ts`):** **72 / 72 Tests PASSED (100%)**
+- **Batch 3 Tax Profile Regression (`prisma/test-tax-profile.ts`):** **18 / 18 Tests PASSED (100%)**
+- **Batch 2 Tax Service Regression (`prisma/test-tax-service.ts`):** **27 / 27 Tests PASSED (100%)**
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Browser QA Testing across Viewports:**
+  - `1440 × 900` (Desktop): **PASS (Clean layout, clear field labels, zero overflow)**
+  - `390 × 844` (Mobile): **PASS (Clean responsive stacking, no horizontal scrolling, all controls accessible)**
+  - Public Proposal Smoke Test (`/q/[token]`): **PASS (Loads smoothly, zero console errors)**
+  - Console Log Inspection: **0 errors / warnings**
+- **Status:** **BATCH 5 — VERIFIED & CLOSED**
+
+---
+
+# 138. TRIPDESK TAX V1: BATCH 6 — PUBLIC PROPOSAL & QUOTATION PDF TAX PRESENTATION
+
+## 138.1 Objective & Scope
+Implement customer-facing tax presentation across the public web proposal (`/q/[shareToken]`) and generated customer Quotation PDF (`/api/quotations/[id]/pdf` and `/api/quotations/public/[token]/pdf` via `quotationPdfService`):
+- **Public Proposal Page (`/q/[shareToken]`):**
+  - Displays customer-safe pricing and tax breakdown (`Price & Tax Breakdown` summary card) reflecting server-persisted tax snapshot fields.
+  - Shows dynamic tax notes on package option cards (`includes X% GST` for INCLUSIVE, `+ X% GST` for EXCLUSIVE, or `0% GST (Exempt)`).
+  - Displays exact GST breakdown: CGST + SGST (Intra-State), IGST (Inter-State), or Non-GST Exempt notice.
+  - Deducts discount before tax; displays clear Taxable Amount, applied GST, and Total Investment.
+  - Dynamically recalculates customer summary when traveler switches between tiered package options.
+- **Quotation PDF Generation (`src/lib/services/quotation-pdf-service.ts`):**
+  - Section 4 (Package Options): Updated option pricing cards with clear tax notes (`+ X% GST` vs `includes X% GST`).
+  - Section 11 (Price & Tax Breakdown): Implemented structured financial table showing Base Price / Taxable Amount, Discount, Itemized GST (CGST/SGST, IGST, or Non-GST Exempt note), and Total Investment banner.
+  - Zero browser/PDF-client tax arithmetic; consumes server-persisted tax snapshot fields directly from `QuotationPdfData`.
+- **Public API & DTO Security (`src/lib/services/quotation-service.ts` & `src/lib/api-client/quotation-client.ts`):**
+  - Safely exposed customer-safe tax snapshot fields on public quotation payload and package options (`taxableAmount`, `taxRate`, `taxMode`, `gstTreatment`, `cgstAmount`, `sgstAmount`, `igstAmount`, `taxAmount`, `discountAmount`, `finalAmount`).
+  - Strict confidentiality: Zero leakage of internal secrets (`supplierCost`, `markupPercentage`, `markupAmount`, `internalNotes` remain 100% redacted).
+- **Scope Protection:** Zero schema mutations or migrations. No changes to Booking or Invoice tax logic (reserved for Batch 7).
+
+## 138.2 Key Architectural Decisions & Invariants Enforced
+- **Zero Client-Side Math:** Browser and PDF engines perform zero tax calculations; all numbers rendered are server-persisted Decimal snapshots.
+- **Strict Data Redaction:** Public DTO strictly omits markup, supplier cost, internal subtotals, and private agency notes across parent quotations and package tiers.
+- **Responsive Layout:** Public proposal (`/q/[shareToken]`) renders seamlessly across viewports from 1440×900 desktop down to 320×568 mobile with zero horizontal overflow or overlapping text.
+- **Single Rate Invariant:** Quotations present a unified commercial tax summary, adhering to the Single Effective Tax Rate policy.
+- **Historical Immutability:** Updating Agency Tax Profile defaults has zero effect on already-generated quotations or PDFs.
+
+## 138.3 Verification & Test Results
+- **Batch 6 Public Proposal & PDF Test Suite (`prisma/test-public-proposal-pdf-tax.ts`):** **54 / 54 Tests PASSED (100%)**
+  - Public proposal DTO & strict secret redaction (markup, supplier cost, internal notes): **PASS**
+  - Exclusive Tax Mode & Intra-State CGST/SGST breakdown: **PASS**
+  - Inclusive Tax Mode & Inter-State IGST breakdown: **PASS**
+  - Non-GST Exempt public presentation: **PASS**
+  - Tiered package options public presentation, tax notes & secret redaction: **PASS**
+  - Historical data safety & token security (invalid/archived token protection): **PASS**
+  - Quotation PDF generation buffer verification across Exclusive, Inclusive, and Tiered packages: **PASS**
+- **Cumulative Regression Test Suites:**
+  - Batch 2 Tax Service (`prisma/test-tax-service.ts`): **27 / 27 Tests PASSED (100%)**
+  - Batch 3 Tax Profile (`prisma/test-tax-profile.ts`): **18 / 18 Tests PASSED (100%)**
+  - Batch 4 Quotation Tax (`prisma/test-quotation-tax.ts`): **72 / 72 Tests PASSED (100%)**
+  - Batch 5 Quotation Studio UI (`prisma/test-quotation-ui-tax.ts`): **54 / 54 Tests PASSED (100%)**
+  - **Total Tax V1 Automated Test Coverage:** **225 / 225 Tests PASSED (100%)**
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Next.js Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Status:** **BATCH 6 — VERIFIED & CLOSED**
+
+---
+
+# 139. TRIPDESK TAX V1: BATCH 7 — BOOKING & INVOICE TAX SNAPSHOTS + GST INVOICE PDF
+
+## 139.1 Objective & Scope
+Implement server-authoritative snapshot persistence for commercial tax across the entire Booking and Invoice lifecycle, along with full customer-facing GST Invoice presentation and high-resolution PDF generation:
+- **Booking Tax Snapshot (`src/lib/services/booking-service.ts`):**
+  - Updated `convertQuotationToBooking` and `createBooking` to snapshot all 8 Tax V1 fields from the accepted quotation or selected package option (`taxableAmount`, `taxAmount`, `taxRate`, `taxMode`, `gstTreatment`, `cgstAmount`, `sgstAmount`, `igstAmount`).
+  - Strict immutability: Once created, changes to the Agency Tax Profile, global TaxRate catalog, or subsequent quotation revisions do NOT alter the Booking's historical commercial tax snapshot.
+- **Invoice Tax Snapshot & Synchronization (`src/lib/services/invoice-service.ts`):**
+  - Updated `getOrCreateInvoiceForBooking` to derive its tax snapshot directly from the Booking's persisted commercial state.
+  - Decision #18 Invariant strictly preserved: One Booking = One Persistent Invoice Number (`INV-YYYY-XXXXX` or sequential `INV-XXXX`). Subsequent generations/views synchronize latest booking amounts and tax snapshot without altering the invoice number or creating replacement invoices.
+  - Added Agency Legal Tax Identity (`isGstRegistered`, `gstin`, `legalName`, `stateCode`, `registeredAddress`) into `agencySnapshot`.
+  - Payment linkage preserved: Completed payments link to the invoice, updating `paidAmount`, `balanceAmount`, and invoice `status` (`ISSUED`, `PARTIALLY_PAID`, `PAID`) without corrupting tax snapshot records.
+  - Cancellation behavior: Cancelling a booking transitions the linked invoice to `CANCELLED` while preserving the historical invoice number and tax snapshot.
+- **GST Invoice PDF Generation (`src/lib/services/invoice-pdf-service.ts`):**
+  - Header: Renders agency legal business name, GSTIN, and State Code when the agency is GST registered. Does NOT fabricate fake GSTINs.
+  - Financial Summary: Renders structured Tax V1 breakdown: Base / Taxable Amount, Discount, itemized GST breakdown (CGST + SGST for Intra-State, IGST for Inter-State, or Non-GST Exempt note), tax mode indicators (`GST added` for EXCLUSIVE vs `GST included` for INCLUSIVE), total contract amount, total received, and balance due.
+  - Zero browser/PDF-client tax math; strictly consumes server-persisted Decimal fields.
+  - Redaction: Zero leakage of supplier costs, markup, margins, or internal notes. Zero customer GSTIN / traveler GST (strictly out of scope).
+- **UI Integrations:**
+  - Booking Detail (`src/app/(dashboard)/bookings/[id]/page.tsx`): Commercial Financial Ledger card displays the Tax V1 snapshot summary (Taxable Base, CGST/SGST/IGST breakdown, GST mode badge).
+  - Invoice Detail (`src/app/(dashboard)/invoices/[id]/page.tsx`): Financial summary card displays full Tax V1 breakdown and payment progress.
+
+## 139.2 Key Architectural Invariants Enforced
+- **Snapshot Hierarchy:** `Quotation (or selected package) -> Booking -> Invoice -> Invoice PDF`.
+- **Decision #18 Persistence:** Invoice numbers remain persistent and immutable. Invoice document reflects the latest allowed Booking commercial state idempotently.
+- **Zero Client-Side Math:** All tax math is performed by `TaxService` on the server and persisted as Prisma Decimals. UI and PDF only format the stored values.
+- **Strict Data Redaction:** Supplier cost, markup percentages, internal margins, and private notes are absent from all customer-facing DTOs and PDFs.
+- **Tenant Isolation:** Multi-tenant security verified; cross-tenant booking or invoice access is strictly blocked.
+
+## 139.3 Verification & Test Results
+- **Batch 7 Test Suite (`prisma/test-booking-invoice-pdf-tax.ts`):** **87 / 87 Tests PASSED (100%)**
+  - Quotation to Booking Tax Snapshot (Exclusive Intra-State): **PASS**
+  - Immutability of Booking snapshot upon Agency Profile changes: **PASS**
+  - Invoice creation & tax snapshot persistence: **PASS**
+  - Agency tax profile in agency snapshot (GSTIN, legal name, state code): **PASS**
+  - Invoice idempotency & persistent numbering (Decision #18): **PASS**
+  - Payment integration & financial balance safety: **PASS**
+  - Inclusive & Inter-State tax snapshots: **PASS**
+  - Non-GST Exempt snapshot: **PASS**
+  - Financial reconciliation & mathematical invariants: **PASS**
+  - Booking cancellation & invoice status synchronization: **PASS**
+  - Invoice PDF buffer generation across Exclusive, Inclusive, and Exempt: **PASS**
+  - PDF confidentiality redaction (supplierCost, markup, internalNotes absent): **PASS**
+  - Tenant isolation & cross-tenant access blocking: **PASS**
+- **Cumulative Regression Test Suites:**
+  - Batch 2 Tax Service (`prisma/test-tax-service.ts`): **27 / 27 Tests PASSED (100%)**
+  - Batch 3 Tax Profile (`prisma/test-tax-profile.ts`): **18 / 18 Tests PASSED (100%)**
+  - Batch 4 Quotation Tax (`prisma/test-quotation-tax.ts`): **72 / 72 Tests PASSED (100%)**
+  - Batch 5 Quotation Studio UI (`prisma/test-quotation-ui-tax.ts`): **54 / 54 Tests PASSED (100%)**
+  - Batch 6 Public Proposal & PDF (`prisma/test-public-proposal-pdf-tax.ts`): **54 / 54 Tests PASSED (100%)**
+  - Phase 11 Booking Operations (`prisma/test-phase11-booking.ts`): **33 / 33 Tests PASSED (100%)**
+  - Phase 12 Finance & Payments (`prisma/test-phase12-finance.ts`): **74 / 74 Tests PASSED (100%)**
+  - **Total Tax V1 + Core Financial Test Coverage:** **345+ Tests PASSED (100%)**
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Next.js Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Status:** **BATCH 7 — VERIFIED & CLOSED**
+
+---
+
+# 140. TRIPDESK TAX V1: BATCH 8 — FINAL REGRESSION MATRIX, END-TO-END QA & TAX V1 CLOSURE
+
+## 140.1 Objective & Scope
+Perform comprehensive final regression verification, end-to-end commercial lifecycle QA, and formal closure of the TripDesk Tax V1 feature set across the entire SaaS application:
+- Full lifecycle validation: `Agency Tax Profile -> Tax Rate Catalog -> Trip Costing -> Quotation -> Package Option -> Quotation Version -> Public Proposal -> Customer Acceptance -> Booking Tax Snapshot -> Payment -> Invoice Tax Snapshot -> GST Invoice PDF`.
+- Verified strict preservation of the One Booking = One Persistent Invoice Number invariant (Decision #18) and historical immutability across all snapshots.
+- Confirmed zero client-side floating-point arithmetic (100% server-authoritative calculations via `TaxService` and Prisma Decimals).
+- Confirmed zero data leakage (supplier cost, markup percentage/amount, profit, margin, and internal notes strictly redacted from all public DTOs and customer PDFs).
+- Confirmed zero schema mutations, zero database resets, and zero mass data backfills.
+
+## 140.2 Complete Final Test & Regression Matrix
+All 9 automated test suites executed with 100% pass rate:
+1. **Tax Calculation Service (`prisma/test-tax-service.ts`):** **27 / 27 PASSED (100%)**
+   - Single effective rate, Exclusive & Inclusive mode math, Intra-State (CGST/SGST), Inter-State (IGST), Non-GST Exempt, 0% rate, discount-before-tax, odd-paise Decimal half-up rounding.
+2. **Agency Tax Profile (`prisma/test-tax-profile.ts`):** **18 / 18 PASSED (100%)**
+   - Active rate catalog, profile defaults, owner-only authorization, tenant isolation, historical data safety.
+3. **Quotation Tax Engine (`prisma/test-quotation-tax.ts`):** **72 / 72 PASSED (100%)**
+   - Quotation-level tax snapshot persistence, package options tax inheritance, quotation versioning snapshot preservation, rate validation.
+4. **Quotation Studio UI Integration (`prisma/test-quotation-ui-tax.ts`):** **54 / 54 PASSED (100%)**
+   - Reactive tax controls, dynamic tax recalculations, package option tax overrides, selected package synchronization, versioning isolation.
+5. **Public Proposal & Quotation PDF (`prisma/test-public-proposal-pdf-tax.ts`):** **54 / 54 PASSED (100%)**
+   - Public proposal customer-safe DTO, internal secret redaction, token scoping, tiered package tax notes, high-resolution PDF buffer rendering.
+6. **Booking & Invoice Snapshots + PDF (`prisma/test-booking-invoice-pdf-tax.ts`):** **87 / 87 PASSED (100%)**
+   - Quotation to Booking tax snapshot, Booking to Invoice tax snapshot, Decision #18 persistent numbering & idempotency, payment preservation, cancellation synchronization, GST Invoice PDF generation, cross-tenant IDOR blocking.
+7. **Core Booking Operations (`prisma/test-phase11-booking.ts`):** **33 / 33 PASSED (100%)**
+   - Booking state machine, operational asset linking, readiness engine, controlled cancellation, multi-tenant isolation.
+8. **Core Finance & Payments (`prisma/test-phase12-finance.ts`):** **74 / 74 PASSED (100%)**
+   - Payment schedule, waterfall allocation, refunds, supplier payables/disbursements, server-authoritative ledger profitability, financial immutability locks.
+9. **Full Tax V1 E2E Closure Suite (`prisma/test-tax-v1-e2e-closure.ts`):** **93 / 93 PASSED (100%)**
+   - End-to-end commercial lifecycle verification across Exclusive/Inclusive, Intra/Inter/Exempt treatments, multi-package acceptance, invoice synchronization, payment recording, booking cancellation, and tenant security.
+
+**Total Automated Assertions Verified:** **512 / 512 PASSED (100%)**
+
+## 140.3 Platform Certification
+- **TypeScript (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Next.js Production Build (`npm run build`):** **Exit code 0 (PASS, Turbopack compiled successfully)**
+- **Browser Responsive QA:** Verified across 1440×900, 1280×800, 1024×768, 768×1024, 390×844, 375×667, 320×568 viewports with 0 horizontal overflow and 0 console errors.
+- **PDF Visual QA:** Verified clean layouts for 0%, 5%, 12%, 18%, 28%, Exclusive, Inclusive, Intra-State, Inter-State, Exempt, and paid/partially paid invoices.
+- **Database Safety:** Zero schema migrations in Batch 8, zero DB resets, zero mass updates.
+- **Scope Status:** Tax V1 is complete, fully verified, and closed. Out-of-scope items (Customer GSTIN, item-level GST, HSN/SAC, e-Invoice, accounting integrations) deferred to future phases.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+
 
 
 

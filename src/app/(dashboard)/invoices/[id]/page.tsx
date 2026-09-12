@@ -54,6 +54,14 @@ interface InvoiceDetail {
   discountType: "FIXED" | "PERCENTAGE" | null;
   discountValue: number | null;
   discountAmount: number;
+  taxableAmount?: number | string | null;
+  taxAmount?: number | string | null;
+  taxRate?: number | string | null;
+  taxMode?: "EXCLUSIVE" | "INCLUSIVE" | null;
+  gstTreatment?: "INTRA_STATE" | "INTER_STATE" | "NON_GST_EXEMPT" | null;
+  cgstAmount?: number | string | null;
+  sgstAmount?: number | string | null;
+  igstAmount?: number | string | null;
   totalAmount: number;
   paidAmount: number;
   balanceAmount: number;
@@ -607,21 +615,76 @@ export default function InvoiceDetailPage() {
           {/* FINANCIAL SUMMARY TOTALS */}
           {/* ══════════════════════════════════════════════════════════════ */}
           <div className="flex flex-col sm:flex-row sm:justify-end">
-            <div className="w-full sm:w-80 bg-slate-50/90 rounded-2xl border border-slate-200/80 p-5 space-y-3 font-mono text-xs shadow-2xs">
+            <div className="w-full sm:w-88 bg-slate-50/90 rounded-2xl border border-slate-200/80 p-5 space-y-2.5 font-mono text-xs shadow-2xs">
+              {/* Taxable Amount */}
               <div className="flex justify-between text-slate-600">
-                <span>Subtotal:</span>
-                <span className="font-semibold text-slate-900">{formatINR(subtotal)}</span>
+                <span>Taxable Base:</span>
+                <span className="font-semibold text-slate-900">
+                  {formatINR(invoice.taxableAmount !== null && invoice.taxableAmount !== undefined ? Number(invoice.taxableAmount) : subtotal)}
+                </span>
               </div>
 
               {discountAmount > 0 && (
                 <div className="flex justify-between text-emerald-700">
-                  <span>Discount:</span>
+                  <span>Special Discount:</span>
                   <span className="font-semibold">- {formatINR(discountAmount)}</span>
                 </div>
               )}
 
+              {/* GST Breakdown */}
+              {(() => {
+                const taxRate = Number(invoice.taxRate ?? (invoice.booking as any)?.taxRate ?? 0);
+                const taxMode = invoice.taxMode || (invoice.booking as any)?.taxMode || "EXCLUSIVE";
+                const gstTreatment = invoice.gstTreatment || (invoice.booking as any)?.gstTreatment || "INTRA_STATE";
+                const cgst = Number(invoice.cgstAmount ?? (invoice.booking as any)?.cgstAmount ?? 0);
+                const sgst = Number(invoice.sgstAmount ?? (invoice.booking as any)?.sgstAmount ?? 0);
+                const igst = Number(invoice.igstAmount ?? (invoice.booking as any)?.igstAmount ?? 0);
+
+                if (gstTreatment === "NON_GST_EXEMPT" || taxRate === 0) {
+                  return (
+                    <div className="flex justify-between text-slate-500 text-[11px] pt-1 border-t border-slate-200/60">
+                      <span>GST (0% Exempt):</span>
+                      <span>₹0.00</span>
+                    </div>
+                  );
+                }
+
+                if (gstTreatment === "INTRA_STATE") {
+                  const halfRate = taxRate / 2;
+                  return (
+                    <div className="pt-1 border-t border-slate-200/60 space-y-1.5 text-slate-700">
+                      <div className="flex justify-between">
+                        <span>CGST ({halfRate}%){taxMode === "INCLUSIVE" ? " (Incl.)" : ""}:</span>
+                        <span className="font-semibold">{formatINR(cgst)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>SGST ({halfRate}%){taxMode === "INCLUSIVE" ? " (Incl.)" : ""}:</span>
+                        <span className="font-semibold">{formatINR(sgst)}</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (gstTreatment === "INTER_STATE") {
+                  return (
+                    <div className="flex justify-between text-slate-700 pt-1 border-t border-slate-200/60">
+                      <span>IGST ({taxRate}%){taxMode === "INCLUSIVE" ? " (Incl.)" : ""}:</span>
+                      <span className="font-semibold">{formatINR(igst)}</span>
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
+
+              {invoice.taxMode === "INCLUSIVE" && Number(invoice.taxRate ?? 0) > 0 && (
+                <p className="text-[10px] text-indigo-600 font-sans italic text-right pt-0.5">
+                  * Customer price includes {Number(invoice.taxRate)}% GST
+                </p>
+              )}
+
               <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-200">
-                <span>Total Amount:</span>
+                <span>Invoice Total:</span>
                 <span className="text-base font-black">{formatINR(liveTotal)}</span>
               </div>
 

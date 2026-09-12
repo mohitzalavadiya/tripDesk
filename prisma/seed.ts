@@ -47,6 +47,36 @@ async function main() {
   });
 
   console.log(`✅ Seeded plans: ${starterPlan.name} (₹${starterPlan.price}) & ${proPlan.name} (₹${proPlan.price})`);
+
+  // 2. Seed Tax Rates Catalog (Tax V1 Presets)
+  const taxRates = [
+    { name: "0%", rate: 0, displayOrder: 1, isDefault: true },
+    { name: "5%", rate: 5, displayOrder: 2, isDefault: false },
+    { name: "12%", rate: 12, displayOrder: 3, isDefault: false },
+    { name: "18%", rate: 18, displayOrder: 4, isDefault: false },
+    { name: "28%", rate: 28, displayOrder: 5, isDefault: false },
+  ];
+
+  for (const tr of taxRates) {
+    await prisma.taxRate.upsert({
+      where: { rate: tr.rate },
+      update: {
+        name: tr.name,
+        displayOrder: tr.displayOrder,
+        isDefault: tr.isDefault,
+        isActive: true,
+      },
+      create: {
+        name: tr.name,
+        rate: tr.rate,
+        displayOrder: tr.displayOrder,
+        isDefault: tr.isDefault,
+        isActive: true,
+      },
+    });
+  }
+  console.log(`✅ Seeded Tax Rate catalog: 0%, 5%, 12%, 18%, 28%`);
+
   console.log("🌱 Seeding completed successfully.");
 }
 

@@ -75,6 +75,8 @@ import {
   quotationClient,
   QuotationWithRelations,
   TripCostingResult,
+  taxClient,
+  TaxRateItem,
 } from "@/lib/api-client";
 import {
   QuotationStatus,
@@ -83,6 +85,8 @@ import {
   QuotationProposalItem,
   QuotationPaymentMilestone,
   QuotationPackageOption,
+  TaxMode,
+  GstTreatment,
 } from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
@@ -106,6 +110,11 @@ export default function TripQuotationEditorPage() {
   const [forkingVersion, setForkingVersion] = React.useState(false);
   const [updatingPricing, setUpdatingPricing] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<ActiveTabType>("pricing");
+
+  // Tax Rate Catalog states
+  const [taxRates, setTaxRates] = React.useState<TaxRateItem[]>([]);
+  const [taxRatesLoading, setTaxRatesLoading] = React.useState(false);
+  const [taxRatesError, setTaxRatesError] = React.useState<string | null>(null);
 
   // Confirm Dialog state
   const [confirmAction, setConfirmAction] = React.useState<{
@@ -142,7 +151,9 @@ export default function TripQuotationEditorPage() {
   const [pkgSubtotal, setPkgSubtotal] = React.useState("");
   const [pkgMarkupPct, setPkgMarkupPct] = React.useState("10");
   const [pkgDiscountPct, setPkgDiscountPct] = React.useState("0");
-  const [pkgTaxPct, setPkgTaxPct] = React.useState("5");
+  const [pkgTaxRate, setPkgTaxRate] = React.useState("5");
+  const [pkgTaxMode, setPkgTaxMode] = React.useState<TaxMode>(TaxMode.EXCLUSIVE);
+  const [pkgGstTreatment, setPkgGstTreatment] = React.useState<GstTreatment>(GstTreatment.INTRA_STATE);
   const [pkgFinalAmount, setPkgFinalAmount] = React.useState("");
   const [pkgHotelNotes, setPkgHotelNotes] = React.useState("");
   const [pkgVehicleNotes, setPkgVehicleNotes] = React.useState("");
@@ -205,9 +216,26 @@ export default function TripQuotationEditorPage() {
     }
   }, [tripId, activeQuoteId]);
 
+  // Load active tax rates catalog from DB
+  const loadTaxRates = React.useCallback(async () => {
+    try {
+      setTaxRatesLoading(true);
+      setTaxRatesError(null);
+      const rates = await taxClient.listTaxRates();
+      setTaxRates(rates.filter((r) => r.isActive));
+    } catch (err: any) {
+      setTaxRatesError(err?.message || "Failed to load tax rate catalog.");
+    } finally {
+      setTaxRatesLoading(false);
+    }
+  }, []);
+
   React.useEffect(() => {
-    if (tripId) fetchTripQuotationData();
-  }, [tripId, fetchTripQuotationData]);
+    if (tripId) {
+      fetchTripQuotationData();
+      loadTaxRates();
+    }
+  }, [tripId, fetchTripQuotationData, loadTaxRates]);
 
   const activeQuote = quotations.find((q) => q.id === activeQuoteId) || quotations[0] || null;
 
@@ -239,7 +267,10 @@ export default function TripQuotationEditorPage() {
       const res = await quotationClient.generateTripQuotation(tripId, {
         markupPercentage: activeQuote ? Number(activeQuote.markupPercentage) : 10,
         discountPercentage: activeQuote ? Number(activeQuote.discountPercentage) : 0,
-        taxPercentage: activeQuote ? Number(activeQuote.taxPercentage) : 0,
+        taxPercentage: activeQuote ? Number(activeQuote.taxRate ?? activeQuote.taxPercentage ?? 0) : 0,
+        taxRate: activeQuote ? Number(activeQuote.taxRate ?? activeQuote.taxPercentage ?? 0) : 0,
+        taxMode: activeQuote?.taxMode || TaxMode.EXCLUSIVE,
+        gstTreatment: activeQuote?.gstTreatment || GstTreatment.INTRA_STATE,
         autoPopulateInclusions: true,
         generatePaymentSchedule: true,
       });
@@ -288,22 +319,25 @@ export default function TripQuotationEditorPage() {
     }
   };
 
-  // Update Pricing Rules
+  // Update Pricing & Tax Rules (Tax V1)
   const handleUpdatePricingRules = async (rules: {
     markupPercentage?: number;
     discountPercentage?: number;
     taxPercentage?: number;
+    taxRate?: number;
+    taxMode?: TaxMode;
+    gstTreatment?: GstTreatment;
   }) => {
     if (!activeQuote || isReadOnly) return;
     try {
       setUpdatingPricing(true);
       const res = await quotationClient.updateQuotation(activeQuote.id, rules);
       if (res.success && res.data) {
-        toast.success("Pricing recalculated successfully.");
+        toast.success("Pricing and tax updated successfully.");
         setQuotations((prev) => prev.map((q) => (q.id === activeQuote.id ? res.data! : q)));
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to update pricing.");
+      toast.error(err?.message || "Failed to update pricing / tax.");
     } finally {
       setUpdatingPricing(false);
     }
@@ -424,7 +458,9 @@ export default function TripQuotationEditorPage() {
     setPkgSubtotal(activeQuote ? String(activeQuote.subtotal) : "30000");
     setPkgMarkupPct(activeQuote ? String(activeQuote.markupPercentage) : "10");
     setPkgDiscountPct("0");
-    setPkgTaxPct("5");
+    setPkgTaxRate(activeQuote ? String(Number(activeQuote.taxRate ?? activeQuote.taxPercentage ?? 5)) : "5");
+    setPkgTaxMode(activeQuote?.taxMode || TaxMode.EXCLUSIVE);
+    setPkgGstTreatment(activeQuote?.gstTreatment || GstTreatment.INTRA_STATE);
     setPkgFinalAmount("");
     setPkgHotelNotes("");
     setPkgVehicleNotes("");
@@ -443,7 +479,9 @@ export default function TripQuotationEditorPage() {
     setPkgSubtotal(String(pkg.subtotal));
     setPkgMarkupPct(String(pkg.markupPercentage));
     setPkgDiscountPct(String(pkg.discountPercentage));
-    setPkgTaxPct(String(pkg.taxPercentage));
+    setPkgTaxRate(String(Number(pkg.taxRate ?? pkg.taxPercentage ?? 5)));
+    setPkgTaxMode(pkg.taxMode || TaxMode.EXCLUSIVE);
+    setPkgGstTreatment(pkg.gstTreatment || GstTreatment.INTRA_STATE);
     setPkgFinalAmount(String(pkg.finalAmount));
     setPkgHotelNotes(pkg.hotelNotes || "");
     setPkgVehicleNotes(pkg.vehicleNotes || "");
@@ -462,7 +500,7 @@ export default function TripQuotationEditorPage() {
       const sub = Number(pkgSubtotal) || 0;
       const mkp = Number(pkgMarkupPct) || 0;
       const dsc = Number(pkgDiscountPct) || 0;
-      const tax = Number(pkgTaxPct) || 0;
+      const taxRateNum = Number(pkgTaxRate) || 0;
       const fin = pkgFinalAmount ? Number(pkgFinalAmount) : undefined;
 
       const incs = pkgInclusionsText
@@ -483,7 +521,10 @@ export default function TripQuotationEditorPage() {
           subtotal: sub,
           markupPercentage: mkp,
           discountPercentage: dsc,
-          taxPercentage: tax,
+          taxPercentage: taxRateNum,
+          taxRate: taxRateNum,
+          taxMode: pkgTaxMode,
+          gstTreatment: pkgGstTreatment,
           finalAmount: fin,
           hotelNotes: pkgHotelNotes || null,
           vehicleNotes: pkgVehicleNotes || null,
@@ -501,7 +542,10 @@ export default function TripQuotationEditorPage() {
           subtotal: sub,
           markupPercentage: mkp,
           discountPercentage: dsc,
-          taxPercentage: tax,
+          taxPercentage: taxRateNum,
+          taxRate: taxRateNum,
+          taxMode: pkgTaxMode,
+          gstTreatment: pkgGstTreatment,
           finalAmount: fin,
           hotelNotes: pkgHotelNotes || null,
           vehicleNotes: pkgVehicleNotes || null,
@@ -1093,7 +1137,7 @@ export default function TripQuotationEditorPage() {
                   </Select>
                 </div>
 
-                {/* Pricing Fields */}
+                {/* Pricing Fields & Commercial Base */}
                 <div className="space-y-3 pt-2 text-xs border-t border-slate-100">
                   <div className="flex justify-between text-slate-600">
                     <span>Base Supplier Cost:</span>
@@ -1107,6 +1151,7 @@ export default function TripQuotationEditorPage() {
                         type="number"
                         min={0}
                         max={500}
+                        disabled={updatingPricing || isReadOnly}
                         defaultValue={Number(activeQuote.markupPercentage)}
                         onBlur={(e) => handleUpdatePricingRules({ markupPercentage: Number(e.target.value) || 0 })}
                         className="h-7 w-16 text-right text-xs bg-slate-50 font-bold"
@@ -1118,6 +1163,13 @@ export default function TripQuotationEditorPage() {
                     </div>
                   </div>
 
+                  <div className="flex justify-between text-slate-600 font-medium">
+                    <span>Selling Price (Base):</span>
+                    <strong className="text-slate-900">
+                      {formatCurrency(Number(activeQuote.subtotal) + Number(activeQuote.markupAmount))}
+                    </strong>
+                  </div>
+
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-slate-600">Special Discount:</span>
                     <div className="flex items-center gap-1.5">
@@ -1125,6 +1177,7 @@ export default function TripQuotationEditorPage() {
                         type="number"
                         min={0}
                         max={100}
+                        disabled={updatingPricing || isReadOnly}
                         defaultValue={Number(activeQuote.discountPercentage)}
                         onBlur={(e) => handleUpdatePricingRules({ discountPercentage: Number(e.target.value) || 0 })}
                         className="h-7 w-16 text-right text-xs bg-slate-50 font-bold"
@@ -1135,31 +1188,193 @@ export default function TripQuotationEditorPage() {
                       </strong>
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-slate-600">Tax / GST:</span>
-                    <div className="flex items-center gap-1.5">
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        defaultValue={Number(activeQuote.taxPercentage)}
-                        onBlur={(e) => handleUpdatePricingRules({ taxPercentage: Number(e.target.value) || 0 })}
-                        className="h-7 w-16 text-right text-xs bg-slate-50 font-bold"
-                      />
-                      <span className="text-slate-500 font-bold">%</span>
-                      <strong className="text-slate-900 min-w-[70px] text-right">
-                        +{formatCurrency(Number(activeQuote.taxAmount))}
-                      </strong>
-                    </div>
+                {/* ─── TAX V1 COMMERCIAL CONTROLS ─── */}
+                <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-indigo-600" />
+                      Tax V1 Configuration
+                    </span>
+                    {updatingPricing && (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" />
+                    )}
                   </div>
 
-                  {/* Grand Total */}
-                  <div className="pt-3 border-t border-slate-200 flex justify-between items-baseline">
-                    <span className="font-bold text-slate-900 text-sm">Customer Price:</span>
-                    <span className="font-black text-indigo-600 text-xl">
-                      {formatCurrency(Number(activeQuote.finalAmount))}
+                  {/* Tax Rate Catalog Selector */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">GST Rate</label>
+                      {taxRatesError && (
+                        <button
+                          type="button"
+                          onClick={loadTaxRates}
+                          className="text-[10px] text-rose-600 underline font-medium hover:text-rose-700 cursor-pointer"
+                        >
+                          Retry Catalog
+                        </button>
+                      )}
+                    </div>
+                    {taxRatesLoading ? (
+                      <div className="h-8 flex items-center gap-2 text-slate-400 text-xs px-2 bg-white rounded-lg border border-slate-200">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading rates...
+                      </div>
+                    ) : (
+                      <Select
+                        disabled={updatingPricing || isReadOnly}
+                        value={String(Number(activeQuote.taxRate ?? activeQuote.taxPercentage ?? 0))}
+                        onValueChange={(val) => {
+                          const rateNum = Number(val);
+                          handleUpdatePricingRules({ taxRate: rateNum, taxPercentage: rateNum });
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-white border-slate-200">
+                          <SelectValue placeholder="Select active tax rate" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-slate-200">
+                          {taxRates.map((rateItem) => (
+                            <SelectItem key={rateItem.id} value={String(rateItem.rate)}>
+                              {rateItem.name} ({rateItem.rate}%)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  {/* Tax Mode Selector */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Tax Mode</label>
+                    <Select
+                      disabled={updatingPricing || isReadOnly}
+                      value={activeQuote.taxMode || TaxMode.EXCLUSIVE}
+                      onValueChange={(val) => handleUpdatePricingRules({ taxMode: val as TaxMode })}
+                    >
+                      <SelectTrigger className="h-8 text-xs bg-white border-slate-200">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        <SelectItem value={TaxMode.EXCLUSIVE}>
+                          Tax Exclusive (+GST added to price)
+                        </SelectItem>
+                        <SelectItem value={TaxMode.INCLUSIVE}>
+                          Tax Inclusive (GST included in price)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* GST Treatment Selector */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">GST Treatment</label>
+                    <Select
+                      disabled={updatingPricing || isReadOnly}
+                      value={activeQuote.gstTreatment || GstTreatment.INTRA_STATE}
+                      onValueChange={(val) => handleUpdatePricingRules({ gstTreatment: val as GstTreatment })}
+                    >
+                      <SelectTrigger className="h-8 text-xs bg-white border-slate-200">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        <SelectItem value={GstTreatment.INTRA_STATE}>
+                          Intra-State (CGST + SGST)
+                        </SelectItem>
+                        <SelectItem value={GstTreatment.INTER_STATE}>
+                          Inter-State (IGST)
+                        </SelectItem>
+                        <SelectItem value={GstTreatment.NON_GST_EXEMPT}>
+                          Non-GST Exempt (0% Tax)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-slate-400 italic pt-0.5 leading-tight">
+                      Select commercial GST treatment for this quotation. TripDesk does not automatically determine legal GST treatment.
+                    </p>
+                  </div>
+                </div>
+
+                {/* ─── SERVER-CALCULATED COMMERCIAL TAX SUMMARY ─── */}
+                <div className="space-y-2 pt-2 text-xs border-t border-slate-100">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Taxable Amount:</span>
+                    <strong className="text-slate-900">
+                      {formatCurrency(
+                        Number(
+                          activeQuote.taxableAmount ??
+                            Math.max(
+                              0,
+                              Number(activeQuote.subtotal) +
+                                Number(activeQuote.markupAmount) -
+                                Number(activeQuote.discountAmount)
+                            )
+                        )
+                      )}
+                    </strong>
+                  </div>
+
+                  {/* GST Breakdown according to treatment */}
+                  {activeQuote.gstTreatment === GstTreatment.INTRA_STATE && (
+                    <>
+                      <div className="flex justify-between text-slate-500 text-[11px] pl-2">
+                        <span>CGST ({(Number(activeQuote.taxRate ?? activeQuote.taxPercentage ?? 0) / 2)}%):</span>
+                        <span className="font-semibold text-slate-700">
+                          +{formatCurrency(Number(activeQuote.cgstAmount ?? Number(activeQuote.taxAmount) / 2))}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-slate-500 text-[11px] pl-2">
+                        <span>SGST ({(Number(activeQuote.taxRate ?? activeQuote.taxPercentage ?? 0) / 2)}%):</span>
+                        <span className="font-semibold text-slate-700">
+                          +{formatCurrency(Number(activeQuote.sgstAmount ?? Number(activeQuote.taxAmount) / 2))}
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  {activeQuote.gstTreatment === GstTreatment.INTER_STATE && (
+                    <div className="flex justify-between text-slate-500 text-[11px] pl-2">
+                      <span>IGST ({Number(activeQuote.taxRate ?? activeQuote.taxPercentage ?? 0)}%):</span>
+                      <span className="font-semibold text-slate-700">
+                        +{formatCurrency(Number(activeQuote.igstAmount ?? Number(activeQuote.taxAmount)))}
+                      </span>
+                    </div>
+                  )}
+
+                  {activeQuote.gstTreatment === GstTreatment.NON_GST_EXEMPT && (
+                    <div className="flex justify-between text-slate-500 text-[11px] pl-2">
+                      <span>GST Status:</span>
+                      <span className="font-semibold text-slate-700">Exempt (₹0.00)</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center text-slate-700">
+                    <span className="flex items-center gap-1.5">
+                      <span>Total Tax Amount:</span>
+                      <Badge
+                        variant="secondary"
+                        className="text-[9px] h-4 px-1.5 font-bold uppercase bg-slate-100 text-slate-600"
+                      >
+                        {activeQuote.taxMode === TaxMode.INCLUSIVE ? "Inclusive" : "Exclusive"}
+                      </Badge>
                     </span>
+                    <strong className="text-slate-900">
+                      +{formatCurrency(Number(activeQuote.taxAmount))}
+                    </strong>
+                  </div>
+
+                  {/* Grand Customer Total */}
+                  <div className="pt-3 border-t border-slate-200 space-y-1">
+                    <div className="flex justify-between items-baseline">
+                      <span className="font-bold text-slate-900 text-sm">Customer Price:</span>
+                      <span className="font-black text-indigo-600 text-xl">
+                        {formatCurrency(Number(activeQuote.finalAmount))}
+                      </span>
+                    </div>
+                    {activeQuote.taxMode === TaxMode.INCLUSIVE && Number(activeQuote.taxAmount) > 0 && (
+                      <p className="text-[10px] text-emerald-700 font-semibold text-right">
+                        Gross price includes {formatCurrency(Number(activeQuote.taxAmount))} GST
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1261,10 +1476,25 @@ export default function TripQuotationEditorPage() {
 
                       {/* Price Section */}
                       <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1 text-center">
-                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Selling Price</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Selling Price</span>
+                          <Badge
+                            variant="secondary"
+                            className="text-[9px] h-4 px-1.5 font-bold uppercase bg-indigo-50 text-indigo-700 border-indigo-200"
+                          >
+                            {Number(opt.taxRate ?? opt.taxPercentage ?? 0)}% GST • {opt.taxMode === TaxMode.INCLUSIVE ? "Incl." : "Excl."}
+                          </Badge>
+                        </div>
                         <div className="text-2xl font-black text-indigo-600 tracking-tight">
                           {formatCurrency(Number(opt.finalAmount))}
                         </div>
+                        {Number(opt.taxAmount ?? 0) > 0 && (
+                          <div className="text-[10px] text-slate-500 pt-0.5 flex items-center justify-center gap-1.5 flex-wrap">
+                            <span>Taxable: {formatCurrency(Number(opt.taxableAmount ?? opt.subtotal))}</span>
+                            <span>•</span>
+                            <span>GST: {formatCurrency(Number(opt.taxAmount))}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Highlights */}
@@ -1751,7 +1981,7 @@ export default function TripQuotationEditorPage() {
                 {/* Financials Grid */}
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
                   <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Pricing Configuration</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Base Subtotal (₹)</label>
                       <Input
@@ -1784,20 +2014,64 @@ export default function TripQuotationEditorPage() {
                         className="h-8 text-xs bg-white"
                       />
                     </div>
+                  </div>
+
+                  {/* Tax V1 Package Controls */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-200/60">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Tax (%)</label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={pkgTaxPct}
-                        onChange={(e) => setPkgTaxPct(e.target.value)}
-                        className="h-8 text-xs bg-white"
-                      />
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">GST Rate</label>
+                      <Select
+                        value={pkgTaxRate}
+                        onValueChange={(val) => val && setPkgTaxRate(val)}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-white border-slate-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-slate-200">
+                          {taxRates.map((rateItem) => (
+                            <SelectItem key={rateItem.id} value={String(rateItem.rate)}>
+                              {rateItem.name} ({rateItem.rate}%)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Tax Mode</label>
+                      <Select
+                        value={pkgTaxMode}
+                        onValueChange={(val) => val && setPkgTaxMode(val as TaxMode)}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-white border-slate-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-slate-200">
+                          <SelectItem value={TaxMode.EXCLUSIVE}>Exclusive (+GST)</SelectItem>
+                          <SelectItem value={TaxMode.INCLUSIVE}>Inclusive (Included)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">GST Treatment</label>
+                      <Select
+                        value={pkgGstTreatment}
+                        onValueChange={(val) => val && setPkgGstTreatment(val as GstTreatment)}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-white border-slate-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-slate-200">
+                          <SelectItem value={GstTreatment.INTRA_STATE}>Intra-State</SelectItem>
+                          <SelectItem value={GstTreatment.INTER_STATE}>Inter-State</SelectItem>
+                          <SelectItem value={GstTreatment.NON_GST_EXEMPT}>Exempt</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 pt-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">
                       Exact Selling Price Override (₹) — <span className="font-normal text-slate-400">Leave blank to auto-calculate</span>
                     </label>
