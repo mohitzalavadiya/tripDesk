@@ -667,7 +667,7 @@ export const quotationService = {
     const discountAmount = Math.round((baseWithMarkup * discountPct) / 100);
     const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
 
-    const taxPct = options?.taxPercentage ?? 5;
+    const taxPct = options?.taxPercentage ?? 0;
     const taxAmount = Math.round((afterDiscount * taxPct) / 100);
     const finalAmount = Math.round(afterDiscount + taxAmount);
 
@@ -2054,20 +2054,20 @@ export const quotationService = {
     // 1. Standard Tier (10% markup)
     const stdSub = baseCost;
     const stdMarkup = Math.round(stdSub * 0.1);
-    const stdTax = Math.round((stdSub + stdMarkup) * 0.05);
-    const stdFinal = stdSub + stdMarkup + stdTax;
+    const stdTax = 0;
+    const stdFinal = stdSub + stdMarkup;
 
-    // 2. Deluxe Tier (22% markup)
+    // 2. Deluxe Tier (15% markup)
     const dlxSub = Math.round(baseCost * 1.25);
     const dlxMarkup = Math.round(dlxSub * 0.15);
-    const dlxTax = Math.round((dlxSub + dlxMarkup) * 0.05);
-    const dlxFinal = dlxSub + dlxMarkup + dlxTax;
+    const dlxTax = 0;
+    const dlxFinal = dlxSub + dlxMarkup;
 
-    // 3. Luxury Tier (40% markup)
+    // 3. Luxury Tier (20% markup)
     const luxSub = Math.round(baseCost * 1.6);
     const luxMarkup = Math.round(luxSub * 0.2);
-    const luxTax = Math.round((luxSub + luxMarkup) * 0.05);
-    const luxFinal = luxSub + luxMarkup + luxTax;
+    const luxTax = 0;
+    const luxFinal = luxSub + luxMarkup;
 
     await prisma.quotationPackageOption.createMany({
       data: [
@@ -2080,7 +2080,7 @@ export const quotationService = {
           subtotal: new Prisma.Decimal(stdSub),
           markupPercentage: new Prisma.Decimal(10),
           markupAmount: new Prisma.Decimal(stdMarkup),
-          taxPercentage: new Prisma.Decimal(5),
+          taxPercentage: new Prisma.Decimal(0),
           taxAmount: new Prisma.Decimal(stdTax),
           finalAmount: new Prisma.Decimal(stdFinal),
           hotelNotes: "3-Star Standard City Center Hotels (AC Deluxe Rooms)",
@@ -2099,7 +2099,7 @@ export const quotationService = {
           subtotal: new Prisma.Decimal(dlxSub),
           markupPercentage: new Prisma.Decimal(15),
           markupAmount: new Prisma.Decimal(dlxMarkup),
-          taxPercentage: new Prisma.Decimal(5),
+          taxPercentage: new Prisma.Decimal(0),
           taxAmount: new Prisma.Decimal(dlxTax),
           finalAmount: new Prisma.Decimal(dlxFinal),
           hotelNotes: "4-Star Deluxe Resorts & Boutique Lake/Hill View Properties",
@@ -2118,7 +2118,7 @@ export const quotationService = {
           subtotal: new Prisma.Decimal(luxSub),
           markupPercentage: new Prisma.Decimal(20),
           markupAmount: new Prisma.Decimal(luxMarkup),
-          taxPercentage: new Prisma.Decimal(5),
+          taxPercentage: new Prisma.Decimal(0),
           taxAmount: new Prisma.Decimal(luxTax),
           finalAmount: new Prisma.Decimal(luxFinal),
           hotelNotes: "5-Star Luxury Heritage Properties / Private Pool Villas",

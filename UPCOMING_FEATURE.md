@@ -21,7 +21,7 @@ Invoice pdf format and invoice page strucutre
 
 **TODO**
 
-some API fail in operations
+quatation genarate
 manage read only from frontend also
 
 remove usused code, imports and files
@@ -30,7 +30,6 @@ check no static data anywhere
 where i can show Announcements ?
 remove reset or refresh button in near dropdown
 
-quatation genarate
 
 compalate QA. 
 
@@ -44,6 +43,7 @@ Chatbot implement
 
 **ONHOLD**
 
+some API fail in operations
 add scroll in table : when lots of data in table in this case add scroll in table not in whole page
 in database i can show password : in database table i want to show password every angency : 
 seperate database for prod and local

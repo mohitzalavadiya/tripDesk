@@ -239,7 +239,7 @@ export default function TripQuotationEditorPage() {
       const res = await quotationClient.generateTripQuotation(tripId, {
         markupPercentage: activeQuote ? Number(activeQuote.markupPercentage) : 10,
         discountPercentage: activeQuote ? Number(activeQuote.discountPercentage) : 0,
-        taxPercentage: activeQuote ? Number(activeQuote.taxPercentage) : 5,
+        taxPercentage: activeQuote ? Number(activeQuote.taxPercentage) : 0,
         autoPopulateInclusions: true,
         generatePaymentSchedule: true,
       });

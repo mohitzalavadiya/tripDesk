@@ -38,10 +38,11 @@ async function main() {
       data: {
         agencyId: apexAgency.id,
         customerId: customer.id,
+        tripNumber: "TRP-APEX-001",
         title: "Golden Triangle Tour",
         startDate: new Date("2026-10-01"),
         endDate: new Date("2026-10-07"),
-        status: "CONFIRMED",
+        status: "BOOKED",
       },
     });
   }
