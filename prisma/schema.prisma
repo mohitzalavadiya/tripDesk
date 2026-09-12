@@ -1180,6 +1180,7 @@ model Invoice {
   payments            Payment[]
 
   @@unique([agencyId, invoiceNumber])
+  @@unique([agencyId, bookingId])
   @@index([agencyId])
   @@index([agencyId, status])
   @@index([bookingId])

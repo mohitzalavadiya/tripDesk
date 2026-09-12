@@ -25,7 +25,6 @@ const quickNavModules: QuickNavItem[] = [
   { id: "nav-trips", title: "Trips", category: "trips", subtitle: "Active trips & itinerary planner", href: "/trips" },
   { id: "nav-quotations", title: "Quotations", category: "quotations", subtitle: "Proposals, pricing & client versions", href: "/quotations" },
   { id: "nav-bookings", title: "Bookings", category: "bookings", subtitle: "Confirmed bookings & vouchers", href: "/bookings" },
-  { id: "nav-invoices", title: "Invoices", category: "invoices", subtitle: "Customer billing, drafts & payments", href: "/invoices" },
   { id: "nav-hotels", title: "Hotels", category: "hotels", subtitle: "Hotel directory & room inventories", href: "/hotels" },
   { id: "nav-suppliers", title: "Suppliers", category: "suppliers", subtitle: "Vendors, cabs & activity providers", href: "/suppliers" },
 ]

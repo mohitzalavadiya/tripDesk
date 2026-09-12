@@ -14,19 +14,21 @@ consistant UI in all page
 Invoice page UI
 Dashboard UI need to check properly.
 finance, follow-ups, /reports, communications, /settings,  UI need to check properly
+manage scroll in table
+Invoice pdf format and invoice page strucutre
 
 
 
 **TODO**
 
-manage scroll in table
-Invoice pdf format and invoice page strucutre
-
+some API fail in operations
 manage read only from frontend also
 
 remove usused code, imports and files
 remove all type script error
 check no static data anywhere
+where i can show Announcements ?
+remove reset or refresh button in near dropdown
 
 quatation genarate
 
@@ -36,6 +38,8 @@ responsive 320 screen
 
 clean database
 understand flow
+
+Chatbot implement
 
 
 **ONHOLD**

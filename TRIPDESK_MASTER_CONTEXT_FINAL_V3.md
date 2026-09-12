@@ -8680,9 +8680,358 @@ In compliance with the permanent TripDesk workflow rule established in Section 1
 
 ---
 
+# SECTION 127 — BOOKING-CENTRIC PERSISTENT INVOICE REDESIGN (BATCH 1 & BATCH 2) [CLOSED]
+
+## 127.1 Overview & Decision #18 Architecture
+- **Milestone Code:** `DEV-05` / `INVOICE-REDESIGN-BATCH-1-AND-2`
+- **Milestone Name:** `Booking-Centric Persistent Invoice & Live Invoice Viewer Redesign`
+- **Final Verdict:** **PASS — BATCH 2 VERIFIED / FORMALLY CLOSED**
+- **Core Product Rule (Decision #18):**
+  > **One Booking = One Persistent Invoice Number (`INV-XXXX`)**
+  - **Single Source of Truth:** The Booking is the single authoritative source of truth.
+  - **Persistent Invoice Record:** The Invoice is a persistent financial identity. The first generation creates the invoice row and allocates an agency-scoped sequential number (`INV-XXXX`). Subsequent views or generation requests reuse the same invoice record and refresh live booking data without incrementing invoice numbers or duplicating records.
+  - **Strict Generation Eligibility:** Invoice generation is permitted **ONLY** when `booking.status === BookingStatus.CONFIRMED`. Other statuses (`DRAFT`, `ONGOING`, `COMPLETED`, `CANCELLED`) reject new invoice generation. Historical invoices on non-confirmed bookings remain viewable and discoverable.
+
+## 127.2 Implemented Scope & Component Breakdown
+
+### 1. Backend Service Layer (`src/lib/services/invoice-service.ts`, `src/lib/services/booking-service.ts`, `src/lib/services/payment-service.ts`)
+- **Persistent Invoice Allocation (`getOrCreateInvoiceForBooking`):**
+  - Uses interactive database transaction with `Serializable` or row-level locking.
+  - Generates agency-scoped sequential number `INV-XXXX` (using `MAX(CAST(SUBSTRING...))`) only when creating a new invoice.
+  - Reuses existing invoice when already generated for the booking.
+  - Auto-links unlinked existing payments for the booking to the invoice.
+- **Live Data Query (`invoiceService.getInvoice`):**
+  - Includes authoritative `booking` sub-relations: `customer`, `trip` (with `travelers`), `quotation` (with `items`), `bookingDate`, `totalAmount`, `paidAmount`, `balanceAmount`, `currency`, and `notes`.
+  - Computes `isOverdue` dynamically based on live balance and due date.
+- **Booking Invoice Relationship (`bookingService.getBooking`):**
+  - Returns `invoices` array ordered by `createdAt: desc` to supply the Booking Detail page with state-aware invoice metadata.
+- **Financial Synchronization (`bookingService.recalculateBookingPaymentTotals` & `updateBooking`):**
+  - Booking total updates (e.g. ₹85k → ₹90k) and payment additions/voids automatically synchronize the active persistent invoice total, paid amount, balance, and invoice status (`ISSUED` → `PARTIALLY_PAID` → `PAID`).
+- **Cancellation Propagation (`bookingService.cancelBooking`):**
+  - Cancelling a booking automatically transitions the linked active invoice to `InvoiceStatus.CANCELLED` with timestamps and reasons, preserving the invoice number without replacement.
+
+### 2. Booking Detail Invoice Card (`src/app/(dashboard)/bookings/[id]/page.tsx`)
+- Replaced legacy top command-bar "Customer Invoice" button with a dedicated, state-aware **Invoice Card** in the right sidebar.
+- **State Matrix:**
+  - `CONFIRMED` + No Invoice: Shows "Invoice Not Generated" with explanation and prominent `Generate Invoice` action.
+  - `CONFIRMED` + Existing Invoice: Displays `INV-XXXX`, status badge, invoice date, due date, financial breakdown (Total, Paid, Balance), `View Invoice` (`/invoices/[id]`), and `Download PDF` (`/api/invoices/[id]/pdf`).
+  - Non-Confirmed + No Invoice (`DRAFT`, `ONGOING`, `COMPLETED`): Displays "Invoice Not Available" with notice that invoice generation requires confirmed booking (no generate button).
+  - Non-Confirmed + Historical Invoice: Displays historical invoice metadata with `View Invoice` and `Download PDF`.
+  - `CANCELLED` + Cancelled Invoice: Displays `INV-XXXX` with `CANCELLED` badge, financial totals, `View Invoice`, and `Download PDF` (no generate/reissue action).
+
+### 3. Read-Only SaaS Invoice Detail Viewer (`src/app/(dashboard)/invoices/[id]/page.tsx`)
+- Completely replaced legacy ~1000-line Draft Invoice Editor with a clean, read-only SaaS invoice document viewer.
+- **Document Structure:**
+  - **Header:** Agency branding/name, agency contact details (phone, email, address), "TAX INVOICE", `INV-XXXX`, status badge, invoice date, due date.
+  - **Billed To & Reference:** Live customer profile (name, phone, email, full address) and Booking reference (booking number with link, trip title, travel period, currency).
+  - **Itemized Services Table:** Displays customer-facing package items from authoritative quotation (`booking.quotation.items`), with safe fallback to `invoice.items` or standard package line item. Never exposes internal costs, supplier rates, markup, or internal notes.
+  - **Financial Summary:** Subtotal, Discount (if applicable), Total Amount Billed, Total Paid, and Balance Due (with settled badge when balance is ₹0).
+  - **Payment Transactions:** Unified booking payment ledger displaying receipt numbers, payment dates, payment methods, transaction references, status, and amounts.
+  - **Actions:** `Back to Booking`, `Print` (`window.print()`), `Download PDF` (`/api/invoices/[id]/pdf`), and `Record Payment` modal trigger (when balance > 0 and status is not CANCELLED).
+  - **Print Optimized:** Clean `@media print` rules for paper-like output without dashboard chrome.
+
+### 4. Invoices List Page Streamline (`src/app/(dashboard)/invoices/page.tsx`)
+- Updated invoice list action dropdowns to "View Invoice" navigating to `/invoices/[id]`.
+- Removed legacy draft deletion / draft edit workflows.
+- "Create from Booking" cleanly routes users to confirmed bookings.
+
+## 127.3 Verified Test Results & Evidence
+
+### 1. Batch 2 Automated Test Matrix (`scratch/test-dev05-batch2-matrix.ts`)
+- **Result:** **20/20 PASSED (100%)**
+- **Tested Areas:**
+  - T01–T04: Booking Service invoice relations, persistent invoice allocation, single-invoice idempotency.
+  - T05–T09: `getInvoice()` live relations (customer, trip travelers, customer-facing quotation items, agency details).
+  - T10–T14: Live booking total updates (₹85k → ₹90k), payment additions, status progression (`PARTIALLY_PAID` → `PAID`).
+  - T15–T18: Booking cancellation propagation, invoice status `CANCELLED`, number preservation, rejection of generation on cancelled bookings.
+  - T19–T20: Multi-tenant security isolation (cross-agency invoice read and generation rejected).
+
+### 2. Batch 1 Regression Matrix (`scratch/test-dev05-batch1-matrix.ts`)
+- **Result:** **29/29 PASSED (100%)**
+
+### 3. Excel Regression Suite (`scratch/test-dev03-excel.ts`)
+- **Result:** **23/23 PASSED (100%)**
+
+### 4. TypeScript Compilation & Production Build
+- **TypeScript (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **Exit code 0, Turbopack (PASS)**
+
+### 5. Responsive Browser QA Viewport Matrix
+- Tested and verified across all 7 target viewports:
+  - `1440 × 900` (Desktop Large): PASS
+  - `1280 × 800` (Desktop Standard): PASS
+  - `1024 × 768` (Desktop Compact): PASS
+  - `768 × 1024` (Tablet Portrait): PASS
+  - `390 × 844` (Mobile Standard): PASS
+  - `375 × 667` (Mobile Compact): PASS
+  - `320 × 568` (Mobile Narrow): PASS
+- Verified zero horizontal overflow, clean responsive wrapping on metadata cards, responsive itemized services tables, and proper modal behavior.
+
+## 127.4 Database & Schema Impact
+- **Prisma Schema (`prisma/schema.prisma`):** **0 changes, 0 migrations created.**
+- **Deferred Database Uniqueness:** Database-level `@@unique([agencyId, bookingId])` constraint remains intentionally deferred as a separate approved database migration task.
+
+## 127.5 Milestone Sign-Off
+- **Batch 1 (Core Service & Payment Unification):** **CLOSED**
+- **Batch 2 (Booking Invoice Card & Invoice Detail Refactor):** **CLOSED**
+- **Final Verdict:** **PASS — BATCH 2 VERIFIED**
+
+---
+
+# SECTION 128 — PROFESSIONAL INVOICE PDF REDESIGN (BATCH 3) [VERIFIED & CLOSED]
+
+## 128.1 Overview & Decision #18 Architecture
+- **Milestone Code:** `DEV-05` / `INVOICE-REDESIGN-BATCH-3`
+- **Milestone Name:** `Professional Commercial Invoice PDF Redesign`
+- **Final Verdict:** **PASS — BATCH 3 READY FOR ACCEPTANCE**
+- **Core Principles:**
+  - **Booking is the Authoritative Financial Source of Truth:** The PDF generation engine prioritizes live booking values (`invoice.booking.totalAmount`, `invoice.booking.paidAmount`, `invoice.booking.balanceAmount`) over static stored invoice snapshot records.
+  - **Single Persistent Invoice Identity (Decision #18):** Downloading or generating a PDF is a pure read-only document generation operation. Zero new invoice rows are created and zero sequence increments occur.
+  - **Customer Data Safety:** PDF generation strictly omits supplier costs, supplier rates, markup/margin data, internal employee/user notes, and database IDs.
+  - **No Tax / GST Features:** Maintained document title as `INVOICE` (or `CANCELLED INVOICE` / `DRAFT INVOICE`). Zero tax calculation/GST fields introduced.
+  - **Multi-Page Support & Pagination:** Dynamic table row heights, safe page breaks, and global footer with `Page X of Y` across buffered pages.
+
+## 128.2 Component & Architecture Breakdown
+1. **Invoice PDF Service (`src/lib/services/invoice-pdf-service.ts`):**
+   - **Visual Design:** High-resolution ISO A4 layout (`595.28 × 841.89 pt`) with 40pt margins, slate typography (`Helvetica`, `Helvetica-Bold`), indigo accents (`#4338CA`), and clean rounded metadata cards.
+   - **Header:** Agency branding (logo with fallback to styled agency title, contact info, address), document title (`INVOICE`), persistent `INV-XXXX`, status badge, invoice date, due date.
+   - **Customer & Booking Metadata:** Billed To card (live customer name, phone, email, full address) and Booking & Trip Reference card (booking number, trip title, travel dates, currency).
+   - **Itemization Hierarchy:**
+     1. Live customer-facing quotation items (`invoice.booking.quotation.items`).
+     2. Stored invoice items (`invoice.items`).
+     3. Complete travel package single-line fallback.
+   - **Authoritative Financial Summary:** Subtotal, Discount (if present), Total Amount Billed, Total Paid, and prominent dark Balance Due callout bar.
+   - **Active Payment History Ledger:** Table of completed payments (receipt/payment number, date, method, transaction reference, amount). Filtered to exclude `VOIDED` and archived payments.
+   - **Notes & Instructions:** Customer-facing `notes` and `paymentInstructions` rendered when present.
+   - **Multi-Page Protection:** Automatic table header repetition, safe page splits, and buffered page iteration.
+   - **Watermarks:** Subtle diagonal watermark for `CANCELLED` (rose) and `DRAFT` (slate) states.
+   - **Global Footer:** Computer-generated document notice and dynamic `Page X of Y` counter on all pages.
+
+## 128.3 Verified Test Results & Evidence
+- **Batch 3 Test Matrix (`scratch/test-dev05-batch3-matrix.ts`):** **24/24 PASSED (100%)**
+  - T01–T06: Confirmed booking PDF generation, binary validation, invoice number, agency branding, customer data.
+  - T07–T08: Persistent identity verification (0 new invoice rows, 0 sequence increments).
+  - T09–T12: Live booking financial synchronization (₹85k → ₹90k update, advance payment, full settlement).
+  - T13–T14: Active payment history ledger & strict voided payment exclusion.
+  - T15–T16: Cancelled booking PDF generation (watermark) & strict rejection of new invoice generation on cancelled bookings.
+  - T17–T18: Tenant security isolation & customer data safety (supplier cost/markup exclusion).
+  - T19–T20: Multi-page document generation (15 complex items) & resilient logo fallback.
+  - T21–T24: Automated page numbering assertion (`Page 1 of 2`, `Page 2 of 2`), zero GST/tax exclusion assertion, forbidden data exclusion assertion, historical invoice discoverability.
+- **Batch 2 Regression Matrix (`scratch/test-dev05-batch2-matrix.ts`):** **20/20 PASSED (100%)**
+- **Batch 1 Regression Matrix (`scratch/test-dev05-batch1-matrix.ts`):** **29/29 PASSED (100%)**
+- **Excel Regression Suite (`scratch/test-dev03-excel.ts`):** **23/23 PASSED (100%)**
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **Exit code 0, Turbopack (PASS)**
+
+## 128.4 Database & Schema Impact
+- **Prisma Schema (`prisma/schema.prisma`):** **0 changes, 0 migrations created.**
+- **Deferred Database Uniqueness:** Database-level `@@unique([agencyId, bookingId])` constraint remains intentionally deferred.
+
+## 128.5 Milestone Sign-Off
+- **Batch 1 (Core Service & Payment Unification):** **CLOSED**
+- **Batch 2 (Booking Invoice Card & Invoice Detail Refactor):** **CLOSED**
+- **Batch 3 (Professional Invoice PDF Redesign):** **CLOSED / VERIFIED**
+- **Final Verdict:** **PASS — BATCH 3 ACCEPTED**
+
+---
+
+# SECTION 129 — INVOICE ONE-PER-BOOKING DATABASE INTEGRITY (BATCH 4) [VERIFIED & CLOSED]
+
+## 129.1 Overview & Decision #18 Database Enforcement
+- **Milestone Code:** `DEV-05` / `INVOICE-DB-INTEGRITY-BATCH-4`
+- **Milestone Name:** `Invoice One-Per-Booking Database Integrity`
+- **Final Verdict:** **PASS — BATCH 4 ACCEPTED**
+- **Core Objective:**
+  - Transition Decision #18's locked rule (**One Booking = One Persistent Invoice**) from application-level convention to an enforced physical database constraint in PostgreSQL.
+  - Target constraint: `@@unique([agencyId, bookingId])` on `model Invoice`.
+  - Safely reconcile and clean confirmed test artifact duplicate invoice rows (`INV-0004`, `INV-0005`), retaining `INV-0003`.
+  - Harden invoice creation services against PostgreSQL `P2002` concurrency races so that parallel requests resolve to the winning invoice without incrementing sequence numbers.
+  - Guard legacy replacement paths against bypassing uniqueness.
+  - Execute 100% full regression across Batch 4, Batch 3, Batch 2, Batch 1, Excel suites, TypeScript compiler, and production build.
+
+## 129.2 Schema & Migration Implementation
+1. **Prisma Schema (`prisma/schema.prisma`):**
+   ```prisma
+   model Invoice {
+     ...
+     @@unique([agencyId, invoiceNumber])
+     @@unique([agencyId, bookingId])
+     ...
+   }
+   ```
+2. **Database Migration:**
+   - Migration Folder: `prisma/migrations/20260912104000_add_invoice_booking_unique_constraint/`
+   - Generated & Applied SQL:
+     ```sql
+     -- CreateIndex
+     CREATE UNIQUE INDEX "invoices_agencyId_bookingId_key" ON "invoices"("agencyId", "bookingId");
+     ```
+   - Applied cleanly to Supabase Cloud PostgreSQL using `npx prisma migrate deploy`.
+   - Verified physical index existence in PostgreSQL via `pg_indexes` (`invoices_agencyId_bookingId_key` on `public.invoices USING btree ("agencyId", "bookingId")`).
+3. **Prisma Client Generation:**
+   - Regenerated Prisma Client v7.9.1 exposing composite selector `agencyId_bookingId`.
+
+## 129.3 Service Layer Hardening & Concurrency Protection
+1. **Concurrency Race Hardening (`src/lib/services/invoice-service.ts`):**
+   - In `getOrCreateInvoiceForBooking()`, wrapped transactional insertion with a `P2002` error handler:
+     ```ts
+     try {
+       // transactional invoice creation logic
+     } catch (error) {
+       if (
+         error instanceof Prisma.PrismaClientKnownRequestError &&
+         error.code === "P2002"
+       ) {
+         const winningInvoice = await prisma.invoice.findUnique({
+           where: {
+             agencyId_bookingId: {
+               agencyId,
+               bookingId,
+             },
+           },
+           include: invoiceDetailInclude,
+         });
+         if (winningInvoice) {
+           return winningInvoice as InvoiceWithDetails;
+         }
+       }
+       throw error;
+     }
+     ```
+   - When multiple concurrent requests race to create an invoice for the same booking, exactly 1 succeeds and allocates a sequence number, while the other requests catch `P2002`, query the winning persistent invoice, and return it cleanly without creating duplicate rows or consuming extra sequence numbers.
+2. **Legacy Replacement Path Guard (`createReplacementInvoice`):**
+   - Guarded `createReplacementInvoice()` to throw an explicit error enforcing Decision #18 and preventing duplicate invoice creation.
+
+## 129.4 Verified Test Results & Evidence
+- **Batch 4 Automated Matrix (`scratch/test-dev05-batch4-matrix.ts`):** **17/17 PASSED (100%)**
+  - T01: Physical unique constraint `invoices_agencyId_bookingId_key` verified in PostgreSQL metadata.
+  - T02: Direct duplicate invoice insertion for same agency + booking throws `P2002`.
+  - T03: Database confirms duplicate row was not inserted.
+  - T04: Multi-tenant isolation verified (different agencies can create invoices for their own bookings without collision).
+  - T05: `findUnique({ where: { agencyId_bookingId } })` retrieves exact persistent invoice.
+  - T06: `findUnique` cross-agency isolation verified.
+  - T07: 10 parallel concurrent `getOrCreateInvoiceForBooking()` calls resolve to identical Invoice ID.
+  - T08: All 10 parallel calls resolve to identical Invoice Number.
+  - T09: Database confirms exactly 1 Invoice row created across 10 concurrent requests.
+  - T10: InvoiceSequence incremented exactly once.
+  - T11: Clean database state verified (0 duplicate groups).
+  - T12: All invoices have valid non-null booking relations.
+  - T13: Zero cross-agency mismatches.
+  - T14: Zero duplicate invoice numbers within agencies.
+  - T15: Confirmed Booking invoice generation succeeds.
+  - T16: Non-confirmed Booking statuses (`DRAFT`, `ONGOING`, `COMPLETED`, `CANCELLED`) reject new invoice generation.
+  - T17: Legacy replacement path strictly blocked from violating uniqueness.
+- **Batch 3 Regression Matrix (`scratch/test-dev05-batch3-matrix.ts`):** **24/24 PASSED (100%)**
+- **Batch 2 Regression Matrix (`scratch/test-dev05-batch2-matrix.ts`):** **20/20 PASSED (100%)**
+- **Batch 1 Regression Matrix (`scratch/test-dev05-batch1-matrix.ts`):** **29/29 PASSED (100%)**
+- **Excel Regression Suite (`scratch/test-dev03-excel.ts`):** **23/23 PASSED (100%)**
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **Exit code 0, Turbopack (PASS)**
+- **Browser QA Verification:** **PASS (clean invoice listing, no duplicates, accurate financial rendering)**
+
+## 129.5 Final Database State & Integrity
+- **Total Invoices in Database:** 16 (15 original clean records + 1 test record)
+- **Duplicate `(agencyId, bookingId)` groups:** 0
+- **Duplicate invoice numbers within agency:** 0
+- **Cross-agency mismatches:** 0
+- **Orphaned bookings:** 0
+- **NULL bookingId:** 0
+- **Status of Deferred Uniqueness:** **NO LONGER DEFERRED — OFFICIALLY ENFORCED AT DATABASE LEVEL.**
+
+## 129.6 Milestone Sign-Off
+- **Batch 1 (Core Service & Payment Unification):** **CLOSED**
+- **Batch 2 (Booking Invoice Card & Invoice Detail Refactor):** **CLOSED**
+- **Batch 3 (Professional Invoice PDF Redesign):** **CLOSED**
+- **Batch 4 (Invoice One-Per-Booking Database Integrity):** **CLOSED / VERIFIED**
+- **Final Verdict:** **PASS — BATCH 4 ACCEPTED**
+
+---
+
+# SECTION 130 — INVOICE UI CONSOLIDATION INTO BOOKING DETAIL [VERIFIED & CLOSED]
+
+## 130.1 Overview & Architecture Consolidation
+- **Milestone Code:** `DEV-05` / `INVOICE-UI-CONSOLIDATION`
+- **Milestone Name:** `Invoice UI Consolidation into Booking Detail`
+- **Status:** **VERIFIED & CLOSED**
+- **Core Objective & UX Transition:**
+  - Transition TripDesk invoice management from a standalone list route to a **Booking-centric workflow**.
+  - Invoices are now discovered, generated, and managed directly from the **Booking Detail** page (`/bookings/[id]`).
+  - Standalone `/invoices` LIST UI is no longer part of normal user-facing navigation.
+  - Safely configured `/invoices` route to redirect immediately to `/bookings`.
+  - Removed "Invoices" from sidebar navigation (`src/lib/navigation.ts`) and global search quick items (`src/components/shared/global-search.tsx`).
+  - Retained `/invoices/[id]` as the dedicated read-only Tax Invoice Detail viewer and print layout.
+  - Repointed `/invoices/[id]` breadcrumb and document header back-navigation directly to the parent Booking Detail (`/bookings/${invoice.bookingId}`) instead of `/invoices`.
+  - Table-row dropdown actions on the `/bookings` list page were kept clean and intact without adding invoice actions, maintaining uncluttered list scanning.
+
+## 130.2 Booking Detail Actions & Invoice Card Integration
+1. **Booking Detail Actions Dropdown (`src/app/(dashboard)/bookings/[id]/page.tsx`):**
+   - Added an **Actions** dropdown menu in the top command header of Booking Detail.
+   - When no invoice exists and the booking is eligible: displays **Generate Invoice** action.
+   - When an invoice exists: displays **View Invoice** (navigates to `/invoices/[id]`) and **Download Invoice PDF** (triggers `/api/invoices/[id]/pdf`).
+2. **Right-Sidebar Invoice Card (`src/app/(dashboard)/bookings/[id]/page.tsx`):**
+   - Preserved and enhanced the existing Invoice Card in the right sidebar.
+   - When no invoice exists and the booking is eligible: displays **Generate Invoice** primary button with explanatory guidance.
+   - When an invoice exists: displays persistent `INV-XXXX` number, live status badge (`ISSUED`, `PARTIALLY_PAID`, `PAID`, `CANCELLED`), **View Invoice**, and **Download PDF** buttons.
+3. **Unified Single-Source Generation Flow:**
+   - Both the top Actions dropdown and the right-sidebar Invoice Card invoke the exact same client handler calling `POST /api/invoices`, which dispatches to `invoiceService.getOrCreateInvoiceForBooking()`.
+   - Strictly enforces Decision #18: **One Booking = One Persistent Invoice**.
+
+## 130.3 Invoice Generation Eligibility Rules
+- **Invoice Generation ALLOWED for:**
+  - `CONFIRMED`
+  - `ONGOING`
+  - `COMPLETED`
+- **Invoice Generation STRICTLY REJECTED for:**
+  - `DRAFT` (must be confirmed before invoicing)
+  - `CANCELLED` (cannot create new invoices for cancelled bookings)
+- **Service Layer Guard (`src/lib/services/invoice-service.ts`):**
+  - Updated `getOrCreateInvoiceForBooking()` validation to explicitly allow `[BookingStatus.CONFIRMED, BookingStatus.ONGOING, BookingStatus.COMPLETED]` and reject all other statuses with clear error messaging.
+
+## 130.4 Invariants & Data Integrity Preserved
+- **One Booking = One Persistent Invoice:** PostgreSQL database unique constraint `invoices_agencyId_bookingId_key` guarantees 1-to-1 persistence under all scenarios including concurrent race conditions.
+- **Financial & Payment Synchronization:** Live booking updates (e.g. quotation edits, payments, voided payments) automatically synchronize across Invoice Detail and PDF generation without altering invoice numbers.
+- **Multi-Tenant Security Isolation:** Strict `agencyId` scoping preserved across all booking and invoice queries, API endpoints, and PDF generation.
+- **Customer Data Safety:** Supplier cost prices, internal markups, driver allowances, and internal notes remain 100% excluded from invoice views and PDFs.
+- **Zero Destructive Operations:** No database records were dropped, altered destructively, or truncated.
+
+## 130.5 Automated Verification & Multi-Viewport QA Results
+
+### Automated Test Matrix:
+- **Invoice Consolidation Integration Matrix (`scratch/test-invoice-consolidation-matrix.ts`):** **12/12 PASSED (100%)**
+- **Batch 1 Regression Matrix (`scratch/test-dev05-batch1-matrix.ts`):** **29/29 PASSED (100%)**
+- **Batch 2 Regression Matrix (`scratch/test-dev05-batch2-matrix.ts`):** **20/20 PASSED (100%)**
+- **Batch 3 Regression Matrix (`scratch/test-dev05-batch3-matrix.ts`):** **24/24 PASSED (100%)**
+- **Batch 4 Database Integrity Matrix (`scratch/test-dev05-batch4-matrix.ts`):** **17/17 PASSED (100%)**
+- **DEV-03B Excel Verification Suite (`scratch/test-dev03-excel.ts`):** **23/23 PASSED (100%)**
+- **TOTAL AUTOMATED TESTS:** **125 / 125 PASSED (100%)**
+
+### Build & Compiler Checks:
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Next.js Production Build (`npm run build`):** **PASS (Turbopack, 32/32 static pages generated, exit code 0)**
+
+### Multi-Viewport Browser QA:
+- **1440 × 900 (Large Desktop):** **PASS** — Actions dropdown and Invoice Card fully visible, clean two-column layout.
+- **1280 × 800 (Standard Laptop):** **PASS** — Proper grid reflow, zero horizontal scrollbar.
+- **1024 × 768 (Tablet Landscape):** **PASS** — Responsive dropdown positioning and card alignment.
+- **768 × 1024 (Tablet Portrait):** **PASS** — Right sidebar stacks cleanly below booking details.
+- **390 × 844 (Modern Mobile - iPhone 14):** **PASS** — Action buttons wrap gracefully, zero touch target overlap.
+- **375 × 667 (Standard Mobile - iPhone SE):** **PASS** — Clean document viewing, no text truncation.
+- **320 × 568 (Small Mobile):** **PASS** — Compact header presentation, zero horizontal overflow or clipping.
+
+## 130.6 Milestone Sign-Off
+- **Batch 1 (Core Service & Payment Unification):** **CLOSED**
+- **Batch 2 (Booking Invoice Card & Invoice Detail Refactor):** **CLOSED**
+- **Batch 3 (Professional Invoice PDF Redesign):** **CLOSED**
+- **Batch 4 (Invoice One-Per-Booking Database Integrity):** **CLOSED**
+- **Invoice UI Consolidation into Booking Detail:** **VERIFIED & CLOSED**
+- **Final Verdict:** **PASS — INVOICE UI CONSOLIDATION ACCEPTED**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
 
 
 

@@ -2,9 +2,37 @@ import "server-only";
 import PDFDocument from "pdfkit";
 import { InvoiceWithDetails } from "./invoice-service";
 
+/**
+ * Helper to format currency in Indian numbering format (INR ₹)
+ */
+function formatINR(val: number | string | any): string {
+  const num = Number(val) || 0;
+  return `₹${num.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+/**
+ * Helper to format dates consistently (DD MMM YYYY)
+ */
+function formatDate(d?: Date | string | null): string {
+  if (!d) return "—";
+  try {
+    return new Date(d).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "—";
+  }
+}
+
 export const invoicePdfService = {
   /**
-   * Generates a high-quality PDF buffer for an Invoice
+   * Generates a commercial-grade, high-resolution PDF buffer for an Invoice
+   * adhering strictly to Decision #18 (Booking as financial source of truth).
    */
   async generateInvoicePdf(invoice: InvoiceWithDetails): Promise<Buffer> {
     return new Promise((resolve, reject) => {
@@ -15,33 +43,508 @@ export const invoicePdfService = {
           bufferPages: true,
           info: {
             Title: `Invoice ${invoice.invoiceNumber || "Draft"}`,
-            Author: (invoice.agencySnapshot as any)?.name || invoice.agency?.name || "TripDesk",
-            Subject: `Travel Invoice for Booking ${invoice.booking?.bookingNumber}`,
+            Author: (invoice.agencySnapshot as any)?.name || invoice.agency?.name || "TripDesk Travel Agency",
+            Subject: `Official Travel Invoice for Booking ${invoice.booking?.bookingNumber || "—"}`,
+            Keywords: `Invoice: ${invoice.invoiceNumber || "DRAFT"}, Booking: ${invoice.booking?.bookingNumber || "—"}`,
+            Creator: "TripDesk Travel Operating System",
           },
         });
 
         const buffers: Buffer[] = [];
-        doc.on("data", (chunk) => buffers.push(chunk));
+        doc.on("data", (chunk: Buffer) => buffers.push(chunk));
         doc.on("end", () => resolve(Buffer.concat(buffers)));
-        doc.on("error", (err) => reject(err));
+        doc.on("error", (err: Error) => reject(err));
 
+        // ═════════════════════════════════════════════════════════════════════
+        // PAGE LAYOUT & COLOR PALETTE
+        // ═════════════════════════════════════════════════════════════════════
         const margin = 40;
         const pageWidth = 595.28;
         const pageHeight = 841.89;
-        const contentWidth = pageWidth - margin * 2;
-        const brandPrimary = "#0F172A"; // Slate 900
-        const brandAccent = "#2563EB"; // Blue 600
+        const contentWidth = pageWidth - margin * 2; // 515.28 pt
 
-        // Background / Watermark check
+        const brandPrimary = "#0F172A"; // Slate 900
+        const brandAccent = "#4338CA"; // Indigo 700
+        const textDark = "#1E293B"; // Slate 800
+        const textMuted = "#475569"; // Slate 600
+        const textLight = "#94A3B8"; // Slate 400
+        const bgLight = "#F8FAFC"; // Slate 50
+        const borderLight = "#E2E8F0"; // Slate 200
+        const greenText = "#16A34A"; // Emerald 600
+        const redText = "#DC2626"; // Rose 600
+
         const isDraft = invoice.status === "DRAFT";
         const isCancelled = invoice.status === "CANCELLED";
 
-        function drawWatermark() {
+        // Multi-page helper: adds page with margin protection
+        const checkPageBreak = (neededHeight: number, onPageAdded?: () => void) => {
+          if (doc.y + neededHeight > pageHeight - 50) {
+            doc.addPage();
+            if (onPageAdded) onPageAdded();
+            return true;
+          }
+          return false;
+        };
+
+        // ═════════════════════════════════════════════════════════════════════
+        // 1. HEADER & AGENCY BRANDING
+        // ═════════════════════════════════════════════════════════════════════
+        let currentY = margin;
+
+        const agencySnap = (invoice.agencySnapshot as any) || invoice.agency || {};
+        const agencyName = agencySnap.name || "TripDesk Partner Agency";
+        const agencyEmail = agencySnap.email || "";
+        const agencyPhone = agencySnap.phone || "";
+        const agencyAddress = agencySnap.address || "";
+        const agencyLogo = agencySnap.logo || invoice.agency?.logo || null;
+
+        // Header Left: Logo or Agency Name
+        let logoDrawn = false;
+        if (agencyLogo && typeof agencyLogo === "string") {
+          try {
+            if (agencyLogo.startsWith("data:image/") || agencyLogo.startsWith("/")) {
+              doc.image(agencyLogo, margin, currentY, { fit: [140, 45] });
+              logoDrawn = true;
+              currentY += 50;
+            }
+          } catch {
+            logoDrawn = false;
+          }
+        }
+
+        if (!logoDrawn) {
+          doc.fillColor(brandPrimary).fontSize(17).font("Helvetica-Bold").text(agencyName, margin, currentY, {
+            width: 280,
+            ellipsis: true,
+          });
+          currentY += 22;
+        }
+
+        doc.fillColor(textMuted).fontSize(8.5).font("Helvetica");
+        if (agencyAddress) {
+          doc.text(agencyAddress, margin, currentY, { width: 280 });
+          currentY += doc.heightOfString(agencyAddress, { width: 280 }) + 2;
+        }
+
+        const agencyContactLine = [agencyPhone, agencyEmail].filter(Boolean).join("  •  ");
+        if (agencyContactLine) {
+          doc.text(agencyContactLine, margin, currentY, { width: 280 });
+          currentY += 12;
+        }
+
+        // Header Right: Title, Number, Status, Dates
+        const rightColW = 200;
+        const rightColX = margin + contentWidth - rightColW;
+        let rightY = margin;
+
+        const headerTitle = isDraft ? "DRAFT INVOICE" : isCancelled ? "CANCELLED INVOICE" : "INVOICE";
+        const titleColor = isCancelled ? redText : isDraft ? textMuted : brandPrimary;
+
+        doc.fillColor(titleColor).fontSize(20).font("Helvetica-Bold").text(headerTitle, rightColX, rightY, {
+          align: "right",
+          width: rightColW,
+        });
+        rightY += 24;
+
+        const invNumberText = invoice.invoiceNumber ? invoice.invoiceNumber : "DRAFT (Unissued)";
+        doc.fillColor(brandAccent).fontSize(11).font("Helvetica-Bold").text(invNumberText, rightColX, rightY, {
+          align: "right",
+          width: rightColW,
+        });
+        rightY += 15;
+
+        doc.fillColor(textMuted).fontSize(8.5).font("Helvetica");
+        doc.text(`Status: ${invoice.status.replace("_", " ")}`, rightColX, rightY, {
+          align: "right",
+          width: rightColW,
+        });
+        rightY += 13;
+
+        doc.text(`Invoice Date: ${formatDate(invoice.invoiceDate)}`, rightColX, rightY, {
+          align: "right",
+          width: rightColW,
+        });
+        rightY += 13;
+
+        doc.text(`Due Date: ${formatDate(invoice.dueDate)}`, rightColX, rightY, {
+          align: "right",
+          width: rightColW,
+        });
+        rightY += 15;
+
+        // Position after header
+        currentY = Math.max(currentY, rightY) + 12;
+
+        // Elegant Divider
+        doc.strokeColor(borderLight).lineWidth(1).moveTo(margin, currentY).lineTo(margin + contentWidth, currentY).stroke();
+        currentY += 14;
+
+        // ═════════════════════════════════════════════════════════════════════
+        // 2. BILLED TO & TRIP / BOOKING REFERENCE CARDS
+        // ═════════════════════════════════════════════════════════════════════
+        const cardH = 82;
+        const cardW = (contentWidth - 14) / 2;
+
+        // Left Card: Customer Details
+        const custSnap: any = (invoice.customerSnapshot as any) || {};
+        const liveCust: any = (invoice.booking?.customer as any) || {};
+        const customerName = liveCust.name || custSnap.name || "Valued Customer";
+        const customerPhone = liveCust.phone || custSnap.phone || "";
+        const customerEmail = liveCust.email || custSnap.email || "";
+        const customerAddress = [
+          liveCust.address || custSnap.address,
+          liveCust.city || custSnap.city,
+          liveCust.state || custSnap.state,
+          liveCust.country || custSnap.country,
+          liveCust.postalCode || custSnap.postalCode,
+        ]
+          .filter(Boolean)
+          .join(", ");
+
+        doc.roundedRect(margin, currentY, cardW, cardH, 4).fillAndStroke(bgLight, borderLight);
+
+        doc.fillColor(brandAccent).fontSize(7.5).font("Helvetica-Bold").text("BILLED TO", margin + 12, currentY + 10);
+        doc.fillColor(brandPrimary).fontSize(10.5).font("Helvetica-Bold").text(customerName, margin + 12, currentY + 22, {
+          width: cardW - 24,
+          ellipsis: true,
+        });
+
+        let custTextY = currentY + 37;
+        doc.fillColor(textMuted).fontSize(8).font("Helvetica");
+        const custContact = [customerPhone, customerEmail].filter(Boolean).join("  •  ");
+        if (custContact) {
+          doc.text(custContact, margin + 12, custTextY, { width: cardW - 24, ellipsis: true });
+          custTextY += 12;
+        }
+        if (customerAddress) {
+          doc.text(customerAddress, margin + 12, custTextY, { width: cardW - 24, height: 24, ellipsis: true });
+        }
+
+        // Right Card: Booking / Trip Reference
+        const rightCardX = margin + cardW + 14;
+        const bookingSnap = (invoice.bookingSnapshot as any) || {};
+        const bookingNumber = invoice.booking?.bookingNumber || bookingSnap.bookingNumber || "—";
+        const tripTitle = invoice.booking?.trip?.title || bookingSnap.tripTitle || "Travel Package";
+        
+        const travelStart = invoice.booking?.travelStartDate || bookingSnap.travelStartDate;
+        const travelEnd = invoice.booking?.travelEndDate || bookingSnap.travelEndDate;
+        const travelPeriodText =
+          travelStart && travelEnd
+            ? `${formatDate(travelStart)} – ${formatDate(travelEnd)}`
+            : travelStart
+            ? `From ${formatDate(travelStart)}`
+            : "Dates confirmed upon booking";
+
+        doc.roundedRect(rightCardX, currentY, cardW, cardH, 4).fillAndStroke(bgLight, borderLight);
+
+        doc.fillColor(brandAccent).fontSize(7.5).font("Helvetica-Bold").text("BOOKING & TRIP REFERENCE", rightCardX + 12, currentY + 10);
+        
+        let refY = currentY + 22;
+        doc.fillColor(textDark).fontSize(8.5).font("Helvetica");
+        
+        doc.text("Booking Ref:", rightCardX + 12, refY);
+        doc.fillColor(brandPrimary).font("Helvetica-Bold").text(bookingNumber, rightCardX + 80, refY);
+        refY += 13;
+
+        doc.fillColor(textDark).font("Helvetica").text("Trip / Tour:", rightCardX + 12, refY);
+        doc.fillColor(brandPrimary).font("Helvetica-Bold").text(tripTitle, rightCardX + 80, refY, {
+          width: cardW - 92,
+          ellipsis: true,
+        });
+        refY += 13;
+
+        doc.fillColor(textDark).font("Helvetica").text("Travel Period:", rightCardX + 12, refY);
+        doc.fillColor(textMuted).font("Helvetica").text(travelPeriodText, rightCardX + 80, refY, {
+          width: cardW - 92,
+          ellipsis: true,
+        });
+        refY += 13;
+
+        doc.fillColor(textDark).font("Helvetica").text("Currency:", rightCardX + 12, refY);
+        doc.fillColor(textMuted).font("Helvetica").text(invoice.currency || "INR", rightCardX + 80, refY);
+
+        currentY += cardH + 18;
+
+        // ═════════════════════════════════════════════════════════════════════
+        // 3. SERVICE ITEMIZATION TABLE
+        // ═════════════════════════════════════════════════════════════════════
+        // Sourcing hierarchy:
+        // 1. Live customer-facing quotation items (invoice.booking.quotation.items)
+        // 2. Existing stored invoice items (invoice.items)
+        // 3. Fallback package summary
+        const quotationItems = invoice.booking?.quotation?.items || [];
+        const invoiceItems = invoice.items || [];
+
+        interface TableLineItem {
+          index: number;
+          name: string;
+          description?: string | null;
+          quantity: number;
+          rate: number;
+          amount: number;
+        }
+
+        const itemsToRender: TableLineItem[] = [];
+
+        if (quotationItems.length > 0) {
+          quotationItems.forEach((item, idx) => {
+            const rate = Number(item.sellingPrice ?? item.unitPrice ?? 0);
+            const amount = Number(item.totalPrice ?? (item.quantity * rate));
+            itemsToRender.push({
+              index: idx + 1,
+              name: item.name,
+              description: item.description,
+              quantity: item.quantity,
+              rate,
+              amount,
+            });
+          });
+        } else if (invoiceItems.length > 0) {
+          invoiceItems.forEach((item, idx) => {
+            itemsToRender.push({
+              index: idx + 1,
+              name: item.description,
+              quantity: item.quantity,
+              rate: Number(item.rate),
+              amount: Number(item.amount),
+            });
+          });
+        } else {
+          // Authoritative Booking total as single package line item
+          const authoritativeTotal = Number(invoice.booking?.totalAmount ?? invoice.totalAmount ?? 0);
+          itemsToRender.push({
+            index: 1,
+            name: tripTitle,
+            description: "Complete Travel Package & Services",
+            quantity: 1,
+            rate: authoritativeTotal,
+            amount: authoritativeTotal,
+          });
+        }
+
+        const colNumW = 28;
+        const colQtyW = 45;
+        const colRateW = 95;
+        const colAmtW = 100;
+        const colDescW = contentWidth - (colNumW + colQtyW + colRateW + colAmtW);
+
+        const drawTableHeader = (yPos: number) => {
+          doc.rect(margin, yPos, contentWidth, 22).fill(brandPrimary);
+          doc.fillColor("#FFFFFF").fontSize(8).font("Helvetica-Bold");
+
+          doc.text("#", margin + 6, yPos + 6, { width: colNumW });
+          doc.text("Description & Services", margin + colNumW + 6, yPos + 6, { width: colDescW });
+          doc.text("Qty", margin + colNumW + colDescW, yPos + 6, { width: colQtyW, align: "center" });
+          doc.text("Rate (₹)", margin + colNumW + colDescW + colQtyW, yPos + 6, { width: colRateW - 8, align: "right" });
+          doc.text("Amount (₹)", margin + colNumW + colDescW + colQtyW + colRateW, yPos + 6, { width: colAmtW - 8, align: "right" });
+        };
+
+        checkPageBreak(50);
+        drawTableHeader(currentY);
+        currentY += 22;
+
+        for (let i = 0; i < itemsToRender.length; i++) {
+          const item = itemsToRender[i];
+          const hasDesc = Boolean(item.description);
+
+          // Calculate dynamic row height
+          let rowHeight = 22;
+          if (hasDesc) {
+            doc.fontSize(7.5).font("Helvetica");
+            const descHeight = doc.heightOfString(item.description!, { width: colDescW - 12 });
+            rowHeight = Math.max(26, 16 + descHeight + 6);
+          }
+
+          if (checkPageBreak(rowHeight)) {
+            currentY = margin;
+            drawTableHeader(currentY);
+            currentY += 22;
+          }
+
+          const bg = i % 2 === 0 ? "#FFFFFF" : bgLight;
+          doc.rect(margin, currentY, contentWidth, rowHeight).fillAndStroke(bg, borderLight);
+
+          doc.fillColor(textDark).fontSize(8.5).font("Helvetica");
+
+          // Index
+          doc.fillColor(textLight).fontSize(8).text(String(item.index), margin + 6, currentY + 6, { width: colNumW });
+
+          // Item Name & Description
+          doc.fillColor(brandPrimary).font("Helvetica-Bold").text(item.name, margin + colNumW + 6, currentY + 6, {
+            width: colDescW - 12,
+          });
+
+          if (hasDesc) {
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(item.description!, margin + colNumW + 6, currentY + 18, {
+              width: colDescW - 12,
+              lineGap: 1,
+            });
+          }
+
+          // Qty, Rate, Amount
+          doc.fillColor(textDark).fontSize(8.5).font("Helvetica");
+          doc.text(String(item.quantity), margin + colNumW + colDescW, currentY + 6, { width: colQtyW, align: "center" });
+          doc.text(formatINR(item.rate), margin + colNumW + colDescW + colQtyW, currentY + 6, {
+            width: colRateW - 8,
+            align: "right",
+          });
+          doc.fillColor(brandPrimary).font("Helvetica-Bold").text(formatINR(item.amount), margin + colNumW + colDescW + colQtyW + colRateW, currentY + 6, {
+            width: colAmtW - 8,
+            align: "right",
+          });
+
+          currentY += rowHeight;
+        }
+
+        currentY += 12;
+
+        // ═════════════════════════════════════════════════════════════════════
+        // 4. FINANCIAL SUMMARY & NOTES (DECISION #18 AUTHORITATIVE)
+        // ═════════════════════════════════════════════════════════════════════
+        // Authoritative Booking financials take strict precedence over static invoice records
+        const subtotal = Number(invoice.subtotal);
+        const discountAmount = Number(invoice.discountAmount || 0);
+        const totalAmount = Number(invoice.booking?.totalAmount ?? invoice.totalAmount ?? 0);
+        const paidAmount = Number(invoice.booking?.paidAmount ?? invoice.paidAmount ?? 0);
+        const balanceAmount = Number(invoice.booking?.balanceAmount ?? invoice.balanceAmount ?? 0);
+
+        const summaryW = 230;
+        const summaryX = margin + contentWidth - summaryW;
+        let summaryH = 96;
+        if (discountAmount > 0) summaryH += 16;
+
+        checkPageBreak(summaryH + 15);
+
+        // Notes and Payment Instructions on the left
+        const notesW = contentWidth - summaryW - 20;
+        let leftNotesY = currentY;
+
+        if (invoice.notes) {
+          doc.fillColor(brandPrimary).fontSize(8).font("Helvetica-Bold").text("Invoice Notes:", margin, leftNotesY);
+          leftNotesY += 11;
+          doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(invoice.notes, margin, leftNotesY, {
+            width: notesW,
+            lineGap: 1.5,
+          });
+          leftNotesY += doc.heightOfString(invoice.notes, { width: notesW }) + 8;
+        }
+
+        if (invoice.paymentInstructions) {
+          doc.fillColor(brandPrimary).fontSize(8).font("Helvetica-Bold").text("Payment Instructions:", margin, leftNotesY);
+          leftNotesY += 11;
+          doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(invoice.paymentInstructions, margin, leftNotesY, {
+            width: notesW,
+            lineGap: 1.5,
+          });
+          leftNotesY += doc.heightOfString(invoice.paymentInstructions, { width: notesW }) + 8;
+        }
+
+        // Summary Card Box on the Right
+        doc.roundedRect(summaryX, currentY, summaryW, summaryH, 4).fillAndStroke(bgLight, borderLight);
+
+        let sumLineY = currentY + 10;
+        doc.fillColor(textMuted).fontSize(8.5).font("Helvetica");
+
+        // Subtotal
+        doc.text("Subtotal:", summaryX + 12, sumLineY);
+        doc.text(formatINR(subtotal), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+        sumLineY += 16;
+
+        // Discount
+        if (discountAmount > 0) {
+          const discLabel =
+            invoice.discountType === "PERCENTAGE"
+              ? `Discount (${Number(invoice.discountValue)}%):`
+              : "Discount:";
+          doc.text(discLabel, summaryX + 12, sumLineY);
+          doc.text(`- ${formatINR(discountAmount)}`, summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+          sumLineY += 16;
+        }
+
+        // Invoice Total
+        doc.fillColor(brandPrimary).font("Helvetica-Bold").text("Invoice Total:", summaryX + 12, sumLineY);
+        doc.text(formatINR(totalAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+        sumLineY += 18;
+
+        // Total Paid
+        doc.fillColor(greenText).font("Helvetica").text("Total Paid:", summaryX + 12, sumLineY);
+        doc.text(formatINR(paidAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+        sumLineY += 18;
+
+        // Balance Due (Dark Highlighted Bar)
+        doc.rect(summaryX, sumLineY - 2, summaryW, 24).fill(brandPrimary);
+        doc.fillColor("#FFFFFF").fontSize(9.5).font("Helvetica-Bold");
+        doc.text("Balance Due:", summaryX + 12, sumLineY + 4);
+        doc.text(formatINR(balanceAmount), summaryX + 12, sumLineY + 4, { width: summaryW - 24, align: "right" });
+
+        currentY = Math.max(leftNotesY, currentY + summaryH) + 16;
+
+        // ═════════════════════════════════════════════════════════════════════
+        // 5. PAYMENT HISTORY LEDGER (EXCLUDES VOIDED / ARCHIVED)
+        // ═════════════════════════════════════════════════════════════════════
+        const activePayments = (invoice.payments || []).filter(
+          (p) => p.status !== "VOIDED" && !p.archivedAt
+        );
+
+        if (activePayments.length > 0) {
+          checkPageBreak(50 + activePayments.length * 18);
+
+          doc.fillColor(brandPrimary).fontSize(9.5).font("Helvetica-Bold").text("Payment History & Receipts", margin, currentY);
+          currentY += 14;
+
+          const pColDateW = 80;
+          const pColNumW = 100;
+          const pColMethodW = 85;
+          const pColRefW = 120;
+          const pColAmtW = contentWidth - (pColDateW + pColNumW + pColMethodW + pColRefW);
+
+          doc.rect(margin, currentY, contentWidth, 20).fill("#F1F5F9");
+          doc.fillColor(textMuted).fontSize(7.5).font("Helvetica-Bold");
+          doc.text("Date", margin + 8, currentY + 6, { width: pColDateW });
+          doc.text("Receipt / Payment #", margin + pColDateW + 8, currentY + 6, { width: pColNumW });
+          doc.text("Method", margin + pColDateW + pColNumW + 8, currentY + 6, { width: pColMethodW });
+          doc.text("Reference (Txn ID)", margin + pColDateW + pColNumW + pColMethodW + 8, currentY + 6, { width: pColRefW });
+          doc.text("Amount (₹)", margin + pColDateW + pColNumW + pColMethodW + pColRefW, currentY + 6, { width: pColAmtW - 8, align: "right" });
+
+          currentY += 20;
+
+          for (let pi = 0; pi < activePayments.length; pi++) {
+            const pay = activePayments[pi];
+            if (checkPageBreak(20)) {
+              currentY = margin;
+            }
+
+            const pBg = pi % 2 === 0 ? "#FFFFFF" : bgLight;
+            doc.rect(margin, currentY, contentWidth, 18).fillAndStroke(pBg, borderLight);
+            doc.fillColor(textDark).fontSize(8).font("Helvetica");
+
+            const payNum = pay.receiptNumber || pay.paymentNumber || "—";
+            doc.text(formatDate(pay.paymentDate), margin + 8, currentY + 5, { width: pColDateW });
+            doc.text(payNum, margin + pColDateW + 8, currentY + 5, { width: pColNumW });
+            doc.text(pay.paymentMethod || "UPI", margin + pColDateW + pColNumW + 8, currentY + 5, { width: pColMethodW });
+            doc.text(pay.referenceNumber || "—", margin + pColDateW + pColNumW + 8, currentY + 5, { width: pColRefW });
+            doc.fillColor(brandPrimary).font("Helvetica-Bold").text(formatINR(pay.amount), margin + pColDateW + pColNumW + pColMethodW + pColRefW, currentY + 5, {
+              width: pColAmtW - 8,
+              align: "right",
+            });
+
+            currentY += 18;
+          }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // 6. GLOBAL WATERMARK & PAGE NUMBERING ON ALL PAGES
+        // ═════════════════════════════════════════════════════════════════════
+        const range = doc.bufferedPageRange();
+        for (let i = range.start; i < range.start + range.count; i++) {
+          doc.switchToPage(i);
+
+          // Watermark for Cancelled / Draft
           if (isDraft || isCancelled) {
             doc.save();
             doc.rotate(-45, { origin: [pageWidth / 2, pageHeight / 2] });
-            doc.fontSize(isDraft ? 36 : 48).font("Helvetica-Bold");
-            doc.fillColor(isCancelled ? "#EF4444" : "#94A3B8", 0.12);
+            doc.fontSize(isDraft ? 36 : 46).font("Helvetica-Bold");
+            doc.fillColor(isCancelled ? "#EF4444" : "#94A3B8", 0.08);
             doc.text(
               isDraft ? "DRAFT — NOT AN ISSUED INVOICE" : "CANCELLED",
               margin,
@@ -50,290 +553,34 @@ export const invoicePdfService = {
             );
             doc.restore();
           }
+
+          // Global Footer
+          const footerY = pageHeight - 32;
+
+          doc.strokeColor(borderLight).lineWidth(0.5).moveTo(margin, footerY).lineTo(margin + contentWidth, footerY).stroke();
+
+          // Left: Computer-generated notice
+          doc
+            .fillColor(textLight)
+            .fontSize(7)
+            .font("Helvetica")
+            .text(
+              `This is a computer-generated invoice from ${agencyName} • Powered by TripDesk`,
+              margin,
+              footerY + 6,
+              { width: contentWidth - 85, ellipsis: true }
+            );
+
+          // Right: Page number
+          doc
+            .fillColor(textLight)
+            .fontSize(7)
+            .font("Helvetica")
+            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 80, footerY + 6, {
+              width: 80,
+              align: "right",
+            });
         }
-
-        drawWatermark();
-
-        let y = margin;
-
-        // ══════════════════════════════════════════════════
-        // 1. HEADER & BRANDING
-        // ══════════════════════════════════════════════════
-        const agencySnap = (invoice.agencySnapshot as any) || invoice.agency || {};
-        const agencyName = agencySnap.name || "Travel Agency";
-        const agencyEmail = agencySnap.email || "";
-        const agencyPhone = agencySnap.phone || "";
-        const agencyAddress = agencySnap.address || "";
-
-        doc.fillColor(brandPrimary).fontSize(20).font("Helvetica-Bold").text(agencyName, margin, y);
-        y += 24;
-
-        doc.fillColor("#64748B").fontSize(8.5).font("Helvetica");
-        if (agencyAddress) {
-          doc.text(agencyAddress, margin, y, { width: 280 });
-          y += doc.heightOfString(agencyAddress, { width: 280 }) + 2;
-        }
-        const contactLine = [agencyPhone, agencyEmail].filter(Boolean).join(" • ");
-        if (contactLine) {
-          doc.text(contactLine, margin, y, { width: 280 });
-          y += 12;
-        }
-
-        // Invoice Header Title (Right Aligned)
-        const headerTitleY = margin;
-        const headerTitle = isDraft ? "DRAFT INVOICE" : isCancelled ? "CANCELLED INVOICE" : "INVOICE";
-        const titleColor = isCancelled ? "#DC2626" : isDraft ? "#64748B" : brandAccent;
-
-        doc.fillColor(titleColor).fontSize(22).font("Helvetica-Bold").text(headerTitle, margin, headerTitleY, {
-          align: "right",
-          width: contentWidth,
-        });
-
-        // Invoice Number & Status
-        const invNumberText = invoice.invoiceNumber ? invoice.invoiceNumber : "DRAFT (Unissued)";
-        doc.fillColor(brandPrimary).fontSize(11).font("Helvetica-Bold").text(invNumberText, margin, headerTitleY + 26, {
-          align: "right",
-          width: contentWidth,
-        });
-
-        doc.fillColor("#64748B").fontSize(9).font("Helvetica").text(
-          `Status: ${invoice.status.replace("_", " ")}`,
-          margin,
-          headerTitleY + 40,
-          { align: "right", width: contentWidth }
-        );
-
-        y = Math.max(y, margin + 60) + 15;
-
-        // Divider
-        doc.strokeColor("#E2E8F0").lineWidth(1).moveTo(margin, y).lineTo(margin + contentWidth, y).stroke();
-        y += 15;
-
-        // ══════════════════════════════════════════════════
-        // 2. BILL TO & INVOICE / TRIP DETAILS
-        // ══════════════════════════════════════════════════
-        const cardHeight = 85;
-        const colWidth = (contentWidth - 15) / 2;
-
-        // Bill To Card
-        doc.rect(margin, y, colWidth, cardHeight).fillAndStroke("#F8FAFC", "#E2E8F0");
-        doc.fillColor("#64748B").fontSize(8).font("Helvetica-Bold").text("BILLED TO", margin + 12, y + 10);
-
-        const custSnap = (invoice.customerSnapshot as any) || {};
-        const custName = custSnap.name || "Customer";
-        const custPhone = custSnap.phone || "";
-        const custEmail = custSnap.email || "";
-        const custAddress = [custSnap.address, custSnap.city, custSnap.state, custSnap.postalCode]
-          .filter(Boolean)
-          .join(", ");
-
-        doc.fillColor(brandPrimary).fontSize(10.5).font("Helvetica-Bold").text(custName, margin + 12, y + 23);
-        doc.fillColor("#475569").fontSize(8.5).font("Helvetica");
-        let custY = y + 37;
-        if (custPhone || custEmail) {
-          doc.text([custPhone, custEmail].filter(Boolean).join(" • "), margin + 12, custY);
-          custY += 12;
-        }
-        if (custAddress) {
-          doc.text(custAddress, margin + 12, custY, { width: colWidth - 24, height: 26 });
-        }
-
-        // Invoice & Booking Details Card (Right Column)
-        const rightColX = margin + colWidth + 15;
-        doc.rect(rightColX, y, colWidth, cardHeight).fillAndStroke("#F8FAFC", "#E2E8F0");
-        doc.fillColor("#64748B").fontSize(8).font("Helvetica-Bold").text("INVOICE & TRIP REFERENCE", rightColX + 12, y + 10);
-
-        const formatDate = (d?: Date | string | null) => {
-          if (!d) return "—";
-          return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-        };
-
-        const bookingSnap = (invoice.bookingSnapshot as any) || {};
-        const bookingNum = bookingSnap.bookingNumber || invoice.booking?.bookingNumber || "—";
-        const tripTitle = bookingSnap.tripTitle || "Travel Package";
-
-        let rightY = y + 23;
-        doc.fillColor("#475569").fontSize(8.5).font("Helvetica");
-        doc.text(`Invoice Date: ${formatDate(invoice.invoiceDate)}`, rightColX + 12, rightY);
-        rightY += 13;
-        doc.text(`Due Date: ${formatDate(invoice.dueDate)}`, rightColX + 12, rightY);
-        rightY += 13;
-        doc.text(`Booking Ref: ${bookingNum}`, rightColX + 12, rightY);
-        rightY += 13;
-        doc.text(`Trip: ${tripTitle}`, rightColX + 12, rightY, { width: colWidth - 24 });
-
-        y += cardHeight + 20;
-
-        // ══════════════════════════════════════════════════
-        // 3. LINE ITEMS TABLE
-        // ══════════════════════════════════════════════════
-        const tableTop = y;
-        const colNumW = 30;
-        const colQtyW = 50;
-        const colRateW = 90;
-        const colAmtW = 95;
-        const colDescW = contentWidth - (colNumW + colQtyW + colRateW + colAmtW);
-
-        // Header
-        doc.rect(margin, tableTop, contentWidth, 24).fill("#0F172A");
-        doc.fillColor("#FFFFFF").fontSize(8.5).font("Helvetica-Bold");
-
-        doc.text("#", margin + 8, tableTop + 7, { width: colNumW });
-        doc.text("Description", margin + colNumW + 8, tableTop + 7, { width: colDescW });
-        doc.text("Qty", margin + colNumW + colDescW, tableTop + 7, { width: colQtyW, align: "center" });
-        doc.text("Rate (₹)", margin + colNumW + colDescW + colQtyW, tableTop + 7, { width: colRateW - 10, align: "right" });
-        doc.text("Amount (₹)", margin + colNumW + colDescW + colQtyW + colRateW, tableTop + 7, { width: colAmtW - 10, align: "right" });
-
-        y = tableTop + 24;
-
-        const formatINR = (val: number | string | any) => {
-          const num = Number(val) || 0;
-          return `₹${num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        };
-
-        let rowIndex = 0;
-        for (const item of invoice.items) {
-          const rowHeight = 22;
-          const bg = rowIndex % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
-
-          doc.rect(margin, y, contentWidth, rowHeight).fillAndStroke(bg, "#E2E8F0");
-          doc.fillColor("#334155").fontSize(8.5).font("Helvetica");
-
-          doc.text(String(rowIndex + 1), margin + 8, y + 6, { width: colNumW });
-          doc.text(item.description, margin + colNumW + 8, y + 6, { width: colDescW - 12 });
-          doc.text(String(item.quantity), margin + colNumW + colDescW, y + 6, { width: colQtyW, align: "center" });
-          doc.text(formatINR(item.rate), margin + colNumW + colDescW + colQtyW, y + 6, { width: colRateW - 10, align: "right" });
-          doc.text(formatINR(item.amount), margin + colNumW + colDescW + colQtyW + colRateW, y + 6, { width: colAmtW - 10, align: "right" });
-
-          y += rowHeight;
-          rowIndex++;
-        }
-
-        y += 10;
-
-        // ══════════════════════════════════════════════════
-        // 4. FINANCIAL SUMMARY (RIGHT ALIGNED CARD)
-        // ══════════════════════════════════════════════════
-        const summaryW = 230;
-        const summaryX = margin + contentWidth - summaryW;
-        const subtotal = Number(invoice.subtotal);
-        const discountAmount = Number(invoice.discountAmount || 0);
-        const totalAmount = Number(invoice.totalAmount);
-        const paidAmount = Number(invoice.paidAmount || 0);
-        const balanceAmount = Number(invoice.balanceAmount || 0);
-
-        let summaryH = 100;
-        if (discountAmount > 0) summaryH += 18;
-
-        doc.rect(summaryX, y, summaryW, summaryH).fillAndStroke("#F8FAFC", "#E2E8F0");
-
-        let sumY = y + 10;
-        doc.fillColor("#475569").fontSize(9).font("Helvetica");
-
-        // Subtotal
-        doc.text("Subtotal:", summaryX + 12, sumY);
-        doc.text(formatINR(subtotal), summaryX + 12, sumY, { width: summaryW - 24, align: "right" });
-        sumY += 16;
-
-        // Discount
-        if (discountAmount > 0) {
-          const discLabel =
-            invoice.discountType === "PERCENTAGE"
-              ? `Discount (${Number(invoice.discountValue)}%):`
-              : "Discount:";
-          doc.text(discLabel, summaryX + 12, sumY);
-          doc.text(`- ${formatINR(discountAmount)}`, summaryX + 12, sumY, { width: summaryW - 24, align: "right" });
-          sumY += 16;
-        }
-
-        // Total
-        doc.fillColor(brandPrimary).font("Helvetica-Bold").text("Invoice Total:", summaryX + 12, sumY);
-        doc.text(formatINR(totalAmount), summaryX + 12, sumY, { width: summaryW - 24, align: "right" });
-        sumY += 18;
-
-        // Total Paid
-        doc.fillColor("#16A34A").font("Helvetica").text("Total Paid:", summaryX + 12, sumY);
-        doc.text(formatINR(paidAmount), summaryX + 12, sumY, { width: summaryW - 24, align: "right" });
-        sumY += 18;
-
-        // Balance Due
-        doc.rect(summaryX, sumY - 2, summaryW, 24).fill("#0F172A");
-        doc.fillColor("#FFFFFF").fontSize(10).font("Helvetica-Bold");
-        doc.text("Balance Due:", summaryX + 12, sumY + 4);
-        doc.text(formatINR(balanceAmount), summaryX + 12, sumY + 4, { width: summaryW - 24, align: "right" });
-
-        // Left side: Payment Instructions & Notes
-        const notesW = contentWidth - summaryW - 20;
-        let noteY = y;
-
-        if (invoice.notes) {
-          doc.fillColor("#475569").fontSize(8.5).font("Helvetica-Bold").text("Invoice Notes:", margin, noteY);
-          noteY += 12;
-          doc.fillColor("#64748B").fontSize(8).font("Helvetica").text(invoice.notes, margin, noteY, { width: notesW });
-          noteY += doc.heightOfString(invoice.notes, { width: notesW }) + 10;
-        }
-
-        if (invoice.paymentInstructions) {
-          doc.fillColor("#475569").fontSize(8.5).font("Helvetica-Bold").text("Payment Instructions:", margin, noteY);
-          noteY += 12;
-          doc.fillColor("#64748B").fontSize(8).font("Helvetica").text(invoice.paymentInstructions, margin, noteY, { width: notesW });
-          noteY += doc.heightOfString(invoice.paymentInstructions, { width: notesW }) + 10;
-        }
-
-        y += summaryH + 20;
-
-        // ══════════════════════════════════════════════════
-        // 5. ACTIVE PAYMENT HISTORY TABLE (Excludes VOIDED)
-        // ══════════════════════════════════════════════════
-        const activePayments = (invoice.payments || []).filter((p) => p.status !== "VOIDED" && !p.archivedAt);
-
-        if (activePayments.length > 0) {
-          doc.fillColor(brandPrimary).fontSize(10).font("Helvetica-Bold").text("Payment History", margin, y);
-          y += 14;
-
-          const pColDateW = 90;
-          const pColNumW = 110;
-          const pColMethodW = 90;
-          const pColRefW = 120;
-          const pColAmtW = contentWidth - (pColDateW + pColNumW + pColMethodW + pColRefW);
-
-          doc.rect(margin, y, contentWidth, 20).fill("#F1F5F9");
-          doc.fillColor("#475569").fontSize(8).font("Helvetica-Bold");
-          doc.text("Date", margin + 8, y + 6, { width: pColDateW });
-          doc.text("Payment #", margin + pColDateW + 8, y + 6, { width: pColNumW });
-          doc.text("Method", margin + pColDateW + pColNumW + 8, y + 6, { width: pColMethodW });
-          doc.text("Reference", margin + pColDateW + pColNumW + pColMethodW + 8, y + 6, { width: pColRefW });
-          doc.text("Amount (₹)", margin + pColDateW + pColNumW + pColMethodW + pColRefW, y + 6, { width: pColAmtW - 10, align: "right" });
-
-          y += 20;
-
-          for (const pay of activePayments) {
-            doc.rect(margin, y, contentWidth, 18).fillAndStroke("#FFFFFF", "#E2E8F0");
-            doc.fillColor("#334155").fontSize(8).font("Helvetica");
-
-            doc.text(formatDate(pay.paymentDate), margin + 8, y + 5, { width: pColDateW });
-            doc.text(pay.paymentNumber || "—", margin + pColDateW + 8, y + 5, { width: pColNumW });
-            doc.text(pay.paymentMethod || "UPI", margin + pColDateW + pColNumW + 8, y + 5, { width: pColMethodW });
-            doc.text(pay.referenceNumber || "—", margin + pColDateW + pColNumW + pColMethodW + 8, y + 5, { width: pColRefW });
-            doc.text(formatINR(pay.amount), margin + pColDateW + pColNumW + pColMethodW + pColRefW, y + 5, { width: pColAmtW - 10, align: "right" });
-
-            y += 18;
-          }
-        }
-
-        // ══════════════════════════════════════════════════
-        // 6. FOOTER
-        // ══════════════════════════════════════════════════
-        doc
-          .fontSize(7.5)
-          .font("Helvetica")
-          .fillColor("#94A3B8")
-          .text(
-            `This is a computer-generated invoice from ${agencyName} • Powered by TripDesk`,
-            margin,
-            pageHeight - 35,
-            { align: "center", width: contentWidth }
-          );
 
         doc.end();
       } catch (err) {

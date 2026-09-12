@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { Payment, PaymentMethod, PaymentStatus, Prisma } from "@prisma/client";
+import { Payment, PaymentMethod, PaymentStatus, InvoiceStatus, Prisma } from "@prisma/client";
 import { bookingService } from "./booking-service";
 import { communicationService } from "./communication-service";
 import {
@@ -173,7 +173,7 @@ export const paymentService = {
   },
 
   /**
-   * Log a new payment and automatically recalculate booking balance
+   * Log a new payment and automatically recalculate booking balance and sync active invoice
    */
   async createPayment(agencyId: string, data: CreatePaymentInput): Promise<PaymentWithRelations> {
     const booking = await prisma.booking.findFirst({
@@ -187,11 +187,22 @@ export const paymentService = {
 
     const paymentNumber = await this.generateNextPaymentNumber(agencyId);
 
+    // Look for active (non-cancelled) invoice for this booking
+    const activeInvoice = await prisma.invoice.findFirst({
+      where: {
+        agencyId,
+        bookingId: data.bookingId,
+        status: { not: InvoiceStatus.CANCELLED },
+        archivedAt: null,
+      },
+    });
+
     const payment = await prisma.$transaction(async (tx) => {
       const p = await tx.payment.create({
         data: {
           agencyId,
           bookingId: data.bookingId,
+          invoiceId: activeInvoice?.id || null,
           tripId: booking.tripId,
           customerId: booking.customerId,
           paymentNumber,
@@ -225,7 +236,7 @@ export const paymentService = {
         },
       });
 
-      // Recalculate booking paid and balance totals
+      // Recalculate booking paid and balance totals (which also syncs active invoice in same tx)
       await bookingService.recalculateBookingPaymentTotals(booking.id, tx);
 
       return p;
