@@ -24,6 +24,7 @@ import {
 import { PaymentMethod, SupplierPayable, Supplier } from "@prisma/client";
 import { financeClient, supplierClient } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -126,7 +127,7 @@ export function RecordSupplierPaymentDialog({
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      toast.error(err.message || "Failed to record disbursement.");
+      toast.error(getErrorMessage(err, "Failed to record disbursement."));
     } finally {
       setLoading(false);
     }

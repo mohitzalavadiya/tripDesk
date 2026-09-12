@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   RefreshCw,
   Zap,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +53,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/shared/page-header";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { getErrorMessage } from "@/lib/utils";
 import {
   documentClient,
   DocumentItem,
@@ -63,6 +67,24 @@ import {
   NotificationChannel,
 } from "@prisma/client";
 import { toast } from "sonner";
+
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  ALL: "All",
+  HOTEL_VOUCHER: "Hotel Voucher",
+  VEHICLE_VOUCHER: "Vehicle Voucher",
+  ACTIVITY_VOUCHER: "Activity Pass",
+  BOOKING_CONFIRMATION: "Booking Confirmation",
+  CUSTOMER_ITINERARY: "Travel Itinerary",
+  PAYMENT_RECEIPT: "Payment Receipt",
+};
+
+const DOCUMENT_STATUS_LABELS: Record<string, string> = {
+  ALL: "All",
+  GENERATED: "Draft / Generated",
+  ISSUED: "Officially Issued",
+  REVOKED: "Revoked",
+  SUPERSEDED: "Superseded",
+};
 
 export default function DocumentCenterPage() {
   const [loading, setLoading] = React.useState(true);
@@ -110,7 +132,7 @@ export default function DocumentCenterPage() {
       setTotal(res.meta.total);
       setTotalPages(res.meta.totalPages);
     } catch (err: any) {
-      toast.error(err?.message || "Failed to fetch documents.");
+      toast.error(getErrorMessage(err, "Failed to fetch documents."));
     } finally {
       setLoading(false);
     }
@@ -133,7 +155,7 @@ export default function DocumentCenterPage() {
       setIssueDoc(null);
       await fetchDocuments();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to issue document.");
+      toast.error(getErrorMessage(err, "Failed to issue document."));
     } finally {
       setIssuing(false);
     }
@@ -153,7 +175,7 @@ export default function DocumentCenterPage() {
       setRevokeReason("");
       await fetchDocuments();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to revoke document.");
+      toast.error(getErrorMessage(err, "Failed to revoke document."));
     } finally {
       setRevoking(false);
     }
@@ -172,7 +194,7 @@ export default function DocumentCenterPage() {
       setCustomRecipient("");
       await fetchDocuments();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to resend document.");
+      toast.error(getErrorMessage(err, "Failed to resend document."));
     } finally {
       setResending(false);
     }
@@ -226,37 +248,6 @@ export default function DocumentCenterPage() {
     }
   };
 
-  const renderStatusBadge = (status: TravelDocumentStatus, isLatest: boolean) => {
-    switch (status) {
-      case "ISSUED":
-        return (
-          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold gap-1">
-            <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Issued
-          </Badge>
-        );
-      case "GENERATED":
-        return (
-          <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] font-bold gap-1">
-            <Clock className="h-3 w-3 text-amber-600" /> Draft / Generated
-          </Badge>
-        );
-      case "REVOKED":
-        return (
-          <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px] font-bold gap-1">
-            <XCircle className="h-3 w-3 text-rose-600" /> Revoked
-          </Badge>
-        );
-      case "SUPERSEDED":
-        return (
-          <Badge className="bg-slate-100 text-slate-600 border-slate-200 text-[10px] font-bold gap-1">
-            <RotateCcw className="h-3 w-3 text-slate-400" /> Superseded
-          </Badge>
-        );
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
-
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return "—";
     try {
@@ -271,72 +262,121 @@ export default function DocumentCenterPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
-      <PageHeader
-        title="Travel Documents & Vouchers"
-        description="Official travel vouchers, booking confirmations, payment receipts, and customer itineraries."
-        breadcrumbs={[{ label: "Documents" }]}
-        primaryAction={{
-          label: "Refresh List",
-          onClick: fetchDocuments,
-          icon: RefreshCw,
-        }}
-      />
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+        <PageHeader
+          title="Travel Documents & Vouchers"
+          description="Official travel vouchers, booking confirmations, payment receipts, and customer itineraries."
+          breadcrumbs={[{ label: "Documents" }]}
+          primaryAction={{
+            label: "Refresh List",
+            onClick: fetchDocuments,
+            icon: RefreshCw,
+          }}
+        />
 
-      <div className="px-4 py-6 md:px-8 max-w-7xl w-full mx-auto space-y-6">
-        {/* Filters and Search Bar */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row items-center gap-3 justify-between">
-          <div className="flex items-center gap-3 w-full md:w-auto flex-1">
-            <div className="relative w-full max-w-md">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search document #, customer, or booking ref..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-9 text-xs bg-slate-50/50 border-slate-200"
-              />
+        {/* Master Workspace Card (Unified Search Toolbar + Table) */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+          {/* Master Toolbar Header */}
+          <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-2xl">
+                <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search document #, customer, or booking ref..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all"
+                />
+                {search && (
+                  <button
+                    onClick={() => {
+                      setSearch("");
+                      setPage(1);
+                    }}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                {/* Type Filter */}
+                <Select
+                  value={typeFilter}
+                  onValueChange={(val) => {
+                    if (val) {
+                      setTypeFilter(val);
+                      setPage(1);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9.5 text-xs w-[160px] rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300">
+                    <SelectValue placeholder="All">
+                      {(val) => DOCUMENT_TYPE_LABELS[val] ?? "All"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All</SelectItem>
+                    <SelectItem value="HOTEL_VOUCHER">Hotel Voucher</SelectItem>
+                    <SelectItem value="VEHICLE_VOUCHER">Vehicle Voucher</SelectItem>
+                    <SelectItem value="ACTIVITY_VOUCHER">Activity Pass</SelectItem>
+                    <SelectItem value="BOOKING_CONFIRMATION">Booking Confirmation</SelectItem>
+                    <SelectItem value="CUSTOMER_ITINERARY">Travel Itinerary</SelectItem>
+                    <SelectItem value="PAYMENT_RECEIPT">Payment Receipt</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Status Filter */}
+                <Select
+                  value={statusFilter}
+                  onValueChange={(val) => {
+                    if (val) {
+                      setStatusFilter(val);
+                      setPage(1);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9.5 text-xs w-[140px] rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300">
+                    <SelectValue placeholder="All">
+                      {(val) => DOCUMENT_STATUS_LABELS[val] ?? "All"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All</SelectItem>
+                    <SelectItem value="GENERATED">Draft / Generated</SelectItem>
+                    <SelectItem value="ISSUED">Officially Issued</SelectItem>
+                    <SelectItem value="REVOKED">Revoked</SelectItem>
+                    <SelectItem value="SUPERSEDED">Superseded</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {(search || typeFilter !== "ALL" || statusFilter !== "ALL") && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearch("");
+                      setTypeFilter("ALL");
+                      setStatusFilter("ALL");
+                      setPage(1);
+                    }}
+                    className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 shrink-0 cursor-pointer font-semibold rounded-lg"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                    Reset
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-
-          <div className="flex items-center gap-2.5 w-full md:w-auto overflow-x-auto">
-            {/* Type Filter */}
-            <Select value={typeFilter} onValueChange={(val) => { if (val) { setTypeFilter(val); setPage(1); } }}>
-              <SelectTrigger className="h-9 text-xs w-[160px] bg-slate-50/50 border-slate-200">
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Document Types</SelectItem>
-                <SelectItem value="HOTEL_VOUCHER">Hotel Voucher</SelectItem>
-                <SelectItem value="VEHICLE_VOUCHER">Vehicle Voucher</SelectItem>
-                <SelectItem value="ACTIVITY_VOUCHER">Activity Pass</SelectItem>
-                <SelectItem value="BOOKING_CONFIRMATION">Booking Confirmation</SelectItem>
-                <SelectItem value="CUSTOMER_ITINERARY">Travel Itinerary</SelectItem>
-                <SelectItem value="PAYMENT_RECEIPT">Payment Receipt</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Status Filter */}
-            <Select value={statusFilter} onValueChange={(val) => { if (val) { setStatusFilter(val); setPage(1); } }}>
-              <SelectTrigger className="h-9 text-xs w-[140px] bg-slate-50/50 border-slate-200">
-                <SelectValue placeholder="All Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Statuses</SelectItem>
-                <SelectItem value="GENERATED">Draft / Generated</SelectItem>
-                <SelectItem value="ISSUED">Officially Issued</SelectItem>
-                <SelectItem value="REVOKED">Revoked</SelectItem>
-                <SelectItem value="SUPERSEDED">Superseded</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Documents Table */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
           {loading ? (
-            <div className="py-20 flex flex-col items-center justify-center text-center">
-              <Loader2 className="h-8 w-8 text-indigo-600 animate-spin mb-3" />
-              <p className="text-xs font-bold text-slate-600">Loading travel documents...</p>
+            <div className="p-4">
+              <TableSkeleton rows={8} />
             </div>
           ) : documents.length === 0 ? (
             <div className="py-20 flex flex-col items-center justify-center text-center px-4">
@@ -347,9 +387,9 @@ export default function DocumentCenterPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[620px] overflow-y-auto">
               <Table>
-                <TableHeader className="bg-slate-50 text-[11px] uppercase font-bold text-slate-600">
+                <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm text-[11px] uppercase font-bold text-slate-600 shadow-2xs">
                   <TableRow>
                     <TableHead className="py-3 px-4">Document #</TableHead>
                     <TableHead className="py-3 px-4">Type</TableHead>
@@ -396,7 +436,7 @@ export default function DocumentCenterPage() {
 
                       {/* Status */}
                       <TableCell className="py-3.5 px-4">
-                        {renderStatusBadge(doc.status, doc.isLatest)}
+                        <StatusBadge status={doc.status} />
                       </TableCell>
 
                       {/* Issue Date */}

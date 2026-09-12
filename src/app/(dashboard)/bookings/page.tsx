@@ -30,10 +30,21 @@ import {
   Layers,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -58,6 +69,13 @@ import { bookingClient, BookingWithRelations } from "@/lib/api-client";
 import { BookingStatus, BookingPaymentStatus } from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+
+const PAYMENT_FILTER_LABELS: Record<string, string> = {
+  all: "All",
+  [BookingPaymentStatus.UNPAID]: "Unpaid",
+  [BookingPaymentStatus.PARTIALLY_PAID]: "Partially Paid",
+  [BookingPaymentStatus.PAID]: "Fully Paid",
+};
 
 export default function BookingsDashboardPage() {
   const router = useRouter();
@@ -115,7 +133,7 @@ export default function BookingsDashboardPage() {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
-      setError(err?.message || "Failed to load bookings from database.");
+      setError(getErrorMessage(err, "Unable to load bookings. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -124,6 +142,15 @@ export default function BookingsDashboardPage() {
   React.useEffect(() => {
     fetchBookings();
   }, [fetchBookings]);
+
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleClearFilters = () => {
     setSearch("");
@@ -136,26 +163,33 @@ export default function BookingsDashboardPage() {
   const isFilterActive = search.trim() !== "" || statusFilter !== "all" || paymentFilter !== "all";
 
   // Soft Archive Booking
-  const handleDelete = async (id: string, number: string) => {
+  const handleDelete = (id: string, number: string) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Modifications are restricted to read-only mode.");
       return;
     }
 
-    if (!confirm(`Archive booking ${number}? This will preserve historical payment audit trails.`)) {
-      return;
-    }
-
-    try {
-      setDeletingId(id);
-      await bookingClient.deleteBooking(id);
-      toast.success(`Booking ${number} archived successfully.`);
-      await fetchBookings();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive booking.");
-    } finally {
-      setDeletingId(null);
-    }
+    setConfirmAction({
+      title: "Archive booking?",
+      description: `Archive booking ${number}? Historical payment audit trails and linked trip details will remain safe.`,
+      confirmText: "Archive Booking",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          setDeletingId(id);
+          await bookingClient.deleteBooking(id);
+          toast.success(`Booking ${number} archived successfully.`);
+          setConfirmAction(null);
+          await fetchBookings();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the booking. Please try again."));
+        } finally {
+          setActionLoading(false);
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
   const formatDateDisplay = (date: Date | string | null | undefined) => {
@@ -262,22 +296,30 @@ export default function BookingsDashboardPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Payment:</span>
-                  <select
+                  <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Payment:</span>
+                  <Select
                     value={paymentFilter}
-                    onChange={(e) => {
-                      setPaymentFilter(e.target.value);
-                      setPage(1);
+                    onValueChange={(val) => {
+                      if (val) {
+                        setPaymentFilter(val);
+                        setPage(1);
+                      }
                     }}
-                    className="h-8 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
-                    <option value="all">All Statuses</option>
-                    <option value={BookingPaymentStatus.UNPAID}>Unpaid</option>
-                    <option value={BookingPaymentStatus.PARTIALLY_PAID}>Partially Paid</option>
-                    <option value={BookingPaymentStatus.PAID}>Fully Paid</option>
-                  </select>
+                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[130px] sm:w-[140px]">
+                      <SelectValue placeholder="All">
+                        {(val) => PAYMENT_FILTER_LABELS[val] ?? "All"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value={BookingPaymentStatus.UNPAID}>Unpaid</SelectItem>
+                      <SelectItem value={BookingPaymentStatus.PARTIALLY_PAID}>Partially Paid</SelectItem>
+                      <SelectItem value={BookingPaymentStatus.PAID}>Fully Paid</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {isFilterActive && (
@@ -297,27 +339,19 @@ export default function BookingsDashboardPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching bookings from database...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchBookings()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load bookings"
+                description={error}
+                onRetry={() => fetchBookings()}
+              />
             </div>
           )}
 
@@ -538,6 +572,24 @@ export default function BookingsDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
+      />
     </div>
   );
 }

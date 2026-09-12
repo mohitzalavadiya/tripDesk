@@ -310,6 +310,240 @@ export const paymentService = {
   },
 
   /**
+   * Record payment directly against an Invoice and sync Invoice + Booking totals
+   */
+  async recordInvoicePayment(
+    agencyId: string,
+    invoiceId: string,
+    data: {
+      amount: number;
+      paymentMethod?: PaymentMethod;
+      paymentDate?: string | Date;
+      referenceNumber?: string | null;
+      receiptNumber?: string | null;
+      notes?: string | null;
+      receivedBy?: string | null;
+    }
+  ): Promise<PaymentWithRelations> {
+    if (data.amount <= 0) {
+      throw new Error("Payment amount must be greater than 0.");
+    }
+
+    const paymentDate = data.paymentDate ? new Date(data.paymentDate) : new Date();
+    const now = new Date();
+    if (paymentDate > now) {
+      throw new Error("Payment Date cannot be in the future.");
+    }
+
+    const payment = await prisma.$transaction(async (tx) => {
+      const invoice = await tx.invoice.findFirst({
+        where: { id: invoiceId, agencyId, archivedAt: null },
+        include: { booking: true },
+      });
+
+      if (!invoice) {
+        throw new Error("Invoice not found.");
+      }
+
+      if (invoice.status === "DRAFT") {
+        throw new Error("Cannot record payment on a DRAFT invoice. The invoice must be issued first.");
+      }
+
+      if (invoice.status === "CANCELLED") {
+        throw new Error("Cannot record payment on a CANCELLED invoice.");
+      }
+
+      const balance = Number(invoice.balanceAmount);
+      if (data.amount > balance) {
+        throw new Error(`Payment amount (₹${data.amount}) exceeds remaining invoice balance (₹${balance}).`);
+      }
+
+      const paymentNumber = await this.generateNextPaymentNumber(agencyId, tx);
+
+      const p = await tx.payment.create({
+        data: {
+          agencyId,
+          bookingId: invoice.bookingId,
+          invoiceId: invoice.id,
+          tripId: invoice.booking.tripId,
+          customerId: invoice.booking.customerId,
+          paymentNumber,
+          amount: new Prisma.Decimal(data.amount),
+          currency: invoice.currency || "INR",
+          paymentMethod: data.paymentMethod || PaymentMethod.UPI,
+          paymentDate,
+          status: PaymentStatus.COMPLETED,
+          referenceNumber: data.referenceNumber,
+          receiptNumber: data.receiptNumber,
+          notes: data.notes,
+          receivedBy: data.receivedBy,
+        },
+        include: {
+          booking: {
+            select: {
+              id: true,
+              bookingNumber: true,
+              totalAmount: true,
+              paidAmount: true,
+              balanceAmount: true,
+              status: true,
+              currency: true,
+            },
+          },
+          customer: {
+            select: { id: true, name: true, phone: true, email: true },
+          },
+          trip: {
+            select: { id: true, title: true, tripNumber: true },
+          },
+        },
+      });
+
+      // Recalculate Invoice balance and status
+      const activePayments = await tx.payment.findMany({
+        where: { invoiceId, archivedAt: null, status: { not: PaymentStatus.VOIDED } },
+        select: { amount: true },
+      });
+
+      const totalPaid = activePayments.reduce((sum, pay) => sum + Number(pay.amount), 0);
+      const totalAmount = Number(invoice.totalAmount);
+      const newBalance = Math.max(0, Math.round((totalAmount - totalPaid) * 100) / 100);
+
+      const newStatus =
+        newBalance <= 0 ? "PAID" : totalPaid > 0 ? "PARTIALLY_PAID" : "ISSUED";
+
+      await tx.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          paidAmount: new Prisma.Decimal(totalPaid),
+          balanceAmount: new Prisma.Decimal(newBalance),
+          status: newStatus as any,
+        },
+      });
+
+      // Recalculate booking payment totals
+      await bookingService.recalculateBookingPaymentTotals(invoice.bookingId, tx);
+
+      return p;
+    });
+
+    // Non-blocking communication notification
+    communicationService.notifyPaymentReceived(agencyId, payment.id).catch((err) => {
+      console.warn("[Communication Non-blocking Notice] Failed to notify payment received:", err?.message || err);
+    });
+
+    return payment as PaymentWithRelations;
+  },
+
+  /**
+   * Void an existing payment with mandatory reason. Recalculates Invoice + Booking totals atomically.
+   */
+  async voidPayment(
+    agencyId: string,
+    paymentId: string,
+    userId: string,
+    voidReason: string
+  ): Promise<PaymentWithRelations> {
+    if (!voidReason || voidReason.trim().length < 3) {
+      throw new Error("A valid void reason (minimum 3 characters) is required.");
+    }
+
+    const voided = await prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findFirst({
+        where: { id: paymentId, agencyId, archivedAt: null },
+      });
+
+      if (!payment) {
+        throw new Error("Payment record not found.");
+      }
+
+      if (payment.status === PaymentStatus.VOIDED) {
+        throw new Error("Payment has already been voided.");
+      }
+
+      const p = await tx.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: PaymentStatus.VOIDED,
+          voidReason: voidReason.trim(),
+          voidedAt: new Date(),
+          voidedBy: userId,
+        },
+        include: {
+          booking: {
+            select: {
+              id: true,
+              bookingNumber: true,
+              totalAmount: true,
+              paidAmount: true,
+              balanceAmount: true,
+              status: true,
+              currency: true,
+            },
+          },
+          customer: {
+            select: { id: true, name: true, phone: true, email: true },
+          },
+          trip: {
+            select: { id: true, title: true, tripNumber: true },
+          },
+        },
+      });
+
+      // If linked to an invoice, recalculate invoice totals & status
+      if (payment.invoiceId) {
+        const invoice = await tx.invoice.findUnique({
+          where: { id: payment.invoiceId },
+        });
+
+        if (invoice) {
+          const activePayments = await tx.payment.findMany({
+            where: {
+              invoiceId: payment.invoiceId,
+              archivedAt: null,
+              status: { not: PaymentStatus.VOIDED },
+            },
+            select: { amount: true },
+          });
+
+          const totalPaid = activePayments.reduce((sum, pay) => sum + Number(pay.amount), 0);
+          const totalAmount = Number(invoice.totalAmount);
+          const newBalance = Math.max(0, Math.round((totalAmount - totalPaid) * 100) / 100);
+
+          if (invoice.status !== "CANCELLED") {
+            const newStatus =
+              newBalance <= 0 ? "PAID" : totalPaid > 0 ? "PARTIALLY_PAID" : "ISSUED";
+
+            await tx.invoice.update({
+              where: { id: payment.invoiceId },
+              data: {
+                paidAmount: new Prisma.Decimal(totalPaid),
+                balanceAmount: new Prisma.Decimal(newBalance),
+                status: newStatus as any,
+              },
+            });
+          } else {
+            await tx.invoice.update({
+              where: { id: payment.invoiceId },
+              data: {
+                paidAmount: new Prisma.Decimal(totalPaid),
+                balanceAmount: new Prisma.Decimal(newBalance),
+              },
+            });
+          }
+        }
+      }
+
+      // Recalculate booking payment totals
+      await bookingService.recalculateBookingPaymentTotals(payment.bookingId, tx);
+
+      return p;
+    });
+
+    return voided as PaymentWithRelations;
+  },
+
+  /**
    * Soft delete / archive payment and recalculate booking balance
    */
   async archivePayment(agencyId: string, paymentId: string): Promise<Payment> {

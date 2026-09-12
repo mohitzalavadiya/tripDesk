@@ -29,6 +29,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/shared/page-header";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   NotificationChannel,
   CustomerNotificationType,
@@ -42,6 +50,50 @@ import {
 import { customerClient } from "@/lib/api-client/customer-client";
 import { tripClient } from "@/lib/api-client/trip-client";
 import { toast } from "sonner";
+const CHANNEL_FILTER_LABELS: Record<string, string> = {
+  ALL: "All",
+  [NotificationChannel.IN_APP]: "In-App Portal",
+  [NotificationChannel.EMAIL]: "Email",
+  [NotificationChannel.WHATSAPP]: "WhatsApp",
+  [NotificationChannel.SMS]: "SMS",
+};
+
+const TYPE_FILTER_LABELS: Record<string, string> = {
+  ALL: "All",
+  [CustomerNotificationType.BOOKING_CONFIRMED]: "Booking Confirmed",
+  [CustomerNotificationType.PAYMENT_RECEIVED]: "Payment Received",
+  [CustomerNotificationType.PAYMENT_DUE]: "Payment Reminder",
+  [CustomerNotificationType.TRIP_CONFIRMED]: "Trip Confirmed",
+  [CustomerNotificationType.TRIP_STARTED]: "Trip Started",
+  [CustomerNotificationType.TRIP_COMPLETED]: "Trip Completed",
+  [CustomerNotificationType.FEEDBACK_REQUEST]: "Feedback Request",
+  [CustomerNotificationType.DOCUMENT_READY]: "Document Ready",
+  [CustomerNotificationType.OPERATIONS_ALERT]: "Operations Alert",
+};
+
+const STATUS_FILTER_LABELS: Record<string, string> = {
+  ALL: "All",
+  [NotificationDeliveryStatus.SENT]: "Sent",
+  [NotificationDeliveryStatus.DELIVERED]: "Delivered",
+  [NotificationDeliveryStatus.READ]: "Read",
+  [NotificationDeliveryStatus.PENDING]: "Pending",
+  [NotificationDeliveryStatus.FAILED]: "Failed",
+  [NotificationDeliveryStatus.CANCELLED]: "Cancelled",
+};
+
+const MODAL_CHANNEL_LABELS: Record<string, string> = {
+  [NotificationChannel.IN_APP]: "In-App Portal",
+  [NotificationChannel.EMAIL]: "Email",
+  [NotificationChannel.WHATSAPP]: "WhatsApp",
+};
+
+const MODAL_CATEGORY_LABELS: Record<string, string> = {
+  [CustomerNotificationType.OPERATIONS_ALERT]: "Operations Alert",
+  [CustomerNotificationType.TRIP_UPDATED]: "Trip Update",
+  [CustomerNotificationType.PAYMENT_DUE]: "Payment Reminder",
+  [CustomerNotificationType.DOCUMENT_READY]: "Document Ready",
+  [CustomerNotificationType.FEEDBACK_REQUEST]: "Feedback Request",
+};
 
 export default function CommunicationsPage() {
   const [loading, setLoading] = useState(true);
@@ -239,30 +291,45 @@ export default function CommunicationsPage() {
   const getStatusBadge = (status: NotificationDeliveryStatus) => {
     switch (status) {
       case NotificationDeliveryStatus.DELIVERED:
+        return (
+          <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-none font-bold text-[10px]">
+            <CheckCircle2 className="w-3 h-3 mr-1" /> Delivered
+          </Badge>
+        );
       case NotificationDeliveryStatus.READ:
         return (
           <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-none font-bold text-[10px]">
-            <CheckCircle2 className="w-3 h-3 mr-1" /> {status}
+            <CheckCircle2 className="w-3 h-3 mr-1" /> Read
           </Badge>
         );
       case NotificationDeliveryStatus.SENT:
         return (
           <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 border-none font-bold text-[10px]">
-            <Send className="w-3 h-3 mr-1" /> SENT
+            <Send className="w-3 h-3 mr-1" /> Sent
           </Badge>
         );
       case NotificationDeliveryStatus.PENDING:
+        return (
+          <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-none font-bold text-[10px]">
+            <Clock className="w-3 h-3 mr-1" /> Pending
+          </Badge>
+        );
       case NotificationDeliveryStatus.QUEUED:
         return (
           <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-none font-bold text-[10px]">
-            <Clock className="w-3 h-3 mr-1" /> {status}
+            <Clock className="w-3 h-3 mr-1" /> Queued
           </Badge>
         );
       case NotificationDeliveryStatus.FAILED:
-      case NotificationDeliveryStatus.CANCELLED:
         return (
           <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100 border-none font-bold text-[10px]">
-            <AlertCircle className="w-3 h-3 mr-1" /> {status}
+            <AlertCircle className="w-3 h-3 mr-1" /> Failed
+          </Badge>
+        );
+      case NotificationDeliveryStatus.CANCELLED:
+        return (
+          <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100 border-none font-bold text-[10px]">
+            <AlertCircle className="w-3 h-3 mr-1" /> Cancelled
           </Badge>
         );
       default:
@@ -278,51 +345,29 @@ export default function CommunicationsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* ─── HEADER ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-2xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center font-bold">
-              <MessageSquare className="h-5 w-5" />
-            </div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900">
-              Communication Center
-            </h1>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Real-time traveler communications, automated reminders, and customer portal alert telemetry.
-          </p>
-        </div>
+    <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
+      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+        {/* ─── HEADER ──────────────────────────────────────────────────────── */}
+        <PageHeader
+          title="Communication Center"
+          description="Real-time traveler communications, automated reminders, and customer portal alert telemetry."
+          breadcrumbs={[{ label: "Communications" }]}
+          primaryAction={{
+            label: "Send Customer Message",
+            onClick: () => setIsSendModalOpen(true),
+            icon: Plus,
+          }}
+          secondaryActions={[
+            {
+              label: isAutomating ? "Running Sweeps..." : "Run Automation Sweeps",
+              onClick: handleRunAutomations,
+              icon: isAutomating ? Loader2 : RotateCcw,
+              variant: "outline",
+            },
+          ]}
+        />
 
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRunAutomations}
-            disabled={isAutomating}
-            className="rounded-xl border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 h-9"
-          >
-            {isAutomating ? (
-              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin text-indigo-600" />
-            ) : (
-              <RotateCcw className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
-            )}
-            Run Automation Sweeps
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={() => setIsSendModalOpen(true)}
-            className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 shadow-xs shadow-indigo-600/20 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Send Customer Message
-          </Button>
-        </div>
-      </div>
-
-      {/* ─── 4 KPI SCORECARDS ────────────────────────────────────────────── */}
+        {/* ─── 4 KPI SCORECARDS ────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
@@ -405,75 +450,102 @@ export default function CommunicationsPage() {
         >
           {/* Search */}
           <div className="relative lg:col-span-2">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
             <Input
               type="text"
               placeholder="Search recipient, message, customer name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-9 text-xs rounded-xl bg-slate-50 border-slate-200"
+              className="pl-10 pr-9 h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white transition-all"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           {/* Channel Filter */}
           <div>
-            <select
-              value={selectedChannel}
-              onChange={(e) => {
-                setSelectedChannel(e.target.value as any);
+            <Select
+              value={selectedChannel || "ALL"}
+              onValueChange={(val) => {
+                setSelectedChannel(val === "ALL" ? "" : (val as any));
                 setPage(1);
               }}
-              className="w-full h-9 text-xs font-semibold px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 focus:outline-indigo-600"
             >
-              <option value="">All Channels</option>
-              <option value={NotificationChannel.IN_APP}>In-App Portal</option>
-              <option value={NotificationChannel.EMAIL}>Email</option>
-              <option value={NotificationChannel.WHATSAPP}>WhatsApp</option>
-              <option value={NotificationChannel.SMS}>SMS</option>
-            </select>
+              <SelectTrigger className="w-full h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+                <SelectValue placeholder="All">
+                  {(val) => CHANNEL_FILTER_LABELS[val] ?? "All"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value={NotificationChannel.IN_APP}>In-App Portal</SelectItem>
+                <SelectItem value={NotificationChannel.EMAIL}>Email</SelectItem>
+                <SelectItem value={NotificationChannel.WHATSAPP}>WhatsApp</SelectItem>
+                <SelectItem value={NotificationChannel.SMS}>SMS</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Type Filter */}
           <div>
-            <select
-              value={selectedType}
-              onChange={(e) => {
-                setSelectedType(e.target.value as any);
+            <Select
+              value={selectedType || "ALL"}
+              onValueChange={(val) => {
+                setSelectedType(val === "ALL" ? "" : (val as any));
                 setPage(1);
               }}
-              className="w-full h-9 text-xs font-semibold px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 focus:outline-indigo-600"
             >
-              <option value="">All Event Types</option>
-              <option value={CustomerNotificationType.BOOKING_CONFIRMED}>Booking Confirmed</option>
-              <option value={CustomerNotificationType.PAYMENT_RECEIVED}>Payment Received</option>
-              <option value={CustomerNotificationType.PAYMENT_DUE}>Payment Reminder</option>
-              <option value={CustomerNotificationType.TRIP_CONFIRMED}>Trip Confirmed</option>
-              <option value={CustomerNotificationType.TRIP_STARTED}>Trip Started</option>
-              <option value={CustomerNotificationType.TRIP_COMPLETED}>Trip Completed</option>
-              <option value={CustomerNotificationType.FEEDBACK_REQUEST}>Feedback Request</option>
-              <option value={CustomerNotificationType.DOCUMENT_READY}>Document Ready</option>
-              <option value={CustomerNotificationType.OPERATIONS_ALERT}>Operations Alert</option>
-            </select>
+              <SelectTrigger className="w-full h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+                <SelectValue placeholder="All">
+                  {(val) => TYPE_FILTER_LABELS[val] ?? "All"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value={CustomerNotificationType.BOOKING_CONFIRMED}>Booking Confirmed</SelectItem>
+                <SelectItem value={CustomerNotificationType.PAYMENT_RECEIVED}>Payment Received</SelectItem>
+                <SelectItem value={CustomerNotificationType.PAYMENT_DUE}>Payment Reminder</SelectItem>
+                <SelectItem value={CustomerNotificationType.TRIP_CONFIRMED}>Trip Confirmed</SelectItem>
+                <SelectItem value={CustomerNotificationType.TRIP_STARTED}>Trip Started</SelectItem>
+                <SelectItem value={CustomerNotificationType.TRIP_COMPLETED}>Trip Completed</SelectItem>
+                <SelectItem value={CustomerNotificationType.FEEDBACK_REQUEST}>Feedback Request</SelectItem>
+                <SelectItem value={CustomerNotificationType.DOCUMENT_READY}>Document Ready</SelectItem>
+                <SelectItem value={CustomerNotificationType.OPERATIONS_ALERT}>Operations Alert</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Status Filter */}
           <div>
-            <select
-              value={selectedStatus}
-              onChange={(e) => {
-                setSelectedStatus(e.target.value as any);
+            <Select
+              value={selectedStatus || "ALL"}
+              onValueChange={(val) => {
+                setSelectedStatus(val === "ALL" ? "" : (val as any));
                 setPage(1);
               }}
-              className="w-full h-9 text-xs font-semibold px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 focus:outline-indigo-600"
             >
-              <option value="">All Statuses</option>
-              <option value={NotificationDeliveryStatus.SENT}>Sent</option>
-              <option value={NotificationDeliveryStatus.DELIVERED}>Delivered</option>
-              <option value={NotificationDeliveryStatus.READ}>Read</option>
-              <option value={NotificationDeliveryStatus.PENDING}>Pending</option>
-              <option value={NotificationDeliveryStatus.FAILED}>Failed</option>
-              <option value={NotificationDeliveryStatus.CANCELLED}>Cancelled</option>
-            </select>
+              <SelectTrigger className="w-full h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+                <SelectValue placeholder="All">
+                  {(val) => STATUS_FILTER_LABELS[val] ?? "All"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value={NotificationDeliveryStatus.SENT}>Sent</SelectItem>
+                <SelectItem value={NotificationDeliveryStatus.DELIVERED}>Delivered</SelectItem>
+                <SelectItem value={NotificationDeliveryStatus.READ}>Read</SelectItem>
+                <SelectItem value={NotificationDeliveryStatus.PENDING}>Pending</SelectItem>
+                <SelectItem value={NotificationDeliveryStatus.FAILED}>Failed</SelectItem>
+                <SelectItem value={NotificationDeliveryStatus.CANCELLED}>Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </form>
       </div>
@@ -515,9 +587,9 @@ export default function CommunicationsPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[620px] overflow-y-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                 <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                   <th className="py-3 px-4">Date & Time</th>
                   <th className="py-3 px-4">Recipient / Customer</th>
@@ -667,19 +739,26 @@ export default function CommunicationsPage() {
                 <label className="text-xs font-bold text-slate-700 block mb-1">
                   Recipient Customer *
                 </label>
-                <select
-                  required
+                <Select
                   value={formData.customerId}
-                  onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
-                  className="w-full h-9 text-xs font-medium px-3 rounded-xl border border-slate-200 focus:outline-indigo-600"
+                  onValueChange={(val) => val && setFormData({ ...formData, customerId: val })}
                 >
-                  <option value="">Select a Customer...</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.phone || c.email || "No direct phone"})
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-9 text-xs rounded-xl border border-slate-200 bg-white focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500">
+                    <SelectValue placeholder="Select a Customer...">
+                      {(val) => {
+                        const c = customers.find((c) => c.id === val);
+                        return c ? `${c.name} (${c.phone || c.email || "No direct phone"})` : "Select a Customer...";
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50 max-h-60">
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} ({c.phone || c.email || "No direct phone"})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Related Trip (Optional) */}
@@ -687,18 +766,28 @@ export default function CommunicationsPage() {
                 <label className="text-xs font-bold text-slate-700 block mb-1">
                   Related Trip (Optional)
                 </label>
-                <select
-                  value={formData.tripId}
-                  onChange={(e) => setFormData({ ...formData, tripId: e.target.value })}
-                  className="w-full h-9 text-xs font-medium px-3 rounded-xl border border-slate-200 focus:outline-indigo-600"
+                <Select
+                  value={formData.tripId || "NONE"}
+                  onValueChange={(val) => setFormData({ ...formData, tripId: !val || val === "NONE" ? "" : val })}
                 >
-                  <option value="">No specific trip (General Notice)</option>
-                  {trips.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.title} ({t.tripNumber})
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-9 text-xs rounded-xl border border-slate-200 bg-white focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500">
+                    <SelectValue placeholder="No specific trip (General Notice)">
+                      {(val) => {
+                        if (!val || val === "NONE") return "No specific trip (General Notice)";
+                        const t = trips.find((t) => t.id === val);
+                        return t ? `${t.title} (${t.tripNumber})` : "No specific trip (General Notice)";
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50 max-h-60">
+                    <SelectItem value="NONE">No specific trip (General Notice)</SelectItem>
+                    {trips.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.title} ({t.tripNumber})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Channel & Event Type Row */}
@@ -707,39 +796,52 @@ export default function CommunicationsPage() {
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     Channel *
                   </label>
-                  <select
+                  <Select
                     value={formData.channel}
-                    onChange={(e) =>
-                      setFormData({ ...formData, channel: e.target.value as NotificationChannel })
+                    onValueChange={(val) =>
+                      val && setFormData({ ...formData, channel: val as NotificationChannel })
                     }
-                    className="w-full h-9 text-xs font-medium px-3 rounded-xl border border-slate-200 focus:outline-indigo-600"
                   >
-                    <option value={NotificationChannel.IN_APP}>In-App Portal</option>
-                    <option value={NotificationChannel.EMAIL}>Email</option>
-                    <option value={NotificationChannel.WHATSAPP}>WhatsApp</option>
-                  </select>
+                    <SelectTrigger className="w-full h-9 text-xs rounded-xl border border-slate-200 bg-white focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500">
+                      <SelectValue placeholder="Select Channel">
+                        {(val) => MODAL_CHANNEL_LABELS[val] ?? val}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value={NotificationChannel.IN_APP}>In-App Portal</SelectItem>
+                      <SelectItem value={NotificationChannel.EMAIL}>Email</SelectItem>
+                      <SelectItem value={NotificationChannel.WHATSAPP}>WhatsApp</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     Category Type
                   </label>
-                  <select
+                  <Select
                     value={formData.type}
-                    onChange={(e) =>
+                    onValueChange={(val) =>
+                      val &&
                       setFormData({
                         ...formData,
-                        type: e.target.value as CustomerNotificationType,
+                        type: val as CustomerNotificationType,
                       })
                     }
-                    className="w-full h-9 text-xs font-medium px-3 rounded-xl border border-slate-200 focus:outline-indigo-600"
                   >
-                    <option value={CustomerNotificationType.OPERATIONS_ALERT}>Operations Alert</option>
-                    <option value={CustomerNotificationType.TRIP_UPDATED}>Trip Update</option>
-                    <option value={CustomerNotificationType.PAYMENT_DUE}>Payment Reminder</option>
-                    <option value={CustomerNotificationType.DOCUMENT_READY}>Document Ready</option>
-                    <option value={CustomerNotificationType.FEEDBACK_REQUEST}>Feedback Request</option>
-                  </select>
+                    <SelectTrigger className="w-full h-9 text-xs rounded-xl border border-slate-200 bg-white focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500">
+                      <SelectValue placeholder="Select Category">
+                        {(val) => MODAL_CATEGORY_LABELS[val] ?? val}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value={CustomerNotificationType.OPERATIONS_ALERT}>Operations Alert</SelectItem>
+                      <SelectItem value={CustomerNotificationType.TRIP_UPDATED}>Trip Update</SelectItem>
+                      <SelectItem value={CustomerNotificationType.PAYMENT_DUE}>Payment Reminder</SelectItem>
+                      <SelectItem value={CustomerNotificationType.DOCUMENT_READY}>Document Ready</SelectItem>
+                      <SelectItem value={CustomerNotificationType.FEEDBACK_REQUEST}>Feedback Request</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -917,6 +1019,7 @@ export default function CommunicationsPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

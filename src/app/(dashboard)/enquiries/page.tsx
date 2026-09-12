@@ -3,11 +3,22 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { EnquiryTable } from "@/components/enquiries/enquiry-table";
 import { EnquiryPipeline } from "@/components/enquiries/enquiry-pipeline";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Inbox,
   Plus,
@@ -36,6 +47,26 @@ import {
 import { EnquiryStatus, EnquiryPriority, EnquirySource } from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+
+const PRIORITY_FILTER_LABELS: Record<string, string> = {
+  all: "All",
+  [EnquiryPriority.URGENT]: "Urgent",
+  [EnquiryPriority.HIGH]: "High",
+  [EnquiryPriority.MEDIUM]: "Medium",
+  [EnquiryPriority.LOW]: "Low",
+};
+
+const SOURCE_FILTER_LABELS: Record<string, string> = {
+  all: "All",
+  [EnquirySource.WHATSAPP]: "WhatsApp",
+  [EnquirySource.WEBSITE]: "Website",
+  [EnquirySource.INSTAGRAM]: "Instagram",
+  [EnquirySource.FACEBOOK]: "Facebook",
+  [EnquirySource.PHONE]: "Phone",
+  [EnquirySource.EMAIL]: "Email",
+  [EnquirySource.REFERRAL]: "Referral",
+  [EnquirySource.WALK_IN]: "Walk-in",
+};
 
 export default function EnquiriesPage() {
   const router = useRouter();
@@ -112,7 +143,7 @@ export default function EnquiriesPage() {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
-      setError(err?.message || "Failed to load enquiries from database.");
+      setError(getErrorMessage(err, "Unable to load enquiries. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -121,6 +152,15 @@ export default function EnquiriesPage() {
   React.useEffect(() => {
     fetchEnquiries();
   }, [fetchEnquiries]);
+
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleClearFilters = () => {
     setSearch("");
@@ -149,7 +189,7 @@ export default function EnquiriesPage() {
       toast.success(`Enquiry status updated to ${status}.`);
       await fetchEnquiries();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to update status.");
+      toast.error(getErrorMessage(err, "Failed to update status."));
     }
   };
 
@@ -167,28 +207,36 @@ export default function EnquiriesPage() {
         router.push(`/trips/${res.data.tripId}`);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to convert enquiry.");
+      toast.error(getErrorMessage(err, "Failed to convert enquiry."));
     }
   };
 
   // Archive Enquiry
-  const handleArchive = async (id: string, enquiryNumber: string) => {
+  const handleArchive = (id: string, enquiryNumber: string) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode active.");
       return;
     }
 
-    if (!confirm(`Archive enquiry ${enquiryNumber}? Converted trips will remain intact.`)) {
-      return;
-    }
-
-    try {
-      await enquiryClient.archiveEnquiry(id);
-      toast.success(`Enquiry ${enquiryNumber} archived.`);
-      await fetchEnquiries();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive enquiry.");
-    }
+    setConfirmAction({
+      title: "Archive enquiry?",
+      description: `Archive enquiry ${enquiryNumber}? Converted trips will remain intact.`,
+      confirmText: "Archive Enquiry",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await enquiryClient.archiveEnquiry(id);
+          toast.success(`Enquiry ${enquiryNumber} archived.`);
+          setConfirmAction(null);
+          await fetchEnquiries();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the enquiry. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // KPI telemetry sums
@@ -244,7 +292,7 @@ export default function EnquiriesPage() {
                 Enquiries & CRM
               </h1>
               <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
-                Inbound customer inquiries, travel requirements, lead stages, and follow-ups
+                Inbound customer enquiries, travel requirements, lead stages, and follow-ups
               </span>
             </div>
 
@@ -385,45 +433,61 @@ export default function EnquiriesPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Priority:</span>
-                  <select
+                  <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Priority:</span>
+                  <Select
                     value={priorityFilter}
-                    onChange={(e) => {
-                      setPriorityFilter(e.target.value);
-                      setPage(1);
+                    onValueChange={(val) => {
+                      if (val) {
+                        setPriorityFilter(val);
+                        setPage(1);
+                      }
                     }}
-                    className="h-8 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
-                    <option value="all">All Priorities</option>
-                    <option value={EnquiryPriority.URGENT}>Urgent</option>
-                    <option value={EnquiryPriority.HIGH}>High</option>
-                    <option value={EnquiryPriority.MEDIUM}>Medium</option>
-                    <option value={EnquiryPriority.LOW}>Low</option>
-                  </select>
+                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[125px] sm:w-[135px]">
+                      <SelectValue placeholder="All">
+                        {(val) => PRIORITY_FILTER_LABELS[val] ?? "All"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value={EnquiryPriority.URGENT}>Urgent</SelectItem>
+                      <SelectItem value={EnquiryPriority.HIGH}>High</SelectItem>
+                      <SelectItem value={EnquiryPriority.MEDIUM}>Medium</SelectItem>
+                      <SelectItem value={EnquiryPriority.LOW}>Low</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Source:</span>
-                  <select
+                  <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Source:</span>
+                  <Select
                     value={sourceFilter}
-                    onChange={(e) => {
-                      setSourceFilter(e.target.value);
-                      setPage(1);
+                    onValueChange={(val) => {
+                      if (val) {
+                        setSourceFilter(val);
+                        setPage(1);
+                      }
                     }}
-                    className="h-8 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
-                    <option value="all">All Sources</option>
-                    <option value={EnquirySource.WHATSAPP}>WhatsApp</option>
-                    <option value={EnquirySource.WEBSITE}>Website</option>
-                    <option value={EnquirySource.INSTAGRAM}>Instagram</option>
-                    <option value={EnquirySource.FACEBOOK}>Facebook</option>
-                    <option value={EnquirySource.PHONE}>Phone</option>
-                    <option value={EnquirySource.EMAIL}>Email</option>
-                    <option value={EnquirySource.REFERRAL}>Referral</option>
-                    <option value={EnquirySource.WALK_IN}>Walk-in</option>
-                  </select>
+                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[125px] sm:w-[135px]">
+                      <SelectValue placeholder="All">
+                        {(val) => SOURCE_FILTER_LABELS[val] ?? "All"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value={EnquirySource.WHATSAPP}>WhatsApp</SelectItem>
+                      <SelectItem value={EnquirySource.WEBSITE}>Website</SelectItem>
+                      <SelectItem value={EnquirySource.INSTAGRAM}>Instagram</SelectItem>
+                      <SelectItem value={EnquirySource.FACEBOOK}>Facebook</SelectItem>
+                      <SelectItem value={EnquirySource.PHONE}>Phone</SelectItem>
+                      <SelectItem value={EnquirySource.EMAIL}>Email</SelectItem>
+                      <SelectItem value={EnquirySource.REFERRAL}>Referral</SelectItem>
+                      <SelectItem value={EnquirySource.WALK_IN}>Walk-in</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {isFilterActive && (
@@ -443,27 +507,19 @@ export default function EnquiriesPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching enquiries from database...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchEnquiries()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load enquiries"
+                description={error}
+                onRetry={() => fetchEnquiries()}
+              />
             </div>
           )}
 
@@ -541,6 +597,24 @@ export default function EnquiriesPage() {
           )}
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { tripClient } from "@/lib/api-client";
 import { TripStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -328,7 +329,7 @@ export default function TripsPage() {
               </span>
               <span className="text-slate-300">•</span>
               <span className="text-xs font-semibold text-slate-500">
-                {pagination.total} database trip records
+                {pagination.total} total trips
               </span>
             </div>
 
@@ -337,7 +338,7 @@ export default function TripsPage() {
                 Trip Workspaces
               </h1>
               <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
-                PostgreSQL-backed travel itineraries, travelers, and operations
+                Travel itineraries, passenger management, costing, and day-wise schedules
               </span>
             </div>
 
@@ -445,9 +446,8 @@ export default function TripsPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching trips from database...</p>
+            <div className="p-4">
+              <TableSkeleton rows={8} />
             </div>
           )}
 
@@ -491,7 +491,7 @@ export default function TripsPage() {
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">
                       <TableHead className="py-3 px-4 font-bold text-slate-600 w-[300px]">Trip & Itinerary</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Customer Client</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">Customer</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Travel Schedule</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Travelers & Items</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Trip Status</TableHead>

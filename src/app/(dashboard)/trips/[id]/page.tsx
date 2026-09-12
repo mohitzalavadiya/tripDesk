@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useFormik } from "formik";
 import Link from "next/link";
+import { useFormik } from "formik";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import {
   tripClient,
@@ -43,6 +43,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { getErrorMessage } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -98,6 +100,16 @@ export default function TripDetailPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [isArchiving, setIsArchiving] = React.useState(false);
+
+  // Confirm Dialog state
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   // Active Tab state
   const [activeTab, setActiveTab] = React.useState<
@@ -294,19 +306,25 @@ export default function TripDetailPage() {
   });
 
   // Archive Trip
-  const handleArchiveTrip = async () => {
-    if (!confirm(`Are you sure you want to archive trip "${trip?.title}"?`)) return;
-
-    try {
-      setIsArchiving(true);
-      await tripClient.archiveTrip(id);
-      toast.success("Trip archived successfully.");
-      router.push("/trips");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive trip.");
-    } finally {
-      setIsArchiving(false);
-    }
+  const handleArchiveTrip = () => {
+    setConfirmAction({
+      title: "Archive trip?",
+      description: `Archive trip "${trip?.title || "this trip"}"? Associated reservations and itinerary records will be preserved.`,
+      confirmText: "Archive Trip",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setIsArchiving(true);
+          await tripClient.archiveTrip(id);
+          toast.success("Trip archived successfully.");
+          router.push("/trips");
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to archive trip. Please try again."));
+        } finally {
+          setIsArchiving(false);
+        }
+      },
+    });
   };
 
   // ──────────────────────── TRAVELER HANDLERS ─────────────────────────
@@ -377,16 +395,22 @@ export default function TripDetailPage() {
     }
   };
 
-  const handleDeleteTraveler = async (travelerId: string, name: string) => {
-    if (!confirm(`Remove traveler "${name}" from this trip?`)) return;
-
-    try {
-      await travelerClient.deleteTraveler(id, travelerId);
-      toast.success("Traveler removed.");
-      await fetchTripDetails();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to remove traveler.");
-    }
+  const handleDeleteTraveler = (travelerId: string, name: string) => {
+    setConfirmAction({
+      title: "Remove traveler?",
+      description: `Remove traveler "${name}" from this trip?`,
+      confirmText: "Remove Traveler",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await travelerClient.deleteTraveler(id, travelerId);
+          toast.success("Traveler removed.");
+          await fetchTripDetails();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to remove traveler. Please try again."));
+        }
+      },
+    });
   };
 
   // ──────────────────────── ITINERARY HANDLERS ─────────────────────────
@@ -467,16 +491,22 @@ export default function TripDetailPage() {
     }
   };
 
-  const handleDeleteItem = async (itemId: string, dayNumber: number) => {
-    if (!confirm(`Delete itinerary schedule for Day ${dayNumber}?`)) return;
-
-    try {
-      await itineraryClient.deleteItineraryItem(id, itemId);
-      toast.success("Itinerary item deleted.");
-      await fetchTripDetails();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete itinerary item.");
-    }
+  const handleDeleteItem = (itemId: string, dayNumber: number) => {
+    setConfirmAction({
+      title: "Delete itinerary schedule?",
+      description: `Delete itinerary schedule for Day ${dayNumber}?`,
+      confirmText: "Delete Day Schedule",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await itineraryClient.deleteItineraryItem(id, itemId);
+          toast.success("Itinerary item deleted.");
+          await fetchTripDetails();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to delete itinerary item. Please try again."));
+        }
+      },
+    });
   };
 
   // ──────────────────────── TRIP HOTEL HANDLERS ─────────────────────────
@@ -566,16 +596,22 @@ export default function TripDetailPage() {
     }
   };
 
-  const handleDeleteTripHotel = async (tripHotelId: string, hotelName: string) => {
-    if (!confirm(`Remove hotel reservation for "${hotelName}"?`)) return;
-
-    try {
-      await tripHotelClient.deleteTripHotel(id, tripHotelId);
-      toast.success("Hotel reservation removed.");
-      await fetchTripDetails();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to remove hotel reservation.");
-    }
+  const handleDeleteTripHotel = (tripHotelId: string, hotelName: string) => {
+    setConfirmAction({
+      title: "Remove hotel reservation?",
+      description: `Remove hotel reservation for "${hotelName}"?`,
+      confirmText: "Remove Reservation",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await tripHotelClient.deleteTripHotel(id, tripHotelId);
+          toast.success("Hotel reservation removed.");
+          await fetchTripDetails();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to remove hotel reservation. Please try again."));
+        }
+      },
+    });
   };
 
   // ──────────────────────── TRIP VEHICLE HANDLERS ─────────────────────────
@@ -704,16 +740,22 @@ export default function TripDetailPage() {
     }
   };
 
-  const handleDeleteTripVehicle = async (tripVehicleId: string, vehicleName: string) => {
-    if (!confirm(`Remove vehicle assignment "${vehicleName}"?`)) return;
-
-    try {
-      await tripVehicleClient.deleteTripVehicle(id, tripVehicleId);
-      toast.success("Vehicle assignment removed.");
-      await fetchTripDetails();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to remove vehicle assignment.");
-    }
+  const handleDeleteTripVehicle = (tripVehicleId: string, vehicleName: string) => {
+    setConfirmAction({
+      title: "Remove vehicle assignment?",
+      description: `Remove vehicle assignment "${vehicleName}" from this trip?`,
+      confirmText: "Remove Vehicle",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await tripVehicleClient.deleteTripVehicle(id, tripVehicleId);
+          toast.success("Vehicle assignment removed.");
+          await fetchTripDetails();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to remove vehicle assignment. Please try again."));
+        }
+      },
+    });
   };
 
   // ──────────────────────── TRIP ACTIVITY HANDLERS ─────────────────────────
@@ -829,16 +871,22 @@ export default function TripDetailPage() {
     }
   };
 
-  const handleDeleteTripActivity = async (tripActivityId: string, activityName: string) => {
-    if (!confirm(`Remove activity "${activityName}" from this trip?`)) return;
-
-    try {
-      await tripActivityClient.deleteTripActivity(id, tripActivityId);
-      toast.success("Activity removed.");
-      await fetchTripDetails();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to remove activity.");
-    }
+  const handleDeleteTripActivity = (tripActivityId: string, activityName: string) => {
+    setConfirmAction({
+      title: "Remove activity?",
+      description: `Remove activity "${activityName}" from this trip?`,
+      confirmText: "Remove Activity",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await tripActivityClient.deleteTripActivity(id, tripActivityId);
+          toast.success("Activity removed.");
+          await fetchTripDetails();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to remove activity. Please try again."));
+        }
+      },
+    });
   };
 
   const formatDateDisplay = (date: Date | string | null | undefined) => {
@@ -2866,6 +2914,27 @@ export default function TripDetailPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Global Action Confirmation Modal */}
+        <ConfirmDialog
+          open={!!confirmAction}
+          onOpenChange={(open) => !open && setConfirmAction(null)}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (!confirmAction) return;
+            setActionLoading(true);
+            try {
+              await confirmAction.action();
+              setConfirmAction(null);
+            } finally {
+              setActionLoading(false);
+            }
+          }}
+        />
       </div>
     </div>
   );

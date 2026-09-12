@@ -26,7 +26,11 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -67,6 +71,14 @@ import {
 import { PaymentMethod, PaymentStatus } from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+const METHOD_FILTER_LABELS: Record<string, string> = {
+  all: "All",
+  [PaymentMethod.UPI]: "UPI",
+  [PaymentMethod.BANK_TRANSFER]: "Bank Transfer",
+  [PaymentMethod.CASH]: "Cash",
+  [PaymentMethod.CARD]: "Card",
+  [PaymentMethod.CHEQUE]: "Cheque",
+};
 
 export default function PaymentsPage() {
   const router = useRouter();
@@ -135,7 +147,7 @@ export default function PaymentsPage() {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
-      setError(err?.message || "Failed to load payments from database.");
+      setError(getErrorMessage(err, "Unable to load payments. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -220,24 +232,41 @@ export default function PaymentsPage() {
     }
   };
 
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
+
   // Archive Payment
-  const handleDelete = async (id: string, num: string) => {
+  const handleDelete = (id: string, num: string) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Modifications are restricted.");
       return;
     }
 
-    if (!confirm(`Archive payment ${num}? This will update the corresponding booking balance.`)) {
-      return;
-    }
-
-    try {
-      await paymentClient.deletePayment(id);
-      toast.success(`Payment ${num} archived successfully.`);
-      await fetchPayments();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive payment.");
-    }
+    setConfirmAction({
+      title: "Archive payment transaction?",
+      description: `Archive payment transaction ${num}? This will recalculate the corresponding booking balance.`,
+      confirmText: "Archive Payment",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await paymentClient.deletePayment(id);
+          toast.success(`Payment ${num} archived successfully.`);
+          setConfirmAction(null);
+          await fetchPayments();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the payment. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   const formatDateDisplay = (date: Date | string | null | undefined) => {
@@ -348,24 +377,32 @@ export default function PaymentsPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase">Method:</span>
-                  <select
+                  <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Method:</span>
+                  <Select
                     value={methodFilter}
-                    onChange={(e) => {
-                      setMethodFilter(e.target.value);
-                      setPage(1);
+                    onValueChange={(val) => {
+                      if (val) {
+                        setMethodFilter(val);
+                        setPage(1);
+                      }
                     }}
-                    className="h-8 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
-                    <option value="all">All Methods</option>
-                    <option value={PaymentMethod.UPI}>UPI</option>
-                    <option value={PaymentMethod.BANK_TRANSFER}>Bank Transfer</option>
-                    <option value={PaymentMethod.CASH}>Cash</option>
-                    <option value={PaymentMethod.CARD}>Card</option>
-                    <option value={PaymentMethod.CHEQUE}>Cheque</option>
-                  </select>
+                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[130px] sm:w-[140px]">
+                      <SelectValue placeholder="All">
+                        {(val) => METHOD_FILTER_LABELS[val] ?? "All"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value={PaymentMethod.UPI}>UPI</SelectItem>
+                      <SelectItem value={PaymentMethod.BANK_TRANSFER}>Bank Transfer</SelectItem>
+                      <SelectItem value={PaymentMethod.CASH}>Cash</SelectItem>
+                      <SelectItem value={PaymentMethod.CARD}>Card</SelectItem>
+                      <SelectItem value={PaymentMethod.CHEQUE}>Cheque</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {isFilterActive && (
@@ -385,27 +422,19 @@ export default function PaymentsPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching payment transactions from database...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchPayments()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load payments"
+                description={error}
+                onRetry={() => fetchPayments()}
+              />
             </div>
           )}
 
@@ -481,7 +510,7 @@ export default function PaymentsPage() {
 
                         <TableCell className="py-3.5 px-4">
                           <Badge variant="outline" className="text-[10px] font-bold">
-                            {p.paymentMethod}
+                            {METHOD_FILTER_LABELS[p.paymentMethod] ?? p.paymentMethod}
                           </Badge>
                         </TableCell>
 
@@ -709,6 +738,24 @@ export default function PaymentsPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          open={confirmAction !== null}
+          onOpenChange={(open) => {
+            if (!open && !actionLoading) setConfirmAction(null);
+          }}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (confirmAction?.action) {
+              await confirmAction.action();
+            }
+          }}
+        />
       </div>
     </div>
   );

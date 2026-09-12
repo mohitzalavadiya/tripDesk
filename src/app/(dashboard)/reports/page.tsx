@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/shared/status-badge";
 import {
   Select,
   SelectContent,
@@ -42,6 +43,13 @@ import {
 } from "@/lib/services/reporting-service";
 import { ReportPreset, ReportType } from "@/lib/validation/reporting-schema";
 import { toast } from "sonner";
+
+const EXPORT_CSV_LABELS: Record<string, string> = {
+  OVERVIEW: "Overview CSV",
+  RECEIVABLES: "Receivables CSV",
+  PAYABLES: "Payables CSV",
+  DESTINATIONS: "Destinations CSV",
+};
 
 export default function ReportsPage() {
   const [reportData, setReportData] = React.useState<AgencyBIReportResult | null>(null);
@@ -124,34 +132,43 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/60 pb-24">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        {/* ─── PAGE HEADER & EXPORT ACTIONS ─────────────────────────────── */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                Agency BI & Accounting Reports
-              </h1>
-              <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 text-[10px] font-bold">
-                PostgreSQL Live
-              </Badge>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Real-time executive telemetry, sales conversion, profit margins, receivables, and vendor liabilities.
-            </p>
-          </div>
+    <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
+      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+        <PageHeader
+          title="Agency BI & Accounting Reports"
+          description="Real-time executive telemetry, sales conversion, profit margins, receivables, and vendor liabilities."
+          breadcrumbs={[{ label: "Reports" }]}
+          primaryAction={{
+            label: "Export PDF",
+            onClick: () => {
+              window.open(
+                reportingClient.getPdfUrl({
+                  preset,
+                  startDate: preset === "CUSTOM_RANGE" ? customStart : undefined,
+                  endDate: preset === "CUSTOM_RANGE" ? customEnd : undefined,
+                }),
+                "_blank"
+              );
+            },
+            icon: FileText,
+          }}
+          secondaryActions={[
+            {
+              label: loading ? "Refreshing..." : "Refresh",
+              onClick: () => fetchReport(),
+              icon: RefreshCw,
+              variant: "outline",
+            },
+          ]}
+        />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fetchReport()}
-              disabled={loading}
-              className="h-9 text-xs font-bold gap-1.5 cursor-pointer bg-white"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-            </Button>
+        {/* ─── TIME HORIZON & EXPORT TOOLBAR ───────────────────────────────────── */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-slate-600 text-xs font-bold shrink-0">
+              <Clock className="h-4 w-4 text-indigo-600" />
+              <span>Time Horizon:</span>
+            </div>
 
             {/* Export CSV Dropdown */}
             <Select
@@ -171,39 +188,19 @@ export default function ReportsPage() {
                 }
               }}
             >
-              <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-300 w-[140px]">
+              <SelectTrigger className="h-8 text-xs font-semibold bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-800 rounded-xl w-[140px] focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 shadow-2xs">
                 <FileSpreadsheet className="h-3.5 w-3.5 mr-1 text-emerald-600" />
-                <SelectValue placeholder="Export CSV" />
+                <SelectValue placeholder="Export CSV">
+                  {(val) => EXPORT_CSV_LABELS[val] ?? "Export CSV"}
+                </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
                 <SelectItem value="OVERVIEW">Overview CSV</SelectItem>
                 <SelectItem value="RECEIVABLES">Receivables CSV</SelectItem>
                 <SelectItem value="PAYABLES">Payables CSV</SelectItem>
                 <SelectItem value="DESTINATIONS">Destinations CSV</SelectItem>
               </SelectContent>
             </Select>
-
-            {/* Export PDF Button */}
-            <a
-              href={reportingClient.getPdfUrl({
-                preset,
-                startDate: preset === "CUSTOM_RANGE" ? customStart : undefined,
-                endDate: preset === "CUSTOM_RANGE" ? customEnd : undefined,
-              })}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center h-9 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-colors gap-1.5 cursor-pointer"
-            >
-              <FileText className="h-3.5 w-3.5" /> Export PDF
-            </a>
-          </div>
-        </div>
-
-        {/* ─── TIME HORIZON DATE FILTER ───────────────────────────────────── */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-          <div className="flex items-center gap-2 text-slate-600 text-xs font-bold shrink-0">
-            <Clock className="h-4 w-4 text-indigo-600" />
-            <span>Time Horizon:</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
@@ -563,9 +560,9 @@ export default function ReportsPage() {
         {activeTab === "REVENUE" && (
           <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
             <h3 className="text-sm font-bold text-slate-900">Revenue & Collections Periodic Ledger</h3>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs text-slate-600 uppercase font-bold border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-3">Time Period</th>
                     <th className="px-4 py-3">Bookings Count</th>
@@ -611,9 +608,9 @@ export default function ReportsPage() {
         {activeTab === "DESTINATIONS" && (
           <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
             <h3 className="text-sm font-bold text-slate-900">Destination Commercial Performance</h3>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs text-slate-600 uppercase font-bold border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-3">Destination</th>
                     <th className="px-4 py-3">Trips Count</th>
@@ -663,9 +660,9 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs text-slate-600 uppercase font-bold border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-3">Booking #</th>
                     <th className="px-4 py-3">Customer</th>
@@ -697,15 +694,7 @@ export default function ReportsPage() {
                         <td className="px-4 py-3 text-emerald-700 font-medium">{formatCurrency(r.paidAmount)}</td>
                         <td className="px-4 py-3 font-bold text-rose-700">{formatCurrency(r.balanceAmount)}</td>
                         <td className="px-4 py-3">
-                          <Badge
-                            className={`text-[10px] font-bold ${
-                              r.isOverdue
-                                ? "bg-rose-100 text-rose-800 border-rose-200"
-                                : "bg-amber-100 text-amber-800 border-amber-200"
-                            }`}
-                          >
-                            {r.isOverdue ? "OVERDUE" : r.paymentStatus}
-                          </Badge>
+                          <StatusBadge status={r.isOverdue ? "OVERDUE" : r.paymentStatus} />
                         </td>
                       </tr>
                     ))}
@@ -727,9 +716,9 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs text-slate-600 uppercase font-bold border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-3">Payable #</th>
                     <th className="px-4 py-3">Supplier</th>
@@ -754,15 +743,7 @@ export default function ReportsPage() {
                       <td className="px-4 py-3 text-emerald-700 font-medium">{formatCurrency(p.paidAmount)}</td>
                       <td className="px-4 py-3 font-bold text-rose-700">{formatCurrency(p.outstandingAmount)}</td>
                       <td className="px-4 py-3">
-                        <Badge
-                          className={`text-[10px] font-bold ${
-                            p.status === "PAID"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-amber-100 text-amber-800"
-                          }`}
-                        >
-                          {p.status}
-                        </Badge>
+                        <StatusBadge status={p.status} />
                       </td>
                     </tr>
                   ))}
@@ -800,9 +781,9 @@ export default function ReportsPage() {
             {/* Top VIP Spenders Table */}
             <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
               <h3 className="text-sm font-bold text-slate-900">Top VIP Customers by Lifetime Value (LTV)</h3>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 text-slate-600 uppercase font-bold border-b border-slate-200">
+                  <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs text-slate-600 uppercase font-bold border-b border-slate-200">
                     <tr>
                       <th className="px-4 py-3">Customer Name</th>
                       <th className="px-4 py-3">Phone</th>

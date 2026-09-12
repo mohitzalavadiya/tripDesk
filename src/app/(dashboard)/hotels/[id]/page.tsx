@@ -23,6 +23,8 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -141,17 +143,18 @@ export default function HotelProfilePage() {
     return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
   };
 
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+
   // Archive action
   const handleArchive = async () => {
-    if (!confirm(`Are you sure you want to archive "${hotel?.name}"?`)) return;
-
     try {
       setIsArchiving(true);
       await hotelClient.archiveHotel(hotelId);
       toast.success("Hotel archived successfully.");
+      setConfirmOpen(false);
       router.push("/hotels");
     } catch (err: any) {
-      toast.error(err?.message || "Failed to archive hotel.");
+      toast.error(getErrorMessage(err, "We couldn't archive the hotel. Please try again."));
     } finally {
       setIsArchiving(false);
     }
@@ -251,7 +254,7 @@ export default function HotelProfilePage() {
               variant="outline"
               size="sm"
               disabled={isReadOnly || isArchiving}
-              onClick={handleArchive}
+              onClick={() => setConfirmOpen(true)}
               className="bg-white hover:bg-rose-50 border-slate-200 text-rose-600 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer disabled:opacity-50"
             >
               <Archive className="h-3.5 w-3.5 mr-1 text-rose-500" />
@@ -459,6 +462,20 @@ export default function HotelProfilePage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={(open) => {
+            if (!open && !isArchiving) setConfirmOpen(false);
+          }}
+          title="Archive hotel property?"
+          description={`Are you sure you want to archive "${hotel?.name}"? Historical trip reservations will remain intact.`}
+          confirmText="Archive Hotel"
+          variant="destructive"
+          loading={isArchiving}
+          onConfirm={handleArchive}
+        />
       </div>
     </div>
   );

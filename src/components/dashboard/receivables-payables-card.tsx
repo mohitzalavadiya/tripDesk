@@ -56,19 +56,19 @@ export function ReceivablesPayablesCard({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* 1. Accounts Receivable & Overdue Cash Inflow */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-2xs space-y-4 flex flex-col justify-between">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 shadow-2xs space-y-4 flex flex-col justify-between">
         <div>
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
+          <div className="flex items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="min-w-0 flex-1">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-rose-600" />
-                <span>Accounts Receivable & Balance Due</span>
+                <CreditCard className="h-4 w-4 text-rose-600 shrink-0" />
+                <span className="truncate">Customer Receivables</span>
               </h3>
-              <p className="text-xs text-slate-500">
-                Pending customer collections and overdue departure balances.
+              <p className="text-xs text-slate-500 line-clamp-1 sm:line-clamp-none">
+                Pending customer collections and overdue balances.
               </p>
             </div>
-            <Link href="/payments">
+            <Link href="/payments" className="shrink-0">
               <Button size="sm" variant="ghost" className="text-xs h-8 text-rose-600 hover:bg-rose-50 cursor-pointer">
                 View Ledger <ArrowRight className="h-3 w-3 ml-1" />
               </Button>
@@ -76,24 +76,24 @@ export function ReceivablesPayablesCard({
           </div>
 
           {/* Aging Summary Badges */}
-          <div className="grid grid-cols-3 gap-3 pt-3">
-            <div className="p-3 bg-rose-50/60 rounded-xl border border-rose-100">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-3">
+            <div className="p-3 bg-rose-50/60 rounded-xl border border-rose-100 flex items-center justify-between sm:block">
               <span className="text-[10px] uppercase font-bold text-rose-700 block">Total Due</span>
-              <strong className="text-base text-rose-900 font-mono font-bold block mt-0.5">
+              <strong className="text-sm sm:text-base text-rose-900 font-mono font-bold block sm:mt-0.5">
                 {formatRupees(receivables?.totalOutstanding)}
               </strong>
             </div>
 
-            <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-100">
+            <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-100 flex items-center justify-between sm:block">
               <span className="text-[10px] uppercase font-bold text-amber-700 block">Overdue</span>
-              <strong className="text-base text-amber-900 font-mono font-bold block mt-0.5">
+              <strong className="text-sm sm:text-base text-amber-900 font-mono font-bold block sm:mt-0.5">
                 {formatRupees(receivables?.overdueAmount)}
               </strong>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between sm:block">
               <span className="text-[10px] uppercase font-bold text-slate-500 block">Overdue Count</span>
-              <strong className="text-base text-slate-900 font-mono font-bold block mt-0.5">
+              <strong className="text-sm sm:text-base text-slate-900 font-mono font-bold block sm:mt-0.5">
                 {receivables?.overdueBookingsCount ?? 0} bookings
               </strong>
             </div>
@@ -116,11 +116,11 @@ export function ReceivablesPayablesCard({
                     href={`/bookings/${r.bookingId}`}
                     className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-100/70 transition-colors text-xs"
                   >
-                    <div>
-                      <div className="font-bold text-slate-800">{r.customerName}</div>
-                      <div className="text-[10px] text-slate-500">{r.bookingNumber} • {r.tripTitle}</div>
+                    <div className="min-w-0 flex-1 mr-2">
+                      <div className="font-bold text-slate-800 truncate">{r.customerName}</div>
+                      <div className="text-[10px] text-slate-500 truncate">{r.bookingNumber} • {r.tripTitle}</div>
                     </div>
-                    <div className="text-right font-mono">
+                    <div className="text-right font-mono shrink-0">
                       <div className="font-bold text-rose-700">{formatRupees(r.balanceAmount)}</div>
                       <div className="text-[10px] text-slate-400">Total: {formatRupees(r.totalAmount)}</div>
                     </div>
@@ -133,19 +133,19 @@ export function ReceivablesPayablesCard({
       </div>
 
       {/* 2. Supplier Payables & Vendor Commitments */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-2xs space-y-4 flex flex-col justify-between">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 shadow-2xs space-y-4 flex flex-col justify-between">
         <div>
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
+          <div className="flex items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="min-w-0 flex-1">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <Building className="h-4 w-4 text-indigo-600" />
-                <span>Supplier Payables & Vendor Commitments</span>
+                <Building className="h-4 w-4 text-indigo-600 shrink-0" />
+                <span className="truncate">Supplier Payables</span>
               </h3>
-              <p className="text-xs text-slate-500">
-                Hotel, fleet, and activity vendor payables and settlement status.
+              <p className="text-xs text-slate-500 line-clamp-1 sm:line-clamp-none">
+                Hotel, fleet, and activity vendor commitments.
               </p>
             </div>
-            <Link href="/suppliers">
+            <Link href="/suppliers" className="shrink-0">
               <Button size="sm" variant="ghost" className="text-xs h-8 text-indigo-600 hover:bg-indigo-50 cursor-pointer">
                 Vendors <ArrowRight className="h-3 w-3 ml-1" />
               </Button>
@@ -153,24 +153,24 @@ export function ReceivablesPayablesCard({
           </div>
 
           {/* Payables Summary Badges */}
-          <div className="grid grid-cols-3 gap-3 pt-3">
-            <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-3">
+            <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 flex items-center justify-between sm:block">
               <span className="text-[10px] uppercase font-bold text-indigo-700 block">Total Cost</span>
-              <strong className="text-base text-indigo-900 font-mono font-bold block mt-0.5">
+              <strong className="text-sm sm:text-base text-indigo-900 font-mono font-bold block sm:mt-0.5">
                 {formatRupees(payables?.totalPayable)}
               </strong>
             </div>
 
-            <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100">
+            <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 flex items-center justify-between sm:block">
               <span className="text-[10px] uppercase font-bold text-emerald-700 block">Paid Out</span>
-              <strong className="text-base text-emerald-900 font-mono font-bold block mt-0.5">
+              <strong className="text-sm sm:text-base text-emerald-900 font-mono font-bold block sm:mt-0.5">
                 {formatRupees(payables?.paidAmount)}
               </strong>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between sm:block">
               <span className="text-[10px] uppercase font-bold text-slate-500 block">Outstanding</span>
-              <strong className="text-base text-slate-900 font-mono font-bold block mt-0.5">
+              <strong className="text-sm sm:text-base text-slate-900 font-mono font-bold block sm:mt-0.5">
                 {formatRupees(payables?.outstandingAmount)}
               </strong>
             </div>
@@ -193,11 +193,11 @@ export function ReceivablesPayablesCard({
                     href={`/suppliers/${s.supplierId}`}
                     className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-100/70 transition-colors text-xs"
                   >
-                    <div>
-                      <div className="font-bold text-slate-800">{s.supplierName}</div>
-                      <div className="text-[10px] text-slate-500">{s.supplierType}</div>
+                    <div className="min-w-0 flex-1 mr-2">
+                      <div className="font-bold text-slate-800 truncate">{s.supplierName}</div>
+                      <div className="text-[10px] text-slate-500 truncate">{s.supplierType}</div>
                     </div>
-                    <div className="text-right font-mono">
+                    <div className="text-right font-mono shrink-0">
                       <div className="font-bold text-indigo-700">{formatRupees(s.outstandingAmount)}</div>
                       <div className="text-[10px] text-slate-400">Total: {formatRupees(s.plannedAmount)}</div>
                     </div>

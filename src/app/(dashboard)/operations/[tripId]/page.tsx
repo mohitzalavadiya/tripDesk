@@ -38,6 +38,12 @@ import { ActivityConfirmationDialog, ActivityDialogMode } from "@/components/ope
 import { RescheduleActivityModal } from "@/components/operations/reschedule-activity-modal";
 import { CreateIssueModal } from "@/components/operations/create-issue-modal";
 import { ResolveIssueDialog } from "@/components/operations/resolve-issue-dialog";
+
+const TRAVELER_TYPE_LABELS: Record<string, string> = {
+  ADULT: "Adult",
+  CHILD: "Child",
+  INFANT: "Infant",
+};
 import { OperationalIssueCard } from "@/components/operations/operational-issue-card";
 import { CompleteTripModal } from "@/components/operations/complete-trip-modal";
 import { CommunicationModal } from "@/components/operations/communication-modal";
@@ -50,6 +56,8 @@ import { OperationsClosureSummary } from "@/lib/api-client";
 import { PageHeader } from "@/components/shared/page-header";
 import { PageSkeleton, CardSkeleton, TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ErrorState } from "@/components/shared/error-state";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { getErrorMessage } from "@/lib/utils";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,6 +116,16 @@ export default function TripOperationsDetailPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [initializing, setInitializing] = React.useState(false);
+
+  // Confirm Dialog state
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   // Active Tab
   const [activeTab, setActiveTab] = React.useState<
@@ -296,25 +314,28 @@ export default function TripOperationsDetailPage() {
     }
   };
 
-  const handleCancelDispatch = async (dispatch: VehicleDispatchWithDetails) => {
+  const handleCancelDispatch = (dispatch: VehicleDispatchWithDetails) => {
     if (!operation) return;
-    const confirmCancel = window.confirm(
-      `Are you sure you want to cancel the dispatch for ${dispatch.tripVehicle?.vehicleName || "this vehicle"}?`
-    );
-    if (!confirmCancel) return;
-
-    try {
-      await operationsClient.updateVehicleDispatch(operation.id, dispatch.id, {
-        status: DispatchStatus.CANCELLED,
-        notes: dispatch.notes
-          ? `${dispatch.notes}\n[CANCELLED]: Cancelled by operations coordinator.`
-          : "[CANCELLED]: Cancelled by operations coordinator.",
-      });
-      toast.success(`Dispatch cancelled.`);
-      fetchOperationData();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to cancel dispatch");
-    }
+    setConfirmAction({
+      title: "Cancel vehicle dispatch?",
+      description: `Are you sure you want to cancel the dispatch for ${dispatch.tripVehicle?.vehicleName || "this vehicle"}?`,
+      confirmText: "Cancel Dispatch",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await operationsClient.updateVehicleDispatch(operation.id, dispatch.id, {
+            status: DispatchStatus.CANCELLED,
+            notes: dispatch.notes
+              ? `${dispatch.notes}\n[CANCELLED]: Cancelled by operations coordinator.`
+              : "[CANCELLED]: Cancelled by operations coordinator.",
+          });
+          toast.success("Dispatch cancelled successfully.");
+          fetchOperationData();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to cancel dispatch. Please try again."));
+        }
+      },
+    });
   };
 
   // Handle Issue Actions
@@ -440,7 +461,7 @@ export default function TripOperationsDetailPage() {
             </div>
 
             <p className="text-xs text-slate-500 flex items-center gap-2 flex-wrap">
-              <span>Client: <strong>{operation.trip.customer.name}</strong> ({operation.trip.customer.phone})</span>
+              <span>Customer: <strong>{operation.trip.customer.name}</strong> ({operation.trip.customer.phone})</span>
               <span>•</span>
               <span className="flex items-center gap-1">
                 <Calendar className="h-3 w-3 text-slate-400" />
@@ -680,7 +701,7 @@ export default function TripOperationsDetailPage() {
                           </span>
                         )}
                       </div>
-                      <span className="text-slate-500 uppercase text-[11px] font-semibold">{trav.type}</span>
+                      <span className="text-slate-500 text-[11px] font-semibold">{TRAVELER_TYPE_LABELS[trav.type] ?? trav.type}</span>
                     </div>
                   ))}
                 </div>
@@ -1503,6 +1524,27 @@ export default function TripOperationsDetailPage() {
           downloadUrl={`/api/operations/${operation.id}/documents/travel-kit/pdf`}
         />
       )}
+
+      {/* Global Action Confirmation Modal */}
+      <ConfirmDialog
+        open={!!confirmAction}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (!confirmAction) return;
+          setActionLoading(true);
+          try {
+            await confirmAction.action();
+            setConfirmAction(null);
+          } finally {
+            setActionLoading(false);
+          }
+        }}
+      />
     </div>
   );
 }

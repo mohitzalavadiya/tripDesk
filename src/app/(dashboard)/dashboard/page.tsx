@@ -6,8 +6,6 @@ import { KpiCards } from "@/components/dashboard/kpi-cards";
 import { RevenueChart } from "@/components/dashboard/revenue-chart";
 import { SalesFunnelCard } from "@/components/dashboard/sales-funnel-card";
 import { ReceivablesPayablesCard } from "@/components/dashboard/receivables-payables-card";
-import { FollowUpsList } from "@/components/dashboard/follow-ups-list";
-import { RecentEnquiriesTable } from "@/components/dashboard/recent-enquiries-table";
 import { UpcomingTripsList } from "@/components/dashboard/upcoming-trips-list";
 import { CommunicationHealthCard } from "@/components/dashboard/communication-health-card";
 import { TopDestinationsCustomersCard } from "@/components/dashboard/top-destinations-customers-card";
@@ -18,7 +16,6 @@ import {
   AlertCircle,
   FileDown,
   LayoutDashboard,
-  TrendingUp,
   CreditCard,
   Compass,
 } from "lucide-react";
@@ -40,7 +37,7 @@ export default function DashboardPage() {
   const [preset, setPreset] = React.useState<DashboardPreset>("THIS_MONTH");
   const [startDate, setStartDate] = React.useState<string | undefined>(undefined);
   const [endDate, setEndDate] = React.useState<string | undefined>(undefined);
-  const [activeTab, setActiveTab] = React.useState<"OVERVIEW" | "SALES" | "FINANCE" | "OPERATIONS">("OVERVIEW");
+  const [activeTab, setActiveTab] = React.useState<"OVERVIEW" | "FINANCE" | "OPERATIONS">("OVERVIEW");
 
   // Data state
   const [data, setData] = React.useState<DashboardApiResponse | null>(null);
@@ -102,37 +99,37 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
-      {/* 1. Page Header */}
-      <PageHeader
-        title="Executive Command Center & Analytics"
-        description="Authoritative, server-aggregated operational, commercial, and financial intelligence."
-        breadcrumbs={[]}
-        primaryAction={{
-          label: "New Enquiry",
-          onClick: () => router.push("/enquiries/new"),
-          icon: Plus,
-        }}
-        secondaryActions={[
-          {
-            label: "Export CSV",
-            onClick: () => {
-              window.open(dashboardClient.getExportUrl({ preset, startDate, endDate }), "_blank");
+      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+        {/* 1. Page Header */}
+        <PageHeader
+          title="Executive Dashboard"
+          description="High-level overview of sales, revenue, collections, and operations."
+          breadcrumbs={[]}
+          primaryAction={{
+            label: "New Enquiry",
+            onClick: () => router.push("/enquiries/new"),
+            icon: Plus,
+          }}
+          secondaryActions={[
+            {
+              label: "Export CSV",
+              onClick: () => {
+                window.open(dashboardClient.getExportUrl({ preset, startDate, endDate }), "_blank");
+              },
+              icon: FileDown,
+              variant: "outline",
             },
-            icon: FileDown,
-            variant: "outline",
-          },
-          {
-            label: "Refresh",
-            onClick: handleRefresh,
-            icon: RefreshCw,
-            variant: "outline",
-          },
-        ]}
-      />
+            {
+              label: "Refresh",
+              onClick: handleRefresh,
+              icon: RefreshCw,
+              variant: "outline",
+            },
+          ]}
+        />
 
-      {/* Error state if API call failed */}
-      {error && !loading && (
-        <div className="px-4 md:px-8 mt-4">
+        {/* Error state if API call failed */}
+        {error && !loading && (
           <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-rose-800 flex items-center justify-between shadow-2xs">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
@@ -142,20 +139,18 @@ export default function DashboardPage() {
               Retry
             </Button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 2. Main Dashboard Content Grid */}
-      <div className="px-4 py-6 md:px-8 space-y-6">
-        {/* Date Filter & Tab Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* 2. Main Dashboard Content Grid */}
+        <div className="space-y-6">
+          {/* Date Filter & Tab Bar */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Tab Navigation */}
           <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200/80 shadow-2xs">
             {[
-              { id: "OVERVIEW", label: "Executive Overview", icon: LayoutDashboard },
-              { id: "SALES", label: "Sales & Pipeline", icon: TrendingUp },
-              { id: "FINANCE", label: "Finance & Profitability", icon: CreditCard },
-              { id: "OPERATIONS", label: "Operations & Departures", icon: Compass },
+              { id: "OVERVIEW", label: "Overview", icon: LayoutDashboard },
+              { id: "FINANCE", label: "Finance & Profit", icon: CreditCard },
+              { id: "OPERATIONS", label: "Operations", icon: Compass },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -233,19 +228,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* TAB 2: SALES & PIPELINE */}
-        {activeTab === "SALES" && (
-          <div className="space-y-6">
-            <SalesFunnelCard funnel={data?.funnel} loading={loading} />
-            <TopDestinationsCustomersCard
-              destinations={data?.destinations}
-              customers={data?.customers}
-              loading={loading}
-            />
-          </div>
-        )}
-
-        {/* TAB 3: FINANCE & PROFITABILITY */}
+        {/* TAB 2: FINANCE & PROFITABILITY */}
         {activeTab === "FINANCE" && (
           <div className="space-y-6">
             <RevenueChart analytics={data?.revenueTrend} loading={loading} />
@@ -257,7 +240,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* TAB 4: OPERATIONS & DEPARTURES */}
+        {/* TAB 3: OPERATIONS & DEPARTURES */}
         {activeTab === "OPERATIONS" && (
           <div className="space-y-6">
             <UpcomingTripsList trips={opsData?.upcomingDepartures} loading={loading} />
@@ -267,6 +250,7 @@ export default function DashboardPage() {
             />
           </div>
         )}
+        </div>
       </div>
     </div>
   );

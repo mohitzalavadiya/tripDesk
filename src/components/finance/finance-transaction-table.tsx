@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,14 @@ interface FinanceTransactionTableProps {
   selectedType: TransactionType;
   search: string;
 }
+
+const TRANSACTION_TYPE_LABELS: Record<string, string> = {
+  ALL: "All",
+  CUSTOMER_PAYMENT: "Customer Payments",
+  CUSTOMER_REFUND: "Refunds",
+  SUPPLIER_PAYMENT: "Supplier Disbursements",
+  EXPENSE: "Operational Expenses",
+};
 
 export function FinanceTransactionTable({
   transactions,
@@ -109,13 +118,22 @@ export function FinanceTransactionTable({
           <div className="flex flex-wrap items-center gap-2">
             {/* Search */}
             <div className="relative w-48 sm:w-64">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
               <Input
                 placeholder="Search number, party, ref..."
                 value={search}
                 onChange={(e) => onSearchChange(e.target.value)}
-                className="pl-8 h-8 text-xs bg-background"
+                className="pl-9 pr-8 h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white transition-all"
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => onSearchChange("")}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
 
             {/* Type Filter */}
@@ -123,11 +141,13 @@ export function FinanceTransactionTable({
               value={selectedType}
               onValueChange={(val) => onTypeChange(val as TransactionType)}
             >
-              <SelectTrigger className="h-8 text-xs w-44 bg-background">
-                <SelectValue placeholder="All Transaction Types" />
+              <SelectTrigger className="h-9.5 text-xs w-44 rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+                <SelectValue placeholder="All">
+                  {(val) => TRANSACTION_TYPE_LABELS[val] ?? "All"}
+                </SelectValue>
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Transactions</SelectItem>
+              <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                <SelectItem value="ALL">All</SelectItem>
                 <SelectItem value="CUSTOMER_PAYMENT">Customer Payments</SelectItem>
                 <SelectItem value="CUSTOMER_REFUND">Refunds</SelectItem>
                 <SelectItem value="SUPPLIER_PAYMENT">Supplier Disbursements</SelectItem>

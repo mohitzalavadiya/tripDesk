@@ -31,7 +31,11 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +65,8 @@ import {
 import { rateSheetClient, RateSheetWithRelations, MatchedRateResult } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+import { ExcelImportModal } from "@/components/excel/excel-import-modal";
+import { Download } from "lucide-react";
 
 export default function RateSheetsPage() {
   const router = useRouter();
@@ -70,6 +76,8 @@ export default function RateSheetsPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [importModalOpen, setImportModalOpen] = React.useState(false);
+  const [downloadingSample, setDownloadingSample] = React.useState(false);
 
   // Search & Filter states
   const [search, setSearch] = React.useState("");
@@ -119,7 +127,7 @@ export default function RateSheetsPage() {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
-      setError(err?.message || "Failed to load rate sheets from database.");
+      setError(getErrorMessage(err, "Unable to load rate sheets. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -128,6 +136,15 @@ export default function RateSheetsPage() {
   React.useEffect(() => {
     fetchRateSheets();
   }, [fetchRateSheets]);
+
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleClearFilters = () => {
     setSearch("");
@@ -142,24 +159,32 @@ export default function RateSheetsPage() {
     search.trim() !== "" || typeFilter !== "ALL" || statusFilter !== "ALL" || includeArchived;
 
   // Handle Archive
-  const handleArchive = async (id: string, name: string, number?: string | null) => {
+  const handleArchive = (id: string, name: string, number?: string | null) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
     }
 
     const ref = number ? `${number} (${name})` : name;
-    if (!confirm(`Archive rate sheet ${ref}? Historical quotations will remain intact.`)) {
-      return;
-    }
-
-    try {
-      await rateSheetClient.archiveRateSheet(id);
-      toast.success(`Rate sheet ${ref} archived.`);
-      await fetchRateSheets();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive rate sheet.");
-    }
+    setConfirmAction({
+      title: "Archive rate sheet?",
+      description: `Archive rate sheet ${ref}? Historical quotations will remain intact.`,
+      confirmText: "Archive Rate Sheet",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await rateSheetClient.archiveRateSheet(id);
+          toast.success(`Rate sheet ${ref} archived.`);
+          setConfirmAction(null);
+          await fetchRateSheets();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the rate sheet. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   const formatDateDisplay = (date: Date | string | null | undefined) => {
@@ -222,7 +247,43 @@ export default function RateSheetsPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
+          <div className="flex flex-wrap items-center gap-2.5 z-10 self-start lg:self-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  setDownloadingSample(true);
+                  await rateSheetClient.downloadSample();
+                  toast.success("Hotel Rate sample template downloaded.");
+                } catch (err: any) {
+                  toast.error(err?.message || "Failed to download sample file.");
+                } finally {
+                  setDownloadingSample(false);
+                }
+              }}
+              disabled={downloadingSample}
+              className="bg-white border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs h-9.5 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all"
+            >
+              {downloadingSample ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5 text-slate-500" />
+              )}
+              Download Sample
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setImportModalOpen(true)}
+              disabled={isReadOnly}
+              className="bg-white border-indigo-200 hover:bg-indigo-50 text-indigo-700 font-semibold text-xs h-9.5 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
+              Import Excel
+            </Button>
+
             <Button
               onClick={() => router.push("/rate-sheets/new")}
               disabled={isReadOnly}
@@ -353,27 +414,19 @@ export default function RateSheetsPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching rate sheets...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchRateSheets()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load rate sheets"
+                description={error}
+                onRetry={() => fetchRateSheets()}
+              />
             </div>
           )}
 
@@ -630,6 +683,36 @@ export default function RateSheetsPage() {
           </div>
         </div>
       </div>
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        importType="rate-sheets"
+        title="Import Hotel Rates from Excel"
+        onSuccess={() => fetchRateSheets()}
+        onDownloadSample={() => rateSheetClient.downloadSample()}
+        onPreview={(file, mode) => rateSheetClient.previewImport(file, mode)}
+        onExecute={(file, mode) => rateSheetClient.executeImport(file, mode)}
+      />
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
+      />
     </div>
   );
 }

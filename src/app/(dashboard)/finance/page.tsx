@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/shared/page-header";
 import { FinanceKpiGrid } from "@/components/finance/finance-kpi-grid";
 import { ProfitabilityCard } from "@/components/finance/profitability-card";
 import { OutstandingBalancesCard } from "@/components/finance/outstanding-balances-card";
@@ -128,186 +129,161 @@ export default function FinanceDashboardPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-      {/* Header & Controls Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Finance & Profitability
-            </h1>
-            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-xs">
-              <Sparkles className="h-3 w-3 mr-1" /> Enterprise Ledger
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Server-authoritative revenue, customer collections, supplier payables, expenses, and net profit margins.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Preset Selector */}
-          <div className="flex items-center gap-1.5 bg-card border border-border rounded-md px-2 py-1 shadow-sm">
-            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-            <Select value={preset} onValueChange={(val) => setPreset(val as FinancePreset)}>
-              <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none w-36 focus:ring-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="TODAY">Today</SelectItem>
-                <SelectItem value="LAST_7_DAYS">Last 7 Days</SelectItem>
-                <SelectItem value="LAST_30_DAYS">Last 30 Days</SelectItem>
-                <SelectItem value="LAST_90_DAYS">Last 90 Days</SelectItem>
-                <SelectItem value="CURRENT_MONTH">Current Month</SelectItem>
-                <SelectItem value="PREVIOUS_MONTH">Previous Month</SelectItem>
-                <SelectItem value="CURRENT_YEAR">Current Year</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Refresh Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={handleRefresh}
-            disabled={loading || refreshing}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-
-          {/* Export CSV Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={() => {
-              window.open(financeClient.getFinanceExportUrl({ preset }), "_blank");
-            }}
-          >
-            <Download className="h-3.5 w-3.5" />
-            Export CSV
-          </Button>
-
-          {/* Action Modals */}
-          <Button
-            size="sm"
-            className="h-9 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={() => handleRecordCustomerPayment()}
-          >
-            <ArrowDownLeft className="h-3.5 w-3.5" />
-            Collect Payment
-          </Button>
-
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-9 text-xs gap-1.5"
-            onClick={() => handleRecordSupplierPayment()}
-          >
-            <ArrowUpRight className="h-3.5 w-3.5" />
-            Pay Supplier
-          </Button>
-
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-9 text-xs gap-1.5"
-            onClick={() => setExpenseDialogOpen(true)}
-          >
-            <Receipt className="h-3.5 w-3.5" />
-            Log Expense
-          </Button>
-        </div>
-      </div>
-
-      {/* KPI Grid */}
-      {data ? (
-        <FinanceKpiGrid kpis={data.kpis} loading={loading} />
-      ) : (
-        <FinanceKpiGrid
-          kpis={{
-            totalSales: 0,
-            amountReceived: 0,
-            customerOutstanding: 0,
-            customerRefunded: 0,
-            supplierPayable: 0,
-            supplierPaid: 0,
-            supplierOutstanding: 0,
-            operationalExpenses: 0,
-            grossProfit: 0,
-            profitMarginPercent: 0,
-            netCashPosition: 0,
-            totalBookingsCount: 0,
-            fullyPaidBookingsCount: 0,
-            partiallyPaidBookingsCount: 0,
-            unpaidBookingsCount: 0,
+    <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
+      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+        <PageHeader
+          title="Finance & Profitability"
+          description="Server-authoritative revenue, customer collections, supplier payables, expenses, and net profit margins."
+          breadcrumbs={[{ label: "Finance" }]}
+          primaryAction={{
+            label: "Collect Payment",
+            onClick: () => handleRecordCustomerPayment(),
+            icon: ArrowDownLeft,
           }}
-          loading={loading}
+          secondaryActions={[
+            {
+              label: "Pay Supplier",
+              onClick: () => handleRecordSupplierPayment(),
+              icon: ArrowUpRight,
+              variant: "outline",
+            },
+            {
+              label: "Log Expense",
+              onClick: () => setExpenseDialogOpen(true),
+              icon: Receipt,
+              variant: "outline",
+            },
+            {
+              label: "Export CSV",
+              onClick: () => {
+                window.open(financeClient.getFinanceExportUrl({ preset }), "_blank");
+              },
+              icon: Download,
+              variant: "outline",
+            },
+            {
+              label: refreshing ? "Refreshing..." : "Refresh",
+              onClick: handleRefresh,
+              icon: RefreshCw,
+              variant: "outline",
+            },
+          ]}
         />
-      )}
 
-      {/* Profitability & Outstanding Dues Grid */}
-      {data && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ProfitabilityCard profitability={data.profitability} />
-          <OutstandingBalancesCard
-            customerReceivables={data.customerReceivables}
-            supplierPayables={data.supplierPayables}
-            onRecordCustomerPayment={handleRecordCustomerPayment}
-            onRecordSupplierPayment={handleRecordSupplierPayment}
-          />
+        {/* Filter Controls Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-700">Financial Period:</span>
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1">
+              <Calendar className="h-3.5 w-3.5 text-slate-500" />
+              <Select value={preset} onValueChange={(val) => setPreset(val as FinancePreset)}>
+                <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none w-36 focus:ring-0 font-medium">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TODAY">Today</SelectItem>
+                  <SelectItem value="LAST_7_DAYS">Last 7 Days</SelectItem>
+                  <SelectItem value="LAST_30_DAYS">Last 30 Days</SelectItem>
+                  <SelectItem value="LAST_90_DAYS">Last 90 Days</SelectItem>
+                  <SelectItem value="CURRENT_MONTH">Current Month</SelectItem>
+                  <SelectItem value="PREVIOUS_MONTH">Previous Month</SelectItem>
+                  <SelectItem value="CURRENT_YEAR">Current Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="text-xs text-slate-400 font-medium">
+            Server-authoritative enterprise ledger
+          </div>
         </div>
-      )}
 
-      {/* Unified Transaction Ledger */}
-      <FinanceTransactionTable
-        transactions={transactions}
-        meta={txMeta}
-        loading={txLoading}
-        onPageChange={setTxPage}
-        onTypeChange={(t) => {
-          setTxType(t);
-          setTxPage(1);
-        }}
-        onSearchChange={(s) => {
-          setTxSearch(s);
-          setTxPage(1);
-        }}
-        selectedType={txType}
-        search={txSearch}
-      />
+        {/* KPI Grid */}
+        {data ? (
+          <FinanceKpiGrid kpis={data.kpis} loading={loading} />
+        ) : (
+          <FinanceKpiGrid
+            kpis={{
+              totalSales: 0,
+              amountReceived: 0,
+              customerOutstanding: 0,
+              customerRefunded: 0,
+              supplierPayable: 0,
+              supplierPaid: 0,
+              supplierOutstanding: 0,
+              operationalExpenses: 0,
+              grossProfit: 0,
+              profitMarginPercent: 0,
+              netCashPosition: 0,
+              totalBookingsCount: 0,
+              fullyPaidBookingsCount: 0,
+              partiallyPaidBookingsCount: 0,
+              unpaidBookingsCount: 0,
+            }}
+            loading={loading}
+          />
+        )}
 
-      {/* Dialog Modals */}
-      <RecordPaymentDialog
-        open={paymentDialogOpen}
-        onOpenChange={setPaymentDialogOpen}
-        defaultBookingId={selectedBookingForPayment}
-        onSuccess={() => {
-          loadDashboard(true);
-          loadTransactions();
-        }}
-      />
+        {/* Profitability & Outstanding Dues Grid */}
+        {data && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ProfitabilityCard profitability={data.profitability} />
+            <OutstandingBalancesCard
+              customerReceivables={data.customerReceivables}
+              supplierPayables={data.supplierPayables}
+              onRecordCustomerPayment={handleRecordCustomerPayment}
+              onRecordSupplierPayment={handleRecordSupplierPayment}
+            />
+          </div>
+        )}
 
-      <RecordSupplierPaymentDialog
-        open={supplierPaymentDialogOpen}
-        onOpenChange={setSupplierPaymentDialogOpen}
-        defaultPayableId={selectedPayableForPayment}
-        onSuccess={() => {
-          loadDashboard(true);
-          loadTransactions();
-        }}
-      />
+        {/* Unified Transaction Ledger */}
+        <FinanceTransactionTable
+          transactions={transactions}
+          meta={txMeta}
+          loading={txLoading}
+          onPageChange={setTxPage}
+          onTypeChange={(t) => {
+            setTxType(t);
+            setTxPage(1);
+          }}
+          onSearchChange={(s) => {
+            setTxSearch(s);
+            setTxPage(1);
+          }}
+          selectedType={txType}
+          search={txSearch}
+        />
 
-      <CreateExpenseDialog
-        open={expenseDialogOpen}
-        onOpenChange={setExpenseDialogOpen}
-        onSuccess={() => {
-          loadDashboard(true);
-          loadTransactions();
-        }}
-      />
+        {/* Dialog Modals */}
+        <RecordPaymentDialog
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          defaultBookingId={selectedBookingForPayment}
+          onSuccess={() => {
+            loadDashboard(true);
+            loadTransactions();
+          }}
+        />
+
+        <RecordSupplierPaymentDialog
+          open={supplierPaymentDialogOpen}
+          onOpenChange={setSupplierPaymentDialogOpen}
+          defaultPayableId={selectedPayableForPayment}
+          onSuccess={() => {
+            loadDashboard(true);
+            loadTransactions();
+          }}
+        />
+
+        <CreateExpenseDialog
+          open={expenseDialogOpen}
+          onOpenChange={setExpenseDialogOpen}
+          onSuccess={() => {
+            loadDashboard(true);
+            loadTransactions();
+          }}
+        />
+      </div>
     </div>
   );
 }

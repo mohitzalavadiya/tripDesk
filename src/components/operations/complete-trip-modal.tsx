@@ -6,6 +6,7 @@ import { operationsClient, OperationDetailWithRelations } from "@/lib/api-client
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import {
   X,
   CheckCircle2,
@@ -77,7 +78,7 @@ export function CompleteTripModal({
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
-      toast.error(err.message || "Failed to complete tour. Please try again.");
+      toast.error(getErrorMessage(err, "Failed to complete tour. Please try again."));
     } finally {
       setLoading(false);
     }

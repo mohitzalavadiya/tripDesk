@@ -22,7 +22,11 @@ import {
   Globe,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +49,8 @@ import {
 import { hotelClient } from "@/lib/api-client";
 import { Hotel } from "@prisma/client";
 import { toast } from "sonner";
+import { ExcelImportModal } from "@/components/excel/excel-import-modal";
+import { FileSpreadsheet, Download } from "lucide-react";
 
 export default function HotelsPage() {
   const router = useRouter();
@@ -55,6 +61,9 @@ export default function HotelsPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [archivingId, setArchivingId] = React.useState<string | null>(null);
+  const [archiveTarget, setArchiveTarget] = React.useState<{ id: string; name: string } | null>(null);
+  const [importModalOpen, setImportModalOpen] = React.useState(false);
+  const [downloadingSample, setDownloadingSample] = React.useState(false);
 
   // Filter & Search states
   const [search, setSearch] = React.useState("");
@@ -115,20 +124,22 @@ export default function HotelsPage() {
   const isFilterActive = search.trim() !== "";
 
   // Archive Hotel
-  const handleArchive = async (id: string, name: string) => {
+  const handleArchive = (id: string, name: string) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Modifications are restricted to read-only mode.");
       return;
     }
+    setArchiveTarget({ id, name });
+  };
 
-    if (!confirm(`Archive hotel "${name}"? This soft-deletes the record while keeping historical trip reservations safe.`)) {
-      return;
-    }
-
+  const executeArchive = async () => {
+    if (!archiveTarget) return;
+    const { id, name } = archiveTarget;
     try {
       setArchivingId(id);
       await hotelClient.archiveHotel(id);
       toast.success(`Hotel "${name}" archived successfully.`);
+      setArchiveTarget(null);
       await fetchHotels();
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
@@ -190,7 +201,43 @@ export default function HotelsPage() {
           </div>
 
           {/* Right Action Controls */}
-          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
+          <div className="flex flex-wrap items-center gap-2.5 z-10 self-start lg:self-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  setDownloadingSample(true);
+                  await hotelClient.downloadSample();
+                  toast.success("Hotel sample template downloaded.");
+                } catch (err: any) {
+                  toast.error(err?.message || "Failed to download sample file.");
+                } finally {
+                  setDownloadingSample(false);
+                }
+              }}
+              disabled={downloadingSample}
+              className="bg-white border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs h-9 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all"
+            >
+              {downloadingSample ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5 text-slate-500" />
+              )}
+              Download Sample
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setImportModalOpen(true)}
+              disabled={isReadOnly}
+              className="bg-white border-indigo-200 hover:bg-indigo-50 text-indigo-700 font-semibold text-xs h-9 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
+              Import Excel
+            </Button>
+
             <Button
               onClick={() => router.push("/hotels/new")}
               disabled={isReadOnly}
@@ -241,27 +288,19 @@ export default function HotelsPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="p-16 text-center space-y-3">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600 mx-auto" />
-              <p className="text-xs text-slate-500 font-medium">Fetching hotels from database...</p>
+            <div className="p-4">
+              <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-5 w-5" />
-              </div>
-              <p className="text-xs font-bold text-slate-800">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchHotels()}
-                className="text-xs h-8 rounded-lg cursor-pointer"
-              >
-                Try Again
-              </Button>
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load hotels"
+                description={error}
+                onRetry={() => fetchHotels()}
+              />
             </div>
           )}
 
@@ -306,9 +345,16 @@ export default function HotelsPage() {
                               <Building2 className="h-4 w-4" />
                             </div>
                             <div className="flex flex-col min-w-0">
-                              <span className="font-semibold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">
-                                {hotel.name}
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-semibold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">
+                                  {hotel.name}
+                                </span>
+                                {hotel.hotelCode && (
+                                  <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/80 px-1.5 py-0.2 rounded shrink-0">
+                                    {hotel.hotelCode}
+                                  </span>
+                                )}
+                              </div>
                               {hotel.category && (
                                 <span className="text-[10px] text-slate-500">
                                   {hotel.category}
@@ -413,7 +459,14 @@ export default function HotelsPage() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <h4 className="font-bold text-slate-900 text-xs">{hotel.name}</h4>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="font-bold text-slate-900 text-xs">{hotel.name}</h4>
+                          {hotel.hotelCode && (
+                            <span className="font-mono text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/80 px-1 py-0.2 rounded">
+                              {hotel.hotelCode}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[11px] text-slate-500">{hotel.category || "Hotel Property"}</p>
                       </div>
                       {hotel.city && (
@@ -469,6 +522,30 @@ export default function HotelsPage() {
           </div>
         </div>
       </div>
+
+      {/* Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        importType="hotels"
+        title="Import Hotels from Excel"
+        onSuccess={() => fetchHotels()}
+        onDownloadSample={() => hotelClient.downloadSample()}
+        onPreview={(file, mode) => hotelClient.previewImport(file, mode)}
+        onExecute={(file, mode) => hotelClient.executeImport(file, mode)}
+      />
+
+      {/* Confirm Archive Dialog */}
+      <ConfirmDialog
+        open={!!archiveTarget}
+        onOpenChange={(open) => !open && setArchiveTarget(null)}
+        title="Archive hotel?"
+        description={`Archive hotel "${archiveTarget?.name}"? This soft-deletes the record while keeping historical trip reservations safe.`}
+        confirmText="Archive Hotel"
+        variant="destructive"
+        loading={!!archivingId}
+        onConfirm={executeArchive}
+      />
     </div>
   );
 }

@@ -45,10 +45,10 @@ export function TopDestinationsCustomersCard({
           <div>
             <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
               <MapPin className="h-4 w-4 text-indigo-600" />
-              <span>Top Destinations by Volume & Revenue</span>
+              <span>Top Destinations</span>
             </h3>
             <p className="text-xs text-slate-500">
-              Most popular travel locations and itinerary demand.
+              Most popular destinations by bookings and revenue.
             </p>
           </div>
         </div>
@@ -90,10 +90,10 @@ export function TopDestinationsCustomersCard({
           <div>
             <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
               <Trophy className="h-4 w-4 text-amber-600" />
-              <span>Top High-Value Travelers & VIPs</span>
+              <span>Top Customers</span>
             </h3>
             <p className="text-xs text-slate-500">
-              Leading clients by confirmed booking spend and trip history.
+              Leading clients by total spend and booking volume.
             </p>
           </div>
           <Link href="/customers" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer">

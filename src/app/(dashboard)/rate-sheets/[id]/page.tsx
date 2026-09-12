@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { rateSheetClient, RateSheetWithRelations } from "@/lib/api-client";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,6 +60,14 @@ export default function RateSheetDetailPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   // Edit Rate Modal State
   const [isEditOpen, setIsEditOpen] = React.useState(false);
@@ -170,24 +180,32 @@ export default function RateSheetDetailPage() {
     }
   };
 
-  const handleArchive = async () => {
+  const handleArchive = () => {
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
     }
 
     if (!rateSheet) return;
-    if (!confirm(`Archive rate sheet ${rateSheet.name}? Historical quotation records remain safe.`)) {
-      return;
-    }
-
-    try {
-      await rateSheetClient.archiveRateSheet(id);
-      toast.success(`Rate sheet ${rateSheet.name} archived.`);
-      router.push("/rate-sheets");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive rate sheet.");
-    }
+    setConfirmAction({
+      title: "Archive rate sheet?",
+      description: `Archive rate sheet "${rateSheet.name}"? Historical quotation records will remain safe.`,
+      confirmText: "Archive Rate Sheet",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await rateSheetClient.archiveRateSheet(id);
+          toast.success(`Rate sheet ${rateSheet.name} archived.`);
+          setConfirmAction(null);
+          router.push("/rate-sheets");
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the rate sheet. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   const formatDateDisplay = (date: Date | string | null | undefined) => {
@@ -679,6 +697,24 @@ export default function RateSheetDetailPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          open={confirmAction !== null}
+          onOpenChange={(open) => {
+            if (!open && !actionLoading) setConfirmAction(null);
+          }}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (confirmAction?.action) {
+              await confirmAction.action();
+            }
+          }}
+        />
       </div>
     </div>
   );

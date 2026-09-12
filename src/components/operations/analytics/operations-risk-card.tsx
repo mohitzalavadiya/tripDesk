@@ -86,25 +86,25 @@ export function OperationsRiskCard({ riskData, loading = false }: OperationsRisk
         {/* Risk Distribution Bar */}
         <div className="grid grid-cols-4 gap-2 mb-4">
           <div className="rounded-lg bg-emerald-50 border border-emerald-200/80 p-2.5 text-center">
-            <div className="text-xs font-medium text-emerald-700">LOW RISK</div>
+            <div className="text-xs font-medium text-emerald-700">Low Risk</div>
             <div className="text-lg font-bold text-emerald-900 mt-0.5">
               {riskData.riskDistribution.low}
             </div>
           </div>
           <div className="rounded-lg bg-blue-50 border border-blue-200/80 p-2.5 text-center">
-            <div className="text-xs font-medium text-blue-700">MEDIUM</div>
+            <div className="text-xs font-medium text-blue-700">Medium Risk</div>
             <div className="text-lg font-bold text-blue-900 mt-0.5">
               {riskData.riskDistribution.medium}
             </div>
           </div>
           <div className="rounded-lg bg-amber-50 border border-amber-200/80 p-2.5 text-center">
-            <div className="text-xs font-medium text-amber-700">HIGH</div>
+            <div className="text-xs font-medium text-amber-700">High Risk</div>
             <div className="text-lg font-bold text-amber-900 mt-0.5">
               {riskData.riskDistribution.high}
             </div>
           </div>
           <div className="rounded-lg bg-rose-50 border border-rose-200/80 p-2.5 text-center">
-            <div className="text-xs font-medium text-rose-700">CRITICAL</div>
+            <div className="text-xs font-medium text-rose-700">Critical Risk</div>
             <div className="text-lg font-bold text-rose-900 mt-0.5">
               {riskData.riskDistribution.critical}
             </div>

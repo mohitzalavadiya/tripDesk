@@ -48,10 +48,10 @@ export function CommunicationHealthCard({
           <div>
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Send className="h-4 w-4 text-teal-600" />
-              <span>Multi-Channel Communication Health</span>
+              <span>Communications & Delivery</span>
             </h3>
             <p className="text-xs text-slate-500">
-              WhatsApp & Email automated delivery status and reliability.
+              WhatsApp, email, and automated delivery health.
             </p>
           </div>
           <Badge

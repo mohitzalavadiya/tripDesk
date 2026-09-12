@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { ExpenseCategory } from "@prisma/client";
 import { financeClient, bookingClient, BookingWithRelations } from "@/lib/api-client";
+import { getErrorMessage } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -96,7 +97,7 @@ export function CreateExpenseDialog({
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      toast.error(err.message || "Failed to log expense.");
+      toast.error(getErrorMessage(err, "Failed to log expense."));
     } finally {
       setLoading(false);
     }

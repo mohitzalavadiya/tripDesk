@@ -42,8 +42,11 @@ import {
   Layers,
   Sparkles,
   Send,
+  Receipt,
 } from "lucide-react";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -96,6 +99,30 @@ import {
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  BANK_TRANSFER: "Bank Transfer",
+  UPI: "UPI",
+  CASH: "Cash",
+  CARD: "Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other",
+};
+
+const TRAVELER_TYPE_LABELS: Record<string, string> = {
+  ADULT: "Adult",
+  CHILD: "Child",
+  INFANT: "Infant",
+};
+
+const PAYMENT_METHOD_MODAL_LABELS: Record<string, string> = {
+  UPI: "UPI / GPay / PhonePe",
+  BANK_TRANSFER: "Bank Transfer (NEFT/RTGS)",
+  CASH: "Cash Deposit",
+  CARD: "Credit / Debit Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other Method",
+};
+
 export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -109,6 +136,36 @@ export default function BookingDetailPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [generatingDocs, setGeneratingDocs] = React.useState(false);
+  const [creatingInvoice, setCreatingInvoice] = React.useState(false);
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
+
+  const handleOpenInvoice = async () => {
+    setCreatingInvoice(true);
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error?.message || json.message || "Failed to open invoice.");
+      }
+      const inv = json.data || json;
+      router.push(`/invoices/${inv.id}`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to open invoice.");
+    } finally {
+      setCreatingInvoice(false);
+    }
+  };
 
   // Add Payment Modal State
   const [isAddPaymentOpen, setIsAddPaymentOpen] = React.useState(false);
@@ -239,23 +296,31 @@ export default function BookingDetailPage() {
   };
 
   // Archive / Delete Payment
-  const handleDeletePayment = async (paymentId: string, paymentNumber: string) => {
+  const handleDeletePayment = (paymentId: string, paymentNumber: string) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
       return;
     }
 
-    if (!confirm(`Archive payment ${paymentNumber}? This will recalculate booking balance.`)) {
-      return;
-    }
-
-    try {
-      await paymentClient.deletePayment(paymentId);
-      toast.success(`Payment ${paymentNumber} archived.`);
-      await fetchBooking();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to archive payment.");
-    }
+    setConfirmAction({
+      title: "Archive payment record?",
+      description: `Archive payment ${paymentNumber}? This will recalculate the booking balance.`,
+      confirmText: "Archive Payment",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await paymentClient.deletePayment(paymentId);
+          toast.success(`Payment ${paymentNumber} archived.`);
+          setConfirmAction(null);
+          await fetchBooking();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the payment record. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   // Generate Booking Documents
@@ -437,6 +502,23 @@ export default function BookingDetailPage() {
               >
                 <FileText className="h-3.5 w-3.5 mr-1 text-slate-400" />
                 Proposal View
+              </Button>
+            )}
+
+            {booking.status === BookingStatus.CONFIRMED && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenInvoice}
+                disabled={creatingInvoice}
+                className="bg-slate-900 text-white hover:bg-slate-800 border-slate-900 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer gap-1.5"
+              >
+                {creatingInvoice ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Receipt className="h-3.5 w-3.5" />
+                )}
+                Customer Invoice
               </Button>
             )}
 
@@ -1016,7 +1098,7 @@ export default function BookingDetailPage() {
                           </TableCell>
                           <TableCell className="py-3 px-4">
                             <Badge variant="outline" className="text-[10px] font-bold">
-                              {p.paymentMethod}
+                              {PAYMENT_METHOD_LABELS[p.paymentMethod] ?? p.paymentMethod}
                             </Badge>
                           </TableCell>
                           <TableCell className="py-3 px-4">
@@ -1160,7 +1242,7 @@ export default function BookingDetailPage() {
                       {booking.trip.travelers.map((t) => (
                         <div key={t.id} className="text-slate-600 flex justify-between">
                           <span>{t.name}</span>
-                          <span className="text-slate-400 text-[10px]">{t.type}</span>
+                          <span className="text-slate-400 text-[10px]">{TRAVELER_TYPE_LABELS[t.type] ?? t.type}</span>
                         </div>
                       ))}
                     </div>
@@ -1232,7 +1314,9 @@ export default function BookingDetailPage() {
                       onValueChange={(val) => val && setPaymentMethod(val as PaymentMethod)}
                     >
                       <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
-                        <SelectValue />
+                        <SelectValue placeholder="Payment Method">
+                          {(val) => PAYMENT_METHOD_MODAL_LABELS[val] ?? val}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
                         <SelectItem value={PaymentMethod.UPI}>UPI / GPay / PhonePe</SelectItem>
@@ -1345,6 +1429,24 @@ export default function BookingDetailPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          open={confirmAction !== null}
+          onOpenChange={(open) => {
+            if (!open && !actionLoading) setConfirmAction(null);
+          }}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (confirmAction?.action) {
+              await confirmAction.action();
+            }
+          }}
+        />
       </div>
     </div>
   );

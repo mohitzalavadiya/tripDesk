@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import {
   CheckCircle2,
   XCircle,
@@ -26,6 +27,15 @@ import {
   ShieldCheck,
   AlertTriangle,
 } from "lucide-react";
+
+const OPERATION_STATUS_LABELS: Record<string, string> = {
+  PLANNING: "Planning",
+  CONFIRMED: "Confirmed",
+  ONGOING: "In Progress",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+  DRAFT: "Draft",
+};
 
 interface FinalizationChecklistCardProps {
   summary: OperationsClosureSummary;
@@ -64,7 +74,7 @@ export function FinalizationChecklistCard({
       setFinalizeDialogOpen(false);
       onSuccess();
     } catch (err: any) {
-      toast.error(err.message || "Failed to finalize operation.");
+      toast.error(getErrorMessage(err, "Failed to finalize operation. Please try again."));
     } finally {
       setProcessing(false);
     }
@@ -86,7 +96,7 @@ export function FinalizationChecklistCard({
       setReopenDialogOpen(false);
       onSuccess();
     } catch (err: any) {
-      toast.error(err.message || "Failed to reopen operation.");
+      toast.error(getErrorMessage(err, "Failed to reopen operation. Please try again."));
     } finally {
       setProcessing(false);
     }
@@ -169,7 +179,7 @@ export function FinalizationChecklistCard({
                 </span>
               ) : (
                 <span className="flex items-center gap-1 font-bold text-rose-700">
-                  <XCircle className="h-4 w-4 text-rose-600" /> {summary.status}
+                  <XCircle className="h-4 w-4 text-rose-600" /> {OPERATION_STATUS_LABELS[summary.status] ?? summary.status}
                 </span>
               )}
             </div>

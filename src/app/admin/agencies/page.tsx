@@ -41,6 +41,7 @@ import {
   ShieldCheck,
   Plus,
 } from "lucide-react";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { adminClient } from "@/lib/api-client/admin-client";
 import { AdminAgencyListItem } from "@/lib/services/admin-service";
 
@@ -288,19 +289,16 @@ export default function AdminAgenciesPage() {
 
                       {/* Agency Status */}
                       <TableCell>
-                        <span
-                          className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                        <StatusBadge
+                          status={agency.status}
+                          label={
                             agency.status === "ACTIVE"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              ? "Active"
                               : agency.status === "SUSPENDED"
-                              ? "bg-rose-50 text-rose-700 border border-rose-200"
-                              : "bg-slate-100 text-slate-600 border border-slate-200"
-                          }`}
-                        >
-                          {agency.status === "ACTIVE" && <CheckCircle2 className="h-3 w-3" />}
-                          {agency.status === "SUSPENDED" && <Ban className="h-3 w-3" />}
-                          {agency.status}
-                        </span>
+                              ? "Suspended"
+                              : agency.status
+                          }
+                        />
                       </TableCell>
 
                       {/* Subscription & Trial */}
@@ -309,17 +307,18 @@ export default function AdminAgenciesPage() {
                           <div className="space-y-0.5 text-xs">
                             <div className="flex items-center gap-1.5">
                               <span className="font-bold text-slate-900">{sub.planName}</span>
-                              <span
-                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              <StatusBadge
+                                status={sub.status}
+                                label={
                                   sub.status === "ACTIVE"
-                                    ? "bg-emerald-100 text-emerald-800"
+                                    ? "Active"
                                     : sub.status === "TRIAL"
-                                    ? "bg-amber-100 text-amber-800"
-                                    : "bg-slate-100 text-slate-600"
-                                }`}
-                              >
-                                {sub.status}
-                              </span>
+                                    ? "Trial"
+                                    : sub.status === "EXPIRED"
+                                    ? "Expired"
+                                    : sub.status
+                                }
+                              />
                             </div>
                             {sub.status === "TRIAL" && (
                               <p className="text-[11px] text-amber-700 font-medium flex items-center gap-1">

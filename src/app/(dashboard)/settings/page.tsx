@@ -156,18 +156,19 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
-      <PageHeader
-        title="Settings & Integrations"
-        description="Manage communication channels, automated customer alerts, and email branding."
-        breadcrumbs={[{ label: "Settings" }]}
-        primaryAction={{
-          label: runningSweep ? "Running Sweep..." : "Run Automation Sweep",
-          onClick: handleRunSweep,
-          icon: Zap,
-        }}
-      />
+      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+        <PageHeader
+          title="Settings & Integrations"
+          description="Manage communication channels, automated customer alerts, and email branding."
+          breadcrumbs={[{ label: "Settings" }]}
+          primaryAction={{
+            label: runningSweep ? "Running Sweep..." : "Run Automation Sweep",
+            onClick: handleRunSweep,
+            icon: Zap,
+          }}
+        />
 
-      <div className="px-4 py-6 md:px-8 max-w-6xl w-full mx-auto space-y-6">
+        <div className="max-w-6xl w-full mx-auto space-y-6">
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2 border-b border-slate-200">
           <button
@@ -507,7 +508,7 @@ export default function SettingsPage() {
                                   : "bg-blue-50 text-blue-700 border-blue-200"
                               }`}
                             >
-                              {log.channel}
+                              {log.channel === "WHATSAPP" ? "WhatsApp" : log.channel === "EMAIL" ? "Email" : log.channel}
                             </Badge>
                           </div>
                           <p className="text-[11px] text-slate-500 line-clamp-1">{log.title}</p>
@@ -526,7 +527,7 @@ export default function SettingsPage() {
                                 : "bg-slate-100 text-slate-600 border-slate-200"
                             }`}
                           >
-                            {log.status}
+                            {log.status === "DELIVERED" ? "Delivered" : log.status === "SENT" ? "Sent" : log.status === "FAILED" ? "Failed" : log.status === "PENDING" ? "Pending" : log.status}
                           </Badge>
                           {log.status === "FAILED" && (
                             <button
@@ -545,6 +546,7 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

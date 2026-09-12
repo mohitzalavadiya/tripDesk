@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/utils";
 import { X, AlertCircle, Loader2 } from "lucide-react";
 
 interface CreateIssueModalProps {
@@ -91,7 +92,7 @@ export function CreateIssueModal({
         if (onSuccess) onSuccess();
         onClose();
       } catch (err: any) {
-        toast.error(err.message || "Failed to create issue. Please try again.");
+        toast.error(getErrorMessage(err, "Failed to create issue. Please try again."));
       } finally {
         setLoading(false);
       }
