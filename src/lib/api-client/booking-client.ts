@@ -81,6 +81,19 @@ export type BookingWithRelations = Booking & {
     status: string;
   } | null;
   payments: Payment[];
+  invoices?: Array<{
+    id: string;
+    invoiceNumber: string | null;
+    status: "DRAFT" | "ISSUED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
+    invoiceDate: Date | string;
+    dueDate: Date | string;
+    totalAmount: number;
+    paidAmount: number;
+    balanceAmount: number;
+    currency: string;
+    cancelledAt?: Date | string | null;
+    createdAt: Date | string;
+  }>;
   tripOperation?: {
     id: string;
     status: string;

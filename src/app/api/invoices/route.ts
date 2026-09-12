@@ -35,16 +35,16 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/invoices
- * Create a new draft invoice from a confirmed booking
+ * Get or create a persistent invoice for a confirmed booking (Decision #18)
  */
 export async function POST(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
     const body = await validateJson(createInvoiceSchema, request);
 
-    const draft = await invoiceService.createDraftInvoice(context.agencyId, body.bookingId);
+    const invoice = await invoiceService.getOrCreateInvoiceForBooking(context.agencyId, body.bookingId);
 
-    return apiCreated(draft);
+    return apiCreated(invoice);
   } catch (error) {
     return handleApiError(error);
   }

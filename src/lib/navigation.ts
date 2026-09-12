@@ -84,11 +84,6 @@ export const agencyNavigationConfig: NavigationSection[] = [
         icon: CalendarCheck,
       },
       {
-        label: "Invoices",
-        href: "/invoices",
-        icon: Receipt,
-      },
-      {
         label: "Documents",
         href: "/documents",
         icon: FileText,

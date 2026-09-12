@@ -13,6 +13,7 @@ import {
   ActivityConfirmation,
   OperationalIssue,
   OperationEvent,
+  InvoiceStatus,
 } from "@prisma/client";
 import {
   CreateBookingInput,
@@ -83,6 +84,19 @@ export type BookingWithRelations = Booking & {
     status: QuotationStatus;
   } | null;
   payments: Payment[];
+  invoices?: Array<{
+    id: string;
+    invoiceNumber: string | null;
+    status: InvoiceStatus;
+    invoiceDate: Date;
+    dueDate: Date;
+    totalAmount: Prisma.Decimal;
+    paidAmount: Prisma.Decimal;
+    balanceAmount: Prisma.Decimal;
+    currency: string;
+    cancelledAt?: Date | null;
+    createdAt: Date;
+  }>;
   tripOperation?: {
     id: string;
     status: string;
@@ -262,6 +276,23 @@ export const bookingService = {
         payments: {
           where: { archivedAt: null },
           orderBy: { paymentDate: "desc" },
+        },
+        invoices: {
+          where: { archivedAt: null },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            invoiceNumber: true,
+            status: true,
+            invoiceDate: true,
+            dueDate: true,
+            totalAmount: true,
+            paidAmount: true,
+            balanceAmount: true,
+            currency: true,
+            cancelledAt: true,
+            createdAt: true,
+          },
         },
         tripOperation: {
           include: {
@@ -610,7 +641,7 @@ export const bookingService = {
       paymentStatus = BookingPaymentStatus.PARTIALLY_PAID;
     }
 
-    return db.booking.update({
+    const updatedBooking = await db.booking.update({
       where: { id: bookingId },
       data: {
         paidAmount: new Prisma.Decimal(paid),
@@ -618,6 +649,39 @@ export const bookingService = {
         paymentStatus,
       },
     });
+
+    // Synchronize active (non-cancelled) Invoice if present
+    const activeInvoice = await db.invoice.findFirst({
+      where: {
+        bookingId,
+        status: { not: InvoiceStatus.CANCELLED },
+        archivedAt: null,
+      },
+    });
+
+    if (activeInvoice) {
+      const invTotal = total;
+      const invBalance = Math.max(0, Math.round((invTotal - paid) * 100) / 100);
+      let newInvStatus: InvoiceStatus = InvoiceStatus.ISSUED;
+      if (invBalance <= 0 && invTotal > 0) {
+        newInvStatus = InvoiceStatus.PAID;
+      } else if (paid > 0) {
+        newInvStatus = InvoiceStatus.PARTIALLY_PAID;
+      }
+
+      await db.invoice.update({
+        where: { id: activeInvoice.id },
+        data: {
+          totalAmount: new Prisma.Decimal(invTotal),
+          subtotal: new Prisma.Decimal(invTotal),
+          paidAmount: new Prisma.Decimal(paid),
+          balanceAmount: new Prisma.Decimal(invBalance),
+          status: newInvStatus,
+        },
+      });
+    }
+
+    return updatedBooking;
   },
 
   /**
@@ -711,6 +775,47 @@ export const bookingService = {
       data: updateData,
     });
 
+    // Synchronize active invoice if total amount changed or booking cancelled
+    const activeInvoice = await prisma.invoice.findFirst({
+      where: {
+        bookingId,
+        status: { not: InvoiceStatus.CANCELLED },
+        archivedAt: null,
+      },
+    });
+
+    if (activeInvoice) {
+      if (data.status === BookingStatus.CANCELLED) {
+        await prisma.invoice.update({
+          where: { id: activeInvoice.id },
+          data: {
+            status: InvoiceStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancellationReason: data.cancellationReason || "Booking was cancelled.",
+          },
+        });
+      } else if (data.totalAmount !== undefined) {
+        const newTotal = Number(data.totalAmount);
+        const paid = Number(activeInvoice.paidAmount);
+        const newBalance = Math.max(0, Math.round((newTotal - paid) * 100) / 100);
+        let newStatus: InvoiceStatus = InvoiceStatus.ISSUED;
+        if (newBalance <= 0 && newTotal > 0) {
+          newStatus = InvoiceStatus.PAID;
+        } else if (paid > 0) {
+          newStatus = InvoiceStatus.PARTIALLY_PAID;
+        }
+
+        await prisma.invoice.update({
+          where: { id: activeInvoice.id },
+          data: {
+            totalAmount: new Prisma.Decimal(newTotal),
+            balanceAmount: new Prisma.Decimal(newBalance),
+            status: newStatus,
+          },
+        });
+      }
+    }
+
     // Record audit event and notifications on status change
     if (data.status && data.status !== booking.status && booking.tripOperation?.id) {
       try {
@@ -770,6 +875,26 @@ export const bookingService = {
         cancellationReason: reason.trim() || "Cancelled by agency coordinator.",
       },
     });
+
+    // Auto-cancel active invoice if present
+    const activeInvoice = await prisma.invoice.findFirst({
+      where: {
+        bookingId,
+        status: { not: InvoiceStatus.CANCELLED },
+        archivedAt: null,
+      },
+    });
+
+    if (activeInvoice) {
+      await prisma.invoice.update({
+        where: { id: activeInvoice.id },
+        data: {
+          status: InvoiceStatus.CANCELLED,
+          cancelledAt: new Date(),
+          cancellationReason: reason.trim() || "Booking was cancelled.",
+        },
+      });
+    }
 
     if (booking.tripOperation?.id) {
       try {

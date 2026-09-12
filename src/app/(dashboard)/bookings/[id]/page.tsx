@@ -43,6 +43,7 @@ import {
   Sparkles,
   Send,
   Receipt,
+  ChevronDown,
 } from "lucide-react";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -51,6 +52,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -136,7 +146,7 @@ export default function BookingDetailPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [generatingDocs, setGeneratingDocs] = React.useState(false);
-  const [creatingInvoice, setCreatingInvoice] = React.useState(false);
+  const [generatingInvoice, setGeneratingInvoice] = React.useState(false);
   const [confirmAction, setConfirmAction] = React.useState<{
     title: string;
     description: string;
@@ -146,8 +156,8 @@ export default function BookingDetailPage() {
   } | null>(null);
   const [actionLoading, setActionLoading] = React.useState(false);
 
-  const handleOpenInvoice = async () => {
-    setCreatingInvoice(true);
+  const handleGenerateInvoice = async () => {
+    setGeneratingInvoice(true);
     try {
       const res = await fetch("/api/invoices", {
         method: "POST",
@@ -156,14 +166,14 @@ export default function BookingDetailPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.error?.message || json.message || "Failed to open invoice.");
+        throw new Error(json.error?.message || json.message || "Failed to generate invoice.");
       }
       const inv = json.data || json;
       router.push(`/invoices/${inv.id}`);
     } catch (err: any) {
-      toast.error(err?.message || "Failed to open invoice.");
+      toast.error(err?.message || "Failed to generate invoice.");
     } finally {
-      setCreatingInvoice(false);
+      setGeneratingInvoice(false);
     }
   };
 
@@ -406,6 +416,8 @@ export default function BookingDetailPage() {
   const readinessScore = readiness?.score ?? 0;
   const isReady = readiness?.isReady ?? false;
 
+  const activeInvoice = booking.invoices?.[0];
+
   const hotelConfirmations = booking.tripOperation?.hotelConfirmations || [];
   const vehicleDispatches = booking.tripOperation?.vehicleDispatches || [];
   const activityConfirmations = booking.tripOperation?.activityConfirmations || [];
@@ -505,23 +517,6 @@ export default function BookingDetailPage() {
               </Button>
             )}
 
-            {booking.status === BookingStatus.CONFIRMED && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleOpenInvoice}
-                disabled={creatingInvoice}
-                className="bg-slate-900 text-white hover:bg-slate-800 border-slate-900 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer gap-1.5"
-              >
-                {creatingInvoice ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Receipt className="h-3.5 w-3.5" />
-                )}
-                Customer Invoice
-              </Button>
-            )}
-
             <Button
               onClick={handleOpenAddPayment}
               disabled={isReadOnly}
@@ -530,6 +525,67 @@ export default function BookingDetailPage() {
               <CreditCard className="h-4 w-4" />
               Add Payment
             </Button>
+
+            {/* Booking & Invoice Actions Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-white hover:bg-slate-50 border-slate-200 h-9 px-3 font-semibold text-xs rounded-xl shadow-2xs gap-1 cursor-pointer"
+                  >
+                    Actions
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md rounded-xl p-1 w-52">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="text-[10px] font-bold uppercase text-slate-400 px-2 py-1">
+                    Invoice Actions
+                  </DropdownMenuLabel>
+                  {activeInvoice ? (
+                    <>
+                      <DropdownMenuItem
+                        onClick={() => router.push(`/invoices/${activeInvoice.id}`)}
+                        className="text-xs cursor-pointer rounded-md"
+                      >
+                        <FileText className="mr-2 h-3.5 w-3.5 text-slate-500" />
+                        View Invoice ({activeInvoice.invoiceNumber || "Draft"})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => window.open(`/api/invoices/${activeInvoice.id}/pdf`, "_blank")}
+                        className="text-xs cursor-pointer rounded-md"
+                      >
+                        <Download className="mr-2 h-3.5 w-3.5 text-slate-500" />
+                        Download Invoice PDF
+                      </DropdownMenuItem>
+                    </>
+                  ) : (booking.status === BookingStatus.CONFIRMED ||
+                      booking.status === BookingStatus.ONGOING ||
+                      booking.status === BookingStatus.COMPLETED) ? (
+                    <DropdownMenuItem
+                      onClick={handleGenerateInvoice}
+                      disabled={generatingInvoice || isReadOnly}
+                      className="text-xs cursor-pointer rounded-md font-medium text-indigo-600 hover:bg-indigo-50"
+                    >
+                      {generatingInvoice ? (
+                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Receipt className="mr-2 h-3.5 w-3.5 text-indigo-600" />
+                      )}
+                      Generate Invoice
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem disabled className="text-xs text-slate-400">
+                      <Lock className="mr-2 h-3.5 w-3.5 text-slate-300" />
+                      Invoice Not Available
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -1196,6 +1252,137 @@ export default function BookingDetailPage() {
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs space-y-1">
                   <span className="font-bold text-rose-800 uppercase text-[10px]">Cancellation Reason</span>
                   <p className="text-rose-700 leading-relaxed">{booking.cancellationReason}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Invoice Card */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-indigo-600" />
+                  <span>Invoice</span>
+                </h3>
+                {activeInvoice && (
+                  <Badge
+                    className={`text-[10px] font-bold ${
+                      activeInvoice.status === "PAID"
+                        ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                        : activeInvoice.status === "PARTIALLY_PAID"
+                        ? "bg-amber-100 text-amber-800 border-amber-200"
+                        : activeInvoice.status === "CANCELLED"
+                        ? "bg-rose-100 text-rose-800 border-rose-200"
+                        : "bg-indigo-100 text-indigo-800 border-indigo-200"
+                    }`}
+                  >
+                    {activeInvoice.status.replace("_", " ")}
+                  </Badge>
+                )}
+              </div>
+
+              {activeInvoice ? (
+                <div className="space-y-3.5 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Invoice Number</span>
+                    <strong className="text-slate-900 block font-mono text-sm">{activeInvoice.invoiceNumber}</strong>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Invoice Date</span>
+                      <p className="text-slate-700 font-medium">{formatDateDisplay(activeInvoice.invoiceDate)}</p>
+                    </div>
+                    {activeInvoice.dueDate && (
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Due Date</span>
+                        <p className="text-slate-700 font-medium">{formatDateDisplay(activeInvoice.dueDate)}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 font-mono">
+                    <div className="flex justify-between text-slate-600 text-xs">
+                      <span>Total:</span>
+                      <span className="font-bold text-slate-900">{formatCurrency(Number(activeInvoice.totalAmount))}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-700 text-xs">
+                      <span>Paid:</span>
+                      <span className="font-bold">{formatCurrency(Number(activeInvoice.paidAmount))}</span>
+                    </div>
+                    <div className="flex justify-between text-rose-700 text-xs pt-1 border-t border-slate-200">
+                      <span>Balance:</span>
+                      <span className="font-bold">{formatCurrency(Number(activeInvoice.balanceAmount))}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <Link href={`/invoices/${activeInvoice.id}`} className="flex-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                      >
+                        <FileText className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                        View Invoice
+                      </Button>
+                    </Link>
+                    <a
+                      href={`/api/invoices/${activeInvoice.id}/pdf`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1"
+                    >
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                        Download PDF
+                      </Button>
+                    </a>
+                  </div>
+                </div>
+              ) : (booking.status === BookingStatus.CONFIRMED ||
+                  booking.status === BookingStatus.ONGOING ||
+                  booking.status === BookingStatus.COMPLETED) ? (
+                <div className="space-y-3 text-xs">
+                  <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-1">
+                    <span className="font-bold text-amber-900 flex items-center gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+                      Invoice Not Generated
+                    </span>
+                    <p className="text-amber-800 text-[11px] leading-relaxed">
+                      Generate an official customer invoice for this booking.
+                    </p>
+                  </div>
+
+                  <Button
+                    onClick={handleGenerateInvoice}
+                    disabled={generatingInvoice || isReadOnly}
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs h-9 rounded-xl shadow-xs gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {generatingInvoice ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Receipt className="h-3.5 w-3.5" />
+                    )}
+                    Generate Invoice
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2 text-xs">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <Lock className="h-3.5 w-3.5 text-slate-400" />
+                      Invoice Not Available
+                    </span>
+                    <p className="text-slate-500 text-[11px] leading-relaxed">
+                      {booking.status === BookingStatus.CANCELLED
+                        ? "Invoice generation is unavailable for cancelled bookings."
+                        : "Invoice generation will be available after confirming this booking."}
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

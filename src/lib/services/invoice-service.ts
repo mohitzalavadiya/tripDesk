@@ -29,6 +29,42 @@ export type InvoiceWithDetails = Invoice & {
     currency: string;
     travelStartDate: Date | null;
     travelEndDate: Date | null;
+    bookingDate?: Date | null;
+    notes?: string | null;
+    customer?: {
+      id: string;
+      name: string;
+      phone: string;
+      email?: string | null;
+      address?: string | null;
+      city?: string | null;
+      state?: string | null;
+      country?: string | null;
+      postalCode?: string | null;
+    } | null;
+    trip?: {
+      id: string;
+      title: string;
+      tripNumber: string;
+      startDate: Date | null;
+      endDate: Date | null;
+      travelers?: Array<{ id: string; name: string; type: string }>;
+    } | null;
+    quotation?: {
+      id: string;
+      quotationNumber: string;
+      title?: string | null;
+      items?: Array<{
+        id: string;
+        name: string;
+        description?: string | null;
+        quantity: number;
+        sellingPrice?: Prisma.Decimal | null;
+        unitPrice?: Prisma.Decimal | null;
+        totalPrice?: Prisma.Decimal | null;
+        sortOrder: number;
+      }>;
+    } | null;
   };
   agency?: {
     id: string;
@@ -40,6 +76,17 @@ export type InvoiceWithDetails = Invoice & {
   } | null;
   isOverdue?: boolean;
 };
+
+export function calculateInvoiceStatus(
+  totalAmount: number,
+  paidAmount: number,
+  isCancelled: boolean = false
+): InvoiceStatus {
+  if (isCancelled) return InvoiceStatus.CANCELLED;
+  if (paidAmount >= totalAmount && totalAmount > 0) return InvoiceStatus.PAID;
+  if (paidAmount > 0) return InvoiceStatus.PARTIALLY_PAID;
+  return InvoiceStatus.ISSUED;
+}
 
 export const invoiceService = {
   /**
@@ -88,10 +135,12 @@ export const invoiceService = {
   },
 
   /**
-   * Create a new Draft Invoice from a Confirmed Booking.
-   * If an active Draft already exists for this Booking, returns the existing Draft.
+   * Get or Create a Persistent Invoice for a Confirmed Booking (Decision #18).
+   * - First call creates the persistent Invoice with sequential INV-XXXX number.
+   * - Later calls reuse the existing Invoice, refreshing latest Booking financial and payment data.
+   * - Never creates a DRAFT; directly creates ISSUED, PARTIALLY_PAID, or PAID.
    */
-  async createDraftInvoice(agencyId: string, bookingId: string): Promise<InvoiceWithDetails> {
+  async getOrCreateInvoiceForBooking(agencyId: string, bookingId: string): Promise<InvoiceWithDetails> {
     const booking = await prisma.booking.findFirst({
       where: { id: bookingId, agencyId, archivedAt: null },
       include: {
@@ -105,6 +154,9 @@ export const invoiceService = {
           },
         },
         agency: true,
+        payments: {
+          where: { archivedAt: null, status: PaymentStatus.COMPLETED },
+        },
       },
     });
 
@@ -112,163 +164,405 @@ export const invoiceService = {
       throw new Error("Booking not found or does not belong to this agency.");
     }
 
-    if (booking.status !== BookingStatus.CONFIRMED) {
-      throw new Error(`Invoices can only be created for CONFIRMED bookings. Current status is ${booking.status}.`);
+    const eligibleStatuses: BookingStatus[] = [
+      BookingStatus.CONFIRMED,
+      BookingStatus.ONGOING,
+      BookingStatus.COMPLETED,
+    ];
+
+    if (!eligibleStatuses.includes(booking.status)) {
+      throw new Error(`Invoices can only be created for CONFIRMED, ONGOING, or COMPLETED bookings. Current status is ${booking.status}.`);
     }
 
-    // Check for existing active (non-cancelled) invoice
-    const existingActive = await prisma.invoice.findFirst({
-      where: {
-        agencyId,
-        bookingId,
-        status: { not: InvoiceStatus.CANCELLED },
-        archivedAt: null,
-      },
-      include: {
-        items: { orderBy: { sortOrder: "asc" } },
-        payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
-        booking: {
-          select: {
-            id: true,
-            bookingNumber: true,
-            status: true,
-            totalAmount: true,
-            paidAmount: true,
-            balanceAmount: true,
-            currency: true,
-            travelStartDate: true,
-            travelEndDate: true,
-          },
-        },
-        agency: {
-          select: { id: true, name: true, email: true, phone: true, address: true, logo: true },
-        },
-      },
-    });
-
-    if (existingActive) {
-      if (existingActive.status === InvoiceStatus.DRAFT) {
-        return existingActive as InvoiceWithDetails;
-      }
-      throw new Error(`An active ${existingActive.status} invoice (${existingActive.invoiceNumber || "existing"}) already exists for this booking.`);
+    // Calculate authoritative payment totals from booking's completed payments
+    let netPaid = 0;
+    for (const p of booking.payments) {
+      const net = Number(p.amount) - Number(p.refundedAmount || 0);
+      netPaid += Math.max(0, net);
     }
+    netPaid = Math.round(netPaid * 100) / 100;
+    const totalAmount = Number(booking.totalAmount);
+    const balanceAmount = Math.max(0, Math.round((totalAmount - netPaid) * 100) / 100);
+    const invoiceStatus = calculateInvoiceStatus(totalAmount, netPaid, false);
 
-    // Build snapshots
-    const customerSnapshot = booking.customer
-      ? {
-          id: booking.customer.id,
-          name: booking.customer.name,
-          phone: booking.customer.phone,
-          email: booking.customer.email,
-          address: booking.customer.address,
-          city: booking.customer.city,
-          state: booking.customer.state,
-          country: booking.customer.country,
-          postalCode: booking.customer.postalCode,
-        }
-      : null;
+    try {
+      const result = await prisma.$transaction(
+        async (tx) => {
+          // Check for existing invoice for this booking (using composite unique selector)
+          const existingActive = await tx.invoice.findUnique({
+            where: {
+              agencyId_bookingId: {
+                agencyId,
+                bookingId,
+              },
+            },
+            include: {
+              items: { orderBy: { sortOrder: "asc" } },
+              payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+              booking: {
+                select: {
+                  id: true,
+                  bookingNumber: true,
+                  status: true,
+                  totalAmount: true,
+                  paidAmount: true,
+                  balanceAmount: true,
+                  currency: true,
+                  travelStartDate: true,
+                  travelEndDate: true,
+                },
+              },
+              agency: {
+                select: { id: true, name: true, email: true, phone: true, address: true, logo: true },
+              },
+            },
+          });
 
-    const bookingSnapshot = {
-      id: booking.id,
-      bookingNumber: booking.bookingNumber,
-      tripId: booking.tripId,
-      tripTitle: booking.trip?.title,
-      travelStartDate: booking.travelStartDate,
-      travelEndDate: booking.travelEndDate,
-      currency: booking.currency || "INR",
-    };
+          if (existingActive) {
+            // If existing active invoice was missing invoiceNumber (e.g. legacy draft), allocate number
+            let invoiceNumber = existingActive.invoiceNumber;
+            if (!invoiceNumber) {
+              invoiceNumber = await invoiceSequenceService.getNextInvoiceNumber(agencyId, tx);
+            }
 
-    const agencySnapshot = booking.agency
-      ? {
-          id: booking.agency.id,
-          name: booking.agency.name,
-          email: booking.agency.email,
-          phone: booking.agency.phone,
-          address: booking.agency.address,
-        }
-      : null;
+            // Synchronize latest Booking financial state & payment state onto existing Invoice
+            const updated = await tx.invoice.update({
+              where: { id: existingActive.id },
+              data: {
+                invoiceNumber,
+                totalAmount: new Prisma.Decimal(totalAmount),
+                paidAmount: new Prisma.Decimal(netPaid),
+                balanceAmount: new Prisma.Decimal(balanceAmount),
+                status: invoiceStatus,
+                currency: booking.currency || "INR",
+              },
+              include: {
+                items: { orderBy: { sortOrder: "asc" } },
+                payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+                booking: {
+                  select: {
+                    id: true,
+                    bookingNumber: true,
+                    status: true,
+                    totalAmount: true,
+                    paidAmount: true,
+                    balanceAmount: true,
+                    currency: true,
+                    travelStartDate: true,
+                    travelEndDate: true,
+                  },
+                },
+                agency: {
+                  select: { id: true, name: true, email: true, phone: true, address: true, logo: true },
+                },
+              },
+            });
 
-    // Seed line items from quotation if available, otherwise from booking total
-    let rawItems: { description: string; quantity: number; rate: number }[] = [];
-    if (booking.quotation?.items && booking.quotation.items.length > 0) {
-      rawItems = booking.quotation.items.map((qi) => ({
-        description: qi.name || qi.description || "Package Item",
-        quantity: qi.quantity || 1,
-        rate: Number(qi.sellingPrice || qi.unitPrice || 0),
-      }));
-    } else {
-      rawItems = [
-        {
-          description: `Package Booking - ${booking.bookingNumber}`,
-          quantity: 1,
-          rate: Number(booking.totalAmount),
+            // Reconcile/link any payments of this booking that had invoiceId = null
+            await tx.payment.updateMany({
+              where: {
+                bookingId: booking.id,
+                invoiceId: null,
+                archivedAt: null,
+              },
+              data: {
+                invoiceId: updated.id,
+              },
+            });
+
+            return updated;
+          }
+
+          // If no active invoice exists: create persistent invoice
+          const invoiceNumber = await invoiceSequenceService.getNextInvoiceNumber(agencyId, tx);
+
+          // Build snapshots for compatibility
+          const customerSnapshot = booking.customer
+            ? {
+                id: booking.customer.id,
+                name: booking.customer.name,
+                phone: booking.customer.phone,
+                email: booking.customer.email,
+                address: booking.customer.address,
+                city: booking.customer.city,
+                state: booking.customer.state,
+                country: booking.customer.country,
+                postalCode: booking.customer.postalCode,
+              }
+            : null;
+
+          const bookingSnapshot = {
+            id: booking.id,
+            bookingNumber: booking.bookingNumber,
+            tripId: booking.tripId,
+            tripTitle: booking.trip?.title,
+            travelStartDate: booking.travelStartDate,
+            travelEndDate: booking.travelEndDate,
+            currency: booking.currency || "INR",
+          };
+
+          const agencySnapshot = booking.agency
+            ? {
+                id: booking.agency.id,
+                name: booking.agency.name,
+                email: booking.agency.email,
+                phone: booking.agency.phone,
+                address: booking.agency.address,
+              }
+            : null;
+
+          // Raw items from quotation or booking
+          let rawItems: { description: string; quantity: number; rate: number }[] = [];
+          if (booking.quotation?.items && booking.quotation.items.length > 0) {
+            rawItems = booking.quotation.items.map((qi) => ({
+              description: qi.name || qi.description || "Package Item",
+              quantity: qi.quantity || 1,
+              rate: Number(qi.sellingPrice || qi.unitPrice || 0),
+            }));
+          } else {
+            rawItems = [
+              {
+                description: `Package Booking - ${booking.bookingNumber}`,
+                quantity: 1,
+                rate: Number(booking.totalAmount),
+              },
+            ];
+          }
+
+          const { subtotal, discountAmount, items } = invoiceService.calculateFinancials(
+            rawItems,
+            null,
+            null,
+            netPaid
+          );
+
+          const now = new Date();
+          let defaultDueDate = new Date(now);
+          defaultDueDate.setDate(defaultDueDate.getDate() + 7);
+
+          const created = await tx.invoice.create({
+            data: {
+              agencyId,
+              bookingId,
+              invoiceNumber,
+              status: invoiceStatus,
+              invoiceDate: now,
+              dueDate: defaultDueDate,
+              currency: booking.currency || "INR",
+              subtotal: new Prisma.Decimal(subtotal || totalAmount),
+              discountType: null,
+              discountValue: null,
+              discountAmount: new Prisma.Decimal(discountAmount || 0),
+              totalAmount: new Prisma.Decimal(totalAmount),
+              paidAmount: new Prisma.Decimal(netPaid),
+              balanceAmount: new Prisma.Decimal(balanceAmount),
+              customerSnapshot: customerSnapshot ? JSON.parse(JSON.stringify(customerSnapshot)) : undefined,
+              bookingSnapshot: JSON.parse(JSON.stringify(bookingSnapshot)),
+              agencySnapshot: agencySnapshot ? JSON.parse(JSON.stringify(agencySnapshot)) : undefined,
+              items: {
+                create: items.map((it) => ({
+                  description: it.description,
+                  quantity: it.quantity,
+                  rate: new Prisma.Decimal(it.rate),
+                  amount: new Prisma.Decimal(it.amount),
+                  sortOrder: it.sortOrder,
+                })),
+              },
+            },
+            include: {
+              items: { orderBy: { sortOrder: "asc" } },
+              payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+              booking: {
+                select: {
+                  id: true,
+                  bookingNumber: true,
+                  status: true,
+                  bookingDate: true,
+                  travelStartDate: true,
+                  travelEndDate: true,
+                  currency: true,
+                  totalAmount: true,
+                  paidAmount: true,
+                  balanceAmount: true,
+                  notes: true,
+                  customer: {
+                    select: {
+                      id: true,
+                      name: true,
+                      phone: true,
+                      email: true,
+                      address: true,
+                      city: true,
+                      state: true,
+                      country: true,
+                      postalCode: true,
+                    },
+                  },
+                  trip: {
+                    select: {
+                      id: true,
+                      title: true,
+                      tripNumber: true,
+                      startDate: true,
+                      endDate: true,
+                      travelers: {
+                        select: {
+                          id: true,
+                          name: true,
+                          type: true,
+                        },
+                      },
+                    },
+                  },
+                  quotation: {
+                    select: {
+                      id: true,
+                      quotationNumber: true,
+                      title: true,
+                      items: {
+                        where: { isOptional: false },
+                        orderBy: { sortOrder: "asc" },
+                        select: {
+                          id: true,
+                          name: true,
+                          description: true,
+                          quantity: true,
+                          sellingPrice: true,
+                          unitPrice: true,
+                          totalPrice: true,
+                          sortOrder: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              agency: {
+                select: { id: true, name: true, email: true, phone: true, address: true, logo: true },
+              },
+            },
+          });
+
+          // Link any existing payments for this booking to this persistent invoice
+          await tx.payment.updateMany({
+            where: {
+              bookingId: booking.id,
+              invoiceId: null,
+              archivedAt: null,
+            },
+            data: {
+              invoiceId: created.id,
+            },
+          });
+
+          return created;
         },
-      ];
-    }
+        { timeout: 15000, maxWait: 10000 }
+      );
 
-    const { subtotal, discountAmount, totalAmount, paidAmount, balanceAmount, items } =
-      this.calculateFinancials(rawItems, null, null, 0);
-
-    // Default due date: today or travelStartDate if in future
-    const now = new Date();
-    let defaultDueDate = new Date(now);
-    defaultDueDate.setDate(defaultDueDate.getDate() + 7);
-
-    const created = await prisma.$transaction(async (tx) => {
-      const inv = await tx.invoice.create({
-        data: {
-          agencyId,
-          bookingId,
-          status: InvoiceStatus.DRAFT,
-          invoiceDate: now,
-          dueDate: defaultDueDate,
-          currency: booking.currency || "INR",
-          subtotal: new Prisma.Decimal(subtotal),
-          discountType: null,
-          discountValue: null,
-          discountAmount: new Prisma.Decimal(discountAmount),
-          totalAmount: new Prisma.Decimal(totalAmount),
-          paidAmount: new Prisma.Decimal(paidAmount),
-          balanceAmount: new Prisma.Decimal(balanceAmount),
-          customerSnapshot: customerSnapshot ? JSON.parse(JSON.stringify(customerSnapshot)) : undefined,
-          bookingSnapshot: JSON.parse(JSON.stringify(bookingSnapshot)),
-          agencySnapshot: agencySnapshot ? JSON.parse(JSON.stringify(agencySnapshot)) : undefined,
-          items: {
-            create: items.map((it) => ({
-              description: it.description,
-              quantity: it.quantity,
-              rate: new Prisma.Decimal(it.rate),
-              amount: new Prisma.Decimal(it.amount),
-              sortOrder: it.sortOrder,
-            })),
-          },
-        },
-        include: {
-          items: { orderBy: { sortOrder: "asc" } },
-          payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
-          booking: {
-            select: {
-              id: true,
-              bookingNumber: true,
-              status: true,
-              totalAmount: true,
-              paidAmount: true,
-              balanceAmount: true,
-              currency: true,
-              travelStartDate: true,
-              travelEndDate: true,
+      return result as InvoiceWithDetails;
+    } catch (error) {
+      // Handle P2002 Unique Constraint Violation under high concurrency races
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        // Fetch the invoice created by the winning concurrent transaction
+        const existingInvoice = await prisma.invoice.findUnique({
+          where: {
+            agencyId_bookingId: {
+              agencyId,
+              bookingId,
             },
           },
-          agency: {
-            select: { id: true, name: true, email: true, phone: true, address: true, logo: true },
+          include: {
+            items: { orderBy: { sortOrder: "asc" } },
+            payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+            booking: {
+              select: {
+                id: true,
+                bookingNumber: true,
+                status: true,
+                bookingDate: true,
+                travelStartDate: true,
+                travelEndDate: true,
+                currency: true,
+                totalAmount: true,
+                paidAmount: true,
+                balanceAmount: true,
+                notes: true,
+                customer: {
+                  select: {
+                    id: true,
+                    name: true,
+                    phone: true,
+                    email: true,
+                    address: true,
+                    city: true,
+                    state: true,
+                    country: true,
+                    postalCode: true,
+                  },
+                },
+                trip: {
+                  select: {
+                    id: true,
+                    title: true,
+                    tripNumber: true,
+                    startDate: true,
+                    endDate: true,
+                    travelers: {
+                      select: {
+                        id: true,
+                        name: true,
+                        type: true,
+                      },
+                    },
+                  },
+                },
+                quotation: {
+                  select: {
+                    id: true,
+                    quotationNumber: true,
+                    title: true,
+                    items: {
+                      where: { isOptional: false },
+                      orderBy: { sortOrder: "asc" },
+                      select: {
+                        id: true,
+                        name: true,
+                        description: true,
+                        quantity: true,
+                        sellingPrice: true,
+                        unitPrice: true,
+                        totalPrice: true,
+                        sortOrder: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            agency: {
+              select: { id: true, name: true, email: true, phone: true, address: true, logo: true },
+            },
           },
-        },
-      });
+        });
 
-      return inv;
-    });
+        if (existingInvoice) {
+          return existingInvoice as InvoiceWithDetails;
+        }
+      }
 
-    return created as InvoiceWithDetails;
+      throw error;
+    }
+  },
+
+  /**
+   * Backward-compatible alias for creating/getting persistent invoice
+   */
+  async createDraftInvoice(agencyId: string, bookingId: string): Promise<InvoiceWithDetails> {
+    return this.getOrCreateInvoiceForBooking(agencyId, bookingId);
   },
 
   /**
@@ -288,12 +582,64 @@ export const invoiceService = {
             id: true,
             bookingNumber: true,
             status: true,
+            bookingDate: true,
+            travelStartDate: true,
+            travelEndDate: true,
+            currency: true,
             totalAmount: true,
             paidAmount: true,
             balanceAmount: true,
-            currency: true,
-            travelStartDate: true,
-            travelEndDate: true,
+            notes: true,
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                email: true,
+                address: true,
+                city: true,
+                state: true,
+                country: true,
+                postalCode: true,
+              },
+            },
+            trip: {
+              select: {
+                id: true,
+                title: true,
+                tripNumber: true,
+                startDate: true,
+                endDate: true,
+                travelers: {
+                  select: {
+                    id: true,
+                    name: true,
+                    type: true,
+                  },
+                },
+              },
+            },
+            quotation: {
+              select: {
+                id: true,
+                quotationNumber: true,
+                title: true,
+                items: {
+                  where: { isOptional: false },
+                  orderBy: { sortOrder: "asc" },
+                  select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    quantity: true,
+                    sellingPrice: true,
+                    unitPrice: true,
+                    totalPrice: true,
+                    sortOrder: true,
+                  },
+                },
+              },
+            },
           },
         },
         agency: {
@@ -806,6 +1152,8 @@ export const invoiceService = {
 
   /**
    * Create a Replacement Draft Invoice for a CANCELLED Invoice.
+   * Legacy path: Under Decision #18 & DB Uniqueness (@@unique([agencyId, bookingId])),
+   * replacement invoice rows are discontinued. One Booking retains one persistent invoice record.
    */
   async createReplacementInvoice(
     agencyId: string,
@@ -813,98 +1161,14 @@ export const invoiceService = {
   ): Promise<InvoiceWithDetails> {
     const cancelled = await prisma.invoice.findFirst({
       where: { id: cancelledInvoiceId, agencyId, archivedAt: null },
-      include: { items: { orderBy: { sortOrder: "asc" } } },
     });
 
     if (!cancelled) {
       throw new Error("Cancelled invoice not found.");
     }
 
-    if (cancelled.status !== InvoiceStatus.CANCELLED) {
-      throw new Error("Replacement invoices can only be created for CANCELLED invoices.");
-    }
-
-    // Check that no other active invoice exists for this booking
-    const existingActive = await prisma.invoice.findFirst({
-      where: {
-        agencyId,
-        bookingId: cancelled.bookingId,
-        status: { not: InvoiceStatus.CANCELLED },
-        archivedAt: null,
-      },
-    });
-
-    if (existingActive) {
-      throw new Error("An active invoice already exists for this booking. Cannot create replacement.");
-    }
-
-    const now = new Date();
-    const defaultDueDate = new Date(now);
-    defaultDueDate.setDate(defaultDueDate.getDate() + 7);
-
-    const replacement = await prisma.$transaction(async (tx) => {
-      const newDraft = await tx.invoice.create({
-        data: {
-          agencyId,
-          bookingId: cancelled.bookingId,
-          status: InvoiceStatus.DRAFT,
-          invoiceDate: now,
-          dueDate: defaultDueDate,
-          currency: cancelled.currency,
-          subtotal: cancelled.subtotal,
-          discountType: cancelled.discountType,
-          discountValue: cancelled.discountValue,
-          discountAmount: cancelled.discountAmount,
-          totalAmount: cancelled.totalAmount,
-          paidAmount: new Prisma.Decimal(0),
-          balanceAmount: cancelled.totalAmount,
-          customerSnapshot: cancelled.customerSnapshot ? JSON.parse(JSON.stringify(cancelled.customerSnapshot)) : undefined,
-          bookingSnapshot: cancelled.bookingSnapshot ? JSON.parse(JSON.stringify(cancelled.bookingSnapshot)) : undefined,
-          agencySnapshot: cancelled.agencySnapshot ? JSON.parse(JSON.stringify(cancelled.agencySnapshot)) : undefined,
-          notes: cancelled.notes,
-          paymentInstructions: cancelled.paymentInstructions,
-          internalNotes: cancelled.internalNotes,
-          items: {
-            create: cancelled.items.map((it) => ({
-              description: it.description,
-              quantity: it.quantity,
-              rate: it.rate,
-              amount: it.amount,
-              sortOrder: it.sortOrder,
-            })),
-          },
-        },
-        include: {
-          items: { orderBy: { sortOrder: "asc" } },
-          payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
-          booking: {
-            select: {
-              id: true,
-              bookingNumber: true,
-              status: true,
-              totalAmount: true,
-              paidAmount: true,
-              balanceAmount: true,
-              currency: true,
-              travelStartDate: true,
-              travelEndDate: true,
-            },
-          },
-          agency: {
-            select: { id: true, name: true, email: true, phone: true, address: true, logo: true },
-          },
-        },
-      });
-
-      // Link replacement reference on cancelled invoice
-      await tx.invoice.update({
-        where: { id: cancelledInvoiceId },
-        data: { replacedByInvoiceId: newDraft.id },
-      });
-
-      return newDraft;
-    });
-
-    return replacement as InvoiceWithDetails;
+    throw new Error(
+      "Replacement invoices are discontinued under Decision #18. One Booking retains one persistent invoice record."
+    );
   },
 };
