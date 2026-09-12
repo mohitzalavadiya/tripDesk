@@ -5,6 +5,7 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
+import { formatEnumLabel } from "@/lib/utils/enum-formatters"
 
 const Select = SelectPrimitive.Root
 
@@ -18,13 +19,19 @@ function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   )
 }
 
-function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
+function SelectValue({ className, children, ...props }: SelectPrimitive.Value.Props) {
   return (
     <SelectPrimitive.Value
       data-slot="select-value"
       className={cn("flex flex-1 text-left", className)}
       {...props}
-    />
+    >
+      {typeof children === "function"
+        ? children
+        : children !== undefined
+        ? children
+        : (value: any) => (value ? formatEnumLabel(value) : undefined)}
+    </SelectPrimitive.Value>
   )
 }
 

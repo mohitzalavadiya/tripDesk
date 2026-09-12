@@ -631,7 +631,13 @@ export default function PaymentsPage() {
                       onValueChange={(val) => val && setSelectedBookingId(val)}
                     >
                       <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
-                        <SelectValue placeholder="Choose a booking..." />
+                        <SelectValue placeholder="Choose a booking...">
+                          {(val) => {
+                            if (!val) return undefined;
+                            const b = bookings.find((item) => item.id === val);
+                            return b ? `${b.bookingNumber} — ${b.customer?.name || "Customer"} (${formatCurrency(Number(b.balanceAmount))} Due)` : val;
+                          }}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
                         {bookings.map((b) => (

@@ -202,7 +202,13 @@ export function AddManualCostModal({
                   }}
                 >
                   <SelectTrigger className={`h-9 text-xs bg-slate-50/50 border-slate-200 ${getFieldError("supplierId") ? "border-red-500 focus:ring-red-500" : ""}`}>
-                    <SelectValue placeholder="Direct / None" />
+                    <SelectValue placeholder="Direct / None">
+                      {(val) => {
+                        if (!val) return "None / Direct";
+                        const sup = suppliers.find((s) => s.id === val);
+                        return sup ? sup.name : val;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-white border-slate-200">
                     <SelectItem value="" className="text-xs">None / Direct</SelectItem>

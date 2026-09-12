@@ -294,7 +294,13 @@ function NewBookingForm() {
                         onValueChange={(val) => val && setSelectedQuotationId(val)}
                       >
                         <SelectTrigger className="h-10 text-xs bg-slate-50/50 border-slate-200">
-                          <SelectValue placeholder="Choose a proposal..." />
+                          <SelectValue placeholder="Choose a proposal...">
+                            {(val) => {
+                              if (!val) return undefined;
+                              const q = quotations.find((x) => x.id === val);
+                              return q ? `${q.quotationNumber} — ${q.trip?.title} (${q.customer?.name}) • ${formatCurrency(Number(q.finalAmount))}` : val;
+                            }}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent className="bg-white border-slate-200">
                           {quotations.map((q) => (
@@ -329,7 +335,13 @@ function NewBookingForm() {
                       onValueChange={(val) => val && setSelectedTripId(val)}
                     >
                       <SelectTrigger className="h-10 text-xs bg-slate-50/50 border-slate-200">
-                        <SelectValue placeholder="Choose a trip..." />
+                        <SelectValue placeholder="Choose a trip...">
+                          {(val) => {
+                            if (!val) return undefined;
+                            const t = trips.find((x) => x.id === val);
+                            return t ? `${t.tripNumber} — ${t.title} (${t.customer?.name})` : val;
+                          }}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
                         {trips.map((t) => (

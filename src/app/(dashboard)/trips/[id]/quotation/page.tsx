@@ -89,6 +89,7 @@ import {
   GstTreatment,
 } from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
+import { formatEnumLabel } from "@/lib/utils/enum-formatters";
 import { toast } from "sonner";
 import { QuotationStatusBadge } from "@/app/(dashboard)/quotations/page";
 
@@ -832,14 +833,19 @@ export default function TripQuotationEditorPage() {
             {/* Version Switcher */}
             {quotations.length > 1 && (
               <Select value={activeQuoteId || ""} onValueChange={(val) => val && setActiveQuoteId(val)}>
-                <SelectTrigger className="h-9 text-xs bg-white border-slate-200 w-36 font-semibold">
+                <SelectTrigger className="h-9 text-xs bg-white border-slate-200 w-auto min-w-36 font-semibold">
                   <History className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
-                  <SelectValue placeholder="Select Version" />
+                  <SelectValue placeholder="Select Version">
+                    {(val) => {
+                      const q = quotations.find((x) => x.id === val);
+                      return q ? `v${q.version} • ${formatCurrency(Number(q.finalAmount))} (${formatEnumLabel(q.status)})` : undefined;
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-white border-slate-200">
                   {quotations.map((q) => (
                     <SelectItem key={q.id} value={q.id} className="text-xs">
-                      v{q.version} • {formatCurrency(Number(q.finalAmount))} ({q.status})
+                      v{q.version} • {formatCurrency(Number(q.finalAmount))} ({formatEnumLabel(q.status)})
                     </SelectItem>
                   ))}
                 </SelectContent>

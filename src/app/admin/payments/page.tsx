@@ -664,7 +664,13 @@ export default function AdminPaymentsPage() {
                 <label className="font-bold text-slate-700">Subscribing Agency</label>
                 <Select value={selectedAgencyId} onValueChange={(v) => v && handleAgencyChange(v)}>
                   <SelectTrigger className="h-9 text-xs">
-                    <SelectValue placeholder="Select Agency" />
+                    <SelectValue placeholder="Select Agency">
+                      {(val) => {
+                        if (!val) return undefined;
+                        const a = agenciesList.find((x) => x.id === val);
+                        return a ? `${a.name} (${a.email})` : val;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-white border-slate-200">
                     {agenciesList.map((a) => (
