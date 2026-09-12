@@ -9028,6 +9028,74 @@ In compliance with the permanent TripDesk workflow rule established in Section 1
 
 ---
 
+# 131. TRIP WORKSPACE COSTING & QUOTATIONS TABS REPAIR
+
+## 131.1 Objective & Context
+Following the full quotation-to-booking code audit, a targeted UI/data connection repair was implemented for the Trip Workspace (`/trips/[id]`):
+1. **Trip Quotations Relation (`trip-service.ts`):** Resolved the `Quotations & Proposals (0)` discrepancy where `getTripById` counted quotations in `_count` but omitted the `quotations` relation.
+2. **Costing Tab (`trips/[id]/page.tsx` Tab 7):** Replaced dead placeholder text containing `{trip.id}` with a professional Trip Costing & Margin Sheet entry card featuring real-time resource tallies (Hotels, Vehicles, Activities), dynamic rate sheet callout, and direct navigation to the dedicated Costing Studio (`/trips/[id]/costing`).
+3. **Quotations Tab (`trips/[id]/page.tsx` Tab 8):** Replaced the static card stub with a full-featured active proposal list rendering quotation number, version, `QuotationStatusBadge`, final price, base cost, creation and validity dates, public share link copy, proposal preview, and direct navigation to Quotation Studio (`/trips/[id]/quotation`). If no quotations exist, a clean empty state with a "Create Quotation" CTA is displayed.
+
+## 131.2 Architecture Invariants Preserved
+- **Zero Architecture Redesign:** Dedicated Costing Studio (`/trips/[id]/costing`) and Quotation Studio (`/trips/[id]/quotation`) remain the authoritative engines. No calculation logic was duplicated.
+- **Business Rules Unchanged:** Costing formulas, rate sheet matching, markup/tax logic, quotation snapshots, quotation versioning, booking conversion, payment ledger, and invoice persistence remain 100% untouched.
+- **Multi-Tenant Security:** Strict `agencyId` scoping preserved across all database queries.
+- **Zero Schema Changes:** No Prisma migrations or database alterations required.
+
+## 131.3 Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Browser Multi-Viewport QA:**
+  - `1440 × 900` (Large Desktop): **PASS**
+  - `1280 × 800` (Standard Laptop): **PASS**
+  - `1024 × 768` (Tablet Landscape): **PASS**
+  - `768 × 1024` (Tablet Portrait): **PASS**
+  - `390 × 844` (Mobile - iPhone 14): **PASS**
+  - `375 × 667` (Mobile - iPhone SE): **PASS**
+  - `320 × 568` (Small Mobile): **PASS**
+- **Status:** **VERIFIED & CLOSED**
+
+---
+
+# 132. TAX V1 ALIGNMENT (LOCKED PRODUCT DECISION)
+
+## 132.1 Objective & Context
+TripDesk V1 has a locked business decision: **"TripDesk V1 has NO tax/GST feature"**.
+The quotation calculation engine previously had a legacy fallback `options?.taxPercentage ?? 5` in `src/lib/services/quotation-service.ts` and `src/lib/validation/quotation-schema.ts`, which silently inflated newly generated quotations and package options by 5% even though no GST/tax feature exists in V1.
+
+A controlled batch was executed to align all quotation generation defaults to `0%` tax across services, schemas, and UI components.
+
+## 132.2 Audit Findings
+1. **No Tax Feature in V1:** There is no agency-level tax configuration, no GST multi-rate engine, and no tax line items on invoices.
+2. **Pricing Engine Formula (V1 Authoritative):**
+   $$\text{Base Supplier Cost} \longrightarrow \text{Markup \%} \longrightarrow \text{Selling Price} \longrightarrow \text{Discount \%} \longrightarrow \text{Final Customer Price}$$
+   $$\text{Tax Rate} = 0\% \implies \text{Final Customer Price} = \text{Selling Price} - \text{Discount Amount}$$
+3. **Database Schema:** `Quotation.taxPercentage`, `Quotation.taxAmount`, `QuotationPackageOption.taxPercentage`, `QuotationPackageOption.taxAmount` exist as decimal fields with `@default(0)`. No schema changes or migrations were made.
+4. **Historical Immutability:** Existing quotation snapshots in the database remain completely untouched and frozen.
+
+## 132.3 Implementation Details
+1. **`src/lib/services/quotation-service.ts`:**
+   - Changed `options?.taxPercentage ?? 5` to `options?.taxPercentage ?? 0` in `generateQuotationFromTrip()`.
+   - In `createDefaultPackageOptions()`, set `stdTax = 0`, `dlxTax = 0`, `luxTax = 0` and persisted `taxPercentage = 0`, `taxAmount = 0` for all tiers (Standard, Deluxe, Luxury).
+2. **`src/lib/validation/quotation-schema.ts`:**
+   - Changed `generateTripQuotationSchema` `taxPercentage` default from `.default(5)` to `.default(0)`.
+3. **`src/app/(dashboard)/trips/[id]/quotation/page.tsx`:**
+   - Updated `handleGenerate` fallback from `taxPercentage: activeQuote ? Number(activeQuote.taxPercentage) : 5` to `0`.
+
+## 132.4 Verification Results
+- **TypeScript (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Mathematical Pricing Verification:**
+  - Case 1 (Standard): Cost ₹10,000 + 10% Markup + 0% Discount + 0% Tax $\implies$ **₹11,000** (NOT ₹11,550).
+  - Case 2 (Discount): Cost ₹10,000 + 10% Markup + 5% Discount + 0% Tax $\implies$ **₹10,450**.
+  - Case 3 (Zero Markup): Cost ₹10,000 + 0% Markup + 0% Discount + 0% Tax $\implies$ **₹10,000**.
+- **Browser E2E QA:**
+  - Verified on live test trip with Base Cost ₹14,500 + 8% Markup (+₹1,160) = Customer Price **₹15,660** (Tax: +₹0).
+  - Proposal Preview (`/preview`) verified: clean display without any tax line, displaying Total Package Price ₹15,660.
+- **Status:** **VERIFIED & CLOSED**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

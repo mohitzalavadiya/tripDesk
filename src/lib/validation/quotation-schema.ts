@@ -90,7 +90,7 @@ export type QuotationQueryInput = z.infer<typeof quotationQuerySchema>;
 export const generateTripQuotationSchema = z.object({
   markupPercentage: z.number().min(0).max(500).default(10).optional(),
   discountPercentage: z.number().min(0).max(100).default(0).optional(),
-  taxPercentage: z.number().min(0).max(100).default(5).optional(),
+  taxPercentage: z.number().min(0).max(100).default(0).optional(),
   proposalSubtitle: z.string().trim().optional(),
   customerMessage: z.string().trim().optional(),
   inclusionsIntro: z.string().trim().optional(),

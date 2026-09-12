@@ -157,6 +157,28 @@ export const tripService = {
         itineraryItems: {
           orderBy: [{ dayNumber: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
         },
+        quotations: {
+          where: { archivedAt: null },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            quotationNumber: true,
+            version: true,
+            title: true,
+            status: true,
+            validUntil: true,
+            currency: true,
+            subtotal: true,
+            markupAmount: true,
+            discountAmount: true,
+            taxAmount: true,
+            finalAmount: true,
+            shareToken: true,
+            acceptedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
         _count: {
           select: {
             travelers: true,
