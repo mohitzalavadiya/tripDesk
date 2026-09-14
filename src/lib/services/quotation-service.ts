@@ -9,10 +9,14 @@ import {
   QuotationPackageOption,
   QuotationStatus,
   ProposalItemType,
+  TaxMode,
+  GstTreatment,
   Prisma,
 } from "@prisma/client";
 import { tripCostingService } from "./trip-costing-service";
 import { communicationService } from "./communication-service";
+import { taxService } from "./tax-service";
+import { taxProfileService } from "./tax-profile-service";
 import {
   CreateQuotationInput,
   UpdateQuotationInput,
@@ -162,6 +166,90 @@ export const quotationService = {
     }
 
     return `${prefix}${String(nextSeq).padStart(5, "0")}`;
+  },
+
+  /**
+   * Resolves and validates the effective tax configuration (taxRate, taxMode, gstTreatment)
+   * for a quotation or package option against the active TaxRate catalog and Agency Tax Profile defaults.
+   */
+  async resolveQuotationTaxConfig(
+    agencyId: string,
+    input: {
+      taxRate?: Prisma.Decimal | number | null;
+      taxPercentage?: Prisma.Decimal | number | null;
+      taxMode?: TaxMode | null;
+      gstTreatment?: GstTreatment | null;
+    },
+    fallback?: {
+      taxRate?: Prisma.Decimal | number | null;
+      taxPercentage?: Prisma.Decimal | number | null;
+      taxMode?: TaxMode | null;
+      gstTreatment?: GstTreatment | null;
+    }
+  ): Promise<{ taxRate: number; taxMode: TaxMode; gstTreatment: GstTreatment }> {
+    let rawTaxRate: number | undefined = undefined;
+    if (input.taxRate !== undefined && input.taxRate !== null) {
+      rawTaxRate = Number(input.taxRate);
+    } else if (input.taxPercentage !== undefined && input.taxPercentage !== null) {
+      rawTaxRate = Number(input.taxPercentage);
+    }
+
+    let taxMode = input.taxMode ?? undefined;
+    let gstTreatment = input.gstTreatment ?? undefined;
+
+    // If any tax setting is missing, check fallback or AgencyTaxProfile
+    if (rawTaxRate === undefined || !taxMode || !gstTreatment) {
+      if (fallback) {
+        if (rawTaxRate === undefined) {
+          rawTaxRate = Number(fallback.taxRate ?? fallback.taxPercentage ?? 0);
+        }
+        if (!taxMode && fallback.taxMode) {
+          taxMode = fallback.taxMode;
+        }
+        if (!gstTreatment && fallback.gstTreatment) {
+          gstTreatment = fallback.gstTreatment;
+        }
+      }
+
+      // If still missing, load Agency Tax Profile defaults
+      if (rawTaxRate === undefined || !taxMode || !gstTreatment) {
+        const agencyProfile = await taxProfileService.getAgencyTaxProfile(agencyId);
+        if (rawTaxRate === undefined) {
+          rawTaxRate = agencyProfile.defaultGstRate ?? 0;
+        }
+        if (!taxMode) {
+          taxMode = agencyProfile.defaultTaxMode ?? TaxMode.EXCLUSIVE;
+        }
+        if (!gstTreatment) {
+          gstTreatment = agencyProfile.defaultGstTreatment ?? GstTreatment.INTRA_STATE;
+        }
+      }
+    }
+
+    const effectiveRate = Number(rawTaxRate || 0);
+    const effectiveMode = taxMode || TaxMode.EXCLUSIVE;
+    const effectiveTreatment = gstTreatment || GstTreatment.INTRA_STATE;
+
+    // Validate rate against active catalog (unless 0% rate)
+    if (effectiveRate > 0) {
+      const activeRate = await prisma.taxRate.findFirst({
+        where: {
+          rate: new Prisma.Decimal(effectiveRate),
+          isActive: true,
+        },
+      });
+      if (!activeRate) {
+        throw new Error(
+          `Selected tax rate (${effectiveRate}%) is not available in the active tax rate catalog.`
+        );
+      }
+    }
+
+    return {
+      taxRate: effectiveRate,
+      taxMode: effectiveMode,
+      gstTreatment: effectiveTreatment,
+    };
   },
 
   /**
@@ -435,6 +523,13 @@ export const quotationService = {
     const quotationNumber = await this.generateNextQuotationNumber(agencyId);
     const shareToken = crypto.randomBytes(16).toString("hex");
 
+    const taxConfig = await this.resolveQuotationTaxConfig(agencyId, {
+      taxRate: data.taxRate,
+      taxPercentage: data.taxPercentage,
+      taxMode: data.taxMode,
+      gstTreatment: data.gstTreatment,
+    });
+
     const subtotal = Number(data.subtotal || 0);
     const markupPct = Number(data.markupPercentage || 0);
     const markupAmount = data.markupAmount !== undefined ? Number(data.markupAmount) : Math.round((subtotal * markupPct) / 100);
@@ -444,9 +539,12 @@ export const quotationService = {
     const discountAmount = data.discountAmount !== undefined ? Number(data.discountAmount) : Math.round((baseWithMarkup * discountPct) / 100);
     const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
 
-    const taxPct = Number(data.taxPercentage || 0);
-    const taxAmount = data.taxAmount !== undefined ? Number(data.taxAmount) : Math.round((afterDiscount * taxPct) / 100);
-    const finalAmount = data.finalAmount !== undefined ? Number(data.finalAmount) : Math.round(afterDiscount + taxAmount);
+    const taxResult = taxService.calculate({
+      amount: afterDiscount,
+      taxRate: taxConfig.taxRate,
+      taxMode: taxConfig.taxMode,
+      gstTreatment: taxConfig.gstTreatment,
+    });
 
     const quote = await prisma.quotation.create({
       data: {
@@ -464,9 +562,16 @@ export const quotationService = {
         markupAmount: new Prisma.Decimal(markupAmount),
         discountPercentage: new Prisma.Decimal(discountPct),
         discountAmount: new Prisma.Decimal(discountAmount),
-        taxPercentage: new Prisma.Decimal(taxPct),
-        taxAmount: new Prisma.Decimal(taxAmount),
-        finalAmount: new Prisma.Decimal(finalAmount),
+        taxPercentage: taxResult.taxRate,
+        taxAmount: taxResult.taxAmount,
+        taxableAmount: taxResult.taxableAmount,
+        taxRate: taxResult.taxRate,
+        taxMode: taxResult.taxMode,
+        gstTreatment: taxResult.gstTreatment,
+        cgstAmount: taxResult.cgstAmount,
+        sgstAmount: taxResult.sgstAmount,
+        igstAmount: taxResult.igstAmount,
+        finalAmount: taxResult.finalAmount,
         proposalSubtitle: data.proposalSubtitle,
         customerMessage: data.customerMessage,
         inclusionsIntro: data.inclusionsIntro,
@@ -537,6 +642,22 @@ export const quotationService = {
       throw new Error("Quotation not found.");
     }
 
+    const taxConfig = await this.resolveQuotationTaxConfig(
+      agencyId,
+      {
+        taxRate: data.taxRate,
+        taxPercentage: data.taxPercentage,
+        taxMode: data.taxMode,
+        gstTreatment: data.gstTreatment,
+      },
+      {
+        taxRate: existing.taxRate,
+        taxPercentage: existing.taxPercentage,
+        taxMode: existing.taxMode,
+        gstTreatment: existing.gstTreatment,
+      }
+    );
+
     const subtotal = data.subtotal !== undefined ? Number(data.subtotal) : Number(existing.subtotal);
     const markupPct = data.markupPercentage !== undefined ? Number(data.markupPercentage) : Number(existing.markupPercentage);
     const markupAmount = data.markupAmount !== undefined ? Number(data.markupAmount) : Math.round((subtotal * markupPct) / 100);
@@ -546,9 +667,12 @@ export const quotationService = {
     const discountAmount = data.discountAmount !== undefined ? Number(data.discountAmount) : Math.round((baseWithMarkup * discountPct) / 100);
     const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
 
-    const taxPct = data.taxPercentage !== undefined ? Number(data.taxPercentage) : Number(existing.taxPercentage);
-    const taxAmount = data.taxAmount !== undefined ? Number(data.taxAmount) : Math.round((afterDiscount * taxPct) / 100);
-    const finalAmount = data.finalAmount !== undefined ? Number(data.finalAmount) : Math.round(afterDiscount + taxAmount);
+    const taxResult = taxService.calculate({
+      amount: afterDiscount,
+      taxRate: taxConfig.taxRate,
+      taxMode: taxConfig.taxMode,
+      gstTreatment: taxConfig.gstTreatment,
+    });
 
     const updated = await prisma.quotation.update({
       where: { id },
@@ -562,9 +686,16 @@ export const quotationService = {
         markupAmount: new Prisma.Decimal(markupAmount),
         discountPercentage: new Prisma.Decimal(discountPct),
         discountAmount: new Prisma.Decimal(discountAmount),
-        taxPercentage: new Prisma.Decimal(taxPct),
-        taxAmount: new Prisma.Decimal(taxAmount),
-        finalAmount: new Prisma.Decimal(finalAmount),
+        taxPercentage: taxResult.taxRate,
+        taxAmount: taxResult.taxAmount,
+        taxableAmount: taxResult.taxableAmount,
+        taxRate: taxResult.taxRate,
+        taxMode: taxResult.taxMode,
+        gstTreatment: taxResult.gstTreatment,
+        cgstAmount: taxResult.cgstAmount,
+        sgstAmount: taxResult.sgstAmount,
+        igstAmount: taxResult.igstAmount,
+        finalAmount: taxResult.finalAmount,
         ...(data.proposalSubtitle !== undefined ? { proposalSubtitle: data.proposalSubtitle } : {}),
         ...(data.customerMessage !== undefined ? { customerMessage: data.customerMessage } : {}),
         ...(data.inclusionsIntro !== undefined ? { inclusionsIntro: data.inclusionsIntro } : {}),
@@ -658,6 +789,13 @@ export const quotationService = {
     const quotationNumber = await this.generateNextQuotationNumber(agencyId);
     const shareToken = crypto.randomBytes(16).toString("hex");
 
+    const taxConfig = await this.resolveQuotationTaxConfig(agencyId, {
+      taxRate: options?.taxRate,
+      taxPercentage: options?.taxPercentage,
+      taxMode: options?.taxMode,
+      gstTreatment: options?.gstTreatment,
+    });
+
     const subtotal = costing.subtotal;
     const markupPct = options?.markupPercentage ?? 10;
     const markupAmount = Math.round((subtotal * markupPct) / 100);
@@ -667,9 +805,13 @@ export const quotationService = {
     const discountAmount = Math.round((baseWithMarkup * discountPct) / 100);
     const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
 
-    const taxPct = options?.taxPercentage ?? 0;
-    const taxAmount = Math.round((afterDiscount * taxPct) / 100);
-    const finalAmount = Math.round(afterDiscount + taxAmount);
+    const taxResult = taxService.calculate({
+      amount: afterDiscount,
+      taxRate: taxConfig.taxRate,
+      taxMode: taxConfig.taxMode,
+      gstTreatment: taxConfig.gstTreatment,
+    });
+    const finalAmount = Number(taxResult.finalAmount);
 
     // Build itemized snapshot
     const itemsToCreate: Array<Prisma.QuotationItemCreateWithoutQuotationInput> = [];
@@ -853,9 +995,16 @@ export const quotationService = {
           markupAmount: new Prisma.Decimal(markupAmount),
           discountPercentage: new Prisma.Decimal(discountPct),
           discountAmount: new Prisma.Decimal(discountAmount),
-          taxPercentage: new Prisma.Decimal(taxPct),
-          taxAmount: new Prisma.Decimal(taxAmount),
-          finalAmount: new Prisma.Decimal(finalAmount),
+          taxPercentage: taxResult.taxRate,
+          taxAmount: taxResult.taxAmount,
+          taxableAmount: taxResult.taxableAmount,
+          taxRate: taxResult.taxRate,
+          taxMode: taxResult.taxMode,
+          gstTreatment: taxResult.gstTreatment,
+          cgstAmount: taxResult.cgstAmount,
+          sgstAmount: taxResult.sgstAmount,
+          igstAmount: taxResult.igstAmount,
+          finalAmount: taxResult.finalAmount,
           customerMessage: options?.customerMessage || "Thank you for planning your holiday with us. Here is your customized itinerary proposal.",
           inclusionsIntro: options?.inclusionsIntro,
           exclusionsIntro: options?.exclusionsIntro,
@@ -971,6 +1120,13 @@ export const quotationService = {
           discountAmount: existing.discountAmount,
           taxPercentage: existing.taxPercentage,
           taxAmount: existing.taxAmount,
+          taxableAmount: existing.taxableAmount,
+          taxRate: existing.taxRate,
+          taxMode: existing.taxMode,
+          gstTreatment: existing.gstTreatment,
+          cgstAmount: existing.cgstAmount,
+          sgstAmount: existing.sgstAmount,
+          igstAmount: existing.igstAmount,
           finalAmount: existing.finalAmount,
           customerMessage: existing.customerMessage,
           inclusionsIntro: existing.inclusionsIntro,
@@ -1034,6 +1190,13 @@ export const quotationService = {
               discountAmount: opt.discountAmount,
               taxPercentage: opt.taxPercentage,
               taxAmount: opt.taxAmount,
+              taxableAmount: opt.taxableAmount,
+              taxRate: opt.taxRate,
+              taxMode: opt.taxMode,
+              gstTreatment: opt.gstTreatment,
+              cgstAmount: opt.cgstAmount,
+              sgstAmount: opt.sgstAmount,
+              igstAmount: opt.igstAmount,
               finalAmount: opt.finalAmount,
               hotelNotes: opt.hotelNotes,
               vehicleNotes: opt.vehicleNotes,
@@ -1290,9 +1453,21 @@ export const quotationService = {
     const discountAmount = Math.round((baseWithMarkup * discountPct) / 100);
     const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
 
-    const taxPct = Number(quote.taxPercentage || 0);
-    const taxAmount = Math.round((afterDiscount * taxPct) / 100);
-    const finalAmount = Math.round(afterDiscount + taxAmount);
+    const { taxRate: effectiveTaxRate, taxMode: effectiveTaxMode, gstTreatment: effectiveGstTreatment } = await this.resolveQuotationTaxConfig(
+      quote.agencyId,
+      {
+        taxRate: quote.taxRate ?? quote.taxPercentage,
+        taxMode: quote.taxMode,
+        gstTreatment: quote.gstTreatment,
+      }
+    );
+
+    const taxCalc = taxService.calculate({
+      amount: afterDiscount,
+      taxRate: effectiveTaxRate,
+      taxMode: effectiveTaxMode,
+      gstTreatment: effectiveGstTreatment,
+    });
 
     await db.quotation.update({
       where: { id: quotationId },
@@ -1300,8 +1475,16 @@ export const quotationService = {
         subtotal: new Prisma.Decimal(subtotal),
         markupAmount: new Prisma.Decimal(markupAmount),
         discountAmount: new Prisma.Decimal(discountAmount),
-        taxAmount: new Prisma.Decimal(taxAmount),
-        finalAmount: new Prisma.Decimal(finalAmount),
+        taxableAmount: new Prisma.Decimal(taxCalc.taxableAmount.toString()),
+        taxRate: new Prisma.Decimal(effectiveTaxRate),
+        taxMode: effectiveTaxMode,
+        gstTreatment: effectiveGstTreatment,
+        cgstAmount: new Prisma.Decimal(taxCalc.cgstAmount.toString()),
+        sgstAmount: new Prisma.Decimal(taxCalc.sgstAmount.toString()),
+        igstAmount: new Prisma.Decimal(taxCalc.igstAmount.toString()),
+        taxAmount: new Prisma.Decimal(taxCalc.taxAmount.toString()),
+        finalAmount: new Prisma.Decimal(taxCalc.finalAmount.toString()),
+        taxPercentage: new Prisma.Decimal(effectiveTaxRate),
       },
     });
   },
@@ -1752,13 +1935,22 @@ export const quotationService = {
       : Math.round((baseWithMarkup * discountPct) / 100);
     const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
 
-    const taxPct = Number(data.taxPercentage || 0);
-    const taxAmount = data.taxAmount !== undefined && data.taxAmount > 0
-      ? Number(data.taxAmount)
-      : Math.round((afterDiscount * taxPct) / 100);
-    const finalAmount = data.finalAmount !== undefined && data.finalAmount > 0
-      ? Number(data.finalAmount)
-      : Math.round(afterDiscount + taxAmount);
+    // Tax V1: Resolve and calculate package option tax
+    const { taxRate: effectiveTaxRate, taxMode: effectiveTaxMode, gstTreatment: effectiveGstTreatment } = await this.resolveQuotationTaxConfig(
+      agencyId,
+      {
+        taxRate: data.taxRate ?? data.taxPercentage ?? quotation.taxRate ?? quotation.taxPercentage,
+        taxMode: data.taxMode ?? quotation.taxMode,
+        gstTreatment: data.gstTreatment ?? quotation.gstTreatment,
+      }
+    );
+
+    const taxCalc = taxService.calculate({
+      amount: afterDiscount,
+      taxRate: effectiveTaxRate,
+      taxMode: effectiveTaxMode,
+      gstTreatment: effectiveGstTreatment,
+    });
 
     const option = await prisma.$transaction(async (tx) => {
       // If setting this option as recommended, unset recommended flag on all other options
@@ -1781,9 +1973,16 @@ export const quotationService = {
           markupAmount: new Prisma.Decimal(markupAmount),
           discountPercentage: new Prisma.Decimal(discountPct),
           discountAmount: new Prisma.Decimal(discountAmount),
-          taxPercentage: new Prisma.Decimal(taxPct),
-          taxAmount: new Prisma.Decimal(taxAmount),
-          finalAmount: new Prisma.Decimal(finalAmount),
+          taxableAmount: new Prisma.Decimal(taxCalc.taxableAmount.toString()),
+          taxRate: new Prisma.Decimal(effectiveTaxRate),
+          taxMode: effectiveTaxMode,
+          gstTreatment: effectiveGstTreatment,
+          cgstAmount: new Prisma.Decimal(taxCalc.cgstAmount.toString()),
+          sgstAmount: new Prisma.Decimal(taxCalc.sgstAmount.toString()),
+          igstAmount: new Prisma.Decimal(taxCalc.igstAmount.toString()),
+          taxAmount: new Prisma.Decimal(taxCalc.taxAmount.toString()),
+          finalAmount: new Prisma.Decimal(taxCalc.finalAmount.toString()),
+          taxPercentage: new Prisma.Decimal(effectiveTaxRate),
           hotelNotes: data.hotelNotes?.trim() || null,
           vehicleNotes: data.vehicleNotes?.trim() || null,
           activityNotes: data.activityNotes?.trim() || null,
@@ -1849,9 +2048,22 @@ export const quotationService = {
     const discountAmount = data.discountAmount !== undefined ? Number(data.discountAmount) : Math.round((baseWithMarkup * discountPct) / 100);
     const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
 
-    const taxPct = data.taxPercentage !== undefined ? Number(data.taxPercentage) : Number(existing.taxPercentage);
-    const taxAmount = data.taxAmount !== undefined ? Number(data.taxAmount) : Math.round((afterDiscount * taxPct) / 100);
-    const finalAmount = data.finalAmount !== undefined ? Number(data.finalAmount) : Math.round(afterDiscount + taxAmount);
+    // Tax V1: Resolve and calculate updated package option tax
+    const { taxRate: effectiveTaxRate, taxMode: effectiveTaxMode, gstTreatment: effectiveGstTreatment } = await this.resolveQuotationTaxConfig(
+      agencyId,
+      {
+        taxRate: data.taxRate ?? data.taxPercentage ?? existing.taxRate ?? existing.taxPercentage,
+        taxMode: data.taxMode ?? existing.taxMode,
+        gstTreatment: data.gstTreatment ?? existing.gstTreatment,
+      }
+    );
+
+    const taxCalc = taxService.calculate({
+      amount: afterDiscount,
+      taxRate: effectiveTaxRate,
+      taxMode: effectiveTaxMode,
+      gstTreatment: effectiveGstTreatment,
+    });
 
     const updated = await prisma.$transaction(async (tx) => {
       if (data.isRecommended) {
@@ -1873,9 +2085,16 @@ export const quotationService = {
           markupAmount: new Prisma.Decimal(markupAmount),
           discountPercentage: new Prisma.Decimal(discountPct),
           discountAmount: new Prisma.Decimal(discountAmount),
-          taxPercentage: new Prisma.Decimal(taxPct),
-          taxAmount: new Prisma.Decimal(taxAmount),
-          finalAmount: new Prisma.Decimal(finalAmount),
+          taxableAmount: new Prisma.Decimal(taxCalc.taxableAmount.toString()),
+          taxRate: new Prisma.Decimal(effectiveTaxRate),
+          taxMode: effectiveTaxMode,
+          gstTreatment: effectiveGstTreatment,
+          cgstAmount: new Prisma.Decimal(taxCalc.cgstAmount.toString()),
+          sgstAmount: new Prisma.Decimal(taxCalc.sgstAmount.toString()),
+          igstAmount: new Prisma.Decimal(taxCalc.igstAmount.toString()),
+          taxAmount: new Prisma.Decimal(taxCalc.taxAmount.toString()),
+          finalAmount: new Prisma.Decimal(taxCalc.finalAmount.toString()),
+          taxPercentage: new Prisma.Decimal(effectiveTaxRate),
           ...(data.hotelNotes !== undefined ? { hotelNotes: data.hotelNotes?.trim() || null } : {}),
           ...(data.vehicleNotes !== undefined ? { vehicleNotes: data.vehicleNotes?.trim() || null } : {}),
           ...(data.activityNotes !== undefined ? { activityNotes: data.activityNotes?.trim() || null } : {}),
@@ -1889,7 +2108,7 @@ export const quotationService = {
       if (quotation.selectedPackageOptionId === optionId) {
         await tx.quotation.update({
           where: { id: quotationId },
-          data: { finalAmount: new Prisma.Decimal(finalAmount) },
+          data: { finalAmount: new Prisma.Decimal(taxCalc.finalAmount.toString()) },
         });
       }
 
@@ -2051,23 +2270,44 @@ export const quotationService = {
       where: { quotationId },
     });
 
+    const { taxRate: effectiveTaxRate, taxMode: effectiveTaxMode, gstTreatment: effectiveGstTreatment } = await this.resolveQuotationTaxConfig(
+      agencyId,
+      {
+        taxRate: quotation.taxRate ?? quotation.taxPercentage,
+        taxMode: quotation.taxMode,
+        gstTreatment: quotation.gstTreatment,
+      }
+    );
+
     // 1. Standard Tier (10% markup)
     const stdSub = baseCost;
     const stdMarkup = Math.round(stdSub * 0.1);
-    const stdTax = 0;
-    const stdFinal = stdSub + stdMarkup;
+    const stdTaxCalc = taxService.calculate({
+      amount: stdSub + stdMarkup,
+      taxRate: effectiveTaxRate,
+      taxMode: effectiveTaxMode,
+      gstTreatment: effectiveGstTreatment,
+    });
 
     // 2. Deluxe Tier (15% markup)
     const dlxSub = Math.round(baseCost * 1.25);
     const dlxMarkup = Math.round(dlxSub * 0.15);
-    const dlxTax = 0;
-    const dlxFinal = dlxSub + dlxMarkup;
+    const dlxTaxCalc = taxService.calculate({
+      amount: dlxSub + dlxMarkup,
+      taxRate: effectiveTaxRate,
+      taxMode: effectiveTaxMode,
+      gstTreatment: effectiveGstTreatment,
+    });
 
     // 3. Luxury Tier (20% markup)
     const luxSub = Math.round(baseCost * 1.6);
     const luxMarkup = Math.round(luxSub * 0.2);
-    const luxTax = 0;
-    const luxFinal = luxSub + luxMarkup;
+    const luxTaxCalc = taxService.calculate({
+      amount: luxSub + luxMarkup,
+      taxRate: effectiveTaxRate,
+      taxMode: effectiveTaxMode,
+      gstTreatment: effectiveGstTreatment,
+    });
 
     await prisma.quotationPackageOption.createMany({
       data: [
@@ -2080,9 +2320,16 @@ export const quotationService = {
           subtotal: new Prisma.Decimal(stdSub),
           markupPercentage: new Prisma.Decimal(10),
           markupAmount: new Prisma.Decimal(stdMarkup),
-          taxPercentage: new Prisma.Decimal(0),
-          taxAmount: new Prisma.Decimal(stdTax),
-          finalAmount: new Prisma.Decimal(stdFinal),
+          taxableAmount: new Prisma.Decimal(stdTaxCalc.taxableAmount.toString()),
+          taxRate: new Prisma.Decimal(effectiveTaxRate),
+          taxMode: effectiveTaxMode,
+          gstTreatment: effectiveGstTreatment,
+          cgstAmount: new Prisma.Decimal(stdTaxCalc.cgstAmount.toString()),
+          sgstAmount: new Prisma.Decimal(stdTaxCalc.sgstAmount.toString()),
+          igstAmount: new Prisma.Decimal(stdTaxCalc.igstAmount.toString()),
+          taxAmount: new Prisma.Decimal(stdTaxCalc.taxAmount.toString()),
+          finalAmount: new Prisma.Decimal(stdTaxCalc.finalAmount.toString()),
+          taxPercentage: new Prisma.Decimal(effectiveTaxRate),
           hotelNotes: "3-Star Standard City Center Hotels (AC Deluxe Rooms)",
           vehicleNotes: "Dedicated AC Sedan (Dzire / Etios)",
           activityNotes: "Standard sightseeing with entry tickets",
@@ -2099,9 +2346,16 @@ export const quotationService = {
           subtotal: new Prisma.Decimal(dlxSub),
           markupPercentage: new Prisma.Decimal(15),
           markupAmount: new Prisma.Decimal(dlxMarkup),
-          taxPercentage: new Prisma.Decimal(0),
-          taxAmount: new Prisma.Decimal(dlxTax),
-          finalAmount: new Prisma.Decimal(dlxFinal),
+          taxableAmount: new Prisma.Decimal(dlxTaxCalc.taxableAmount.toString()),
+          taxRate: new Prisma.Decimal(effectiveTaxRate),
+          taxMode: effectiveTaxMode,
+          gstTreatment: effectiveGstTreatment,
+          cgstAmount: new Prisma.Decimal(dlxTaxCalc.cgstAmount.toString()),
+          sgstAmount: new Prisma.Decimal(dlxTaxCalc.sgstAmount.toString()),
+          igstAmount: new Prisma.Decimal(dlxTaxCalc.igstAmount.toString()),
+          taxAmount: new Prisma.Decimal(dlxTaxCalc.taxAmount.toString()),
+          finalAmount: new Prisma.Decimal(dlxTaxCalc.finalAmount.toString()),
+          taxPercentage: new Prisma.Decimal(effectiveTaxRate),
           hotelNotes: "4-Star Deluxe Resorts & Boutique Lake/Hill View Properties",
           vehicleNotes: "Dedicated AC Innova / Ertiga SUV",
           activityNotes: "Guided sightseeing + Boat Cruise / Safari Pass",
@@ -2118,9 +2372,16 @@ export const quotationService = {
           subtotal: new Prisma.Decimal(luxSub),
           markupPercentage: new Prisma.Decimal(20),
           markupAmount: new Prisma.Decimal(luxMarkup),
-          taxPercentage: new Prisma.Decimal(0),
-          taxAmount: new Prisma.Decimal(luxTax),
-          finalAmount: new Prisma.Decimal(luxFinal),
+          taxableAmount: new Prisma.Decimal(luxTaxCalc.taxableAmount.toString()),
+          taxRate: new Prisma.Decimal(effectiveTaxRate),
+          taxMode: effectiveTaxMode,
+          gstTreatment: effectiveGstTreatment,
+          cgstAmount: new Prisma.Decimal(luxTaxCalc.cgstAmount.toString()),
+          sgstAmount: new Prisma.Decimal(luxTaxCalc.sgstAmount.toString()),
+          igstAmount: new Prisma.Decimal(luxTaxCalc.igstAmount.toString()),
+          taxAmount: new Prisma.Decimal(luxTaxCalc.taxAmount.toString()),
+          finalAmount: new Prisma.Decimal(luxTaxCalc.finalAmount.toString()),
+          taxPercentage: new Prisma.Decimal(effectiveTaxRate),
           hotelNotes: "5-Star Luxury Heritage Properties / Private Pool Villas",
           vehicleNotes: "Private Luxury SUV (Innova Crysta / Fortuner)",
           activityNotes: "Exclusive VIP tours, private guide & sunset yacht cruise",
@@ -2304,6 +2565,16 @@ export const quotationService = {
             subtitle: true,
             description: true,
             isRecommended: true,
+            discountAmount: true,
+            taxableAmount: true,
+            taxAmount: true,
+            taxRate: true,
+            taxPercentage: true,
+            taxMode: true,
+            gstTreatment: true,
+            cgstAmount: true,
+            sgstAmount: true,
+            igstAmount: true,
             finalAmount: true,
             hotelNotes: true,
             vehicleNotes: true,
@@ -2320,6 +2591,16 @@ export const quotationService = {
             subtitle: true,
             description: true,
             isRecommended: true,
+            discountAmount: true,
+            taxableAmount: true,
+            taxAmount: true,
+            taxRate: true,
+            taxPercentage: true,
+            taxMode: true,
+            gstTreatment: true,
+            cgstAmount: true,
+            sgstAmount: true,
+            igstAmount: true,
             finalAmount: true,
             hotelNotes: true,
             vehicleNotes: true,
@@ -2348,9 +2629,16 @@ export const quotationService = {
       currency: quotation.currency,
       validUntil: quotation.validUntil,
       isExpired,
-      discountAmount: Number(quotation.discountAmount),
-      taxAmount: Number(quotation.taxAmount),
-      finalAmount: Number(quotation.finalAmount),
+      discountAmount: Number(quotation.discountAmount || 0),
+      taxableAmount: Number(quotation.taxableAmount || 0),
+      taxRate: Number(quotation.taxRate || quotation.taxPercentage || 0),
+      taxMode: quotation.taxMode || "EXCLUSIVE",
+      gstTreatment: quotation.gstTreatment || "INTRA_STATE",
+      cgstAmount: Number(quotation.cgstAmount || 0),
+      sgstAmount: Number(quotation.sgstAmount || 0),
+      igstAmount: Number(quotation.igstAmount || 0),
+      taxAmount: Number(quotation.taxAmount || 0),
+      finalAmount: Number(quotation.finalAmount || 0),
       selectedPackageOptionId: quotation.selectedPackageOptionId,
       customerMessage: quotation.customerMessage,
       inclusionsIntro: quotation.inclusionsIntro,
@@ -2398,7 +2686,16 @@ export const quotationService = {
         subtitle: opt.subtitle,
         description: opt.description,
         isRecommended: opt.isRecommended,
-        finalAmount: Number(opt.finalAmount),
+        discountAmount: Number(opt.discountAmount || 0),
+        taxableAmount: Number(opt.taxableAmount || 0),
+        taxRate: Number(opt.taxRate || opt.taxPercentage || 0),
+        taxMode: opt.taxMode || "EXCLUSIVE",
+        gstTreatment: opt.gstTreatment || "INTRA_STATE",
+        cgstAmount: Number(opt.cgstAmount || 0),
+        sgstAmount: Number(opt.sgstAmount || 0),
+        igstAmount: Number(opt.igstAmount || 0),
+        taxAmount: Number(opt.taxAmount || 0),
+        finalAmount: Number(opt.finalAmount || 0),
         hotelNotes: opt.hotelNotes,
         vehicleNotes: opt.vehicleNotes,
         activityNotes: opt.activityNotes,
@@ -2412,7 +2709,16 @@ export const quotationService = {
         subtitle: quotation.selectedPackageOption.subtitle,
         description: quotation.selectedPackageOption.description,
         isRecommended: quotation.selectedPackageOption.isRecommended,
-        finalAmount: Number(quotation.selectedPackageOption.finalAmount),
+        discountAmount: Number(quotation.selectedPackageOption.discountAmount || 0),
+        taxableAmount: Number(quotation.selectedPackageOption.taxableAmount || 0),
+        taxRate: Number(quotation.selectedPackageOption.taxRate || quotation.selectedPackageOption.taxPercentage || 0),
+        taxMode: quotation.selectedPackageOption.taxMode || "EXCLUSIVE",
+        gstTreatment: quotation.selectedPackageOption.gstTreatment || "INTRA_STATE",
+        cgstAmount: Number(quotation.selectedPackageOption.cgstAmount || 0),
+        sgstAmount: Number(quotation.selectedPackageOption.sgstAmount || 0),
+        igstAmount: Number(quotation.selectedPackageOption.igstAmount || 0),
+        taxAmount: Number(quotation.selectedPackageOption.taxAmount || 0),
+        finalAmount: Number(quotation.selectedPackageOption.finalAmount || 0),
         hotelNotes: quotation.selectedPackageOption.hotelNotes,
         vehicleNotes: quotation.selectedPackageOption.vehicleNotes,
         activityNotes: quotation.selectedPackageOption.activityNotes,

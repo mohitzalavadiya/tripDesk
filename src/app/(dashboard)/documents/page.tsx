@@ -354,23 +354,6 @@ export default function DocumentCenterPage() {
                     <SelectItem value="SUPERSEDED">Superseded</SelectItem>
                   </SelectContent>
                 </Select>
-
-                {(search || typeFilter !== "ALL" || statusFilter !== "ALL") && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSearch("");
-                      setTypeFilter("ALL");
-                      setStatusFilter("ALL");
-                      setPage(1);
-                    }}
-                    className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 shrink-0 cursor-pointer font-semibold rounded-lg"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                    Reset
-                  </Button>
-                )}
               </div>
             </div>
           </div>

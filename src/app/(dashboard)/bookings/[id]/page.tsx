@@ -1008,6 +1008,57 @@ export default function BookingDetailPage() {
                 </div>
               </div>
 
+              {/* Tax V1 Snapshot Breakdown */}
+              {booking && (booking.taxRate !== null && booking.taxRate !== undefined || booking.taxAmount !== null && booking.taxAmount !== undefined) && (
+                <div className="p-3.5 bg-slate-50/70 border border-slate-100 rounded-xl text-xs space-y-2">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                      Commercial Tax Snapshot
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-semibold bg-white text-slate-600 border-slate-200">
+                      {booking.gstTreatment === "NON_GST_EXEMPT"
+                        ? "Non-GST Exempt"
+                        : booking.taxMode === "INCLUSIVE"
+                        ? `GST Included (${Number(booking.taxRate ?? 0)}%)`
+                        : `GST Added (${Number(booking.taxRate ?? 0)}%)`}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-slate-600">
+                    <div>
+                      <div className="text-[10px] text-slate-400 font-medium">Taxable Base</div>
+                      <div className="font-bold text-slate-800">{formatCurrency(Number(booking.taxableAmount ?? 0))}</div>
+                    </div>
+                    {booking.gstTreatment === "INTRA_STATE" ? (
+                      <>
+                        <div>
+                          <div className="text-[10px] text-slate-400 font-medium">CGST ({(Number(booking.taxRate ?? 0) / 2).toFixed(1)}%)</div>
+                          <div className="font-bold text-slate-800">{formatCurrency(Number(booking.cgstAmount ?? 0))}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-slate-400 font-medium">SGST ({(Number(booking.taxRate ?? 0) / 2).toFixed(1)}%)</div>
+                          <div className="font-bold text-slate-800">{formatCurrency(Number(booking.sgstAmount ?? 0))}</div>
+                        </div>
+                      </>
+                    ) : booking.gstTreatment === "INTER_STATE" ? (
+                      <div className="col-span-2">
+                        <div className="text-[10px] text-slate-400 font-medium">IGST ({Number(booking.taxRate ?? 0)}%)</div>
+                        <div className="font-bold text-slate-800">{formatCurrency(Number(booking.igstAmount ?? 0))}</div>
+                      </div>
+                    ) : (
+                      <div className="col-span-2">
+                        <div className="text-[10px] text-slate-400 font-medium">Tax Status</div>
+                        <div className="font-bold text-slate-800">₹0.00 (Exempt)</div>
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-[10px] text-slate-400 font-medium">Total GST</div>
+                      <div className="font-black text-slate-900">{formatCurrency(Number(booking.taxAmount ?? 0))}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Payment Milestones & Schedule Breakdown */}
               {schedule && schedule.milestones && schedule.milestones.length > 0 && (
                 <div className="pt-2 border-t border-slate-100 space-y-3">

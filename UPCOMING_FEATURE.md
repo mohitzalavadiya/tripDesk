@@ -16,19 +16,24 @@ Dashboard UI need to check properly.
 finance, follow-ups, /reports, communications, /settings,  UI need to check properly
 manage scroll in table
 Invoice pdf format and invoice page strucutre
+quatation genarate flow
+Tax system impeliment
 
 
 
 **TODO**
 
-quatation genarate
+remove reset or refresh button in near dropdown
+email verification
+
 manage read only from frontend also
+where i can show Announcements ?
+subscription model changes
+
 
 remove usused code, imports and files
 remove all type script error
 check no static data anywhere
-where i can show Announcements ?
-remove reset or refresh button in near dropdown
 
 
 compalate QA. 
@@ -53,3 +58,31 @@ create a wireframe for understand flow of project
 after sign up don't redirect direact on dashboard. redireact on login page
 notification is static
 error msg change
+
+
+trips/cmtydy8ch0003x0tqh49i7jlr/quotation
+Proposal Status dropdown have captital value or with _ value
+Tax Mode dropdown have captital value or with _ value
+GST Treatment dropdown have captital value or with _ value
+
+/trips/new
+Trip Status dropdown have captital value or with _ value
+
+rate-sheets/new
+Pricing Model Basis dropdown have captital value or with _ value
+
+/finance
+Financial Period => LAST_90_DAYS
+
+/payments
+Log Customer Payment modal
+Target Booking i can show here id insted of value : fix it 
+Payment Method drop down show BANK_TRANSFER   
+
+same issue in Schedule New Follow-up
+
+/bookings/new
+Quotation Proposal dropdown i see id insted of value : fix it
+
+trips/cmtydy8ch0003x0tqh49i7jlr/quotation
+i show id in fork new version dropdown

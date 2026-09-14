@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TaxMode, GstTreatment } from "@prisma/client";
 
 export const createPackageOptionSchema = z.object({
   name: z.string().min(1, "Package name is required").max(100, "Package name must not exceed 100 characters"),
@@ -11,6 +12,9 @@ export const createPackageOptionSchema = z.object({
   discountPercentage: z.number().min(0).max(100).optional().default(0),
   discountAmount: z.number().min(0).optional().default(0),
   taxPercentage: z.number().min(0).max(100).optional().default(0),
+  taxRate: z.number().min(0).max(100).optional(),
+  taxMode: z.nativeEnum(TaxMode).optional(),
+  gstTreatment: z.nativeEnum(GstTreatment).optional(),
   taxAmount: z.number().min(0).optional().default(0),
   finalAmount: z.number().min(0, "Final package amount must be positive").optional(),
   hotelNotes: z.string().max(1000).optional().nullable(),
@@ -32,6 +36,9 @@ export const updatePackageOptionSchema = z.object({
   discountPercentage: z.number().min(0).max(100).optional(),
   discountAmount: z.number().min(0).optional(),
   taxPercentage: z.number().min(0).max(100).optional(),
+  taxRate: z.number().min(0).max(100).optional(),
+  taxMode: z.nativeEnum(TaxMode).optional(),
+  gstTreatment: z.nativeEnum(GstTreatment).optional(),
   taxAmount: z.number().min(0).optional(),
   finalAmount: z.number().min(0).optional(),
   hotelNotes: z.string().max(1000).optional().nullable(),

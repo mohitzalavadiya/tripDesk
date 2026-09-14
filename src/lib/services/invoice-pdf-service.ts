@@ -132,12 +132,30 @@ export const invoicePdfService = {
           currentY += 12;
         }
 
+        // Agency GST Identity (if present in snapshot)
+        const agencyGstin = agencySnap.gstin || null;
+        const agencyStateCode = agencySnap.stateCode || null;
+        const agencyLegalName = agencySnap.legalName || null;
+        if (agencyGstin) {
+          doc.fillColor(brandAccent).fontSize(8).font("Helvetica-Bold");
+          const gstLine = [
+            `GSTIN: ${agencyGstin}`,
+            agencyStateCode ? `State Code: ${agencyStateCode}` : null,
+          ].filter(Boolean).join("  •  ");
+          doc.text(gstLine, margin, currentY, { width: 280 });
+          currentY += 12;
+        } else if (agencyLegalName && agencyLegalName !== agencyName) {
+          doc.fillColor(textMuted).fontSize(7.5).font("Helvetica");
+          doc.text(`Legal Name: ${agencyLegalName}`, margin, currentY, { width: 280 });
+          currentY += 11;
+        }
+
         // Header Right: Title, Number, Status, Dates
         const rightColW = 200;
         const rightColX = margin + contentWidth - rightColW;
         let rightY = margin;
 
-        const headerTitle = isDraft ? "DRAFT INVOICE" : isCancelled ? "CANCELLED INVOICE" : "INVOICE";
+        const headerTitle = isDraft ? "DRAFT INVOICE" : isCancelled ? "CANCELLED INVOICE" : "TAX INVOICE";
         const titleColor = isCancelled ? redText : isDraft ? textMuted : brandPrimary;
 
         doc.fillColor(titleColor).fontSize(20).font("Helvetica-Bold").text(headerTitle, rightColX, rightY, {
@@ -268,10 +286,6 @@ export const invoicePdfService = {
         // ═════════════════════════════════════════════════════════════════════
         // 3. SERVICE ITEMIZATION TABLE
         // ═════════════════════════════════════════════════════════════════════
-        // Sourcing hierarchy:
-        // 1. Live customer-facing quotation items (invoice.booking.quotation.items)
-        // 2. Existing stored invoice items (invoice.items)
-        // 3. Fallback package summary
         const quotationItems = invoice.booking?.quotation?.items || [];
         const invoiceItems = invoice.items || [];
 
@@ -399,19 +413,49 @@ export const invoicePdfService = {
         currentY += 12;
 
         // ═════════════════════════════════════════════════════════════════════
-        // 4. FINANCIAL SUMMARY & NOTES (DECISION #18 AUTHORITATIVE)
+        // 4. FINANCIAL SUMMARY & TAX BREAKDOWN (DECISION #18 AUTHORITATIVE)
         // ═════════════════════════════════════════════════════════════════════
-        // Authoritative Booking financials take strict precedence over static invoice records
-        const subtotal = Number(invoice.subtotal);
         const discountAmount = Number(invoice.discountAmount || 0);
         const totalAmount = Number(invoice.booking?.totalAmount ?? invoice.totalAmount ?? 0);
         const paidAmount = Number(invoice.booking?.paidAmount ?? invoice.paidAmount ?? 0);
         const balanceAmount = Number(invoice.booking?.balanceAmount ?? invoice.balanceAmount ?? 0);
 
-        const summaryW = 230;
+        // Tax Snapshot Fields from Invoice (with fallback to booking)
+        const rawTaxRate = invoice.taxRate ?? (invoice.booking as any)?.taxRate ?? null;
+        const taxRate = rawTaxRate !== null ? Number(rawTaxRate) : 0;
+        const taxMode = invoice.taxMode || (invoice.booking as any)?.taxMode || "EXCLUSIVE";
+        const gstTreatment = invoice.gstTreatment || (invoice.booking as any)?.gstTreatment || "INTRA_STATE";
+        
+        const rawTaxable = invoice.taxableAmount ?? (invoice.booking as any)?.taxableAmount ?? null;
+        const taxableAmount = rawTaxable !== null ? Number(rawTaxable) : Number(invoice.subtotal);
+        
+        const rawTaxAmt = invoice.taxAmount ?? (invoice.booking as any)?.taxAmount ?? null;
+        const taxAmount = rawTaxAmt !== null ? Number(rawTaxAmt) : 0;
+        
+        const rawCgst = invoice.cgstAmount ?? (invoice.booking as any)?.cgstAmount ?? null;
+        const cgstAmount = rawCgst !== null ? Number(rawCgst) : 0;
+        
+        const rawSgst = invoice.sgstAmount ?? (invoice.booking as any)?.sgstAmount ?? null;
+        const sgstAmount = rawSgst !== null ? Number(rawSgst) : 0;
+        
+        const rawIgst = invoice.igstAmount ?? (invoice.booking as any)?.igstAmount ?? null;
+        const igstAmount = rawIgst !== null ? Number(rawIgst) : 0;
+
+        const summaryW = 240;
         const summaryX = margin + contentWidth - summaryW;
-        let summaryH = 96;
-        if (discountAmount > 0) summaryH += 16;
+        
+        let summaryH = 110;
+        if (discountAmount > 0) summaryH += 15;
+        if (gstTreatment === "INTRA_STATE" && taxAmount > 0) {
+          summaryH += 30; // 2 lines: CGST and SGST
+        } else if (gstTreatment === "INTER_STATE" && taxAmount > 0) {
+          summaryH += 16; // 1 line: IGST
+        } else if (gstTreatment === "NON_GST_EXEMPT" || taxRate === 0) {
+          summaryH += 16; // 1 line: Exempt notice
+        }
+        if (taxMode === "INCLUSIVE") {
+          summaryH += 14;
+        }
 
         checkPageBreak(summaryH + 15);
 
@@ -445,31 +489,60 @@ export const invoicePdfService = {
         let sumLineY = currentY + 10;
         doc.fillColor(textMuted).fontSize(8.5).font("Helvetica");
 
-        // Subtotal
-        doc.text("Subtotal:", summaryX + 12, sumLineY);
-        doc.text(formatINR(subtotal), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
-        sumLineY += 16;
+        // Taxable Base / Base Amount
+        doc.text("Taxable Base Amount:", summaryX + 12, sumLineY);
+        doc.text(formatINR(taxableAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+        sumLineY += 15;
 
         // Discount
         if (discountAmount > 0) {
           const discLabel =
             invoice.discountType === "PERCENTAGE"
               ? `Discount (${Number(invoice.discountValue)}%):`
-              : "Discount:";
+              : "Special Discount:";
           doc.text(discLabel, summaryX + 12, sumLineY);
           doc.text(`- ${formatINR(discountAmount)}`, summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
-          sumLineY += 16;
+          sumLineY += 15;
+        }
+
+        // Itemized GST Breakdown
+        if (gstTreatment === "NON_GST_EXEMPT" || taxRate === 0) {
+          doc.text("GST (0% Exempt):", summaryX + 12, sumLineY);
+          doc.text("₹0.00", summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+          sumLineY += 15;
+        } else if (gstTreatment === "INTRA_STATE") {
+          const halfRate = taxRate / 2;
+          const modeTag = taxMode === "INCLUSIVE" ? " (Incl.)" : "";
+          doc.text(`CGST (${halfRate}%)${modeTag}:`, summaryX + 12, sumLineY);
+          doc.text(formatINR(cgstAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+          sumLineY += 15;
+
+          doc.text(`SGST (${halfRate}%)${modeTag}:`, summaryX + 12, sumLineY);
+          doc.text(formatINR(sgstAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+          sumLineY += 15;
+        } else if (gstTreatment === "INTER_STATE") {
+          const modeTag = taxMode === "INCLUSIVE" ? " (Incl.)" : "";
+          doc.text(`IGST (${taxRate}%)${modeTag}:`, summaryX + 12, sumLineY);
+          doc.text(formatINR(igstAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+          sumLineY += 15;
+        }
+
+        // Inclusive Note
+        if (taxMode === "INCLUSIVE" && taxRate > 0) {
+          doc.fillColor(brandAccent).fontSize(7.5).font("Helvetica-Oblique");
+          doc.text(`* Total includes ${taxRate}% GST`, summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+          sumLineY += 13;
         }
 
         // Invoice Total
-        doc.fillColor(brandPrimary).font("Helvetica-Bold").text("Invoice Total:", summaryX + 12, sumLineY);
+        doc.fillColor(brandPrimary).fontSize(9).font("Helvetica-Bold").text("Invoice Total:", summaryX + 12, sumLineY);
         doc.text(formatINR(totalAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
-        sumLineY += 18;
+        sumLineY += 16;
 
         // Total Paid
-        doc.fillColor(greenText).font("Helvetica").text("Total Paid:", summaryX + 12, sumLineY);
+        doc.fillColor(greenText).fontSize(8.5).font("Helvetica").text("Total Paid:", summaryX + 12, sumLineY);
         doc.text(formatINR(paidAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
-        sumLineY += 18;
+        sumLineY += 16;
 
         // Balance Due (Dark Highlighted Bar)
         doc.rect(summaryX, sumLineY - 2, summaryW, 24).fill(brandPrimary);

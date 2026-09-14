@@ -352,21 +352,6 @@ export default function AdminPaymentsPage() {
               </SelectContent>
             </Select>
 
-            {(searchQuery || statusFilter !== "ALL") && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSearchQuery("");
-                  setStatusFilter("ALL");
-                }}
-                className="h-9 text-xs font-semibold text-slate-500 hover:text-slate-900 cursor-pointer"
-              >
-                <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                Reset
-              </Button>
-            )}
-
             <Button
               variant="outline"
               size="sm"
@@ -664,7 +649,13 @@ export default function AdminPaymentsPage() {
                 <label className="font-bold text-slate-700">Subscribing Agency</label>
                 <Select value={selectedAgencyId} onValueChange={(v) => v && handleAgencyChange(v)}>
                   <SelectTrigger className="h-9 text-xs">
-                    <SelectValue placeholder="Select Agency" />
+                    <SelectValue placeholder="Select Agency">
+                      {(val) => {
+                        if (!val) return undefined;
+                        const a = agenciesList.find((x) => x.id === val);
+                        return a ? `${a.name} (${a.email})` : val;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-white border-slate-200">
                     {agenciesList.map((a) => (

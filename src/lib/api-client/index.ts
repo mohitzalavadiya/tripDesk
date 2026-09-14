@@ -23,3 +23,4 @@ export * from "./follow-up-client";
 export * from "./communication-client";
 export * from "./document-client";
 export * from "./admin-client";
+export * from "./tax-client";

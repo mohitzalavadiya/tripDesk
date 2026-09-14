@@ -1193,7 +1193,13 @@ export default function FollowUpsPage() {
               ) : (
                 <Select value={selectedEnquiryId} onValueChange={(val) => val && setSelectedEnquiryId(val)}>
                   <SelectTrigger className="text-xs border-slate-200">
-                    <SelectValue placeholder="Pick a lead..." />
+                    <SelectValue placeholder="Pick a lead...">
+                      {(val) => {
+                        if (!val) return undefined;
+                        const e = enquiries.find((x) => x.id === val);
+                        return e ? `${e.enquiryNumber} • ${e.customer?.name || "Customer"} (${e.destination || "Trip"})` : val;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
                     {enquiries.map((e) => (

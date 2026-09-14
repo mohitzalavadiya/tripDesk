@@ -315,22 +315,6 @@ export function GlobalIssuesDashboardPage() {
                 <SelectItem value={IssuePriority.LOW}>Low</SelectItem>
               </SelectContent>
             </Select>
-
-            {(searchQuery || statusFilter !== "ALL" || priorityFilter !== "ALL") && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSearchQuery("");
-                  setStatusFilter("ALL");
-                  setPriorityFilter("ALL");
-                }}
-                className="text-xs text-slate-500 hover:text-slate-900 cursor-pointer shrink-0"
-              >
-                <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                Reset
-              </Button>
-            )}
           </div>
         </div>
 

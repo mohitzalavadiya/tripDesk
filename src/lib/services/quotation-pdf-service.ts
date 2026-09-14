@@ -9,6 +9,15 @@ export interface QuotationPdfData {
   title?: string | null;
   proposalSubtitle?: string | null;
   currency: string;
+  discountAmount?: number;
+  taxableAmount?: number;
+  taxRate?: number;
+  taxMode?: string;
+  gstTreatment?: string;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  taxAmount?: number;
   finalAmount: number;
   validUntil?: Date | string | null;
   customerMessage?: string | null;
@@ -84,6 +93,15 @@ export interface QuotationPdfData {
     subtitle?: string | null;
     description?: string | null;
     isRecommended?: boolean;
+    discountAmount?: number;
+    taxableAmount?: number;
+    taxRate?: number;
+    taxMode?: string;
+    gstTreatment?: string;
+    cgstAmount?: number;
+    sgstAmount?: number;
+    igstAmount?: number;
+    taxAmount?: number;
     finalAmount: number;
     hotelNotes?: string | null;
     vehicleNotes?: string | null;
@@ -99,6 +117,15 @@ export interface QuotationPdfData {
     subtitle?: string | null;
     description?: string | null;
     isRecommended?: boolean;
+    discountAmount?: number;
+    taxableAmount?: number;
+    taxRate?: number;
+    taxMode?: string;
+    gstTreatment?: string;
+    cgstAmount?: number;
+    sgstAmount?: number;
+    igstAmount?: number;
+    taxAmount?: number;
     finalAmount: number;
     hotelNotes?: string | null;
     vehicleNotes?: string | null;
@@ -480,11 +507,21 @@ export class QuotationPdfService {
                 align: "center",
               });
 
+            const pkgTaxRate = Number(pkg.taxRate || 0);
+            const pkgTaxMode = pkg.taxMode || "EXCLUSIVE";
+            const pkgTaxExempt = pkg.gstTreatment === "NON_GST_EXEMPT" || pkgTaxRate === 0;
+
+            const pkgTaxSubtitle = pkgTaxExempt
+              ? "Tax Exempt (0% GST)"
+              : pkgTaxMode === "INCLUSIVE"
+              ? `Includes ${pkgTaxRate}% GST`
+              : `+ ${pkgTaxRate}% GST (${formatCurrency(Number(pkg.taxAmount || 0))})`;
+
             doc
               .fillColor(textLight)
               .fontSize(6)
               .font("Helvetica")
-              .text("Taxes included", cardX + 6, priceBoxY + 16, {
+              .text(pkgTaxSubtitle, cardX + 6, priceBoxY + 16, {
                 width: pkgCardWidth - 12,
                 align: "center",
               });
@@ -861,40 +898,224 @@ export class QuotationPdfService {
         }
 
         // ═════════════════════════════════════════════════════════════════════
-        // 11. COMMERCIAL TOTAL INVESTMENT CARD
+        // 11. PRICE & TAX SUMMARY / COMMERCIAL TOTAL INVESTMENT
         // ═════════════════════════════════════════════════════════════════════
-        checkPageBreak(65);
-        const totalCardY = doc.y;
-        doc
-          .roundedRect(margin, totalCardY, contentWidth, 50, 6)
-          .fill(primaryDark);
-
         const chosenPkg =
           data.selectedPackageOption ||
           data.packageOptions?.find((p) => p.id === data.selectedPackageOptionId);
+
+        const activeTaxSnapshot = chosenPkg
+          ? {
+              discountAmount: Number(chosenPkg.discountAmount || 0),
+              taxableAmount: Number(chosenPkg.taxableAmount || 0),
+              taxRate: Number(chosenPkg.taxRate || 0),
+              taxMode: chosenPkg.taxMode || "EXCLUSIVE",
+              gstTreatment: chosenPkg.gstTreatment || "INTRA_STATE",
+              cgstAmount: Number(chosenPkg.cgstAmount || 0),
+              sgstAmount: Number(chosenPkg.sgstAmount || 0),
+              igstAmount: Number(chosenPkg.igstAmount || 0),
+              taxAmount: Number(chosenPkg.taxAmount || 0),
+              finalAmount: Number(chosenPkg.finalAmount || effectiveFinalAmount),
+            }
+          : {
+              discountAmount: Number(data.discountAmount || 0),
+              taxableAmount: Number(data.taxableAmount || 0),
+              taxRate: Number(data.taxRate || 0),
+              taxMode: data.taxMode || "EXCLUSIVE",
+              gstTreatment: data.gstTreatment || "INTRA_STATE",
+              cgstAmount: Number(data.cgstAmount || 0),
+              sgstAmount: Number(data.sgstAmount || 0),
+              igstAmount: Number(data.igstAmount || 0),
+              taxAmount: Number(data.taxAmount || 0),
+              finalAmount: Number(data.finalAmount || effectiveFinalAmount),
+            };
+
+        drawSectionHeader("Price & Tax Breakdown", "Commercial quotation and applicable GST summary");
+
+        const hasDiscount = activeTaxSnapshot.discountAmount > 0;
+        const isExempt = activeTaxSnapshot.gstTreatment === "NON_GST_EXEMPT" || activeTaxSnapshot.taxRate === 0;
+        const isIntraState = activeTaxSnapshot.gstTreatment === "INTRA_STATE" && !isExempt;
+        const isInterState = activeTaxSnapshot.gstTreatment === "INTER_STATE" && !isExempt;
+        const isInclusive = activeTaxSnapshot.taxMode === "INCLUSIVE";
+
+        let breakdownRowsCount = 2; // Taxable amount + GST main row
+        if (hasDiscount) breakdownRowsCount += 1;
+        if (isIntraState) breakdownRowsCount += 2; // CGST + SGST sub-rows
+        if (isInterState) breakdownRowsCount += 1; // IGST sub-row
+
+        const tableContentHeight = 24 + breakdownRowsCount * 17;
+        const totalSectionHeight = tableContentHeight + 62;
+        checkPageBreak(totalSectionHeight);
+
+        const breakdownY = doc.y;
+
+        // Draw Breakdown Container
+        doc
+          .roundedRect(margin, breakdownY, contentWidth, tableContentHeight, 6)
+          .fillAndStroke(bgLight, borderLight);
+
+        let rowY = breakdownY + 10;
+        const col1X = margin + 14;
+        const col2X = margin + contentWidth - 160;
+        const col2W = 146;
+
+        // Row: Discount (if applicable)
+        if (hasDiscount) {
+          doc
+            .fillColor(textMuted)
+            .fontSize(8)
+            .font("Helvetica")
+            .text("Discount Applied:", col1X, rowY);
+          doc
+            .fillColor("#059669")
+            .fontSize(8)
+            .font("Helvetica-Bold")
+            .text(`-${formatCurrency(activeTaxSnapshot.discountAmount)}`, col2X, rowY, { width: col2W, align: "right" });
+          rowY += 17;
+        }
+
+        // Row: Taxable Amount
+        doc
+          .fillColor(textDark)
+          .fontSize(8.5)
+          .font("Helvetica-Bold")
+          .text("Taxable Amount:", col1X, rowY);
+        doc
+          .fillColor(textDark)
+          .fontSize(8.5)
+          .font("Helvetica-Bold")
+          .text(formatCurrency(activeTaxSnapshot.taxableAmount), col2X, rowY, { width: col2W, align: "right" });
+        rowY += 17;
+
+        // Row: GST Main
+        if (isExempt) {
+          doc
+            .fillColor(textMuted)
+            .fontSize(8)
+            .font("Helvetica")
+            .text("GST (Tax Exempt / 0%):", col1X, rowY);
+          doc
+            .fillColor(textDark)
+            .fontSize(8)
+            .font("Helvetica-Bold")
+            .text("₹0.00", col2X, rowY, { width: col2W, align: "right" });
+          rowY += 17;
+        } else if (isIntraState) {
+          const gstLabel = isInclusive
+            ? `GST ${activeTaxSnapshot.taxRate}% (Included):`
+            : `GST ${activeTaxSnapshot.taxRate}%:`;
+          doc
+            .fillColor(textDark)
+            .fontSize(8)
+            .font("Helvetica-Bold")
+            .text(gstLabel, col1X, rowY);
+          doc
+            .fillColor(primaryColor)
+            .fontSize(8)
+            .font("Helvetica-Bold")
+            .text(formatCurrency(activeTaxSnapshot.taxAmount), col2X, rowY, { width: col2W, align: "right" });
+          rowY += 17;
+
+          // CGST Sub-row
+          doc
+            .fillColor(textMuted)
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(`  • CGST (${activeTaxSnapshot.taxRate / 2}%):`, col1X, rowY);
+          doc
+            .fillColor(textMuted)
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(formatCurrency(activeTaxSnapshot.cgstAmount), col2X, rowY, { width: col2W, align: "right" });
+          rowY += 15;
+
+          // SGST Sub-row
+          doc
+            .fillColor(textMuted)
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(`  • SGST (${activeTaxSnapshot.taxRate / 2}%):`, col1X, rowY);
+          doc
+            .fillColor(textMuted)
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(formatCurrency(activeTaxSnapshot.sgstAmount), col2X, rowY, { width: col2W, align: "right" });
+          rowY += 17;
+        } else if (isInterState) {
+          const gstLabel = isInclusive
+            ? `GST ${activeTaxSnapshot.taxRate}% (Included):`
+            : `GST ${activeTaxSnapshot.taxRate}%:`;
+          doc
+            .fillColor(textDark)
+            .fontSize(8)
+            .font("Helvetica-Bold")
+            .text(gstLabel, col1X, rowY);
+          doc
+            .fillColor(primaryColor)
+            .fontSize(8)
+            .font("Helvetica-Bold")
+            .text(formatCurrency(activeTaxSnapshot.taxAmount), col2X, rowY, { width: col2W, align: "right" });
+          rowY += 17;
+
+          // IGST Sub-row
+          doc
+            .fillColor(textMuted)
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(`  • IGST (${activeTaxSnapshot.taxRate}%):`, col1X, rowY);
+          doc
+            .fillColor(textMuted)
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(formatCurrency(activeTaxSnapshot.igstAmount), col2X, rowY, { width: col2W, align: "right" });
+          rowY += 17;
+        }
+
+        doc.y = breakdownY + tableContentHeight + 8;
+
+        // Total Investment Banner
+        const totalCardY = doc.y;
+        doc
+          .roundedRect(margin, totalCardY, contentWidth, 48, 6)
+          .fill(primaryDark);
 
         doc
           .fillColor("#A5B4FC")
           .fontSize(7.5)
           .font("Helvetica-Bold")
-          .text("TOTAL PROPOSAL INVESTMENT", margin + 16, totalCardY + 10);
+          .text("TOTAL PROPOSAL INVESTMENT", margin + 16, totalCardY + 9);
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(11)
+          .fontSize(10.5)
           .font("Helvetica-Bold")
-          .text(chosenPkg ? `${chosenPkg.name} Package` : "Complete Tour Price", margin + 16, totalCardY + 24);
+          .text(chosenPkg ? `${chosenPkg.name} Package` : "Complete Tour Price", margin + 16, totalCardY + 22);
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(18)
+          .fontSize(17)
           .font("Helvetica-Bold")
-          .text(formatCurrency(effectiveFinalAmount), margin + 200, totalCardY + 14, {
+          .text(formatCurrency(activeTaxSnapshot.finalAmount), margin + 200, totalCardY + 12, {
             width: contentWidth - 216,
             align: "right",
           });
 
-        doc.y = totalCardY + 60;
+        doc
+          .fillColor("#C7D2FE")
+          .fontSize(6.5)
+          .font("Helvetica")
+          .text(
+            isInclusive
+              ? "All statutory GST and taxes are included in the total price"
+              : isExempt
+              ? "Tax exempt / 0% GST"
+              : `Inclusive of ${activeTaxSnapshot.taxRate}% GST added to taxable amount`,
+            margin + 200,
+            totalCardY + 33,
+            { width: contentWidth - 216, align: "right" }
+          );
+
+        doc.y = totalCardY + 56;
 
         // ═════════════════════════════════════════════════════════════════════
         // 12. IMPORTANT POLICIES & ADVISORIES
