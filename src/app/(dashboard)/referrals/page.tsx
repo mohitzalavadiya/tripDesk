@@ -278,21 +278,6 @@ export default function ReferralsAndRewardsPage() {
               </SelectContent>
             </Select>
 
-            {(searchQuery || statusFilter !== "ALL") && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSearchQuery("");
-                  setStatusFilter("ALL");
-                }}
-                className="h-9 text-xs font-semibold text-slate-500 hover:text-slate-900 cursor-pointer"
-              >
-                <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                Reset
-              </Button>
-            )}
-
             <Button
               variant="outline"
               size="sm"

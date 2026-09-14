@@ -9553,6 +9553,38 @@ All 9 automated test suites executed with 100% pass rate:
 
 ---
 
+# 141. GLOBAL TABLE/LIST FILTER RESET BUTTON REMOVAL (UI CLEANUP)
+
+## 141.1 Objective & Overview
+- Cleaned up table and list filter toolbars globally across all tenant dashboard and super admin pages by removing the visible **"Reset Filters" / "Reset Filter" / "Reset"** buttons.
+- Filter functionality, internal filter state, URL query parameters, API request parameters, search inputs, status/priority tabs, pagination, sorting, and empty state actions remain 100% intact and operational.
+- Unrelated resets (e.g. error retry buttons, pricing recalculate buttons, operational issue recovery actions, refund indicators, password reset, form reset) were strictly preserved.
+
+## 141.2 Exact Pages Updated (16 files)
+1. `src/app/(dashboard)/trips/page.tsx`
+2. `src/app/(dashboard)/bookings/page.tsx`
+3. `src/app/(dashboard)/quotations/page.tsx`
+4. `src/app/(dashboard)/customers/page.tsx`
+5. `src/app/(dashboard)/enquiries/page.tsx`
+6. `src/app/(dashboard)/payments/page.tsx`
+7. `src/app/(dashboard)/hotels/page.tsx`
+8. `src/app/(dashboard)/vehicles/page.tsx`
+9. `src/app/(dashboard)/activities/page.tsx`
+10. `src/app/(dashboard)/suppliers/page.tsx`
+11. `src/app/(dashboard)/rate-sheets/page.tsx`
+12. `src/app/(dashboard)/documents/page.tsx`
+13. `src/app/(dashboard)/operations/page.tsx`
+14. `src/app/(dashboard)/operations/issues/page.tsx`
+15. `src/app/(dashboard)/referrals/page.tsx`
+16. `src/app/admin/payments/page.tsx`
+
+## 141.3 Validation & Certification
+- **TypeScript (`npx tsc --noEmit`):** 0 errors (PASS)
+- **Production Build (`npm run build`):** PASS (Turbopack, exit code 0)
+- **Status:** **GLOBAL FILTER RESET UI — VERIFIED & CLOSED**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
