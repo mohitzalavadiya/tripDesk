@@ -13,6 +13,8 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "";
   const resetSuccess = searchParams.get("reset") === "success";
+  const verifiedSuccess = searchParams.get("verified") === "true";
+  const urlError = searchParams.get("error");
 
   const [state, formAction, isPending] = useActionState(loginAction, {});
   const [showPassword, setShowPassword] = React.useState(false);
@@ -33,6 +35,18 @@ function LoginForm() {
       </div>
 
       {/* Feedback Alerts */}
+      {verifiedSuccess && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl p-3.5 flex items-start gap-2.5">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <span className="font-bold block">Email verified successfully!</span>
+            <span className="text-emerald-700">
+              Your 7-day Starter trial is active. Please enter your credentials to access your workspace.
+            </span>
+          </div>
+        </div>
+      )}
+
       {resetSuccess && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl p-3 flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
@@ -40,12 +54,43 @@ function LoginForm() {
         </div>
       )}
 
-      {state?.error && (
+      {state?.unverified ? (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xl p-3.5 space-y-2.5">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-bold block">Verification Required</span>
+              <p className="text-amber-800 leading-relaxed">
+                Please verify your email address before signing in to TripDesk.
+              </p>
+            </div>
+          </div>
+          <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between">
+            <Link
+              href={`/verify-email?email=${encodeURIComponent(state.email || "")}`}
+              className="text-amber-900 font-bold hover:underline inline-flex items-center gap-1"
+            >
+              Go to Verification Screen &rarr;
+            </Link>
+          </div>
+        </div>
+      ) : state?.error ? (
         <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl p-3 flex items-center gap-2">
           <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
           <span>{state.error}</span>
         </div>
-      )}
+      ) : urlError && !verifiedSuccess && !resetSuccess ? (
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl p-3 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+          <span>
+            {urlError === "verification_link_invalid" || urlError === "link_expired"
+              ? "The verification link is invalid or has expired. Please request a new one."
+              : urlError === "missing_verification_code"
+              ? "Missing verification code. Please check your verification email link."
+              : "Unable to complete sign in. Please try again."}
+          </span>
+        </div>
+      ) : null}
 
       {/* Form */}
       <form action={formAction} className="space-y-4 text-xs">

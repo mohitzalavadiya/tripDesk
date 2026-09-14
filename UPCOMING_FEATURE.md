@@ -25,6 +25,11 @@ Tax system impeliment
 
 remove reset or refresh button in near dropdown
 email verification
+quotation check priceing
+
+/enquiries/new Budget Structure per_person
+
+in Gender give dropdown
 
 manage read only from frontend also
 where i can show Announcements ?
