@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { provisionOnboardedAgencyOwner } from "@/lib/services/onboarding-service";
 import prisma from "@/lib/prisma";
 
 export interface AuthActionResult {
@@ -298,6 +299,94 @@ export async function resendVerificationEmailAction(
     }
     return { error: "Unable to resend verification email right now. Please try again." };
   }
+
+  return { success: true };
+}
+
+/**
+ * Verify Native Supabase Email OTP for Agency Owner registration.
+ * Validates 6-8 digit OTP with Supabase Auth, retrieves confirmed identity, executes atomic onboarding,
+ * wipes temporary metadata, and terminates the session to enforce no auto-login.
+ */
+export async function verifyEmailOtpAction(
+  prevState: any,
+  formData: FormData
+): Promise<AuthActionResult> {
+  const email = (formData.get("email") as string)?.trim()?.toLowerCase();
+  const token = (formData.get("token") as string)?.trim();
+
+  if (!email) {
+    return { error: "Please enter your registered email address." };
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return { error: "Please enter a valid email address." };
+  }
+
+  if (!token) {
+    return { error: "Please enter the verification code sent to your email." };
+  }
+
+  if (!/^\d{6,8}$/.test(token)) {
+    return { error: "Verification code must be 6 to 8 numeric digits." };
+  }
+
+  const supabase = await createClient();
+
+  // 1. Verify OTP natively through Supabase Auth
+  const { error: verifyError } = await supabase.auth.verifyOtp({
+    email,
+    token,
+    type: "email",
+  });
+
+  if (verifyError) {
+    console.error("Supabase OTP verification error:", verifyError.message);
+    const msg = verifyError.message?.toLowerCase() || "";
+    if (msg.includes("expired")) {
+      return { error: "This verification code has expired or is no longer valid. Please request a new code." };
+    }
+    if (msg.includes("invalid") || msg.includes("token") || verifyError.status === 400) {
+      return { error: "The verification code is incorrect. Please check the code and try again." };
+    }
+    if (msg.includes("rate limit") || msg.includes("security purposes") || verifyError.status === 429) {
+      return { error: "Too many verification attempts. Please wait a moment before trying again." };
+    }
+    return { error: verifyError.message || "Failed to verify verification code." };
+  }
+
+  // 2. Retrieve Authenticated User Identity (never trust client-supplied ID)
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    console.error("Failed to retrieve authenticated user after OTP verification:", userError?.message);
+    await supabase.auth.signOut();
+    return { error: "Authentication session could not be established. Please try again." };
+  }
+
+  // 3. Execute Atomic Onboarding Transaction
+  const onboardingResult = await provisionOnboardedAgencyOwner(user, supabase);
+
+  if (!onboardingResult.success) {
+    await supabase.auth.signOut();
+    if (onboardingResult.error === "unverified_account") {
+      return { error: "Your email address is not yet confirmed by the authentication provider." };
+    }
+    if (onboardingResult.error === "missing_onboarding_data") {
+      return { error: "Your registration details could not be found. Please contact support or sign up again." };
+    }
+    if (onboardingResult.error === "plan_unavailable") {
+      return { error: "Starter subscription plan is currently unavailable in the catalog." };
+    }
+    return { error: "Failed to initialize agency workspace. Please try again or contact support." };
+  }
+
+  // 4. Sign Out to Enforce "No Auto-Login" Rule
+  await supabase.auth.signOut();
 
   return { success: true };
 }

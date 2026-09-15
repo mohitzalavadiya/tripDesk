@@ -18,13 +18,14 @@ manage scroll in table
 Invoice pdf format and invoice page strucutre
 quatation genarate flow
 Tax system impeliment
+remove reset or refresh button in near dropdown
 
 
 
 **TODO**
 
-remove reset or refresh button in near dropdown
-email verification
+Next Renewal Date issue in subscription
+some API fail in operations
 quotation check priceing
 
 /enquiries/new Budget Structure per_person
@@ -53,7 +54,7 @@ Chatbot implement
 
 **ONHOLD**
 
-some API fail in operations
+email verification
 add scroll in table : when lots of data in table in this case add scroll in table not in whole page
 in database i can show password : in database table i want to show password every angency : 
 seperate database for prod and local
