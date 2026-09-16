@@ -2,18 +2,27 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getAdminClient, deleteAuthUser } from "@/lib/supabase/admin";
+import { provisionOnboardedAgencyOwner } from "@/lib/services/onboarding-service";
 import prisma from "@/lib/prisma";
 
 export interface AuthActionResult {
   success?: boolean;
   error?: string;
+  unverified?: boolean;
+  email?: string;
+}
+
+function getAuthCallbackUrl(): string {
+  const siteUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  return `${siteUrl.replace(/\/$/, "")}/auth/callback`;
 }
 
 /**
- * Hardened single unified Agency Onboarding + Supabase Auth signup.
- * Creates confirmed Supabase Auth User, TripDesk Agency, TripDesk User (AGENCY_OWNER), and 7-day TRIAL subscription.
- * Recovers safely from partial database failure by rolling back Prisma transactions and cleaning up orphaned Auth accounts.
+ * Public Agency Owner Registration with Native Supabase Auth & Onboarding Metadata Staging.
+ * Creates an unconfirmed Supabase Auth user and stores temporary onboarding metadata.
+ * Deferring database provisioning (Agency, User, Subscription) to the post-verification callback.
  */
 export async function signupAgencyOwnerAction(
   prevState: any,
@@ -47,160 +56,55 @@ export async function signupAgencyOwnerAction(
     return { error: "Passwords do not match." };
   }
 
-  let supabaseUserId: string;
-
-  // 1. Supabase Auth Account Creation
-  const adminClient = getAdminClient();
-  if (adminClient) {
-    // Create confirmed user using Admin API to prevent email rate limit lockouts
-    const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        name: ownerName,
-        phone,
-        role: "AGENCY_OWNER",
-      },
-    });
-
-    if (authError || !authData.user) {
-      if (
-        authError?.message?.toLowerCase().includes("already registered") ||
-        authError?.message?.toLowerCase().includes("already exists")
-      ) {
-        return { error: "An account with this email already exists. Please log in instead." };
-      }
-      return { error: authError?.message || "Failed to create authentication account." };
-    }
-
-    supabaseUserId = authData.user.id;
-  } else {
-    // Standard client fallback if service role key is not configured
-    const supabase = await createClient();
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name: ownerName,
-          phone,
-        },
-      },
-    });
-
-    if (authError) {
-      return { error: authError.message || "Failed to create authentication account." };
-    }
-
-    if (!authData.user) {
-      return { error: "Authentication service did not return a valid user identity." };
-    }
-
-    if (authData.user.identities && authData.user.identities.length === 0) {
-      return { error: "An account with this email already exists. Please log in instead." };
-    }
-
-    supabaseUserId = authData.user.id;
-  }
-
-  let isNewlyCreated = true;
-
-  try {
-    // 2. Atomic Prisma Transaction: Agency + User + 7-Day Trial Subscription
-    await prisma.$transaction(async (tx) => {
-      // Idempotency check: verify if DB User + Agency already exist
-      const existingDbUser = await tx.user.findUnique({
-        where: { id: supabaseUserId },
-        include: { agency: true },
-      });
-
-      if (existingDbUser && existingDbUser.agencyId) {
-        isNewlyCreated = false;
-        return;
-      }
-
-      // Find or create default Starter subscription plan
-      let defaultPlan = await tx.subscriptionPlan.findFirst({
-        where: { name: "Starter" },
-      });
-
-      if (!defaultPlan) {
-        defaultPlan = await tx.subscriptionPlan.create({
-          data: {
-            name: "Starter",
-            description: "Essential travel planning & quotation workflow for boutique operators.",
-            price: 1999.0,
-            durationDays: 30,
-            isActive: true,
-          },
-        });
-      }
-
-      const now = new Date();
-      const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const fullAddress = [address, city, state, country].filter(Boolean).join(", ");
-
-      // Create Agency
-      const agency = await tx.agency.create({
-        data: {
-          name: agencyName,
-          phone: agencyPhone,
-          email: agencyEmail,
-          address: fullAddress || null,
-          status: "ACTIVE",
-        },
-      });
-
-      // Create User
-      await tx.user.create({
-        data: {
-          id: supabaseUserId,
-          agencyId: agency.id,
-          name: ownerName,
-          email,
-          phone,
-          role: "AGENCY_OWNER",
-        },
-      });
-
-      // Create 7-day TRIAL subscription
-      await tx.subscription.create({
-        data: {
-          agencyId: agency.id,
-          planId: defaultPlan.id,
-          status: "TRIAL",
-          trialStart: now,
-          trialEnd: trialEnd,
-        },
-      });
-    });
-  } catch (err: any) {
-    console.error("Agency onboarding failed during database transaction. Attempting cleanup of newly-created Auth user:", err);
-
-    // Safe cleanup: Delete ONLY the newly created Auth user from this signup attempt
-    if (isNewlyCreated) {
-      await deleteAuthUser(supabaseUserId);
-    }
-
-    return {
-      error: "Unable to complete your agency setup right now. Please try again.",
-    };
-  }
-
-  // 3. Establish active session in cookies for seamless immediate onboarding
-  const serverSupabase = await createClient();
-  const { error: signInError } = await serverSupabase.auth.signInWithPassword({
+  // 1. Native Supabase Auth Signup with temporary onboarding metadata
+  const supabase = await createClient();
+  const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      emailRedirectTo: getAuthCallbackUrl(),
+      data: {
+        agencyName,
+        agencyEmail,
+        agencyPhone,
+        address,
+        city,
+        state,
+        country,
+        ownerName,
+        phone,
+      },
+    },
   });
 
-  if (signInError) {
-    console.warn("Auto-login after registration had notice:", signInError.message);
-    redirect("/login?registered=true");
+  if (authError) {
+    if (
+      authError.message?.toLowerCase().includes("already registered") ||
+      authError.message?.toLowerCase().includes("already exists")
+    ) {
+      return { error: "An account with this email already exists. Please log in instead." };
+    }
+    if (
+      authError.message?.toLowerCase().includes("rate limit") ||
+      authError.message?.toLowerCase().includes("security purposes") ||
+      authError.status === 429
+    ) {
+      return { error: "Too many registration attempts. Please wait a moment before trying again." };
+    }
+    return { error: authError.message || "Failed to create authentication account." };
   }
 
-  redirect("/dashboard");
+  if (!authData.user) {
+    return { error: "Authentication service did not return a valid user identity." };
+  }
+
+  // Supabase returns identities: [] if user already registered (when email confirmation is enabled)
+  if (authData.user.identities && authData.user.identities.length === 0) {
+    return { error: "An account with this email already exists. Please log in instead." };
+  }
+
+  // 2. Redirect to /verify-email without creating database records or auto-logging in
+  redirect(`/verify-email?email=${encodeURIComponent(email)}`);
 }
 
 /**
@@ -226,6 +130,16 @@ export async function loginAction(
 
   if (authError || !authData.user) {
     if (
+      authError?.message?.toLowerCase().includes("email not confirmed") ||
+      authError?.message?.toLowerCase().includes("email_not_confirmed")
+    ) {
+      return {
+        error: "Please verify your email address before signing in to TripDesk.",
+        unverified: true,
+        email,
+      };
+     }
+    if (
       authError?.message?.toLowerCase().includes("invalid login credentials") ||
       authError?.status === 400
     ) {
@@ -240,14 +154,31 @@ export async function loginAction(
   });
 
   if (!dbUser) {
+    // Explicitly destroy session to prevent orphaned access
+    await supabase.auth.signOut();
     return {
       error:
         "Your authentication credentials are valid, but no TripDesk workspace profile was found. Please contact support.",
     };
   }
 
-  // Role-specific redirect validation (prevents open redirects and cross-role routing)
   const isPlatformOwner = dbUser.role === "PLATFORM_OWNER";
+
+  // Login Verification Gate (Agency Users must be confirmed in Supabase Auth; Platform Owner is exempt)
+  const isEmailConfirmed = !!(
+    authData.user.email_confirmed_at ||
+    (authData.user as any).confirmed_at
+  );
+
+  if (!isPlatformOwner && !isEmailConfirmed) {
+    // Unverified Agency Owner: safely destroy the session and block workspace access
+    await supabase.auth.signOut();
+    return {
+      error: "Please verify your email address before signing in to TripDesk.",
+      unverified: true,
+      email,
+    };
+  }
 
   if (isPlatformOwner) {
     if (
@@ -334,4 +265,128 @@ export async function resetPasswordAction(
   }
 
   redirect("/login?reset=success");
+}
+
+/**
+ * Resend email verification link for an unconfirmed Agency Owner account.
+ */
+export async function resendVerificationEmailAction(
+  prevState: any,
+  formData: FormData
+): Promise<AuthActionResult> {
+  const email = (formData.get("email") as string)?.trim()?.toLowerCase();
+
+  if (!email) {
+    return { error: "Please enter your registered email address to resend verification." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: getAuthCallbackUrl(),
+    },
+  });
+
+  if (error) {
+    if (
+      error.message?.toLowerCase().includes("rate limit") ||
+      error.message?.toLowerCase().includes("security purposes") ||
+      error.status === 429
+    ) {
+      return { error: "Please wait a moment before requesting another verification email." };
+    }
+    return { error: "Unable to resend verification email right now. Please try again." };
+  }
+
+  return { success: true };
+}
+
+/**
+ * Verify Native Supabase Email OTP for Agency Owner registration.
+ * Validates 6-8 digit OTP with Supabase Auth, retrieves confirmed identity, executes atomic onboarding,
+ * wipes temporary metadata, and terminates the session to enforce no auto-login.
+ */
+export async function verifyEmailOtpAction(
+  prevState: any,
+  formData: FormData
+): Promise<AuthActionResult> {
+  const email = (formData.get("email") as string)?.trim()?.toLowerCase();
+  const token = (formData.get("token") as string)?.trim();
+
+  if (!email) {
+    return { error: "Please enter your registered email address." };
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return { error: "Please enter a valid email address." };
+  }
+
+  if (!token) {
+    return { error: "Please enter the verification code sent to your email." };
+  }
+
+  if (!/^\d{6,8}$/.test(token)) {
+    return { error: "Verification code must be 6 to 8 numeric digits." };
+  }
+
+  const supabase = await createClient();
+
+  // 1. Verify OTP natively through Supabase Auth
+  const { error: verifyError } = await supabase.auth.verifyOtp({
+    email,
+    token,
+    type: "email",
+  });
+
+  if (verifyError) {
+    console.error("Supabase OTP verification error:", verifyError.message);
+    const msg = verifyError.message?.toLowerCase() || "";
+    if (msg.includes("expired")) {
+      return { error: "This verification code has expired or is no longer valid. Please request a new code." };
+    }
+    if (msg.includes("invalid") || msg.includes("token") || verifyError.status === 400) {
+      return { error: "The verification code is incorrect. Please check the code and try again." };
+    }
+    if (msg.includes("rate limit") || msg.includes("security purposes") || verifyError.status === 429) {
+      return { error: "Too many verification attempts. Please wait a moment before trying again." };
+    }
+    return { error: verifyError.message || "Failed to verify verification code." };
+  }
+
+  // 2. Retrieve Authenticated User Identity (never trust client-supplied ID)
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    console.error("Failed to retrieve authenticated user after OTP verification:", userError?.message);
+    await supabase.auth.signOut();
+    return { error: "Authentication session could not be established. Please try again." };
+  }
+
+  // 3. Execute Atomic Onboarding Transaction
+  const onboardingResult = await provisionOnboardedAgencyOwner(user, supabase);
+
+  if (!onboardingResult.success) {
+    await supabase.auth.signOut();
+    if (onboardingResult.error === "unverified_account") {
+      return { error: "Your email address is not yet confirmed by the authentication provider." };
+    }
+    if (onboardingResult.error === "missing_onboarding_data") {
+      return { error: "Your registration details could not be found. Please contact support or sign up again." };
+    }
+    if (onboardingResult.error === "plan_unavailable") {
+      return { error: "Starter subscription plan is currently unavailable in the catalog." };
+    }
+    return { error: "Failed to initialize agency workspace. Please try again or contact support." };
+  }
+
+  // 4. Sign Out to Enforce "No Auto-Login" Rule
+  await supabase.auth.signOut();
+
+  return { success: true };
 }

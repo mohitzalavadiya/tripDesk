@@ -9585,9 +9585,359 @@ All 9 automated test suites executed with 100% pass rate:
 
 ---
 
+# 142. EMAIL VERIFICATION: BATCH 1 — SUPABASE SIGNUP REFACTOR & METADATA STAGING
+
+## 142.1 Objective & Overview
+- Implemented Batch 1 of the locked TripDesk Email Verification lifecycle.
+- Refactored `signupAgencyOwnerAction` to use native `supabase.auth.signUp()` with temporary onboarding metadata staged in `user_metadata` (`agencyName`, `agencyEmail`, `agencyPhone`, `address`, `city`, `state`, `country`, `ownerName`, `phone`).
+- Removed `email_confirm: true` from public signup so accounts remain unconfirmed until verified.
+- Deferred all database provisioning (`Agency`, `User`, `Subscription`) and trial consumption to the post-verification callback (Batch 3). 0 database records and 0 trial days are consumed during initial public signup.
+- Removed automatic `signInWithPassword()` session establishment; public signup now redirects directly to `/verify-email?email=...`.
+- Updated middleware to whitelist `/verify-email` as a public route.
+- Platform Owner bootstrap (`prisma/bootstrap-owner.ts`) and existing accounts remain completely untouched.
+
+## 142.2 Files Changed
+1. `src/actions/auth-actions.ts`: Refactored `signupAgencyOwnerAction` for native unconfirmed signup, metadata staging, removed immediate DB transaction and auto-login, redirect to `/verify-email`.
+2. `src/lib/supabase/middleware.ts`: Added `/verify-email` to public routes.
+3. `prisma/test-qa-05-signup.ts`: Updated QA-05 test suite to assert Batch 1 invariants (unconfirmed status, metadata staging, 0 DB records, no trial consumption).
+
+## 142.3 Verification & Test Certification
+- **TypeScript Compilation (`npx tsc --noEmit`):** 0 errors (PASS)
+- **QA-05 Integration Test (`prisma/test-qa-05-signup.ts`):** 8 / 8 assertions PASSED (100%)
+- **QA-01 Auth Suite (`prisma/test-qa-01-auth.ts`):** 16 / 16 assertions PASSED (100%)
+- **Next.js Production Build (`npm run build`):** Exit code 0 (PASS, Turbopack compiled successfully)
+- **Status:** **BATCH 1 — VERIFIED & CLOSED**
+
+## 142.4 Known Limitations & Next Scope
+- Batch 2: Dedicated `/verify-email` screen with 60-second cooldown Resend Verification button (intentionally unimplemented in Batch 1).
+- Batch 3: `/auth/callback` route handler with atomic idempotent database onboarding and 7-day Starter trial start (intentionally unimplemented in Batch 1).
+- Batch 4: Login verification gate and post-verification success banner (intentionally unimplemented in Batch 1).
+
+---
+
+# 143. EMAIL VERIFICATION: BATCH 2 — `/verify-email` SCREEN + RESEND VERIFICATION
+
+## 143.1 Objective & Overview
+- Implemented Batch 2 of the locked TripDesk Email Verification feature.
+- Created dedicated `/verify-email` screen (`src/app/verify-email/page.tsx`) with consistent TripDesk branding, explanatory instructions, email display (UX-only), resend action, 60-second cooldown timer, and navigation to `/login` and `/signup`.
+- Implemented `resendVerificationEmailAction` in `src/actions/auth-actions.ts` using native `supabase.auth.resend({ type: "signup", email })`.
+- Handled server-side abuse and rate limiting gracefully with user-friendly notices ("Please wait a moment before requesting another verification email.").
+- Verified that Batch 2 does NOT create any database records (`Agency`, `User`, `Subscription`, `Starter trial`), does not execute automatic onboarding, and does not establish sessions.
+
+## 143.2 Files Changed
+1. `src/app/verify-email/page.tsx` [NEW]: Created dedicated verification instructions and resend UI with 60s cooldown timer.
+2. `src/actions/auth-actions.ts`: Added `resendVerificationEmailAction` using native Supabase Auth.
+3. `prisma/test-qa-06-verify-email.ts` [NEW]: Created automated test suite validating empty input rejection and resend action dispatch.
+4. `prisma/test-qa-05-signup.ts`: Maintained and verified Batch 1 & 2 signup rate-limit and safety handling.
+
+## 143.3 Verification & Test Certification
+- **TypeScript Compilation (`npx tsc --noEmit`):** 0 errors (PASS)
+- **QA-06 Resend Test (`prisma/test-qa-06-verify-email.ts`):** 100% PASSED
+- **QA-05 Integration Test (`prisma/test-qa-05-signup.ts`):** 100% PASSED
+- **QA-01 Auth Suite (`prisma/test-qa-01-auth.ts`):** 16 / 16 PASSED (100%)
+- **Next.js Production Build (`npm run build`):** Exit code 0 (PASS, Turbopack compiled successfully, `/verify-email` prerendered statically)
+- **Browser Responsive QA:** Verified across `1440×900` (desktop) and `390×844` (mobile) viewports with 0 horizontal overflow and clean UI presentation.
+- **Status:** **BATCH 2 — VERIFIED & CLOSED**
+
+## 143.4 Known Limitations & Next Scope
+- Batch 3: `/auth/callback` route handler with atomic idempotent database onboarding (`Agency`, `User`, `Subscription`) and 7-day Starter trial activation (intentionally unimplemented in Batch 2).
+- Batch 4: Login verification gate and post-verification success banner (intentionally unimplemented in Batch 2).
+
+# 144. EMAIL VERIFICATION: BATCH 3 — `/auth/callback` + ATOMIC ONBOARDING + 7-DAY STARTER TRIAL
+
+## 144.1 Objective & Overview
+- Implemented Batch 3 of the locked TripDesk Email Verification feature.
+- Implemented dedicated Supabase authentication callback Route Handler at `src/app/auth/callback/route.ts`.
+- Exchanged native Supabase authorization code for session (`supabase.auth.exchangeCodeForSession(code)`).
+- Validated authenticated user identity directly from Supabase Auth (`supabase.auth.getUser()`). Supabase Auth remains the source of truth for email confirmation.
+- Implemented atomic Prisma transaction provisioning:
+  1. `Agency`: Created with verified metadata (`name`, `phone`, `email`, `address`, `status: ACTIVE`).
+  2. `User`: Created with `id = Supabase Auth user.id`, `role = AGENCY_OWNER`, `agencyId = agency.id`, `emailVerified = now`.
+  3. `Subscription`: Dynamically resolved `Starter` plan from database catalog; initialized with `status: TRIAL`, `billingCycle: MONTHLY`, `trialStart = now`, `trialEnd = now + 7 days`.
+- Enforced Idempotency & Concurrency Protection: If onboarding was already completed or if multiple callback requests arrive concurrently, the existing records are preserved, no duplicates are created, and trial dates are NOT reset.
+- Failure Recovery: If DB provisioning fails, onboarding metadata in Supabase Auth is preserved so the callback can be retried safely.
+- Metadata Cleanup: Temporary onboarding metadata in Supabase `user_metadata` is wiped ONLY after the database transaction succeeds.
+- No Auto-Login: User session established during code exchange is explicitly signed out (`supabase.auth.signOut()`), and user is redirected to `/login?verified=true`.
+- Added `/auth/callback` to public route whitelist in `src/lib/supabase/middleware.ts`.
+- Passed `emailRedirectTo: getAuthCallbackUrl()` in `signUpAction` and `resendVerificationEmailAction`.
+
+## 144.2 Files Changed
+1. `src/app/auth/callback/route.ts` [NEW]: Supabase Auth verification callback handler with atomic idempotent onboarding transaction, metadata cleanup, and safe redirection.
+2. `src/actions/auth-actions.ts` [MODIFY]: Added `getAuthCallbackUrl()` helper and included `emailRedirectTo` in `signUp` and `resend` options.
+3. `src/lib/supabase/middleware.ts` [MODIFY]: Added `/auth/callback` to `isPublicRoute`.
+4. `prisma/test-qa-07-auth-callback.ts` [NEW]: Automated test suite validating Starter plan resolution, atomic onboarding, exact 7-day trial calculation, idempotency on repeated calls, and rollback on failure.
+
+## 144.3 Verification & Test Certification
+- **TypeScript Compilation (`npx tsc --noEmit`):** 0 errors (PASS)
+- **QA-07 Callback & Onboarding Test (`prisma/test-qa-07-auth-callback.ts`):** 100% PASSED
+- **QA-06 Resend Test (`prisma/test-qa-06-verify-email.ts`):** 100% PASSED
+- **QA-05 Signup Test (`prisma/test-qa-05-signup.ts`):** 100% PASSED
+- **QA-01 Auth Suite (`prisma/test-qa-01-auth.ts`):** 16 / 16 PASSED (100%)
+- **Next.js Production Build (`npm run build`):** Exit code 0 (PASS, Turbopack compiled successfully, `/auth/callback` dynamic route created)
+- **Browser QA:** Verified verification link dispatch, callback code exchange, and safe redirect to `/login?verified=true` across Desktop (`1440×900`) and Mobile (`390×844`).
+- **Status:** **EMAIL VERIFICATION BATCH 3 — VERIFIED & CLOSED**
+
+# 145. EMAIL VERIFICATION: BATCH 4 — LOGIN VERIFICATION GATE + `?verified=true` SUCCESS STATE
+
+## 145.1 Objective & Overview
+- Implemented Batch 4 of the locked TripDesk Email Verification feature.
+- Implemented the server-side Login Verification Gate inside `loginAction` (`src/actions/auth-actions.ts`).
+- Enforced that Supabase Auth confirmation status is the authoritative source of truth:
+  - Catches unconfirmed email responses from `supabase.auth.signInWithPassword()`.
+  - Verifies `email_confirmed_at` / `confirmed_at` on the authenticated user.
+  - If an unverified Agency Owner attempts sign in, their session is immediately destroyed (`supabase.auth.signOut()`) and workspace access is blocked.
+  - Returns friendly user message: *"Please verify your email address before signing in to TripDesk."* with `unverified: true` and `email` for seamless recovery navigation.
+- Verified that Platform Owner (`PLATFORM_OWNER`) accounts remain completely exempt from the verification gate and route normally to `/admin`.
+- Updated `src/app/login/page.tsx` with:
+  - `?verified=true` success state: Displays green confirmation banner (*"Email verified successfully! Your 7-day Starter trial is active. Please enter your credentials to access your workspace."*). Parameter is UX-only and strictly does not auto-login or bypass authentication.
+  - Verification-required amber alert with interactive *"Go to Verification Screen"* action navigating to `/verify-email?email=...` where the 60s cooldown resend action is readily accessible.
+  - Mapped URL error parameters from callback redirects cleanly without exposing internal details.
+- Ensured zero database records are created or modified during login attempts.
+
+## 145.2 Files Changed
+1. `src/actions/auth-actions.ts` [MODIFY]: Updated `loginAction` with Supabase Auth verification gate, session teardown for unverified accounts, and Platform Owner exemption. Updated `AuthActionResult` interface.
+2. `src/app/login/page.tsx` [MODIFY]: Added `?verified=true` success banner, unverified amber alert with verification screen link, and safe error notice mapping.
+3. `prisma/test-qa-08-login-verification.ts` [NEW]: Automated test suite validating missing credentials, invalid credential handling without account enumeration, Platform Owner verification exemption, and zero DB record creation during login.
+
+## 145.3 Verification & Test Certification
+- **TypeScript Compilation (`npx tsc --noEmit`):** 0 errors (PASS)
+- **QA-08 Login Verification Gate Test (`prisma/test-qa-08-login-verification.ts`):** 100% PASSED
+- **QA-07 Callback & Onboarding Test (`prisma/test-qa-07-auth-callback.ts`):** 100% PASSED
+- **QA-06 Resend Test (`prisma/test-qa-06-verify-email.ts`):** 100% PASSED
+- **QA-05 Signup Test (`prisma/test-qa-05-signup.ts`):** 100% PASSED
+- **QA-01 Auth Suite (`prisma/test-qa-01-auth.ts`):** 16 / 16 PASSED (100%)
+- **Next.js Production Build (`npm run build`):** Exit code 0 (PASS, Turbopack compiled successfully)
+- **Browser QA:** Verified `/login`, `/login?verified=true`, unverified login warning, verification navigation, and verified login routing across Desktop (`1440×900`) and Mobile (`390×844`).
+- **Status:** **EMAIL VERIFICATION BATCH 4 — VERIFIED & CLOSED**
+
+# 146. EMAIL VERIFICATION V1 — FINAL FAILURE RECOVERY + REGRESSION QA
+
+## 146.1 Objective & Overview
+- Completed the final comprehensive closure and regression audit for the entire TripDesk Email Verification V1 feature lifecycle.
+- Validated all invariants across the complete lifecycle:
+  1. **Signup Phase (Batch 1):** Public Agency Owner signup uses native `supabase.auth.signUp()`, unconfirmed auth user, temporary metadata in `user_metadata`, 0 Prisma records, 0 trial days consumed, redirects to `/verify-email?email=...`.
+  2. **Verify Screen Phase (Batch 2):** Dedicated `/verify-email` route with safe email display, 60-second client cooldown, native Supabase resend action, safe error handling, no auto-login.
+  3. **Verification & Onboarding Phase (Batch 3):** Dedicated `/auth/callback` Route Handler, authorization code exchange for session, verified user authentication, atomic Prisma transaction creating 1 `Agency` + 1 `User` (`role: AGENCY_OWNER`, `emailVerified: now`) + 1 `Subscription` (`plan: Starter`, `status: TRIAL`, `trialStart: now`, `trialEnd: now + 7 days`).
+  4. **Idempotency & Concurrency Safety:** Repeated/concurrent callback executions preserve existing records, prevent duplicates, and never reset trial dates. Transaction rollback on failure leaves 0 orphaned records and preserves metadata for retry. Metadata wiped only after successful commit.
+  5. **Login Gate Phase (Batch 4):** Server-side verification gate in `loginAction`, destroys temporary sessions for unverified Agency Owners, displays amber alert with navigation to `/verify-email`. Renders green confirmation banner for `?verified=true` (presentation-only, requires manual login).
+  6. **Platform Owner & Tenant Isolation:** Platform Owner (`mzpatel14@gmail.com`, `PLATFORM_OWNER`) remains completely exempt from the verification gate and routes to `/admin`. Multi-tenant boundaries, role authorization, and redirect security (`redirectTo`) are strictly enforced.
+  7. **Database Safety:** Prisma `User.emailVerified` is decoupled from authorization; Supabase Auth remains the sole authoritative source of truth. Zero database records are created or altered during login attempts.
+
+## 146.2 Complete Test Suite Matrix & Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **QA-01 Auth & Session Suite (`prisma/test-qa-01-auth.ts`):** **16 / 16 PASSED (100%)**
+- **QA-05 Signup & Staging Suite (`prisma/test-qa-05-signup.ts`):** **PASS (100%)**
+- **QA-06 Resend Action Suite (`prisma/test-qa-06-verify-email.ts`):** **PASS (100%)**
+- **QA-07 Callback & Onboarding Suite (`prisma/test-qa-07-auth-callback.ts`):** **PASS (100%)**
+- **QA-08 Login Verification Audit Suite (`prisma/test-qa-08-login-verification.ts`):** **9 / 9 PASSED (100%)**
+- **QA-09 Final Regression Closure Suite (`prisma/test-qa-09-email-verification-final.ts`):** **10 / 10 PASSED (100%)**
+- **Next.js Production Build (`npm run build`):** **Exit Code 0 (PASS, Turbopack compiled successfully)**
+- **Browser Responsive QA:** Verified across Desktop (`1440×900`) and Mobile (`390×844`).
+
+## 146.3 Final Production-Readiness Verdict
+**EMAIL VERIFICATION V1 — VERIFIED, CLOSED & PRODUCTION-READY FOR CURRENT SCOPE**
+
+---
+
+# 147. DATABASE CLEANUP COMPLETE & TEST ENVIRONMENT BASELINE
+
+## 147.1 Overview & Purpose
+- Executed controlled, dependency-safe database cleanup and corrective cleanup.
+- Purged all obsolete development/test agencies, disposable test user records, and all historical mock tenant/business data across all 50 Prisma models.
+- Preserved global catalogs, platform configuration, and the permanent Platform Owner identity.
+- Database is currently at a clean, zero-tenant baseline ready for Mohit to personally create/provide the permanent testing Agency + Agency Owner account.
+
+## 147.2 Permanent System & Testing Identities
+1. **Permanent Platform Owner:**
+   - **Email:** `mzpatel14@gmail.com`
+   - **Role:** `PLATFORM_OWNER`
+   - **Supabase Auth User ID:** `de5c1377-0e7c-4747-b3ed-aaee8b7e32a9`
+   - **Prisma User ID:** `de5c1377-0e7c-4747-b3ed-aaee8b7e32a9`
+   - **Agency ID:** `null` (Platform Level)
+   - **Routing:** `/admin` (Platform Control Plane)
+
+2. **Permanent Test Agency:**
+   - **Name:** `TripDesk Offical Test Agnecy`
+   - **Status:** `ACTIVE`
+   - **Subscription:** `Starter` (`TRIAL`, 7-Day Free Trial)
+
+3. **Permanent Test Agency Owner:**
+   - **Email:** `tripmadeeasy.in@gmail.com`
+   - **Role:** `AGENCY_OWNER`
+   - **Status:** `ACTIVE & VERIFIED`
+   - **Credential Secret:** Stored in `.env` as `BOOTSTRAP_AGENCY_PASSWORD` (never documented in V3)
+
+## 147.3 Preserved Global Application Catalogs
+- **Subscription Plans (`SubscriptionPlan` - 2 rows):**
+  - `Starter` (Display Order 1, ₹999/mo, ₹9,999/yr, Active)
+  - `Professional` (Display Order 2, ₹1,499/mo, ₹14,999/yr, Active, Popular)
+- **Tax Rate Catalog (`TaxRate` - 5 rows):**
+  - `0%` (Rate: 0.00, Default: true, Active: true, Display Order: 1)
+  - `5%` (Rate: 5.00, Default: false, Active: true, Display Order: 2)
+  - `12%` (Rate: 12.00, Default: false, Active: true, Display Order: 3)
+  - `18%` (Rate: 18.00, Default: false, Active: true, Display Order: 4)
+  - `28%` (Rate: 28.00, Default: false, Active: true, Display Order: 5)
+- **Platform Settings (`PlatformSetting` - 2 rows):**
+  - `defaultTrialDays`: `"7"`
+  - `supportEmail`: `"enterprise@tripdesk.io"`
+
+## 147.4 Permanent Testing Rules & Governance
+1. **Single Permanent Agency Rule:**
+   - After Mohit establishes the permanent Agency + Agency Owner, all future development, Antigravity agent tasks, ChatGPT-assisted QA, browser testing, regression testing, and feature workflows must permanently reuse that same single permanent test Agency and single permanent Agency Owner.
+2. **Zero Additional Test Tenants:**
+   - Never create another `Agency`, `Agency Owner`, QA agency, temporary tenant, or ad-hoc test user account unless explicitly authorized by Mohit.
+3. **Data Reset Policy:**
+   - When future tests require clean data, reset/clean the records *inside* the established permanent Agency rather than creating a new agency tenant.
+4. **Security & Credential Integrity:**
+   - Passwords, access tokens, and API secret keys must never be committed to Git, stored in documentation, or printed in public reports.
+
+## 147.5 Final Verified Database State
+- **Supabase Auth Users:** Exactly 1 (`mzpatel14@gmail.com` [Platform Owner])
+- **Prisma Users:** Exactly 1 (`PLATFORM_OWNER` with `agencyId: null`)
+- **Agencies:** Exactly 0 (Ready for permanent tenant onboarding)
+- **Subscriptions:** Exactly 0 tenant subscriptions
+- **All Tenant/Business Data Models (45 tables):** Exactly 0 rows (Clean baseline)
+- **Global Catalogs:** `SubscriptionPlan` (2 rows), `TaxRate` (5 rows), `PlatformSetting` (2 rows)
+
+## 147.6 Email Verification & PKCE Confirmation Architecture Fix
+- **Problem:** Cross-browser / email-client verification link clicks resulted in `error=link_expired` because `@supabase/ssr` server actions stored the PKCE `code_verifier` cookie in the signup browser, which was unavailable when clicking links from external email clients.
+- **Solution:** Enhanced `/auth/callback` route handler to support dual verification pathways (`token_hash` + `verifyOtp` and `code` + `exchangeCodeForSession`), categorized errors accurately (avoiding spurious `link_expired` redirects), and enforced verified identity validation before atomic Prisma onboarding (`Agency` + `User [AGENCY_OWNER]` + 7-Day Starter `Subscription`).
+- **QA Verification:** Passed `test-qa-10-pkce-architecture-fix.ts` (8/8 tests passed), `test-qa-09-email-verification-final.ts` (10/10 tests passed), TypeScript (`npx tsc --noEmit` - 0 errors), and Production Build (`npm run build` - succeeded).
+
+---
+
+# 148. NATIVE SUPABASE EMAIL OTP VERIFICATION (LOCKED V1 DECISION)
+
+## 148.1 Overview & Architecture Decision
+- **Final Decision:** TripDesk V1 uses **Native Supabase Email OTP** verification.
+- **Rationale:** Native Email OTP delivers a direct verification code (6–8 numeric digits) via Supabase Auth, completely decoupling verification from browser session cookies, PKCE verifiers, and automated email security link prefetchers.
+- **Workflow:**
+  ```text
+  Signup (/signup)
+    ↓
+  Supabase Auth signUp() with staged metadata in user_metadata
+    ↓
+  Supabase Auth delivers email with verification code ({{ .Token }})
+    ↓
+  User navigates to /verify-email and enters 6–8 digit code
+    ↓
+  verifyEmailOtpAction calls supabase.auth.verifyOtp({ email, token, type: "email" })
+    ↓
+  Authenticated Supabase user confirmed
+    ↓
+  Shared Atomic Onboarding (provisionOnboardedAgencyOwner)
+    ↓
+  Agency + User (AGENCY_OWNER) + Starter Subscription (7-day Trial)
+    ↓
+  Staged metadata cleaned & supabase.auth.signOut()
+    ↓
+  Redirect to /login?verified=true
+  ```
+
+## 148.2 Architecture & Security Invariants Preserved
+1. **Flexible OTP Validation (`src/actions/auth-actions.ts: verifyEmailOtpAction`):**
+   - Validates email and accepts 6 to 8 numeric digits (`/^\d{6,8}$/`) to seamlessly support Supabase Auth default (6-digit) and customized (8-digit) OTP tokens without client-side rejection.
+   - Natively verifies via `supabase.auth.verifyOtp({ email, token, type: "email" })` and resolves verified user identity via `supabase.auth.getUser()`.
+2. **Shared Atomic Onboarding Service (`src/lib/services/onboarding-service.ts`):**
+   - Centralized `provisionOnboardedAgencyOwner(user, supabase)` executes an atomic Prisma `$transaction`.
+   - Strictly verifies `email_confirmed_at`, enforces idempotency, prevents `P2002` race collisions, resolves the catalog `Starter` plan, and wipes temporary `user_metadata`.
+3. **Verify Email OTP Screen (`src/app/verify-email/page.tsx`):**
+   - Clean, branded OTP input interface with monospaced letter-spaced typography, numeric inputMode, max 8-digit auto-sanitization, "Verify & Activate Agency" primary button, and 60-second cooldown timer for native resend (`resendVerificationEmailAction`).
+4. **Dual-Path Callback Preservation (`src/app/auth/callback/route.ts`):**
+   - Retained support for authorization `code` exchange and `token_hash` OTP verification as fallback compatibility.
+5. **Login Verification Gate (`src/actions/auth-actions.ts: loginAction`):**
+   - Unverified users are rejected and prompted to verify; Platform Owner (`mzpatel14@gmail.com`) remains exempt.
+
+## 148.3 Verification & Quality Assurance
+- **QA-11 OTP Verification Suite:** 21/21 assertions passed (100%), validating 6–8 digit inputs, unverified email gates, missing metadata rejection, and clean database invariants.
+- **QA-09 Final Verification Suite:** 10/10 tests passed (100%).
+- **QA-10 PKCE Architecture Fix Suite:** 8/8 tests passed (100%).
+- **TypeScript:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack.
+- **Browser QA:** Automated browser subagent verified `/verify-email` at 1440x900 (desktop) and 390x844 (mobile) with zero horizontal overflow, 8-digit input formatting, button states, and active 60s cooldown.
+- **Clean Database Invariant:** Platform Owner = 1 (`mzpatel14@gmail.com`), Agencies = 0, Subscriptions = 0, Tenant data = 0.
+
+---
+
+# 149. PERMANENT TRIPDESK TEST AGENCY & TESTING GOVERNANCE
+
+## 149.1 Overview & Permanent Test Workspace
+TripDesk has one permanent Agency Owner test workspace used for routine development QA, browser testing, regression testing, and feature verification.
+
+- **Email:** `tripmadeeasy.in@gmail.com`
+- **Role:** `AGENCY_OWNER`
+- **Agency Name:** `TripDesk Offical Test Agnecy`
+- **Agency Status:** `ACTIVE`
+- **Subscription:** `Starter` (Catalog Plan)
+- **Subscription Status:** `TRIAL`
+- **Billing Cycle:** `MONTHLY`
+- **Trial Duration:** 7 days
+
+The test account has already been created, verified, and provisioned in both Supabase Auth and Prisma.
+
+The password is stored only in the project's `.env` file as:
+`BOOTSTRAP_AGENCY_PASSWORD`
+
+> [!WARNING]
+> **NEVER** store, copy, print, expose, or document the actual password in V3, source code, test scripts, terminal output, reports, or chat responses.
+
+## 149.2 Permanent Test Account Rule
+`tripmadeeasy.in@gmail.com` is the permanent TripDesk Agency Owner test account.
+
+1. **Mandatory Reuse:**
+   - Future TripDesk development testing, regression testing, browser QA, and workflow verification should reuse this existing test agency whenever an Agency Owner account is required.
+2. **Zero Disposable Test Tenants:**
+   - Do NOT create another temporary Agency Owner/test agency for routine testing.
+   - Do NOT create a new Agency, User, or Subscription merely because a test requires an Agency Owner account.
+3. **Data Preservation Policy:**
+   - Do NOT delete, reset, wipe, rename, or otherwise modify the permanent test agency's configuration or business data during routine QA.
+4. **Controlled Exceptions:**
+   - If a test specifically requires destructive/reset behavior, obtain explicit approval from Mohit before modifying or resetting the permanent test agency.
+   - If an additional isolated test tenant is genuinely required, explicitly report why the permanent test agency cannot safely be used and wait for approval before creating one.
+
+## 149.3 Test Account Environment Configuration
+The permanent test account configuration is stored in `.env`:
+- `BOOTSTRAP_AGENCY_EMAIL`
+- `BOOTSTRAP_AGENCY_PASSWORD`
+- `BOOTSTRAP_AGENCY_NAME`
+
+The actual password is a secret and MUST NOT be copied into:
+- V3
+- source code
+- test scripts
+- documentation
+- logs
+- screenshots
+- terminal output
+- generated reports
+- chat responses
+
+Only document the variable name `BOOTSTRAP_AGENCY_PASSWORD`.
+
+## 149.4 Permanent Test Agency Verification
+Verified existing database/auth state:
+- Supabase Auth user exists.
+- Prisma User exists.
+- Prisma User role = `AGENCY_OWNER`.
+- Prisma User is linked to a valid Agency (`agencyId` is not null).
+- Agency exists with status `ACTIVE`.
+- Agency name matches `TripDesk Offical Test Agnecy`.
+- Starter Subscription exists.
+- Subscription status = `TRIAL`.
+- Billing cycle = `MONTHLY`.
+- Trial duration = 7 days.
+- No new Agency or User was created during verification.
+- Temporary verification script was removed after the read-only check.
+
+**Verification Result:**
+`PASS — PERMANENT TEST AGENCY VERIFIED`
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
 
 
 

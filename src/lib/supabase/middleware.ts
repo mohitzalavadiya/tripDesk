@@ -50,6 +50,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/signup") ||
     pathname.startsWith("/forgot-password") ||
     pathname.startsWith("/reset-password") ||
+    pathname.startsWith("/verify-email") ||
+    pathname.startsWith("/auth/callback") ||
     pathname.startsWith("/q/") || // Public quotation link
     pathname.startsWith("/trip/") || // Public trip portal
     pathname.startsWith("/b/") || // Public booking token
