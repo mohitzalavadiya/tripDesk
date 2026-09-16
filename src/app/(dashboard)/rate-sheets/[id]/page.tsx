@@ -319,13 +319,10 @@ export default function RateSheetDetailPage() {
                   {rateSheet.supplier && (
                     <>
                       <span>•</span>
-                      <Link
-                        href={`/suppliers/${rateSheet.supplier.id}`}
-                        className="flex items-center gap-1 font-semibold text-indigo-600 hover:underline"
-                      >
-                        <Truck className="h-3.5 w-3.5 text-indigo-500" />
+                      <span className="flex items-center gap-1 font-semibold text-slate-700">
+                        <Truck className="h-3.5 w-3.5 text-slate-500" />
                         <span>{rateSheet.supplier.name}</span>
-                      </Link>
+                      </span>
                     </>
                   )}
                 </div>
@@ -527,14 +524,9 @@ export default function RateSheetDetailPage() {
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400">Supplier / Vendor Partner</span>
                 {rateSheet.supplier ? (
-                  <div className="flex items-center justify-between pt-1">
-                    <div>
-                      <h4 className="font-bold text-slate-900">{rateSheet.supplier.name}</h4>
-                      <span className="text-[11px] text-slate-500 font-mono">{rateSheet.supplier.supplierCode}</span>
-                    </div>
-                    <Link href={`/suppliers/${rateSheet.supplier.id}`} className="text-indigo-600 hover:underline font-semibold">
-                      Supplier 360
-                    </Link>
+                  <div className="pt-1">
+                    <h4 className="font-bold text-slate-900">{rateSheet.supplier.name}</h4>
+                    <span className="text-[11px] text-slate-500 font-mono">{rateSheet.supplier.supplierCode}</span>
                   </div>
                 ) : (
                   <p className="text-slate-700 font-semibold pt-1">Direct Hotel / In-House Inventory</p>

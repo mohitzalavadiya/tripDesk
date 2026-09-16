@@ -168,7 +168,7 @@ export const tripCostingService = {
         seasonName = matchedRate.seasonName;
       } else {
         // Fallback to manual trip assignment snapshot
-        if (totalCost === 0 && nightlyRate > 0) {
+        if (nightlyRate > 0) {
           totalCost = nightlyRate * rooms * diffDays;
         }
       }

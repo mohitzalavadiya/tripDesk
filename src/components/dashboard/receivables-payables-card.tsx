@@ -135,21 +135,14 @@ export function ReceivablesPayablesCard({
       {/* 2. Supplier Payables & Vendor Commitments */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 shadow-2xs space-y-4 flex flex-col justify-between">
         <div>
-          <div className="flex items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <div className="min-w-0 flex-1">
-              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <Building className="h-4 w-4 text-indigo-600 shrink-0" />
-                <span className="truncate">Supplier Payables</span>
-              </h3>
-              <p className="text-xs text-slate-500 line-clamp-1 sm:line-clamp-none">
-                Hotel, fleet, and activity vendor commitments.
-              </p>
-            </div>
-            <Link href="/suppliers" className="shrink-0">
-              <Button size="sm" variant="ghost" className="text-xs h-8 text-indigo-600 hover:bg-indigo-50 cursor-pointer">
-                Vendors <ArrowRight className="h-3 w-3 ml-1" />
-              </Button>
-            </Link>
+          <div className="border-b border-slate-100 pb-3">
+            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+              <Building className="h-4 w-4 text-indigo-600 shrink-0" />
+              <span className="truncate">Supplier Payables</span>
+            </h3>
+            <p className="text-xs text-slate-500 line-clamp-1 sm:line-clamp-none mt-0.5">
+              Hotel, fleet, and activity vendor commitments.
+            </p>
           </div>
 
           {/* Payables Summary Badges */}
@@ -188,10 +181,9 @@ export function ReceivablesPayablesCard({
             ) : (
               <div className="space-y-1.5 max-h-[160px] overflow-y-auto no-scrollbar">
                 {topSuppliers.slice(0, 4).map((s) => (
-                  <Link
+                  <div
                     key={s.supplierId}
-                    href={`/suppliers/${s.supplierId}`}
-                    className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-100/70 transition-colors text-xs"
+                    className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 text-xs"
                   >
                     <div className="min-w-0 flex-1 mr-2">
                       <div className="font-bold text-slate-800 truncate">{s.supplierName}</div>
@@ -201,7 +193,7 @@ export function ReceivablesPayablesCard({
                       <div className="font-bold text-indigo-700">{formatRupees(s.outstandingAmount)}</div>
                       <div className="text-[10px] text-slate-400">Total: {formatRupees(s.plannedAmount)}</div>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}

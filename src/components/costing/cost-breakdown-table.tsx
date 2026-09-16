@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import {
   CostItem,
   InternalExpense,
@@ -342,18 +341,9 @@ export function CostBreakdownTable({
                   {/* Supplier */}
                   <td className="py-3.5 px-4">
                     {item.supplierName ? (
-                      <div className="text-slate-800 font-semibold">
-                        {item.supplierId ? (
-                          <Link
-                            href={`/suppliers/${item.supplierId}`}
-                            className="text-indigo-600 hover:underline flex items-center gap-1"
-                          >
-                            <Building2 className="h-3 w-3 text-indigo-400" />
-                            <span>{item.supplierName}</span>
-                          </Link>
-                        ) : (
-                          item.supplierName
-                        )}
+                      <div className="text-slate-800 font-semibold flex items-center gap-1">
+                        <Building2 className="h-3 w-3 text-slate-400" />
+                        <span>{item.supplierName}</span>
                       </div>
                     ) : (
                       <span className="text-slate-400 italic">Direct / In-house</span>

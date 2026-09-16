@@ -14,6 +14,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { formatEnumLabel, GENDER_OPTIONS } from "@/lib/utils/enum-formatters";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -639,7 +647,7 @@ export default function CustomerDetailPage() {
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-400">Gender & Nationality</span>
                     <p className="text-slate-800 font-semibold">
-                      {customer.gender || "—"} • {customer.nationality || "Indian"}
+                      {customer.gender ? formatEnumLabel(customer.gender) : "—"} • {customer.nationality || "Indian"}
                     </p>
                   </div>
 
@@ -1323,6 +1331,38 @@ export default function CustomerDetailPage() {
                     <Input
                       type="date"
                       {...editFormik.getFieldProps("dateOfBirth")}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Gender</label>
+                    <Select
+                      value={editFormik.values.gender || ""}
+                      onValueChange={(val) => {
+                        editFormik.setFieldValue("gender", val || "");
+                        editFormik.setFieldTouched("gender", true);
+                      }}
+                    >
+                      <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        {GENDER_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Nationality</label>
+                    <Input
+                      {...editFormik.getFieldProps("nationality")}
+                      placeholder="Indian"
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>

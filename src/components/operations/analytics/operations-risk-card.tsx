@@ -9,6 +9,7 @@ import {
 } from "@/lib/api-client/operations-client";
 import { ShieldAlert, ShieldCheck, ArrowUpRight, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatEnumLabel } from "@/lib/utils/enum-formatters";
 
 interface OperationsRiskCardProps {
   riskData?: OperationalRiskAnalyticsResult;
@@ -140,7 +141,7 @@ export function OperationsRiskCard({ riskData, loading = false }: OperationsRisk
                       </div>
                     </td>
                     <td className="py-2.5 px-2">
-                      <span className="font-medium text-slate-700">{op.status}</span>
+                      <span className="font-medium text-slate-700">{formatEnumLabel(op.status)}</span>
                     </td>
                     <td className="py-2.5 px-2">
                       <div className="flex items-center gap-1.5">

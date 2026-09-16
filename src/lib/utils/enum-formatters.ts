@@ -62,10 +62,12 @@ export const ENUM_LABEL_MAP: Record<string, string> = {
   REFUND: "Refund",
   ADJUSTMENT: "Adjustment",
 
-  // ─── Pricing Models & Basis ───
-  PER_KM: "Per Kilometer",
+  // ─── Pricing Models & Budget Structures ───
+  PER_KM: "Per KM",
   PER_DAY: "Per Day",
-  TOTAL: "Total Fixed Rate",
+  TOTAL: "Total",
+  TOTAL_PACKAGE: "Total Package",
+  TOTAL_BUDGET: "Total Package Budget",
   FIXED: "Fixed Trip Rate",
   INCLUDED: "Included in Package",
   OPTIONAL: "Optional Add-on",
@@ -73,6 +75,8 @@ export const ENUM_LABEL_MAP: Record<string, string> = {
   PER_PERSON: "Per Person",
   PER_ROOM: "Per Room",
   PER_VEHICLE: "Per Vehicle",
+  PER_TRIP: "Per Trip",
+  PER_NIGHT: "Per Night",
 
   // ─── Meal Plans ───
   EP: "EP (Room Only)",
@@ -168,6 +172,8 @@ export const ENUM_LABEL_MAP: Record<string, string> = {
   NEGOTIATION: "Negotiation",
   CONVERTED: "Converted",
   LOST: "Lost",
+  WALK_IN: "Walk-In",
+  AGENT: "Travel Agent",
 
   // ─── Subscription & Platform Admin ───
   TRIAL: "7-Day Free Trial",
@@ -181,30 +187,83 @@ export const ENUM_LABEL_MAP: Record<string, string> = {
   INACTIVE: "Inactive",
   AGENCY_SUSPENDED: "Agency Suspended",
   AGENCY_REACTIVATED: "Agency Reactivated",
-  TRIAL_EXTENDED: "Trial Extended",
-  PLAN_CREATED: "Plan Created",
+  // ─── Demographic & Personal ───
+  MALE: "Male",
+  FEMALE: "Female",
 };
 
 /**
- * Returns a clean, user-friendly label for any internal enum or preset string.
- * If the value is not in the explicit dictionary, it formats SCREAMING_SNAKE_CASE
- * into Title Case while preserving acronyms and lowercase strings.
+ * Canonical user-facing gender dropdown options across all customer & traveler forms.
+ */
+export const GENDER_OPTIONS = [
+  { value: "Male", label: "Male" },
+  { value: "Female", label: "Female" },
+  { value: "Other", label: "Other" },
+] as const;
+
+export type GenderOption = (typeof GENDER_OPTIONS)[number]["value"];
+
+const ACRONYMS = new Set([
+  "UPI",
+  "GST",
+  "INR",
+  "USD",
+  "EUR",
+  "GBP",
+  "PDF",
+  "SMS",
+  "URL",
+  "ID",
+  "API",
+  "B2B",
+  "B2C",
+  "KM",
+  "EP",
+  "CP",
+  "MAP",
+  "AP",
+]);
+
+/**
+ * Returns a clean, user-friendly label for any internal enum, snake_case, kebab-case,
+ * or preset string across the entire TripDesk SaaS platform.
+ * 
+ * Rules:
+ * 1. Internal enum values and database IDs remain completely untouched.
+ * 2. Only user-facing display strings are formatted.
+ * 3. Specific domain wording takes precedence over generic underscore replacement.
+ * 4. Case-insensitive dictionary matching supports both lowercase and uppercase enums.
+ * 5. Universal snake_case/kebab-case fallback converts any identifier to Title Case.
  */
 export function formatEnumLabel(val: unknown): string {
   if (val === null || val === undefined) return "";
   const str = String(val).trim();
   if (!str) return "";
 
+  // 1. Direct dictionary match
   if (ENUM_LABEL_MAP[str]) {
     return ENUM_LABEL_MAP[str];
   }
 
-  // Handle SCREAMING_SNAKE_CASE fallback
-  if (/^[A-Z0-9_]+$/.test(str)) {
+  // 2. Case-insensitive dictionary match (e.g. "per_person" -> "PER_PERSON" -> "Per Person")
+  const upper = str.toUpperCase();
+  if (ENUM_LABEL_MAP[upper]) {
+    return ENUM_LABEL_MAP[upper];
+  }
+
+  // 3. Universal snake_case, kebab-case, or SCREAMING_SNAKE_CASE fallback
+  if (/^[A-Za-z0-9_-]+$/.test(str)) {
     return str
-      .toLowerCase()
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .replace(/[-_]+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .map((word) => {
+        const upperWord = word.toUpperCase();
+        if (ACRONYMS.has(upperWord)) {
+          return upperWord;
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
       .join(" ");
   }
 

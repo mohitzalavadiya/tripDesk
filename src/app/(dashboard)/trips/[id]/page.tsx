@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { formatEnumLabel, GENDER_OPTIONS } from "@/lib/utils/enum-formatters";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { getErrorMessage } from "@/lib/utils";
@@ -517,15 +518,57 @@ export default function TripDetailPage() {
   };
 
   // ──────────────────────── TRIP HOTEL HANDLERS ─────────────────────────
+  const computeHotelTotalTariff = (checkInStr: string, checkOutStr: string, roomsCount: number, rateStr: string): string => {
+    if (!checkInStr || !checkOutStr || !rateStr) return "";
+    const rate = Number(rateStr);
+    if (isNaN(rate) || rate <= 0) return "";
+    const cIn = new Date(checkInStr).getTime();
+    const cOut = new Date(checkOutStr).getTime();
+    if (isNaN(cIn) || isNaN(cOut)) return "";
+    const nights = Math.max(1, Math.ceil((cOut - cIn) / (1000 * 60 * 60 * 24)));
+    const rooms = Math.max(1, Number(roomsCount) || 1);
+    return String(rate * rooms * nights);
+  };
+
+  const handleHotelCheckInChange = (val: string) => {
+    setHotelFormCheckIn(val);
+    const computed = computeHotelTotalTariff(val, hotelFormCheckOut, hotelFormRooms, hotelFormNightlyRate);
+    if (computed) setHotelFormTotalAmount(computed);
+  };
+
+  const handleHotelCheckOutChange = (val: string) => {
+    setHotelFormCheckOut(val);
+    const computed = computeHotelTotalTariff(hotelFormCheckIn, val, hotelFormRooms, hotelFormNightlyRate);
+    if (computed) setHotelFormTotalAmount(computed);
+  };
+
+  const handleHotelRoomsChange = (val: number) => {
+    setHotelFormRooms(val);
+    const computed = computeHotelTotalTariff(hotelFormCheckIn, hotelFormCheckOut, val, hotelFormNightlyRate);
+    if (computed) setHotelFormTotalAmount(computed);
+  };
+
+  const handleHotelNightlyRateChange = (val: string) => {
+    setHotelFormNightlyRate(val);
+    const computed = computeHotelTotalTariff(hotelFormCheckIn, hotelFormCheckOut, hotelFormRooms, val);
+    if (computed) setHotelFormTotalAmount(computed);
+  };
+
   const handleOpenAddHotel = () => {
+    const cIn = trip?.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "";
+    const cOut = trip?.endDate ? new Date(trip.endDate).toISOString().split("T")[0] : "";
+    const defaultRate = "3500";
+    const defaultRooms = 1;
+    const initialTotal = computeHotelTotalTariff(cIn, cOut, defaultRooms, defaultRate);
+
     setHotelFormHotelId(masterHotels[0]?.id || "");
-    setHotelFormCheckIn(trip?.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "");
-    setHotelFormCheckOut(trip?.endDate ? new Date(trip.endDate).toISOString().split("T")[0] : "");
+    setHotelFormCheckIn(cIn);
+    setHotelFormCheckOut(cOut);
     setHotelFormRoomType("Deluxe Room");
-    setHotelFormRooms(1);
+    setHotelFormRooms(defaultRooms);
     setHotelFormMealPlan("CP - Breakfast Included");
-    setHotelFormNightlyRate("3500");
-    setHotelFormTotalAmount("7000");
+    setHotelFormNightlyRate(defaultRate);
+    setHotelFormTotalAmount(initialTotal);
     setHotelFormNotes("");
     setIsAddHotelOpen(true);
   };
@@ -562,15 +605,21 @@ export default function TripDetailPage() {
   };
 
   const handleOpenEditHotel = (th: TripHotelWithHotel) => {
+    const cIn = th.checkIn ? new Date(th.checkIn).toISOString().split("T")[0] : "";
+    const cOut = th.checkOut ? new Date(th.checkOut).toISOString().split("T")[0] : "";
+    const rateStr = th.nightlyRate !== null && th.nightlyRate !== undefined ? String(th.nightlyRate) : "";
+    const computed = computeHotelTotalTariff(cIn, cOut, th.rooms, rateStr);
+    const totalStr = computed || (th.totalAmount !== null && th.totalAmount !== undefined ? String(th.totalAmount) : "");
+
     setSelectedTripHotelId(th.id);
     setHotelFormHotelId(th.hotelId);
-    setHotelFormCheckIn(th.checkIn ? new Date(th.checkIn).toISOString().split("T")[0] : "");
-    setHotelFormCheckOut(th.checkOut ? new Date(th.checkOut).toISOString().split("T")[0] : "");
+    setHotelFormCheckIn(cIn);
+    setHotelFormCheckOut(cOut);
     setHotelFormRoomType(th.roomType);
     setHotelFormRooms(th.rooms);
     setHotelFormMealPlan(th.mealPlan || "");
-    setHotelFormNightlyRate(th.nightlyRate !== null && th.nightlyRate !== undefined ? String(th.nightlyRate) : "");
-    setHotelFormTotalAmount(th.totalAmount !== null && th.totalAmount !== undefined ? String(th.totalAmount) : "");
+    setHotelFormNightlyRate(rateStr);
+    setHotelFormTotalAmount(totalStr);
     setHotelFormNotes(th.notes || "");
     setIsEditHotelOpen(true);
   };
@@ -1243,7 +1292,7 @@ export default function TripDetailPage() {
                             )}
                           </div>
                           <span className="text-[11px] text-slate-500 capitalize">
-                            {t.type.toLowerCase()} {t.gender ? `• ${t.gender}` : ""} {t.nationality ? `• ${t.nationality}` : ""}
+                            {t.type.toLowerCase()} {t.gender ? `• ${formatEnumLabel(t.gender)}` : ""} {t.nationality ? `• ${t.nationality}` : ""}
                           </span>
                         </div>
                       </div>
@@ -1977,12 +2026,18 @@ export default function TripDetailPage() {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Gender</label>
-                    <Input
-                      value={travelerGender}
-                      onChange={(e) => setTravelerGender(e.target.value)}
-                      placeholder="e.g. Male / Female"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
+                    <Select value={travelerGender} onValueChange={(val) => setTravelerGender(val || "")}>
+                      <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        {GENDER_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -2063,11 +2118,18 @@ export default function TripDetailPage() {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Gender</label>
-                    <Input
-                      value={travelerGender}
-                      onChange={(e) => setTravelerGender(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
+                    <Select value={travelerGender} onValueChange={(val) => setTravelerGender(val || "")}>
+                      <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        {GENDER_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -2356,7 +2418,7 @@ export default function TripDetailPage() {
                     <Input
                       type="date"
                       value={hotelFormCheckIn}
-                      onChange={(e) => setHotelFormCheckIn(e.target.value)}
+                      onChange={(e) => handleHotelCheckInChange(e.target.value)}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                       required
                     />
@@ -2366,7 +2428,7 @@ export default function TripDetailPage() {
                     <Input
                       type="date"
                       value={hotelFormCheckOut}
-                      onChange={(e) => setHotelFormCheckOut(e.target.value)}
+                      onChange={(e) => handleHotelCheckOutChange(e.target.value)}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                       required
                     />
@@ -2389,7 +2451,7 @@ export default function TripDetailPage() {
                       type="number"
                       min={1}
                       value={hotelFormRooms}
-                      onChange={(e) => setHotelFormRooms(parseInt(e.target.value) || 1)}
+                      onChange={(e) => handleHotelRoomsChange(parseInt(e.target.value) || 1)}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                       required
                     />
@@ -2411,7 +2473,7 @@ export default function TripDetailPage() {
                     <Input
                       type="number"
                       value={hotelFormNightlyRate}
-                      onChange={(e) => setHotelFormNightlyRate(e.target.value)}
+                      onChange={(e) => handleHotelNightlyRateChange(e.target.value)}
                       placeholder="3500"
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     />
@@ -2475,7 +2537,7 @@ export default function TripDetailPage() {
                     <Input
                       type="date"
                       value={hotelFormCheckIn}
-                      onChange={(e) => setHotelFormCheckIn(e.target.value)}
+                      onChange={(e) => handleHotelCheckInChange(e.target.value)}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                       required
                     />
@@ -2485,7 +2547,7 @@ export default function TripDetailPage() {
                     <Input
                       type="date"
                       value={hotelFormCheckOut}
-                      onChange={(e) => setHotelFormCheckOut(e.target.value)}
+                      onChange={(e) => handleHotelCheckOutChange(e.target.value)}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                       required
                     />
@@ -2507,8 +2569,9 @@ export default function TripDetailPage() {
                       type="number"
                       min={1}
                       value={hotelFormRooms}
-                      onChange={(e) => setHotelFormRooms(parseInt(e.target.value) || 1)}
+                      onChange={(e) => handleHotelRoomsChange(parseInt(e.target.value) || 1)}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      required
                     />
                   </div>
                 </div>
@@ -2527,7 +2590,7 @@ export default function TripDetailPage() {
                     <Input
                       type="number"
                       value={hotelFormNightlyRate}
-                      onChange={(e) => setHotelFormNightlyRate(e.target.value)}
+                      onChange={(e) => handleHotelNightlyRateChange(e.target.value)}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>

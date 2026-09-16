@@ -320,6 +320,9 @@ export default function TripQuotationEditorPage() {
     }
   };
 
+  // Request sequence counter for race condition protection (F-05)
+  const pricingRequestIdRef = React.useRef(0);
+
   // Update Pricing & Tax Rules (Tax V1)
   const handleUpdatePricingRules = async (rules: {
     markupPercentage?: number;
@@ -330,17 +333,27 @@ export default function TripQuotationEditorPage() {
     gstTreatment?: GstTreatment;
   }) => {
     if (!activeQuote || isReadOnly) return;
+    const currentRequestId = ++pricingRequestIdRef.current;
+    const targetQuoteId = activeQuote.id;
     try {
       setUpdatingPricing(true);
-      const res = await quotationClient.updateQuotation(activeQuote.id, rules);
+      const res = await quotationClient.updateQuotation(targetQuoteId, rules);
+      // If a newer request was dispatched while this was in flight, ignore this stale response (F-05)
+      if (currentRequestId !== pricingRequestIdRef.current) {
+        return;
+      }
       if (res.success && res.data) {
         toast.success("Pricing and tax updated successfully.");
-        setQuotations((prev) => prev.map((q) => (q.id === activeQuote.id ? res.data! : q)));
+        setQuotations((prev) => prev.map((q) => (q.id === targetQuoteId ? res.data! : q)));
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to update pricing / tax.");
+      if (currentRequestId === pricingRequestIdRef.current) {
+        toast.error(err?.message || "Failed to update pricing / tax.");
+      }
     } finally {
-      setUpdatingPricing(false);
+      if (currentRequestId === pricingRequestIdRef.current) {
+        setUpdatingPricing(false);
+      }
     }
   };
 
@@ -1097,7 +1110,7 @@ export default function TripQuotationEditorPage() {
 
             {/* Right Col: Commercial Pricing & Margins Card */}
             <div className="lg:col-span-1 space-y-6">
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5 relative overflow-hidden">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-indigo-600" />
@@ -1107,6 +1120,14 @@ export default function TripQuotationEditorPage() {
                     {activeQuote.currency}
                   </Badge>
                 </div>
+
+                {/* Recalculation Alert Banner (F-04) */}
+                {updatingPricing && (
+                  <div className="flex items-center gap-2 p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-700 text-xs font-semibold animate-pulse">
+                    <Loader2 className="h-4 w-4 animate-spin text-indigo-600 shrink-0" />
+                    <span>Recalculating quotation pricing & tax…</span>
+                  </div>
+                )}
 
                 {/* Selected Package Option notice */}
                 {activeQuote.selectedPackageOption && (
@@ -1144,7 +1165,7 @@ export default function TripQuotationEditorPage() {
                 </div>
 
                 {/* Pricing Fields & Commercial Base */}
-                <div className="space-y-3 pt-2 text-xs border-t border-slate-100">
+                <div className={`space-y-3 pt-2 text-xs border-t border-slate-100 transition-opacity duration-200 ${updatingPricing ? "opacity-60" : "opacity-100"}`}>
                   <div className="flex justify-between text-slate-600">
                     <span>Base Supplier Cost:</span>
                     <strong className="text-slate-900">{formatCurrency(Number(activeQuote.subtotal))}</strong>
@@ -1301,7 +1322,7 @@ export default function TripQuotationEditorPage() {
                 </div>
 
                 {/* ─── SERVER-CALCULATED COMMERCIAL TAX SUMMARY ─── */}
-                <div className="space-y-2 pt-2 text-xs border-t border-slate-100">
+                <div className={`space-y-2 pt-2 text-xs border-t border-slate-100 transition-opacity duration-200 ${updatingPricing ? "opacity-60" : "opacity-100"}`}>
                   <div className="flex justify-between text-slate-600">
                     <span>Taxable Amount:</span>
                     <strong className="text-slate-900">
@@ -1371,8 +1392,15 @@ export default function TripQuotationEditorPage() {
                   {/* Grand Customer Total */}
                   <div className="pt-3 border-t border-slate-200 space-y-1">
                     <div className="flex justify-between items-baseline">
-                      <span className="font-bold text-slate-900 text-sm">Customer Price:</span>
-                      <span className="font-black text-indigo-600 text-xl">
+                      <span className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                        Customer Price:
+                        {updatingPricing && (
+                          <Badge variant="outline" className="text-[10px] text-indigo-600 border-indigo-200 bg-indigo-50 animate-pulse font-normal">
+                            Recalculating…
+                          </Badge>
+                        )}
+                      </span>
+                      <span className={`font-black text-xl transition-all duration-200 ${updatingPricing ? "text-slate-400" : "text-indigo-600"}`}>
                         {formatCurrency(Number(activeQuote.finalAmount))}
                       </span>
                     </div>

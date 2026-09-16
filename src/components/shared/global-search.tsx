@@ -26,7 +26,6 @@ const quickNavModules: QuickNavItem[] = [
   { id: "nav-quotations", title: "Quotations", category: "quotations", subtitle: "Proposals, pricing & client versions", href: "/quotations" },
   { id: "nav-bookings", title: "Bookings", category: "bookings", subtitle: "Confirmed bookings & vouchers", href: "/bookings" },
   { id: "nav-hotels", title: "Hotels", category: "hotels", subtitle: "Hotel directory & room inventories", href: "/hotels" },
-  { id: "nav-suppliers", title: "Suppliers", category: "suppliers", subtitle: "Vendors, cabs & activity providers", href: "/suppliers" },
 ]
 
 export function GlobalSearch() {

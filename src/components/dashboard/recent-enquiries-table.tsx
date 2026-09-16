@@ -13,6 +13,7 @@ import { Eye, ArrowRight, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { StatusBadge } from "../enquiries/status-badge";
 import { RecentEnquiryItem } from "@/lib/services/dashboard-service";
+import { formatEnumLabel } from "@/lib/utils/enum-formatters";
 
 interface RecentEnquiriesTableProps {
   enquiries?: RecentEnquiryItem[];
@@ -172,7 +173,7 @@ export function RecentEnquiriesTable({
                 </div>
                 <div className="mt-1">
                   <span className="text-slate-400 block text-[10px] uppercase font-medium">Source</span>
-                  <span className="text-slate-600 truncate block">{enq.source}</span>
+                  <span className="text-slate-600 truncate block">{formatEnumLabel(enq.source)}</span>
                 </div>
               </div>
 
