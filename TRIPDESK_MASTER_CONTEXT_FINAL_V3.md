@@ -9934,6 +9934,254 @@ Verified existing database/auth state:
 
 ---
 
+# 150. ISSUE #1 — PAID STARTER MONTHLY RENEWAL DATE DISPLAY FIX
+
+## 150.1 Issue Summary
+- **Issue:** Paid Starter monthly subscription showed historical trial end date (`22 Sep 2026`) as the renewal date instead of the paid renewal date (`15 Oct 2026`).
+- **Target Account:** `tripmadeeasy.in@gmail.com` (`TripDesk Offical Test Agnecy`).
+
+## 150.2 Root Cause
+- **Location:** `src/app/(dashboard)/subscription/page.tsx` (lines 408–442).
+- **Cause:** Subscription UI metric strip checked `sub?.trialEnd ? ... : sub?.subscriptionEnd ? ...` without gating on the subscription's `isTrial` state. Because the database preserves historical trial telemetry (`trialEnd: 2026-09-22`), the truthy value of `sub.trialEnd` caused the UI to always display the trial end date even when `sub.status === "ACTIVE"`.
+
+## 150.3 Solution & Implementation
+- **Frontend Correction:** Updated `src/app/(dashboard)/subscription/page.tsx` to conditionally branch on `isTrial`:
+  - For **Subscription Start**: `isTrial ? sub?.trialStart : sub?.subscriptionStart`.
+  - For **Next Renewal Date**: `isTrial ? sub?.trialEnd : sub?.subscriptionEnd`.
+- **Backend / Database State:** No backend or database changes required. Historical trial telemetry (`trialStart`, `trialEnd`) remains strictly preserved in database records.
+
+## 150.4 Quality Assurance & Verification
+- **Active Monthly Starter Display:**
+  - **Status:** `ACTIVE SUBSCRIPTION`
+  - **Billing Cycle:** `Monthly Billing`
+  - **Subscription Start:** `15 Sep 2026`
+  - **Next Renewal Date:** `15 Oct 2026`
+- **Trial Display Invariant:** For subscriptions where `status === "TRIAL"`, UI continues to render `Trial Started: trialStart` and `Trial Ends / Expires: trialEnd`.
+- **TypeScript:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack.
+- **Browser QA:** Verified via browser subagent on `http://localhost:3001/subscription` with automated screenshot & visual validation.
+
+**Verdict:**
+`ISSUE #1 — VERIFIED & CLOSED`
+
+---
+
+# 151. SUPPLIERS + REFERRALS UI VISIBILITY REMOVAL
+
+## 151.1 Decision Summary
+- **Business Decision:** For TripDesk V1, Supplier Management and Referral Programs are deferred from the active Agency Owner navigation and discovery UI surface.
+- **Architectural Distinction:** `REMOVE FROM UI ≠ REMOVE FROM CODEBASE ≠ REMOVE FROM DATABASE`.
+- **Implementation Scope:** UI discovery removal only. All underlying routes, APIs, services, and database schemas remain 100% preserved.
+
+## 151.2 Modified UI Entry Points
+1. **Desktop Sidebar & Mobile Navigation Drawer (`src/lib/navigation.ts`):**
+   - Removed `Suppliers` from `RESOURCES` navigation section.
+   - Removed `Referrals & Rewards` from `FINANCE & RETENTION` navigation section.
+2. **Global Search Modal (`src/components/shared/global-search.tsx`):**
+   - Removed `nav-suppliers` from `quickNavModules`.
+3. **Executive Dashboard (`src/components/dashboard/receivables-payables-card.tsx`):**
+   - Removed `Vendors →` navigation button on Supplier Payables card header.
+   - Made Top Vendor Payables list items non-clickable plain text rows while retaining financial summary data.
+4. **Trip Costing Breakdown (`src/components/costing/cost-breakdown-table.tsx`):**
+   - Rendered supplier names as non-clickable text with `Building2` icon; removed hyperlink to `/suppliers/[id]`.
+5. **Rate Sheet Detail (`src/app/(dashboard)/rate-sheets/[id]/page.tsx`):**
+   - Replaced supplier header link with non-clickable badge.
+   - Removed "Supplier 360" link from supplier info card.
+
+## 151.3 Architecture & Data Preservation
+- **Routes Preserved:** `/suppliers`, `/suppliers/[id]`, `/suppliers/new`, `/referrals`, `/referrals/[id]`.
+- **Backend Preserved:** `/api/suppliers/*`, `/api/referrals/*`, `supplier-service.ts`, `referral-service.ts`, `supplier-client.ts`, `experience-client.ts`.
+- **Database & Prisma:** Zero schema migrations, zero record deletions. `Supplier` and `Referral` models remain intact with all foreign key relationships.
+- **Financial Analytics:** Dashboard `Supplier Payables` calculations and totals remain fully functional.
+
+## 151.4 Quality Assurance & Verification
+- **TypeScript:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack (0 errors, all routes statically/dynamically generated).
+- **Desktop & Mobile QA:** Verified sidebar and mobile drawer hide Suppliers and Referrals. Global search does not return `/suppliers`.
+- **Direct Route Preservation QA:** Verified authenticated direct navigation to `http://localhost:3001/suppliers` and `http://localhost:3001/referrals` successfully renders pages.
+
+**Verdict:**
+`SUPPLIERS + REFERRALS UI REMOVAL — VERIFIED & CLOSED`
+
+---
+
+# 152. OPERATIONS COMPLETE QA & LIFECYCLE VERIFICATION
+
+## 152.1 Executive Summary
+- **Module:** `/operations`, `/operations/[tripId]`, `/operations/issues`, `/operations/analytics`.
+- **Status:** **PASS — OPERATIONS VERIFIED**.
+- **Scope:** Complete functional, security, responsive, data integrity, and automated regression verification across the end-to-end Operations lifecycle.
+- **Active Mock Data:** 0% (Fully backed by PostgreSQL, Prisma, Operations Service, and API Client).
+
+## 152.2 Automated Test Suites Execution
+- **Phase 10.13E (Operational Issues Tracker):** `30/30` passed (100%).
+- **Phase 10.13F (Vouchers & Travel Documents PDF):** `24/24` passed (100%).
+- **Phase 10.13G (Activities Operational Workflow):** `27/27` passed (100%).
+- **Phase 10.13H (Operations Lifecycle & Handover):** `25/25` passed (100%).
+- **Phase 10.13I (Operations Closure & Reconciliation):** `49/49` passed (100%).
+- **Phase 10.13J (Operations Analytics & Management Insights):** `52/52` passed (100%).
+- **Total Assertions Verified:** `207/207` across active operations integration suites (100% pass rate).
+
+## 152.3 Technical Validation
+- **Prisma Schema:** `npx prisma validate` passed (Valid schema 🚀).
+- **TypeScript:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed (Next.js Turbopack, 0 errors).
+- **Database Data Integrity:** 0 orphaned hotels, 0 orphaned vehicles, 0 orphaned activities, 0 orphaned issues, 0 orphaned timeline events.
+
+## 152.4 Browser & Responsive Verification
+- **Desktop (1440x900, 1280x800, 1024x768):** Full command center grid, KPIs, workspace table, issues tracker, and analytics dashboard rendered cleanly.
+- **Tablet (768x1024):** Grid gracefully collapses into multi-row cards with internal table scrolling.
+- **Mobile (390x844, 375x667, 320x568):** Sidebar converts to responsive navigation drawer, all KPI cards and status badges scale fluidly with zero horizontal page blowout.
+- **Console Errors:** 0 errors.
+
+**Verdict:**
+`OPERATIONS MODULE — VERIFIED & CLOSED`
+
+---
+
+# 153. HOTEL EXCEL SAMPLE & IMPORT PHONE VALUE FIX
+
+## 153.1 Problem & Root Cause
+- **Problem:** Phone numbers beginning with `+` (such as `+91 832 665 6000` or `+91 98765 43210`) downloaded in `Hotels.xlsx` sample or imported into TripDesk resulted in a literal leading apostrophe (`'+91 832 665 6000`) in the Preview modal and database record.
+- **Root Cause:** In `src/lib/excel/hotel-excel-service.ts`, the helper `sanitizeCellValue` was applying formula-injection escaping (`str = "'${str}"`) during the **import parsing** stage. Because phone strings beginning with `+` matched the regex `/^[=+\-@\t\r]/` and contained spaces (`isNaN(Number(str))` was true), the function was actively prepending a literal apostrophe `'` to every international phone number during sheet ingestion.
+
+## 153.2 Implementation Fix
+- **File Modified:** `src/lib/excel/hotel-excel-service.ts`.
+- **Change:** Refactored `sanitizeCellValue` to trim whitespace and strip accidental leading apostrophes (from Excel text prefixes) rather than prepending them.
+- **Result:** Phone values like `+91 832 665 6000` and `+91 98765 43210` parse cleanly as text without any literal apostrophe at the logical cell, preview, or database persistence levels.
+
+## 153.3 Verification
+- **Sample Generation:** Raw cell G2 in `Hotels.xlsx` has type `t: "s"`, value `+91 98765 43210` with zero apostrophe.
+- **Test Matrix:** Verified all 6 test cases:
+  1. `+91 832 665 6000` -> `+91 832 665 6000`
+  2. `+91 141 456 7777` -> `+91 141 456 7777`
+  3. `8326656000` -> `8326656000`
+  4. Blank / empty cell -> `null`
+  5. `+91 94472 53009` -> `+91 94472 53009`
+  6. Sample Download & Ingestion -> `+91 98765 43210`
+- **TypeScript & Build:** `npx tsc --noEmit` (0 errors) and `npm run build` (0 errors).
+- **Hotel Code & Data Safety:** Hotel Code generation (`HTL-XXXX`), validation rules, database models, and historical data remain 100% unchanged.
+
+**Verdict:**
+`PASS — HOTEL EXCEL PHONE VALUE FIX VERIFIED & CLOSED`
+
+---
+
+# 154. GLOBAL DISPLAY VALUE & DROPDOWN LABEL CONSISTENCY PERMANENT FIX
+
+## 154.1 Problem & Root Cause
+- **Problem:** In `/enquiries/new`, selecting the "Budget Structure" option `per_person` resulted in the raw string `per_person` being displayed in the closed Select trigger instead of human-readable `Per Person`.
+- **Root Cause:**
+  1. `src/components/ui/select.tsx` routes uncustomized `<SelectValue />` through `formatEnumLabel(value)`.
+  2. In `src/lib/utils/enum-formatters.ts`, `ENUM_LABEL_MAP` only contained uppercase keys (e.g. `PER_PERSON: "Per Person"`), and did not perform case-insensitive dictionary lookups.
+  3. The fallback regex `/^[A-Z0-9_]+$/` strictly tested uppercase ASCII characters. When given lowercase snake_case (e.g. `per_person` or `total`), the regex returned `false`, bypassing Title Case formatting and returning the raw internal value.
+
+## 154.2 Architectural Solution
+- **Enhanced `formatEnumLabel` (`src/lib/utils/enum-formatters.ts`):**
+  1. **Direct Dictionary Lookup:** Checks exact match in `ENUM_LABEL_MAP[str]`.
+  2. **Case-Insensitive Dictionary Lookup:** Checks `ENUM_LABEL_MAP[str.toUpperCase()]` so lowercase/mixed-case enums (e.g. `per_person` -> `PER_PERSON`) resolve instantly to canonical domain labels (`Per Person`).
+  3. **Universal Snake/Kebab-Case Fallback:** Normalizes any delimiter (`_`, `-`, space) and converts all words to Title Case while preserving uppercase acronyms (`UPI`, `GST`, `INR`, `PDF`, `SMS`, `URL`, `ID`, `API`, `KM`, `EP`, `CP`, `MAP`, `AP`).
+  4. **Domain Label Dictionary Expansion:** Added explicit canonical mappings for `TOTAL: "Total"`, `TOTAL_PACKAGE: "Total Package"`, `TOTAL_BUDGET: "Total Package Budget"`, `PER_KM: "Per KM"`, `PER_DAY: "Per Day"`, `PER_TRIP: "Per Trip"`, `PER_NIGHT: "Per Night"`, `WALK_IN: "Walk-In"`, and `AGENT: "Travel Agent"`.
+
+## 154.3 Verification
+- **Automated Test Suite:** 34/34 assertions passed (100% pass rate).
+  - `per_person` -> `Per Person`
+  - `PER_PERSON` -> `Per Person`
+  - `total` -> `Total`
+  - `TOTAL` -> `Total`
+  - `PARTIALLY_PAID` -> `Partially Paid`
+  - `BANK_TRANSFER` -> `Bank Transfer`
+  - `ALL` -> `All`
+  - `IN_PROGRESS` -> `In Progress`
+  - `NON_GST_EXEMPT` -> `Non-GST / Exempt`
+  - `tax_exclusive` -> `Tax Exclusive`
+  - `intra_state` -> `Intra-State`
+  - `upi` -> `UPI`
+  - `draft` -> `Draft`
+  - `trial` -> `7-Day Free Trial`
+  - `walk_in` -> `Walk-In`
+  - `hotel_category` -> `Hotel Category`
+- **TypeScript & Build:** `npx tsc --noEmit` (0 errors) and `npm run build` (0 errors).
+- **Data & Business Rule Safety:** Internal values, API contracts, Zod schemas, Formik state, Prisma enums, and database rows remain 100% unchanged.
+
+**Verdict:**
+`PASS — GLOBAL DISPLAY VALUE CONSISTENCY VERIFIED`
+
+---
+
+# 155. MULTI-ROOM HOTEL COSTING, REACTIVE TARIFF & QUOTATION ASYNC UX (F-01, F-02, F-04, F-05)
+
+## 155.1 Batch Executive Summary
+- **Controlled Implementation Batch:**
+  - **F-01 (P0):** Multi-room hotel costing calculation in manual / `TRIP_SNAPSHOT` mode.
+  - **F-02 (P1):** Reactive Add & Edit Hotel Total Tariff calculation in Trip Details.
+  - **F-04 (P2):** Quotation recalculation loading indicator, customer price badge, and stale-value visual state.
+  - **F-05 (P2):** Quotation pricing & tax asynchronous request sequence race protection.
+- **Status:** **PASS — VERIFIED & CLOSED**.
+- **Scope Discipline:** F-03 (quotation line-item `costPrice` auto-scaling) remains strictly **OUT OF SCOPE** and was not modified.
+
+## 155.2 Detailed Feature Implementations
+
+### 155.2.1 F-01 — Multi-Room Hotel Costing Fallback (`src/lib/services/trip-costing-service.ts`)
+- **Problem:** When hotel services lacked an active RateSheet match, the manual / `TRIP_SNAPSHOT` fallback checked `if (totalCost === 0 && nightlyRate > 0)`. If a legacy or single-room `totalAmount` was present on the record, `totalCost` was non-zero, bypassing `nightlyRate * rooms * diffDays` and causing multi-room bookings (2, 3, 4+ rooms) to cost at single-room rates.
+- **Solution:** Updated the fallback condition to `if (nightlyRate > 0) { totalCost = nightlyRate * rooms * diffDays; }`.
+- **Invariants Preserved:**
+  - Dynamic formula `nightlyRate × rooms × nights` is authoritative whenever a valid nightly rate exists.
+  - Active `RateSheet` inventory lookup and seasonal rate resolution path remain 100% unchanged.
+  - Verified across single hotel, multiple hotels, variable night stays, and 1 to 4+ room permutations.
+
+### 155.2.2 F-02 — Add & Edit Hotel Reactive Tariff (`src/app/(dashboard)/trips/[id]/page.tsx`)
+- **Problem:** The Add Hotel dialog had a static initial total of ₹7,000 and did not reactively recalculate Total Tariff when users modified check-in, check-out, room count, or nightly rate. The Edit Hotel dialog also retained stale totals on field edits.
+- **Solution:** Introduced `computeHotelTotalTariff(checkIn, checkOut, rooms, nightlyRate)` and wired reactive handlers (`handleHotelCheckInChange`, `handleHotelCheckOutChange`, `handleHotelRoomsChange`, `handleHotelNightlyRateChange`) to both Add Hotel and Edit Hotel dialogs.
+- **Formula:** `nightlyRate × rooms × nights` (where `nights = max(1, diffDays)`).
+- **Invariants Preserved:** Edge cases (zero rooms, empty nightly rate, invalid dates) safely fallback to ₹0 without NaN or form crashes. Stale hardcoded default totals are eliminated.
+
+### 155.2.3 F-04 — Quotation Recalculation UX (`src/app/(dashboard)/trips/[id]/quotation/page.tsx`)
+- **Problem:** During asynchronous markup, discount, tax rate, or GST treatment changes, Quotation Studio displayed no clear visual indication that backend calculation was running, making displayed numbers appear momentarily stale.
+- **Solution:**
+  - Added an animated `Recalculating quotation pricing & tax…` alert banner in the Commercial Pricing & Margins card during `updatingPricing === true`.
+  - Added a `Recalculating…` pulsing badge adjacent to the Customer Price label.
+  - Applied subtle `opacity-60` dimming to the financial summary and server-calculated commercial tax summary sections during in-flight recalculation.
+  - Ensured reliable state cleanup on both successful updates and error handling.
+
+### 155.2.4 F-05 — Pricing Request Race Protection (`src/app/(dashboard)/trips/[id]/quotation/page.tsx`)
+- **Problem:** Rapid sequential edits to markup, discount, or tax parameters could result in out-of-order network responses, where a slower earlier request could overwrite the state of a faster later request.
+- **Solution:** Added a monotonic request sequence counter (`pricingRequestIdRef = React.useRef(0)`). Inside `handleUpdatePricingRules`, each dispatch captures `currentRequestId = ++pricingRequestIdRef.current`. Stale responses with `currentRequestId !== pricingRequestIdRef.current` are discarded, preventing stale state overwrites and premature loading-state termination.
+
+## 155.3 Explicit Scope Exclusions & Preservations
+
+### 155.3.1 F-03 Unchanged (Strictly Out of Scope)
+- `src/lib/services/quotation-service.ts` remains untouched.
+- Quotation line-item `costPrice` does not automatically scale on quantity changes without explicit cost input. This behavior is intentionally preserved and deferred.
+
+### 155.3.2 Tax V1 Architecture Preserved
+- Locked Tax V1 business rules remain 100% active:
+  - `TAX_INCLUSIVE` vs `TAX_EXCLUSIVE` pricing math unchanged.
+  - `INTRA_STATE` (CGST + SGST) vs `INTER_STATE` (IGST) split logic unchanged.
+  - `NON_GST_EXEMPT` zero-tax behavior unchanged.
+  - No default 5% GST was introduced (18% used strictly as an explicit scenario in QA-13).
+
+### 155.3.3 Architecture & Data Safety Preserved
+- **Prisma Schema & Migrations:** 0 schema changes, 0 migrations created.
+- **Security & Multi-Tenancy:** Supabase Auth, Agency scoping (`agencyId`), and RLS remain intact.
+- **Downstream Consistency:** Verified complete mathematical consistency across Trip Costing -> Quotation -> Public Proposal -> Booking -> Invoice.
+- **Public Proposal Security:** Verified customer-facing proposal routes (`/q/[token]`) redact internal cost price, supplier information, markup percentage, and internal commercial notes.
+
+## 155.4 Quality Assurance & Verification Evidence
+- **Automated QA-13 Multi-Room Suite (`prisma/test-qa-13-quotation-multi-room-costing.ts`):** `55/55` passed (100%).
+- **Quotation Tax Engine Suite (`prisma/test-quotation-tax.ts`):** `72/72` passed (100%).
+- **Tax Calculation Service Suite (`prisma/test-tax-service.ts`):** `27/27` passed (100%).
+- **Tax V1 End-to-End Closure Suite (`prisma/test-tax-v1-e2e-closure.ts`):** `93/93` passed (100%).
+- **Total Regression Assertions Verified:** `247/247` passed (100% pass rate).
+- **TypeScript:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed (Turbopack, all routes compiled).
+- **Browser QA:** Verified Add/Edit Hotel reactive tariff recalculation and Quotation Studio async loading states across desktop and mobile viewports.
+
+**Verdict:**
+`PASS — F-01 / F-02 / F-04 / F-05 BATCH VERIFIED & CLOSED`
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

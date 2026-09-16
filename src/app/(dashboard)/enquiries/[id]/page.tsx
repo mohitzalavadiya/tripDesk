@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { StatusBadge, PriorityBadge } from "@/components/enquiries/status-badge";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { formatEnumLabel } from "@/lib/utils/enum-formatters";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -695,7 +696,9 @@ export default function EnquiryDetailPage() {
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
                       <span className="text-[10px] font-bold text-slate-400 uppercase">Target Budget</span>
                       <strong className="text-sm text-emerald-700 block font-black">
-                        {enquiry.budget ? formatCurrency(Number(enquiry.budget)) : "Flexible"}
+                        {enquiry.budget
+                          ? `${formatCurrency(Number(enquiry.budget))}${enquiry.budgetType ? ` (${formatEnumLabel(enquiry.budgetType)})` : ""}`
+                          : "Flexible"}
                       </strong>
                     </div>
 
@@ -726,7 +729,7 @@ export default function EnquiryDetailPage() {
                     <div className="space-y-1">
                       <label className="font-bold text-slate-700">Lead Ingestion Source</label>
                       <p className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-700 font-semibold">
-                        {enquiry.source}
+                        {formatEnumLabel(enquiry.source)}
                       </p>
                     </div>
                   </div>

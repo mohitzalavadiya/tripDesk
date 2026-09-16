@@ -52,15 +52,16 @@ export interface HotelExecuteResult {
 }
 
 /**
- * Sanitizes cell values to protect against CSV/Excel formula injection.
+ * Sanitizes cell values from Excel by trimming whitespace and stripping any accidental leading apostrophe used by Excel text formatting.
  */
 function sanitizeCellValue(val: any): string | null {
   if (val === null || val === undefined) return null;
   let str = String(val).trim();
   if (str === "") return null;
-  // If string starts with formula triggers and is not a plain number, escape it
-  if (/^[=+\-@\t\r]/.test(str) && isNaN(Number(str))) {
-    str = `'${str}`;
+  // If string has a leading apostrophe from Excel text prefix (e.g. '+91...), strip it so clean logical value is preserved
+  if (str.startsWith("'")) {
+    str = str.substring(1).trim();
+    if (str === "") return null;
   }
   return str;
 }

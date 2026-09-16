@@ -405,12 +405,14 @@ export default function AgencySubscriptionPage() {
                 {isTrial ? "Trial Started" : "Subscription Start"}
               </span>
               <span className="font-bold text-slate-200 mt-0.5 block font-mono">
-                {sub?.trialStart
-                  ? new Date(sub.trialStart).toLocaleDateString("en-IN", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })
+                {isTrial
+                  ? sub?.trialStart
+                    ? new Date(sub.trialStart).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "—"
                   : sub?.subscriptionStart
                   ? new Date(sub.subscriptionStart).toLocaleDateString("en-IN", {
                       day: "2-digit",
@@ -426,12 +428,14 @@ export default function AgencySubscriptionPage() {
                 {isTrial ? "Trial Ends / Expires" : "Next Renewal Date"}
               </span>
               <span className="font-bold text-amber-300 font-mono mt-0.5 block">
-                {sub?.trialEnd
-                  ? new Date(sub.trialEnd).toLocaleDateString("en-IN", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })
+                {isTrial
+                  ? sub?.trialEnd
+                    ? new Date(sub.trialEnd).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "—"
                   : sub?.subscriptionEnd
                   ? new Date(sub.subscriptionEnd).toLocaleDateString("en-IN", {
                       day: "2-digit",

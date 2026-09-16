@@ -19,23 +19,32 @@ Invoice pdf format and invoice page strucutre
 quatation genarate flow
 Tax system impeliment
 remove reset or refresh button in near dropdown
+Next Renewal Date issue in subscription
+some page i want to remove from UI like Referral, Suppliers
+some API fail in operations(check with QA)
+Add hotel and rate for test
+/enquiries/new => Budget Structure per_person
+in Gender give dropdown
+clean database
+
+
+you already know we build a tripdesk. so my old chat is reach the limit so i want to start new chat foe this project. i want to contunie project in new chat without breaking anythings. i have file TRIPDESK_MASTER_CONTEXT_FINAL_V3.md   for whole project. whole flow, what we build, what we dicide everythings. so i give you this file review it and then we continue
 
 
 
 **TODO**
 
-Next Renewal Date issue in subscription
-some API fail in operations
 quotation check priceing
 
-/enquiries/new Budget Structure per_person
+/quotation page UI when no quotation available
+Agency Service & Planning (15%): should not show on quotation
 
-in Gender give dropdown
 
 manage read only from frontend also
 where i can show Announcements ?
 subscription model changes
 
+notification test
 
 remove usused code, imports and files
 remove all type script error
@@ -46,7 +55,6 @@ compalate QA.
 
 responsive 320 screen
 
-clean database
 understand flow
 
 Chatbot implement
@@ -54,41 +62,12 @@ Chatbot implement
 
 **ONHOLD**
 
-email verification
+email and verification and OTP
 add scroll in table : when lots of data in table in this case add scroll in table not in whole page
 in database i can show password : in database table i want to show password every angency : 
 seperate database for prod and local
 what is change is for producation
-email and verification and OTP
 create a wireframe for understand flow of project
 after sign up don't redirect direact on dashboard. redireact on login page
-notification is static
 error msg change
 
-
-trips/cmtydy8ch0003x0tqh49i7jlr/quotation
-Proposal Status dropdown have captital value or with _ value
-Tax Mode dropdown have captital value or with _ value
-GST Treatment dropdown have captital value or with _ value
-
-/trips/new
-Trip Status dropdown have captital value or with _ value
-
-rate-sheets/new
-Pricing Model Basis dropdown have captital value or with _ value
-
-/finance
-Financial Period => LAST_90_DAYS
-
-/payments
-Log Customer Payment modal
-Target Booking i can show here id insted of value : fix it 
-Payment Method drop down show BANK_TRANSFER   
-
-same issue in Schedule New Follow-up
-
-/bookings/new
-Quotation Proposal dropdown i see id insted of value : fix it
-
-trips/cmtydy8ch0003x0tqh49i7jlr/quotation
-i show id in fork new version dropdown

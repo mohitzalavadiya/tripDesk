@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { formatEnumLabel } from "@/lib/utils/enum-formatters";
 import {
   CreditCard,
   CheckCircle2,
@@ -243,7 +244,7 @@ export default function AdminSubscriptionsPage() {
                       >
                         {sub.status === "ACTIVE" && <CheckCircle2 className="h-3 w-3" />}
                         {sub.status === "TRIAL" && <Clock className="h-3 w-3" />}
-                        {sub.status}
+                        {formatEnumLabel(sub.status)}
                       </span>
                     </TableCell>
 

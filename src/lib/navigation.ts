@@ -106,11 +106,6 @@ export const agencyNavigationConfig: NavigationSection[] = [
         icon: Hotel,
       },
       {
-        label: "Suppliers",
-        href: "/suppliers",
-        icon: Truck,
-      },
-      {
         label: "Vehicles",
         href: "/vehicles",
         icon: Car,
@@ -149,11 +144,6 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Feedback & Reviews",
         href: "/feedback",
         icon: Star,
-      },
-      {
-        label: "Referrals & Rewards",
-        href: "/referrals",
-        icon: Gift,
       },
       {
         label: "Customer Insights",
