@@ -5,6 +5,13 @@ import { ActivityType } from "@prisma/client";
  * Zod validation schema for creating a new Activity master record.
  */
 export const createActivitySchema = z.object({
+  destinationId: z
+    .string()
+    .trim()
+    .min(1, "Destination ID cannot be empty.")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
   name: z
     .string()
     .trim()
@@ -66,6 +73,13 @@ export type CreateActivityInput = z.infer<typeof createActivitySchema>;
  */
 export const updateActivitySchema = z
   .object({
+    destinationId: z
+      .string()
+      .trim()
+      .min(1, "Destination ID cannot be empty.")
+      .optional()
+      .nullable()
+      .or(z.literal("")),
     name: z
       .string()
       .trim()
@@ -140,6 +154,7 @@ export const activityListQuerySchema = z.object({
     .default(20),
   search: z.string().trim().optional(),
   location: z.string().trim().optional(),
+  destinationId: z.string().trim().optional(),
   type: z.nativeEnum(ActivityType).optional(),
   includeArchived: z
     .enum(["true", "false"])
@@ -157,3 +172,4 @@ export const activityRouteParamsSchema = z.object({
 });
 
 export type ActivityRouteParams = z.infer<typeof activityRouteParamsSchema>;
+

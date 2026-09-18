@@ -28,6 +28,9 @@ export const createTripSchema = z
       .nativeEnum(TripStatus)
       .optional()
       .default(TripStatus.DRAFT),
+    destinationIds: z
+      .array(z.string().min(1, "Destination ID cannot be empty."))
+      .optional(),
     notes: z
       .string()
       .trim()

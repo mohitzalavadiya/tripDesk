@@ -9,6 +9,16 @@ import {
   ApiClientError,
 } from "./customer-client";
 
+export type HotelWithRelations = Hotel & {
+  destination?: {
+    id: string;
+    name: string;
+    state: string | null;
+    country: string;
+    status: string;
+  } | null;
+};
+
 async function handleResponse<T>(res: Response): Promise<T> {
   const json = await res.json().catch(() => ({}));
 
@@ -28,6 +38,7 @@ export interface HotelListParams {
   limit?: number;
   search?: string;
   city?: string;
+  destinationId?: string;
   includeArchived?: boolean;
 }
 
@@ -35,12 +46,13 @@ export const hotelClient = {
   /**
    * Retrieves a paginated list of hotels for the authenticated agency.
    */
-  async getHotels(params: HotelListParams = {}): Promise<PaginatedResponse<Hotel>> {
+  async getHotels(params: HotelListParams = {}): Promise<PaginatedResponse<HotelWithRelations>> {
     const query = new URLSearchParams();
     if (params.page) query.set("page", params.page.toString());
     if (params.limit) query.set("limit", params.limit.toString());
     if (params.search) query.set("search", params.search);
     if (params.city) query.set("city", params.city);
+    if (params.destinationId) query.set("destinationId", params.destinationId);
     if (params.includeArchived) query.set("includeArchived", "true");
 
     const url = `/api/hotels${query.toString() ? `?${query.toString()}` : ""}`;
@@ -50,13 +62,13 @@ export const hotelClient = {
       cache: "no-store",
     });
 
-    return handleResponse<PaginatedResponse<Hotel>>(res);
+    return handleResponse<PaginatedResponse<HotelWithRelations>>(res);
   },
 
   /**
    * Retrieves a single hotel record by ID.
    */
-  async getHotel(id: string): Promise<SingleResponse<Hotel>> {
+  async getHotel(id: string): Promise<SingleResponse<HotelWithRelations>> {
     const res = await fetch(`/api/hotels/${encodeURIComponent(id)}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },

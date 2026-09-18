@@ -16,6 +16,8 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+import { destinationService } from "../src/lib/services/destination-service";
+
 export async function bootstrapAgencyOwner(options?: {
   email?: string;
   password?: string;
@@ -25,19 +27,29 @@ export async function bootstrapAgencyOwner(options?: {
 }) {
   const email = (
     options?.email ||
+    process.env.BOOTSTRAP_AGENCY_EMAIL ||
     process.env.AGENCY_OWNER_EMAIL ||
-    "agency.owner@tripdesk.io"
+    "tripmadeeasy.in@gmail.com"
   )
     .trim()
     .toLowerCase();
 
   const password =
     options?.password ||
+    process.env.BOOTSTRAP_AGENCY_PASSWORD ||
     process.env.AGENCY_OWNER_PASSWORD ||
     "ChangeMeTripDesk2026!";
 
-  const name = options?.name || process.env.AGENCY_OWNER_NAME || "TripDesk Agency Owner";
-  const agencyName = options?.agencyName || process.env.AGENCY_NAME || "TripDesk Travels & Tours";
+  const name =
+    options?.name ||
+    process.env.BOOTSTRAP_AGENCY_NAME ||
+    process.env.AGENCY_OWNER_NAME ||
+    "TripDesk Agency Owner";
+  const agencyName =
+    options?.agencyName ||
+    process.env.BOOTSTRAP_AGENCY_NAME ||
+    process.env.AGENCY_NAME ||
+    "TripDesk Offical Test Agnecy";
   const phone = options?.phone || "+91 98765 43210";
 
   console.log(`🔐 Bootstrapping Agency Owner for target email: ${email}`);
@@ -202,6 +214,12 @@ export async function bootstrapAgencyOwner(options?: {
       },
     });
     console.log(`💳 Created 14-day TRIAL subscription for agency.`);
+  }
+
+  // 4b. Ensure 32 Starter Destinations exist for Agency (Idempotent)
+  const seededCount = await destinationService.seedStarterDestinations(agency.id);
+  if (seededCount > 0) {
+    console.log(`📍 Seeded ${seededCount} starter destinations for agency.`);
   }
 
   // 5. Clean up any previous typo user record in Prisma to prevent unique constraint conflict

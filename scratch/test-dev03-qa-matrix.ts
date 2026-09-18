@@ -508,11 +508,12 @@ async function runDev03QAMatrix() {
     console.log('\n--- SECTION 3: HOTEL CODE INTEGRITY & CONCURRENCY TESTS (49 - 56) ---');
 
     // 49. New hotel generates code automatically
-    const createdHotel1 = await hotelService.createHotel(agencyA.id, { name: 'Sequential Test Hotel 1', city: 'Delhi' });
+    const destActive = await prisma.destination.findFirst({ where: { agencyId: agencyA.id, status: "ACTIVE" } });
+    const createdHotel1 = await hotelService.createHotel(agencyA.id, { destinationId: destActive?.id || "", name: 'Sequential Test Hotel 1', city: 'Delhi' });
     assert(Boolean(createdHotel1.hotelCode?.startsWith('HTL-')), 49, `New hotel generates hotelCode: ${createdHotel1.hotelCode}`);
 
     // 50. Multiple sequential hotels increment code correctly
-    const createdHotel2 = await hotelService.createHotel(agencyA.id, { name: 'Sequential Test Hotel 2', city: 'Delhi' });
+    const createdHotel2 = await hotelService.createHotel(agencyA.id, { destinationId: destActive?.id || "", name: 'Sequential Test Hotel 2', city: 'Delhi' });
     const codeNum1 = parseInt(createdHotel1.hotelCode!.replace('HTL-', ''), 10);
     const codeNum2 = parseInt(createdHotel2.hotelCode!.replace('HTL-', ''), 10);
     assert(codeNum2 === codeNum1 + 1, 50, `Sequential hotels increment code (${createdHotel1.hotelCode} -> ${createdHotel2.hotelCode})`);
@@ -548,13 +549,20 @@ async function runDev03QAMatrix() {
         phone: `999222${String(timestamp).slice(-4)}`,
       }
     });
+    const concurrentDest = await prisma.destination.create({
+      data: {
+        agencyId: concurrentAgency.id,
+        name: "Goa",
+        status: "ACTIVE",
+      },
+    });
 
     const concurrentPromises = [
-      hotelService.createHotel(concurrentAgency.id, { name: 'Concurrent Hotel 1', city: 'Goa' }),
-      hotelService.createHotel(concurrentAgency.id, { name: 'Concurrent Hotel 2', city: 'Goa' }),
-      hotelService.createHotel(concurrentAgency.id, { name: 'Concurrent Hotel 3', city: 'Goa' }),
-      hotelService.createHotel(concurrentAgency.id, { name: 'Concurrent Hotel 4', city: 'Goa' }),
-      hotelService.createHotel(concurrentAgency.id, { name: 'Concurrent Hotel 5', city: 'Goa' }),
+      hotelService.createHotel(concurrentAgency.id, { destinationId: concurrentDest.id, name: 'Concurrent Hotel 1', city: 'Goa' }),
+      hotelService.createHotel(concurrentAgency.id, { destinationId: concurrentDest.id, name: 'Concurrent Hotel 2', city: 'Goa' }),
+      hotelService.createHotel(concurrentAgency.id, { destinationId: concurrentDest.id, name: 'Concurrent Hotel 3', city: 'Goa' }),
+      hotelService.createHotel(concurrentAgency.id, { destinationId: concurrentDest.id, name: 'Concurrent Hotel 4', city: 'Goa' }),
+      hotelService.createHotel(concurrentAgency.id, { destinationId: concurrentDest.id, name: 'Concurrent Hotel 5', city: 'Goa' }),
     ];
     const concurrentResults = await Promise.all(concurrentPromises);
     const concurrentCodes = new Set(concurrentResults.map(h => h.hotelCode));

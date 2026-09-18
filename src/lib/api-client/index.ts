@@ -24,3 +24,5 @@ export * from "./communication-client";
 export * from "./document-client";
 export * from "./admin-client";
 export * from "./tax-client";
+export * from "./destination-client";
+export * from "./trip-destination-client";

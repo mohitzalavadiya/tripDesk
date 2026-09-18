@@ -1,14 +1,15 @@
 import "server-only";
 import prisma from "@/lib/prisma";
-import { NotFoundError } from "@/lib/api";
+import { NotFoundError, ValidationError } from "@/lib/api";
 import {
   CreateTripActivityInput,
   UpdateTripActivityInput,
 } from "@/lib/validation/trip-activity-schema";
-import { TripActivity, Activity } from "@prisma/client";
+import { TripActivity, Activity, TripDestination, Destination } from "@prisma/client";
 
 export interface TripActivityWithActivity extends TripActivity {
   activity: Activity | null;
+  tripDestination?: (TripDestination & { destination: Destination }) | null;
 }
 
 export const tripActivityService = {
@@ -35,7 +36,14 @@ export const tripActivityService = {
 
     return prisma.tripActivity.findMany({
       where: { tripId },
-      include: { activity: true },
+      include: {
+        activity: true,
+        tripDestination: {
+          include: {
+            destination: true,
+          },
+        },
+      },
       orderBy: { createdAt: "asc" },
     });
   },
@@ -66,14 +74,21 @@ export const tripActivityService = {
         id: tripActivityId,
         tripId,
       },
-      include: { activity: true },
+      include: {
+        activity: true,
+        tripDestination: {
+          include: {
+            destination: true,
+          },
+        },
+      },
     });
   },
 
   /**
    * Creates a new Trip-Activity assignment.
-   * Verifies Trip belongs to authenticated agency and is not archived.
-   * If activityId is provided, verifies Activity belongs to authenticated agency and is active.
+   * If activityId is provided, verifies ownership and active state.
+   * If tripDestinationId is provided, validates leg and destination match.
    */
   async createTripActivity(
     agencyId: string,
@@ -86,32 +101,67 @@ export const tripActivityService = {
         agencyId,
         archivedAt: null,
       },
-      select: { id: true },
+      include: {
+        tripDestinations: true,
+      },
     });
 
     if (!trip) {
       throw new NotFoundError("Trip not found or does not belong to your agency.");
     }
 
-    if (data.activityId) {
-      const activity = await prisma.activity.findFirst({
+    let activityRecord: Activity | null = null;
+    if (data.activityId && data.activityId.trim() !== "") {
+      activityRecord = await prisma.activity.findFirst({
         where: {
           id: data.activityId,
           agencyId,
           archivedAt: null,
         },
-        select: { id: true },
       });
 
-      if (!activity) {
+      if (!activityRecord) {
         throw new NotFoundError("Selected activity not found or does not belong to your agency.");
       }
+
+      // Validate that activity belongs to the Trip's configured destination set (if destinations exist)
+      if (trip.tripDestinations.length > 0) {
+        const tripDestIds = trip.tripDestinations.map((td) => td.destinationId);
+        if (!activityRecord.destinationId || !tripDestIds.includes(activityRecord.destinationId)) {
+          throw new ValidationError("Selected activity does not belong to any destination configured for this Trip.");
+        }
+      }
+    }
+
+    let tripDestinationId: string | null = null;
+    if (data.tripDestinationId && data.tripDestinationId.trim() !== "") {
+      const tripDest = await prisma.tripDestination.findFirst({
+        where: {
+          id: data.tripDestinationId,
+          tripId,
+          destination: {
+            agencyId,
+            status: "ACTIVE",
+          },
+        },
+      });
+
+      if (!tripDest) {
+        throw new ValidationError("Trip destination leg not found or does not belong to this Trip.");
+      }
+
+      if (activityRecord?.destinationId && activityRecord.destinationId !== tripDest.destinationId) {
+        throw new ValidationError("Selected activity does not belong to the selected Trip Destination leg.");
+      }
+
+      tripDestinationId = tripDest.id;
     }
 
     return prisma.tripActivity.create({
       data: {
         tripId,
         activityId: data.activityId || null,
+        tripDestinationId,
         name: data.name,
         description: data.description || null,
         date: data.date || null,
@@ -124,7 +174,14 @@ export const tripActivityService = {
         totalPrice: data.totalPrice !== undefined && data.totalPrice !== null ? data.totalPrice : null,
         notes: data.notes || null,
       },
-      include: { activity: true },
+      include: {
+        activity: true,
+        tripDestination: {
+          include: {
+            destination: true,
+          },
+        },
+      },
     });
   },
 
@@ -146,24 +203,81 @@ export const tripActivityService = {
           archivedAt: null,
         },
       },
+      include: {
+        activity: true,
+        tripDestination: true,
+        trip: {
+          include: {
+            tripDestinations: true,
+          },
+        },
+      },
     });
 
     if (!existing) {
       throw new NotFoundError("Trip activity assignment not found.");
     }
 
-    if (data.activityId && data.activityId !== existing.activityId) {
-      const targetActivity = await prisma.activity.findFirst({
-        where: {
-          id: data.activityId,
-          agencyId,
-          archivedAt: null,
-        },
-        select: { id: true },
-      });
+    let targetActivity = existing.activity;
+    if (data.activityId !== undefined) {
+      if (data.activityId && data.activityId.trim() !== "") {
+        const foundActivity = await prisma.activity.findFirst({
+          where: {
+            id: data.activityId,
+            agencyId,
+            archivedAt: null,
+          },
+        });
 
-      if (!targetActivity) {
-        throw new NotFoundError("Target activity not found or does not belong to your agency.");
+        if (!foundActivity) {
+          throw new NotFoundError("Target activity not found or does not belong to your agency.");
+        }
+        targetActivity = foundActivity;
+      } else {
+        targetActivity = null;
+      }
+    }
+
+    // Validate that target activity belongs to the Trip's configured destination set
+    if (targetActivity && existing.trip.tripDestinations.length > 0) {
+      const tripDestIds = existing.trip.tripDestinations.map((td) => td.destinationId);
+      if (!targetActivity.destinationId || !tripDestIds.includes(targetActivity.destinationId)) {
+        throw new ValidationError("Selected activity does not belong to any destination configured for this Trip.");
+      }
+    }
+
+    let targetTripDestinationId = existing.tripDestinationId;
+    if (data.tripDestinationId !== undefined) {
+      if (data.tripDestinationId && data.tripDestinationId.trim() !== "") {
+        const tripDest = await prisma.tripDestination.findFirst({
+          where: {
+            id: data.tripDestinationId,
+            tripId,
+            destination: {
+              agencyId,
+              status: "ACTIVE",
+            },
+          },
+        });
+
+        if (!tripDest) {
+          throw new ValidationError("Trip destination leg not found or does not belong to this Trip.");
+        }
+
+        if (targetActivity?.destinationId && targetActivity.destinationId !== tripDest.destinationId) {
+          throw new ValidationError("Selected activity does not belong to the selected Trip Destination leg.");
+        }
+
+        targetTripDestinationId = tripDest.id;
+      } else {
+        targetTripDestinationId = null;
+      }
+    } else if (data.activityId && targetActivity && existing.tripDestinationId) {
+      const existingTripDest = await prisma.tripDestination.findUnique({
+        where: { id: existing.tripDestinationId },
+      });
+      if (existingTripDest && targetActivity.destinationId && targetActivity.destinationId !== existingTripDest.destinationId) {
+        targetTripDestinationId = null;
       }
     }
 
@@ -171,6 +285,7 @@ export const tripActivityService = {
       where: { id: tripActivityId },
       data: {
         ...(data.activityId !== undefined && { activityId: data.activityId || null }),
+        ...(data.tripDestinationId !== undefined && { tripDestinationId: targetTripDestinationId }),
         ...(data.name !== undefined && { name: data.name }),
         ...(data.description !== undefined && { description: data.description || null }),
         ...(data.date !== undefined && { date: data.date || null }),
@@ -191,7 +306,14 @@ export const tripActivityService = {
         }),
         ...(data.notes !== undefined && { notes: data.notes || null }),
       },
-      include: { activity: true },
+      include: {
+        activity: true,
+        tripDestination: {
+          include: {
+            destination: true,
+          },
+        },
+      },
     });
   },
 

@@ -16,11 +16,13 @@ import {
   AlertCircle,
   Archive,
   Info,
+  Compass,
 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { DestinationSelect } from "@/components/shared/destination-select";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,12 +43,13 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { activityClient } from "@/lib/api-client";
-import { Activity, ActivityType } from "@prisma/client";
+import { activityClient, ActivityWithRelations } from "@/lib/api-client";
+import { ActivityType } from "@prisma/client";
 import { toast } from "sonner";
 
 const editActivitySchema = Yup.object().shape({
   name: Yup.string().trim().required("Activity name is required").max(200),
+  destinationId: Yup.string().nullable().optional(),
   location: Yup.string().trim().max(200),
   description: Yup.string().trim().max(2000),
   duration: Yup.string().trim().max(100),
@@ -62,7 +65,7 @@ export default function ActivityProfilePage() {
   const router = useRouter();
   const activityId = params.id as string;
 
-  const [activity, setActivity] = React.useState<Activity | null>(null);
+  const [activity, setActivity] = React.useState<ActivityWithRelations | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
@@ -76,7 +79,7 @@ export default function ActivityProfilePage() {
       setError(null);
       const res = await activityClient.getActivity(activityId);
       if (res.success && res.data) {
-        setActivity(res.data);
+        setActivity(res.data as ActivityWithRelations);
       }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
@@ -96,6 +99,7 @@ export default function ActivityProfilePage() {
   const editActivityFormik = useFormik({
     initialValues: {
       name: activity?.name || "",
+      destinationId: activity?.destinationId || "",
       location: activity?.location || "",
       description: activity?.description || "",
       duration: activity?.duration || "Half Day",
@@ -112,6 +116,7 @@ export default function ActivityProfilePage() {
         setSubmitting(true);
         await activityClient.updateActivity(activityId, {
           name: values.name.trim(),
+          destinationId: values.destinationId || null,
           location: values.location.trim() || undefined,
           description: values.description.trim() || undefined,
           duration: values.duration.trim() || undefined,
@@ -219,6 +224,13 @@ export default function ActivityProfilePage() {
 
             {/* Micro details */}
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+              {activity.destination && (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full">
+                  <Compass className="h-3.5 w-3.5 text-emerald-600" />
+                  {activity.destination.name}
+                  {activity.destination.state ? ` (${activity.destination.state})` : ""}
+                </span>
+              )}
               {activity.location && (
                 <span className="flex items-center gap-1">
                   <MapPin className="h-3.5 w-3.5 text-slate-400" />
@@ -268,6 +280,18 @@ export default function ActivityProfilePage() {
             <div>
               <span className="text-slate-400 block text-[11px]">Activity Name</span>
               <strong className="text-slate-900">{activity.name}</strong>
+            </div>
+            <div>
+              <span className="text-slate-400 block text-[11px]">Destination</span>
+              {activity.destination ? (
+                <span className="text-emerald-700 font-semibold inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md text-xs">
+                  <Compass className="h-3 w-3" />
+                  {activity.destination.name}
+                  {activity.destination.state ? ` (${activity.destination.state})` : ""}
+                </span>
+              ) : (
+                <span className="text-slate-400 italic">Unassigned</span>
+              )}
             </div>
             <div>
               <span className="text-slate-400 block text-[11px]">Category / Type</span>
@@ -340,6 +364,19 @@ export default function ActivityProfilePage() {
                   />
                   {getFieldError("name") && (
                     <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("name")}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Assigned Destination</label>
+                  <DestinationSelect
+                    value={editActivityFormik.values.destinationId}
+                    onChange={(val) => editActivityFormik.setFieldValue("destinationId", val)}
+                    initialDestination={activity?.destination}
+                    disabled={editActivityFormik.isSubmitting}
+                  />
+                  {getFieldError("destinationId") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("destinationId")}</p>
                   )}
                 </div>
 

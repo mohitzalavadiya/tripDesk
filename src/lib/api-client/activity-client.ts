@@ -9,6 +9,16 @@ import {
   ApiClientError,
 } from "./customer-client";
 
+export type ActivityWithRelations = Activity & {
+  destination?: {
+    id: string;
+    name: string;
+    state: string | null;
+    country: string;
+    status: string;
+  } | null;
+};
+
 async function handleResponse<T>(res: Response): Promise<T> {
   const json = await res.json().catch(() => ({}));
 
@@ -28,6 +38,7 @@ export interface ActivityListParams {
   limit?: number;
   search?: string;
   location?: string;
+  destinationId?: string;
   type?: ActivityType;
   includeArchived?: boolean;
 }
@@ -36,12 +47,13 @@ export const activityClient = {
   /**
    * Retrieves a paginated list of activities for the authenticated agency.
    */
-  async getActivities(params: ActivityListParams = {}): Promise<PaginatedResponse<Activity>> {
+  async getActivities(params: ActivityListParams = {}): Promise<PaginatedResponse<ActivityWithRelations>> {
     const query = new URLSearchParams();
     if (params.page) query.set("page", params.page.toString());
     if (params.limit) query.set("limit", params.limit.toString());
     if (params.search) query.set("search", params.search);
     if (params.location) query.set("location", params.location);
+    if (params.destinationId) query.set("destinationId", params.destinationId);
     if (params.type) query.set("type", params.type);
     if (params.includeArchived) query.set("includeArchived", "true");
 
@@ -52,13 +64,13 @@ export const activityClient = {
       cache: "no-store",
     });
 
-    return handleResponse<PaginatedResponse<Activity>>(res);
+    return handleResponse<PaginatedResponse<ActivityWithRelations>>(res);
   },
 
   /**
    * Retrieves a single activity record by ID.
    */
-  async getActivity(id: string): Promise<SingleResponse<Activity>> {
+  async getActivity(id: string): Promise<SingleResponse<ActivityWithRelations>> {
     const res = await fetch(`/api/activities/${encodeURIComponent(id)}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },

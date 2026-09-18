@@ -359,6 +359,7 @@ export function ExcelImportModal({
                         {importType === "hotels" ? (
                           <>
                             <th className="py-2.5 px-3 border-b border-slate-200">Hotel Name</th>
+                            <th className="py-2.5 px-3 border-b border-slate-200">Destination</th>
                             <th className="py-2.5 px-3 border-b border-slate-200">City</th>
                             <th className="py-2.5 px-3 border-b border-slate-200">Category</th>
                           </>
@@ -393,6 +394,15 @@ export function ExcelImportModal({
                             {importType === "hotels" ? (
                               <>
                                 <td className="py-2.5 px-3 font-semibold text-slate-900">{r.name || "—"}</td>
+                                <td className="py-2.5 px-3">
+                                  {r.destination ? (
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md">
+                                      {r.destination}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400">—</span>
+                                  )}
+                                </td>
                                 <td className="py-2.5 px-3 text-slate-600">{r.city || "—"}</td>
                                 <td className="py-2.5 px-3 text-slate-500">{r.category || "—"}</td>
                               </>

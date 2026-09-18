@@ -4,6 +4,10 @@ import { z } from "zod";
  * Zod validation schema for creating a new Hotel master record.
  */
 export const createHotelSchema = z.object({
+  destinationId: z
+    .string()
+    .trim()
+    .min(1, "Destination is required."),
   name: z
     .string()
     .trim()
@@ -83,6 +87,13 @@ export type CreateHotelPayload = z.input<typeof createHotelSchema>;
  */
 export const updateHotelSchema = z
   .object({
+    destinationId: z
+      .string()
+      .trim()
+      .min(1, "Destination ID cannot be empty.")
+      .optional()
+      .nullable()
+      .or(z.literal("")),
     name: z
       .string()
       .trim()
@@ -176,6 +187,7 @@ export const hotelListQuerySchema = z.object({
     .default(20),
   search: z.string().trim().optional(),
   city: z.string().trim().optional(),
+  destinationId: z.string().trim().optional(),
   includeArchived: z
     .enum(["true", "false"])
     .optional()

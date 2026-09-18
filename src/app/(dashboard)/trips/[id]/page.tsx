@@ -15,9 +15,15 @@ import {
   tripHotelClient,
   tripVehicleClient,
   tripActivityClient,
+  tripDestinationClient,
+  rateSheetClient,
   TripHotelWithHotel,
   TripVehicleWithVehicle,
   TripActivityWithActivity,
+  TripDestinationWithDestination,
+  RateSheetWithRelations,
+  HotelWithRelations,
+  ActivityWithRelations,
 } from "@/lib/api-client";
 import {
   TripStatus,
@@ -55,6 +61,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import { DestinationMultiSelect } from "@/components/shared/destination-multi-select";
 import {
   ArrowLeft,
   Compass,
@@ -81,6 +88,10 @@ import {
   Share2,
   Eye,
   Sparkles,
+  MapPin,
+  ArrowUp,
+  ArrowDown,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatTripStatus, TripStatusBadge } from "../page";
@@ -93,6 +104,7 @@ export default function TripDetailPage() {
 
   // Real Database States
   const [trip, setTrip] = React.useState<TripWithRelations | null>(null);
+  const [tripDestinations, setTripDestinations] = React.useState<TripDestinationWithDestination[]>([]);
   const [travelers, setTravelers] = React.useState<Traveler[]>([]);
   const [itineraryItems, setItineraryItems] = React.useState<ItineraryItem[]>([]);
   const [tripHotels, setTripHotels] = React.useState<TripHotelWithHotel[]>([]);
@@ -100,9 +112,9 @@ export default function TripDetailPage() {
   const [tripActivities, setTripActivities] = React.useState<TripActivityWithActivity[]>([]);
 
   // Master Inventory States (for selectors)
-  const [masterHotels, setMasterHotels] = React.useState<Hotel[]>([]);
+  const [masterHotels, setMasterHotels] = React.useState<HotelWithRelations[]>([]);
   const [masterVehicles, setMasterVehicles] = React.useState<Vehicle[]>([]);
-  const [masterActivities, setMasterActivities] = React.useState<Activity[]>([]);
+  const [masterActivities, setMasterActivities] = React.useState<ActivityWithRelations[]>([]);
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -137,8 +149,9 @@ export default function TripDetailPage() {
       setLoading(true);
       setError(null);
 
-      const [tripRes, hotelsRes, vehiclesRes, activitiesRes] = await Promise.all([
+      const [tripRes, destsRes, hotelsRes, vehiclesRes, activitiesRes] = await Promise.all([
         tripClient.getTrip(id),
+        tripDestinationClient.getTripDestinations(id).catch(() => ({ success: true, data: [] as TripDestinationWithDestination[] })),
         tripHotelClient.getTripHotels(id).catch(() => ({ success: true, data: [] as TripHotelWithHotel[] })),
         tripVehicleClient.getTripVehicles(id).catch(() => ({ success: true, data: [] as TripVehicleWithVehicle[] })),
         tripActivityClient.getTripActivities(id).catch(() => ({ success: true, data: [] as TripActivityWithActivity[] })),
@@ -148,6 +161,10 @@ export default function TripDetailPage() {
         setTrip(tripRes.data);
         setTravelers(tripRes.data.travelers || []);
         setItineraryItems(tripRes.data.itineraryItems || []);
+      }
+
+      if (destsRes.success && destsRes.data) {
+        setTripDestinations(destsRes.data);
       }
 
       if (hotelsRes.success && hotelsRes.data) {
@@ -201,6 +218,9 @@ export default function TripDetailPage() {
   const [isEditOpen, setIsEditOpen] = React.useState(false);
   const [editSaving, setEditSaving] = React.useState(false);
 
+  // Destination Dialog & Action states (no standalone route card needed)
+
+
   // Traveler Dialog states
   const [isAddTravelerOpen, setIsAddTravelerOpen] = React.useState(false);
   const [isEditTravelerOpen, setIsEditTravelerOpen] = React.useState(false);
@@ -229,6 +249,7 @@ export default function TripDetailPage() {
   const [isAddHotelOpen, setIsAddHotelOpen] = React.useState(false);
   const [isEditHotelOpen, setIsEditHotelOpen] = React.useState(false);
   const [selectedTripHotelId, setSelectedTripHotelId] = React.useState<string | null>(null);
+  const [hotelFormTripDestinationId, setHotelFormTripDestinationId] = React.useState("");
   const [hotelFormHotelId, setHotelFormHotelId] = React.useState("");
   const [hotelFormCheckIn, setHotelFormCheckIn] = React.useState("");
   const [hotelFormCheckOut, setHotelFormCheckOut] = React.useState("");
@@ -239,6 +260,10 @@ export default function TripDetailPage() {
   const [hotelFormTotalAmount, setHotelFormTotalAmount] = React.useState("");
   const [hotelFormNotes, setHotelFormNotes] = React.useState("");
   const [hotelSaving, setHotelSaving] = React.useState(false);
+  const [hotelAvailableRates, setHotelAvailableRates] = React.useState<RateSheetWithRelations[]>([]);
+  const [hotelFormRateSheetId, setHotelFormRateSheetId] = React.useState<string | null>(null);
+  const [hotelRateLoading, setHotelRateLoading] = React.useState(false);
+  const [hotelRateMessage, setHotelRateMessage] = React.useState<string | null>(null);
 
   // Trip Vehicle Dialog states
   const [isAddVehicleOpen, setIsAddVehicleOpen] = React.useState(false);
@@ -265,6 +290,7 @@ export default function TripDetailPage() {
   const [isAddActivityOpen, setIsAddActivityOpen] = React.useState(false);
   const [isEditActivityOpen, setIsEditActivityOpen] = React.useState(false);
   const [selectedTripActivityId, setSelectedTripActivityId] = React.useState<string | null>(null);
+  const [activityFormTripDestinationId, setActivityFormTripDestinationId] = React.useState("");
   const [activityFormActivityId, setActivityFormActivityId] = React.useState("");
   const [activityFormName, setActivityFormName] = React.useState("Sightseeing Tour");
   const [activityFormDescription, setActivityFormDescription] = React.useState("");
@@ -278,6 +304,85 @@ export default function TripDetailPage() {
   const [activityFormTotalPrice, setActivityFormTotalPrice] = React.useState("");
   const [activityFormNotes, setActivityFormNotes] = React.useState("");
   const [activitySaving, setActivitySaving] = React.useState(false);
+  const [activityAvailableRates, setActivityAvailableRates] = React.useState<RateSheetWithRelations[]>([]);
+  const [activityFormRateSheetId, setActivityFormRateSheetId] = React.useState<string | null>(null);
+  const [activityRateLoading, setActivityRateLoading] = React.useState(false);
+  const [activityRateMessage, setActivityRateMessage] = React.useState<string | null>(null);
+
+  // Helper to sync TripDestinations on edit save
+  const syncTripDestinations = async (
+    tripId: string,
+    currentTDs: TripDestinationWithDestination[],
+    targetDestIds: string[]
+  ) => {
+    const currentIds = currentTDs.map((td) => td.destinationId);
+    if (
+      currentIds.length === targetDestIds.length &&
+      currentIds.every((dId, idx) => dId === targetDestIds[idx])
+    ) {
+      return;
+    }
+
+    const usedCurrentIndices = new Set<number>();
+    const toAdd: string[] = [];
+
+    for (const targetDestId of targetDestIds) {
+      let foundIdx = -1;
+      for (let i = 0; i < currentTDs.length; i++) {
+        if (!usedCurrentIndices.has(i) && currentTDs[i].destinationId === targetDestId) {
+          foundIdx = i;
+          break;
+        }
+      }
+      if (foundIdx !== -1) {
+        usedCurrentIndices.add(foundIdx);
+      } else {
+        toAdd.push(targetDestId);
+      }
+    }
+
+    for (let i = 0; i < currentTDs.length; i++) {
+      if (!usedCurrentIndices.has(i)) {
+        await tripDestinationClient.deleteTripDestination(tripId, currentTDs[i].id);
+      }
+    }
+
+    const addedTdIds: string[] = [];
+    for (const destId of toAdd) {
+      const res = await tripDestinationClient.addTripDestination(tripId, {
+        destinationId: destId,
+      });
+      if (res.success && res.data) {
+        addedTdIds.push(res.data.id);
+      }
+    }
+
+    let addedPtr = 0;
+    const finalOrderedTdIds: string[] = [];
+    const usedFinalMatched = new Set<string>();
+
+    for (const targetDestId of targetDestIds) {
+      const matched = currentTDs.find(
+        (td, idx) =>
+          usedCurrentIndices.has(idx) &&
+          !usedFinalMatched.has(td.id) &&
+          td.destinationId === targetDestId
+      );
+      if (matched) {
+        usedFinalMatched.add(matched.id);
+        finalOrderedTdIds.push(matched.id);
+      } else if (addedPtr < addedTdIds.length) {
+        finalOrderedTdIds.push(addedTdIds[addedPtr]);
+        addedPtr++;
+      }
+    }
+
+    if (finalOrderedTdIds.length > 1) {
+      await tripDestinationClient.reorderTripDestinations(tripId, {
+        tripDestinationIds: finalOrderedTdIds,
+      });
+    }
+  };
 
   // Edit Trip Formik
   const editTripFormik = useFormik({
@@ -286,6 +391,7 @@ export default function TripDetailPage() {
       startDate: trip?.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "",
       endDate: trip?.endDate ? new Date(trip.endDate).toISOString().split("T")[0] : "",
       status: trip?.status || TripStatus.PLANNING,
+      destinationIds: tripDestinations.map((td) => td.destinationId),
       notes: trip?.notes || "",
     },
     enableReinitialize: true,
@@ -299,6 +405,8 @@ export default function TripDetailPage() {
           status: values.status,
           notes: values.notes.trim() || undefined,
         });
+
+        await syncTripDestinations(id, tripDestinations, values.destinationIds);
 
         if (res.success && res.data) {
           toast.success("Trip updated successfully.");
@@ -518,6 +626,18 @@ export default function TripDetailPage() {
   };
 
   // ──────────────────────── TRIP HOTEL HANDLERS ─────────────────────────
+  const getFilteredHotels = React.useCallback(() => {
+    if (tripDestinations.length === 0) return [];
+    const uniqueDestIds = Array.from(new Set(tripDestinations.map((td) => td.destinationId)));
+    return masterHotels.filter((h) => h.destinationId && uniqueDestIds.includes(h.destinationId));
+  }, [masterHotels, tripDestinations]);
+
+  const getFilteredActivities = React.useCallback(() => {
+    if (tripDestinations.length === 0) return [];
+    const uniqueDestIds = Array.from(new Set(tripDestinations.map((td) => td.destinationId)));
+    return masterActivities.filter((a) => a.destinationId && uniqueDestIds.includes(a.destinationId));
+  }, [masterActivities, tripDestinations]);
+
   const computeHotelTotalTariff = (checkInStr: string, checkOutStr: string, roomsCount: number, rateStr: string): string => {
     if (!checkInStr || !checkOutStr || !rateStr) return "";
     const rate = Number(rateStr);
@@ -530,10 +650,97 @@ export default function TripDetailPage() {
     return String(rate * rooms * nights);
   };
 
+  const hotelRateReqRef = React.useRef(0);
+  const fetchApplicableHotelRates = React.useCallback(
+    async (
+      hId: string,
+      travelDate: string,
+      currentRoomType?: string,
+      currentMealPlan?: string,
+      overrideRooms?: number,
+      overrideCheckIn?: string,
+      overrideCheckOut?: string
+    ) => {
+      if (!hId) {
+        setHotelAvailableRates([]);
+        setHotelFormRateSheetId(null);
+        setHotelRateMessage(null);
+        return;
+      }
+      const reqId = ++hotelRateReqRef.current;
+      setHotelRateLoading(true);
+      setHotelRateMessage(null);
+      try {
+        const res = await rateSheetClient.getRateSheets({
+          inventoryType: "HOTEL",
+          hotelId: hId,
+          status: "ACTIVE",
+          validDate: travelDate ? new Date(travelDate) : undefined,
+          limit: 100,
+        });
+
+        if (reqId !== hotelRateReqRef.current) return;
+
+        if (res.success && res.data) {
+          const rates = res.data;
+          setHotelAvailableRates(rates);
+
+          const cIn = overrideCheckIn ?? hotelFormCheckIn;
+          const cOut = overrideCheckOut ?? hotelFormCheckOut;
+          const rCount = overrideRooms ?? hotelFormRooms;
+
+          if (rates.length === 0) {
+            setHotelFormRateSheetId(null);
+            setHotelRateMessage("No active master rate sheet found for this property on selected dates. You may enter rate manually.");
+          } else if (rates.length === 1) {
+            const singleRate = rates[0];
+            setHotelFormRateSheetId(singleRate.id);
+            if (singleRate.roomType) setHotelFormRoomType(singleRate.roomType);
+            if (singleRate.mealPlan) setHotelFormMealPlan(singleRate.mealPlan);
+            const rateCost = String(Number(singleRate.costPrice));
+            setHotelFormNightlyRate(rateCost);
+            const computed = computeHotelTotalTariff(cIn, cOut, rCount, rateCost);
+            if (computed) setHotelFormTotalAmount(computed);
+            setHotelRateMessage(null);
+          } else {
+            const match =
+              rates.find(
+                (r) =>
+                  r.roomType?.toLowerCase() === (currentRoomType || "").toLowerCase() &&
+                  r.mealPlan?.toLowerCase() === (currentMealPlan || "").toLowerCase()
+              ) || rates[0];
+
+            setHotelFormRateSheetId(match.id);
+            if (match.roomType) setHotelFormRoomType(match.roomType);
+            if (match.mealPlan) setHotelFormMealPlan(match.mealPlan);
+            const rateCost = String(Number(match.costPrice));
+            setHotelFormNightlyRate(rateCost);
+            const computed = computeHotelTotalTariff(cIn, cOut, rCount, rateCost);
+            if (computed) setHotelFormTotalAmount(computed);
+            setHotelRateMessage(null);
+          }
+        }
+      } catch {
+        if (reqId === hotelRateReqRef.current) {
+          setHotelAvailableRates([]);
+          setHotelRateMessage("Failed to load rate sheets.");
+        }
+      } finally {
+        if (reqId === hotelRateReqRef.current) {
+          setHotelRateLoading(false);
+        }
+      }
+    },
+    [hotelFormCheckIn, hotelFormCheckOut, hotelFormRooms]
+  );
+
   const handleHotelCheckInChange = (val: string) => {
     setHotelFormCheckIn(val);
     const computed = computeHotelTotalTariff(val, hotelFormCheckOut, hotelFormRooms, hotelFormNightlyRate);
     if (computed) setHotelFormTotalAmount(computed);
+    if (hotelFormHotelId) {
+      fetchApplicableHotelRates(hotelFormHotelId, val, hotelFormRoomType, hotelFormMealPlan, hotelFormRooms, val, hotelFormCheckOut);
+    }
   };
 
   const handleHotelCheckOutChange = (val: string) => {
@@ -557,20 +764,29 @@ export default function TripDetailPage() {
   const handleOpenAddHotel = () => {
     const cIn = trip?.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "";
     const cOut = trip?.endDate ? new Date(trip.endDate).toISOString().split("T")[0] : "";
-    const defaultRate = "3500";
     const defaultRooms = 1;
-    const initialTotal = computeHotelTotalTariff(cIn, cOut, defaultRooms, defaultRate);
 
-    setHotelFormHotelId(masterHotels[0]?.id || "");
+    const filtered = getFilteredHotels();
+    const initialHotelId = filtered[0]?.id || "";
+
+    setHotelFormTripDestinationId("");
+    setHotelFormHotelId(initialHotelId);
     setHotelFormCheckIn(cIn);
     setHotelFormCheckOut(cOut);
     setHotelFormRoomType("Deluxe Room");
     setHotelFormRooms(defaultRooms);
     setHotelFormMealPlan("CP - Breakfast Included");
-    setHotelFormNightlyRate(defaultRate);
-    setHotelFormTotalAmount(initialTotal);
+    setHotelFormNightlyRate("");
+    setHotelFormTotalAmount("");
     setHotelFormNotes("");
+    setHotelAvailableRates([]);
+    setHotelFormRateSheetId(null);
+    setHotelRateMessage(null);
     setIsAddHotelOpen(true);
+
+    if (initialHotelId) {
+      fetchApplicableHotelRates(initialHotelId, cIn, "Deluxe Room", "CP - Breakfast Included", defaultRooms, cIn, cOut);
+    }
   };
 
   const handleSaveAddHotel = async (e: React.FormEvent) => {
@@ -583,6 +799,7 @@ export default function TripDetailPage() {
     try {
       setHotelSaving(true);
       await tripHotelClient.createTripHotel(id, {
+        tripDestinationId: undefined,
         hotelId: hotelFormHotelId,
         checkIn: new Date(hotelFormCheckIn),
         checkOut: new Date(hotelFormCheckOut),
@@ -612,6 +829,7 @@ export default function TripDetailPage() {
     const totalStr = computed || (th.totalAmount !== null && th.totalAmount !== undefined ? String(th.totalAmount) : "");
 
     setSelectedTripHotelId(th.id);
+    setHotelFormTripDestinationId(th.tripDestinationId || "");
     setHotelFormHotelId(th.hotelId);
     setHotelFormCheckIn(cIn);
     setHotelFormCheckOut(cOut);
@@ -621,7 +839,14 @@ export default function TripDetailPage() {
     setHotelFormNightlyRate(rateStr);
     setHotelFormTotalAmount(totalStr);
     setHotelFormNotes(th.notes || "");
+    setHotelAvailableRates([]);
+    setHotelFormRateSheetId(null);
+    setHotelRateMessage(null);
     setIsEditHotelOpen(true);
+
+    if (th.hotelId) {
+      fetchApplicableHotelRates(th.hotelId, cIn, th.roomType, th.mealPlan || "", th.rooms, cIn, cOut);
+    }
   };
 
   const handleSaveEditHotel = async (e: React.FormEvent) => {
@@ -631,6 +856,7 @@ export default function TripDetailPage() {
     try {
       setHotelSaving(true);
       await tripHotelClient.updateTripHotel(id, selectedTripHotelId, {
+        tripDestinationId: hotelFormTripDestinationId || null,
         hotelId: hotelFormHotelId,
         checkIn: new Date(hotelFormCheckIn),
         checkOut: new Date(hotelFormCheckOut),
@@ -815,24 +1041,109 @@ export default function TripDetailPage() {
   };
 
   // ──────────────────────── TRIP ACTIVITY HANDLERS ─────────────────────────
+  const activityRateReqRef = React.useRef(0);
+  const fetchApplicableActivityRates = React.useCallback(
+    async (aId: string, scheduledDate: string, currentParticipants?: number) => {
+      if (!aId) {
+        setActivityAvailableRates([]);
+        setActivityFormRateSheetId(null);
+        setActivityRateMessage(null);
+        return;
+      }
+      const reqId = ++activityRateReqRef.current;
+      setActivityRateLoading(true);
+      setActivityRateMessage(null);
+      try {
+        const res = await rateSheetClient.getRateSheets({
+          inventoryType: "ACTIVITY",
+          activityId: aId,
+          status: "ACTIVE",
+          validDate: scheduledDate ? new Date(scheduledDate) : undefined,
+          limit: 100,
+        });
+
+        if (reqId !== activityRateReqRef.current) return;
+
+        const pax = currentParticipants ?? activityFormParticipants;
+
+        if (res.success && res.data) {
+          const rates = res.data;
+          setActivityAvailableRates(rates);
+
+          if (rates.length === 0) {
+            setActivityFormRateSheetId(null);
+            setActivityRateMessage("No active master rate sheet found for this activity on scheduled date.");
+          } else if (rates.length === 1) {
+            const singleRate = rates[0];
+            setActivityFormRateSheetId(singleRate.id);
+            const adultCost = singleRate.adultCost ? Number(singleRate.adultCost) : Number(singleRate.costPrice);
+            const childCost = singleRate.childCost ? Number(singleRate.childCost) : null;
+            setActivityFormAdultPrice(String(adultCost));
+            if (childCost !== null) setActivityFormChildPrice(String(childCost));
+            setActivityFormTotalPrice(String(adultCost * pax));
+            setActivityRateMessage(null);
+          } else {
+            const match = rates[0];
+            setActivityFormRateSheetId(match.id);
+            const adultCost = match.adultCost ? Number(match.adultCost) : Number(match.costPrice);
+            const childCost = match.childCost ? Number(match.childCost) : null;
+            setActivityFormAdultPrice(String(adultCost));
+            if (childCost !== null) setActivityFormChildPrice(String(childCost));
+            setActivityFormTotalPrice(String(adultCost * pax));
+            setActivityRateMessage(null);
+          }
+        }
+      } catch {
+        if (reqId === activityRateReqRef.current) {
+          setActivityAvailableRates([]);
+          setActivityRateMessage("Failed to load activity rate sheets.");
+        }
+      } finally {
+        if (reqId === activityRateReqRef.current) {
+          setActivityRateLoading(false);
+        }
+      }
+    },
+    [activityFormParticipants]
+  );
+
   const handleOpenAddActivity = () => {
-    setActivityFormActivityId(masterActivities[0]?.id || "");
-    setActivityFormName(masterActivities[0]?.name || "Sightseeing Excursion");
-    setActivityFormDescription(masterActivities[0]?.description || "");
-    setActivityFormDate(trip?.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "");
+    const actDate = trip?.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "";
+    const pax = travelers.length || 2;
+
+    const filtered = getFilteredActivities();
+    const act = filtered[0] || null;
+
+    setActivityFormTripDestinationId("");
+    setActivityFormActivityId(act?.id || "");
+    setActivityFormName(act?.name || "Sightseeing Tour");
+    setActivityFormDescription(act?.description || "");
+    setActivityFormDate(actDate);
     setActivityFormTime("09:00 AM");
-    setActivityFormLocation(masterActivities[0]?.location || "");
-    setActivityFormParticipants(travelers.length || 2);
-    setActivityFormType(masterActivities[0]?.type || ActivityType.INCLUDED);
-    setActivityFormAdultPrice(masterActivities[0]?.adultPrice ? String(masterActivities[0].adultPrice) : "1500");
-    setActivityFormChildPrice(masterActivities[0]?.childPrice ? String(masterActivities[0].childPrice) : "800");
-    setActivityFormTotalPrice("3000");
+    setActivityFormLocation(act?.location || "");
+    setActivityFormParticipants(pax);
+    setActivityFormType(act?.type || ActivityType.INCLUDED);
+    setActivityFormAdultPrice(act?.adultPrice ? String(act.adultPrice) : "");
+    setActivityFormChildPrice(act?.childPrice ? String(act.childPrice) : "");
+    setActivityFormTotalPrice(act?.adultPrice ? String(Number(act.adultPrice) * pax) : "");
     setActivityFormNotes("");
+    setActivityAvailableRates([]);
+    setActivityFormRateSheetId(null);
+    setActivityRateMessage(null);
     setIsAddActivityOpen(true);
+
+    if (act?.id) {
+      fetchApplicableActivityRates(act.id, actDate, pax);
+    }
   };
 
   const handleSelectMasterActivity = (actId: string | null) => {
-    if (!actId) return;
+    if (!actId) {
+      setActivityFormActivityId("");
+      setActivityAvailableRates([]);
+      setActivityFormRateSheetId(null);
+      return;
+    }
     setActivityFormActivityId(actId);
     const ma = masterActivities.find((a) => a.id === actId);
     if (ma) {
@@ -840,9 +1151,13 @@ export default function TripDetailPage() {
       setActivityFormDescription(ma.description || "");
       setActivityFormLocation(ma.location || "");
       setActivityFormType(ma.type);
-      if (ma.adultPrice) setActivityFormAdultPrice(String(ma.adultPrice));
+      if (ma.adultPrice) {
+        setActivityFormAdultPrice(String(ma.adultPrice));
+        setActivityFormTotalPrice(String(Number(ma.adultPrice) * activityFormParticipants));
+      }
       if (ma.childPrice) setActivityFormChildPrice(String(ma.childPrice));
     }
+    fetchApplicableActivityRates(actId, activityFormDate, activityFormParticipants);
   };
 
   const handleSaveAddActivity = async (e: React.FormEvent) => {
@@ -855,6 +1170,7 @@ export default function TripDetailPage() {
     try {
       setActivitySaving(true);
       await tripActivityClient.createTripActivity(id, {
+        tripDestinationId: undefined,
         activityId: activityFormActivityId || undefined,
         name: activityFormName.trim(),
         description: activityFormDescription.trim() || undefined,
@@ -880,11 +1196,14 @@ export default function TripDetailPage() {
   };
 
   const handleOpenEditActivity = (ta: TripActivityWithActivity) => {
+    const actDate = ta.date ? new Date(ta.date).toISOString().split("T")[0] : "";
+
     setSelectedTripActivityId(ta.id);
+    setActivityFormTripDestinationId(ta.tripDestinationId || "");
     setActivityFormActivityId(ta.activityId || "");
     setActivityFormName(ta.name);
     setActivityFormDescription(ta.description || "");
-    setActivityFormDate(ta.date ? new Date(ta.date).toISOString().split("T")[0] : "");
+    setActivityFormDate(actDate);
     setActivityFormTime(ta.time || "");
     setActivityFormLocation(ta.location || "");
     setActivityFormParticipants(ta.numberOfParticipants || 1);
@@ -893,7 +1212,14 @@ export default function TripDetailPage() {
     setActivityFormChildPrice(ta.childPrice !== null && ta.childPrice !== undefined ? String(ta.childPrice) : "");
     setActivityFormTotalPrice(ta.totalPrice !== null && ta.totalPrice !== undefined ? String(ta.totalPrice) : "");
     setActivityFormNotes(ta.notes || "");
+    setActivityAvailableRates([]);
+    setActivityFormRateSheetId(null);
+    setActivityRateMessage(null);
     setIsEditActivityOpen(true);
+
+    if (ta.activityId) {
+      fetchApplicableActivityRates(ta.activityId, actDate, ta.numberOfParticipants || 1);
+    }
   };
 
   const handleSaveEditActivity = async (e: React.FormEvent) => {
@@ -903,6 +1229,7 @@ export default function TripDetailPage() {
     try {
       setActivitySaving(true);
       await tripActivityClient.updateTripActivity(id, selectedTripActivityId, {
+        tripDestinationId: activityFormTripDestinationId || null,
         activityId: activityFormActivityId || undefined,
         name: activityFormName.trim(),
         description: activityFormDescription.trim() || undefined,
@@ -944,6 +1271,9 @@ export default function TripDetailPage() {
       },
     });
   };
+
+  // ──────────────────────── TRIP DESTINATION HANDLERS (HANDLED VIA EDIT MODAL) ─────────────────────────
+
 
   const formatDateDisplay = (date: Date | string | null | undefined) => {
     if (!date) return "Unscheduled";
@@ -1032,6 +1362,11 @@ export default function TripDetailPage() {
               <span className="flex items-center gap-1 font-medium">
                 <Calendar className="h-3.5 w-3.5 text-slate-400" />
                 {formatDateDisplay(trip.startDate)} – {formatDateDisplay(trip.endDate)}
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="flex items-center gap-1 font-medium">
+                <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                {tripDestinations.length} {tripDestinations.length === 1 ? "Destination" : "Destinations"}
               </span>
               <span className="text-slate-300">•</span>
               <span className="flex items-center gap-1 font-medium">
@@ -1142,6 +1477,14 @@ export default function TripDetailPage() {
                     <span className="font-semibold text-slate-800">{trip.customer?.email || "No email registered"}</span>
                   </div>
                   <div>
+                    <span className="text-slate-400 block text-[11px]">Destinations</span>
+                    <span className="font-semibold text-slate-800">
+                      {tripDestinations.length > 0
+                        ? tripDestinations.map((td) => td.destination.name).join(", ")
+                        : "No destinations assigned"}
+                    </span>
+                  </div>
+                  <div>
                     <span className="text-slate-400 block text-[11px]">Travel Dates</span>
                     <span className="font-semibold text-slate-800">
                       {formatDateDisplay(trip.startDate)} – {formatDateDisplay(trip.endDate)} ({duration} Days)
@@ -1210,6 +1553,10 @@ export default function TripDetailPage() {
                   Workspace Telemetry
                 </h3>
                 <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">Destinations</span>
+                    <strong className="text-slate-900">{tripDestinations.length}</strong>
+                  </div>
                   <div className="flex justify-between py-1 border-b border-slate-50">
                     <span className="text-slate-500">Travelers</span>
                     <strong className="text-slate-900">{travelers.length}</strong>
@@ -1467,11 +1814,16 @@ export default function TripDetailPage() {
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2">
                       <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md uppercase">
                             {th.roomType}
                           </span>
                           <h4 className="font-bold text-slate-900 text-sm">{th.hotel?.name || "Contracted Hotel"}</h4>
+                          {th.tripDestination && (
+                            <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                              <MapPin className="h-2.5 w-2.5" /> Leg {th.tripDestination.sequence}: {th.tripDestination.destination?.name}
+                            </span>
+                          )}
                         </div>
                         <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
                           <Calendar className="h-3 w-3 text-slate-400" />
@@ -1682,11 +2034,16 @@ export default function TripDetailPage() {
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2">
                       <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-md uppercase">
                             {ta.type}
                           </span>
                           <h4 className="font-bold text-slate-900 text-sm">{ta.name}</h4>
+                          {ta.tripDestination && (
+                            <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                              <MapPin className="h-2.5 w-2.5" /> Leg {ta.tripDestination.sequence}: {ta.tripDestination.destination?.name}
+                            </span>
+                          )}
                         </div>
                         {(ta.date || ta.time) && (
                           <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
@@ -2390,27 +2747,109 @@ export default function TripDetailPage() {
               </DialogHeader>
 
               <div className="space-y-3.5 mt-4 text-xs">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Select Hotel Property *</label>
-                  <Select value={hotelFormHotelId} onValueChange={(val) => val && setHotelFormHotelId(val)}>
-                    <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
-                      <SelectValue placeholder="Choose hotel...">
-                        {(val: string | null) => {
-                          if (!val) return undefined;
-                          const h = masterHotels.find((item) => item.id === val);
-                          return h ? `${h.name} ${h.city ? `(${h.city})` : ""}` : val;
-                        }}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-slate-200">
-                      {masterHotels.map((h) => (
-                        <SelectItem key={h.id} value={h.id} className="text-xs">
-                          {h.name} {h.city ? `(${h.city})` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Hotel Property Selection (Filtered automatically by Trip destinations) */}
+                {(() => {
+                  const filtered = getFilteredHotels();
+                  return (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Select Hotel Property *</label>
+                      {tripDestinations.length === 0 ? (
+                        <div className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                          Add destinations to this Trip to see destination-specific Hotels.
+                        </div>
+                      ) : (
+                        <>
+                          <Select
+                            value={hotelFormHotelId}
+                            onValueChange={(val) => {
+                              if (!val) return;
+                              setHotelFormHotelId(val);
+                              fetchApplicableHotelRates(val, hotelFormCheckIn, hotelFormRoomType, hotelFormMealPlan);
+                            }}
+                          >
+                            <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
+                              <SelectValue placeholder={filtered.length === 0 ? "No matching hotels for trip destinations..." : "Choose hotel..."}>
+                                {(val: string | null) => {
+                                  if (!val) return undefined;
+                                  const h = masterHotels.find((item) => item.id === val);
+                                  return h ? `${h.name} (${h.destination?.name || h.city || "Destination"})` : val;
+                                }}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="bg-white border-slate-200">
+                              {filtered.map((h) => (
+                                <SelectItem key={h.id} value={h.id} className="text-xs">
+                                  {h.name} <span className="text-slate-400 font-normal">({h.destination?.name || h.city || "Destination"})</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {filtered.length === 0 && (
+                            <p className="text-[11px] text-amber-600 mt-1">
+                              No hotels associated with the destinations in this trip route. You can assign destinations under Inventory &gt; Hotels.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* 3. RateSheet Resolution State */}
+                {hotelRateLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-indigo-600 bg-indigo-50/60 p-2.5 rounded-lg border border-indigo-100">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" /> Fetching applicable master rate sheets...
+                  </div>
+                ) : hotelRateMessage ? (
+                  <div className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                    {hotelRateMessage}
+                  </div>
+                ) : hotelAvailableRates.length > 1 ? (
+                  <div className="space-y-1 bg-indigo-50/40 p-3 rounded-xl border border-indigo-100">
+                    <label className="text-[10px] font-bold text-indigo-700 uppercase">Applicable Master Rate Sheet ({hotelAvailableRates.length} available)</label>
+                    <Select
+                      value={hotelFormRateSheetId || ""}
+                      onValueChange={(val) => {
+                        if (!val) return;
+                        setHotelFormRateSheetId(val);
+                        const selectedRate = hotelAvailableRates.find((r) => r.id === val);
+                        if (selectedRate) {
+                          if (selectedRate.roomType) setHotelFormRoomType(selectedRate.roomType);
+                          if (selectedRate.mealPlan) setHotelFormMealPlan(selectedRate.mealPlan);
+                          const cost = String(Number(selectedRate.costPrice));
+                          setHotelFormNightlyRate(cost);
+                          const total = computeHotelTotalTariff(hotelFormCheckIn, hotelFormCheckOut, hotelFormRooms, cost);
+                          if (total) setHotelFormTotalAmount(total);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-9 bg-white border-indigo-200 text-xs">
+                        <SelectValue placeholder="Choose rate plan...">
+                          {(val: string | null) => {
+                            if (!val) return undefined;
+                            const r = hotelAvailableRates.find((item) => item.id === val);
+                            return r ? `${r.name} - ${r.roomType || "Room"} (${r.mealPlan || "No Meal"}) - ₹${Number(r.costPrice)}/night` : val;
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        {hotelAvailableRates.map((r) => (
+                          <SelectItem key={r.id} value={r.id} className="text-xs">
+                            {r.name} - {r.roomType || "Room"} ({r.mealPlan || "No Meal"}) - ₹{Number(r.costPrice)}/night
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : hotelAvailableRates.length === 1 ? (
+                  <div className="flex items-center justify-between text-xs bg-emerald-50/80 text-emerald-800 p-2.5 rounded-lg border border-emerald-200">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <span>Master Rate: <strong>{hotelAvailableRates[0].name}</strong> (₹{Number(hotelAvailableRates[0].costPrice)}/night)</span>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Auto-selected</span>
+                  </div>
+                ) : null}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -2474,7 +2913,7 @@ export default function TripDetailPage() {
                       type="number"
                       value={hotelFormNightlyRate}
                       onChange={(e) => handleHotelNightlyRateChange(e.target.value)}
-                      placeholder="3500"
+                      placeholder="Enter rate"
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
@@ -2484,7 +2923,7 @@ export default function TripDetailPage() {
                       type="number"
                       value={hotelFormTotalAmount}
                       onChange={(e) => setHotelFormTotalAmount(e.target.value)}
-                      placeholder="7000"
+                      placeholder="0"
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
@@ -2531,6 +2970,110 @@ export default function TripDetailPage() {
               </DialogHeader>
 
               <div className="space-y-3.5 mt-4 text-xs">
+                {/* Hotel Property Selection (Filtered automatically by Trip destinations) */}
+                {(() => {
+                  const filtered = getFilteredHotels();
+                  return (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Select Hotel Property *</label>
+                      {tripDestinations.length === 0 ? (
+                        <div className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                          Add destinations to this Trip to see destination-specific Hotels.
+                        </div>
+                      ) : (
+                        <>
+                          <Select
+                            value={hotelFormHotelId}
+                            onValueChange={(val) => {
+                              if (!val) return;
+                              setHotelFormHotelId(val);
+                              fetchApplicableHotelRates(val, hotelFormCheckIn, hotelFormRoomType, hotelFormMealPlan);
+                            }}
+                          >
+                            <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
+                              <SelectValue placeholder={filtered.length === 0 ? "No matching hotels for trip destinations..." : "Choose hotel..."}>
+                                {(val: string | null) => {
+                                  if (!val) return undefined;
+                                  const h = masterHotels.find((item) => item.id === val);
+                                  return h ? `${h.name} (${h.destination?.name || h.city || "Destination"})` : val;
+                                }}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="bg-white border-slate-200">
+                              {filtered.map((h) => (
+                                <SelectItem key={h.id} value={h.id} className="text-xs">
+                                  {h.name} <span className="text-slate-400 font-normal">({h.destination?.name || h.city || "Destination"})</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {filtered.length === 0 && (
+                            <p className="text-[11px] text-amber-600 mt-1">
+                              No hotels associated with the destinations in this trip route.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* 3. RateSheet Resolution State */}
+                {hotelRateLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-indigo-600 bg-indigo-50/60 p-2.5 rounded-lg border border-indigo-100">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" /> Fetching applicable master rate sheets...
+                  </div>
+                ) : hotelRateMessage ? (
+                  <div className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                    {hotelRateMessage}
+                  </div>
+                ) : hotelAvailableRates.length > 1 ? (
+                  <div className="space-y-1 bg-indigo-50/40 p-3 rounded-xl border border-indigo-100">
+                    <label className="text-[10px] font-bold text-indigo-700 uppercase">Applicable Master Rate Sheet ({hotelAvailableRates.length} available)</label>
+                    <Select
+                      value={hotelFormRateSheetId || ""}
+                      onValueChange={(val) => {
+                        if (!val) return;
+                        setHotelFormRateSheetId(val);
+                        const selectedRate = hotelAvailableRates.find((r) => r.id === val);
+                        if (selectedRate) {
+                          if (selectedRate.roomType) setHotelFormRoomType(selectedRate.roomType);
+                          if (selectedRate.mealPlan) setHotelFormMealPlan(selectedRate.mealPlan);
+                          const cost = String(Number(selectedRate.costPrice));
+                          setHotelFormNightlyRate(cost);
+                          const total = computeHotelTotalTariff(hotelFormCheckIn, hotelFormCheckOut, hotelFormRooms, cost);
+                          if (total) setHotelFormTotalAmount(total);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-9 bg-white border-indigo-200 text-xs">
+                        <SelectValue placeholder="Choose rate plan...">
+                          {(val: string | null) => {
+                            if (!val) return undefined;
+                            const r = hotelAvailableRates.find((item) => item.id === val);
+                            return r ? `${r.name} - ${r.roomType || "Room"} (${r.mealPlan || "No Meal"}) - ₹${Number(r.costPrice)}/night` : val;
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        {hotelAvailableRates.map((r) => (
+                          <SelectItem key={r.id} value={r.id} className="text-xs">
+                            {r.name} - {r.roomType || "Room"} ({r.mealPlan || "No Meal"}) - ₹{Number(r.costPrice)}/night
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : hotelAvailableRates.length === 1 ? (
+                  <div className="flex items-center justify-between text-xs bg-emerald-50/80 text-emerald-800 p-2.5 rounded-lg border border-emerald-200">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <span>Master Rate: <strong>{hotelAvailableRates[0].name}</strong> (₹{Number(hotelAvailableRates[0].costPrice)}/night)</span>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Auto-selected</span>
+                  </div>
+                ) : null}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Check-in Date *</label>
@@ -2907,29 +3450,103 @@ export default function TripDetailPage() {
               </DialogHeader>
 
               <div className="space-y-3.5 mt-4 text-xs">
-                {masterActivities.length > 0 && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Pre-fill from Inventory</label>
-                    <Select value={activityFormActivityId} onValueChange={(val) => handleSelectMasterActivity(val)}>
-                      <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
-                        <SelectValue placeholder="Choose activity...">
+                {/* Activity Pre-fill (Filtered automatically by Trip destinations) */}
+                {(() => {
+                  const filtered = getFilteredActivities();
+                  if (tripDestinations.length === 0) {
+                    return (
+                      <div className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                        Add destinations to this Trip to see destination-specific Activities.
+                      </div>
+                    );
+                  }
+                  return filtered.length > 0 ? (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Pre-fill from Inventory</label>
+                      <Select value={activityFormActivityId} onValueChange={(val) => handleSelectMasterActivity(val)}>
+                        <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
+                          <SelectValue placeholder="Choose activity...">
+                            {(val: string | null) => {
+                              if (!val) return undefined;
+                              const a = masterActivities.find((item) => item.id === val);
+                              return a ? `${a.name} (${a.destination?.name || a.type})` : val;
+                            }}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-slate-200">
+                          {filtered.map((a) => (
+                            <SelectItem key={a.id} value={a.id} className="text-xs">
+                              {a.name} <span className="text-slate-400 font-normal">({a.destination?.name || a.type})</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      No catalog activities found for trip destinations. You can type activity details manually below.
+                    </p>
+                  );
+                })()}
+
+                {/* RateSheet Resolution State */}
+                {activityRateLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-indigo-600 bg-indigo-50/60 p-2.5 rounded-lg border border-indigo-100">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" /> Fetching applicable master rate sheets...
+                  </div>
+                ) : activityRateMessage ? (
+                  <div className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                    {activityRateMessage}
+                  </div>
+                ) : activityAvailableRates.length > 1 ? (
+                  <div className="space-y-1 bg-indigo-50/40 p-3 rounded-xl border border-indigo-100">
+                    <label className="text-[10px] font-bold text-indigo-700 uppercase">Applicable Master Rate Sheet ({activityAvailableRates.length} available)</label>
+                    <Select
+                      value={activityFormRateSheetId || ""}
+                      onValueChange={(val) => {
+                        if (!val) return;
+                        setActivityFormRateSheetId(val);
+                        const selectedRate = activityAvailableRates.find((r) => r.id === val);
+                        if (selectedRate) {
+                          const adultCost = selectedRate.adultCost ? Number(selectedRate.adultCost) : Number(selectedRate.costPrice);
+                          const childCost = selectedRate.childCost ? Number(selectedRate.childCost) : null;
+                          setActivityFormAdultPrice(String(adultCost));
+                          if (childCost !== null) setActivityFormChildPrice(String(childCost));
+                          setActivityFormTotalPrice(String(adultCost * activityFormParticipants));
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-9 bg-white border-indigo-200 text-xs">
+                        <SelectValue placeholder="Choose rate plan...">
                           {(val: string | null) => {
                             if (!val) return undefined;
-                            const a = masterActivities.find((item) => item.id === val);
-                            return a ? `${a.name} (${a.type})` : val;
+                            const r = activityAvailableRates.find((item) => item.id === val);
+                            const cost = r ? (r.adultCost ?? r.costPrice) : 0;
+                            return r ? `${r.name} - ₹${Number(cost)}/pax` : val;
                           }}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
-                        {masterActivities.map((a) => (
-                          <SelectItem key={a.id} value={a.id} className="text-xs">
-                            {a.name} ({a.type})
-                          </SelectItem>
-                        ))}
+                        {activityAvailableRates.map((r) => {
+                          const cost = r.adultCost ?? r.costPrice;
+                          return (
+                            <SelectItem key={r.id} value={r.id} className="text-xs">
+                              {r.name} - ₹${Number(cost)}/pax
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
-                )}
+                ) : activityAvailableRates.length === 1 ? (
+                  <div className="flex items-center justify-between text-xs bg-emerald-50/80 text-emerald-800 p-2.5 rounded-lg border border-emerald-200">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <span>Master Rate: <strong>{activityAvailableRates[0].name}</strong> (₹{Number(activityAvailableRates[0].adultCost ?? activityAvailableRates[0].costPrice)}/pax)</span>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Auto-selected</span>
+                  </div>
+                ) : null}
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Activity Name *</label>
@@ -2947,7 +3564,13 @@ export default function TripDetailPage() {
                     <Input
                       type="date"
                       value={activityFormDate}
-                      onChange={(e) => setActivityFormDate(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setActivityFormDate(val);
+                        if (activityFormActivityId) {
+                          fetchApplicableActivityRates(activityFormActivityId, val, activityFormParticipants);
+                        }
+                      }}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
@@ -2977,7 +3600,13 @@ export default function TripDetailPage() {
                       type="number"
                       min={1}
                       value={activityFormParticipants}
-                      onChange={(e) => setActivityFormParticipants(parseInt(e.target.value) || 1)}
+                      onChange={(e) => {
+                        const pax = parseInt(e.target.value) || 1;
+                        setActivityFormParticipants(pax);
+                        if (activityFormAdultPrice) {
+                          setActivityFormTotalPrice(String(Number(activityFormAdultPrice) * pax));
+                        }
+                      }}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
@@ -2989,7 +3618,14 @@ export default function TripDetailPage() {
                     <Input
                       type="number"
                       value={activityFormAdultPrice}
-                      onChange={(e) => setActivityFormAdultPrice(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setActivityFormAdultPrice(val);
+                        if (val) {
+                          setActivityFormTotalPrice(String(Number(val) * activityFormParticipants));
+                        }
+                      }}
+                      placeholder="Enter price"
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
@@ -2999,6 +3635,7 @@ export default function TripDetailPage() {
                       type="number"
                       value={activityFormTotalPrice}
                       onChange={(e) => setActivityFormTotalPrice(e.target.value)}
+                      placeholder="0"
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
@@ -3050,7 +3687,13 @@ export default function TripDetailPage() {
                     <Input
                       type="date"
                       value={activityFormDate}
-                      onChange={(e) => setActivityFormDate(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setActivityFormDate(val);
+                        if (activityFormActivityId) {
+                          fetchApplicableActivityRates(activityFormActivityId, val, activityFormParticipants);
+                        }
+                      }}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
@@ -3105,6 +3748,15 @@ export default function TripDetailPage() {
                     {...editTripFormik.getFieldProps("title")}
                     className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                     required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Destinations</label>
+                  <DestinationMultiSelect
+                    value={editTripFormik.values.destinationIds}
+                    onChange={(val) => editTripFormik.setFieldValue("destinationIds", val)}
+                    placeholder="Select destinations..."
                   />
                 </div>
 

@@ -8,8 +8,18 @@ import {
 } from "@/lib/validation/activity-schema";
 import { Activity } from "@prisma/client";
 
+export type ActivityWithRelations = Activity & {
+  destination?: {
+    id: string;
+    name: string;
+    state: string | null;
+    country: string;
+    status: string;
+  } | null;
+};
+
 export interface PaginatedActivitiesResult {
-  items: Activity[];
+  items: ActivityWithRelations[];
   total: number;
   page: number;
   limit: number;
@@ -25,7 +35,7 @@ export const activityService = {
     agencyId: string,
     params: ActivityListQueryInput
   ): Promise<PaginatedActivitiesResult> {
-    const { page, limit, search, location, type, includeArchived } = params;
+    const { page = 1, limit = 50, search, location, destinationId, type, includeArchived } = params;
     const skip = (page - 1) * limit;
 
     const searchFilter = search
@@ -35,12 +45,17 @@ export const activityService = {
             { location: { contains: search, mode: "insensitive" as const } },
             { description: { contains: search, mode: "insensitive" as const } },
             { duration: { contains: search, mode: "insensitive" as const } },
+            { destination: { name: { contains: search, mode: "insensitive" as const } } },
           ],
         }
       : {};
 
     const locationFilter = location
       ? { location: { contains: location, mode: "insensitive" as const } }
+      : {};
+
+    const destinationFilter = destinationId
+      ? { destinationId }
       : {};
 
     const typeFilter = type ? { type } : {};
@@ -50,6 +65,7 @@ export const activityService = {
       ...(includeArchived ? {} : { archivedAt: null }),
       ...searchFilter,
       ...locationFilter,
+      ...destinationFilter,
       ...typeFilter,
     };
 
@@ -57,6 +73,17 @@ export const activityService = {
       prisma.activity.findMany({
         where,
         orderBy: { name: "asc" },
+        include: {
+          destination: {
+            select: {
+              id: true,
+              name: true,
+              state: true,
+              country: true,
+              status: true,
+            },
+          },
+        },
         skip,
         take: limit,
       }),
@@ -77,22 +104,49 @@ export const activityService = {
   /**
    * Retrieves a single activity record by ID, strictly enforcing agency tenancy.
    */
-  async getActivityById(agencyId: string, activityId: string): Promise<Activity | null> {
+  async getActivityById(agencyId: string, activityId: string): Promise<ActivityWithRelations | null> {
     return prisma.activity.findFirst({
       where: {
         id: activityId,
         agencyId,
+      },
+      include: {
+        destination: {
+          select: {
+            id: true,
+            name: true,
+            state: true,
+            country: true,
+            status: true,
+          },
+        },
       },
     });
   },
 
   /**
    * Creates a new activity master record under the authenticated agency.
+   * Validates destinationId server-side to guarantee strict tenant isolation.
    */
-  async createActivity(agencyId: string, data: CreateActivityInput): Promise<Activity> {
+  async createActivity(agencyId: string, data: CreateActivityInput): Promise<ActivityWithRelations> {
+    const cleanDestinationId = data.destinationId?.trim() || null;
+    if (cleanDestinationId) {
+      const destination = await prisma.destination.findFirst({
+        where: {
+          id: cleanDestinationId,
+          agencyId,
+        },
+      });
+
+      if (!destination) {
+        throw new NotFoundError("Destination not found or does not belong to your agency.");
+      }
+    }
+
     return prisma.activity.create({
       data: {
         agencyId,
+        destinationId: cleanDestinationId,
         name: data.name,
         location: data.location || null,
         description: data.description || null,
@@ -103,17 +157,29 @@ export const activityService = {
         price: data.price !== undefined && data.price !== null ? data.price : null,
         notes: data.notes || null,
       },
+      include: {
+        destination: {
+          select: {
+            id: true,
+            name: true,
+            state: true,
+            country: true,
+            status: true,
+          },
+        },
+      },
     });
   },
 
   /**
    * Updates an existing activity master record, strictly verifying agency tenancy.
+   * Validates destinationId server-side to guarantee strict tenant isolation.
    */
   async updateActivity(
     agencyId: string,
     activityId: string,
     data: UpdateActivityInput
-  ): Promise<Activity> {
+  ): Promise<ActivityWithRelations> {
     const existing = await prisma.activity.findFirst({
       where: {
         id: activityId,
@@ -125,9 +191,26 @@ export const activityService = {
       throw new NotFoundError("Activity not found or does not belong to your agency.");
     }
 
+    if (data.destinationId !== undefined) {
+      const cleanDestinationId = data.destinationId?.trim() || null;
+      if (cleanDestinationId) {
+        const destination = await prisma.destination.findFirst({
+          where: {
+            id: cleanDestinationId,
+            agencyId,
+          },
+        });
+
+        if (!destination) {
+          throw new NotFoundError("Destination not found or does not belong to your agency.");
+        }
+      }
+    }
+
     return prisma.activity.update({
       where: { id: activityId },
       data: {
+        ...(data.destinationId !== undefined && { destinationId: data.destinationId?.trim() || null }),
         ...(data.name !== undefined && { name: data.name }),
         ...(data.location !== undefined && { location: data.location || null }),
         ...(data.description !== undefined && { description: data.description || null }),
@@ -143,6 +226,17 @@ export const activityService = {
           price: data.price !== null ? data.price : null,
         }),
         ...(data.notes !== undefined && { notes: data.notes || null }),
+      },
+      include: {
+        destination: {
+          select: {
+            id: true,
+            name: true,
+            state: true,
+            country: true,
+            status: true,
+          },
+        },
       },
     });
   },
