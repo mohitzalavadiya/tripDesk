@@ -11051,6 +11051,161 @@ Executed in a single relational transaction:
   - `/trips/cmu5fhkk40006v4tqpd2k2kd4`: Verified removal of the separate route card, presence of Destinations in profile details, and functional `DestinationMultiSelect` inside the Edit Trip modal.
 - **Verdict:** **IMPLEMENTATION COMPLETE — DESTINATION UI CONSISTENCY VERIFIED**.
 
+# 171. COMPLETE QUOTATION UX, PRICING, PAYMENT SCHEDULE, PDF & LIVE-LINK PRODUCTION AUDIT
+
+## 171.1 Objective & Overview
+- Executed a deep production-readiness overhaul for the TripDesk Quotation Studio (`/trips/[id]/quotation`), price recalculation chain, payment milestone synchronization, customer-facing PDF, and public share token flows.
+
+## 171.2 Pricing Architecture & Pricing Semantics Guard
+- **Base Cost (`QuotationItem.costPrice`)**: Represents the net supplier procurement cost (from RateSheets, vehicle master, or manual supplier rates). Strictly internal to the agency for margin calculation (`markupAmount = subtotal * markupPct`).
+- **Base Cost Independence**: `QuotationItem.costPrice` is **NEVER** automatically rewritten when an agent edits the customer-facing `Quoted Unit Price`. Procurement cost remains strictly independent.
+- **Selling Price (`unitPrice` / `sellingPrice` / `totalPrice`)**: Customer-facing quoted unit and line-item prices.
+- **Pricing Propagation Chain**:
+  ```text
+  Quoted Unit Price
+          ↓
+  Item Selling Price (unitPrice × quantity)
+          ↓
+  Quotation Selling Subtotal
+          ↓
+  Quotation Markup Margin (sellingSubtotal - baseCostSubtotal)
+          ↓
+  Discount (%)
+          ↓
+  Statutory Tax / GST
+          ↓
+  Quotation Final Amount
+          ↓
+  Persisted Payment Milestones (Dynamically Synchronized)
+          ↓
+  Customer Preview / PDF / Public Live Link
+  ```
+
+## 171.3 Pricing Semantics & Invariance Rules
+- **Base Procurement Cost (`subtotal`)**: Persisted as $\sum (\text{costPrice})$ across all line items. Represents what the agency pays suppliers and remains strictly untouched during customer quoted price edits.
+- **Agency Markup Margin (`markupAmount`)**: Evaluated as $\text{Total Quoted Selling} - \text{subtotal}$.
+- **Signed Margin Support**: When customer quoted selling price is discounted below supplier cost (e.g., loss leaders or negotiated concessions), `markupAmount` and `markupPercentage` evaluate to negative values. The costing engine evaluates this state as `Loss Warning` (`status: "Loss"`). UI formats negative margin in rose styling (`-₹4,550`), while customer-facing documents and public links remain 100% sanitized.
+- **Quoted Selling Base**: $\text{subtotal} + \text{markupAmount} \equiv \sum (\text{line-item quoted selling prices})$.
+- **Taxable Amount**: $\max(0, (\text{subtotal} + \text{markupAmount}) - \text{discountAmount})$.
+- **Final Amount**: $\text{taxableAmount} + \text{taxAmount}$ (for `EXCLUSIVE` tax mode) or $\text{taxableAmount}$ (for `INCLUSIVE` tax mode).
+- **Consumer Consistency**: Verified across Quotation workspace, Option Packages, Customer Preview, React-PDF, Payment Schedule synchronization, Booking conversion (`booking.totalAmount = quotation.finalAmount`), and Profitability / Costing Engine.
+
+## 171.4 Payment Schedule Synchronization
+- **Root Cause Fixed**: Previously, `recalculateQuotationTotals` updated `quotation.finalAmount`, but left percentage-based milestone `amount` fields on `quotation_payment_milestones` frozen at draft creation values.
+- **Implementation (`syncPaymentMilestones`)**:
+  - Whenever line item prices, markups, discounts, or taxes alter `finalAmount`, all percentage milestones dynamically recompute `amount = Math.round((finalAmount * percentage) / 100)`.
+  - The rounding remainder is assigned to the final milestone, guaranteeing `sum(milestones.amount) === finalAmount` exactly.
+  - Recalculated milestones are persisted server-side in the database transaction.
+
+## 171.5 Empty Quotation UI Redesign
+- Replaced blank viewport when `!activeQuote` with a dedicated, professional TripDesk Empty Workspace Card displaying:
+  - Clear heading: *No Quotation Proposal Created Yet*.
+  - Feature overview: Costing Snapshot, Tiered Packages, Payment Schedule.
+  - Primary action: *Generate Initial Proposal* with loading spinner states.
+
+## 171.6 Line Item Modal Simplification
+- Replaced confusing competing editable price fields with a single, clear customer-facing **"Quoted Unit Price (₹) *"** input.
+- Added a dynamic real-time calculation box showing `Customer Quoted Total` and displaying internal `Base Procurement Cost` as a subtle non-editable badge.
+
+## 171.7 Customer-Facing PDF & Preview Privacy
+- **Stripped Markup Leakage**: Removed `"Agency Service & Planning ({markupPercentage}%)"` and raw markup margins from customer-facing previews (`preview/page.tsx`) and PDFs.
+- **Clean Commercial Presentation**: Customer sees clean tour package tariffs, inclusions/exclusions, statutory GST breakdown, payment milestone schedule, and prominent **TOTAL PROPOSAL INVESTMENT**.
+- **Public Share Security**: Verified `quotationService.getPublicQuotationByToken` strictly redacts `costPrice`, `markupPercentage`, `markupAmount`, and `internalNotes`.
+
+## 171.8 Verification & QA Test Matrix
+| Area | Test Description | Result |
+| :--- | :--- | :---: |
+| **Empty State** | Loaded when no quotation exists | **PASS** |
+| **Pricing** | Increase Quoted Unit Price (₹40,000 → ₹50,000) | **PASS** |
+| **Pricing** | Decrease Quoted Unit Price (₹50,000 → ₹35,000 — Below Base Cost) | **PASS** |
+| **Pricing** | Base Cost Independence (`costPrice` unchanged at ₹40,000) | **PASS** |
+| **Pricing** | Signed Margin Calculation (`markupAmount = -₹4,550` on below-cost quote) | **PASS** |
+| **Payment Schedule** | Dynamic milestone synchronization & persistence (`sum === finalAmount`) | **PASS** |
+| **Preview** | Latest total & no internal markup leak | **PASS** |
+| **PDF** | Professional format & zero commercial leakage | **PASS** |
+| **Public Live Link** | Real-time latest data & strict redaction | **PASS** |
+| **Quotation → Booking** | Compatibility & correct total snapshot | **PASS** |
+| **TypeScript** | `npx tsc --noEmit` (0 errors) | **PASS** |
+| **Production Build** | `npm run build` (all routes static/dynamic compiled) | **PASS** |
+| **Permanent Data** | 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles intact | **PASS** |
+
+## 171.9 Final Verdict
+- **QUOTATION FLOW VERIFIED — PRODUCTION READY**
+
+---
+
+# 172. READ-ONLY QUOTATION PRICING MODEL & CUSTOMER PDF FORMAT AUDIT
+
+## 172.1 Audit Baseline & Architectural Findings
+- **Pricing Model Alignment**: Identified previous hybrid pricing model where line items maintained individual quoted prices alongside package-level markup.
+- **Audit Recommendation for Phase 173**:
+  1. Standardize quotation line items to strictly reflect RateSheet unit rates. Line items do NOT have independent markup or selling price inputs.
+  2. Apply Agency Markup ONCE at the package/quotation level over aggregate RateSheet base subtotal.
+  3. Redact intermediate pricing breakdowns and non-final monetary amounts from customer-facing surfaces (Customer Preview, Public Proposal Link, Quotation PDF).
+  4. Redesign Customer Quotation PDF into an original, multi-section travel-itinerary document with a strict single monetary value rule (`FINAL QUOTATION AMOUNT: ₹XX,XXX`).
+
+---
+
+# 173. QUOTATION PRICING MODEL & CUSTOMER-FACING ITINERARY PDF REDESIGN
+
+## 173.1 Core Architecture & Single Package Markup Rule
+- **RateSheet Rate as Single Unit Rate**:
+  - For each quotation line item, `unitPrice` is sourced directly and read-only from the selected hotel/vehicle/activity RateSheet.
+  - Line items do NOT have individual markups or independent selling prices (`QuotationItem.markupPercentage = 0`).
+  - $\text{Line Item Base Amount} = \text{RateSheet Rate} \times \text{Quantity}$.
+  - `QuotationItem.costPrice = QuotationItem.sellingPrice = QuotationItem.totalPrice = Line Item Base Amount`.
+- **Package-Level Markup (Applied ONCE)**:
+  $$\text{Subtotal} = \sum (\text{Line Item Base Amounts})$$
+  $$\text{Agency Markup Amount} = \text{Math.round}((\text{Subtotal} \times \text{Quotation Markup \%}) / 100)$$
+  $$\text{Gross Package Amount} = \text{Subtotal} + \text{Agency Markup Amount}$$
+  $$\text{Discount Amount} = \text{Math.round}((\text{Gross Package Amount} \times \text{Discount \%}) / 100)$$
+  $$\text{Taxable Amount} = \max(0, \text{Gross Package Amount} - \text{Discount Amount})$$
+  $$\text{Final Quotation Amount} = \text{TaxService.calculate}(\text{Taxable Amount}, \text{Tax Rate}, \text{Tax Mode})$$
+
+## 173.2 Dynamic Payment Milestone Synchronization
+- `syncPaymentMilestones(id, finalAmount)` dynamically synchronizes all percentage-based milestones upon quotation recalculation.
+- Remainder distribution guarantees $\sum (\text{milestones.amount}) \equiv \text{finalAmount}$ exactly to the rupee.
+- `updateQuotation` automatically returns the refreshed quotation object with updated payment milestones.
+
+## 173.3 Customer-Facing Financial Redaction
+- **Customer Preview (`/trips/[id]/quotation/preview`)**:
+  - Displays package services, non-price quantity badges, itinerary schedule, inclusions/exclusions, milestone percentages, and **Total Final Quotation Amount** exclusively.
+  - Line prices, subtotals, markups, discounts, and tax breakdowns are strictly omitted.
+- **Public Share Proposal (`/q/[shareToken]`)**:
+  - Sanitized public DTO completely redacts internal costs, subtotals, line item rates, markups, discounts, and milestone currency amounts.
+  - Displays package tier options, day-wise itinerary, inclusions/exclusions, milestone percentages, and **Total Package Investment** exclusively.
+- **Public API (`/api/quotations/public/[token]`)**:
+  - Server-side redaction ensures zero confidential financial leakage over the network.
+
+## 173.4 Customer-Facing Travel Itinerary PDF Redesign
+- **Original TripDesk Design**: Rebuilt `QuotationPdfService` into an original, elegant, multi-section travel-itinerary proposal with modern typography, card styling, and brand palettes.
+- **Structured Sections**:
+  1. Cover / Hero Banner (Agency branding, title, quotation number, version, prepared for, travel dates, validity).
+  2. Trip Overview Card (Travel dates, group size, validity).
+  3. Travel Consultant Greeting (if present).
+  4. Day-Wise Tour Itinerary (Day badge, date, title, location, detailed description).
+  5. Hotel Accommodations (Hotel, city, room type, meal plan, check-in, check-out, nights, rooms — non-price).
+  6. Transportation & Transfers (Vehicle, type, capacity, notes — non-price).
+  7. Sightseeing & Activities (Excursion name, city, date, description — non-price).
+  8. Package Inclusions & Exclusions (Two-column emerald/rose structured cards).
+  9. Payment Schedule (Stage names and percentages only — strictly zero currency amounts).
+  10. Booking Policies & Terms (Cancellation policy, terms and conditions).
+  11. **FINAL QUOTATION AMOUNT**: The **ONLY** monetary section in the entire PDF document, rendered as a prominent dark hero card with emerald final amount.
+  12. Global Header / Footer (Agency contact details and `Page X of Y` on all pages).
+
+## 173.5 Verification & QA Test Results
+- **Automated Verification Suite (`prisma/test-phase173-pricing-pdf.ts`)**:
+  - Scenario A: RateSheet single unit rate sourcing & aggregate subtotal (PASS)
+  - Scenario B: Package markup applied once at quotation level (PASS)
+  - Scenario C: Discount and statutory tax recalculation (PASS)
+  - Scenario D: Dynamic payment milestone synchronization (PASS)
+  - Scenario E: Public proposal DTO security redaction (PASS)
+  - Scenario F: Customer PDF generation & single monetary value rule (PASS)
+  - Result: **54 PASSED, 0 FAILED (TOTAL: 54)**.
+- **TypeScript Compilation**: `npx tsc --noEmit` (0 errors).
+- **Target Trip & Agency**: Verified on Trip `cmu5fhkk40006v4tqpd2k2kd4` and Agency `cmu2g9rgq0000swtqbr5aie7x`.
+- **Permanent Test Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% intact.
+
 ---
 
 # END OF MASTER HANDOVER V3

@@ -231,7 +231,7 @@ export default function TripQuotationPreviewPage() {
             {/* Inclusions & Line Items */}
             <div className="space-y-4">
               <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider border-b border-slate-100 pb-2">
-                Package Inclusions & Line Items
+                Package Inclusions & Services
               </h3>
 
               <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
@@ -250,10 +250,7 @@ export default function TripQuotationPreviewPage() {
                     </div>
 
                     <div className="text-right shrink-0">
-                      <span className="font-extrabold text-slate-900 text-sm block">
-                        {formatCurrency(Number(item.totalPrice))}
-                      </span>
-                      <span className="text-[10px] text-slate-400">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-[11px] font-bold text-slate-700">
                         {item.quantity} {item.unit || "Unit"}
                       </span>
                     </div>
@@ -285,34 +282,98 @@ export default function TripQuotationPreviewPage() {
               </div>
             )}
 
-            {/* Financial Summary Card */}
-            <div className="p-6 bg-slate-900 text-white rounded-2xl space-y-3">
-              <div className="flex justify-between text-xs text-slate-300">
-                <span>Subtotal (Base Tariff):</span>
-                <span>{formatCurrency(Number(quotation.subtotal))}</span>
+            {/* Inclusions & Exclusions from proposalItems if present */}
+            {quotation.proposalItems && quotation.proposalItems.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                {quotation.proposalItems.some((p) => p.type === "INCLUSION") && (
+                  <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-2xl space-y-2">
+                    <h4 className="font-bold text-emerald-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      What&apos;s Included
+                    </h4>
+                    <ul className="space-y-1.5 text-slate-700">
+                      {quotation.proposalItems
+                        .filter((p) => p.type === "INCLUSION")
+                        .map((inc) => (
+                          <li key={inc.id} className="flex items-start gap-2">
+                            <span className="text-emerald-600 font-bold">✓</span>
+                            <div>
+                              <strong className="text-slate-900">{inc.title}</strong>
+                              {inc.description && <p className="text-[11px] text-slate-500">{inc.description}</p>}
+                            </div>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
+
+                {quotation.proposalItems.some((p) => p.type === "EXCLUSION") && (
+                  <div className="p-4 bg-rose-50/60 border border-rose-100 rounded-2xl space-y-2">
+                    <h4 className="font-bold text-rose-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-rose-500" />
+                      What&apos;s Excluded
+                    </h4>
+                    <ul className="space-y-1.5 text-slate-700">
+                      {quotation.proposalItems
+                        .filter((p) => p.type === "EXCLUSION")
+                        .map((exc) => (
+                          <li key={exc.id} className="flex items-start gap-2">
+                            <span className="text-rose-600 font-bold">✕</span>
+                            <div>
+                              <strong className="text-slate-900">{exc.title}</strong>
+                              {exc.description && <p className="text-[11px] text-slate-500">{exc.description}</p>}
+                            </div>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-              {Number(quotation.markupAmount) > 0 && (
-                <div className="flex justify-between text-xs text-slate-300">
-                  <span>Agency Service & Planning ({Number(quotation.markupPercentage)}%):</span>
-                  <span>+{formatCurrency(Number(quotation.markupAmount))}</span>
+            )}
+
+            {/* Payment Milestone Schedule if present */}
+            {quotation.paymentMilestones && quotation.paymentMilestones.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider border-b border-slate-100 pb-2">
+                  Payment Milestone Schedule
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {quotation.paymentMilestones.map((m, idx) => (
+                    <div key={m.id} className="p-3.5 bg-slate-50 border border-slate-200/70 rounded-xl space-y-1 text-xs">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-indigo-700">
+                        <span>Stage {idx + 1}</span>
+                        {m.percentage && (
+                          <span className="font-bold text-indigo-900 bg-indigo-100/80 px-2 py-0.5 rounded-md">
+                            {Number(m.percentage)}%
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-semibold text-slate-800">{m.title}</p>
+                      {m.dueDate && (
+                        <p className="text-[10px] text-slate-400">Due: {new Date(m.dueDate).toLocaleDateString("en-IN")}</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              )}
-              {Number(quotation.discountAmount) > 0 && (
-                <div className="flex justify-between text-xs text-emerald-400">
-                  <span>Special Discount ({Number(quotation.discountPercentage)}%):</span>
-                  <span>-{formatCurrency(Number(quotation.discountAmount))}</span>
-                </div>
-              )}
-              {Number(quotation.taxAmount) > 0 && (
-                <div className="flex justify-between text-xs text-slate-300">
-                  <span>Tax / GST ({Number(quotation.taxPercentage)}%):</span>
-                  <span>+{formatCurrency(Number(quotation.taxAmount))}</span>
-                </div>
-              )}
-              <div className="pt-3 border-t border-slate-800 flex justify-between items-baseline">
-                <span className="font-bold text-sm">Total Package Price:</span>
-                <span className="font-black text-2xl text-emerald-400">
+              </div>
+            )}
+
+            {/* Financial Summary Card - Final Quotation Amount ONLY */}
+            <div className="p-6 bg-slate-900 text-white rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-400 block">
+                  Final Proposal Price
+                </span>
+                <span className="font-bold text-sm text-slate-200">
+                  Total Final Quotation Amount
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="font-black text-3xl sm:text-4xl text-emerald-400 tracking-tight block">
                   {formatCurrency(Number(quotation.finalAmount))}
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  All-inclusive package price ({quotation.currency})
                 </span>
               </div>
             </div>

@@ -751,7 +751,55 @@ export const quotationService = {
       },
     });
 
-    return updated as QuotationWithRelations;
+    // Synchronize percentage-based payment milestones with updated finalAmount
+    await this.syncPaymentMilestones(id, Number(taxResult.finalAmount));
+
+    const refreshed = await prisma.quotation.findUnique({
+      where: { id },
+      include: {
+        customer: { select: { id: true, name: true, phone: true, email: true } },
+        trip: {
+          select: {
+            id: true,
+            title: true,
+            tripNumber: true,
+            startDate: true,
+            endDate: true,
+            status: true,
+            travelers: { select: { id: true, name: true, type: true } },
+            itineraryItems: {
+              select: {
+                id: true,
+                dayNumber: true,
+                date: true,
+                title: true,
+                description: true,
+                location: true,
+                startTime: true,
+                endTime: true,
+                sortOrder: true,
+              },
+              orderBy: { sortOrder: "asc" },
+            },
+          },
+        },
+        items: {
+          orderBy: { sortOrder: "asc" },
+        },
+        proposalItems: {
+          orderBy: { sortOrder: "asc" },
+        },
+        paymentMilestones: {
+          orderBy: { sortOrder: "asc" },
+        },
+        packageOptions: {
+          orderBy: { sortOrder: "asc" },
+        },
+        selectedPackageOption: true,
+      },
+    });
+
+    return (refreshed || updated) as QuotationWithRelations;
   },
 
   /**
@@ -799,11 +847,11 @@ export const quotationService = {
     const subtotal = costing.subtotal;
     const markupPct = options?.markupPercentage ?? 10;
     const markupAmount = Math.round((subtotal * markupPct) / 100);
-    const baseWithMarkup = subtotal + markupAmount;
+    const grossPackageAmount = subtotal + markupAmount;
 
     const discountPct = options?.discountPercentage ?? 0;
-    const discountAmount = Math.round((baseWithMarkup * discountPct) / 100);
-    const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
+    const discountAmount = Math.round((grossPackageAmount * discountPct) / 100);
+    const afterDiscount = Math.max(0, grossPackageAmount - discountAmount);
 
     const taxResult = taxService.calculate({
       amount: afterDiscount,
@@ -813,33 +861,33 @@ export const quotationService = {
     });
     const finalAmount = Number(taxResult.finalAmount);
 
-    // Build itemized snapshot
+    // Build itemized RateSheet base snapshot (without line-level markup)
     const itemsToCreate: Array<Prisma.QuotationItemCreateWithoutQuotationInput> = [];
     let sortIdx = 0;
 
     for (const h of costing.hotels) {
       const itemCost = Number(h.totalCost);
-      const itemSelling = Math.round(itemCost * (1 + markupPct / 100));
+      const roomsQty = h.rooms || 1;
+      const unitRate = Math.round(itemCost / roomsQty);
       itemsToCreate.push({
         type: "HOTEL",
         sourceType: "TRIP_HOTEL",
         sourceId: h.id,
         name: `${h.hotelName} (${h.roomType})`,
         description: `${h.rooms} room(s), ${h.nights} night(s) stay${h.mealPlan ? ` • ${h.mealPlan}` : ""}`,
-        quantity: h.rooms,
+        quantity: roomsQty,
         unit: "rooms",
-        unitPrice: new Prisma.Decimal(Math.round(itemSelling / (h.rooms || 1))),
+        unitPrice: new Prisma.Decimal(unitRate),
         costPrice: new Prisma.Decimal(itemCost),
-        markupPercentage: new Prisma.Decimal(markupPct),
-        sellingPrice: new Prisma.Decimal(itemSelling),
-        totalPrice: new Prisma.Decimal(itemSelling),
+        markupPercentage: new Prisma.Decimal(0),
+        sellingPrice: new Prisma.Decimal(itemCost),
+        totalPrice: new Prisma.Decimal(itemCost),
         sortOrder: sortIdx++,
       });
     }
 
     for (const v of costing.vehicles) {
       const itemCost = Number(v.totalCost);
-      const itemSelling = Math.round(itemCost * (1 + markupPct / 100));
       itemsToCreate.push({
         type: "VEHICLE",
         sourceType: "TRIP_VEHICLE",
@@ -848,31 +896,32 @@ export const quotationService = {
         description: `Dedicated transport • ${v.pricingType} pricing (${v.estimatedKm} km estimated)`,
         quantity: 1,
         unit: "vehicle",
-        unitPrice: new Prisma.Decimal(itemSelling),
+        unitPrice: new Prisma.Decimal(itemCost),
         costPrice: new Prisma.Decimal(itemCost),
-        markupPercentage: new Prisma.Decimal(markupPct),
-        sellingPrice: new Prisma.Decimal(itemSelling),
-        totalPrice: new Prisma.Decimal(itemSelling),
+        markupPercentage: new Prisma.Decimal(0),
+        sellingPrice: new Prisma.Decimal(itemCost),
+        totalPrice: new Prisma.Decimal(itemCost),
         sortOrder: sortIdx++,
       });
     }
 
     for (const a of costing.activities) {
       const itemCost = Number(a.totalCost);
-      const itemSelling = Math.round(itemCost * (1 + markupPct / 100));
+      const paxQty = a.numberOfParticipants || 1;
+      const unitRate = Math.round(itemCost / paxQty);
       itemsToCreate.push({
         type: "ACTIVITY",
         sourceType: "TRIP_ACTIVITY",
         sourceId: a.id,
         name: a.activityName,
         description: `${a.type} Activity for ${a.numberOfParticipants} participant(s)`,
-        quantity: a.numberOfParticipants,
+        quantity: paxQty,
         unit: "pax",
-        unitPrice: new Prisma.Decimal(Math.round(itemSelling / (a.numberOfParticipants || 1))),
+        unitPrice: new Prisma.Decimal(unitRate),
         costPrice: new Prisma.Decimal(itemCost),
-        markupPercentage: new Prisma.Decimal(markupPct),
-        sellingPrice: new Prisma.Decimal(itemSelling),
-        totalPrice: new Prisma.Decimal(itemSelling),
+        markupPercentage: new Prisma.Decimal(0),
+        sellingPrice: new Prisma.Decimal(itemCost),
+        totalPrice: new Prisma.Decimal(itemCost),
         sortOrder: sortIdx++,
       });
     }
@@ -1293,50 +1342,48 @@ export const quotationService = {
     }
 
     const qty = data.quantity || 1;
-    const unitPrice = Number(data.unitPrice || 0);
-    const costPrice = Number(data.costPrice ?? unitPrice * qty);
-    const markupPct = Number(data.markupPercentage || 0);
-    const sellingPrice = data.sellingPrice !== undefined ? Number(data.sellingPrice) : Math.round(unitPrice * qty);
-    const discount = Number(data.discount || 0);
-    const tax = Number(data.tax || 0);
-    const totalPrice = data.totalPrice !== undefined ? Number(data.totalPrice) : Math.max(0, sellingPrice - discount + tax);
+    const rateSheetRate = Number(data.unitPrice || data.costPrice || 0);
+    const lineBaseAmount = Math.round(rateSheetRate * qty);
 
-    const item = await prisma.$transaction(async (tx) => {
-      const created = await tx.quotationItem.create({
-        data: {
-          quotationId,
-          type: data.type,
-          category: data.category,
-          sourceType: data.sourceType,
-          sourceId: data.sourceId,
-          name: data.name,
-          description: data.description,
-          quantity: qty,
-          unit: data.unit,
-          unitPrice: new Prisma.Decimal(unitPrice),
-          costPrice: new Prisma.Decimal(costPrice),
-          markupPercentage: new Prisma.Decimal(markupPct),
-          sellingPrice: new Prisma.Decimal(sellingPrice),
-          totalPrice: new Prisma.Decimal(totalPrice),
-          discount: new Prisma.Decimal(discount),
-          tax: new Prisma.Decimal(tax),
-          isOptional: data.isOptional || false,
-          sortOrder: data.sortOrder || 0,
-          notes: data.notes,
-        },
-      });
+    const item = await prisma.$transaction(
+      async (tx) => {
+        const created = await tx.quotationItem.create({
+          data: {
+            quotationId,
+            type: data.type,
+            category: data.category,
+            sourceType: data.sourceType,
+            sourceId: data.sourceId,
+            name: data.name,
+            description: data.description,
+            quantity: qty,
+            unit: data.unit,
+            unitPrice: new Prisma.Decimal(rateSheetRate),
+            costPrice: new Prisma.Decimal(lineBaseAmount),
+            markupPercentage: new Prisma.Decimal(0),
+            sellingPrice: new Prisma.Decimal(lineBaseAmount),
+            totalPrice: new Prisma.Decimal(lineBaseAmount),
+            discount: new Prisma.Decimal(0),
+            tax: new Prisma.Decimal(0),
+            isOptional: data.isOptional || false,
+            sortOrder: data.sortOrder || 0,
+            notes: data.notes,
+          },
+        });
 
-      // Recalculate quotation subtotal & grand total
-      await this.recalculateQuotationTotals(quotationId, tx);
+        // Recalculate quotation subtotal & grand total
+        await this.recalculateQuotationTotals(quotationId, tx);
 
-      return created;
-    });
+        return created;
+      },
+      { timeout: 15000, maxWait: 10000 }
+    );
 
     return item;
   },
 
   /**
-   * Update a line item & recalculate totals
+   * Update a line item & recalculate totals (RateSheet Rate is read-only / fixed)
    */
   async updateQuotationItem(
     agencyId: string,
@@ -1361,41 +1408,42 @@ export const quotationService = {
     }
 
     const qty = data.quantity !== undefined ? data.quantity : existing.quantity;
-    const unitPrice = data.unitPrice !== undefined ? Number(data.unitPrice) : Number(existing.unitPrice);
-    const costPrice = data.costPrice !== undefined ? Number(data.costPrice) : Number(existing.costPrice);
-    const markupPct = data.markupPercentage !== undefined ? Number(data.markupPercentage) : Number(existing.markupPercentage);
-    const sellingPrice = data.sellingPrice !== undefined ? Number(data.sellingPrice) : Math.round(unitPrice * qty);
-    const discount = data.discount !== undefined ? Number(data.discount) : Number(existing.discount);
-    const tax = data.tax !== undefined ? Number(data.tax) : Number(existing.tax);
-    const totalPrice = data.totalPrice !== undefined ? Number(data.totalPrice) : Math.max(0, sellingPrice - discount + tax);
+    const rateSheetRate =
+      existing.unitPrice && Number(existing.unitPrice) > 0
+        ? Number(existing.unitPrice)
+        : existing.quantity > 0
+        ? Math.round(Number(existing.costPrice) / existing.quantity)
+        : Number(existing.costPrice);
+    const lineBaseAmount = Math.round(rateSheetRate * qty);
 
-    const item = await prisma.$transaction(async (tx) => {
-      const updated = await tx.quotationItem.update({
-        where: { id: itemId },
-        data: {
-          ...(data.type !== undefined ? { type: data.type } : {}),
-          ...(data.category !== undefined ? { category: data.category } : {}),
-          ...(data.name !== undefined ? { name: data.name } : {}),
-          ...(data.description !== undefined ? { description: data.description } : {}),
-          quantity: qty,
-          ...(data.unit !== undefined ? { unit: data.unit } : {}),
-          unitPrice: new Prisma.Decimal(unitPrice),
-          costPrice: new Prisma.Decimal(costPrice),
-          markupPercentage: new Prisma.Decimal(markupPct),
-          sellingPrice: new Prisma.Decimal(sellingPrice),
-          totalPrice: new Prisma.Decimal(totalPrice),
-          discount: new Prisma.Decimal(discount),
-          tax: new Prisma.Decimal(tax),
-          ...(data.isOptional !== undefined ? { isOptional: data.isOptional } : {}),
-          ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
-          ...(data.notes !== undefined ? { notes: data.notes } : {}),
-        },
-      });
+    const item = await prisma.$transaction(
+      async (tx) => {
+        const updated = await tx.quotationItem.update({
+          where: { id: itemId },
+          data: {
+            ...(data.type !== undefined ? { type: data.type } : {}),
+            ...(data.category !== undefined ? { category: data.category } : {}),
+            ...(data.name !== undefined ? { name: data.name } : {}),
+            ...(data.description !== undefined ? { description: data.description } : {}),
+            quantity: qty,
+            ...(data.unit !== undefined ? { unit: data.unit } : {}),
+            unitPrice: new Prisma.Decimal(rateSheetRate),
+            costPrice: new Prisma.Decimal(lineBaseAmount),
+            markupPercentage: new Prisma.Decimal(0),
+            sellingPrice: new Prisma.Decimal(lineBaseAmount),
+            totalPrice: new Prisma.Decimal(lineBaseAmount),
+            ...(data.isOptional !== undefined ? { isOptional: data.isOptional } : {}),
+            ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
+            ...(data.notes !== undefined ? { notes: data.notes } : {}),
+          },
+        });
 
-      await this.recalculateQuotationTotals(quotationId, tx);
+        await this.recalculateQuotationTotals(quotationId, tx);
 
-      return updated;
-    });
+        return updated;
+      },
+      { timeout: 15000, maxWait: 10000 }
+    );
 
     return item;
   },
@@ -1420,19 +1468,66 @@ export const quotationService = {
       throw new Error("Line item not found on this quotation.");
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.quotationItem.delete({
-        where: { id: itemId },
-      });
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.quotationItem.delete({
+          where: { id: itemId },
+        });
 
-      await this.recalculateQuotationTotals(quotationId, tx);
-    });
+        await this.recalculateQuotationTotals(quotationId, tx);
+      },
+      { timeout: 15000, maxWait: 10000 }
+    );
 
     return true;
   },
 
   /**
+   * Synchronize percentage-based payment milestones with the latest quotation finalAmount
+   */
+  async syncPaymentMilestones(quotationId: string, finalAmount: number, tx?: Prisma.TransactionClient): Promise<void> {
+    const db = tx || prisma;
+    const milestones = await db.quotationPaymentMilestone.findMany({
+      where: { quotationId },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    const pctMilestones = milestones.filter((m) => m.percentage !== null && Number(m.percentage) > 0);
+    if (pctMilestones.length === 0) return;
+
+    let allocatedAmount = 0;
+    const totalPct = pctMilestones.reduce((acc, curr) => acc + Number(curr.percentage || 0), 0);
+    const isHundredPct = Math.abs(totalPct - 100) < 0.01;
+
+    for (let i = 0; i < pctMilestones.length; i++) {
+      const m = pctMilestones[i];
+      const isLast = i === pctMilestones.length - 1;
+      let amt = Math.round((finalAmount * Number(m.percentage)) / 100);
+      if (isLast && isHundredPct) {
+        // Assign rounding remainder to the final milestone
+        amt = Math.max(0, finalAmount - allocatedAmount);
+      }
+      allocatedAmount += amt;
+
+      await db.quotationPaymentMilestone.update({
+        where: { id: m.id },
+        data: {
+          amount: new Prisma.Decimal(amt),
+        },
+      });
+    }
+  },
+
+  /**
    * Internal helper: Recalculates Quotation subtotal and finalAmount from line items
+   *
+   * RateSheet Pricing Model:
+   * 1. subtotal = aggregate of all quotation item RateSheet base amounts
+   * 2. markupAmount = round(subtotal * markupPercentage / 100)  [APPLIED ONCE AT PACKAGE LEVEL]
+   * 3. grossPackageAmount = subtotal + markupAmount
+   * 4. discountAmount = round(grossPackageAmount * discountPercentage / 100)
+   * 5. taxableAmount = max(0, grossPackageAmount - discountAmount)
+   * 6. finalAmount = TaxService.calculate(...)
    */
   async recalculateQuotationTotals(quotationId: string, tx?: Prisma.TransactionClient): Promise<void> {
     const db = tx || prisma;
@@ -1444,15 +1539,23 @@ export const quotationService = {
       where: { id: quotationId },
     });
 
-    const subtotal = items.reduce((acc, i) => acc + Number(i.costPrice || 0), 0);
+    // 1. RateSheet Base Subtotal = Aggregate of all line item RateSheet base amounts
+    const subtotal = items.reduce((acc, i) => {
+      const lineBase = Number(i.costPrice || (Number(i.unitPrice || 0) * (i.quantity || 1)));
+      return acc + lineBase;
+    }, 0);
+
+    // 2. Package-Level Agency Markup (Applied ONCE to the aggregate subtotal)
     const markupPct = Number(quote.markupPercentage || 0);
     const markupAmount = Math.round((subtotal * markupPct) / 100);
-    const baseWithMarkup = subtotal + markupAmount;
+    const grossPackageAmount = subtotal + markupAmount;
 
+    // 3. Discount applied before tax
     const discountPct = Number(quote.discountPercentage || 0);
-    const discountAmount = Math.round((baseWithMarkup * discountPct) / 100);
-    const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
+    const discountAmount = Math.round((grossPackageAmount * discountPct) / 100);
+    const afterDiscount = Math.max(0, grossPackageAmount - discountAmount);
 
+    // 4. Tax calculation
     const { taxRate: effectiveTaxRate, taxMode: effectiveTaxMode, gstTreatment: effectiveGstTreatment } = await this.resolveQuotationTaxConfig(
       quote.agencyId,
       {
@@ -1473,6 +1576,7 @@ export const quotationService = {
       where: { id: quotationId },
       data: {
         subtotal: new Prisma.Decimal(subtotal),
+        markupPercentage: new Prisma.Decimal(markupPct.toFixed(2)),
         markupAmount: new Prisma.Decimal(markupAmount),
         discountAmount: new Prisma.Decimal(discountAmount),
         taxableAmount: new Prisma.Decimal(taxCalc.taxableAmount.toString()),
@@ -1487,6 +1591,9 @@ export const quotationService = {
         taxPercentage: new Prisma.Decimal(effectiveTaxRate),
       },
     });
+
+    // Synchronize percentage-based payment milestones with updated finalAmount
+    await this.syncPaymentMilestones(quotationId, Number(taxCalc.finalAmount), db);
   },
 
   // ──────────────────────── PROPOSAL ITEMS (INCLUSIONS / EXCLUSIONS / NOTES) ─────────────────────────
@@ -2530,8 +2637,6 @@ export const quotationService = {
             description: true,
             quantity: true,
             unit: true,
-            unitPrice: true,
-            totalPrice: true,
             sortOrder: true,
           },
         },
@@ -2552,7 +2657,6 @@ export const quotationService = {
             title: true,
             description: true,
             percentage: true,
-            amount: true,
             dueDate: true,
             sortOrder: true,
           },
@@ -2565,16 +2669,6 @@ export const quotationService = {
             subtitle: true,
             description: true,
             isRecommended: true,
-            discountAmount: true,
-            taxableAmount: true,
-            taxAmount: true,
-            taxRate: true,
-            taxPercentage: true,
-            taxMode: true,
-            gstTreatment: true,
-            cgstAmount: true,
-            sgstAmount: true,
-            igstAmount: true,
             finalAmount: true,
             hotelNotes: true,
             vehicleNotes: true,
@@ -2591,16 +2685,6 @@ export const quotationService = {
             subtitle: true,
             description: true,
             isRecommended: true,
-            discountAmount: true,
-            taxableAmount: true,
-            taxAmount: true,
-            taxRate: true,
-            taxPercentage: true,
-            taxMode: true,
-            gstTreatment: true,
-            cgstAmount: true,
-            sgstAmount: true,
-            igstAmount: true,
             finalAmount: true,
             hotelNotes: true,
             vehicleNotes: true,
@@ -2629,15 +2713,6 @@ export const quotationService = {
       currency: quotation.currency,
       validUntil: quotation.validUntil,
       isExpired,
-      discountAmount: Number(quotation.discountAmount || 0),
-      taxableAmount: Number(quotation.taxableAmount || 0),
-      taxRate: Number(quotation.taxRate || quotation.taxPercentage || 0),
-      taxMode: quotation.taxMode || "EXCLUSIVE",
-      gstTreatment: quotation.gstTreatment || "INTRA_STATE",
-      cgstAmount: Number(quotation.cgstAmount || 0),
-      sgstAmount: Number(quotation.sgstAmount || 0),
-      igstAmount: Number(quotation.igstAmount || 0),
-      taxAmount: Number(quotation.taxAmount || 0),
       finalAmount: Number(quotation.finalAmount || 0),
       selectedPackageOptionId: quotation.selectedPackageOptionId,
       customerMessage: quotation.customerMessage,
@@ -2660,8 +2735,6 @@ export const quotationService = {
         description: i.description,
         quantity: i.quantity,
         unit: i.unit,
-        unitPrice: Number(i.unitPrice),
-        totalPrice: Number(i.totalPrice),
         sortOrder: i.sortOrder,
       })),
       proposalItems: quotation.proposalItems.map((p) => ({
@@ -2676,7 +2749,6 @@ export const quotationService = {
         title: m.title,
         description: m.description,
         percentage: m.percentage ? Number(m.percentage) : null,
-        amount: m.amount ? Number(m.amount) : null,
         dueDate: m.dueDate,
         sortOrder: m.sortOrder,
       })),
@@ -2686,15 +2758,6 @@ export const quotationService = {
         subtitle: opt.subtitle,
         description: opt.description,
         isRecommended: opt.isRecommended,
-        discountAmount: Number(opt.discountAmount || 0),
-        taxableAmount: Number(opt.taxableAmount || 0),
-        taxRate: Number(opt.taxRate || opt.taxPercentage || 0),
-        taxMode: opt.taxMode || "EXCLUSIVE",
-        gstTreatment: opt.gstTreatment || "INTRA_STATE",
-        cgstAmount: Number(opt.cgstAmount || 0),
-        sgstAmount: Number(opt.sgstAmount || 0),
-        igstAmount: Number(opt.igstAmount || 0),
-        taxAmount: Number(opt.taxAmount || 0),
         finalAmount: Number(opt.finalAmount || 0),
         hotelNotes: opt.hotelNotes,
         vehicleNotes: opt.vehicleNotes,
@@ -2709,15 +2772,6 @@ export const quotationService = {
         subtitle: quotation.selectedPackageOption.subtitle,
         description: quotation.selectedPackageOption.description,
         isRecommended: quotation.selectedPackageOption.isRecommended,
-        discountAmount: Number(quotation.selectedPackageOption.discountAmount || 0),
-        taxableAmount: Number(quotation.selectedPackageOption.taxableAmount || 0),
-        taxRate: Number(quotation.selectedPackageOption.taxRate || quotation.selectedPackageOption.taxPercentage || 0),
-        taxMode: quotation.selectedPackageOption.taxMode || "EXCLUSIVE",
-        gstTreatment: quotation.selectedPackageOption.gstTreatment || "INTRA_STATE",
-        cgstAmount: Number(quotation.selectedPackageOption.cgstAmount || 0),
-        sgstAmount: Number(quotation.selectedPackageOption.sgstAmount || 0),
-        igstAmount: Number(quotation.selectedPackageOption.igstAmount || 0),
-        taxAmount: Number(quotation.selectedPackageOption.taxAmount || 0),
         finalAmount: Number(quotation.selectedPackageOption.finalAmount || 0),
         hotelNotes: quotation.selectedPackageOption.hotelNotes,
         vehicleNotes: quotation.selectedPackageOption.vehicleNotes,

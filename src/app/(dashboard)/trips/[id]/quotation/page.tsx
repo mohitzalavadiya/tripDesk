@@ -375,16 +375,16 @@ export default function TripQuotationEditorPage() {
     try {
       setItemSaving(true);
       const qty = Number(itemQuantity) || 1;
-      const uPrice = Number(itemUnitPrice) || 0;
-      const cPrice = Number(itemCostPrice) || uPrice * qty;
+      const rateSheetRate = Number(itemUnitPrice) || 0;
+      const lineBase = Math.round(rateSheetRate * qty);
 
       const res = await quotationClient.createQuotationItem(activeQuote.id, {
         type: itemType,
         name: itemName,
         description: itemDescription || undefined,
         quantity: qty,
-        unitPrice: uPrice,
-        costPrice: cPrice,
+        unitPrice: rateSheetRate,
+        costPrice: lineBase,
       });
 
       if (res.success) {
@@ -405,7 +405,14 @@ export default function TripQuotationEditorPage() {
     setItemName(item.name);
     setItemDescription(item.description || "");
     setItemQuantity(item.quantity);
-    setItemUnitPrice(String(item.unitPrice));
+    const rateSheetRate = Number(
+      item.unitPrice && Number(item.unitPrice) > 0
+        ? item.unitPrice
+        : item.quantity > 0
+        ? Math.round(Number(item.costPrice) / item.quantity)
+        : item.costPrice
+    );
+    setItemUnitPrice(String(rateSheetRate));
     setItemCostPrice(String(item.costPrice));
     setIsEditItemOpen(true);
   };
@@ -417,16 +424,23 @@ export default function TripQuotationEditorPage() {
     try {
       setItemSaving(true);
       const qty = Number(itemQuantity) || 1;
-      const uPrice = Number(itemUnitPrice) || 0;
-      const cPrice = Number(itemCostPrice) || uPrice * qty;
+      // RateSheet Rate is fixed and read-only
+      const rateSheetRate = Number(
+        editingItem.unitPrice && Number(editingItem.unitPrice) > 0
+          ? editingItem.unitPrice
+          : editingItem.quantity > 0
+          ? Math.round(Number(editingItem.costPrice) / editingItem.quantity)
+          : editingItem.costPrice
+      );
+      const lineBase = Math.round(rateSheetRate * qty);
 
       const res = await quotationClient.updateQuotationItem(activeQuote.id, editingItem.id, {
         type: itemType,
         name: itemName,
         description: itemDescription || null,
         quantity: qty,
-        unitPrice: uPrice,
-        costPrice: cPrice,
+        unitPrice: rateSheetRate,
+        costPrice: lineBase,
       });
 
       if (res.success) {
@@ -941,6 +955,77 @@ export default function TripQuotationEditorPage() {
           </div>
         </div>
 
+        {/* Empty State when no quotations exist */}
+        {!activeQuote && (
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-12 shadow-xs text-center space-y-6 animate-in fade-in duration-300">
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-2xs">
+              <Sparkles className="w-8 h-8" />
+            </div>
+
+            <div className="max-w-md mx-auto space-y-2">
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                No Quotation Proposal Created Yet
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                Generate an itemized customer proposal from this trip&apos;s itinerary, hotel stays, vehicle allocations, and live supplier rate sheets.
+              </p>
+            </div>
+
+            {/* Feature highlights grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto text-left pt-2">
+              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
+                  <DollarSign className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Costing Snapshot</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Automatic line items calculated from hotels, vehicles, and activities.
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
+                  <Package className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Tiered Packages</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Provide Standard, Deluxe, and Luxury options for traveler choice.
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
+                  <CreditCard className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Payment Schedule</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Multi-stage milestones dynamically synchronized to proposal total.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                onClick={handleGenerate}
+                disabled={generating || isReadOnly}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-6 rounded-xl shadow-xs gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generating Proposal...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Generate Initial Proposal
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Customer Feedback Banner if changes requested */}
         {activeQuote?.customerFeedback && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
@@ -1052,56 +1137,69 @@ export default function TripQuotationEditorPage() {
                         <TableHead className="py-2.5 px-4 font-bold text-slate-600">Item Description</TableHead>
                         <TableHead className="py-2.5 px-4 font-bold text-slate-600">Type</TableHead>
                         <TableHead className="py-2.5 px-4 font-bold text-slate-600">Qty</TableHead>
-                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">Cost Price</TableHead>
-                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">Selling Price</TableHead>
+                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">RateSheet Rate</TableHead>
+                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">Line Base Total</TableHead>
                         <TableHead className="py-2.5 px-4 text-right font-bold text-slate-600">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {activeQuote.items.map((item) => (
-                        <TableRow key={item.id} className="border-b border-slate-100 text-xs hover:bg-slate-50/50">
-                          <TableCell className="py-3 px-4 font-semibold text-slate-900">
-                            <div>
-                              <span>{item.name}</span>
-                              {item.description && (
-                                <p className="text-[11px] font-normal text-slate-500">{item.description}</p>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3 px-4">
-                            <Badge variant="outline" className="text-[10px] font-bold">
-                              {item.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-3 px-4 text-slate-700">
-                            {item.quantity} {item.unit || ""}
-                          </TableCell>
-                          <TableCell className="py-3 px-4 text-slate-500 font-mono">
-                            {formatCurrency(Number(item.costPrice))}
-                          </TableCell>
-                          <TableCell className="py-3 px-4 font-extrabold text-slate-900">
-                            {formatCurrency(Number(item.totalPrice))}
-                          </TableCell>
-                          <TableCell className="py-3 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => handleOpenEditItem(item)}
-                                disabled={isReadOnly}
-                                className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer disabled:opacity-50"
-                              >
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteItem(item.id, item.name)}
-                                disabled={isReadOnly}
-                                className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer disabled:opacity-50"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {activeQuote.items.map((item) => {
+                        const rateSheetRate = Number(
+                          item.unitPrice && Number(item.unitPrice) > 0
+                            ? item.unitPrice
+                            : item.quantity > 0
+                            ? Math.round(Number(item.costPrice) / item.quantity)
+                            : item.costPrice
+                        );
+                        const lineBase = Number(item.costPrice || rateSheetRate * item.quantity);
+
+                        return (
+                          <TableRow key={item.id} className="border-b border-slate-100 text-xs hover:bg-slate-50/50">
+                            <TableCell className="py-3 px-4 font-semibold text-slate-900">
+                              <div>
+                                <span>{item.name}</span>
+                                {item.description && (
+                                  <p className="text-[11px] font-normal text-slate-500">{item.description}</p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-3 px-4">
+                              <Badge variant="outline" className="text-[10px] font-bold">
+                                {item.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-3 px-4 text-slate-700">
+                              {item.quantity} {item.unit || ""}
+                            </TableCell>
+                            <TableCell className="py-3 px-4 text-slate-700 font-mono font-semibold">
+                              {formatCurrency(rateSheetRate)}
+                            </TableCell>
+                            <TableCell className="py-3 px-4 font-extrabold text-slate-900">
+                              {formatCurrency(lineBase)}
+                            </TableCell>
+                            <TableCell className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => handleOpenEditItem(item)}
+                                  disabled={isReadOnly}
+                                  className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer disabled:opacity-50"
+                                  title="Edit item quantity / description"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteItem(item.id, item.name)}
+                                  disabled={isReadOnly}
+                                  className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer disabled:opacity-50"
+                                  title="Remove item"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -1167,7 +1265,7 @@ export default function TripQuotationEditorPage() {
                 {/* Pricing Fields & Commercial Base */}
                 <div className={`space-y-3 pt-2 text-xs border-t border-slate-100 transition-opacity duration-200 ${updatingPricing ? "opacity-60" : "opacity-100"}`}>
                   <div className="flex justify-between text-slate-600">
-                    <span>Base Supplier Cost:</span>
+                    <span>RateSheet Base Subtotal:</span>
                     <strong className="text-slate-900">{formatCurrency(Number(activeQuote.subtotal))}</strong>
                   </div>
 
@@ -1184,14 +1282,14 @@ export default function TripQuotationEditorPage() {
                         className="h-7 w-16 text-right text-xs bg-slate-50 font-bold"
                       />
                       <span className="text-slate-500 font-bold">%</span>
-                      <strong className="text-slate-900 min-w-[70px] text-right">
-                        +{formatCurrency(Number(activeQuote.markupAmount))}
+                      <strong className={`min-w-[70px] text-right ${Number(activeQuote.markupAmount) < 0 ? "text-rose-600 font-semibold" : "text-slate-900"}`}>
+                        {Number(activeQuote.markupAmount) >= 0 ? `+${formatCurrency(Number(activeQuote.markupAmount))}` : formatCurrency(Number(activeQuote.markupAmount))}
                       </strong>
                     </div>
                   </div>
 
                   <div className="flex justify-between text-slate-600 font-medium">
-                    <span>Selling Price (Base):</span>
+                    <span>Gross Package Amount:</span>
                     <strong className="text-slate-900">
                       {formatCurrency(Number(activeQuote.subtotal) + Number(activeQuote.markupAmount))}
                     </strong>
@@ -1877,7 +1975,9 @@ export default function TripQuotationEditorPage() {
                   {isAddItemOpen ? "Add Custom Line Item" : "Edit Line Item"}
                 </DialogTitle>
                 <DialogDescription className="text-slate-500 text-xs mt-1">
-                  Configure line item description, quantity, and pricing.
+                  {isAddItemOpen
+                    ? "Add a custom quotation line item with quantity and RateSheet unit rate."
+                    : "Update line item quantity, description, or notes. RateSheet Rate is fixed and read-only."}
                 </DialogDescription>
               </DialogHeader>
 
@@ -1895,39 +1995,60 @@ export default function TripQuotationEditorPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Quantity</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Quantity *</label>
                     <Input
                       type="number"
                       min={1}
                       value={itemQuantity}
                       onChange={(e) => setItemQuantity(Number(e.target.value) || 1)}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Selling Unit Price (₹)</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={itemUnitPrice}
-                      onChange={(e) => setItemUnitPrice(e.target.value)}
-                      placeholder="0.00"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                       required
                     />
                   </div>
+                  {isAddItemOpen ? (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">RateSheet Rate (₹) *</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={itemUnitPrice}
+                        onChange={(e) => setItemUnitPrice(e.target.value)}
+                        placeholder="0.00"
+                        className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                        required
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">RateSheet Rate (Fixed)</label>
+                      <div className="h-9 px-3 bg-slate-100 border border-slate-200 rounded-md flex items-center font-mono font-bold text-slate-800 text-xs">
+                        {formatCurrency(Number(itemUnitPrice) || 0)}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base Cost Price (₹)</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Description / Notes</label>
                   <Input
-                    type="number"
-                    min={0}
-                    value={itemCostPrice}
-                    onChange={(e) => setItemCostPrice(e.target.value)}
-                    placeholder="Supplier rate or net cost"
+                    value={itemDescription}
+                    onChange={(e) => setItemDescription(e.target.value)}
+                    placeholder="e.g. 2 room(s), 2 night(s) stay"
                     className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                   />
+                </div>
+
+                {/* Real-time Line Base Total Calculation */}
+                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-600 font-medium">Line Item Base Amount:</span>
+                    <span className="font-mono font-black text-slate-900 text-sm">
+                      {formatCurrency(Math.round((Number(itemQuantity) || 1) * (Number(itemUnitPrice) || 0)))}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    {formatCurrency(Number(itemUnitPrice) || 0)} × {itemQuantity} {editingItem?.unit || "unit(s)"}
+                  </p>
                 </div>
               </div>
 

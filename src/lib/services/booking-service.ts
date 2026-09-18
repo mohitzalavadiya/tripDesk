@@ -418,7 +418,7 @@ export const bookingService = {
         data: {
           agencyId,
           tripId: data.tripId,
-          customerId: data.customerId,
+          customerId: data.customerId || trip.customerId,
           quotationId: data.quotationId || null,
           packageOptionName: quoteTax?.packageOptionName || null,
           bookingNumber,

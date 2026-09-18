@@ -167,7 +167,6 @@ export interface PublicPaymentMilestone {
   title: string;
   description?: string | null;
   percentage?: number | null;
-  amount?: number | null;
   dueDate?: string | null;
   sortOrder: number;
 }
@@ -178,15 +177,6 @@ export interface PublicPackageOption {
   subtitle?: string | null;
   description?: string | null;
   isRecommended: boolean;
-  discountAmount?: number;
-  taxableAmount?: number;
-  taxRate?: number;
-  taxMode?: string;
-  gstTreatment?: string;
-  cgstAmount?: number;
-  sgstAmount?: number;
-  igstAmount?: number;
-  taxAmount?: number;
   finalAmount: number;
   hotelNotes?: string | null;
   vehicleNotes?: string | null;
@@ -206,15 +196,6 @@ export interface PublicQuotationPayload {
   currency: string;
   validUntil?: string | null;
   isExpired: boolean;
-  discountAmount: number;
-  taxableAmount?: number;
-  taxRate?: number;
-  taxMode?: string;
-  gstTreatment?: string;
-  cgstAmount?: number;
-  sgstAmount?: number;
-  igstAmount?: number;
-  taxAmount: number;
   finalAmount: number;
   selectedPackageOptionId?: string | null;
   customerMessage?: string | null;

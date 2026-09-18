@@ -195,35 +195,6 @@ export default function PublicQuotationPage() {
   const activePackage = packageOptions.find((p) => p.id === selectedOptionId) || quotation.selectedPackageOption || null;
   const effectiveFinalAmount = activePackage ? Number(activePackage.finalAmount) : quotation.finalAmount;
 
-  const activeTaxSnapshot = React.useMemo(() => {
-    if (activePackage) {
-      return {
-        discountAmount: Number(activePackage.discountAmount || 0),
-        taxableAmount: Number(activePackage.taxableAmount || 0),
-        taxRate: Number(activePackage.taxRate || 0),
-        taxMode: activePackage.taxMode || "EXCLUSIVE",
-        gstTreatment: activePackage.gstTreatment || "INTRA_STATE",
-        cgstAmount: Number(activePackage.cgstAmount || 0),
-        sgstAmount: Number(activePackage.sgstAmount || 0),
-        igstAmount: Number(activePackage.igstAmount || 0),
-        taxAmount: Number(activePackage.taxAmount || 0),
-        finalAmount: Number(activePackage.finalAmount || 0),
-      };
-    }
-    return {
-      discountAmount: Number(quotation.discountAmount || 0),
-      taxableAmount: Number(quotation.taxableAmount || 0),
-      taxRate: Number(quotation.taxRate || 0),
-      taxMode: quotation.taxMode || "EXCLUSIVE",
-      gstTreatment: quotation.gstTreatment || "INTRA_STATE",
-      cgstAmount: Number(quotation.cgstAmount || 0),
-      sgstAmount: Number(quotation.sgstAmount || 0),
-      igstAmount: Number(quotation.igstAmount || 0),
-      taxAmount: Number(quotation.taxAmount || 0),
-      finalAmount: Number(quotation.finalAmount || 0),
-    };
-  }, [activePackage, quotation]);
-
   const inclusions = quotation.proposalItems?.filter((p) => p.type === "INCLUSION") || [];
   const exclusions = quotation.proposalItems?.filter((p) => p.type === "EXCLUSION") || [];
   const importantNotes = quotation.proposalItems?.filter((p) => p.type === "IMPORTANT_NOTE") || [];
@@ -449,19 +420,7 @@ export default function PublicQuotationPage() {
                           <div className="text-3xl font-black text-indigo-600 tracking-tight">
                             {formatCurrency(Number(opt.finalAmount))}
                           </div>
-                          {(() => {
-                            const pkgRate = Number(opt.taxRate || 0);
-                            const pkgMode = opt.taxMode || "EXCLUSIVE";
-                            const pkgExempt = opt.gstTreatment === "NON_GST_EXEMPT" || pkgRate === 0;
-
-                            if (pkgExempt) {
-                              return <span className="text-[10px] text-slate-500 block">per group (tax exempt / 0% GST)</span>;
-                            }
-                            if (pkgMode === "INCLUSIVE") {
-                              return <span className="text-[10px] text-slate-500 block">per group (includes {pkgRate}% GST)</span>;
-                            }
-                            return <span className="text-[10px] text-slate-500 block">per group (+ {pkgRate}% GST: {formatCurrency(Number(opt.taxAmount || 0))})</span>;
-                          })()}
+                          <span className="text-[10px] text-slate-500 block">All-inclusive package price ({quotation.currency})</span>
                         </div>
 
                         {/* Specifications */}
@@ -624,42 +583,34 @@ export default function PublicQuotationPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {milestones.map((m, idx) => {
-                    // Dynamically calculate milestone amount if activePackage has different total
-                    const calculatedAmt = m.percentage
-                      ? Math.round((effectiveFinalAmount * Number(m.percentage)) / 100)
-                      : Number(m.amount || 0);
-
-                    return (
-                      <div
-                        key={m.id}
-                        className="p-5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                            Milestone {idx + 1}
+                  {milestones.map((m, idx) => (
+                    <div
+                      key={m.id}
+                      className="p-5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                          Milestone {idx + 1}
+                        </span>
+                        {m.percentage && (
+                          <span className="text-xs font-black text-indigo-900 bg-indigo-100/80 px-2 py-0.5 rounded-md">
+                            {Number(m.percentage)}%
                           </span>
-                          {m.percentage && (
-                            <span className="text-xs font-black text-slate-700">{Number(m.percentage)}%</span>
-                          )}
-                        </div>
-
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-sm">{m.title}</h4>
-                          {m.description && <p className="text-[11px] text-slate-500 mt-0.5">{m.description}</p>}
-                        </div>
-
-                        <div className="pt-2 border-t border-slate-200 flex items-baseline justify-between">
-                          <span className="text-[10px] text-slate-400">
-                            {m.dueDate ? `Due: ${new Date(m.dueDate).toLocaleDateString()}` : "Upon schedule"}
-                          </span>
-                          <strong className="text-indigo-600 font-extrabold text-base">
-                            {formatCurrency(calculatedAmt)}
-                          </strong>
-                        </div>
+                        )}
                       </div>
-                    );
-                  })}
+
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm">{m.title}</h4>
+                        {m.description && <p className="text-[11px] text-slate-500 mt-0.5">{m.description}</p>}
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200 flex items-baseline justify-between text-[11px] text-slate-500">
+                        <span>
+                          {m.dueDate ? `Due: ${new Date(m.dueDate).toLocaleDateString("en-IN")}` : "Upon schedule"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -702,9 +653,9 @@ export default function PublicQuotationPage() {
               </div>
             )}
 
-            {/* Total Commercial Package Price Summary & Tax Breakdown */}
+            {/* Total Commercial Package Price Summary - Final Amount ONLY */}
             <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 text-white space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 border-b border-white/10 pb-6">
+              <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
                 <div>
                   <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-400">
                     Total Package Investment
@@ -715,98 +666,12 @@ export default function PublicQuotationPage() {
                 </div>
 
                 <div className="text-left sm:text-right">
-                  <div className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-                    {formatCurrency(activeTaxSnapshot.finalAmount)}
+                  <div className="text-3xl sm:text-5xl font-black text-emerald-400 tracking-tight">
+                    {formatCurrency(effectiveFinalAmount)}
                   </div>
                   <span className="text-[11px] text-slate-400 mt-1 block">
-                    {activeTaxSnapshot.taxMode === "INCLUSIVE"
-                      ? `Includes all stated taxes and service charges (${quotation.currency})`
-                      : activeTaxSnapshot.gstTreatment === "NON_GST_EXEMPT" || activeTaxSnapshot.taxRate === 0
-                      ? `Tax exempt / 0% GST (${quotation.currency})`
-                      : `Includes ${activeTaxSnapshot.taxRate}% GST added to taxable value (${quotation.currency})`}
+                    All-inclusive customer package price ({quotation.currency})
                   </span>
-                </div>
-              </div>
-
-              {/* Price & Tax Breakdown */}
-              <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 sm:p-6 space-y-3 text-xs">
-                <div className="pb-2 border-b border-slate-700/60 flex items-center justify-between">
-                  <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-300">
-                    Price & Tax Breakdown
-                  </h4>
-                  <span className="text-[10px] text-slate-400 font-medium">
-                    {activeTaxSnapshot.taxMode === "INCLUSIVE" ? "Tax Inclusive Pricing" : "Tax Exclusive Pricing"}
-                  </span>
-                </div>
-
-                <div className="space-y-2">
-                  {/* Discount if present */}
-                  {activeTaxSnapshot.discountAmount > 0 && (
-                    <div className="flex justify-between items-center text-emerald-400">
-                      <span>Package Discount</span>
-                      <span className="font-bold">-{formatCurrency(activeTaxSnapshot.discountAmount)}</span>
-                    </div>
-                  )}
-
-                  {/* Taxable Amount */}
-                  <div className="flex justify-between items-center text-slate-300">
-                    <span>Taxable Amount</span>
-                    <span className="font-bold text-white">{formatCurrency(activeTaxSnapshot.taxableAmount)}</span>
-                  </div>
-
-                  {/* GST Treatment & Breakdown */}
-                  {activeTaxSnapshot.gstTreatment === "NON_GST_EXEMPT" || activeTaxSnapshot.taxRate === 0 ? (
-                    <div className="flex justify-between items-center text-slate-400">
-                      <span>Tax (Exempt / 0% GST)</span>
-                      <span className="font-bold text-slate-300">₹0.00</span>
-                    </div>
-                  ) : activeTaxSnapshot.gstTreatment === "INTRA_STATE" ? (
-                    <>
-                      <div className="flex justify-between items-center text-indigo-300">
-                        <span>
-                          GST {activeTaxSnapshot.taxRate}%
-                          {activeTaxSnapshot.taxMode === "INCLUSIVE" ? " (Included)" : ""}
-                        </span>
-                        <span className="font-bold">{formatCurrency(activeTaxSnapshot.taxAmount)}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-slate-400 pl-3 text-[11px]">
-                        <span>CGST ({activeTaxSnapshot.taxRate / 2}%)</span>
-                        <span>{formatCurrency(activeTaxSnapshot.cgstAmount)}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-slate-400 pl-3 text-[11px]">
-                        <span>SGST ({activeTaxSnapshot.taxRate / 2}%)</span>
-                        <span>{formatCurrency(activeTaxSnapshot.sgstAmount)}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex justify-between items-center text-indigo-300">
-                        <span>
-                          GST {activeTaxSnapshot.taxRate}%
-                          {activeTaxSnapshot.taxMode === "INCLUSIVE" ? " (Included)" : ""}
-                        </span>
-                        <span className="font-bold">{formatCurrency(activeTaxSnapshot.taxAmount)}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-slate-400 pl-3 text-[11px]">
-                        <span>IGST ({activeTaxSnapshot.taxRate}%)</span>
-                        <span>{formatCurrency(activeTaxSnapshot.igstAmount)}</span>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Total Final Line */}
-                  <div className="pt-2.5 border-t border-slate-700/80 flex justify-between items-center text-sm font-bold text-white">
-                    <span>Total Final Price</span>
-                    <span className="text-base text-indigo-400">{formatCurrency(activeTaxSnapshot.finalAmount)}</span>
-                  </div>
-                </div>
-
-                <div className="pt-1 text-[10px] text-slate-400 italic">
-                  {activeTaxSnapshot.taxMode === "INCLUSIVE"
-                    ? "GST is already included in the customer price."
-                    : activeTaxSnapshot.gstTreatment === "NON_GST_EXEMPT" || activeTaxSnapshot.taxRate === 0
-                    ? "This proposal has no tax applied."
-                    : "GST is added to the taxable amount."}
                 </div>
               </div>
 
