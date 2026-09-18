@@ -54,6 +54,14 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 export type QuotationWithRelations = Quotation & {
+  agency?: {
+    id: string;
+    name: string;
+    phone: string;
+    email: string;
+    logo?: string | null;
+    address?: string | null;
+  } | null;
   customer: {
     id: string;
     name: string;
@@ -72,6 +80,17 @@ export type QuotationWithRelations = Quotation & {
       name: string;
       type: string;
     }>;
+    tripDestinations?: Array<{
+      id: string;
+      sequence: number;
+      destination: {
+        id: string;
+        name: string;
+        cityArea?: string | null;
+        state?: string | null;
+        country?: string | null;
+      };
+    }>;
     itineraryItems: Array<{
       id: string;
       dayNumber: number;
@@ -82,6 +101,47 @@ export type QuotationWithRelations = Quotation & {
       startTime?: string | null;
       endTime?: string | null;
       sortOrder: number;
+    }>;
+    tripHotels?: Array<{
+      id: string;
+      checkIn: Date | string;
+      checkOut: Date | string;
+      roomType: string;
+      mealPlan?: string | null;
+      rooms: number;
+      notes?: string | null;
+      hotel?: {
+        id: string;
+        name: string;
+        city?: string | null;
+        category?: string | null;
+      } | null;
+    }>;
+    tripVehicles?: Array<{
+      id: string;
+      vehicleName: string;
+      vehicleType?: string | null;
+      startDate?: Date | string | null;
+      endDate?: Date | string | null;
+      notes?: string | null;
+      vehicle?: {
+        id: string;
+        name: string;
+        type: string;
+        capacity?: number | null;
+      } | null;
+    }>;
+    tripActivities?: Array<{
+      id: string;
+      name: string;
+      date?: Date | string | null;
+      description?: string | null;
+      notes?: string | null;
+      activity?: {
+        id: string;
+        name: string;
+        location?: string | null;
+      } | null;
     }>;
   };
   items: QuotationItem[];
@@ -227,6 +287,17 @@ export interface PublicQuotationPayload {
     startDate: string;
     endDate: string;
     travelers: Array<{ id: string; name: string; type: string }>;
+    tripDestinations?: Array<{
+      id: string;
+      sequence: number;
+      destination: {
+        id: string;
+        name: string;
+        cityArea?: string | null;
+        state?: string | null;
+        country?: string | null;
+      };
+    }>;
     itineraryItems: Array<{
       id: string;
       dayNumber: number;
@@ -238,6 +309,47 @@ export interface PublicQuotationPayload {
       endTime?: string | null;
       sortOrder: number;
     }>;
+    tripHotels?: Array<{
+      id: string;
+      checkIn: string | Date;
+      checkOut: string | Date;
+      roomType: string;
+      mealPlan?: string | null;
+      rooms: number;
+      notes?: string | null;
+      hotel?: {
+        id: string;
+        name: string;
+        city?: string | null;
+        category?: string | null;
+      } | null;
+    }>;
+    tripVehicles?: Array<{
+      id: string;
+      vehicleName: string;
+      vehicleType?: string | null;
+      startDate?: string | Date | null;
+      endDate?: string | Date | null;
+      notes?: string | null;
+      vehicle?: {
+        id: string;
+        name: string;
+        type: string;
+        capacity?: number | null;
+      } | null;
+    }>;
+    tripActivities?: Array<{
+      id: string;
+      name: string;
+      date?: string | Date | null;
+      description?: string | null;
+      notes?: string | null;
+      activity?: {
+        id: string;
+        name: string;
+        location?: string | null;
+      } | null;
+    }>;
   };
   items: Array<{
     id: string;
@@ -247,8 +359,6 @@ export interface PublicQuotationPayload {
     description?: string | null;
     quantity: number;
     unit?: string | null;
-    unitPrice: number;
-    totalPrice: number;
     sortOrder: number;
   }>;
   proposalItems: PublicProposalItem[];

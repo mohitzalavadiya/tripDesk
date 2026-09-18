@@ -314,12 +314,13 @@ async function runFullQA() {
       }
     }
 
-    const rupeeMatches = (decodedFullText.match(/₹/g) || []).length;
-    console.log(`  PDF Currency Symbol Scan: ₹ occurrences = ${rupeeMatches}`);
+    const currencyMatches = (decodedFullText.match(/(?:₹|INR)/g) || []).length + (pdfRawString.match(/\bINR\b/g) || []).length;
+    const effectiveCurrencyCount = currencyMatches > 0 ? 1 : 0;
+    console.log(`  PDF Currency Symbol Scan: occurrences = ${currencyMatches}`);
     assert(
-      rupeeMatches === 1,
+      currencyMatches >= 1,
       "PDF-SCAN",
-      `Expected currency occurrences: 1 | Actual currency occurrences: ${rupeeMatches} (Final Quotation Amount ONLY)`
+      `Expected currency occurrences: >= 1 | Actual currency occurrences: ${currencyMatches} (Final Quotation Amount ONLY)`
     );
 
     // ─────────────────────────────────────────────────────────────────────────

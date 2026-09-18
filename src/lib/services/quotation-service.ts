@@ -83,6 +83,17 @@ export type QuotationWithRelations = Quotation & {
       endTime?: string | null;
       sortOrder: number;
     }>;
+    tripDestinations?: Array<{
+      id: string;
+      sequence: number;
+      destination: {
+        id: string;
+        name: string;
+        cityArea?: string | null;
+        state?: string | null;
+        country?: string | null;
+      };
+    }>;
     tripHotels?: Array<{
       id: string;
       checkIn: Date;
@@ -292,6 +303,9 @@ export const quotationService = {
         take: limit,
         orderBy: { [sortBy]: sortOrder },
         include: {
+          agency: {
+            select: { id: true, name: true, phone: true, email: true, logo: true, address: true },
+          },
           customer: {
             select: { id: true, name: true, phone: true, email: true },
           },
@@ -304,6 +318,22 @@ export const quotationService = {
               endDate: true,
               status: true,
               travelers: { select: { id: true, name: true, type: true } },
+              tripDestinations: {
+                select: {
+                  id: true,
+                  sequence: true,
+                  destination: {
+                    select: {
+                      id: true,
+                      name: true,
+                      cityArea: true,
+                      state: true,
+                      country: true,
+                    },
+                  },
+                },
+                orderBy: { sequence: "asc" },
+              },
               itineraryItems: {
                 select: {
                   id: true,
@@ -317,6 +347,62 @@ export const quotationService = {
                   sortOrder: true,
                 },
                 orderBy: { sortOrder: "asc" },
+              },
+              tripHotels: {
+                select: {
+                  id: true,
+                  checkIn: true,
+                  checkOut: true,
+                  roomType: true,
+                  mealPlan: true,
+                  rooms: true,
+                  notes: true,
+                  hotel: {
+                    select: {
+                      id: true,
+                      name: true,
+                      city: true,
+                      category: true,
+                    },
+                  },
+                },
+                orderBy: { checkIn: "asc" },
+              },
+              tripVehicles: {
+                select: {
+                  id: true,
+                  vehicleName: true,
+                  vehicleType: true,
+                  startDate: true,
+                  endDate: true,
+                  notes: true,
+                  vehicle: {
+                    select: {
+                      id: true,
+                      name: true,
+                      type: true,
+                      capacity: true,
+                    },
+                  },
+                },
+                orderBy: { startDate: "asc" },
+              },
+              tripActivities: {
+                select: {
+                  id: true,
+                  name: true,
+                  date: true,
+                  description: true,
+                  notes: true,
+                  activity: {
+                    select: {
+                      id: true,
+                      name: true,
+                      location: true,
+                    },
+                  },
+                },
+                orderBy: { date: "asc" },
               },
             },
           },
@@ -370,6 +456,22 @@ export const quotationService = {
             endDate: true,
             status: true,
             travelers: { select: { id: true, name: true, type: true } },
+            tripDestinations: {
+              select: {
+                id: true,
+                sequence: true,
+                destination: {
+                  select: {
+                    id: true,
+                    name: true,
+                    cityArea: true,
+                    state: true,
+                    country: true,
+                  },
+                },
+              },
+              orderBy: { sequence: "asc" },
+            },
             itineraryItems: {
               select: {
                 id: true,
@@ -469,6 +571,9 @@ export const quotationService = {
       where: { agencyId, tripId, archivedAt: null },
       orderBy: { version: "desc" },
       include: {
+        agency: {
+          select: { id: true, name: true, phone: true, email: true, logo: true, address: true },
+        },
         customer: {
           select: { id: true, name: true, phone: true, email: true },
         },
@@ -481,6 +586,22 @@ export const quotationService = {
             endDate: true,
             status: true,
             travelers: { select: { id: true, name: true, type: true } },
+            tripDestinations: {
+              select: {
+                id: true,
+                sequence: true,
+                destination: {
+                  select: {
+                    id: true,
+                    name: true,
+                    cityArea: true,
+                    state: true,
+                    country: true,
+                  },
+                },
+              },
+              orderBy: { sequence: "asc" },
+            },
             itineraryItems: {
               select: {
                 id: true,
@@ -494,6 +615,62 @@ export const quotationService = {
                 sortOrder: true,
               },
               orderBy: { sortOrder: "asc" },
+            },
+            tripHotels: {
+              select: {
+                id: true,
+                checkIn: true,
+                checkOut: true,
+                roomType: true,
+                mealPlan: true,
+                rooms: true,
+                notes: true,
+                hotel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    city: true,
+                    category: true,
+                  },
+                },
+              },
+              orderBy: { checkIn: "asc" },
+            },
+            tripVehicles: {
+              select: {
+                id: true,
+                vehicleName: true,
+                vehicleType: true,
+                startDate: true,
+                endDate: true,
+                notes: true,
+                vehicle: {
+                  select: {
+                    id: true,
+                    name: true,
+                    type: true,
+                    capacity: true,
+                  },
+                },
+              },
+              orderBy: { startDate: "asc" },
+            },
+            tripActivities: {
+              select: {
+                id: true,
+                name: true,
+                date: true,
+                description: true,
+                notes: true,
+                activity: {
+                  select: {
+                    id: true,
+                    name: true,
+                    location: true,
+                  },
+                },
+              },
+              orderBy: { date: "asc" },
             },
           },
         },
@@ -594,6 +771,19 @@ export const quotationService = {
             endDate: true,
             status: true,
             travelers: { select: { id: true, name: true, type: true } },
+            tripDestinations: {
+              select: {
+                id: true,
+                sequence: true,
+                destination: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+              orderBy: { sequence: "asc" },
+            },
             itineraryItems: {
               select: {
                 id: true,
@@ -607,6 +797,62 @@ export const quotationService = {
                 sortOrder: true,
               },
               orderBy: { sortOrder: "asc" },
+            },
+            tripHotels: {
+              select: {
+                id: true,
+                roomType: true,
+                mealPlan: true,
+                checkIn: true,
+                checkOut: true,
+                rooms: true,
+                notes: true,
+                hotel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    city: true,
+                    category: true,
+                  },
+                },
+              },
+              orderBy: { checkIn: "asc" },
+            },
+            tripVehicles: {
+              select: {
+                id: true,
+                vehicleName: true,
+                vehicleType: true,
+                startDate: true,
+                endDate: true,
+                notes: true,
+                vehicle: {
+                  select: {
+                    id: true,
+                    name: true,
+                    type: true,
+                    capacity: true,
+                  },
+                },
+              },
+              orderBy: { startDate: "asc" },
+            },
+            tripActivities: {
+              select: {
+                id: true,
+                name: true,
+                date: true,
+                description: true,
+                notes: true,
+                activity: {
+                  select: {
+                    id: true,
+                    name: true,
+                    location: true,
+                  },
+                },
+              },
+              orderBy: { date: "asc" },
             },
           },
         },
@@ -719,6 +965,19 @@ export const quotationService = {
             endDate: true,
             status: true,
             travelers: { select: { id: true, name: true, type: true } },
+            tripDestinations: {
+              select: {
+                id: true,
+                sequence: true,
+                destination: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+              orderBy: { sequence: "asc" },
+            },
             itineraryItems: {
               select: {
                 id: true,
@@ -732,6 +991,62 @@ export const quotationService = {
                 sortOrder: true,
               },
               orderBy: { sortOrder: "asc" },
+            },
+            tripHotels: {
+              select: {
+                id: true,
+                roomType: true,
+                mealPlan: true,
+                checkIn: true,
+                checkOut: true,
+                rooms: true,
+                notes: true,
+                hotel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    city: true,
+                    category: true,
+                  },
+                },
+              },
+              orderBy: { checkIn: "asc" },
+            },
+            tripVehicles: {
+              select: {
+                id: true,
+                vehicleName: true,
+                vehicleType: true,
+                startDate: true,
+                endDate: true,
+                notes: true,
+                vehicle: {
+                  select: {
+                    id: true,
+                    name: true,
+                    type: true,
+                    capacity: true,
+                  },
+                },
+              },
+              orderBy: { startDate: "asc" },
+            },
+            tripActivities: {
+              select: {
+                id: true,
+                name: true,
+                date: true,
+                description: true,
+                notes: true,
+                activity: {
+                  select: {
+                    id: true,
+                    name: true,
+                    location: true,
+                  },
+                },
+              },
+              orderBy: { date: "asc" },
             },
           },
         },
@@ -767,6 +1082,19 @@ export const quotationService = {
             endDate: true,
             status: true,
             travelers: { select: { id: true, name: true, type: true } },
+            tripDestinations: {
+              select: {
+                id: true,
+                sequence: true,
+                destination: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+              orderBy: { sequence: "asc" },
+            },
             itineraryItems: {
               select: {
                 id: true,
@@ -780,6 +1108,62 @@ export const quotationService = {
                 sortOrder: true,
               },
               orderBy: { sortOrder: "asc" },
+            },
+            tripHotels: {
+              select: {
+                id: true,
+                roomType: true,
+                mealPlan: true,
+                checkIn: true,
+                checkOut: true,
+                rooms: true,
+                notes: true,
+                hotel: {
+                  select: {
+                    id: true,
+                    name: true,
+                    city: true,
+                    category: true,
+                  },
+                },
+              },
+              orderBy: { checkIn: "asc" },
+            },
+            tripVehicles: {
+              select: {
+                id: true,
+                vehicleName: true,
+                vehicleType: true,
+                startDate: true,
+                endDate: true,
+                notes: true,
+                vehicle: {
+                  select: {
+                    id: true,
+                    name: true,
+                    type: true,
+                    capacity: true,
+                  },
+                },
+              },
+              orderBy: { startDate: "asc" },
+            },
+            tripActivities: {
+              select: {
+                id: true,
+                name: true,
+                date: true,
+                description: true,
+                notes: true,
+                activity: {
+                  select: {
+                    id: true,
+                    name: true,
+                    location: true,
+                  },
+                },
+              },
+              orderBy: { date: "asc" },
             },
           },
         },
@@ -1083,6 +1467,19 @@ export const quotationService = {
               endDate: true,
               status: true,
               travelers: { select: { id: true, name: true, type: true } },
+              tripDestinations: {
+                select: {
+                  id: true,
+                  sequence: true,
+                  destination: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+                orderBy: { sequence: "asc" },
+              },
               itineraryItems: {
                 select: {
                   id: true,
@@ -1096,6 +1493,62 @@ export const quotationService = {
                   sortOrder: true,
                 },
                 orderBy: { sortOrder: "asc" },
+              },
+              tripHotels: {
+                select: {
+                  id: true,
+                  roomType: true,
+                  mealPlan: true,
+                  checkIn: true,
+                  checkOut: true,
+                  rooms: true,
+                  notes: true,
+                  hotel: {
+                    select: {
+                      id: true,
+                      name: true,
+                      city: true,
+                      category: true,
+                    },
+                  },
+                },
+                orderBy: { checkIn: "asc" },
+              },
+              tripVehicles: {
+                select: {
+                  id: true,
+                  vehicleName: true,
+                  vehicleType: true,
+                  startDate: true,
+                  endDate: true,
+                  notes: true,
+                  vehicle: {
+                    select: {
+                      id: true,
+                      name: true,
+                      type: true,
+                      capacity: true,
+                    },
+                  },
+                },
+                orderBy: { startDate: "asc" },
+              },
+              tripActivities: {
+                select: {
+                  id: true,
+                  name: true,
+                  date: true,
+                  description: true,
+                  notes: true,
+                  activity: {
+                    select: {
+                      id: true,
+                      name: true,
+                      location: true,
+                    },
+                  },
+                },
+                orderBy: { date: "asc" },
               },
             },
           },
@@ -1267,6 +1720,19 @@ export const quotationService = {
               endDate: true,
               status: true,
               travelers: { select: { id: true, name: true, type: true } },
+              tripDestinations: {
+                select: {
+                  id: true,
+                  sequence: true,
+                  destination: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+                orderBy: { sequence: "asc" },
+              },
               itineraryItems: {
                 select: {
                   id: true,
@@ -1280,6 +1746,62 @@ export const quotationService = {
                   sortOrder: true,
                 },
                 orderBy: { sortOrder: "asc" },
+              },
+              tripHotels: {
+                select: {
+                  id: true,
+                  roomType: true,
+                  mealPlan: true,
+                  checkIn: true,
+                  checkOut: true,
+                  rooms: true,
+                  notes: true,
+                  hotel: {
+                    select: {
+                      id: true,
+                      name: true,
+                      city: true,
+                      category: true,
+                    },
+                  },
+                },
+                orderBy: { checkIn: "asc" },
+              },
+              tripVehicles: {
+                select: {
+                  id: true,
+                  vehicleName: true,
+                  vehicleType: true,
+                  startDate: true,
+                  endDate: true,
+                  notes: true,
+                  vehicle: {
+                    select: {
+                      id: true,
+                      name: true,
+                      type: true,
+                      capacity: true,
+                    },
+                  },
+                },
+                orderBy: { startDate: "asc" },
+              },
+              tripActivities: {
+                select: {
+                  id: true,
+                  name: true,
+                  date: true,
+                  description: true,
+                  notes: true,
+                  activity: {
+                    select: {
+                      id: true,
+                      name: true,
+                      location: true,
+                    },
+                  },
+                },
+                orderBy: { date: "asc" },
               },
             },
           },
@@ -2554,6 +3076,22 @@ export const quotationService = {
             startDate: true,
             endDate: true,
             travelers: { select: { id: true, name: true, type: true } },
+            tripDestinations: {
+              select: {
+                id: true,
+                sequence: true,
+                destination: {
+                  select: {
+                    id: true,
+                    name: true,
+                    cityArea: true,
+                    state: true,
+                    country: true,
+                  },
+                },
+              },
+              orderBy: { sequence: "asc" },
+            },
             itineraryItems: {
               select: {
                 id: true,

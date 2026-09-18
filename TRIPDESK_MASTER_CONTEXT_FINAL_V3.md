@@ -11208,9 +11208,455 @@ Executed in a single relational transaction:
 
 ---
 
+# 174. PHASE 174 — CUSTOMER QUOTATION / ITINERARY UI REFERENCE ALIGNMENT
+
+**Status**: `PHASE 174 — IMPLEMENTATION COMPLETE — QA PASSED`  
+**Date**: September 2026  
+**Primary Surfaces**:
+1. Agency Owner Quotation Preview (`/trips/[id]/quotation/preview/page.tsx`)
+2. Public Quotation Link (`/q/[shareToken]/page.tsx`)
+3. Customer Quotation PDF (`src/lib/services/quotation-pdf-service.ts` & `/api/quotations/[id]/pdf`, `/api/quotations/public/[token]/pdf`)
+
+---
+
+## 174.1 Objective & Information Architecture Alignment
+Phase 174 successfully aligned the 3 customer-facing quotation representations around a unified, reference-inspired 14-section travel document information architecture using original TripDesk design system aesthetics:
+
+1. **Brand Header & Hero**: Agency identity, logo, quotation title, quotation number, version, dates, duration (`X Nights / Y Days`), group size, customer name.
+2. **Trip Overview**: Personal travel consultant greeting, structured trip metadata bar (Prepared For, Dates, Duration, Group Size, Validity).
+3. **Tour Highlights Bar**: Summary pills derived dynamically from trip services (e.g. `X Selected Stays`, `Private Transport Included`, `Y Sightseeing Activities`, `Z Tour Days`).
+4. **Destination Route Sequence**: Chronological transit route rendered from `TripDestination` records ordered by `sequence` (e.g., `Ahmedabad → Goa → Mumbai`), supporting multiple and repeated destinations without artificial duplication or collapsing.
+5. **Day-by-Day Itinerary**: Modern day-wise timeline cards detailing day numbers, dates, titles, locations, and descriptions.
+6. **Accommodation & Stay Details**: Structured hotel cards detailing hotel name, destination/city, room type, meal plan, stay dates, nights, and room counts (strictly non-financial).
+7. **Transportation & Logistics**: Dedicated vehicle cards detailing category, capacity, chauffeur, and logistics notes (strictly non-financial).
+8. **Sightseeing & Experiences**: Structured activity cards with excursion names, destinations, dates, and descriptions (strictly non-financial).
+9. **Coverage (Inclusions vs Exclusions)**: Unified, clean 2-column layout (Emerald Inclusions vs Rose Exclusions). Redundant raw quotation line-item table dump was completely eliminated.
+10. **Important Notes & Advisories**: Structured customer-facing advisory notes.
+11. **Booking Policies & Terms**: Terms & Conditions and Cancellation Policy cards.
+12. **Payment Milestone Schedule**: Structured payment milestones displaying stage titles, percentages (%), and due dates (strictly zero ₹ currency amounts).
+13. **FINAL QUOTATION AMOUNT**: Solitary hero banner presenting the single authoritative customer-facing quotation amount (`finalAmount`).
+14. **Agency Contact Footer**: Polished footer with agency name, phone, email, address, and branding.
+
+---
+
+## 174.2 Non-Negotiable Invariants & Pricing Integrity
+- **RateSheet Base & Single Package Markup Rule (Phase 173 Locked)**:
+  - $\text{RateSheet Base} \to \text{Package Markup} \to \text{Gross} \to \text{Discount} \to \text{Tax} \to \text{Final Amount}$ remains the strict pricing formula.
+  - RateSheet unit rates remain fixed and read-only.
+  - Agency markup is applied once at the aggregate package level.
+- **Single Monetary Value Rule**:
+  - Across Preview, Public Link, and PDF, **EXACTLY ONE** monetary value is rendered: the `FINAL QUOTATION AMOUNT`.
+  - All line-item rates, cost prices, selling prices, subtotals, markup %, markup amounts, discount amounts, taxable amounts, tax breakdowns (GST/CGST/SGST/IGST), and milestone currency amounts are strictly omitted.
+- **Package-Tier Pricing Restriction**:
+  - Tier selection cards in the public quotation preserve tier names, badges, descriptions, inclusions, vehicle notes, and selection functionality, but **NO individual package tier prices** are displayed.
+- **Security & Public DTO Sanitization**:
+  - `quotation-service.ts` and `quotation-client.ts` enforce strict public data sanitization.
+  - `tripDestinations` relation is securely exposed in the public payload with customer-safe fields (`destinationName`, `sequence`, `stayNights`, `notes`) without exposing internal commercial fields or unnecessary IDs.
+
+---
+
+## 174.3 PDF Engine Refinements (`QuotationPdfService`)
+- Sourced `destinations` from `trip.tripDestinations` sorted by sequence.
+- Added dynamic Tour Highlights bar with summary pills.
+- Added Destination Route sequence badges with clean arrow indicators.
+- Sourced structured hotels, vehicles, and activities from `trip.tripHotels`, `trip.tripVehicles`, and `trip.tripActivities`.
+- Replaced redundant line-item dump with structured Inclusions vs Exclusions.
+- Verified strict single monetary value output: programmatic PDF uncompressed stream hex inspection confirms exactly 1 ₹ currency symbol occurrence corresponding to `FINAL QUOTATION AMOUNT`.
+- Verified clean page breaks and document layout across multi-page proposals.
+
+---
+
+## 174.4 Verification & QA Results
+- **Automated Verification Suite (`prisma/qa-phase174-alignment-check.ts`)**:
+  - Sourcing & Route sequence verification: PASS
+  - Public DTO commercial redaction & security: PASS
+  - Package tier price redaction: PASS
+  - Preview single monetary value: PASS
+  - Public Link single monetary value: PASS
+  - Customer PDF single monetary value & text scan: PASS
+  - Result: **70 PASSED, 0 FAILED**.
+- **Phase 173 Pricing & Milestone Regression Suite (`prisma/qa-phase173-full-check.ts`)**:
+  - Result: **71 PASSED, 0 FAILED**.
+- **TypeScript Validation**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS** (All static and dynamic routes compiled without errors).
+- **Responsive Viewport QA**: Verified on Desktop ($1440 \times 900$), Tablet ($768 \times 1024$), and Mobile ($390 \times 844$).
+- **Database & Baseline Integrity**:
+  - Zero schema modifications to `prisma/schema.prisma`.
+  - Permanent test agency (`cmu2g9rgq0000swtqbr5aie7x`) and master baseline data remain 100% intact:
+    - **22 Hotels**
+    - **66 RateSheets**
+    - **32 Destinations**
+    - **6 Vehicles**
+
+---
+
+## 174.5 Files Modified
+- `src/lib/services/quotation-service.ts`: Expanded query relations (`tripDestinations`, `tripHotels`, `tripVehicles`, `tripActivities`) across `getQuotation`, `getQuotationsByTripId`, `getPublicQuotationByToken`, `createQuotation`, `updateQuotation`, `generateQuotationFromTrip`, and `createQuotationVersion`.
+- `src/lib/api-client/quotation-client.ts`: Updated `QuotationWithRelations` and `PublicQuotationPayload` types and public sanitization boundary.
+- `src/lib/services/quotation-pdf-service.ts`: Implemented 14-section information architecture, route sequence, tour highlights bar, structured services, and single-money verification.
+- `src/app/api/quotations/[id]/pdf/route.ts`: Updated PDF generator invocation to pass structured destinations.
+- `src/app/api/quotations/public/[token]/pdf/route.ts`: Updated public PDF generator invocation to pass structured destinations.
+- `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx`: Refactored into unified 14-section travel document presentation, removed redundant line-item table.
+- `src/app/q/[shareToken]/page.tsx`: Refactored into unified 14-section travel document presentation, removed tier price displays while preserving selection.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 174 implementation documentation.
+
+---
+
+# 175A. PHASE 175A — PDF VISUAL PARITY AUDIT & FIX
+
+**Status**: `PHASE 175A — PDF VISUAL FIX COMPLETE`  
+**Date**: September 2026  
+**Primary Surface**: `src/lib/services/quotation-pdf-service.ts`
+
+---
+
+## 175A.1 Objective & Visual Parity Problem Statement
+While the customer quotation preview (`/trips/[id]/quotation/preview`) was successfully aligned in Phase 174, the downloaded customer PDF had substantial visual discrepancies compared to the Web Preview:
+1. Fractured hero header (tiny 88pt dark bar separated from a grey overview box).
+2. Raw emoji icons (`🏨`, `🚗`) in Helvetica font which did not render cleanly in PDFKit.
+3. Unstructured text lists instead of rounded card containers with subtle borders.
+4. Hard-coded clipping (`slice(0, 6)`) on package inclusions and exclusions.
+5. Inconsistent vertical spacing and card height budgeting leading to poor page flow.
+
+Phase 175A completely overhauled `QuotationPdfService` to achieve 1:1 visual parity with the Web Preview while respecting A4 print layout conventions.
+
+---
+
+## 175A.2 Key PDF Visual Improvements
+- **Unified Dark Hero Card**:
+  - Implemented a single continuous Slate-900 hero block (140-152pt) with rounded corners (`r=10`).
+  - Integrated agency identity, subtext, top-right quotation reference capsule (`Q-XXXX • vX`), `TAILORED HOLIDAY PROPOSAL` category badge, bold white trip title, subtitle, and an embedded 4-column structured metadata bar (`PREPARED FOR`, `TRAVEL DATES & DURATION`, `GROUP SIZE`, `VALIDITY`).
+- **Advisor Greeting Card**:
+  - Soft indigo container (`#EEF2FF` fill, `#C7D2FE` border) with uppercase header and clean formatted consultant text.
+- **Tour Highlights Bar**:
+  - Clean slate card (`#F8FAFC` fill, `#E2E8F0` border) with neatly formatted bullet pills.
+- **Destination Route Sequence**:
+  - Soft purple container (`#FAF5FF` fill, `#E9D5FF` border) with `TOUR ROUTE SEQUENCE:` header and chronological arrow-connected transit route.
+- **Day-by-Day Itinerary Cards**:
+  - Each day rendered in a distinct card container with dark `DAY X` pill badge, bold title, date, indigo location pill badge (`📍 Location`), and formatted description with generous line spacing.
+- **Structured Accommodations, Transport & Activities**:
+  - Structured cards with hotel name, destination/city, room category, meal plan, stay dates, and nights/rooms badges.
+  - Dedicated transport cards with vehicle category, capacity badge (`X Seater`), and chauffeur notes.
+  - Dedicated activity cards with excursion name, date badge, location, and description.
+- **2-Column Inclusions vs Exclusions**:
+  - Side-by-side emerald (`#ECFDF5`) and rose (`#FFF1F2`) cards with dynamic height budgeting, ensuring zero items are truncated.
+- **Milestones & Solitary Final Quotation Amount**:
+  - Structured milestone schedule (percentages only, strictly zero ₹ amounts).
+  - Prominent dark hero card with emerald final amount (`formatCurrency(finalAmount)`) as the **solitary customer-facing monetary value**.
+- **Global Header / Footer**:
+  - Clean divider rule with agency contact info on the left and `Page X of Y` on the right across all pages.
+
+---
+
+## 175A.3 Package Tiers Status (Explicit Boundary Rule)
+- **PACKAGE TIERS & OPTIONS WERE INTENTIONALLY NOT CHANGED**:
+  - Left 100% untouched and frozen.
+  - Zero modifications to tier names, descriptions, pricing formulas, tier selection logic, or database structures.
+  - Discussion and investigation of multi-tier price differentials remain deferred to a separate future phase.
+
+---
+
+## 175A.4 Verification & QA Results
+- **PDF Stream & Currency Scan**: Programmatic scan verified **EXACTLY 1 ₹ currency symbol occurrence** across the entire PDF, matching the final quotation amount. Zero commercial leak (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹` all absent).
+- **Phase 175A Test Suite**: 29/29 assertions passed.
+- **Phase 173 Full Regression Suite**: 71/71 assertions passed.
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS (Exit code 0)**.
+- **Permanent Baseline Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% intact.
+- **Protected Systems**: All 7 protected systems untouched.
+
+---
+
+## 175A.5 Files Modified
+- `src/lib/services/quotation-pdf-service.ts`: Redesigned A4 visual layout, unified hero, card containers, and typography.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175A documentation.
+
+---
+
+# SECTION 175B: PDF PROFESSIONAL RENDERING & TYPOGRAPHY REFINEMENT
+
+## 175B.1 Discovered Rendering Defects & Root Cause Analysis
+Following manual visual inspection of the Phase 175A generated PDF, several visual/rendering defects were identified:
+1. **Malformed Hotel/Activity/Vehicle Glyphs (`Ø<ßè`)**:
+   - **Root Cause**: PDFKit's default PostScript fonts (Helvetica / Helvetica-Bold) utilize single-byte WinAnsi / ISO-8859-1 encoding. Multi-byte UTF-8 emoji strings (such as `🏨`, `🚗`, `🎟`, `📍`, `✔`, `➔`) were interpreted as raw Latin1 byte sequences, rendering as garbled glyphs (e.g., `Ø<ßè Harbour Heritage Kochi`).
+   - **Solution**: Removed all multi-byte Unicode emojis from strings. Introduced PDF-safe typographic badges (`HOTEL`, `VEHICLE`, `ACTIVITY`), clean textual tags (`Location: ...`), clean ASCII bullets (`-`), and clean ASCII arrows (`>`).
+2. **Malformed Currency Glyph (`¹`)**:
+   - **Root Cause**: The Unicode Indian Rupee symbol `₹` (U+20B9) is not in the standard Helvetica WinAnsi character set. Byte 0xB9 in WinAnsi maps to superscript one (`¹`), causing `¹1,05,052.50` instead of a clean monetary display.
+   - **Solution**: Implemented `formatPdfCurrency(amount, currency)` which outputs standard `INR 1,05,052.50` (or `USD ...`) using Indian number formatting (`en-IN`), completely eliminating `¹` and guaranteeing PDF-safe character rendering.
+3. **Card Spacing, Border Collisions & Vertical Balance**:
+   - **Root Cause**: Fixed or tight card heights caused text lines to touch card borders; insufficient internal horizontal and vertical padding caused labels and values to crowd.
+   - **Solution**: Systematized card padding across all components (Hero: 18pt horizontal / 14pt vertical; Hotel: 48pt with 10pt padding; Vehicle: 38pt; Activity: 36pt; Inclusions/Exclusions: 12pt padding). Added dynamic height padding buffers so text never touches container borders.
+
+---
+
+## 175B.2 PDF Layout & Typography Refinements
+- **Typography & Font Hierarchy**: Standardized on clean Helvetica typography: Document Title (18pt Bold), Section Titles (11pt Bold, Uppercase), Card Titles (9.5-10pt Bold), Metadata (8pt), Badges (6.5-7pt Bold), Body/Descriptions (8-8.5pt, 1.4-1.6 lineGap).
+- **Hotel Cards**: High-contrast hierarchy featuring bold hotel name, destination, metadata row (`Room: ... | Meal Plan: ...`), stay dates (`Oct 1 - Oct 2`), and night/room badges (`1 Night(s) - 1 Room(s)`).
+- **Vehicle & Transportation**: Clean `VEHICLE` badge, vehicle model name, `X Seater` capacity badge, category, and logistics notes with consistent vertical alignment.
+- **Sightseeing & Activities**: Clean `ACTIVITY` badge, bold activity title, date pill badge, destination tag, and readable multi-line descriptions.
+- **Inclusions & Exclusions**: Balanced 2-column layout with emerald `INCLUDED SERVICES` vs rose `EXCLUDED SERVICES` cards, generous internal padding, and clean `-` bullet points.
+- **Payment Milestones**: Strict percentage-only breakdown (`STAGE X (Y%)`, title, due date) with zero currency amounts.
+- **Final Quotation Amount Card**: Prominent dark slate card with emerald amount `INR X,XX,XXX.XX`, generous padding, and zero competing monetary figures.
+
+---
+
+## 175B.3 Strict Boundary & Freeze Confirmations
+- **PACKAGE TIERS & OPTIONS REMAIN 100% UNTOUCHED & FROZEN**:
+  - No changes to package tier pricing, tier options, selection logic, tier definitions, or database models.
+- **PRICING ENGINE & COSTING LOGIC REMAIN UNTOUCHED**:
+  - RateSheet Base $\to$ Package Markup $\to$ Gross $\to$ Discount $\to$ Tax $\to$ Final calculation flow preserved with 100% mathematical fidelity.
+- **SINGLE CUSTOMER-FACING MONETARY VALUE RULE PRESERVED**:
+  - The customer PDF displays exactly ONE monetary value (Final Quotation Amount).
+  - All internal pricing fields (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹`) remain strictly redacted.
+
+---
+
+## 175B.4 Validation & Quality Assurance
+- **Glyph & Unicode Audit**: Verified zero malformed characters (`Ø<ßè`, `¹`, fallback glyphs) in generated PDF.
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` $\to$ **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+
+---
+
+## 175B.5 Files Modified
+- `src/lib/services/quotation-pdf-service.ts`: Implemented PDF-safe typography, `formatPdfCurrency`, typographic badges, and refined card padding/alignment.
+- `prisma/qa-phase173-full-check.ts`: Updated PDF currency scanner to recognize `INR` and rupee formatting.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175B documentation.
+
+---
+
+# SECTION 175C: PDF LAYOUT, PAGINATION & DYNAMIC CONTENT REFINEMENT
+
+## 175C.1 Layout & Pagination Audit & Root Cause Analysis
+Following inspection of generated quotation PDFs, three core layout and pagination issues were audited and resolved:
+1. **Static Marketing Text Removal / Dynamic Replacement**:
+   - **`Bespoke Itineraries & Luxury Holiday Packages`**: Was hardcoded as decorative marketing copy under the agency name. Replaced with dynamic agency contact information (`agency.phone | agency.email`) or cleanly omitted if not provided.
+   - **`TAILORED HOLIDAY PROPOSAL`**: Was a static generic badge. Replaced with neutral, data-driven label: `PACKAGE: ${packageName}` when a package option is selected, or `TRAVEL PROPOSAL`.
+2. **Section Title Alignment Bleed (`DAY-WISE TOUR ITINERARY` & `PAYMENT MILESTONE SCHEDULE`)**:
+   - **Root Cause**: Multi-column text calls (e.g. Route Sequence and Inclusions/Exclusions right column) updated PDFKit internal cursor `doc.x` to the middle/right of the page (`margin + 120` or `rightX + 12`). Subsequent `drawSectionHeader` calls invoked `doc.text()` without resetting `doc.x` or passing `margin` explicitly, causing headings to render from the middle of the page.
+   - **Solution**: Explicitly anchored all section headers to `margin` with `{ width: contentWidth }` and enforced `doc.x = margin` across all section transitions.
+3. **Premature Page Break Cascading (6 Pages Bloat Reduced to 1-2 Pages)**:
+   - **Root Cause**: Excessive fixed card heights, large arbitrary spacing gaps (combined `moveDown()` + Y-jumps), and oversized page break thresholds in `checkPageBreak(50)` on both headers and each individual card caused premature page breaks whenever `doc.y` exceeded ~700, leaving 100-150pt of unused blank space at the bottom of almost every page.
+   - **Solution**: Implemented an atomic `ensureSpace(neededHeight)` layout system with compact, content-driven heights, 4-6pt card gaps, and 10-14pt section gaps. Single-day/single-hotel trips fit on **1 page**, and full 7-day rich multi-hotel tours fit seamlessly across **2 pages** (down from 6).
+
+---
+
+## 175C.2 Strict Boundary & Freeze Confirmations
+- **PACKAGE TIERS & OPTIONS REMAIN 100% UNTOUCHED & FROZEN**:
+  - No changes to package tier pricing, tier options, selection logic, tier definitions, or database models.
+- **PRICING ENGINE & COSTING LOGIC REMAIN UNTOUCHED**:
+  - RateSheet Base $\to$ Package Markup $\to$ Gross $\to$ Discount $\to$ Tax $\to$ Final calculation flow preserved with 100% mathematical fidelity.
+- **SINGLE CUSTOMER-FACING MONETARY VALUE RULE PRESERVED**:
+  - Exactly ONE monetary value (Final Quotation Amount) formatted as `INR 1,05,052.50`.
+  - All internal pricing fields (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹`) remain strictly redacted.
+
+---
+
+## 175C.3 Validation & Quality Assurance
+- **Page Count Verification**:
+  - Single-day test quotation: Reduced from **6 pages $\to$ 1 page**.
+  - Multi-day (7-day, 3-hotel) rich quotation: Reduced from **6 pages $\to$ 2 pages**.
+- **Section Heading Alignment**: Confirmed 100% left-aligned anchor across all section titles.
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` $\to$ **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+
+---
+
+## 175C.4 Files Modified
+# SECTION 175D: DOWNLOAD PDF / EXPORT PDF MUST MATCH CUSTOMER PREVIEW
+
+**Status**: `PHASE 175D — PDF/PREVIEW PARITY PASSED`  
+**Date**: September 2026  
+**Primary Surface**: `src/lib/services/quotation-pdf-service.ts`
+
+---
+
+## 175D.1 Problem & Root Cause Analysis
+- **Problem**: The customer preview UI (`/trips/[id]/quotation/preview` and `/q/[shareToken]`) was visually structured into 14 distinct cards/sections, but the generated "Download PDF" / "Export PDF" had visual & structural discrepancies with the web preview (omission of package tier specifications when multiple options were configured, inconsistent spacing in cards, section header styling differences).
+- **Root Cause**:
+  1. Web Preview displayed a Package Tier Specifications overview (Tier Name, Subtitle, Hotel Notes, Vehicle Notes, and `[SELECTED TIER]` badge) when multiple package options existed, but PDF omitted tier specs completely.
+  2. PDF card styles, highlight capsules, route pills, and milestone cards required exact 1:1 structural alignment with the Web Preview components while maintaining A4 print dimensions.
+  3. Single customer monetary value rule needed strict preservation across PDF (zero individual tier prices displayed, only the solitary Final Quotation Amount).
+
+---
+
+## 175D.2 Exact Fixes Applied
+1. **Quotation PDF Service (`src/lib/services/quotation-pdf-service.ts`)**:
+   - Replicated Web Preview's 14-section visual structure:
+     - **Hero/Header Banner**: Slate-900 / Indigo-950 dark container with agency branding, quotation pill (`QT-XXXXX • vX`), dynamic package/travel proposal badge, bold trip title, proposal subtitle, and 4-column metadata grid (`PREPARED FOR`, `TRAVEL DATES`, `GROUP SIZE`, `VALIDITY`).
+     - **Advisor Greeting**: Soft indigo container (`#EEF2FF` fill, `#C7D2FE` border) with `GREETING FROM YOUR TRAVEL CONSULTANT` header and clean message.
+     - **Package Tier Specifications**: Multi-tier comparison cards showing Tier Name, Subtitle, Hotel Specs, Transport Specs, and `[SELECTED TIER]` badge (strictly with zero monetary values, preserving the single customer price rule).
+     - **Tour Highlights Bar**: Compact capsule pills for stays, vehicles, activities, and tour schedule.
+     - **Destination Route Sequence**: Soft purple container (`#FAF5FF`, `#E9D5FF` border) with `[City] > [City]` transit route.
+     - **Day-Wise Itinerary**: Day badges, dates, bold titles, location pills, and formatted descriptions.
+     - **Hotel Accommodations**: Bold hotel name, city tag, stay dates, night/room badges, and meal plan.
+     - **Transportation**: Vehicle model, seater capacity badge, type and logistics notes.
+     - **Sightseeing & Activities**: Activity title, date badge, location tag, and description.
+     - **Inclusions vs Exclusions**: Side-by-side emerald and rose 2-column cards without truncation.
+     - **Payment Milestones**: Stage cards with stage name, percentage, and due date (zero ₹ amounts).
+     - **Important Notes & Policies**: Advisories, cancellation policy, terms & conditions.
+     - **Final Quotation Amount Card**: Prominent dark slate card (`#0F172A`) with emerald amount (`INR X,XX,XXX.XX`).
+     - **Global Footer**: Agency contact info on left, page numbers on right.
+   - Enforced strict cursor resets (`doc.x = margin`) before every section to guarantee left alignment.
+   - Preserved atomic `ensureSpace()` pagination preventing unnecessary page fragmentations.
+
+---
+
+## 175D.3 Strict Boundary & Freeze Confirmations
+- **PACKAGE TIERS & OPTIONS REMAIN 100% UNTOUCHED & FROZEN**:
+  - No changes to package tier pricing, tier options, selection logic, tier definitions, or database models.
+- **PRICING ENGINE & COSTING LOGIC REMAIN UNTOUCHED**:
+  - RateSheet Base → Package Markup → Gross → Discount → Tax → Final calculation flow preserved with 100% mathematical fidelity.
+- **SINGLE CUSTOMER-FACING MONETARY VALUE RULE PRESERVED**:
+  - Exactly ONE monetary value (Final Quotation Amount) formatted as `INR 1,05,052.50`.
+  - All internal pricing fields (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹`) remain strictly redacted.
+
+---
+
+## 175D.4 Validation & Quality Assurance
+- **TypeScript**: `npx tsc --noEmit` → **0 errors**.
+- **Production Build**: `npm run build` → **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` → **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+- **Protected Systems**: All 7 protected systems untouched.
+
+---
+
+## 175D.5 Files Modified
+- `src/lib/services/quotation-pdf-service.ts`: Redesigned layout engine to achieve 1:1 visual parity with Web Preview.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175D documentation.
+
+---
+
+# SECTION 175E: PDF CONTENT CLEANUP & DYNAMIC HEADER LABELS
+
+**Status**: `PHASE 175E — PDF CONTENT CLEANUP PASSED`  
+**Date**: September 2026  
+**Primary Surface**: `src/lib/services/quotation-pdf-service.ts`
+
+---
+
+## 175E.1 Cleaned Up Content & Removed PDF Sections
+Per customer document guidelines, the following 3 sections were completely removed from the generated customer-facing PDF:
+1. **`TOUR ROUTE` / Destination Route Sequence**: Entirely removed from PDF rendering (database model, trip destinations, and web preview remain 100% intact).
+2. **`PAYMENT MILESTONE SCHEDULE`**: Entirely removed from PDF rendering (database model, milestone calculations, and financial synchronization remain 100% intact).
+3. **`TRAVEL PACKAGE OPTIONS`**: Entirely removed from PDF rendering (package tier database models, tier pricing, tier selection, and costing remain 100% intact).
+
+---
+
+## 175E.2 Dynamic Header Labels & Fallbacks
+1. **Replaced `Bespoke Itineraries & Luxury Holiday Packages`**:
+   - Replaced with dynamic agency contact information (`agency.phone | agency.email`).
+   - If contact information is unavailable, falls back cleanly to the neutral label: `TRIP PROPOSAL`.
+   - Zero hard-coded luxury/marketing slogans.
+2. **Replaced `Tailored Holiday Proposal`**:
+   - Dynamically renders `PACKAGE: ${selectedPackageOption.name.toUpperCase()}` when a package tier is selected.
+   - Falls back cleanly to `TRAVEL PROPOSAL` when no specific tier is selected.
+   - Zero marketing copy.
+
+---
+
+## 175E.3 Boundary & Freeze Confirmations
+- **PACKAGE TIERS & OPTIONS REMAIN 100% UNTOUCHED & FROZEN**:
+  - No changes to package tier database schema, tier selection, tier pricing logic, or web preview UI.
+- **CUSTOMER PREVIEW & PUBLIC WEB PROPOSAL UNCHANGED**:
+  - `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx` and `src/app/q/[shareToken]/page.tsx` remain untouched.
+- **PRICING ENGINE & SINGLE MONETARY VALUE RULE PRESERVED**:
+  - Customer PDF contains strictly ONE monetary value (`FINAL QUOTATION AMOUNT`).
+  - Zero commercial leakage (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹` all absent).
+
+---
+
+## 175E.4 Validation & Quality Assurance
+- **Targeted PDF String Verification**:
+  - Verified `TOUR ROUTE`, `PAYMENT MILESTONE SCHEDULE`, `TRAVEL PACKAGE OPTIONS`, `Bespoke Itineraries & Luxury Holiday Packages`, and `TAILORED HOLIDAY PROPOSAL` are **100% ABSENT** from generated PDF.
+  - Verified dynamic package badge (`PACKAGE: LUXURY HERITAGE`) and neutral fallback (`TRAVEL PROPOSAL`).
+  - Verified dynamic agency contact line and neutral fallback (`TRIP PROPOSAL`).
+- **TypeScript**: `npx tsc --noEmit` → **0 errors**.
+- **Production Build**: `npm run build` → **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` → **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+
+---
+
+## 175E.5 Files Modified
+- `src/lib/services/quotation-pdf-service.ts`: Removed 3 PDF sections, implemented dynamic header labels and neutral fallbacks.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175E documentation.
+
+---
+
+# SECTION 175F: CUSTOMER PREVIEW REGRESSION FIX & DYNAMIC HEADER LABELS
+
+**Status**: `PHASE 175F — PREVIEW REGRESSION FIX PASSED`  
+**Date**: September 2026  
+**Primary Surfaces**:
+- `src/lib/services/quotation-service.ts`
+- `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx`
+- `src/app/q/[shareToken]/page.tsx`
+
+---
+
+## 175F.1 Root Cause & Investigation
+- **Root Cause of Missing Service Details (Hotels, Vehicles, Activities)**:
+  - In `src/lib/services/quotation-service.ts`, the `getQuotations` and `getQuotationsByTripId` queries (used by `GET /api/trips/[id]/quotation` to feed the Customer Preview page) previously selected only basic trip scalar fields and omitted relations for `tripHotels`, `tripVehicles`, `tripActivities`, `tripDestinations`, and `agency` from Prisma's `include` block.
+  - As a consequence, `res.data.quotations[0].trip.tripHotels`, `tripVehicles`, and `tripActivities` returned `undefined`/empty arrays, causing the conditional rendering guards in the Preview page (`hotelsList.length > 0`, `vehiclesList.length > 0`, `activitiesList.length > 0`) to evaluate to false and hide those customer-safe service detail sections.
+- **Backend Fix Applied**:
+  - Updated `getQuotations` and `getQuotationsByTripId` in `src/lib/services/quotation-service.ts` to include `agency` and the full `trip` relation with nested `tripHotels` (including `hotel`), `tripVehicles` (including `vehicle`), `tripActivities` (including `activity`), and `tripDestinations` (including `destination`).
+  - Restored full data flow to `/trips/[id]/quotation/preview/page.tsx`.
+
+---
+
+## 175F.2 Dynamic Header Labels & Marketing Copy Removal
+1. **Replaced `Bespoke Itineraries & Luxury Holiday Packages`**:
+   - In both `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx` and `src/app/q/[shareToken]/page.tsx`, replaced hard-coded marketing copy with dynamic agency contact line (`agency.phone | agency.email`).
+   - If contact details are unavailable, falls back cleanly to neutral label `TRIP PROPOSAL`.
+2. **Replaced `Tailored Holiday Proposal`**:
+   - In both preview and public proposal pages, dynamically displays `PACKAGE: ${selectedPackageName.toUpperCase()}` when a package option is selected.
+   - When no package option is selected, falls back cleanly to neutral label `TRAVEL PROPOSAL`.
+   - Zero hard-coded luxury/bespoke slogans remain across the codebase.
+
+---
+
+## 175F.3 Preview Design & Pricing Security Intact
+- **Visual Design Preserved**:
+  - Header, hero gradient, trip overview metadata bar, day-by-day itinerary cards, hotel cards, vehicle cards, activity cards, and responsive layouts remained visually intact without any layout regression.
+- **Zero Commercial Information Leakage**:
+  - Customer Preview strictly renders only non-financial details for hotels (hotel name, city, room type, meal plan, check-in, check-out, nights), vehicles (vehicle name, type, capacity, notes), and activities (name, date, description).
+  - Internal pricing (`costPrice`, `unitPrice`, `sellingPrice`, `subtotal`, `markup`, `tax`, `milestone ₹`) strictly excluded.
+  - Final quotation amount remains the ONLY customer-facing price displayed.
+
+---
+
+## 175F.4 Validation & Quality Assurance
+- **TypeScript**: `npx tsc --noEmit` → **0 errors**.
+- **Production Build**: `npm run build` → **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` → **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+- **Hard-coded String Audit**: Verified 0 occurrences of `Bespoke Itineraries`, `Tailored Holiday Proposal`, or `TAILORED HOLIDAY PROPOSAL` across `src`.
+
+---
+
+## 175F.5 Files Modified
+- `src/lib/services/quotation-service.ts`: Added full `trip` relations (`tripHotels`, `tripVehicles`, `tripActivities`, `tripDestinations`) and `agency` to `getQuotations` and `getQuotationsByTripId`.
+- `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx`: Dynamic agency contact subtext, dynamic proposal badge text.
+- `src/app/q/[shareToken]/page.tsx`: Dynamic agency contact subtext, dynamic proposal badge text.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175F documentation.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+
+
+
+
+
 
 
 

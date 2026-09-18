@@ -26,6 +26,11 @@ import {
   Package,
   Building2,
   Car,
+  Hotel,
+  Ticket,
+  MapPin,
+  Mail,
+  Building,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -89,7 +94,7 @@ export default function PublicQuotationPage() {
     loadPublicQuote();
   }, [loadPublicQuote]);
 
-  // Handle customer selecting a tier
+  // Handle customer selecting a tier (NO tier price shown)
   const handleSelectTier = async (opt: PublicPackageOption) => {
     setSelectedOptionId(opt.id);
     try {
@@ -152,7 +157,7 @@ export default function PublicQuotationPage() {
 
   const handleWhatsAppContact = () => {
     if (!quotation) return;
-    const phone = quotation.agency.phone.replace(/[^0-9]/g, "") || "919876543210";
+    const phone = quotation.agency.phone?.replace(/[^0-9]/g, "") || "919876543210";
     const selectedPkg = quotation.packageOptions?.find((p) => p.id === selectedOptionId);
     const pkgText = selectedPkg ? ` for the ${selectedPkg.name} package` : "";
     const text = `Hi ${quotation.agency.name}! I am reviewing quotation ${quotation.quotationNumber} (${quotation.title}). I would like to discuss and confirm this trip${pkgText}.`;
@@ -195,10 +200,33 @@ export default function PublicQuotationPage() {
   const activePackage = packageOptions.find((p) => p.id === selectedOptionId) || quotation.selectedPackageOption || null;
   const effectiveFinalAmount = activePackage ? Number(activePackage.finalAmount) : quotation.finalAmount;
 
+  // Duration calculation
+  let durationText = "";
+  if (quotation.trip.startDate && quotation.trip.endDate) {
+    const start = new Date(quotation.trip.startDate);
+    const end = new Date(quotation.trip.endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const nights = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
+    durationText = `${nights} Nights / ${nights + 1} Days`;
+  }
+
+  // Highlights & services
+  const hotelsList = quotation.trip.tripHotels || [];
+  const vehiclesList = quotation.trip.tripVehicles || [];
+  const activitiesList = quotation.trip.tripActivities || [];
+  const itineraryItems = quotation.trip.itineraryItems || [];
+  const destinations = (quotation.trip as any).tripDestinations || [];
+  const sortedDestinations = [...destinations].sort((a: any, b: any) => a.sequence - b.sequence);
+
   const inclusions = quotation.proposalItems?.filter((p) => p.type === "INCLUSION") || [];
   const exclusions = quotation.proposalItems?.filter((p) => p.type === "EXCLUSION") || [];
   const importantNotes = quotation.proposalItems?.filter((p) => p.type === "IMPORTANT_NOTE") || [];
   const milestones = quotation.paymentMilestones || [];
+
+  // Dynamic agency contact line & Proposal label
+  const agencyContacts = [quotation.agency?.phone, quotation.agency?.email].filter(Boolean);
+  const agencySubtext = agencyContacts.length > 0 ? agencyContacts.join(" | ") : "TRIP PROPOSAL";
+  const proposalBadgeText = activePackage?.name ? `PACKAGE: ${activePackage.name.toUpperCase()}` : "TRAVEL PROPOSAL";
 
   return (
     <div className="min-h-screen bg-slate-100/90 text-slate-900 pb-28 sm:pb-20 font-sans">
@@ -237,10 +265,10 @@ export default function PublicQuotationPage() {
               className="text-xs font-semibold h-8.5 px-3 rounded-xl cursor-pointer bg-white hidden sm:inline-flex"
             >
               <Printer className="h-3.5 w-3.5 mr-1 text-slate-500" />
-              Print Proposal
+              Print
             </Button>
 
-            {!isAccepted && !isExpired && (
+            {!isExpired && !isAccepted && (
               <>
                 <Button
                   variant="outline"
@@ -275,7 +303,7 @@ export default function PublicQuotationPage() {
       {/* Main Document Layout */}
       <main className="max-w-5xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
         <div className="bg-white text-slate-900 shadow-sm rounded-3xl border border-slate-200/90 overflow-hidden font-sans">
-          {/* Header Hero */}
+          {/* 1. Header Hero */}
           <div className="relative bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-10 lg:p-12 overflow-hidden">
             <div className="flex items-center justify-between border-b border-white/10 pb-6 mb-8">
               <div>
@@ -283,7 +311,7 @@ export default function PublicQuotationPage() {
                   {quotation.agency.name}
                 </div>
                 <div className="text-[11px] text-slate-300 tracking-wide mt-0.5">
-                  Bespoke Holiday & Travel Itineraries
+                  {agencySubtext}
                 </div>
               </div>
 
@@ -303,7 +331,7 @@ export default function PublicQuotationPage() {
 
             <div className="space-y-3">
               <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-400 bg-indigo-500/20 px-3 py-1 rounded-full border border-indigo-400/30">
-                Official Itinerary & Travel Proposal
+                {proposalBadgeText}
               </span>
               <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
                 {quotation.title}
@@ -315,7 +343,7 @@ export default function PublicQuotationPage() {
               )}
             </div>
 
-            {/* Traveler & Trip Quick Stats Bar */}
+            {/* 2. Trip Overview Metadata Bar */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-white/10 text-xs">
               <div>
                 <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Prepared For</span>
@@ -328,6 +356,7 @@ export default function PublicQuotationPage() {
                   {new Date(quotation.trip.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} –{" "}
                   {new Date(quotation.trip.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 </span>
+                {durationText && <span className="text-[10px] text-indigo-300 block font-medium mt-0.5">{durationText}</span>}
               </div>
 
               <div>
@@ -340,7 +369,7 @@ export default function PublicQuotationPage() {
               <div>
                 <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Valid Until</span>
                 <span className="font-bold text-indigo-300 text-sm">
-                  {quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString() : "Upon confirmation"}
+                  {quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Upon confirmation"}
                 </span>
               </div>
             </div>
@@ -358,7 +387,7 @@ export default function PublicQuotationPage() {
               </div>
             )}
 
-            {/* ─── PACKAGE TIERS SELECTOR (PHASE 10.11B) ─── */}
+            {/* ─── PACKAGE TIERS SELECTOR (NO INDIVIDUAL TIER PRICES AS PER SINGLE MONETARY VALUE RULE) ─── */}
             {packageOptions.length > 0 && (
               <div className="space-y-4">
                 <div className="border-b border-slate-200 pb-3">
@@ -414,15 +443,6 @@ export default function PublicQuotationPage() {
                           {opt.description && <p className="text-xs text-slate-500 leading-relaxed">{opt.description}</p>}
                         </div>
 
-                        {/* Price Card */}
-                        <div className="p-4 bg-slate-50/90 rounded-2xl border border-slate-200/80 text-center space-y-0.5">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Package Price</span>
-                          <div className="text-3xl font-black text-indigo-600 tracking-tight">
-                            {formatCurrency(Number(opt.finalAmount))}
-                          </div>
-                          <span className="text-[10px] text-slate-500 block">All-inclusive package price ({quotation.currency})</span>
-                        </div>
-
                         {/* Specifications */}
                         <div className="space-y-2 text-xs">
                           {opt.hotelNotes && (
@@ -472,7 +492,57 @@ export default function PublicQuotationPage() {
               </div>
             )}
 
-            {/* Day-by-Day Itinerary Presentation */}
+            {/* 3. Tour Highlights Bar */}
+            <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
+              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-xs text-slate-700 font-semibold">
+                {hotelsList.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <Hotel className="h-4 w-4 text-indigo-600" />
+                    <span>{hotelsList.length} Premium Stay{hotelsList.length > 1 ? "s" : ""}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <Car className="h-4 w-4 text-indigo-600" />
+                  <span>{vehiclesList.length > 0 ? "Private Vehicle & Chauffeur" : "Transfers Included"}</span>
+                </div>
+                {activitiesList.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <Ticket className="h-4 w-4 text-indigo-600" />
+                    <span>{activitiesList.length} Curated Experience{activitiesList.length > 1 ? "s" : ""}</span>
+                  </div>
+                )}
+                {itineraryItems.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-indigo-600" />
+                    <span>{itineraryItems.length} Days Itinerary</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 4. Destination Route Sequence */}
+            {sortedDestinations.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 text-indigo-600" />
+                  Tour Route Sequence
+                </h3>
+                <div className="flex flex-wrap items-center gap-2 p-3 bg-purple-50/60 border border-purple-100 rounded-2xl">
+                  {sortedDestinations.map((dest: any, idx: number) => (
+                    <React.Fragment key={dest.id || idx}>
+                      <span className="px-3 py-1 bg-white border border-purple-200 text-purple-900 font-bold text-xs rounded-xl shadow-2xs">
+                        {dest.destination?.name || dest.name || "Destination"}
+                      </span>
+                      {idx < sortedDestinations.length - 1 && (
+                        <span className="text-purple-400 font-black text-xs">➔</span>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 5. Day-by-Day Itinerary Schedule */}
             {quotation.trip.itineraryItems.length > 0 && (
               <div className="space-y-4">
                 <div className="border-b border-slate-200 pb-3">
@@ -516,7 +586,110 @@ export default function PublicQuotationPage() {
               </div>
             )}
 
-            {/* Structured Inclusions & Exclusions */}
+            {/* 6. Accommodation & Stay Details (NO PRICING) */}
+            {hotelsList.length > 0 && (
+              <div className="space-y-4">
+                <div className="border-b border-slate-200 pb-3">
+                  <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <Hotel className="h-5 w-5 text-indigo-600" />
+                    Hotel Accommodations
+                  </h2>
+                  <p className="text-xs text-slate-500">Handpicked luxury and comfortable stays</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {hotelsList.map((h) => {
+                    const hotelName = h.hotel?.name || "Selected Hotel";
+                    const cityName = h.hotel?.city || "";
+                    const nights = Math.max(1, Math.round((new Date(h.checkOut).getTime() - new Date(h.checkIn).getTime()) / (1000 * 60 * 60 * 24)));
+
+                    return (
+                      <div key={h.id} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2 text-xs">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">{hotelName}</h4>
+                            {cityName && <span className="text-xs text-indigo-600 font-semibold">{cityName}</span>}
+                          </div>
+                          <span className="px-2.5 py-1 bg-slate-100 text-slate-700 font-bold text-xs rounded-lg shrink-0">
+                            {nights} Night(s)
+                          </span>
+                        </div>
+
+                        <div className="space-y-1 text-slate-600 text-xs pt-1">
+                          <div><strong className="text-slate-800">Room Category:</strong> {h.roomType}</div>
+                          {h.mealPlan && <div><strong className="text-slate-800">Meal Plan:</strong> {h.mealPlan}</div>}
+                          <div><strong className="text-slate-800">Check-in:</strong> {new Date(h.checkIn).toLocaleDateString("en-US", { month: "short", day: "numeric" })} • <strong className="text-slate-800">Check-out:</strong> {new Date(h.checkOut).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 7. Transportation & Logistics (NO PRICING) */}
+            {vehiclesList.length > 0 && (
+              <div className="space-y-4">
+                <div className="border-b border-slate-200 pb-3">
+                  <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <Car className="h-5 w-5 text-indigo-600" />
+                    Transportation & Transfers
+                  </h2>
+                  <p className="text-xs text-slate-500">Private vehicle arrangements and chauffeured transit</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {vehiclesList.map((v) => (
+                    <div key={v.id} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">{v.vehicleName || v.vehicle?.name || "Private Vehicle"}</h4>
+                        {v.vehicle?.capacity && (
+                          <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-bold text-xs rounded-lg">
+                            {v.vehicle.capacity} Seater
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-slate-600 text-xs">
+                        {v.vehicleType || v.vehicle?.type || "Dedicated Private Transport"} • {v.notes || "Airport transfers, sightseeing, and intercity transit as per itinerary"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 8. Sightseeing & Activities (NO PRICING) */}
+            {activitiesList.length > 0 && (
+              <div className="space-y-4">
+                <div className="border-b border-slate-200 pb-3">
+                  <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <Ticket className="h-5 w-5 text-indigo-600" />
+                    Sightseeing & Activities
+                  </h2>
+                  <p className="text-xs text-slate-500">Curated experiences and entry excursions</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {activitiesList.map((act) => (
+                    <div key={act.id} className="p-4 bg-white border border-slate-200 shadow-2xs rounded-2xl space-y-1 text-xs">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <h4 className="font-extrabold text-slate-900 text-sm">{act.name || act.activity?.name || "Excursion"}</h4>
+                        {act.date && (
+                          <span className="text-[11px] text-slate-400 font-medium shrink-0">
+                            {new Date(act.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </span>
+                        )}
+                      </div>
+                      {act.description && (
+                        <p className="text-slate-600 text-xs leading-relaxed">{act.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 9. Structured Inclusions & Exclusions */}
             {(inclusions.length > 0 || exclusions.length > 0) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Inclusions */}
@@ -571,7 +744,7 @@ export default function PublicQuotationPage() {
               </div>
             )}
 
-            {/* Payment Milestone Schedule */}
+            {/* 10. Payment Milestone Schedule (PERCENTAGES ONLY) */}
             {milestones.length > 0 && (
               <div className="space-y-4">
                 <div className="border-b border-slate-200 pb-3">
@@ -606,7 +779,7 @@ export default function PublicQuotationPage() {
 
                       <div className="pt-2 border-t border-slate-200 flex items-baseline justify-between text-[11px] text-slate-500">
                         <span>
-                          {m.dueDate ? `Due: ${new Date(m.dueDate).toLocaleDateString("en-IN")}` : "Upon schedule"}
+                          {m.dueDate ? `Due: ${new Date(m.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "Upon schedule"}
                         </span>
                       </div>
                     </div>
@@ -615,7 +788,7 @@ export default function PublicQuotationPage() {
               </div>
             )}
 
-            {/* Important Notes & Policies */}
+            {/* 11. Important Notes & Policies */}
             {(importantNotes.length > 0 || quotation.cancellationPolicy || quotation.terms) && (
               <div className="space-y-4">
                 <div className="border-b border-slate-200 pb-3">
@@ -653,7 +826,7 @@ export default function PublicQuotationPage() {
               </div>
             )}
 
-            {/* Total Commercial Package Price Summary - Final Amount ONLY */}
+            {/* 12. Total Commercial Package Price Summary - Final Amount ONLY */}
             <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 text-white space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
                 <div>
@@ -724,6 +897,22 @@ export default function PublicQuotationPage() {
                 </div>
               </div>
             </div>
+
+            {/* 13. Agency Contact Footer */}
+            <div className="pt-6 border-t border-slate-200 text-center text-xs text-slate-500 space-y-2">
+              <p className="font-bold text-slate-700">{quotation.agency.name}</p>
+              <div className="flex flex-wrap items-center justify-center gap-4 text-[11px]">
+                {quotation.agency.phone && (
+                  <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {quotation.agency.phone}</span>
+                )}
+                {quotation.agency.email && (
+                  <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {quotation.agency.email}</span>
+                )}
+                {quotation.agency.address && (
+                  <span className="flex items-center gap-1"><Building className="h-3 w-3" /> {quotation.agency.address}</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </main>
@@ -739,7 +928,7 @@ export default function PublicQuotationPage() {
               <DialogTitle className="text-slate-900 font-bold text-lg">Accept Itinerary Proposal</DialogTitle>
               <DialogDescription className="text-slate-500 text-xs mt-1">
                 Confirm your acceptance of quotation {quotation.quotationNumber}
-                {activePackage ? ` (${activePackage.name} — ${formatCurrency(effectiveFinalAmount)})` : ` (${formatCurrency(effectiveFinalAmount)})`}.
+                {activePackage ? ` (${activePackage.name})` : ""}.
                 Your travel advisor will be notified immediately to proceed with reservation bookings.
               </DialogDescription>
             </DialogHeader>
@@ -749,7 +938,6 @@ export default function PublicQuotationPage() {
                 <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
                   <span className="text-[10px] font-bold text-indigo-500 uppercase block">Selected Tier</span>
                   <span className="font-extrabold text-slate-900 text-xs">{activePackage.name}</span>
-                  <span className="font-bold text-indigo-700 text-xs float-right">{formatCurrency(effectiveFinalAmount)}</span>
                 </div>
               )}
 
@@ -806,7 +994,7 @@ export default function PublicQuotationPage() {
                 <Textarea
                   value={changeMessage}
                   onChange={(e) => setChangeMessage(e.target.value)}
-                  placeholder="e.g. Could we upgrade the Munnar hotel to a 5-star resort and add an extra day in Alleppey?"
+                  placeholder="e.g. Could we upgrade the hotel to a 5-star resort and add an extra day in the itinerary?"
                   rows={4}
                   className="text-xs bg-slate-50/50 border-slate-200 resize-none"
                   required

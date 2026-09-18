@@ -73,6 +73,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         startDate: quotation.trip.startDate,
         endDate: quotation.trip.endDate,
         travelers: quotation.trip.travelers,
+        destinations: (quotation.trip as any).tripDestinations?.map((td: any) => ({
+          id: td.id,
+          sequence: td.sequence,
+          name: td.destination?.name || td.name || "Destination",
+        })),
         itineraryItems: quotation.trip.itineraryItems,
         hotels: quotation.trip.tripHotels?.map((th) => ({
           id: th.id,
