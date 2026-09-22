@@ -25,6 +25,7 @@ import {
 import { tripService } from "./trip-service";
 import { followUpService } from "./follow-up-service";
 import { communicationService } from "./communication-service";
+import { internalNotificationService } from "./internal-notification-service";
 
 export type EnquiryWithRelations = Enquiry & {
   customer: {
@@ -305,6 +306,22 @@ export const enquiryService = {
     // Non-blocking communication trigger
     communicationService.notifyEnquiryCreated(agencyId, enquiry.id).catch((err) => {
       console.warn("[Communication Non-blocking Notice] Failed to notify enquiry created:", err?.message || err);
+    });
+
+    internalNotificationService.notifyAgencyOwner(agencyId, {
+      type: "CUSTOMER_ENQUIRY_CREATED",
+      title: "New Enquiry Received",
+      message: `Enquiry #${enquiry.enquiryNumber} received for ${enquiry.destination} from ${enquiry.customer?.name || "Client"}.`,
+      linkUrl: `/enquiries/${enquiry.id}`,
+      metadata: {
+        enquiryId: enquiry.id,
+        enquiryNumber: enquiry.enquiryNumber,
+        destination: enquiry.destination,
+        customerId: enquiry.customerId,
+      },
+      idempotencyKey: `enquiry-created-${enquiry.id}`,
+    }).catch((err) => {
+      console.warn("[EnquiryService] Failed to notify agency owner of enquiry creation:", err);
     });
 
     return enquiry as EnquiryWithRelations;

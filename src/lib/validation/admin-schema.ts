@@ -133,4 +133,16 @@ export const subscriptionPaymentRejectSchema = z.object({
 
 export type SubscriptionPaymentRejectInput = z.infer<typeof subscriptionPaymentRejectSchema>;
 
+export const billingSettingsUpdateSchema = z.object({
+  upiId: z.string().trim().min(3, "UPI ID is required").max(100),
+  upiDisplayName: z.string().trim().max(100).optional().nullable(),
+  accountHolder: z.string().trim().min(2, "Account Holder name is required").max(150),
+  bankName: z.string().trim().min(2, "Bank Name is required").max(100),
+  accountNumber: z.string().trim().min(5, "Account Number is required").max(50),
+  ifscCode: z.string().trim().min(4, "IFSC Code is required").max(20),
+  branchName: z.string().trim().max(100).optional().nullable(),
+});
+
+export type BillingSettingsUpdateInput = z.infer<typeof billingSettingsUpdateSchema>;
+
 

@@ -8,6 +8,7 @@ import {
   SubscriptionPaymentCreateInput,
   SubscriptionPaymentVerifyInput,
   SubscriptionPaymentRejectInput,
+  BillingSettingsUpdateInput,
 } from "@/lib/validation/admin-schema";
 
 export const adminClient = {
@@ -221,6 +222,51 @@ export const adminClient = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || "Failed to update platform settings");
+    }
+    return res.json();
+  },
+
+  async getBillingSettings() {
+    const res = await fetch("/api/admin/billing-settings");
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to fetch billing settings");
+    }
+    return res.json();
+  },
+
+  async updateBillingSettings(input: BillingSettingsUpdateInput) {
+    const res = await fetch("/api/admin/billing-settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to update billing settings");
+    }
+    return res.json();
+  },
+
+  async uploadBillingQr(formData: FormData) {
+    const res = await fetch("/api/admin/billing-settings/qr", {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to upload QR code");
+    }
+    return res.json();
+  },
+
+  async deleteBillingQr() {
+    const res = await fetch("/api/admin/billing-settings/qr", {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to remove QR code");
     }
     return res.json();
   },

@@ -18,7 +18,10 @@ import {
   SubscriptionPaymentCreateInput,
   SubscriptionPaymentVerifyInput,
   SubscriptionPaymentRejectInput,
+  BillingSettingsUpdateInput,
 } from "@/lib/validation/admin-schema";
+import { internalNotificationService } from "@/lib/services/internal-notification-service";
+import { getAdminClient } from "@/lib/supabase/admin";
 
 export interface SubscriptionPaymentSummaryStats {
   totalExpected: number;
@@ -626,6 +629,17 @@ export const adminService = {
       },
     });
 
+    internalNotificationService.notifyAgencyOwner(agencyId, {
+      type: "AGENCY_STATUS_CHANGED",
+      title: "Account Status Update",
+      message: `Your agency account has been suspended: ${reason}`,
+      linkUrl: "/subscription",
+      metadata: { status: "SUSPENDED", reason },
+      idempotencyKey: `agency-suspend-${agencyId}-${Date.now()}`,
+    }).catch((err) => {
+      console.warn("[AdminService] Failed to notify agency owner of suspension:", err);
+    });
+
     return updated;
   },
 
@@ -653,6 +667,17 @@ export const adminService = {
           newStatus: AgencyStatus.ACTIVE,
         },
       },
+    });
+
+    internalNotificationService.notifyAgencyOwner(agencyId, {
+      type: "AGENCY_STATUS_CHANGED",
+      title: "Account Reactivated",
+      message: "Your agency account has been successfully reactivated.",
+      linkUrl: "/dashboard",
+      metadata: { status: "ACTIVE" },
+      idempotencyKey: `agency-reactivate-${agencyId}-${Date.now()}`,
+    }).catch((err) => {
+      console.warn("[AdminService] Failed to notify agency owner of reactivation:", err);
     });
 
     return updated;
@@ -990,6 +1015,19 @@ export const adminService = {
       },
     });
 
+    if ((input.status || "ACTIVE") === "ACTIVE") {
+      internalNotificationService.notifyAllAgencyOwners({
+        type: "PLATFORM_ANNOUNCEMENT",
+        title: input.title,
+        message: input.message,
+        linkUrl: "/dashboard",
+        metadata: { announcementId: announcement.id, type: input.type },
+        idempotencyKey: `announcement-${announcement.id}`,
+      }).catch((err) => {
+        console.warn("[AdminService] Failed to notify agency owners of announcement:", err);
+      });
+    }
+
     return announcement;
   },
 
@@ -1082,6 +1120,223 @@ export const adminService = {
     });
 
     return this.getPlatformSettings();
+  },
+
+  /**
+   * 12B. Platform Billing & Payment Settings (UPI, Bank Details, QR Code)
+   */
+  async getBillingSettings() {
+    let settings = prisma.platformBillingSettings
+      ? await prisma.platformBillingSettings.findUnique({
+          where: { id: "default" },
+        })
+      : null;
+
+    if (!settings && prisma.platformBillingSettings) {
+      settings = await prisma.platformBillingSettings.upsert({
+        where: { id: "default" },
+        create: {
+          id: "default",
+          upiId: "tripdesk.billing@icici",
+          upiDisplayName: "TripDesk Billing",
+          accountHolder: "TripDesk SaaS Technologies Pvt Ltd",
+          bankName: "ICICI Bank",
+          accountNumber: "002105009844",
+          ifscCode: "ICIC0000021",
+          branchName: "MG Road Branch",
+        },
+        update: {},
+      });
+    }
+
+    if (!settings) {
+      return {
+        id: "default",
+        upiId: "tripdesk.billing@icici",
+        upiDisplayName: "TripDesk Billing",
+        accountHolder: "TripDesk SaaS Technologies Pvt Ltd",
+        bankName: "ICICI Bank",
+        accountNumber: "002105009844",
+        ifscCode: "ICIC0000021",
+        branchName: "MG Road Branch",
+        qrCodeUrl: null,
+        qrStoragePath: null,
+        updatedBy: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
+
+    return settings;
+  },
+
+  async updateBillingSettings(input: BillingSettingsUpdateInput, actorUserId: string) {
+    const updated = await prisma.platformBillingSettings.upsert({
+      where: { id: "default" },
+      create: {
+        id: "default",
+        upiId: input.upiId,
+        upiDisplayName: input.upiDisplayName || null,
+        accountHolder: input.accountHolder,
+        bankName: input.bankName,
+        accountNumber: input.accountNumber,
+        ifscCode: input.ifscCode,
+        branchName: input.branchName || null,
+        updatedBy: actorUserId,
+      },
+      update: {
+        upiId: input.upiId,
+        upiDisplayName: input.upiDisplayName || null,
+        accountHolder: input.accountHolder,
+        bankName: input.bankName,
+        accountNumber: input.accountNumber,
+        ifscCode: input.ifscCode,
+        branchName: input.branchName || null,
+        updatedBy: actorUserId,
+      },
+    });
+
+    await prisma.platformAuditLog.create({
+      data: {
+        actorUserId,
+        action: "PLATFORM_BILLING_SETTINGS_UPDATED",
+        entityType: "PLATFORM_BILLING_SETTINGS",
+        metadata: input as any,
+      },
+    });
+
+    return updated;
+  },
+
+  async uploadBillingQr(fileBuffer: Buffer, fileName: string, mimeType: string, actorUserId: string) {
+    const allowedMimes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+    if (!allowedMimes.includes(mimeType.toLowerCase())) {
+      throw new Error("Invalid image format. Allowed formats: PNG, JPEG, JPG, WEBP.");
+    }
+
+    if (fileBuffer.length > 2 * 1024 * 1024) {
+      throw new Error("File size exceeds 2MB limit.");
+    }
+
+    const currentSettings = await this.getBillingSettings();
+    const oldStoragePath = currentSettings.qrStoragePath;
+
+    let qrCodeUrl: string;
+    let qrStoragePath: string | null = null;
+
+    const ext = fileName.split(".").pop() || "png";
+    const storagePath = `platform/billing/qr-${Date.now()}.${ext}`;
+
+    const adminClient = getAdminClient();
+    if (adminClient) {
+      const bucketName = "platform-assets";
+      // Ensure bucket exists
+      const { data: buckets } = await adminClient.storage.listBuckets();
+      const bucketExists = buckets?.some((b) => b.name === bucketName);
+      if (!bucketExists) {
+        await adminClient.storage.createBucket(bucketName, { public: true });
+      }
+
+      const { error: uploadError } = await adminClient.storage
+        .from(bucketName)
+        .upload(storagePath, fileBuffer, {
+          contentType: mimeType,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        throw new Error(`Failed to upload QR image: ${uploadError.message}`);
+      }
+
+      const { data: publicUrlData } = adminClient.storage
+        .from(bucketName)
+        .getPublicUrl(storagePath);
+
+      qrCodeUrl = publicUrlData.publicUrl;
+      qrStoragePath = storagePath;
+    } else {
+      // Safe local/offline fallback
+      qrCodeUrl = `data:${mimeType};base64,${fileBuffer.toString("base64")}`;
+      qrStoragePath = null;
+    }
+
+    // Update DB
+    const updated = await prisma.platformBillingSettings.upsert({
+      where: { id: "default" },
+      create: {
+        id: "default",
+        qrCodeUrl,
+        qrStoragePath,
+        updatedBy: actorUserId,
+      },
+      update: {
+        qrCodeUrl,
+        qrStoragePath,
+        updatedBy: actorUserId,
+      },
+    });
+
+    await prisma.platformAuditLog.create({
+      data: {
+        actorUserId,
+        action: "PLATFORM_BILLING_QR_UPLOADED",
+        entityType: "PLATFORM_BILLING_SETTINGS",
+        metadata: { qrCodeUrl, qrStoragePath },
+      },
+    });
+
+    // Cleanup previous storage object only after successful DB update
+    if (oldStoragePath && adminClient) {
+      try {
+        await adminClient.storage.from("platform-assets").remove([oldStoragePath]);
+      } catch (cleanupErr) {
+        console.warn("Non-fatal: Failed to delete previous QR image from storage:", cleanupErr);
+      }
+    }
+
+    return updated;
+  },
+
+  async deleteBillingQr(actorUserId: string) {
+    const currentSettings = await this.getBillingSettings();
+    const oldStoragePath = currentSettings.qrStoragePath;
+
+    const updated = await prisma.platformBillingSettings.upsert({
+      where: { id: "default" },
+      create: {
+        id: "default",
+        qrCodeUrl: null,
+        qrStoragePath: null,
+        updatedBy: actorUserId,
+      },
+      update: {
+        qrCodeUrl: null,
+        qrStoragePath: null,
+        updatedBy: actorUserId,
+      },
+    });
+
+    await prisma.platformAuditLog.create({
+      data: {
+        actorUserId,
+        action: "PLATFORM_BILLING_QR_REMOVED",
+        entityType: "PLATFORM_BILLING_SETTINGS",
+        metadata: {},
+      },
+    });
+
+    if (oldStoragePath) {
+      const adminClient = getAdminClient();
+      if (adminClient) {
+        try {
+          await adminClient.storage.from("platform-assets").remove([oldStoragePath]);
+        } catch (cleanupErr) {
+          console.warn("Non-fatal: Failed to delete QR image from storage:", cleanupErr);
+        }
+      }
+    }
+
+    return updated;
   },
 
   /**
@@ -1564,6 +1819,22 @@ export const adminService = {
       },
     });
 
+    internalNotificationService.notifyAgencyOwner(payment.agencyId, {
+      type: "SUBSCRIPTION_PAYMENT_VERIFIED",
+      title: "Subscription Payment Verified",
+      message: `Your payment of ₹${Number(payment.amount).toLocaleString("en-IN")} has been verified. Subscription is now active.`,
+      linkUrl: "/subscription",
+      metadata: {
+        paymentId: payment.id,
+        amount: Number(payment.amount),
+        planName: payment.subscription?.plan?.name,
+        validUntil: subEnd.toISOString(),
+      },
+      idempotencyKey: `sub-pay-verify-${payment.id}`,
+    }).catch((err) => {
+      console.warn("[AdminService] Failed to notify agency owner of verified payment:", err);
+    });
+
     return updatedPayment;
   },
 
@@ -1611,6 +1882,21 @@ export const adminService = {
           rejectedBy: actorUserId,
         },
       },
+    });
+
+    internalNotificationService.notifyAgencyOwner(payment.agencyId, {
+      type: "SUBSCRIPTION_PAYMENT_REJECTED",
+      title: "Subscription Payment Rejected",
+      message: `Your payment of ₹${Number(payment.amount).toLocaleString("en-IN")} was rejected. Reason: ${input.reason}`,
+      linkUrl: "/subscription",
+      metadata: {
+        paymentId: payment.id,
+        amount: Number(payment.amount),
+        reason: input.reason,
+      },
+      idempotencyKey: `sub-pay-reject-${payment.id}`,
+    }).catch((err) => {
+      console.warn("[AdminService] Failed to notify agency owner of rejected payment:", err);
     });
 
     return updatedPayment;

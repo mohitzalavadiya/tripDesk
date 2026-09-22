@@ -16,6 +16,7 @@ import { tripCostingService } from "./trip-costing-service";
 import { communicationService } from "./communication-service";
 import { taxService } from "./tax-service";
 import { taxProfileService } from "./tax-profile-service";
+import { internalNotificationService } from "./internal-notification-service";
 import {
   CreateQuotationInput,
   UpdateQuotationInput,
@@ -2730,6 +2731,21 @@ export const quotationService = {
       },
     });
 
+    internalNotificationService.notifyAgencyOwner(quotation.agencyId, {
+      type: "QUOTATION_ACCEPTED",
+      title: "Quotation Accepted",
+      message: `Quotation #${quotation.quotationNumber} (${quotation.title}) was accepted by the client.`,
+      linkUrl: `/quotations/${quotation.id}`,
+      metadata: {
+        quotationId: quotation.id,
+        quotationNumber: quotation.quotationNumber,
+        finalAmount: Number(quotation.finalAmount),
+      },
+      idempotencyKey: `quote-accept-${quotation.id}`,
+    }).catch((err) => {
+      console.warn("[QuotationService] Failed to notify agency owner of quotation acceptance:", err);
+    });
+
     return {
       success: true,
       message: "Thank you! You have accepted the quotation proposal. Our travel specialist will be in touch shortly.",
@@ -2766,6 +2782,21 @@ export const quotationService = {
         customerFeedback: input.message,
         customerFeedbackAt: new Date(),
       },
+    });
+
+    internalNotificationService.notifyAgencyOwner(quotation.agencyId, {
+      type: "QUOTATION_CHANGE_REQUESTED",
+      title: "Quotation Revision Requested",
+      message: `Client requested changes for Quotation #${quotation.quotationNumber}: "${input.message.slice(0, 100)}"`,
+      linkUrl: `/quotations/${quotation.id}`,
+      metadata: {
+        quotationId: quotation.id,
+        quotationNumber: quotation.quotationNumber,
+        message: input.message,
+      },
+      idempotencyKey: `quote-changes-${quotation.id}-${Date.now()}`,
+    }).catch((err) => {
+      console.warn("[QuotationService] Failed to notify agency owner of quotation change request:", err);
     });
 
     return {

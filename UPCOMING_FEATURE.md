@@ -30,11 +30,6 @@ clean database
 
 you already know we build a tripdesk. so my old chat is reach the limit so i want to start new chat foe this project. i want to contunie project in new chat without breaking anythings. i have file TRIPDESK_MASTER_CONTEXT_FINAL_V3.md   for whole project. whole flow, what we build, what we dicide everythings. so i give you this file review it and then we continue
 
-
-
-**TODO**
-
-
 Hotel and rate issue in costing
 Add destination field for trip
 
@@ -44,12 +39,16 @@ quatation priceing issue
 /quotation page UI when no quotation available
 Price should not show on quotation
 Agency Service & Planning (15%): should not show on quotation
+notification test
+
+
+**TODO**
+
+Add QR and UPI for payment
 
 some changes in activity. R&D 
 
-Add QR and UPI for patment
 
-notification test
 
 manage read only from frontend also
 where i can show Announcements ?

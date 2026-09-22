@@ -6,6 +6,18 @@ import {
   Prisma,
 } from "@prisma/client";
 import { AgencyPaymentRequestInput } from "@/lib/validation/subscription-schema";
+import { internalNotificationService } from "@/lib/services/internal-notification-service";
+
+export interface PublicPlatformBillingSettings {
+  upiId: string | null;
+  upiDisplayName: string | null;
+  accountHolder: string | null;
+  bankName: string | null;
+  accountNumber: string | null;
+  ifscCode: string | null;
+  branchName: string | null;
+  qrCodeUrl: string | null;
+}
 
 export interface AgencySubscriptionOverview {
   agency: {
@@ -76,6 +88,7 @@ export interface AgencySubscriptionOverview {
     displayOrder: number;
     isActive: boolean;
   }>;
+  billingSettings?: PublicPlatformBillingSettings;
 }
 
 
@@ -268,7 +281,44 @@ export const subscriptionService = {
       latestPendingPayment,
       paymentHistory,
       availablePlans,
+      billingSettings: await this.getPublicBillingSettings(),
     };
+  },
+
+  /**
+   * 1B. Get public platform billing instructions for subscription payments
+   */
+  async getPublicBillingSettings(): Promise<PublicPlatformBillingSettings> {
+    const settings = prisma.platformBillingSettings
+      ? await prisma.platformBillingSettings.findUnique({
+          where: { id: "default" },
+          select: {
+            upiId: true,
+            upiDisplayName: true,
+            accountHolder: true,
+            bankName: true,
+            accountNumber: true,
+            ifscCode: true,
+            branchName: true,
+            qrCodeUrl: true,
+          },
+        })
+      : null;
+
+    if (!settings) {
+      return {
+        upiId: "tripdesk.billing@icici",
+        upiDisplayName: "TripDesk Billing",
+        accountHolder: "TripDesk SaaS Technologies Pvt Ltd",
+        bankName: "ICICI Bank",
+        accountNumber: "002105009844",
+        ifscCode: "ICIC0000021",
+        branchName: "MG Road Branch",
+        qrCodeUrl: null,
+      };
+    }
+
+    return settings;
   },
 
 
@@ -383,6 +433,32 @@ export const subscriptionService = {
           paymentMethod: input.paymentMethod,
         },
       },
+    });
+
+    // 6. Notify Platform Owners
+    const agencyRecord = await prisma.agency.findUnique({
+      where: { id: agencyId },
+      select: { name: true },
+    });
+    const agencyName = agencyRecord?.name || "An Agency";
+
+    internalNotificationService.notifyPlatformOwners({
+      type: "SUBSCRIPTION_PAYMENT_SUBMITTED",
+      title: "Subscription Payment Submitted",
+      message: `${agencyName} submitted a ₹${calculatedAmount.toLocaleString("en-IN")} payment for ${plan.name} plan.`,
+      linkUrl: "/admin/subscriptions",
+      metadata: {
+        paymentId: payment.id,
+        agencyId,
+        agencyName,
+        planId: plan.id,
+        planName: plan.name,
+        amount: calculatedAmount,
+        utrNumber: input.utrNumber.trim(),
+      },
+      idempotencyKey: `sub-pay-sub-${payment.id}`,
+    }).catch((err) => {
+      console.warn("[SubscriptionService] Failed to send notification to platform owners:", err);
     });
 
     return {

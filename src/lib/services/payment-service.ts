@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Payment, PaymentMethod, PaymentStatus, InvoiceStatus, Prisma } from "@prisma/client";
 import { bookingService } from "./booking-service";
 import { communicationService } from "./communication-service";
+import { internalNotificationService } from "./internal-notification-service";
 import {
   CreatePaymentInput,
   UpdatePaymentInput,
@@ -245,6 +246,23 @@ export const paymentService = {
     // Non-blocking communication trigger
     communicationService.notifyPaymentReceived(agencyId, payment.id).catch((err) => {
       console.warn("[Communication Non-blocking Notice] Failed to notify payment received:", err?.message || err);
+    });
+
+    internalNotificationService.notifyAgencyOwner(agencyId, {
+      type: "PAYMENT_RECEIVED",
+      title: "Payment Logged",
+      message: `Received ₹${Number(payment.amount).toLocaleString("en-IN")} for Booking #${booking.bookingNumber} (${booking.customer?.name || "Client"}).`,
+      linkUrl: `/bookings/${booking.id}`,
+      metadata: {
+        paymentId: payment.id,
+        paymentNumber: payment.paymentNumber,
+        bookingId: booking.id,
+        bookingNumber: booking.bookingNumber,
+        amount: Number(payment.amount),
+      },
+      idempotencyKey: `payment-recv-${payment.id}`,
+    }).catch((err) => {
+      console.warn("[PaymentService] Failed to notify agency owner of payment received:", err);
     });
 
     return payment as PaymentWithRelations;

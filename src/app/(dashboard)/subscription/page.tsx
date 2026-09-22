@@ -27,6 +27,9 @@ import {
   BadgeCheck,
   ChevronRight,
   ExternalLink,
+  Copy,
+  Landmark,
+  Smartphone,
 } from "lucide-react";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { subscriptionClient } from "@/lib/api-client/subscription-client";
@@ -102,6 +105,16 @@ interface AgencySubscriptionData {
     rejectionReason: string | null;
     createdAt: string;
   }>;
+  billingSettings?: {
+    upiId: string | null;
+    upiDisplayName: string | null;
+    accountHolder: string | null;
+    bankName: string | null;
+    accountNumber: string | null;
+    ifscCode: string | null;
+    branchName: string | null;
+    qrCodeUrl: string | null;
+  };
 }
 
 interface PlanItem {
@@ -130,6 +143,14 @@ export default function AgencySubscriptionPage() {
   const [utrNumber, setUtrNumber] = React.useState("");
   const [paymentNotes, setPaymentNotes] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
+  const [copiedField, setCopiedField] = React.useState<string | null>(null);
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(label);
+    toast.success(`Copied ${label} to clipboard`);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   const fetchData = React.useCallback(async () => {
     setLoading(true);
@@ -776,29 +797,148 @@ export default function AgencySubscriptionPage() {
                   </span>
                 </div>
 
-                {/* Bank / UPI Details */}
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 text-xs">
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                      TripDesk Official Billing UPI ID
-                    </span>
-                    <span className="font-mono font-black text-slate-900 text-sm bg-white px-2.5 py-1 rounded border border-slate-200 block select-all">
-                      tripdesk.billing@icici
-                    </span>
-                  </div>
+                {/* Dynamic Bank / UPI / QR Billing Details */}
+                {(() => {
+                  const billing = data?.billingSettings;
+                  const upi = billing?.upiId || "";
+                  const upiName = billing?.upiDisplayName || "";
+                  const accHolder = billing?.accountHolder || "—";
+                  const bank = billing?.bankName || "—";
+                  const branch = billing?.branchName || "";
+                  const accNum = billing?.accountNumber || "—";
+                  const ifsc = billing?.ifscCode || "—";
+                  const qrUrl = billing?.qrCodeUrl;
 
-                  <div className="space-y-1 pt-1 border-t border-slate-200/60">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                      Direct Bank Transfer (NEFT / IMPS / RTGS)
-                    </span>
-                    <div className="text-slate-700 leading-relaxed space-y-0.5 select-all">
-                      <p><strong>A/C Name:</strong> TripDesk SaaS Technologies Pvt Ltd</p>
-                      <p><strong>Bank:</strong> ICICI Bank, MG Road Branch</p>
-                      <p><strong>A/C Number:</strong> 002105009844</p>
-                      <p><strong>IFSC Code:</strong> ICIC0000021</p>
+                  return (
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4 text-xs">
+                      {/* Optional QR Code Preview */}
+                      {qrUrl && (
+                        <div className="bg-white border border-slate-200/90 rounded-xl p-3 flex flex-col sm:flex-row items-center gap-4 shadow-2xs">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={qrUrl}
+                            alt="Subscription Payment QR"
+                            className="w-28 h-28 object-contain bg-white rounded-lg border border-slate-200 p-1 shrink-0"
+                          />
+                          <div className="space-y-1 text-center sm:text-left">
+                            <div className="flex items-center justify-center sm:justify-start gap-1.5 text-slate-900 font-bold">
+                              <QrCode className="h-4 w-4 text-indigo-600" />
+                              <span>Scan & Pay via UPI App</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 leading-relaxed">
+                              Open GPay, PhonePe, Paytm, or any banking UPI app to scan and complete payment.
+                            </p>
+                            {upi && (
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(upi, "UPI ID")}
+                                className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded cursor-pointer mt-1"
+                              >
+                                <span>{upi}</span>
+                                {copiedField === "UPI ID" ? (
+                                  <Check className="h-3 w-3 text-emerald-600" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Official UPI ID Section */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                            TripDesk Official Billing UPI ID
+                          </span>
+                          {upiName && (
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              Name: {upiName}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-slate-200">
+                          <span className="font-mono font-black text-slate-900 text-xs sm:text-sm select-all">
+                            {upi || "—"}
+                          </span>
+                          {upi && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(upi, "UPI ID")}
+                              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors cursor-pointer"
+                            >
+                              {copiedField === "UPI ID" ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                  <span className="text-emerald-600 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3.5 w-3.5" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Direct Bank Transfer Section */}
+                      <div className="space-y-2 pt-2 border-t border-slate-200/60">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                          Direct Bank Transfer (NEFT / IMPS / RTGS)
+                        </span>
+                        <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-2 text-slate-700 select-all">
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-500">Beneficiary Name:</span>
+                            <span className="font-bold text-slate-900">{accHolder}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-500">Bank & Branch:</span>
+                            <span className="font-semibold text-slate-900">{bank}{branch ? `, ${branch}` : ""}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px] border-t border-slate-100 pt-1.5">
+                            <span className="text-slate-500">Account Number:</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-slate-900">{accNum}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(accNum, "Account Number")}
+                                className="text-slate-400 hover:text-indigo-600 p-0.5 rounded cursor-pointer"
+                                title="Copy Account Number"
+                              >
+                                {copiedField === "Account Number" ? (
+                                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-500">IFSC Code:</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-slate-900">{ifsc}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(ifsc, "IFSC Code")}
+                                className="text-slate-400 hover:text-indigo-600 p-0.5 rounded cursor-pointer"
+                                title="Copy IFSC Code"
+                              >
+                                {copiedField === "IFSC Code" ? (
+                                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* UTR Input Form */}
                 <div className="space-y-4">
