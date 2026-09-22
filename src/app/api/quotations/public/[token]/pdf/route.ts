@@ -87,9 +87,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           notes: ta.notes || null,
         })),
       },
-      packageOptions: quotation.packageOptions,
-      selectedPackageOptionId: quotation.selectedPackageOptionId,
-      selectedPackageOption: quotation.selectedPackageOption,
+      tier: quotation.tier,
       proposalItems: quotation.proposalItems as any,
       paymentMilestones: quotation.paymentMilestones,
     });

@@ -6,7 +6,6 @@ import {
   QuotationItem,
   QuotationProposalItem,
   QuotationPaymentMilestone,
-  QuotationPackageOption,
   QuotationStatus,
   ProposalItemType,
   TaxMode,
@@ -24,6 +23,7 @@ import {
   GenerateTripQuotationInput,
   AcceptQuotationInput,
   RequestChangesInput,
+  QuotationTier,
 } from "@/lib/validation/quotation-schema";
 import {
   CreateQuotationItemInput,
@@ -39,11 +39,6 @@ import {
   UpdatePaymentMilestoneInput,
   GeneratePaymentScheduleInput,
 } from "@/lib/validation/payment-milestone-schema";
-import {
-  CreatePackageOptionInput,
-  UpdatePackageOptionInput,
-  ReorderPackageOptionsInput,
-} from "@/lib/validation/package-option-schema";
 
 export type QuotationWithRelations = Quotation & {
   agency?: {
@@ -139,8 +134,6 @@ export type QuotationWithRelations = Quotation & {
   items: QuotationItem[];
   proposalItems: QuotationProposalItem[];
   paymentMilestones: QuotationPaymentMilestone[];
-  packageOptions: QuotationPackageOption[];
-  selectedPackageOption?: QuotationPackageOption | null;
 };
 
 export const quotationService = {
@@ -415,10 +408,6 @@ export const quotationService = {
           paymentMilestones: {
             orderBy: { sortOrder: "asc" },
           },
-          packageOptions: {
-            orderBy: { sortOrder: "asc" },
-          },
-          selectedPackageOption: true,
         },
       }),
     ]);
@@ -553,10 +542,6 @@ export const quotationService = {
         paymentMilestones: {
           orderBy: { sortOrder: "asc" },
         },
-        packageOptions: {
-          orderBy: { sortOrder: "asc" },
-        },
-        selectedPackageOption: true,
       },
     });
 
@@ -683,10 +668,6 @@ export const quotationService = {
         paymentMilestones: {
           orderBy: { sortOrder: "asc" },
         },
-        packageOptions: {
-          orderBy: { sortOrder: "asc" },
-        },
-        selectedPackageOption: true,
       },
     });
 
@@ -723,6 +704,14 @@ export const quotationService = {
       gstTreatment: taxConfig.gstTreatment,
     });
 
+    const selectedTier = data.tier || "Deluxe";
+    let quotationTitle = data.title;
+    if (!quotationTitle) {
+      quotationTitle = `Proposal for Trip - ${selectedTier}`;
+    } else if (!quotationTitle.includes(selectedTier)) {
+      quotationTitle = `${quotationTitle} - ${selectedTier}`;
+    }
+
     const quote = await prisma.quotation.create({
       data: {
         agencyId,
@@ -730,7 +719,8 @@ export const quotationService = {
         customerId: data.customerId,
         quotationNumber,
         version: 1,
-        title: data.title,
+        tier: selectedTier,
+        title: quotationTitle,
         status: data.status || QuotationStatus.DRAFT,
         validUntil: data.validUntil ? new Date(data.validUntil) : null,
         currency: data.currency || "INR",
@@ -865,10 +855,6 @@ export const quotationService = {
         paymentMilestones: {
           orderBy: { sortOrder: "asc" },
         },
-        packageOptions: {
-          orderBy: { sortOrder: "asc" },
-        },
-        selectedPackageOption: true,
       },
     });
 
@@ -920,10 +906,21 @@ export const quotationService = {
       gstTreatment: taxConfig.gstTreatment,
     });
 
+    let titleToUpdate = data.title;
+    if (data.tier !== undefined && data.title === undefined && existing.title) {
+      const tierRegex = / - (Deluxe|Ultra Deluxe|Premium)$/i;
+      if (tierRegex.test(existing.title)) {
+        titleToUpdate = existing.title.replace(tierRegex, ` - ${data.tier}`);
+      } else {
+        titleToUpdate = `${existing.title} - ${data.tier}`;
+      }
+    }
+
     const updated = await prisma.quotation.update({
       where: { id },
       data: {
-        ...(data.title !== undefined ? { title: data.title } : {}),
+        ...(titleToUpdate !== undefined ? { title: titleToUpdate } : {}),
+        ...(data.tier !== undefined ? { tier: data.tier } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.validUntil !== undefined ? { validUntil: data.validUntil ? new Date(data.validUntil) : null } : {}),
         ...(data.currency !== undefined ? { currency: data.currency } : {}),
@@ -952,7 +949,6 @@ export const quotationService = {
         ...(data.customerFeedback !== undefined ? { customerFeedback: data.customerFeedback } : {}),
         ...(data.internalNotes !== undefined ? { internalNotes: data.internalNotes } : {}),
         ...(data.terms !== undefined ? { terms: data.terms } : {}),
-        ...(data.selectedPackageOptionId !== undefined ? { selectedPackageOptionId: data.selectedPackageOptionId } : {}),
       },
       include: {
         customer: { select: { id: true, name: true, phone: true, email: true } },
@@ -1059,10 +1055,6 @@ export const quotationService = {
         paymentMilestones: {
           orderBy: { sortOrder: "asc" },
         },
-        packageOptions: {
-          orderBy: { sortOrder: "asc" },
-        },
-        selectedPackageOption: true,
       },
     });
 
@@ -1176,10 +1168,6 @@ export const quotationService = {
         paymentMilestones: {
           orderBy: { sortOrder: "asc" },
         },
-        packageOptions: {
-          orderBy: { sortOrder: "asc" },
-        },
-        selectedPackageOption: true,
       },
     });
 
@@ -1410,6 +1398,9 @@ export const quotationService = {
       );
     }
 
+    const selectedTier = options?.tier || "Deluxe";
+    const quotationTitle = options?.title || `Proposal for ${costing.tripTitle} - ${selectedTier}`;
+
     const quotation = await prisma.$transaction(async (tx) => {
       const q = await tx.quotation.create({
         data: {
@@ -1418,7 +1409,8 @@ export const quotationService = {
           customerId: costing.customer.id,
           quotationNumber,
           version: 1,
-          title: `Proposal for ${costing.tripTitle}`,
+          tier: selectedTier,
+          title: quotationTitle,
           proposalSubtitle: options?.proposalSubtitle,
           status: QuotationStatus.DRAFT,
           validUntil: options?.validUntil ? new Date(options.validUntil) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
@@ -1561,10 +1553,6 @@ export const quotationService = {
           paymentMilestones: {
             orderBy: { sortOrder: "asc" },
           },
-          packageOptions: {
-            orderBy: { sortOrder: "asc" },
-          },
-          selectedPackageOption: true,
         },
       });
 
@@ -1584,7 +1572,6 @@ export const quotationService = {
         items: true,
         proposalItems: true,
         paymentMilestones: true,
-        packageOptions: true,
       },
     });
 
@@ -1610,6 +1597,7 @@ export const quotationService = {
           customerId: existing.customerId,
           quotationNumber: existing.quotationNumber,
           version: nextVersion,
+          tier: existing.tier,
           title: `Proposal v${nextVersion} for ${existing.title?.replace(/Proposal v\d+ for /i, "") || "Trip"}`,
           proposalSubtitle: existing.proposalSubtitle,
           status: QuotationStatus.DRAFT,
@@ -1677,35 +1665,6 @@ export const quotationService = {
               amount: m.amount,
               dueDate: m.dueDate,
               sortOrder: m.sortOrder,
-            })),
-          },
-          packageOptions: {
-            create: existing.packageOptions.map((opt) => ({
-              name: opt.name,
-              subtitle: opt.subtitle,
-              description: opt.description,
-              isRecommended: opt.isRecommended,
-              subtotal: opt.subtotal,
-              markupPercentage: opt.markupPercentage,
-              markupAmount: opt.markupAmount,
-              discountPercentage: opt.discountPercentage,
-              discountAmount: opt.discountAmount,
-              taxPercentage: opt.taxPercentage,
-              taxAmount: opt.taxAmount,
-              taxableAmount: opt.taxableAmount,
-              taxRate: opt.taxRate,
-              taxMode: opt.taxMode,
-              gstTreatment: opt.gstTreatment,
-              cgstAmount: opt.cgstAmount,
-              sgstAmount: opt.sgstAmount,
-              igstAmount: opt.igstAmount,
-              finalAmount: opt.finalAmount,
-              hotelNotes: opt.hotelNotes,
-              vehicleNotes: opt.vehicleNotes,
-              activityNotes: opt.activityNotes,
-              inclusions: opt.inclusions,
-              exclusions: opt.exclusions,
-              sortOrder: opt.sortOrder,
             })),
           },
         },
@@ -1814,10 +1773,6 @@ export const quotationService = {
           paymentMilestones: {
             orderBy: { sortOrder: "asc" },
           },
-          packageOptions: {
-            orderBy: { sortOrder: "asc" },
-          },
-          selectedPackageOption: true,
         },
       });
 
@@ -2493,555 +2448,6 @@ export const quotationService = {
     });
   },
 
-  // ──────────────────────── PACKAGE OPTIONS (PHASE 10.11B TIERED PRICING) ─────────────────────────
-
-  /**
-   * List package options for a quotation
-   */
-  async getPackageOptions(agencyId: string, quotationId: string): Promise<QuotationPackageOption[]> {
-    const quotation = await prisma.quotation.findFirst({
-      where: { id: quotationId, agencyId, archivedAt: null },
-    });
-
-    if (!quotation) {
-      throw new Error("Quotation not found.");
-    }
-
-    return prisma.quotationPackageOption.findMany({
-      where: { quotationId },
-      orderBy: { sortOrder: "asc" },
-    });
-  },
-
-  /**
-   * Create a package option (Tier) for a quotation
-   */
-  async createPackageOption(
-    agencyId: string,
-    quotationId: string,
-    data: CreatePackageOptionInput
-  ): Promise<QuotationPackageOption> {
-    const quotation = await prisma.quotation.findFirst({
-      where: { id: quotationId, agencyId, archivedAt: null },
-    });
-
-    if (!quotation) {
-      throw new Error("Quotation not found.");
-    }
-
-    // Limit check: Maximum 4 package options allowed per quotation
-    const count = await prisma.quotationPackageOption.count({
-      where: { quotationId },
-    });
-    if (count >= 4) {
-      throw new Error("A maximum of 4 package options are allowed per quotation proposal.");
-    }
-
-    // Duplicate name check
-    const existingName = await prisma.quotationPackageOption.findUnique({
-      where: {
-        quotationId_name: {
-          quotationId,
-          name: data.name.trim(),
-        },
-      },
-    });
-    if (existingName) {
-      throw new Error(`A package option named "${data.name.trim()}" already exists on this quotation.`);
-    }
-
-    // Pricing calculations
-    const subtotal = Number(data.subtotal || 0);
-    const markupPct = Number(data.markupPercentage || 0);
-    const markupAmount = data.markupAmount !== undefined && data.markupAmount > 0
-      ? Number(data.markupAmount)
-      : Math.round((subtotal * markupPct) / 100);
-    const baseWithMarkup = subtotal + markupAmount;
-
-    const discountPct = Number(data.discountPercentage || 0);
-    const discountAmount = data.discountAmount !== undefined && data.discountAmount > 0
-      ? Number(data.discountAmount)
-      : Math.round((baseWithMarkup * discountPct) / 100);
-    const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
-
-    // Tax V1: Resolve and calculate package option tax
-    const { taxRate: effectiveTaxRate, taxMode: effectiveTaxMode, gstTreatment: effectiveGstTreatment } = await this.resolveQuotationTaxConfig(
-      agencyId,
-      {
-        taxRate: data.taxRate ?? data.taxPercentage ?? quotation.taxRate ?? quotation.taxPercentage,
-        taxMode: data.taxMode ?? quotation.taxMode,
-        gstTreatment: data.gstTreatment ?? quotation.gstTreatment,
-      }
-    );
-
-    const taxCalc = taxService.calculate({
-      amount: afterDiscount,
-      taxRate: effectiveTaxRate,
-      taxMode: effectiveTaxMode,
-      gstTreatment: effectiveGstTreatment,
-    });
-
-    const option = await prisma.$transaction(async (tx) => {
-      // If setting this option as recommended, unset recommended flag on all other options
-      if (data.isRecommended) {
-        await tx.quotationPackageOption.updateMany({
-          where: { quotationId },
-          data: { isRecommended: false },
-        });
-      }
-
-      const created = await tx.quotationPackageOption.create({
-        data: {
-          quotationId,
-          name: data.name.trim(),
-          subtitle: data.subtitle?.trim() || null,
-          description: data.description?.trim() || null,
-          isRecommended: data.isRecommended || false,
-          subtotal: new Prisma.Decimal(subtotal),
-          markupPercentage: new Prisma.Decimal(markupPct),
-          markupAmount: new Prisma.Decimal(markupAmount),
-          discountPercentage: new Prisma.Decimal(discountPct),
-          discountAmount: new Prisma.Decimal(discountAmount),
-          taxableAmount: new Prisma.Decimal(taxCalc.taxableAmount.toString()),
-          taxRate: new Prisma.Decimal(effectiveTaxRate),
-          taxMode: effectiveTaxMode,
-          gstTreatment: effectiveGstTreatment,
-          cgstAmount: new Prisma.Decimal(taxCalc.cgstAmount.toString()),
-          sgstAmount: new Prisma.Decimal(taxCalc.sgstAmount.toString()),
-          igstAmount: new Prisma.Decimal(taxCalc.igstAmount.toString()),
-          taxAmount: new Prisma.Decimal(taxCalc.taxAmount.toString()),
-          finalAmount: new Prisma.Decimal(taxCalc.finalAmount.toString()),
-          taxPercentage: new Prisma.Decimal(effectiveTaxRate),
-          hotelNotes: data.hotelNotes?.trim() || null,
-          vehicleNotes: data.vehicleNotes?.trim() || null,
-          activityNotes: data.activityNotes?.trim() || null,
-          inclusions: data.inclusions || [],
-          exclusions: data.exclusions || [],
-          sortOrder: data.sortOrder ?? count,
-        },
-      });
-
-      return created;
-    });
-
-    return option;
-  },
-
-  /**
-   * Update an existing package option
-   */
-  async updatePackageOption(
-    agencyId: string,
-    quotationId: string,
-    optionId: string,
-    data: UpdatePackageOptionInput
-  ): Promise<QuotationPackageOption> {
-    const quotation = await prisma.quotation.findFirst({
-      where: { id: quotationId, agencyId, archivedAt: null },
-    });
-
-    if (!quotation) {
-      throw new Error("Quotation not found.");
-    }
-
-    const existing = await prisma.quotationPackageOption.findUnique({
-      where: { id: optionId },
-    });
-
-    if (!existing || existing.quotationId !== quotationId) {
-      throw new Error("Package option not found on this quotation.");
-    }
-
-    // Name uniqueness check if changing name
-    if (data.name && data.name.trim() !== existing.name) {
-      const duplicate = await prisma.quotationPackageOption.findUnique({
-        where: {
-          quotationId_name: {
-            quotationId,
-            name: data.name.trim(),
-          },
-        },
-      });
-      if (duplicate) {
-        throw new Error(`A package option named "${data.name.trim()}" already exists on this quotation.`);
-      }
-    }
-
-    // Pricing calculation
-    const subtotal = data.subtotal !== undefined ? Number(data.subtotal) : Number(existing.subtotal);
-    const markupPct = data.markupPercentage !== undefined ? Number(data.markupPercentage) : Number(existing.markupPercentage);
-    const markupAmount = data.markupAmount !== undefined ? Number(data.markupAmount) : Math.round((subtotal * markupPct) / 100);
-    const baseWithMarkup = subtotal + markupAmount;
-
-    const discountPct = data.discountPercentage !== undefined ? Number(data.discountPercentage) : Number(existing.discountPercentage);
-    const discountAmount = data.discountAmount !== undefined ? Number(data.discountAmount) : Math.round((baseWithMarkup * discountPct) / 100);
-    const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
-
-    // Tax V1: Resolve and calculate updated package option tax
-    const { taxRate: effectiveTaxRate, taxMode: effectiveTaxMode, gstTreatment: effectiveGstTreatment } = await this.resolveQuotationTaxConfig(
-      agencyId,
-      {
-        taxRate: data.taxRate ?? data.taxPercentage ?? existing.taxRate ?? existing.taxPercentage,
-        taxMode: data.taxMode ?? existing.taxMode,
-        gstTreatment: data.gstTreatment ?? existing.gstTreatment,
-      }
-    );
-
-    const taxCalc = taxService.calculate({
-      amount: afterDiscount,
-      taxRate: effectiveTaxRate,
-      taxMode: effectiveTaxMode,
-      gstTreatment: effectiveGstTreatment,
-    });
-
-    const updated = await prisma.$transaction(async (tx) => {
-      if (data.isRecommended) {
-        await tx.quotationPackageOption.updateMany({
-          where: { quotationId },
-          data: { isRecommended: false },
-        });
-      }
-
-      const opt = await tx.quotationPackageOption.update({
-        where: { id: optionId },
-        data: {
-          ...(data.name !== undefined ? { name: data.name.trim() } : {}),
-          ...(data.subtitle !== undefined ? { subtitle: data.subtitle?.trim() || null } : {}),
-          ...(data.description !== undefined ? { description: data.description?.trim() || null } : {}),
-          ...(data.isRecommended !== undefined ? { isRecommended: data.isRecommended } : {}),
-          subtotal: new Prisma.Decimal(subtotal),
-          markupPercentage: new Prisma.Decimal(markupPct),
-          markupAmount: new Prisma.Decimal(markupAmount),
-          discountPercentage: new Prisma.Decimal(discountPct),
-          discountAmount: new Prisma.Decimal(discountAmount),
-          taxableAmount: new Prisma.Decimal(taxCalc.taxableAmount.toString()),
-          taxRate: new Prisma.Decimal(effectiveTaxRate),
-          taxMode: effectiveTaxMode,
-          gstTreatment: effectiveGstTreatment,
-          cgstAmount: new Prisma.Decimal(taxCalc.cgstAmount.toString()),
-          sgstAmount: new Prisma.Decimal(taxCalc.sgstAmount.toString()),
-          igstAmount: new Prisma.Decimal(taxCalc.igstAmount.toString()),
-          taxAmount: new Prisma.Decimal(taxCalc.taxAmount.toString()),
-          finalAmount: new Prisma.Decimal(taxCalc.finalAmount.toString()),
-          taxPercentage: new Prisma.Decimal(effectiveTaxRate),
-          ...(data.hotelNotes !== undefined ? { hotelNotes: data.hotelNotes?.trim() || null } : {}),
-          ...(data.vehicleNotes !== undefined ? { vehicleNotes: data.vehicleNotes?.trim() || null } : {}),
-          ...(data.activityNotes !== undefined ? { activityNotes: data.activityNotes?.trim() || null } : {}),
-          ...(data.inclusions !== undefined ? { inclusions: data.inclusions } : {}),
-          ...(data.exclusions !== undefined ? { exclusions: data.exclusions } : {}),
-          ...(data.sortOrder !== undefined ? { sortOrder: data.sortOrder } : {}),
-        },
-      });
-
-      // If this option is currently selected on the quotation, sync Quotation finalAmount
-      if (quotation.selectedPackageOptionId === optionId) {
-        await tx.quotation.update({
-          where: { id: quotationId },
-          data: { finalAmount: new Prisma.Decimal(taxCalc.finalAmount.toString()) },
-        });
-      }
-
-      return opt;
-    });
-
-    return updated;
-  },
-
-  /**
-   * Delete a package option
-   */
-  async deletePackageOption(agencyId: string, quotationId: string, optionId: string): Promise<boolean> {
-    const quotation = await prisma.quotation.findFirst({
-      where: { id: quotationId, agencyId, archivedAt: null },
-    });
-
-    if (!quotation) {
-      throw new Error("Quotation not found.");
-    }
-
-    const existing = await prisma.quotationPackageOption.findUnique({
-      where: { id: optionId },
-    });
-
-    if (!existing || existing.quotationId !== quotationId) {
-      throw new Error("Package option not found on this quotation.");
-    }
-
-    await prisma.$transaction(async (tx) => {
-      // If deleted option was selected, clear selected option on quotation
-      if (quotation.selectedPackageOptionId === optionId) {
-        await tx.quotation.update({
-          where: { id: quotationId },
-          data: { selectedPackageOptionId: null },
-        });
-      }
-
-      await tx.quotationPackageOption.delete({
-        where: { id: optionId },
-      });
-    });
-
-    return true;
-  },
-
-  /**
-   * Batch reorder package options
-   */
-  async reorderPackageOptions(
-    agencyId: string,
-    quotationId: string,
-    data: ReorderPackageOptionsInput
-  ): Promise<boolean> {
-    const quotation = await prisma.quotation.findFirst({
-      where: { id: quotationId, agencyId, archivedAt: null },
-    });
-
-    if (!quotation) {
-      throw new Error("Quotation not found.");
-    }
-
-    await prisma.$transaction(
-      data.items.map((item) =>
-        prisma.quotationPackageOption.update({
-          where: { id: item.id },
-          data: { sortOrder: item.sortOrder },
-        })
-      )
-    );
-
-    return true;
-  },
-
-  /**
-   * Select a package option on a quotation (Agency selection)
-   */
-  async selectPackageOption(
-    agencyId: string,
-    quotationId: string,
-    optionId: string
-  ): Promise<QuotationWithRelations> {
-    const quotation = await prisma.quotation.findFirst({
-      where: { id: quotationId, agencyId, archivedAt: null },
-    });
-
-    if (!quotation) {
-      throw new Error("Quotation not found.");
-    }
-
-    const option = await prisma.quotationPackageOption.findUnique({
-      where: { id: optionId },
-    });
-
-    if (!option || option.quotationId !== quotationId) {
-      throw new Error("Package option not found on this quotation.");
-    }
-
-    const updated = await prisma.quotation.update({
-      where: { id: quotationId },
-      data: {
-        selectedPackageOptionId: optionId,
-        finalAmount: option.finalAmount,
-      },
-      include: {
-        customer: { select: { id: true, name: true, phone: true, email: true } },
-        trip: {
-          select: {
-            id: true,
-            title: true,
-            tripNumber: true,
-            startDate: true,
-            endDate: true,
-            status: true,
-            travelers: { select: { id: true, name: true, type: true } },
-            itineraryItems: {
-              select: {
-                id: true,
-                dayNumber: true,
-                date: true,
-                title: true,
-                description: true,
-                location: true,
-                startTime: true,
-                endTime: true,
-                sortOrder: true,
-              },
-              orderBy: { sortOrder: "asc" },
-            },
-          },
-        },
-        items: { orderBy: { sortOrder: "asc" } },
-        proposalItems: { orderBy: { sortOrder: "asc" } },
-        paymentMilestones: { orderBy: { sortOrder: "asc" } },
-        packageOptions: { orderBy: { sortOrder: "asc" } },
-        selectedPackageOption: true,
-      },
-    });
-
-    return updated as QuotationWithRelations;
-  },
-
-  /**
-   * Generate 3 Standard Default Package Tiers (Standard, Deluxe, Luxury)
-   */
-  async generateDefaultPackageTiers(agencyId: string, quotationId: string): Promise<QuotationPackageOption[]> {
-    const quotation = await prisma.quotation.findFirst({
-      where: { id: quotationId, agencyId, archivedAt: null },
-    });
-
-    if (!quotation) {
-      throw new Error("Quotation not found.");
-    }
-
-    const baseCost = Number(quotation.subtotal || 30000);
-
-    // Delete existing package options
-    await prisma.quotationPackageOption.deleteMany({
-      where: { quotationId },
-    });
-
-    const { taxRate: effectiveTaxRate, taxMode: effectiveTaxMode, gstTreatment: effectiveGstTreatment } = await this.resolveQuotationTaxConfig(
-      agencyId,
-      {
-        taxRate: quotation.taxRate ?? quotation.taxPercentage,
-        taxMode: quotation.taxMode,
-        gstTreatment: quotation.gstTreatment,
-      }
-    );
-
-    // 1. Standard Tier (10% markup)
-    const stdSub = baseCost;
-    const stdMarkup = Math.round(stdSub * 0.1);
-    const stdTaxCalc = taxService.calculate({
-      amount: stdSub + stdMarkup,
-      taxRate: effectiveTaxRate,
-      taxMode: effectiveTaxMode,
-      gstTreatment: effectiveGstTreatment,
-    });
-
-    // 2. Deluxe Tier (15% markup)
-    const dlxSub = Math.round(baseCost * 1.25);
-    const dlxMarkup = Math.round(dlxSub * 0.15);
-    const dlxTaxCalc = taxService.calculate({
-      amount: dlxSub + dlxMarkup,
-      taxRate: effectiveTaxRate,
-      taxMode: effectiveTaxMode,
-      gstTreatment: effectiveGstTreatment,
-    });
-
-    // 3. Luxury Tier (20% markup)
-    const luxSub = Math.round(baseCost * 1.6);
-    const luxMarkup = Math.round(luxSub * 0.2);
-    const luxTaxCalc = taxService.calculate({
-      amount: luxSub + luxMarkup,
-      taxRate: effectiveTaxRate,
-      taxMode: effectiveTaxMode,
-      gstTreatment: effectiveGstTreatment,
-    });
-
-    await prisma.quotationPackageOption.createMany({
-      data: [
-        {
-          quotationId,
-          name: "Standard (3-Star)",
-          subtitle: "Comfortable stays with essential sightseeing",
-          description: "Standard package featuring handpicked 3-star hotels and private transport for budget-conscious travelers.",
-          isRecommended: false,
-          subtotal: new Prisma.Decimal(stdSub),
-          markupPercentage: new Prisma.Decimal(10),
-          markupAmount: new Prisma.Decimal(stdMarkup),
-          taxableAmount: new Prisma.Decimal(stdTaxCalc.taxableAmount.toString()),
-          taxRate: new Prisma.Decimal(effectiveTaxRate),
-          taxMode: effectiveTaxMode,
-          gstTreatment: effectiveGstTreatment,
-          cgstAmount: new Prisma.Decimal(stdTaxCalc.cgstAmount.toString()),
-          sgstAmount: new Prisma.Decimal(stdTaxCalc.sgstAmount.toString()),
-          igstAmount: new Prisma.Decimal(stdTaxCalc.igstAmount.toString()),
-          taxAmount: new Prisma.Decimal(stdTaxCalc.taxAmount.toString()),
-          finalAmount: new Prisma.Decimal(stdTaxCalc.finalAmount.toString()),
-          taxPercentage: new Prisma.Decimal(effectiveTaxRate),
-          hotelNotes: "3-Star Standard City Center Hotels (AC Deluxe Rooms)",
-          vehicleNotes: "Dedicated AC Sedan (Dzire / Etios)",
-          activityNotes: "Standard sightseeing with entry tickets",
-          inclusions: ["Daily Buffet Breakfast", "AC Sedan with dedicated driver", "All Tolls & Driver Allowances"],
-          exclusions: ["Lunch & Dinner", "Personal Expenses", "Flight Tickets"],
-          sortOrder: 0,
-        },
-        {
-          quotationId,
-          name: "Deluxe (4-Star)",
-          subtitle: "Premium resorts, upgraded vehicles & full meals",
-          description: "Our most popular choice. Relax in luxury 4-star boutique properties with upgraded SUV transport.",
-          isRecommended: true,
-          subtotal: new Prisma.Decimal(dlxSub),
-          markupPercentage: new Prisma.Decimal(15),
-          markupAmount: new Prisma.Decimal(dlxMarkup),
-          taxableAmount: new Prisma.Decimal(dlxTaxCalc.taxableAmount.toString()),
-          taxRate: new Prisma.Decimal(effectiveTaxRate),
-          taxMode: effectiveTaxMode,
-          gstTreatment: effectiveGstTreatment,
-          cgstAmount: new Prisma.Decimal(dlxTaxCalc.cgstAmount.toString()),
-          sgstAmount: new Prisma.Decimal(dlxTaxCalc.sgstAmount.toString()),
-          igstAmount: new Prisma.Decimal(dlxTaxCalc.igstAmount.toString()),
-          taxAmount: new Prisma.Decimal(dlxTaxCalc.taxAmount.toString()),
-          finalAmount: new Prisma.Decimal(dlxTaxCalc.finalAmount.toString()),
-          taxPercentage: new Prisma.Decimal(effectiveTaxRate),
-          hotelNotes: "4-Star Deluxe Resorts & Boutique Lake/Hill View Properties",
-          vehicleNotes: "Dedicated AC Innova / Ertiga SUV",
-          activityNotes: "Guided sightseeing + Boat Cruise / Safari Pass",
-          inclusions: ["Breakfast & Dinner (MAP Plan)", "Dedicated AC Innova SUV", "Priority entry passes & cruise vouchers", "Complimentary welcome drink on arrival"],
-          exclusions: ["Lunch", "Flight Tickets", "Optional Adventure Activities"],
-          sortOrder: 1,
-        },
-        {
-          quotationId,
-          name: "Luxury (5-Star & Heritage)",
-          subtitle: "Ultra-luxury suites, private chauffeur & VIP treatment",
-          description: "Indulge in 5-star palace suites and luxury private villas with dedicated concierge and all meals included.",
-          isRecommended: false,
-          subtotal: new Prisma.Decimal(luxSub),
-          markupPercentage: new Prisma.Decimal(20),
-          markupAmount: new Prisma.Decimal(luxMarkup),
-          taxableAmount: new Prisma.Decimal(luxTaxCalc.taxableAmount.toString()),
-          taxRate: new Prisma.Decimal(effectiveTaxRate),
-          taxMode: effectiveTaxMode,
-          gstTreatment: effectiveGstTreatment,
-          cgstAmount: new Prisma.Decimal(luxTaxCalc.cgstAmount.toString()),
-          sgstAmount: new Prisma.Decimal(luxTaxCalc.sgstAmount.toString()),
-          igstAmount: new Prisma.Decimal(luxTaxCalc.igstAmount.toString()),
-          taxAmount: new Prisma.Decimal(luxTaxCalc.taxAmount.toString()),
-          finalAmount: new Prisma.Decimal(luxTaxCalc.finalAmount.toString()),
-          taxPercentage: new Prisma.Decimal(effectiveTaxRate),
-          hotelNotes: "5-Star Luxury Heritage Properties / Private Pool Villas",
-          vehicleNotes: "Private Luxury SUV (Innova Crysta / Fortuner)",
-          activityNotes: "Exclusive VIP tours, private guide & sunset yacht cruise",
-          inclusions: ["All Meals (Breakfast, Lunch & Gourmet Dinner)", "Chauffeur-driven Luxury SUV", "Private Speedboat / Yacht Excursion", "Complimentary 60-min Couple Spa Voucher", "24/7 Dedicated Concierge Support"],
-          exclusions: ["International Flight Tickets", "Visa Fees"],
-          sortOrder: 2,
-        },
-      ],
-    });
-
-    // Automatically set Deluxe as the default selected option
-    const deluxe = await prisma.quotationPackageOption.findFirst({
-      where: { quotationId, name: "Deluxe (4-Star)" },
-    });
-
-    if (deluxe) {
-      await prisma.quotation.update({
-        where: { id: quotationId },
-        data: {
-          selectedPackageOptionId: deluxe.id,
-          finalAmount: deluxe.finalAmount,
-        },
-      });
-    }
-
-    return prisma.quotationPackageOption.findMany({
-      where: { quotationId },
-      orderBy: { sortOrder: "asc" },
-    });
-  },
-
   // ──────────────────────── PUBLIC SHARE & CUSTOMER ACTIONS ─────────────────────────
 
   /**
@@ -3199,39 +2605,6 @@ export const quotationService = {
             sortOrder: true,
           },
         },
-        packageOptions: {
-          orderBy: { sortOrder: "asc" },
-          select: {
-            id: true,
-            name: true,
-            subtitle: true,
-            description: true,
-            isRecommended: true,
-            finalAmount: true,
-            hotelNotes: true,
-            vehicleNotes: true,
-            activityNotes: true,
-            inclusions: true,
-            exclusions: true,
-            sortOrder: true,
-          },
-        },
-        selectedPackageOption: {
-          select: {
-            id: true,
-            name: true,
-            subtitle: true,
-            description: true,
-            isRecommended: true,
-            finalAmount: true,
-            hotelNotes: true,
-            vehicleNotes: true,
-            activityNotes: true,
-            inclusions: true,
-            exclusions: true,
-            sortOrder: true,
-          },
-        },
       },
     });
 
@@ -3245,14 +2618,14 @@ export const quotationService = {
       id: quotation.id,
       quotationNumber: quotation.quotationNumber,
       version: quotation.version,
-      title: quotation.title || `Proposal for ${quotation.trip.title}`,
+      tier: quotation.tier || "Deluxe",
+      title: quotation.title || `Proposal for ${quotation.trip.title} - ${quotation.tier || "Deluxe"}`,
       proposalSubtitle: quotation.proposalSubtitle,
       status: quotation.status,
       currency: quotation.currency,
       validUntil: quotation.validUntil,
       isExpired,
       finalAmount: Number(quotation.finalAmount || 0),
-      selectedPackageOptionId: quotation.selectedPackageOptionId,
       customerMessage: quotation.customerMessage,
       inclusionsIntro: quotation.inclusionsIntro,
       exclusionsIntro: quotation.exclusionsIntro,
@@ -3290,34 +2663,6 @@ export const quotationService = {
         dueDate: m.dueDate,
         sortOrder: m.sortOrder,
       })),
-      packageOptions: quotation.packageOptions.map((opt) => ({
-        id: opt.id,
-        name: opt.name,
-        subtitle: opt.subtitle,
-        description: opt.description,
-        isRecommended: opt.isRecommended,
-        finalAmount: Number(opt.finalAmount || 0),
-        hotelNotes: opt.hotelNotes,
-        vehicleNotes: opt.vehicleNotes,
-        activityNotes: opt.activityNotes,
-        inclusions: opt.inclusions,
-        exclusions: opt.exclusions,
-        sortOrder: opt.sortOrder,
-      })),
-      selectedPackageOption: quotation.selectedPackageOption ? {
-        id: quotation.selectedPackageOption.id,
-        name: quotation.selectedPackageOption.name,
-        subtitle: quotation.selectedPackageOption.subtitle,
-        description: quotation.selectedPackageOption.description,
-        isRecommended: quotation.selectedPackageOption.isRecommended,
-        finalAmount: Number(quotation.selectedPackageOption.finalAmount || 0),
-        hotelNotes: quotation.selectedPackageOption.hotelNotes,
-        vehicleNotes: quotation.selectedPackageOption.vehicleNotes,
-        activityNotes: quotation.selectedPackageOption.activityNotes,
-        inclusions: quotation.selectedPackageOption.inclusions,
-        exclusions: quotation.selectedPackageOption.exclusions,
-        sortOrder: quotation.selectedPackageOption.sortOrder,
-      } : null,
       createdAt: quotation.createdAt,
     };
   },
@@ -3349,61 +2694,12 @@ export const quotationService = {
   },
 
   /**
-   * Customer Action: Select Package Option from public view
+   * Customer Action: Accept Proposal
    */
-  async selectPublicPackageOption(shareToken: string, optionId: string) {
+  async acceptPublicQuotation(shareToken: string, _input?: AcceptQuotationInput) {
     const quotation = await prisma.quotation.findFirst({
       where: { shareToken, archivedAt: null },
       include: { bookings: true },
-    });
-
-    if (!quotation) {
-      throw new Error("Quotation proposal not found or link has expired.");
-    }
-
-    if (quotation.validUntil && new Date() > new Date(quotation.validUntil)) {
-      throw new Error("This quotation proposal has expired. Package options can no longer be modified.");
-    }
-
-    if (quotation.status === QuotationStatus.REJECTED || quotation.status === QuotationStatus.EXPIRED) {
-      throw new Error(`This quotation has been ${quotation.status.toLowerCase()} and cannot be modified.`);
-    }
-
-    if (quotation.bookings.length > 0) {
-      throw new Error("This proposal has already been confirmed as a booking and its package tier cannot be changed.");
-    }
-
-    const option = await prisma.quotationPackageOption.findUnique({
-      where: { id: optionId },
-    });
-
-    if (!option || option.quotationId !== quotation.id) {
-      throw new Error("Invalid package option selected for this proposal.");
-    }
-
-    const updated = await prisma.quotation.update({
-      where: { id: quotation.id },
-      data: {
-        selectedPackageOptionId: optionId,
-        finalAmount: option.finalAmount,
-      },
-    });
-
-    return {
-      success: true,
-      message: `Selected package option "${option.name}".`,
-      selectedPackageOptionId: optionId,
-      finalAmount: Number(option.finalAmount),
-    };
-  },
-
-  /**
-   * Customer Action: Accept Proposal
-   */
-  async acceptPublicQuotation(shareToken: string, input?: AcceptQuotationInput) {
-    const quotation = await prisma.quotation.findFirst({
-      where: { shareToken, archivedAt: null },
-      include: { bookings: true, packageOptions: true },
     });
 
     if (!quotation) {
@@ -3426,26 +2722,11 @@ export const quotationService = {
       throw new Error("This proposal has already been confirmed as a booking.");
     }
 
-    let selectedOptionId = quotation.selectedPackageOptionId;
-    let finalAmount = quotation.finalAmount;
-
-    // If an option was selected during acceptance
-    if (input?.selectedOptionId) {
-      const chosen = quotation.packageOptions.find((p) => p.id === input.selectedOptionId);
-      if (!chosen) {
-        throw new Error("Selected package option is not valid for this proposal.");
-      }
-      selectedOptionId = chosen.id;
-      finalAmount = chosen.finalAmount;
-    }
-
     const updated = await prisma.quotation.update({
       where: { id: quotation.id },
       data: {
         status: QuotationStatus.ACCEPTED,
         acceptedAt: new Date(),
-        selectedPackageOptionId: selectedOptionId,
-        finalAmount,
       },
     });
 
@@ -3454,7 +2735,6 @@ export const quotationService = {
       message: "Thank you! You have accepted the quotation proposal. Our travel specialist will be in touch shortly.",
       quotationId: updated.id,
       status: updated.status,
-      selectedPackageOptionId: updated.selectedPackageOptionId,
       finalAmount: Number(updated.finalAmount),
     };
   },

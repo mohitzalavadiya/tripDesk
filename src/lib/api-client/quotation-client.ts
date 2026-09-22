@@ -3,7 +3,6 @@ import {
   QuotationItem,
   QuotationProposalItem,
   QuotationPaymentMilestone,
-  QuotationPackageOption,
   ProposalItemType,
 } from "@prisma/client";
 import {
@@ -28,11 +27,6 @@ import {
   UpdatePaymentMilestoneInput,
   GeneratePaymentScheduleInput,
 } from "@/lib/validation/payment-milestone-schema";
-import {
-  CreatePackageOptionInput,
-  UpdatePackageOptionInput,
-  ReorderPackageOptionsInput,
-} from "@/lib/validation/package-option-schema";
 import {
   PaginatedResponse,
   SingleResponse,
@@ -147,8 +141,6 @@ export type QuotationWithRelations = Quotation & {
   items: QuotationItem[];
   proposalItems: QuotationProposalItem[];
   paymentMilestones: QuotationPaymentMilestone[];
-  packageOptions: QuotationPackageOption[];
-  selectedPackageOption?: QuotationPackageOption | null;
 };
 
 export interface HotelCostItem {
@@ -231,21 +223,6 @@ export interface PublicPaymentMilestone {
   sortOrder: number;
 }
 
-export interface PublicPackageOption {
-  id: string;
-  name: string;
-  subtitle?: string | null;
-  description?: string | null;
-  isRecommended: boolean;
-  finalAmount: number;
-  hotelNotes?: string | null;
-  vehicleNotes?: string | null;
-  activityNotes?: string | null;
-  inclusions: string[];
-  exclusions: string[];
-  sortOrder: number;
-}
-
 export interface PublicQuotationPayload {
   id: string;
   quotationNumber: string;
@@ -254,10 +231,10 @@ export interface PublicQuotationPayload {
   proposalSubtitle?: string | null;
   status: string;
   currency: string;
+  tier: string;
   validUntil?: string | null;
   isExpired: boolean;
   finalAmount: number;
-  selectedPackageOptionId?: string | null;
   customerMessage?: string | null;
   inclusionsIntro?: string | null;
   exclusionsIntro?: string | null;
@@ -363,8 +340,6 @@ export interface PublicQuotationPayload {
   }>;
   proposalItems: PublicProposalItem[];
   paymentMilestones: PublicPaymentMilestone[];
-  packageOptions: PublicPackageOption[];
-  selectedPackageOption?: PublicPackageOption | null;
   createdAt: string;
 }
 
@@ -685,117 +660,7 @@ export const quotationClient = {
     return handleResponse<SingleResponse<QuotationPaymentMilestone[]>>(res);
   },
 
-  // ──────────────────────── PACKAGE OPTIONS (PHASE 10.11B) ─────────────────────────
 
-  /**
-   * List package options
-   */
-  async getPackageOptions(
-    quotationId: string
-  ): Promise<SingleResponse<QuotationPackageOption[]>> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-    });
-
-    return handleResponse<SingleResponse<QuotationPackageOption[]>>(res);
-  },
-
-  /**
-   * Create package option
-   */
-  async createPackageOption(
-    quotationId: string,
-    data: CreatePackageOptionInput
-  ): Promise<SingleResponse<QuotationPackageOption>> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    return handleResponse<SingleResponse<QuotationPackageOption>>(res);
-  },
-
-  /**
-   * Update package option
-   */
-  async updatePackageOption(
-    quotationId: string,
-    optionId: string,
-    data: UpdatePackageOptionInput
-  ): Promise<SingleResponse<QuotationPackageOption>> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options/${encodeURIComponent(optionId)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    return handleResponse<SingleResponse<QuotationPackageOption>>(res);
-  },
-
-  /**
-   * Delete package option
-   */
-  async deletePackageOption(
-    quotationId: string,
-    optionId: string
-  ): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options/${encodeURIComponent(optionId)}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-    });
-
-    return handleResponse<{ success: boolean; message: string }>(res);
-  },
-
-  /**
-   * Reorder package options
-   */
-  async reorderPackageOptions(
-    quotationId: string,
-    data: ReorderPackageOptionsInput
-  ): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options/reorder`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    return handleResponse<{ success: boolean; message: string }>(res);
-  },
-
-  /**
-   * Select package option on quotation (Agency side)
-   */
-  async selectPackageOption(
-    quotationId: string,
-    optionId: string
-  ): Promise<SingleResponse<QuotationWithRelations>> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options/select`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ optionId }),
-    });
-
-    return handleResponse<SingleResponse<QuotationWithRelations>>(res);
-  },
-
-  /**
-   * Generate 3 default package tiers (Standard, Deluxe, Luxury)
-   */
-  async generateDefaultPackageTiers(
-    quotationId: string
-  ): Promise<SingleResponse<QuotationPackageOption[]>> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options/generate-default`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-
-    return handleResponse<SingleResponse<QuotationPackageOption[]>>(res);
-  },
 
   // ──────────────────────── TRIP INTEGRATION ─────────────────────────
 
@@ -857,35 +722,19 @@ export const quotationClient = {
   },
 
   /**
-   * Public Action: Select Package Option (Customer)
-   */
-  async selectPublicPackageOption(
-    token: string,
-    optionId: string
-  ): Promise<{ success: boolean; message: string; selectedPackageOptionId: string; finalAmount: number }> {
-    const res = await fetch(`/api/quotations/public/${encodeURIComponent(token)}/select-option`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ optionId }),
-    });
-
-    return handleResponse<{ success: boolean; message: string; selectedPackageOptionId: string; finalAmount: number }>(res);
-  },
-
-  /**
    * Public Action: Accept Quotation
    */
   async acceptPublicQuotation(
     token: string,
     data?: AcceptQuotationInput
-  ): Promise<{ success: boolean; message: string; quotationId: string; selectedPackageOptionId?: string; finalAmount?: number }> {
+  ): Promise<{ success: boolean; message: string; quotationId: string; finalAmount?: number }> {
     const res = await fetch(`/api/quotations/public/${encodeURIComponent(token)}/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data || {}),
     });
 
-    return handleResponse<{ success: boolean; message: string; quotationId: string; selectedPackageOptionId?: string; finalAmount?: number }>(res);
+    return handleResponse<{ success: boolean; message: string; quotationId: string; finalAmount?: number }>(res);
   },
 
   /**

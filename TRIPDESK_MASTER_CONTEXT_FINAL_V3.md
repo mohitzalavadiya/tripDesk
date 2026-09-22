@@ -11648,9 +11648,104 @@ Per customer document guidelines, the following 3 sections were completely remov
 
 ---
 
+---
+
+# 177. PHASE 177 DATABASE ROLLBACK RECORD
+
+## 177.1 Context & Rollback Scope
+- **Code Reversion**: Phase 177 experimental package tier code was reverted in Git.
+- **Database Audit**: Read-only audit confirmed that `prisma/schema.prisma` was in the clean pre-Phase-177 state, but the PostgreSQL table `quotation_package_options` still retained five extraneous columns introduced during Phase 177 via `prisma db push`:
+  - `packageType`
+  - `hotelIds`
+  - `vehicleIds`
+  - `activityIds`
+  - `selectedServices`
+- **Rollback Execution**:
+  - Executed authorized SQL dropping all five orphaned columns:
+    ```sql
+    ALTER TABLE "quotation_package_options"
+      DROP COLUMN IF EXISTS "packageType",
+      DROP COLUMN IF EXISTS "hotelIds",
+      DROP COLUMN IF EXISTS "vehicleIds",
+      DROP COLUMN IF EXISTS "activityIds",
+      DROP COLUMN IF EXISTS "selectedServices";
+    ```
+  - Regenerated Prisma Client (`npx prisma generate`) to synchronize DMMF definitions with `prisma/schema.prisma`.
+
+## 177.2 Data & Architecture Integrity
+- **0 Temporary Records**: All Phase 177 temporary QA test data was fully removed; 0 temporary records remain.
+- **Permanent Package Options Preserved**: All 6 pre-existing permanent package option records remain intact with zero financial or descriptive data loss.
+- **Permanent Master Data Preserved**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% intact for permanent test agency `cmu2g9rgq0000swtqbr5aie7x`.
+- **Zero Migration Artifacts**: No migrations were created, altered, or deleted (`_prisma_migrations` remains at 4 baseline migrations).
+
+## 177.3 Verification
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` $\to$ **71 / 71 assertions PASSED (100%)**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS (Exit code 0)**.
+- **Current Alignment**: Current codebase and PostgreSQL database are 100% aligned to pre-Phase-177 schema.
+
+---
+
+# 178. QUOTATION TIER SIMPLIFICATION (SEPTEMBER 2026)
+
+## 178.1 Objective & Architecture Overview
+The complex multi-package tier architecture (`QuotationPackageOption` model, option modals, auto-generation multipliers, package cards) was completely removed and replaced with a **simple Tier selection field** on the Quotation model.
+
+### Key Rules & Behavior:
+1. **Field on Quotation**: `tier: String @default("Deluxe")` on `Quotation` model.
+2. **Exactly 3 Allowed Options**:
+   - `Deluxe`
+   - `Ultra Deluxe`
+   - `Premium`
+3. **Default Selection**: `Deluxe` is selected by default on all new quotations.
+4. **Free Selection / Zero Restrictions**: User can change tier freely anytime with NO eligibility conditions, NO hotel/vehicle/activity dependencies, NO package conditions, and NO pricing limits.
+5. **Single Purpose — Quotation Naming**:
+   - The selected Tier is used **ONLY as part of the Quotation Name** (e.g., `Proposal for [TripTitle] - Deluxe`, `Proposal for [TripTitle] - Ultra Deluxe`, `Proposal for [TripTitle] - Premium`).
+   - Changing the Tier updates the quotation name suffix seamlessly.
+6. **Zero Pricing / Costing / Calculation Impact**:
+   - Tier does **NOT** alter subtotal, costing, markup, discount, tax, payment milestones, or final quotation amount.
+   - Line items, hotels, rooms, vehicles, and activities remain 100% manually selected and controlled.
+7. **Single Source of Truth**:
+   - All legacy package options tables (`quotation_package_options`), API routes, and UI tabs have been dropped.
+   - Public proposal and PDFKit generator display the simple tier badge (`TIER: DELUXE`) and solitary customer investment amount without separate package cards.
+
+## 178.2 Database & Schema Migration
+- **Prisma Schema (`prisma/schema.prisma`)**:
+  - Added `tier String @default("Deluxe")` to `Quotation`.
+  - Removed `selectedPackageOptionId`, `selectedPackageOption`, `packageOptions` from `Quotation`.
+  - Removed obsolete model `QuotationPackageOption`.
+- **Migration SQL (`prisma/migrations/20260922113500_simplify_quotation_tier/migration.sql`)**:
+  ```sql
+  ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "tier" TEXT NOT NULL DEFAULT 'Deluxe';
+  ALTER TABLE "quotations" DROP CONSTRAINT IF EXISTS "quotations_selectedPackageOptionId_fkey";
+  DROP INDEX IF EXISTS "quotations_selectedPackageOptionId_idx";
+  ALTER TABLE "quotations" DROP COLUMN IF EXISTS "selectedPackageOptionId";
+  DROP TABLE IF EXISTS "quotation_package_options" CASCADE;
+  ```
+
+## 178.3 Verification & Baseline Preservation
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **End-to-End Tier Flow**:
+  - Default selection `Deluxe` $\to$ Verified.
+  - Switch to `Ultra Deluxe` $\to$ Title synchronized to `... - Ultra Deluxe`, pricing unchanged.
+  - Switch to `Premium` $\to$ Title synchronized to `... - Premium`, pricing unchanged.
+  - Switch back to `Deluxe` $\to$ Title synchronized to `... - Deluxe`, pricing unchanged.
+  - Public view & PDF output $\to$ Verified clean tier rendering with solitary final quotation amount.
+- **Permanent Baseline Counts**:
+  - Destinations: **32** (100% intact)
+  - Hotels: **26** (22 permanent + 4 test, 100% intact)
+  - RateSheets: **66** (100% intact)
+  - Vehicles: **9** (6 permanent + 3 test, 100% intact)
+  - PLATFORM_OWNER: `mzpatel14@gmail.com` (100% intact)
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+
 
 
 

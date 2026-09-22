@@ -91,34 +91,7 @@ export interface QuotationPdfData {
     }>;
   } | null;
 
-  packageOptions?: Array<{
-    id: string;
-    name: string;
-    subtitle?: string | null;
-    description?: string | null;
-    isRecommended?: boolean;
-    finalAmount: number;
-    hotelNotes?: string | null;
-    vehicleNotes?: string | null;
-    activityNotes?: string | null;
-    inclusions?: string[];
-    exclusions?: string[];
-  }>;
-
-  selectedPackageOptionId?: string | null;
-  selectedPackageOption?: {
-    id: string;
-    name: string;
-    subtitle?: string | null;
-    description?: string | null;
-    isRecommended?: boolean;
-    finalAmount: number;
-    hotelNotes?: string | null;
-    vehicleNotes?: string | null;
-    activityNotes?: string | null;
-    inclusions?: string[];
-    exclusions?: string[];
-  } | null;
+  tier?: string | null;
 
   proposalItems?: Array<{
     id: string;
@@ -255,9 +228,7 @@ export class QuotationPdfService {
         };
 
         // Determine effective final quotation amount (solitary customer monetary value)
-        const effectiveFinalAmount = data.selectedPackageOption
-          ? Number(data.selectedPackageOption.finalAmount)
-          : Number(data.finalAmount);
+        const effectiveFinalAmount = Number(data.finalAmount);
 
         // Derive Duration
         let durationText = "";
@@ -321,11 +292,10 @@ export class QuotationPdfService {
             align: "center",
           });
 
-        // Proposal Category / Package Pill (Dynamic & Neutral)
+        // Proposal Category / Tier Pill (Dynamic & Neutral)
         const catPillY = margin + 34;
-        const proposalBadgeText = data.selectedPackageOption?.name
-          ? `PACKAGE: ${data.selectedPackageOption.name.toUpperCase()}`
-          : "TRAVEL PROPOSAL";
+        const tierName = data.tier || "Deluxe";
+        const proposalBadgeText = `TIER: ${tierName.toUpperCase()}`;
         const badgeW = Math.min(200, Math.max(100, proposalBadgeText.length * 6 + 16));
 
         doc

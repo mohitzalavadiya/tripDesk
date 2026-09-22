@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { QuotationStatus, TaxMode, GstTreatment } from "@prisma/client";
 
+export const quotationTierSchema = z.enum(["Deluxe", "Ultra Deluxe", "Premium"]);
+export type QuotationTier = z.infer<typeof quotationTierSchema>;
+
 /**
  * Zod schema for creating a new Quotation
  */
@@ -8,6 +11,7 @@ export const createQuotationSchema = z.object({
   tripId: z.string().min(1, "Trip ID is required"),
   customerId: z.string().min(1, "Customer ID is required"),
   title: z.string().trim().max(200, "Title cannot exceed 200 characters").optional(),
+  tier: quotationTierSchema.default("Deluxe").optional(),
   proposalSubtitle: z.string().trim().max(300).optional().nullable(),
   version: z.number().int().min(1).default(1).optional(),
   status: z.nativeEnum(QuotationStatus).default(QuotationStatus.DRAFT).optional(),
@@ -42,6 +46,7 @@ export type CreateQuotationInput = z.infer<typeof createQuotationSchema>;
 export const updateQuotationSchema = z
   .object({
     title: z.string().trim().max(200).optional().nullable(),
+    tier: quotationTierSchema.optional(),
     proposalSubtitle: z.string().trim().max(300).optional().nullable(),
     status: z.nativeEnum(QuotationStatus).optional(),
     validUntil: z.coerce.date().optional().nullable(),
@@ -66,7 +71,6 @@ export const updateQuotationSchema = z
     customerFeedback: z.string().trim().max(5000).optional().nullable(),
     internalNotes: z.string().trim().max(5000).optional().nullable(),
     terms: z.string().trim().max(5000).optional().nullable(),
-    selectedPackageOptionId: z.string().trim().optional().nullable(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided for update",
@@ -94,6 +98,8 @@ export type QuotationQueryInput = z.infer<typeof quotationQuerySchema>;
  * Schema for generating a quotation snapshot from a trip
  */
 export const generateTripQuotationSchema = z.object({
+  title: z.string().trim().max(200).optional(),
+  tier: quotationTierSchema.default("Deluxe").optional(),
   markupPercentage: z.number().min(0).max(500).default(10).optional(),
   discountPercentage: z.number().min(0).max(100).default(0).optional(),
   taxPercentage: z.number().min(0).max(100).default(0).optional(),
@@ -111,7 +117,6 @@ export const generateTripQuotationSchema = z.object({
   validUntil: z.coerce.date().optional(),
   autoPopulateInclusions: z.boolean().default(true).optional(),
   generatePaymentSchedule: z.boolean().default(true).optional(),
-  generateDefaultPackageOptions: z.boolean().default(false).optional(),
 });
 
 export type GenerateTripQuotationInput = z.infer<typeof generateTripQuotationSchema>;
@@ -120,7 +125,6 @@ export type GenerateTripQuotationInput = z.infer<typeof generateTripQuotationSch
  * Schema for public customer actions
  */
 export const acceptQuotationSchema = z.object({
-  selectedOptionId: z.string().trim().optional().nullable(),
   customerName: z.string().trim().min(1).max(200).optional(),
   customerEmail: z.string().trim().email().optional().nullable(),
   customerPhone: z.string().trim().max(30).optional().nullable(),

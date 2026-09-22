@@ -44,7 +44,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { quotationClient, PublicQuotationPayload, PublicPackageOption } from "@/lib/api-client";
+import { quotationClient, PublicQuotationPayload } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
 
@@ -53,7 +53,6 @@ export default function PublicQuotationPage() {
   const shareToken = params.shareToken as string;
 
   const [quotation, setQuotation] = React.useState<PublicQuotationPayload | null>(null);
-  const [selectedOptionId, setSelectedOptionId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -74,13 +73,6 @@ export default function PublicQuotationPage() {
       const res = await quotationClient.getPublicQuotation(shareToken);
       if (res.success && res.data) {
         setQuotation(res.data);
-        // Default selected package option
-        if (res.data.selectedPackageOptionId) {
-          setSelectedOptionId(res.data.selectedPackageOptionId);
-        } else if (res.data.packageOptions && res.data.packageOptions.length > 0) {
-          const rec = res.data.packageOptions.find((p) => p.isRecommended) || res.data.packageOptions[0];
-          setSelectedOptionId(rec.id);
-        }
         quotationClient.markQuotationViewed(shareToken).catch(() => {});
       }
     } catch (err: any) {
@@ -94,17 +86,6 @@ export default function PublicQuotationPage() {
     loadPublicQuote();
   }, [loadPublicQuote]);
 
-  // Handle customer selecting a tier (NO tier price shown)
-  const handleSelectTier = async (opt: PublicPackageOption) => {
-    setSelectedOptionId(opt.id);
-    try {
-      await quotationClient.selectPublicPackageOption(shareToken, opt.id);
-      toast.success(`Selected "${opt.name}" package.`);
-    } catch (err) {
-      // Non-blocking UI update
-    }
-  };
-
   const handleAcceptProposal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!shareToken) return;
@@ -112,7 +93,6 @@ export default function PublicQuotationPage() {
     try {
       setAccepting(true);
       const res = await quotationClient.acceptPublicQuotation(shareToken, {
-        selectedOptionId: selectedOptionId || undefined,
         customerName: quotation?.customer.name,
         customerEmail: quotation?.customer.email,
         customerPhone: quotation?.customer.phone,
@@ -158,9 +138,7 @@ export default function PublicQuotationPage() {
   const handleWhatsAppContact = () => {
     if (!quotation) return;
     const phone = quotation.agency.phone?.replace(/[^0-9]/g, "") || "919876543210";
-    const selectedPkg = quotation.packageOptions?.find((p) => p.id === selectedOptionId);
-    const pkgText = selectedPkg ? ` for the ${selectedPkg.name} package` : "";
-    const text = `Hi ${quotation.agency.name}! I am reviewing quotation ${quotation.quotationNumber} (${quotation.title}). I would like to discuss and confirm this trip${pkgText}.`;
+    const text = `Hi ${quotation.agency.name}! I am reviewing quotation ${quotation.quotationNumber} (${quotation.title}). I would like to discuss and confirm this trip.`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
   };
 
@@ -196,9 +174,7 @@ export default function PublicQuotationPage() {
   const isExpired = quotation.isExpired;
   const isAccepted = quotation.status === "ACCEPTED";
 
-  const packageOptions = quotation.packageOptions || [];
-  const activePackage = packageOptions.find((p) => p.id === selectedOptionId) || quotation.selectedPackageOption || null;
-  const effectiveFinalAmount = activePackage ? Number(activePackage.finalAmount) : quotation.finalAmount;
+  const effectiveFinalAmount = quotation.finalAmount;
 
   // Duration calculation
   let durationText = "";
@@ -226,7 +202,8 @@ export default function PublicQuotationPage() {
   // Dynamic agency contact line & Proposal label
   const agencyContacts = [quotation.agency?.phone, quotation.agency?.email].filter(Boolean);
   const agencySubtext = agencyContacts.length > 0 ? agencyContacts.join(" | ") : "TRIP PROPOSAL";
-  const proposalBadgeText = activePackage?.name ? `PACKAGE: ${activePackage.name.toUpperCase()}` : "TRAVEL PROPOSAL";
+  const tierName = quotation.tier || "Deluxe";
+  const proposalBadgeText = `TIER: ${tierName.toUpperCase()}`;
 
   return (
     <div className="min-h-screen bg-slate-100/90 text-slate-900 pb-28 sm:pb-20 font-sans">
@@ -387,110 +364,7 @@ export default function PublicQuotationPage() {
               </div>
             )}
 
-            {/* ─── PACKAGE TIERS SELECTOR (NO INDIVIDUAL TIER PRICES AS PER SINGLE MONETARY VALUE RULE) ─── */}
-            {packageOptions.length > 0 && (
-              <div className="space-y-4">
-                <div className="border-b border-slate-200 pb-3">
-                  <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                    <Package className="h-5 w-5 text-indigo-600" />
-                    Choose Your Travel Package Tier
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Compare hotel categories, transport options, and select your preferred package.
-                  </p>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  {packageOptions.map((opt) => {
-                    const isSelected = selectedOptionId === opt.id;
-
-                    return (
-                      <div
-                        key={opt.id}
-                        onClick={() => !isAccepted && handleSelectTier(opt)}
-                        className={`p-6 rounded-3xl border-2 transition-all flex flex-col justify-between space-y-4 relative cursor-pointer ${
-                          isSelected
-                            ? "bg-gradient-to-b from-indigo-50/70 to-white border-indigo-600 shadow-lg ring-2 ring-indigo-500/20"
-                            : "bg-white border-slate-200 hover:border-slate-300 shadow-2xs"
-                        }`}
-                      >
-                        {/* Badges */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            {opt.isRecommended && (
-                              <Badge className="bg-indigo-600 text-white text-[10px] font-bold h-5 px-2 gap-1 rounded-md shadow-2xs">
-                                <Star className="h-3 w-3 fill-amber-300 text-amber-300" />
-                                Recommended
-                              </Badge>
-                            )}
-                          </div>
-
-                          <div
-                            className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                              isSelected
-                                ? "border-indigo-600 bg-indigo-600 text-white"
-                                : "border-slate-300 bg-white"
-                            }`}
-                          >
-                            {isSelected && <Check className="h-3 w-3" />}
-                          </div>
-                        </div>
-
-                        {/* Title & Subtitle */}
-                        <div className="space-y-1">
-                          <h3 className="font-extrabold text-slate-900 text-lg">{opt.name}</h3>
-                          {opt.subtitle && <p className="text-xs text-indigo-700 font-semibold">{opt.subtitle}</p>}
-                          {opt.description && <p className="text-xs text-slate-500 leading-relaxed">{opt.description}</p>}
-                        </div>
-
-                        {/* Specifications */}
-                        <div className="space-y-2 text-xs">
-                          {opt.hotelNotes && (
-                            <div className="flex items-start gap-2 text-slate-700">
-                              <Building2 className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
-                              <span className="leading-snug">{opt.hotelNotes}</span>
-                            </div>
-                          )}
-                          {opt.vehicleNotes && (
-                            <div className="flex items-start gap-2 text-slate-700">
-                              <Car className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
-                              <span className="leading-snug">{opt.vehicleNotes}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Inclusions list */}
-                        {opt.inclusions.length > 0 && (
-                          <div className="pt-3 border-t border-slate-100 space-y-1.5">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Inclusions</span>
-                            <ul className="space-y-1.5 text-xs">
-                              {opt.inclusions.map((inc, i) => (
-                                <li key={i} className="flex items-start gap-2 text-slate-700">
-                                  <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                                  <span className="leading-tight">{inc}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        <Button
-                          size="sm"
-                          variant={isSelected ? "default" : "outline"}
-                          className={`w-full text-xs font-bold h-9 rounded-xl mt-2 cursor-pointer ${
-                            isSelected
-                              ? "bg-indigo-600 hover:bg-indigo-700 text-white"
-                              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                          }`}
-                        >
-                          {isSelected ? "Selected Tier" : "Select This Tier"}
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* 3. Tour Highlights Bar */}
             <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
@@ -834,7 +708,7 @@ export default function PublicQuotationPage() {
                     Total Package Investment
                   </span>
                   <h3 className="text-xl sm:text-2xl font-black text-white mt-1">
-                    {activePackage ? `${activePackage.name} Package` : "Complete Tour Price"}
+                    Complete Tour Price
                   </h3>
                 </div>
 
@@ -927,19 +801,12 @@ export default function PublicQuotationPage() {
               </div>
               <DialogTitle className="text-slate-900 font-bold text-lg">Accept Itinerary Proposal</DialogTitle>
               <DialogDescription className="text-slate-500 text-xs mt-1">
-                Confirm your acceptance of quotation {quotation.quotationNumber}
-                {activePackage ? ` (${activePackage.name})` : ""}.
+                Confirm your acceptance of quotation {quotation.quotationNumber}.
                 Your travel advisor will be notified immediately to proceed with reservation bookings.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-3.5 mt-4 text-xs">
-              {activePackage && (
-                <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
-                  <span className="text-[10px] font-bold text-indigo-500 uppercase block">Selected Tier</span>
-                  <span className="font-extrabold text-slate-900 text-xs">{activePackage.name}</span>
-                </div>
-              )}
 
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase">Traveler Name</label>

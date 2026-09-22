@@ -121,8 +121,8 @@ export default function TripQuotationPreviewPage() {
   const agencyContacts = [quotation.agency?.phone, quotation.agency?.email].filter(Boolean);
   const agencySubtext = agencyContacts.length > 0 ? agencyContacts.join(" | ") : "TRIP PROPOSAL";
 
-  const selectedPkg = quotation.selectedPackageOption || quotation.packageOptions?.find((p) => p.id === quotation.selectedPackageOptionId);
-  const proposalBadgeText = selectedPkg?.name ? `PACKAGE: ${selectedPkg.name.toUpperCase()}` : "TRAVEL PROPOSAL";
+  const tierName = quotation.tier || "Deluxe";
+  const proposalBadgeText = `TIER: ${tierName.toUpperCase()}`;
 
   return (
     <div className="min-h-screen bg-slate-100/70 pb-16 font-sans">
