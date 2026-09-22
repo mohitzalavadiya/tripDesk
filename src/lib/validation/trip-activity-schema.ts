@@ -5,6 +5,12 @@ import { ActivityType } from "@prisma/client";
  * Zod validation schema for creating a Trip-Activity assignment.
  */
 export const createTripActivitySchema = z.object({
+  tripDestinationId: z
+    .string()
+    .trim()
+    .optional()
+    .nullable()
+    .or(z.literal("")),
   activityId: z.string().trim().optional().nullable(),
   name: z
     .string()
@@ -74,6 +80,12 @@ export type CreateTripActivityInput = z.infer<typeof createTripActivitySchema>;
  */
 export const updateTripActivitySchema = z
   .object({
+    tripDestinationId: z
+      .string()
+      .trim()
+      .optional()
+      .nullable()
+      .or(z.literal("")),
     activityId: z.string().trim().optional().nullable(),
     name: z
       .string()

@@ -49,7 +49,9 @@ async function runDev03Tests() {
     console.log("\n--- Testing Hotel Master & Hotel Code ---");
 
     // 1. Create Hotel manually -> Hotel Code generated
+    const destKerala = await prisma.destination.findFirst({ where: { agencyId: agencyA.id, status: "ACTIVE" } });
     const hotel1 = await hotelService.createHotel(agencyA.id, {
+      destinationId: destKerala?.id || "",
       name: "Grand View Resort",
       city: "Munnar",
       category: "5 Star",
@@ -65,6 +67,7 @@ async function runDev03Tests() {
 
     // 2. Second Hotel in Agency A gets next code
     const hotel2 = await hotelService.createHotel(agencyA.id, {
+      destinationId: destKerala?.id || "",
       name: "Seaside Villa",
       city: "Kovalam",
       category: "4 Star",

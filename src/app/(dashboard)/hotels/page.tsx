@@ -8,18 +8,21 @@ import {
   Search,
   Building2,
   MapPin,
-  RotateCcw,
   X,
   Eye,
   MoreVertical,
   Archive,
   Loader2,
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
   Phone,
   Mail,
   Globe,
+  FileSpreadsheet,
+  Download,
+  Compass,
+  Star,
+  Filter,
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -46,17 +49,24 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { hotelClient } from "@/lib/api-client";
-import { Hotel } from "@prisma/client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { hotelClient, HotelWithRelations } from "@/lib/api-client/hotel-client";
+import { destinationClient } from "@/lib/api-client/destination-client";
 import { toast } from "sonner";
 import { ExcelImportModal } from "@/components/excel/excel-import-modal";
-import { FileSpreadsheet, Download } from "lucide-react";
 
 export default function HotelsPage() {
   const router = useRouter();
 
   // Data states
-  const [hotels, setHotels] = React.useState<Hotel[]>([]);
+  const [hotels, setHotels] = React.useState<HotelWithRelations[]>([]);
+  const [destinations, setDestinations] = React.useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
@@ -68,6 +78,7 @@ export default function HotelsPage() {
   // Filter & Search states
   const [search, setSearch] = React.useState("");
   const [debouncedSearch, setDebouncedSearch] = React.useState("");
+  const [selectedDestinationId, setSelectedDestinationId] = React.useState<string>("");
   const [page, setPage] = React.useState(1);
   const [pagination, setPagination] = React.useState({
     total: 0,
@@ -75,6 +86,25 @@ export default function HotelsPage() {
     limit: 20,
     totalPages: 1,
   });
+
+  // Fetch available destinations for filtering
+  React.useEffect(() => {
+    let isMounted = true;
+    async function loadDestinations() {
+      try {
+        const res = await destinationClient.getDestinations({ limit: 100, status: "ACTIVE" });
+        if (isMounted && res.success && res.data) {
+          setDestinations(res.data.map((d: any) => ({ id: d.id, name: d.name })));
+        }
+      } catch {
+        // Fallback silently if destinations cannot be fetched
+      }
+    }
+    loadDestinations();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Debounce search input (300ms)
   React.useEffect(() => {
@@ -85,7 +115,7 @@ export default function HotelsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Fetch real hotels from API
+  // Fetch hotels from API
   const fetchHotels = React.useCallback(async () => {
     try {
       setLoading(true);
@@ -93,6 +123,7 @@ export default function HotelsPage() {
 
       const res = await hotelClient.getHotels({
         search: debouncedSearch || undefined,
+        destinationId: selectedDestinationId || undefined,
         page,
         limit: 20,
       });
@@ -109,7 +140,7 @@ export default function HotelsPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, page]);
+  }, [debouncedSearch, selectedDestinationId, page]);
 
   React.useEffect(() => {
     fetchHotels();
@@ -118,10 +149,11 @@ export default function HotelsPage() {
   const handleClearFilters = () => {
     setSearch("");
     setDebouncedSearch("");
+    setSelectedDestinationId("");
     setPage(1);
   };
 
-  const isFilterActive = search.trim() !== "";
+  const isFilterActive = search.trim() !== "" || selectedDestinationId !== "";
 
   // Archive Hotel
   const handleArchive = (id: string, name: string) => {
@@ -181,7 +213,7 @@ export default function HotelsPage() {
                 Hotels & Resorts
               </h1>
               <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
-                Manage contracted properties, categories, contact points, and trip accommodations
+                Manage contracted properties, destinations, categories, and inventory
               </span>
             </div>
 
@@ -251,24 +283,73 @@ export default function HotelsPage() {
 
         {/* Master Card (Filter Bar + Table) */}
         <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
-          {/* Search Toolbar */}
+          {/* Search & Filter Toolbar */}
           <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="relative flex-1 max-w-2xl">
-                <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search hotels by property name, city, state, or category..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all"
-                />
-                {search && (
-                  <button
-                    onClick={() => setSearch("")}
-                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 max-w-3xl">
+                {/* Search Input */}
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search hotels by property name, code, city, state, or category..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all"
+                  />
+                  {search && (
+                    <button
+                      onClick={() => setSearch("")}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Destination Filter Dropdown */}
+                <div className="w-full sm:w-56">
+                  <Select
+                    value={selectedDestinationId || "ALL"}
+                    onValueChange={(val: string | null) => {
+                      setSelectedDestinationId(val === "ALL" || !val ? "" : val);
+                      setPage(1);
+                    }}
                   >
-                    <X className="h-4 w-4" />
-                  </button>
+                    <SelectTrigger className="h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all cursor-pointer">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <SelectValue placeholder="All Destinations">
+                          {(val: string | null) => {
+                            if (!val || val === "ALL") return "All Destinations";
+                            const match = destinations.find((d) => d.id === val);
+                            return match ? match.name : "All Destinations";
+                          }}
+                        </SelectValue>
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60 bg-white border-slate-200">
+                      <SelectItem value="ALL" className="text-xs cursor-pointer font-semibold text-slate-700">
+                        All Destinations
+                      </SelectItem>
+                      {destinations.map((d) => (
+                        <SelectItem key={d.id} value={d.id} className="text-xs cursor-pointer">
+                          <span className="font-semibold text-slate-800">{d.name}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Clear Filters Button */}
+                {isFilterActive && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearFilters}
+                    className="h-9.5 text-xs text-slate-500 hover:text-slate-800 font-semibold px-3 cursor-pointer shrink-0"
+                  >
+                    Clear Filters
+                  </Button>
                 )}
               </div>
             </div>
@@ -300,7 +381,7 @@ export default function HotelsPage() {
                 title={isFilterActive ? "No matching hotels found" : "No hotel inventory registered yet"}
                 description={
                   isFilterActive
-                    ? "Try adjusting your search query."
+                    ? "Try adjusting your search query or destination filter."
                     : "Add your first contracted hotel or resort property to make it available for trip itineraries."
                 }
                 actionText={isFilterActive ? "Clear Filter" : "Add Hotel"}
@@ -313,11 +394,13 @@ export default function HotelsPage() {
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">
-                      <TableHead className="py-3 px-4 font-bold text-slate-600 w-[300px]">Hotel & Category</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Location</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600 w-[280px]">Hotel & Code</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">Destination</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">City / Location</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">Star Category</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Contact</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Website</TableHead>
-                      <TableHead className="py-3 px-4 w-[80px] text-right font-bold text-slate-600">Actions</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600 w-[100px]">Status</TableHead>
+                      <TableHead className="py-3 px-4 w-[70px] text-right font-bold text-slate-600">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -327,74 +410,95 @@ export default function HotelsPage() {
                         onClick={() => router.push(`/hotels/${hotel.id}`)}
                         className="hover:bg-slate-50/70 cursor-pointer transition-colors group border-b border-slate-100/80"
                       >
+                        {/* Hotel & Code */}
                         <TableCell className="py-3.5 px-4 font-medium text-slate-900">
                           <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center border border-indigo-100 shrink-0">
+                            <div className="h-8.5 w-8.5 rounded-xl bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center border border-indigo-100/90 shrink-0 shadow-2xs">
                               <Building2 className="h-4 w-4" />
                             </div>
                             <div className="flex flex-col min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-semibold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">
+                                <span className="font-bold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">
                                   {hotel.name}
                                 </span>
                                 {hotel.hotelCode && (
-                                  <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/80 px-1.5 py-0.2 rounded shrink-0">
+                                  <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50/90 border border-indigo-200/80 px-1.5 py-0.2 rounded shrink-0">
                                     {hotel.hotelCode}
                                   </span>
                                 )}
                               </div>
-                              {hotel.category && (
-                                <span className="text-[10px] text-slate-500">
-                                  {hotel.category}
-                                </span>
-                              )}
                             </div>
                           </div>
                         </TableCell>
 
+                        {/* Destination */}
+                        <TableCell className="py-3.5 px-4">
+                          {hotel.destination ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
+                              <Compass className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate max-w-[140px]">{hotel.destination.name}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic font-normal">Unassigned</span>
+                          )}
+                        </TableCell>
+
+                        {/* City / Location */}
                         <TableCell className="py-3.5 px-4">
                           <div className="flex items-center gap-1.5 text-xs text-slate-700">
                             <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                            <span>
-                              {hotel.city ? `${hotel.city}${hotel.state ? `, ${hotel.state}` : ""}` : (hotel.address || "Unspecified")}
+                            <span className="truncate max-w-[180px]">
+                              {hotel.city ? `${hotel.city}${hotel.state ? `, ${hotel.state}` : ""}` : (hotel.address || "—")}
                             </span>
                           </div>
                         </TableCell>
 
+                        {/* Star Category */}
+                        <TableCell className="py-3.5 px-4">
+                          {hotel.category ? (
+                            <Badge
+                              variant="outline"
+                              className="bg-amber-50/60 text-amber-800 border-amber-200/70 font-semibold text-[11px] px-2 py-0.5"
+                            >
+                              {hotel.category}
+                            </Badge>
+                          ) : (
+                            <span className="text-slate-400 text-xs">—</span>
+                          )}
+                        </TableCell>
+
+                        {/* Contact */}
                         <TableCell className="py-3.5 px-4">
                           <div className="flex flex-col gap-0.5 text-xs text-slate-600">
                             {hotel.phone && (
                               <span className="flex items-center gap-1">
-                                <Phone className="h-3 w-3 text-slate-400" />
-                                {hotel.phone}
+                                <Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                                <span className="truncate max-w-[130px]">{hotel.phone}</span>
                               </span>
                             )}
                             {hotel.email && (
                               <span className="flex items-center gap-1 text-[11px] text-slate-500">
-                                <Mail className="h-3 w-3 text-slate-400" />
-                                {hotel.email}
+                                <Mail className="h-3 w-3 text-slate-400 shrink-0" />
+                                <span className="truncate max-w-[130px]">{hotel.email}</span>
                               </span>
+                            )}
+                            {!hotel.phone && !hotel.email && (
+                              <span className="text-slate-400 text-xs">—</span>
                             )}
                           </div>
                         </TableCell>
 
+                        {/* Status */}
                         <TableCell className="py-3.5 px-4">
-                          {hotel.website ? (
-                            <a
-                              href={hotel.website.startsWith("http") ? hotel.website : `https://${hotel.website}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline"
-                            >
-                              <Globe className="h-3 w-3 text-indigo-400" />
-                              <span className="truncate max-w-[140px]">{hotel.website.replace(/^https?:\/\//, "")}</span>
-                            </a>
-                          ) : (
-                            <span className="text-slate-400 text-xs">-</span>
-                          )}
+                          <Badge
+                            variant="outline"
+                            className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5"
+                          >
+                            Active
+                          </Badge>
                         </TableCell>
 
+                        {/* Actions */}
                         <TableCell className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger
@@ -443,10 +547,10 @@ export default function HotelsPage() {
                   <div
                     key={hotel.id}
                     onClick={() => router.push(`/hotels/${hotel.id}`)}
-                    className="p-4 space-y-2.5 hover:bg-slate-50/50 cursor-pointer active:bg-slate-100 transition-colors"
+                    className="p-4 space-y-3 hover:bg-slate-50/50 cursor-pointer active:bg-slate-100 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div>
+                      <div className="space-y-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h4 className="font-bold text-slate-900 text-xs">{hotel.name}</h4>
                           {hotel.hotelCode && (
@@ -455,20 +559,34 @@ export default function HotelsPage() {
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-slate-500">{hotel.category || "Hotel Property"}</p>
+                        {hotel.category && (
+                          <p className="text-[11px] text-amber-700 font-medium">{hotel.category}</p>
+                        )}
                       </div>
-                      {hotel.city && (
-                        <Badge variant="outline" className="text-[10px] bg-slate-50">
-                          {hotel.city}
-                        </Badge>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {hotel.destination ? (
+                          <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 flex items-center font-medium">
+                            <Compass className="h-2.5 w-2.5" />
+                            {hotel.destination.name}
+                          </Badge>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">Unassigned</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-600 pt-1 border-t border-slate-50">
+                      <span className="flex items-center gap-1 text-[11px]">
+                        <MapPin className="h-3 w-3 text-slate-400" />
+                        {hotel.city ? `${hotel.city}${hotel.state ? `, ${hotel.state}` : ""}` : (hotel.address || "Location unspecified")}
+                      </span>
+                      {hotel.phone && (
+                        <span className="flex items-center gap-1 text-[11px] text-slate-500">
+                          <Phone className="h-3 w-3 text-slate-400" />
+                          {hotel.phone}
+                        </span>
                       )}
                     </div>
-                    {hotel.phone && (
-                      <p className="text-xs text-slate-600 flex items-center gap-1.5">
-                        <Phone className="h-3 w-3 text-slate-400" />
-                        {hotel.phone}
-                      </p>
-                    )}
                   </div>
                 ))}
               </div>

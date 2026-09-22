@@ -7,6 +7,7 @@ import * as Yup from "yup";
 import { Ticket, ArrowLeft, Loader2, Plus, AlertCircle, Info } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { DestinationSelect } from "@/components/shared/destination-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +27,7 @@ const createActivitySchema = Yup.object().shape({
     .trim()
     .required("Activity name is required")
     .max(200, "Name cannot exceed 200 characters"),
+  destinationId: Yup.string().nullable().optional(),
   location: Yup.string().trim().max(200, "Location cannot exceed 200 characters"),
   description: Yup.string().trim().max(2000, "Description cannot exceed 2000 characters"),
   duration: Yup.string().trim().max(100, "Duration cannot exceed 100 characters"),
@@ -44,6 +46,7 @@ export default function NewActivityPage() {
   const formik = useFormik({
     initialValues: {
       name: "",
+      destinationId: "",
       location: "",
       description: "",
       duration: "Half Day",
@@ -66,6 +69,7 @@ export default function NewActivityPage() {
 
         const res = await activityClient.createActivity({
           name: values.name.trim(),
+          destinationId: values.destinationId || null,
           location: values.location.trim() || undefined,
           description: values.description.trim() || undefined,
           duration: values.duration.trim() || undefined,
@@ -186,6 +190,21 @@ export default function NewActivityPage() {
                   />
                   {getFieldError("duration") && (
                     <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("duration")}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">Assigned Destination</label>
+                  <DestinationSelect
+                    value={formik.values.destinationId}
+                    onChange={(val) => {
+                      formik.setFieldValue("destinationId", val);
+                      formik.setFieldTouched("destinationId", true);
+                    }}
+                    disabled={formik.isSubmitting}
+                  />
+                  {getFieldError("destinationId") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("destinationId")}</p>
                   )}
                 </div>
 

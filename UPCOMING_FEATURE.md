@@ -34,17 +34,26 @@ you already know we build a tripdesk. so my old chat is reach the limit so i wan
 
 **TODO**
 
-quotation check priceing
 
+Hotel and rate issue in costing
+Add destination field for trip
+
+rate sheet not working
+
+quatation priceing issue
 /quotation page UI when no quotation available
+Price should not show on quotation
 Agency Service & Planning (15%): should not show on quotation
 
+some changes in activity. R&D 
+
+Add QR and UPI for patment
+
+notification test
 
 manage read only from frontend also
 where i can show Announcements ?
 subscription model changes
-
-notification test
 
 remove usused code, imports and files
 remove all type script error

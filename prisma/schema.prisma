@@ -43,6 +43,11 @@ enum ReferralStatus {
   CANCELLED
 }
 
+enum DestinationStatus {
+  ACTIVE
+  INACTIVE
+}
+
 
 
 enum TripStatus {
@@ -376,6 +381,7 @@ model Agency {
   enquiries        Enquiry[]
   enquiryFollowUps EnquiryFollowUp[]
   trips            Trip[]
+  destinations     Destination[]
   hotels           Hotel[]
   vehicles         Vehicle[]
   activities       Activity[]
@@ -587,6 +593,7 @@ model Trip {
   customer         Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
   enquiries        Enquiry[]
   travelers        Traveler[]
+  tripDestinations TripDestination[]
   tripHotels       TripHotel[]
   itineraryItems   ItineraryItem[]
   tripVehicles     TripVehicle[]
@@ -638,34 +645,87 @@ model Traveler {
 }
 
 // ═════════════════════════════════════════════════════════════════════
+// 7B. DESTINATION MASTER
+// ═════════════════════════════════════════════════════════════════════
+
+model Destination {
+  id               String            @id @default(cuid())
+  agencyId         String
+  name             String
+  country          String            @default("India")
+  state            String?
+  cityArea         String?
+  status           DestinationStatus @default(ACTIVE)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  agency           Agency            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  hotels           Hotel[]
+  activities       Activity[]
+  tripDestinations TripDestination[]
+
+  @@unique([agencyId, name])
+  @@index([agencyId])
+  @@index([agencyId, status])
+  @@map("destinations")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 7C. TRIP DESTINATION (MULTI-DESTINATION ITINERARY LEGS)
+// ═════════════════════════════════════════════════════════════════════
+
+model TripDestination {
+  id            String          @id @default(cuid())
+  tripId        String
+  destinationId String
+  sequence      Int             @default(1)
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  trip          Trip            @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  destination   Destination     @relation(fields: [destinationId], references: [id], onDelete: Restrict)
+  tripHotels    TripHotel[]
+  tripActivities TripActivity[]
+
+  @@unique([tripId, sequence])
+  @@index([tripId])
+  @@index([destinationId])
+  @@map("trip_destinations")
+}
+
+// ═════════════════════════════════════════════════════════════════════
 // 8. HOTEL
 // ═════════════════════════════════════════════════════════════════════
 
 model Hotel {
-  id         String    @id @default(cuid())
-  agencyId   String
-  hotelCode  String?
-  supplierId String?
-  name       String
-  category   String?
-  address    String?
-  city       String?
-  state      String?
-  country    String?   @default("India")
-  phone      String?
-  email      String?
-  website    String?
-  notes      String?
-  archivedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id            String       @id @default(cuid())
+  agencyId      String
+  destinationId String?
+  hotelCode     String?
+  supplierId    String?
+  name          String
+  category      String?
+  address       String?
+  city          String?
+  state         String?
+  country       String?      @default("India")
+  phone         String?
+  email         String?
+  website       String?
+  notes         String?
+  archivedAt    DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
-  agency     Agency      @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  supplier   Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  tripHotels TripHotel[]
-  rateSheets RateSheet[]
+  agency        Agency       @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  destination   Destination? @relation(fields: [destinationId], references: [id], onDelete: Restrict)
+  supplier      Supplier?    @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  tripHotels    TripHotel[]
+  rateSheets    RateSheet[]
 
   @@index([agencyId])
+  @@index([destinationId])
   @@index([agencyId, hotelCode])
   @@index([supplierId])
   @@index([agencyId, city])
@@ -677,25 +737,28 @@ model Hotel {
 // ═════════════════════════════════════════════════════════════════════
 
 model TripHotel {
-  id          String    @id @default(cuid())
-  tripId      String
-  hotelId     String
-  checkIn     DateTime
-  checkOut    DateTime
-  roomType    String
-  rooms       Int       @default(1)
-  mealPlan    String?
-  nightlyRate Decimal?  @db.Decimal(10, 2)
-  totalAmount Decimal?  @db.Decimal(10, 2)
-  notes       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                String           @id @default(cuid())
+  tripId            String
+  tripDestinationId String?
+  hotelId           String
+  checkIn           DateTime
+  checkOut          DateTime
+  roomType          String
+  rooms             Int              @default(1)
+  mealPlan          String?
+  nightlyRate       Decimal?         @db.Decimal(10, 2)
+  totalAmount       Decimal?         @db.Decimal(10, 2)
+  notes             String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
-  trip               Trip                @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  hotel              Hotel               @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  trip              Trip             @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  tripDestination   TripDestination? @relation(fields: [tripDestinationId], references: [id], onDelete: Restrict)
+  hotel             Hotel            @relation(fields: [hotelId], references: [id], onDelete: Restrict)
   hotelConfirmations HotelConfirmation[]
 
   @@index([tripId])
+  @@index([tripDestinationId])
   @@index([hotelId])
   @@map("trip_hotels")
 }
@@ -798,29 +861,32 @@ model TripVehicle {
 // ═════════════════════════════════════════════════════════════════════
 
 model Activity {
-  id          String       @id @default(cuid())
-  agencyId    String
-  supplierId  String?
-  name        String
-  location    String?
-  description String?
-  duration    String?
-  type        ActivityType @default(INCLUDED)
-  adultPrice  Decimal?     @db.Decimal(10, 2)
-  childPrice  Decimal?     @db.Decimal(10, 2)
-  price       Decimal?     @db.Decimal(10, 2)
-  notes       String?
-  archivedAt  DateTime?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id            String       @id @default(cuid())
+  agencyId      String
+  destinationId String?
+  supplierId    String?
+  name          String
+  location      String?
+  description   String?
+  duration      String?
+  type          ActivityType @default(INCLUDED)
+  adultPrice    Decimal?     @db.Decimal(10, 2)
+  childPrice    Decimal?     @db.Decimal(10, 2)
+  price         Decimal?     @db.Decimal(10, 2)
+  notes         String?
+  archivedAt    DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   agency                Agency                 @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  destination           Destination?           @relation(fields: [destinationId], references: [id], onDelete: Restrict)
   supplier              Supplier?              @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   tripActivities        TripActivity[]
   rateSheets            RateSheet[]
   activityConfirmations ActivityConfirmation[]
 
   @@index([agencyId])
+  @@index([destinationId])
   @@index([supplierId])
   @@index([agencyId, location])
   @@map("activities")
@@ -831,28 +897,31 @@ model Activity {
 // ═════════════════════════════════════════════════════════════════════
 
 model TripActivity {
-  id                   String       @id @default(cuid())
+  id                   String           @id @default(cuid())
   tripId               String
+  tripDestinationId    String?
   activityId           String?
   name                 String
   description          String?
   date                 DateTime?
   time                 String?
   location             String?
-  numberOfParticipants Int?         @default(1)
-  type                 ActivityType @default(INCLUDED)
-  adultPrice           Decimal?     @db.Decimal(10, 2)
-  childPrice           Decimal?     @db.Decimal(10, 2)
-  totalPrice           Decimal?     @db.Decimal(10, 2)
+  numberOfParticipants Int?             @default(1)
+  type                 ActivityType     @default(INCLUDED)
+  adultPrice           Decimal?         @db.Decimal(10, 2)
+  childPrice           Decimal?         @db.Decimal(10, 2)
+  totalPrice           Decimal?         @db.Decimal(10, 2)
   notes                String?
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
-  trip                  Trip                   @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  activity              Activity?              @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  trip                  Trip             @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  tripDestination       TripDestination? @relation(fields: [tripDestinationId], references: [id], onDelete: Restrict)
+  activity              Activity?        @relation(fields: [activityId], references: [id], onDelete: SetNull)
   activityConfirmations ActivityConfirmation[]
 
   @@index([tripId])
+  @@index([tripDestinationId])
   @@index([activityId])
   @@map("trip_activities")
 }
@@ -903,7 +972,7 @@ model Quotation {
   viewedAt                DateTime?
   acceptedAt              DateTime?
   rejectedAt              DateTime?
-  selectedPackageOptionId String?
+  tier                    String          @default("Deluxe")
   archivedAt              DateTime?
   createdAt               DateTime        @default(now())
   updatedAt               DateTime        @updatedAt
@@ -911,12 +980,10 @@ model Quotation {
   agency                Agency                      @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   trip                  Trip                        @relation(fields: [tripId], references: [id], onDelete: Cascade)
   customer              Customer                    @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  selectedPackageOption QuotationPackageOption?     @relation("QuotationSelectedOption", fields: [selectedPackageOptionId], references: [id], onDelete: SetNull)
   enquiries             Enquiry[]
   items                 QuotationItem[]
   proposalItems         QuotationProposalItem[]
   paymentMilestones     QuotationPaymentMilestone[]
-  packageOptions        QuotationPackageOption[]    @relation("QuotationPackageOptions")
   bookings              Booking[]
   publicShareLinks      PublicShareLink[]
   customerNotifications CustomerNotification[]
@@ -926,7 +993,6 @@ model Quotation {
   @@index([tripId])
   @@index([customerId])
   @@index([shareToken])
-  @@index([selectedPackageOptionId])
   @@index([agencyId, status])
   @@map("quotations")
 }
@@ -1006,50 +1072,6 @@ model QuotationPaymentMilestone {
 
   @@index([quotationId])
   @@map("quotation_payment_milestones")
-}
-
-// ═════════════════════════════════════════════════════════════════════
-// 14C. QUOTATION PACKAGE OPTION (TIERED PRICING / MULTI-OPTION PROPOSAL)
-// ═════════════════════════════════════════════════════════════════════
-
-model QuotationPackageOption {
-  id                 String   @id @default(cuid())
-  quotationId        String
-  name               String
-  subtitle           String?
-  description        String?
-  isRecommended      Boolean  @default(false)
-  subtotal           Decimal  @default(0) @db.Decimal(12, 2)
-  markupPercentage   Decimal  @default(0) @db.Decimal(5, 2)
-  markupAmount       Decimal  @default(0) @db.Decimal(12, 2)
-  discountPercentage Decimal  @default(0) @db.Decimal(5, 2)
-  discountAmount     Decimal  @default(0) @db.Decimal(12, 2)
-  taxPercentage      Decimal  @default(0) @db.Decimal(5, 2)
-  taxAmount          Decimal  @default(0) @db.Decimal(12, 2)
-  taxableAmount      Decimal? @default(0) @db.Decimal(12, 2)
-  taxRate            Decimal? @default(0) @db.Decimal(5, 2)
-  taxMode            TaxMode? @default(EXCLUSIVE)
-  gstTreatment       GstTreatment? @default(INTRA_STATE)
-  cgstAmount         Decimal? @default(0) @db.Decimal(12, 2)
-  sgstAmount         Decimal? @default(0) @db.Decimal(12, 2)
-  igstAmount         Decimal? @default(0) @db.Decimal(12, 2)
-  finalAmount        Decimal  @default(0) @db.Decimal(12, 2)
-  hotelNotes         String?
-  vehicleNotes       String?
-  activityNotes      String?
-  inclusions         String[] @default([])
-  exclusions         String[] @default([])
-  sortOrder          Int      @default(0)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  quotation            Quotation   @relation("QuotationPackageOptions", fields: [quotationId], references: [id], onDelete: Cascade)
-  selectedByQuotations Quotation[] @relation("QuotationSelectedOption")
-
-  @@unique([quotationId, name])
-  @@index([quotationId])
-  @@index([quotationId, sortOrder])
-  @@map("quotation_package_options")
 }
 
 // ═════════════════════════════════════════════════════════════════════

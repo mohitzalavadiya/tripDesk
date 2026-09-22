@@ -44,15 +44,15 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { activityClient } from "@/lib/api-client";
-import { Activity } from "@prisma/client";
+import { activityClient, ActivityWithRelations } from "@/lib/api-client";
 import { toast } from "sonner";
+import { Compass } from "lucide-react";
 
 export default function ActivitiesPage() {
   const router = useRouter();
 
   // Data states
-  const [activities, setActivities] = React.useState<Activity[]>([]);
+  const [activities, setActivities] = React.useState<ActivityWithRelations[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
@@ -284,7 +284,8 @@ export default function ActivitiesPage() {
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">
-                      <TableHead className="py-3 px-4 font-bold text-slate-600 w-[300px]">Activity & Type</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600 w-[260px]">Activity & Type</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">Destination</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Location</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Duration</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Pricing Tariff</TableHead>
@@ -310,6 +311,17 @@ export default function ActivitiesPage() {
                               <span className="text-[10px] text-slate-500">{act.type}</span>
                             </div>
                           </div>
+                        </TableCell>
+
+                        <TableCell className="py-3.5 px-4">
+                          {act.destination ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md">
+                              <Compass className="h-3 w-3 text-emerald-600 shrink-0" />
+                              <span className="truncate max-w-[130px]">{act.destination.name}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs">-</span>
+                          )}
                         </TableCell>
 
                         <TableCell className="py-3.5 px-4">
@@ -396,11 +408,19 @@ export default function ActivitiesPage() {
                         <h4 className="font-bold text-slate-900 text-xs">{act.name}</h4>
                         <p className="text-[11px] text-slate-500">{act.type} • {act.duration || "Half Day"}</p>
                       </div>
-                      {act.adultPrice !== null && (
-                        <Badge variant="outline" className="text-[10px] bg-slate-50">
-                          ₹{Number(act.adultPrice)}
-                        </Badge>
-                      )}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {act.destination && (
+                          <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 flex items-center font-medium">
+                            <Compass className="h-2.5 w-2.5" />
+                            {act.destination.name}
+                          </Badge>
+                        )}
+                        {act.adultPrice !== null && (
+                          <Badge variant="outline" className="text-[10px] bg-slate-50">
+                            ₹{Number(act.adultPrice)}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

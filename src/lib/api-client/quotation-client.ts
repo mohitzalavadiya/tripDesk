@@ -3,7 +3,6 @@ import {
   QuotationItem,
   QuotationProposalItem,
   QuotationPaymentMilestone,
-  QuotationPackageOption,
   ProposalItemType,
 } from "@prisma/client";
 import {
@@ -29,11 +28,6 @@ import {
   GeneratePaymentScheduleInput,
 } from "@/lib/validation/payment-milestone-schema";
 import {
-  CreatePackageOptionInput,
-  UpdatePackageOptionInput,
-  ReorderPackageOptionsInput,
-} from "@/lib/validation/package-option-schema";
-import {
   PaginatedResponse,
   SingleResponse,
   ApiClientError,
@@ -54,6 +48,14 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 export type QuotationWithRelations = Quotation & {
+  agency?: {
+    id: string;
+    name: string;
+    phone: string;
+    email: string;
+    logo?: string | null;
+    address?: string | null;
+  } | null;
   customer: {
     id: string;
     name: string;
@@ -72,6 +74,17 @@ export type QuotationWithRelations = Quotation & {
       name: string;
       type: string;
     }>;
+    tripDestinations?: Array<{
+      id: string;
+      sequence: number;
+      destination: {
+        id: string;
+        name: string;
+        cityArea?: string | null;
+        state?: string | null;
+        country?: string | null;
+      };
+    }>;
     itineraryItems: Array<{
       id: string;
       dayNumber: number;
@@ -83,12 +96,51 @@ export type QuotationWithRelations = Quotation & {
       endTime?: string | null;
       sortOrder: number;
     }>;
+    tripHotels?: Array<{
+      id: string;
+      checkIn: Date | string;
+      checkOut: Date | string;
+      roomType: string;
+      mealPlan?: string | null;
+      rooms: number;
+      notes?: string | null;
+      hotel?: {
+        id: string;
+        name: string;
+        city?: string | null;
+        category?: string | null;
+      } | null;
+    }>;
+    tripVehicles?: Array<{
+      id: string;
+      vehicleName: string;
+      vehicleType?: string | null;
+      startDate?: Date | string | null;
+      endDate?: Date | string | null;
+      notes?: string | null;
+      vehicle?: {
+        id: string;
+        name: string;
+        type: string;
+        capacity?: number | null;
+      } | null;
+    }>;
+    tripActivities?: Array<{
+      id: string;
+      name: string;
+      date?: Date | string | null;
+      description?: string | null;
+      notes?: string | null;
+      activity?: {
+        id: string;
+        name: string;
+        location?: string | null;
+      } | null;
+    }>;
   };
   items: QuotationItem[];
   proposalItems: QuotationProposalItem[];
   paymentMilestones: QuotationPaymentMilestone[];
-  packageOptions: QuotationPackageOption[];
-  selectedPackageOption?: QuotationPackageOption | null;
 };
 
 export interface HotelCostItem {
@@ -167,32 +219,7 @@ export interface PublicPaymentMilestone {
   title: string;
   description?: string | null;
   percentage?: number | null;
-  amount?: number | null;
   dueDate?: string | null;
-  sortOrder: number;
-}
-
-export interface PublicPackageOption {
-  id: string;
-  name: string;
-  subtitle?: string | null;
-  description?: string | null;
-  isRecommended: boolean;
-  discountAmount?: number;
-  taxableAmount?: number;
-  taxRate?: number;
-  taxMode?: string;
-  gstTreatment?: string;
-  cgstAmount?: number;
-  sgstAmount?: number;
-  igstAmount?: number;
-  taxAmount?: number;
-  finalAmount: number;
-  hotelNotes?: string | null;
-  vehicleNotes?: string | null;
-  activityNotes?: string | null;
-  inclusions: string[];
-  exclusions: string[];
   sortOrder: number;
 }
 
@@ -204,19 +231,10 @@ export interface PublicQuotationPayload {
   proposalSubtitle?: string | null;
   status: string;
   currency: string;
+  tier: string;
   validUntil?: string | null;
   isExpired: boolean;
-  discountAmount: number;
-  taxableAmount?: number;
-  taxRate?: number;
-  taxMode?: string;
-  gstTreatment?: string;
-  cgstAmount?: number;
-  sgstAmount?: number;
-  igstAmount?: number;
-  taxAmount: number;
   finalAmount: number;
-  selectedPackageOptionId?: string | null;
   customerMessage?: string | null;
   inclusionsIntro?: string | null;
   exclusionsIntro?: string | null;
@@ -246,6 +264,17 @@ export interface PublicQuotationPayload {
     startDate: string;
     endDate: string;
     travelers: Array<{ id: string; name: string; type: string }>;
+    tripDestinations?: Array<{
+      id: string;
+      sequence: number;
+      destination: {
+        id: string;
+        name: string;
+        cityArea?: string | null;
+        state?: string | null;
+        country?: string | null;
+      };
+    }>;
     itineraryItems: Array<{
       id: string;
       dayNumber: number;
@@ -257,6 +286,47 @@ export interface PublicQuotationPayload {
       endTime?: string | null;
       sortOrder: number;
     }>;
+    tripHotels?: Array<{
+      id: string;
+      checkIn: string | Date;
+      checkOut: string | Date;
+      roomType: string;
+      mealPlan?: string | null;
+      rooms: number;
+      notes?: string | null;
+      hotel?: {
+        id: string;
+        name: string;
+        city?: string | null;
+        category?: string | null;
+      } | null;
+    }>;
+    tripVehicles?: Array<{
+      id: string;
+      vehicleName: string;
+      vehicleType?: string | null;
+      startDate?: string | Date | null;
+      endDate?: string | Date | null;
+      notes?: string | null;
+      vehicle?: {
+        id: string;
+        name: string;
+        type: string;
+        capacity?: number | null;
+      } | null;
+    }>;
+    tripActivities?: Array<{
+      id: string;
+      name: string;
+      date?: string | Date | null;
+      description?: string | null;
+      notes?: string | null;
+      activity?: {
+        id: string;
+        name: string;
+        location?: string | null;
+      } | null;
+    }>;
   };
   items: Array<{
     id: string;
@@ -266,14 +336,10 @@ export interface PublicQuotationPayload {
     description?: string | null;
     quantity: number;
     unit?: string | null;
-    unitPrice: number;
-    totalPrice: number;
     sortOrder: number;
   }>;
   proposalItems: PublicProposalItem[];
   paymentMilestones: PublicPaymentMilestone[];
-  packageOptions: PublicPackageOption[];
-  selectedPackageOption?: PublicPackageOption | null;
   createdAt: string;
 }
 
@@ -594,117 +660,7 @@ export const quotationClient = {
     return handleResponse<SingleResponse<QuotationPaymentMilestone[]>>(res);
   },
 
-  // ──────────────────────── PACKAGE OPTIONS (PHASE 10.11B) ─────────────────────────
 
-  /**
-   * List package options
-   */
-  async getPackageOptions(
-    quotationId: string
-  ): Promise<SingleResponse<QuotationPackageOption[]>> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-    });
-
-    return handleResponse<SingleResponse<QuotationPackageOption[]>>(res);
-  },
-
-  /**
-   * Create package option
-   */
-  async createPackageOption(
-    quotationId: string,
-    data: CreatePackageOptionInput
-  ): Promise<SingleResponse<QuotationPackageOption>> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    return handleResponse<SingleResponse<QuotationPackageOption>>(res);
-  },
-
-  /**
-   * Update package option
-   */
-  async updatePackageOption(
-    quotationId: string,
-    optionId: string,
-    data: UpdatePackageOptionInput
-  ): Promise<SingleResponse<QuotationPackageOption>> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options/${encodeURIComponent(optionId)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    return handleResponse<SingleResponse<QuotationPackageOption>>(res);
-  },
-
-  /**
-   * Delete package option
-   */
-  async deletePackageOption(
-    quotationId: string,
-    optionId: string
-  ): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options/${encodeURIComponent(optionId)}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-    });
-
-    return handleResponse<{ success: boolean; message: string }>(res);
-  },
-
-  /**
-   * Reorder package options
-   */
-  async reorderPackageOptions(
-    quotationId: string,
-    data: ReorderPackageOptionsInput
-  ): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options/reorder`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    return handleResponse<{ success: boolean; message: string }>(res);
-  },
-
-  /**
-   * Select package option on quotation (Agency side)
-   */
-  async selectPackageOption(
-    quotationId: string,
-    optionId: string
-  ): Promise<SingleResponse<QuotationWithRelations>> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options/select`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ optionId }),
-    });
-
-    return handleResponse<SingleResponse<QuotationWithRelations>>(res);
-  },
-
-  /**
-   * Generate 3 default package tiers (Standard, Deluxe, Luxury)
-   */
-  async generateDefaultPackageTiers(
-    quotationId: string
-  ): Promise<SingleResponse<QuotationPackageOption[]>> {
-    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/package-options/generate-default`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-
-    return handleResponse<SingleResponse<QuotationPackageOption[]>>(res);
-  },
 
   // ──────────────────────── TRIP INTEGRATION ─────────────────────────
 
@@ -766,35 +722,19 @@ export const quotationClient = {
   },
 
   /**
-   * Public Action: Select Package Option (Customer)
-   */
-  async selectPublicPackageOption(
-    token: string,
-    optionId: string
-  ): Promise<{ success: boolean; message: string; selectedPackageOptionId: string; finalAmount: number }> {
-    const res = await fetch(`/api/quotations/public/${encodeURIComponent(token)}/select-option`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ optionId }),
-    });
-
-    return handleResponse<{ success: boolean; message: string; selectedPackageOptionId: string; finalAmount: number }>(res);
-  },
-
-  /**
    * Public Action: Accept Quotation
    */
   async acceptPublicQuotation(
     token: string,
     data?: AcceptQuotationInput
-  ): Promise<{ success: boolean; message: string; quotationId: string; selectedPackageOptionId?: string; finalAmount?: number }> {
+  ): Promise<{ success: boolean; message: string; quotationId: string; finalAmount?: number }> {
     const res = await fetch(`/api/quotations/public/${encodeURIComponent(token)}/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data || {}),
     });
 
-    return handleResponse<{ success: boolean; message: string; quotationId: string; selectedPackageOptionId?: string; finalAmount?: number }>(res);
+    return handleResponse<{ success: boolean; message: string; quotationId: string; finalAmount?: number }>(res);
   },
 
   /**

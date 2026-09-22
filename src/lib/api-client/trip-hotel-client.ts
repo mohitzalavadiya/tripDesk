@@ -1,4 +1,4 @@
-import { TripHotel, Hotel } from "@prisma/client";
+import { TripHotel, Hotel, TripDestination, Destination } from "@prisma/client";
 import {
   CreateTripHotelInput,
   UpdateTripHotelInput,
@@ -7,6 +7,7 @@ import { SingleResponse, ApiClientError } from "./customer-client";
 
 export interface TripHotelWithHotel extends TripHotel {
   hotel: Hotel;
+  tripDestination?: (TripDestination & { destination: Destination }) | null;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {

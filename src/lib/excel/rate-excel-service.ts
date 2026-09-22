@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import prisma from "@/lib/prisma";
 import { rateSheetService } from "@/lib/services/rate-sheet-service";
 import { ImportMode } from "./hotel-excel-service";
+import { ValidationError } from "@/lib/api";
 
 export interface RatePreviewRow {
   rowNumber: number;
@@ -380,14 +381,14 @@ export const rateExcelService = {
     }
 
     if (!sheetName) {
-      throw new Error("Workbook contains no readable sheets.");
+      throw new ValidationError("Workbook contains no readable sheets.");
     }
 
     const ws = wb.Sheets[sheetName];
     const rawRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
     if (!rawRows || rawRows.length === 0) {
-      throw new Error("The selected sheet is completely empty.");
+      throw new ValidationError("The selected sheet is completely empty.");
     }
 
     const headerRow = rawRows[0].map((h: any) => String(h).trim());
@@ -419,18 +420,18 @@ export const rateExcelService = {
       if (validToIdx === -1) missing.push("'Valid To'");
       if (costPriceIdx === -1) missing.push("'Cost Price'");
 
-      throw new Error(
+      throw new ValidationError(
         `Invalid template headers. Missing required column(s): ${missing.join(", ")}. Please download and use the official sample template.`
       );
     }
 
     const dataRows = rawRows.slice(1);
     if (dataRows.length === 0) {
-      throw new Error("The Excel file contains no rate data rows to import.");
+      throw new ValidationError("The Excel file contains no rate data rows to import.");
     }
 
     if (dataRows.length > 1000) {
-      throw new Error("The Excel file exceeds the maximum allowed limit of 1,000 data rows.");
+      throw new ValidationError("The Excel file exceeds the maximum allowed limit of 1,000 data rows.");
     }
 
     // Preload agency's hotels strictly scoped to authenticated agency
@@ -729,7 +730,7 @@ export const rateExcelService = {
 
     const validRows = preview.rows.filter((r) => r.status !== "ERROR" && r.status !== "REJECT");
     if (validRows.length === 0) {
-      throw new Error("No valid rows available to import.");
+      throw new ValidationError("No valid rows available to import.");
     }
 
     let imported = 0;

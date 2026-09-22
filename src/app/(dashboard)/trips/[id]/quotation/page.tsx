@@ -84,7 +84,6 @@ import {
   ProposalItemType,
   QuotationProposalItem,
   QuotationPaymentMilestone,
-  QuotationPackageOption,
   TaxMode,
   GstTreatment,
 } from "@prisma/client";
@@ -93,7 +92,7 @@ import { formatEnumLabel } from "@/lib/utils/enum-formatters";
 import { toast } from "sonner";
 import { QuotationStatusBadge } from "@/app/(dashboard)/quotations/page";
 
-type ActiveTabType = "pricing" | "packages" | "inclusions" | "milestones" | "policies";
+type ActiveTabType = "pricing" | "inclusions" | "milestones" | "policies";
 
 export default function TripQuotationEditorPage() {
   const params = useParams();
@@ -142,26 +141,7 @@ export default function TripQuotationEditorPage() {
   const [itemCostPrice, setItemCostPrice] = React.useState("");
   const [itemSaving, setItemSaving] = React.useState(false);
 
-  // Package Option Modal states
-  const [isPackageModalOpen, setIsPackageModalOpen] = React.useState(false);
-  const [editingPackage, setEditingPackage] = React.useState<QuotationPackageOption | null>(null);
-  const [pkgName, setPkgName] = React.useState("");
-  const [pkgSubtitle, setPkgSubtitle] = React.useState("");
-  const [pkgDescription, setPkgDescription] = React.useState("");
-  const [pkgIsRecommended, setPkgIsRecommended] = React.useState(false);
-  const [pkgSubtotal, setPkgSubtotal] = React.useState("");
-  const [pkgMarkupPct, setPkgMarkupPct] = React.useState("10");
-  const [pkgDiscountPct, setPkgDiscountPct] = React.useState("0");
-  const [pkgTaxRate, setPkgTaxRate] = React.useState("5");
-  const [pkgTaxMode, setPkgTaxMode] = React.useState<TaxMode>(TaxMode.EXCLUSIVE);
-  const [pkgGstTreatment, setPkgGstTreatment] = React.useState<GstTreatment>(GstTreatment.INTRA_STATE);
-  const [pkgFinalAmount, setPkgFinalAmount] = React.useState("");
-  const [pkgHotelNotes, setPkgHotelNotes] = React.useState("");
-  const [pkgVehicleNotes, setPkgVehicleNotes] = React.useState("");
-  const [pkgActivityNotes, setPkgActivityNotes] = React.useState("");
-  const [pkgInclusionsText, setPkgInclusionsText] = React.useState("");
-  const [pkgExclusionsText, setPkgExclusionsText] = React.useState("");
-  const [packageSaving, setPackageSaving] = React.useState(false);
+
 
   // Proposal Item (Inclusion/Exclusion) Modal states
   const [isProposalItemModalOpen, setIsProposalItemModalOpen] = React.useState(false);
@@ -375,16 +355,16 @@ export default function TripQuotationEditorPage() {
     try {
       setItemSaving(true);
       const qty = Number(itemQuantity) || 1;
-      const uPrice = Number(itemUnitPrice) || 0;
-      const cPrice = Number(itemCostPrice) || uPrice * qty;
+      const rateSheetRate = Number(itemUnitPrice) || 0;
+      const lineBase = Math.round(rateSheetRate * qty);
 
       const res = await quotationClient.createQuotationItem(activeQuote.id, {
         type: itemType,
         name: itemName,
         description: itemDescription || undefined,
         quantity: qty,
-        unitPrice: uPrice,
-        costPrice: cPrice,
+        unitPrice: rateSheetRate,
+        costPrice: lineBase,
       });
 
       if (res.success) {
@@ -405,7 +385,14 @@ export default function TripQuotationEditorPage() {
     setItemName(item.name);
     setItemDescription(item.description || "");
     setItemQuantity(item.quantity);
-    setItemUnitPrice(String(item.unitPrice));
+    const rateSheetRate = Number(
+      item.unitPrice && Number(item.unitPrice) > 0
+        ? item.unitPrice
+        : item.quantity > 0
+        ? Math.round(Number(item.costPrice) / item.quantity)
+        : item.costPrice
+    );
+    setItemUnitPrice(String(rateSheetRate));
     setItemCostPrice(String(item.costPrice));
     setIsEditItemOpen(true);
   };
@@ -417,16 +404,23 @@ export default function TripQuotationEditorPage() {
     try {
       setItemSaving(true);
       const qty = Number(itemQuantity) || 1;
-      const uPrice = Number(itemUnitPrice) || 0;
-      const cPrice = Number(itemCostPrice) || uPrice * qty;
+      // RateSheet Rate is fixed and read-only
+      const rateSheetRate = Number(
+        editingItem.unitPrice && Number(editingItem.unitPrice) > 0
+          ? editingItem.unitPrice
+          : editingItem.quantity > 0
+          ? Math.round(Number(editingItem.costPrice) / editingItem.quantity)
+          : editingItem.costPrice
+      );
+      const lineBase = Math.round(rateSheetRate * qty);
 
       const res = await quotationClient.updateQuotationItem(activeQuote.id, editingItem.id, {
         type: itemType,
         name: itemName,
         description: itemDescription || null,
         quantity: qty,
-        unitPrice: uPrice,
-        costPrice: cPrice,
+        unitPrice: rateSheetRate,
+        costPrice: lineBase,
       });
 
       if (res.success) {
@@ -462,160 +456,17 @@ export default function TripQuotationEditorPage() {
     });
   };
 
-  // Package Option Handlers
-  const handleOpenAddPackage = () => {
-    setEditingPackage(null);
-    setPkgName("");
-    setPkgSubtitle("");
-    setPkgDescription("");
-    setPkgIsRecommended(false);
-    setPkgSubtotal(activeQuote ? String(activeQuote.subtotal) : "30000");
-    setPkgMarkupPct(activeQuote ? String(activeQuote.markupPercentage) : "10");
-    setPkgDiscountPct("0");
-    setPkgTaxRate(activeQuote ? String(Number(activeQuote.taxRate ?? activeQuote.taxPercentage ?? 5)) : "5");
-    setPkgTaxMode(activeQuote?.taxMode || TaxMode.EXCLUSIVE);
-    setPkgGstTreatment(activeQuote?.gstTreatment || GstTreatment.INTRA_STATE);
-    setPkgFinalAmount("");
-    setPkgHotelNotes("");
-    setPkgVehicleNotes("");
-    setPkgActivityNotes("");
-    setPkgInclusionsText("");
-    setPkgExclusionsText("");
-    setIsPackageModalOpen(true);
-  };
-
-  const handleOpenEditPackage = (pkg: QuotationPackageOption) => {
-    setEditingPackage(pkg);
-    setPkgName(pkg.name);
-    setPkgSubtitle(pkg.subtitle || "");
-    setPkgDescription(pkg.description || "");
-    setPkgIsRecommended(pkg.isRecommended);
-    setPkgSubtotal(String(pkg.subtotal));
-    setPkgMarkupPct(String(pkg.markupPercentage));
-    setPkgDiscountPct(String(pkg.discountPercentage));
-    setPkgTaxRate(String(Number(pkg.taxRate ?? pkg.taxPercentage ?? 5)));
-    setPkgTaxMode(pkg.taxMode || TaxMode.EXCLUSIVE);
-    setPkgGstTreatment(pkg.gstTreatment || GstTreatment.INTRA_STATE);
-    setPkgFinalAmount(String(pkg.finalAmount));
-    setPkgHotelNotes(pkg.hotelNotes || "");
-    setPkgVehicleNotes(pkg.vehicleNotes || "");
-    setPkgActivityNotes(pkg.activityNotes || "");
-    setPkgInclusionsText(pkg.inclusions.join("\n"));
-    setPkgExclusionsText(pkg.exclusions.join("\n"));
-    setIsPackageModalOpen(true);
-  };
-
-  const handleSavePackage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeQuote || !pkgName || isReadOnly) return;
-
+  // Quotation Tier Change Handler
+  const handleTierChange = async (newTier: string) => {
+    if (!activeQuote || isReadOnly) return;
     try {
-      setPackageSaving(true);
-      const sub = Number(pkgSubtotal) || 0;
-      const mkp = Number(pkgMarkupPct) || 0;
-      const dsc = Number(pkgDiscountPct) || 0;
-      const taxRateNum = Number(pkgTaxRate) || 0;
-      const fin = pkgFinalAmount ? Number(pkgFinalAmount) : undefined;
-
-      const incs = pkgInclusionsText
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const excs = pkgExclusionsText
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      if (editingPackage) {
-        await quotationClient.updatePackageOption(activeQuote.id, editingPackage.id, {
-          name: pkgName,
-          subtitle: pkgSubtitle || null,
-          description: pkgDescription || null,
-          isRecommended: pkgIsRecommended,
-          subtotal: sub,
-          markupPercentage: mkp,
-          discountPercentage: dsc,
-          taxPercentage: taxRateNum,
-          taxRate: taxRateNum,
-          taxMode: pkgTaxMode,
-          gstTreatment: pkgGstTreatment,
-          finalAmount: fin,
-          hotelNotes: pkgHotelNotes || null,
-          vehicleNotes: pkgVehicleNotes || null,
-          activityNotes: pkgActivityNotes || null,
-          inclusions: incs,
-          exclusions: excs,
-        });
-        toast.success("Package option updated.");
-      } else {
-        await quotationClient.createPackageOption(activeQuote.id, {
-          name: pkgName,
-          subtitle: pkgSubtitle || null,
-          description: pkgDescription || null,
-          isRecommended: pkgIsRecommended,
-          subtotal: sub,
-          markupPercentage: mkp,
-          discountPercentage: dsc,
-          taxPercentage: taxRateNum,
-          taxRate: taxRateNum,
-          taxMode: pkgTaxMode,
-          gstTreatment: pkgGstTreatment,
-          finalAmount: fin,
-          hotelNotes: pkgHotelNotes || null,
-          vehicleNotes: pkgVehicleNotes || null,
-          activityNotes: pkgActivityNotes || null,
-          inclusions: incs,
-          exclusions: excs,
-        });
-        toast.success("Package option created.");
+      const res = await quotationClient.updateQuotation(activeQuote.id, { tier: newTier as any });
+      if (res.success && res.data) {
+        toast.success(`Quotation tier set to ${newTier}`);
+        setQuotations((prev) => prev.map((q) => (q.id === activeQuote.id ? res.data! : q)));
       }
-      setIsPackageModalOpen(false);
-      await fetchTripQuotationData();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to save package option.");
-    } finally {
-      setPackageSaving(false);
-    }
-  };
-
-  const handleDeletePackage = (optionId: string, name: string) => {
-    if (!activeQuote || isReadOnly) return;
-    setConfirmAction({
-      title: "Delete package tier?",
-      description: `Delete package tier "${name}"? This option will no longer be available to the client.`,
-      confirmText: "Delete Package Tier",
-      variant: "destructive",
-      action: async () => {
-        try {
-          await quotationClient.deletePackageOption(activeQuote.id, optionId);
-          toast.success("Package tier deleted.");
-          await fetchTripQuotationData();
-        } catch (err: any) {
-          toast.error(getErrorMessage(err, "Failed to delete package tier. Please try again."));
-        }
-      },
-    });
-  };
-
-  const handleSelectPackageOption = async (optionId: string) => {
-    if (!activeQuote || isReadOnly) return;
-    try {
-      await quotationClient.selectPackageOption(activeQuote.id, optionId);
-      toast.success("Selected package tier updated.");
-      await fetchTripQuotationData();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to select package option.");
-    }
-  };
-
-  const handleGenerateDefaultPackageTiers = async () => {
-    if (!activeQuote || isReadOnly) return;
-    try {
-      await quotationClient.generateDefaultPackageTiers(activeQuote.id);
-      toast.success("3 Standard package tiers generated (Standard, Deluxe, Luxury)!");
-      await fetchTripQuotationData();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to generate default package tiers.");
+      toast.error(err?.message || "Failed to update quotation tier.");
     }
   };
 
@@ -808,7 +659,6 @@ export default function TripQuotationEditorPage() {
   const exclusions = activeQuote?.proposalItems?.filter((p) => p.type === ProposalItemType.EXCLUSION) || [];
   const importantNotes = activeQuote?.proposalItems?.filter((p) => p.type === ProposalItemType.IMPORTANT_NOTE) || [];
   const milestones = activeQuote?.paymentMilestones || [];
-  const packageOptions = activeQuote?.packageOptions || [];
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
@@ -941,6 +791,77 @@ export default function TripQuotationEditorPage() {
           </div>
         </div>
 
+        {/* Empty State when no quotations exist */}
+        {!activeQuote && (
+          <div className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-12 shadow-xs text-center space-y-6 animate-in fade-in duration-300">
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-2xs">
+              <Sparkles className="w-8 h-8" />
+            </div>
+
+            <div className="max-w-md mx-auto space-y-2">
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                No Quotation Proposal Created Yet
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                Generate an itemized customer proposal from this trip&apos;s itinerary, hotel stays, vehicle allocations, and live supplier rate sheets.
+              </p>
+            </div>
+
+            {/* Feature highlights grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto text-left pt-2">
+              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
+                  <DollarSign className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Costing Snapshot</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Automatic line items calculated from hotels, vehicles, and activities.
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
+                  <Package className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Tiered Packages</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Provide Standard, Deluxe, and Luxury options for traveler choice.
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
+                  <CreditCard className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Payment Schedule</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Multi-stage milestones dynamically synchronized to proposal total.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                onClick={handleGenerate}
+                disabled={generating || isReadOnly}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-6 rounded-xl shadow-xs gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generating Proposal...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Generate Initial Proposal
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Customer Feedback Banner if changes requested */}
         {activeQuote?.customerFeedback && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
@@ -972,17 +893,6 @@ export default function TripQuotationEditorPage() {
             >
               <DollarSign className="h-4 w-4" />
               Costing & Pricing Snapshot
-            </button>
-            <button
-              onClick={() => setActiveTab("packages")}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
-                activeTab === "packages"
-                  ? "border-indigo-600 text-indigo-600"
-                  : "border-transparent text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              <Package className="h-4 w-4" />
-              Package Tiers & Options ({packageOptions.length})
             </button>
             <button
               onClick={() => setActiveTab("inclusions")}
@@ -1052,56 +962,69 @@ export default function TripQuotationEditorPage() {
                         <TableHead className="py-2.5 px-4 font-bold text-slate-600">Item Description</TableHead>
                         <TableHead className="py-2.5 px-4 font-bold text-slate-600">Type</TableHead>
                         <TableHead className="py-2.5 px-4 font-bold text-slate-600">Qty</TableHead>
-                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">Cost Price</TableHead>
-                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">Selling Price</TableHead>
+                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">RateSheet Rate</TableHead>
+                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">Line Base Total</TableHead>
                         <TableHead className="py-2.5 px-4 text-right font-bold text-slate-600">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {activeQuote.items.map((item) => (
-                        <TableRow key={item.id} className="border-b border-slate-100 text-xs hover:bg-slate-50/50">
-                          <TableCell className="py-3 px-4 font-semibold text-slate-900">
-                            <div>
-                              <span>{item.name}</span>
-                              {item.description && (
-                                <p className="text-[11px] font-normal text-slate-500">{item.description}</p>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3 px-4">
-                            <Badge variant="outline" className="text-[10px] font-bold">
-                              {item.type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-3 px-4 text-slate-700">
-                            {item.quantity} {item.unit || ""}
-                          </TableCell>
-                          <TableCell className="py-3 px-4 text-slate-500 font-mono">
-                            {formatCurrency(Number(item.costPrice))}
-                          </TableCell>
-                          <TableCell className="py-3 px-4 font-extrabold text-slate-900">
-                            {formatCurrency(Number(item.totalPrice))}
-                          </TableCell>
-                          <TableCell className="py-3 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => handleOpenEditItem(item)}
-                                disabled={isReadOnly}
-                                className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer disabled:opacity-50"
-                              >
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteItem(item.id, item.name)}
-                                disabled={isReadOnly}
-                                className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer disabled:opacity-50"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {activeQuote.items.map((item) => {
+                        const rateSheetRate = Number(
+                          item.unitPrice && Number(item.unitPrice) > 0
+                            ? item.unitPrice
+                            : item.quantity > 0
+                            ? Math.round(Number(item.costPrice) / item.quantity)
+                            : item.costPrice
+                        );
+                        const lineBase = Number(item.costPrice || rateSheetRate * item.quantity);
+
+                        return (
+                          <TableRow key={item.id} className="border-b border-slate-100 text-xs hover:bg-slate-50/50">
+                            <TableCell className="py-3 px-4 font-semibold text-slate-900">
+                              <div>
+                                <span>{item.name}</span>
+                                {item.description && (
+                                  <p className="text-[11px] font-normal text-slate-500">{item.description}</p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-3 px-4">
+                              <Badge variant="outline" className="text-[10px] font-bold">
+                                {item.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-3 px-4 text-slate-700">
+                              {item.quantity} {item.unit || ""}
+                            </TableCell>
+                            <TableCell className="py-3 px-4 text-slate-700 font-mono font-semibold">
+                              {formatCurrency(rateSheetRate)}
+                            </TableCell>
+                            <TableCell className="py-3 px-4 font-extrabold text-slate-900">
+                              {formatCurrency(lineBase)}
+                            </TableCell>
+                            <TableCell className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => handleOpenEditItem(item)}
+                                  disabled={isReadOnly}
+                                  className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer disabled:opacity-50"
+                                  title="Edit item quantity / description"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteItem(item.id, item.name)}
+                                  disabled={isReadOnly}
+                                  className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer disabled:opacity-50"
+                                  title="Remove item"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -1129,19 +1052,32 @@ export default function TripQuotationEditorPage() {
                   </div>
                 )}
 
-                {/* Selected Package Option notice */}
-                {activeQuote.selectedPackageOption && (
-                  <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Active Package Tier</span>
-                      {activeQuote.selectedPackageOption.isRecommended && (
-                        <Badge className="bg-amber-500 text-white text-[9px] h-4">Recommended</Badge>
-                      )}
-                    </div>
-                    <div className="font-bold text-slate-900 text-xs">{activeQuote.selectedPackageOption.name}</div>
-                    <div className="text-xs font-black text-indigo-700">{formatCurrency(Number(activeQuote.selectedPackageOption.finalAmount))}</div>
+                {/* Quotation Tier Selector */}
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-700">Tier</label>
+                    <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-600 border-slate-200">
+                      Naming Suffix
+                    </Badge>
                   </div>
-                )}
+                  <Select
+                    disabled={isReadOnly}
+                    value={activeQuote.tier || "Deluxe"}
+                    onValueChange={(val) => val && handleTierChange(val)}
+                  >
+                    <SelectTrigger className="h-9 text-xs bg-slate-50 border-slate-200 font-semibold">
+                      <SelectValue placeholder="Select Tier" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-slate-200">
+                      <SelectItem value="Deluxe">Deluxe</SelectItem>
+                      <SelectItem value="Ultra Deluxe">Ultra Deluxe</SelectItem>
+                      <SelectItem value="Premium">Premium</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-slate-400">
+                    Sets the quotation tier and updates the proposal title. Does not affect pricing or service selections.
+                  </p>
+                </div>
 
                 {/* Status Selector */}
                 <div className="space-y-1.5 text-xs">
@@ -1167,7 +1103,7 @@ export default function TripQuotationEditorPage() {
                 {/* Pricing Fields & Commercial Base */}
                 <div className={`space-y-3 pt-2 text-xs border-t border-slate-100 transition-opacity duration-200 ${updatingPricing ? "opacity-60" : "opacity-100"}`}>
                   <div className="flex justify-between text-slate-600">
-                    <span>Base Supplier Cost:</span>
+                    <span>RateSheet Base Subtotal:</span>
                     <strong className="text-slate-900">{formatCurrency(Number(activeQuote.subtotal))}</strong>
                   </div>
 
@@ -1184,14 +1120,14 @@ export default function TripQuotationEditorPage() {
                         className="h-7 w-16 text-right text-xs bg-slate-50 font-bold"
                       />
                       <span className="text-slate-500 font-bold">%</span>
-                      <strong className="text-slate-900 min-w-[70px] text-right">
-                        +{formatCurrency(Number(activeQuote.markupAmount))}
+                      <strong className={`min-w-[70px] text-right ${Number(activeQuote.markupAmount) < 0 ? "text-rose-600 font-semibold" : "text-slate-900"}`}>
+                        {Number(activeQuote.markupAmount) >= 0 ? `+${formatCurrency(Number(activeQuote.markupAmount))}` : formatCurrency(Number(activeQuote.markupAmount))}
                       </strong>
                     </div>
                   </div>
 
                   <div className="flex justify-between text-slate-600 font-medium">
-                    <span>Selling Price (Base):</span>
+                    <span>Gross Package Amount:</span>
                     <strong className="text-slate-900">
                       {formatCurrency(Number(activeQuote.subtotal) + Number(activeQuote.markupAmount))}
                     </strong>
@@ -1416,174 +1352,7 @@ export default function TripQuotationEditorPage() {
           </div>
         )}
 
-        {/* ─── TAB 2: PACKAGE TIERS & OPTIONS ─── */}
-        {activeQuote && activeTab === "packages" && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 flex-wrap gap-3">
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">Tiered Proposal Packages (Standard / Deluxe / Luxury)</h3>
-                <p className="text-xs text-slate-500">
-                  Offer 2–3 tiered packages with independent hotel categories, vehicle types, inclusions and selling prices.
-                </p>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleGenerateDefaultPackageTiers}
-                  className="h-8.5 text-xs font-semibold bg-slate-50 hover:bg-slate-100 border-slate-200"
-                >
-                  <Sparkles className="h-3.5 w-3.5 mr-1 text-indigo-600" />
-                  Auto-Generate 3 Tiers
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleOpenAddPackage}
-                  className="h-8.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Custom Package Tier
-                </Button>
-              </div>
-            </div>
-
-            {packageOptions.length === 0 ? (
-              <div className="text-center py-12 space-y-3">
-                <Package className="h-10 w-10 text-slate-300 mx-auto" />
-                <p className="text-xs text-slate-500">No package options created for this proposal yet.</p>
-                <Button size="sm" onClick={handleGenerateDefaultPackageTiers} className="text-xs">
-                  Generate Standard, Deluxe & Luxury Tiers
-                </Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {packageOptions.map((opt) => {
-                  const isSelected = activeQuote.selectedPackageOptionId === opt.id;
-
-                  return (
-                    <div
-                      key={opt.id}
-                      className={`p-5 rounded-3xl border transition-all flex flex-col justify-between space-y-4 relative ${
-                        opt.isRecommended
-                          ? "bg-gradient-to-b from-indigo-50/50 to-white border-indigo-300 shadow-md ring-2 ring-indigo-500/20"
-                          : "bg-white border-slate-200 shadow-xs hover:border-slate-300"
-                      }`}
-                    >
-                      {/* Badges */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          {opt.isRecommended && (
-                            <Badge className="bg-indigo-600 text-white text-[10px] font-bold h-5 px-2 gap-1 rounded-md shadow-2xs">
-                              <Star className="h-3 w-3 fill-amber-300 text-amber-300" />
-                              Recommended
-                            </Badge>
-                          )}
-                          {isSelected && (
-                            <Badge className="bg-emerald-600 text-white text-[10px] font-bold h-5 px-2 rounded-md">
-                              Active Tier
-                            </Badge>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleOpenEditPackage(opt)}
-                            className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeletePackage(opt.id, opt.name)}
-                            className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Package Header */}
-                      <div className="space-y-1">
-                        <h4 className="font-extrabold text-slate-900 text-base">{opt.name}</h4>
-                        {opt.subtitle && <p className="text-xs text-indigo-700 font-semibold">{opt.subtitle}</p>}
-                        {opt.description && <p className="text-[11px] text-slate-500 leading-relaxed">{opt.description}</p>}
-                      </div>
-
-                      {/* Price Section */}
-                      <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1 text-center">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Selling Price</span>
-                          <Badge
-                            variant="secondary"
-                            className="text-[9px] h-4 px-1.5 font-bold uppercase bg-indigo-50 text-indigo-700 border-indigo-200"
-                          >
-                            {Number(opt.taxRate ?? opt.taxPercentage ?? 0)}% GST • {opt.taxMode === TaxMode.INCLUSIVE ? "Incl." : "Excl."}
-                          </Badge>
-                        </div>
-                        <div className="text-2xl font-black text-indigo-600 tracking-tight">
-                          {formatCurrency(Number(opt.finalAmount))}
-                        </div>
-                        {Number(opt.taxAmount ?? 0) > 0 && (
-                          <div className="text-[10px] text-slate-500 pt-0.5 flex items-center justify-center gap-1.5 flex-wrap">
-                            <span>Taxable: {formatCurrency(Number(opt.taxableAmount ?? opt.subtotal))}</span>
-                            <span>•</span>
-                            <span>GST: {formatCurrency(Number(opt.taxAmount))}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Highlights */}
-                      <div className="space-y-2 text-xs">
-                        {opt.hotelNotes && (
-                          <div className="flex items-start gap-2 text-slate-700">
-                            <Building2 className="h-3.5 w-3.5 text-indigo-600 shrink-0 mt-0.5" />
-                            <span className="leading-snug">{opt.hotelNotes}</span>
-                          </div>
-                        )}
-                        {opt.vehicleNotes && (
-                          <div className="flex items-start gap-2 text-slate-700">
-                            <Car className="h-3.5 w-3.5 text-indigo-600 shrink-0 mt-0.5" />
-                            <span className="leading-snug">{opt.vehicleNotes}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Inclusions */}
-                      {opt.inclusions.length > 0 && (
-                        <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Key Inclusions</span>
-                          <ul className="space-y-1 text-[11px]">
-                            {opt.inclusions.map((inc, i) => (
-                              <li key={i} className="flex items-start gap-1.5 text-slate-700">
-                                <Check className="h-3 w-3 text-emerald-600 shrink-0 mt-0.5" />
-                                <span className="leading-tight">{inc}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Select Tier Action */}
-                      <div className="pt-3 border-t border-slate-100">
-                        <Button
-                          size="sm"
-                          variant={isSelected ? "outline" : "default"}
-                          onClick={() => handleSelectPackageOption(opt.id)}
-                          className={`w-full text-xs font-bold h-8.5 rounded-xl cursor-pointer ${
-                            isSelected
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : "bg-slate-900 hover:bg-slate-800 text-white"
-                          }`}
-                        >
-                          {isSelected ? "Active Default Tier" : "Set as Active Tier"}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* ─── TAB 3: STRUCTURED INCLUSIONS & EXCLUSIONS ─── */}
         {activeQuote && activeTab === "inclusions" && (
@@ -1877,7 +1646,9 @@ export default function TripQuotationEditorPage() {
                   {isAddItemOpen ? "Add Custom Line Item" : "Edit Line Item"}
                 </DialogTitle>
                 <DialogDescription className="text-slate-500 text-xs mt-1">
-                  Configure line item description, quantity, and pricing.
+                  {isAddItemOpen
+                    ? "Add a custom quotation line item with quantity and RateSheet unit rate."
+                    : "Update line item quantity, description, or notes. RateSheet Rate is fixed and read-only."}
                 </DialogDescription>
               </DialogHeader>
 
@@ -1895,39 +1666,60 @@ export default function TripQuotationEditorPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Quantity</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Quantity *</label>
                     <Input
                       type="number"
                       min={1}
                       value={itemQuantity}
                       onChange={(e) => setItemQuantity(Number(e.target.value) || 1)}
                       className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Selling Unit Price (₹)</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={itemUnitPrice}
-                      onChange={(e) => setItemUnitPrice(e.target.value)}
-                      placeholder="0.00"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                       required
                     />
                   </div>
+                  {isAddItemOpen ? (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">RateSheet Rate (₹) *</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={itemUnitPrice}
+                        onChange={(e) => setItemUnitPrice(e.target.value)}
+                        placeholder="0.00"
+                        className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                        required
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">RateSheet Rate (Fixed)</label>
+                      <div className="h-9 px-3 bg-slate-100 border border-slate-200 rounded-md flex items-center font-mono font-bold text-slate-800 text-xs">
+                        {formatCurrency(Number(itemUnitPrice) || 0)}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Base Cost Price (₹)</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Description / Notes</label>
                   <Input
-                    type="number"
-                    min={0}
-                    value={itemCostPrice}
-                    onChange={(e) => setItemCostPrice(e.target.value)}
-                    placeholder="Supplier rate or net cost"
+                    value={itemDescription}
+                    onChange={(e) => setItemDescription(e.target.value)}
+                    placeholder="e.g. 2 room(s), 2 night(s) stay"
                     className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                   />
+                </div>
+
+                {/* Real-time Line Base Total Calculation */}
+                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-600 font-medium">Line Item Base Amount:</span>
+                    <span className="font-mono font-black text-slate-900 text-sm">
+                      {formatCurrency(Math.round((Number(itemQuantity) || 1) * (Number(itemUnitPrice) || 0)))}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    {formatCurrency(Number(itemUnitPrice) || 0)} × {itemQuantity} {editingItem?.unit || "unit(s)"}
+                  </p>
                 </div>
               </div>
 
@@ -1952,240 +1744,7 @@ export default function TripQuotationEditorPage() {
           </DialogContent>
         </Dialog>
 
-        {/* ─── ADD / EDIT PACKAGE OPTION MODAL ─── */}
-        <Dialog open={isPackageModalOpen} onOpenChange={setIsPackageModalOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-3xl max-w-xl p-6 shadow-2xl">
-            <form onSubmit={handleSavePackage}>
-              <DialogHeader>
-                <DialogTitle className="text-slate-900 font-bold text-base">
-                  {editingPackage ? "Edit Package Tier Option" : "Add Package Tier Option"}
-                </DialogTitle>
-                <DialogDescription className="text-slate-500 text-xs mt-1">
-                  Configure package option name, subtitle, pricing breakdown, hotel notes, and inclusions.
-                </DialogDescription>
-              </DialogHeader>
 
-              <div className="space-y-4 mt-4 text-xs max-h-[65vh] overflow-y-auto pr-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Package Name *</label>
-                    <Input
-                      value={pkgName}
-                      onChange={(e) => setPkgName(e.target.value)}
-                      placeholder="e.g. Deluxe (4-Star)"
-                      className="h-9 text-xs bg-slate-50/50"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Subtitle / Tagline</label>
-                    <Input
-                      value={pkgSubtitle}
-                      onChange={(e) => setPkgSubtitle(e.target.value)}
-                      placeholder="e.g. Premium stays & upgraded SUV"
-                      className="h-9 text-xs bg-slate-50/50"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="pkgIsRecommended"
-                    checked={pkgIsRecommended}
-                    onChange={(e) => setPkgIsRecommended(e.target.checked)}
-                    className="h-4 w-4 text-indigo-600 rounded-sm"
-                  />
-                  <label htmlFor="pkgIsRecommended" className="font-bold text-slate-700 text-xs cursor-pointer">
-                    Mark as &ldquo;Recommended Package&rdquo; for this proposal
-                  </label>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Description</label>
-                  <Textarea
-                    value={pkgDescription}
-                    onChange={(e) => setPkgDescription(e.target.value)}
-                    placeholder="Short overview of what makes this tier special..."
-                    rows={2}
-                    className="text-xs bg-slate-50/50 resize-none"
-                  />
-                </div>
-
-                {/* Financials Grid */}
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
-                  <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Pricing Configuration</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Base Subtotal (₹)</label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={pkgSubtotal}
-                        onChange={(e) => setPkgSubtotal(e.target.value)}
-                        className="h-8 text-xs bg-white"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Markup (%)</label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={500}
-                        value={pkgMarkupPct}
-                        onChange={(e) => setPkgMarkupPct(e.target.value)}
-                        className="h-8 text-xs bg-white"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Discount (%)</label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={pkgDiscountPct}
-                        onChange={(e) => setPkgDiscountPct(e.target.value)}
-                        className="h-8 text-xs bg-white"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Tax V1 Package Controls */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-200/60">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">GST Rate</label>
-                      <Select
-                        value={pkgTaxRate}
-                        onValueChange={(val) => val && setPkgTaxRate(val)}
-                      >
-                        <SelectTrigger className="h-8 text-xs bg-white border-slate-200">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border-slate-200">
-                          {taxRates.map((rateItem) => (
-                            <SelectItem key={rateItem.id} value={String(rateItem.rate)}>
-                              {rateItem.name} ({rateItem.rate}%)
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Tax Mode</label>
-                      <Select
-                        value={pkgTaxMode}
-                        onValueChange={(val) => val && setPkgTaxMode(val as TaxMode)}
-                      >
-                        <SelectTrigger className="h-8 text-xs bg-white border-slate-200">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border-slate-200">
-                          <SelectItem value={TaxMode.EXCLUSIVE}>Exclusive (+GST)</SelectItem>
-                          <SelectItem value={TaxMode.INCLUSIVE}>Inclusive (Included)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">GST Treatment</label>
-                      <Select
-                        value={pkgGstTreatment}
-                        onValueChange={(val) => val && setPkgGstTreatment(val as GstTreatment)}
-                      >
-                        <SelectTrigger className="h-8 text-xs bg-white border-slate-200">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border-slate-200">
-                          <SelectItem value={GstTreatment.INTRA_STATE}>Intra-State</SelectItem>
-                          <SelectItem value={GstTreatment.INTER_STATE}>Inter-State</SelectItem>
-                          <SelectItem value={GstTreatment.NON_GST_EXEMPT}>Exempt</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 pt-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">
-                      Exact Selling Price Override (₹) — <span className="font-normal text-slate-400">Leave blank to auto-calculate</span>
-                    </label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={pkgFinalAmount}
-                      onChange={(e) => setPkgFinalAmount(e.target.value)}
-                      placeholder="Auto calculated if empty"
-                      className="h-8 text-xs bg-white"
-                    />
-                  </div>
-                </div>
-
-                {/* Inventory / Notes */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Hotel Specification</label>
-                    <Input
-                      value={pkgHotelNotes}
-                      onChange={(e) => setPkgHotelNotes(e.target.value)}
-                      placeholder="e.g. 4-Star Boutique Resorts (Lake View)"
-                      className="h-8 text-xs bg-slate-50/50"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Vehicle Specification</label>
-                    <Input
-                      value={pkgVehicleNotes}
-                      onChange={(e) => setPkgVehicleNotes(e.target.value)}
-                      placeholder="e.g. Dedicated AC Innova SUV"
-                      className="h-8 text-xs bg-slate-50/50"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Inclusions (One per line)</label>
-                    <Textarea
-                      value={pkgInclusionsText}
-                      onChange={(e) => setPkgInclusionsText(e.target.value)}
-                      placeholder="Daily Buffet Breakfast&#10;Dedicated AC Innova&#10;Entry tickets included"
-                      rows={3}
-                      className="text-xs bg-slate-50/50 resize-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Exclusions (One per line)</label>
-                    <Textarea
-                      value={pkgExclusionsText}
-                      onChange={(e) => setPkgExclusionsText(e.target.value)}
-                      placeholder="Flight Tickets&#10;Lunch&#10;Personal Expenses"
-                      rows={3}
-                      className="text-xs bg-slate-50/50 resize-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <DialogFooter className="mt-6 flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsPackageModalOpen(false)}
-                  className="h-9 text-xs"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={packageSaving || isReadOnly}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9 px-4 font-semibold"
-                >
-                  {packageSaving ? "Saving..." : "Save Package Tier"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
 
         {/* ─── ADD / EDIT PROPOSAL ITEM MODAL ─── */}
         <Dialog open={isProposalItemModalOpen} onOpenChange={setIsProposalItemModalOpen}>

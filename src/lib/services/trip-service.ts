@@ -1,17 +1,18 @@
 import "server-only";
 import prisma from "@/lib/prisma";
-import { NotFoundError } from "@/lib/api";
+import { NotFoundError, ValidationError } from "@/lib/api";
 import {
   CreateTripInput,
   UpdateTripInput,
   TripQueryParams,
 } from "@/lib/validation/trip-schema";
-import { Trip, Customer, Traveler, ItineraryItem } from "@prisma/client";
+import { Trip, Customer, Traveler, ItineraryItem, TripDestination, Destination } from "@prisma/client";
 
 export interface TripWithRelations extends Trip {
   customer: Customer;
   travelers?: Traveler[];
   itineraryItems?: ItineraryItem[];
+  tripDestinations?: (TripDestination & { destination: Destination })[];
   quotations?: any[];
   tripHotels?: any[];
   tripVehicles?: any[];
@@ -151,6 +152,12 @@ export const tripService = {
       },
       include: {
         customer: true,
+        tripDestinations: {
+          include: {
+            destination: true,
+          },
+          orderBy: { sequence: "asc" },
+        },
         travelers: {
           orderBy: { createdAt: "asc" },
         },
@@ -194,6 +201,7 @@ export const tripService = {
   /**
    * Creates a new trip record under the authenticated agency.
    * Verifies the referenced customer belongs to the same agency and is active.
+   * If destinationIds are provided, verifies all exist under agency and creates TripDestination records.
    */
   async createTrip(agencyId: string, data: CreateTripInput): Promise<Trip> {
     // 1. Verify customer exists under this agency and is not archived
@@ -209,10 +217,27 @@ export const tripService = {
       throw new NotFoundError("Customer");
     }
 
-    // 2. Determine or generate unique trip number
+    // 2. Validate destination IDs if provided
+    if (data.destinationIds && data.destinationIds.length > 0) {
+      const uniqueDestIds = Array.from(new Set(data.destinationIds));
+      const foundDests = await prisma.destination.findMany({
+        where: {
+          id: { in: uniqueDestIds },
+          agencyId,
+          status: "ACTIVE",
+        },
+        select: { id: true },
+      });
+
+      if (foundDests.length !== uniqueDestIds.length) {
+        throw new ValidationError("One or more selected destinations do not exist, are inactive, or belong to another agency.");
+      }
+    }
+
+    // 3. Determine or generate unique trip number
     const tripNumber = data.tripNumber?.trim() || (await generateUniqueTripNumber(agencyId));
 
-    // 3. Create trip
+    // 4. Create trip with optional nested trip destinations
     return prisma.trip.create({
       data: {
         agencyId,
@@ -223,9 +248,25 @@ export const tripService = {
         endDate: data.endDate,
         status: data.status || "DRAFT",
         notes: data.notes || null,
+        ...(data.destinationIds && data.destinationIds.length > 0
+          ? {
+              tripDestinations: {
+                create: data.destinationIds.map((destId, idx) => ({
+                  destinationId: destId,
+                  sequence: idx + 1,
+                })),
+              },
+            }
+          : {}),
       },
       include: {
         customer: true,
+        tripDestinations: {
+          include: {
+            destination: true,
+          },
+          orderBy: { sequence: "asc" },
+        },
       },
     });
   },

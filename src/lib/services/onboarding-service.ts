@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { SupabaseClient, User } from "@supabase/supabase-js";
+import { destinationService } from "@/lib/services/destination-service";
 
 export interface OnboardingResult {
   success: boolean;
@@ -116,6 +117,9 @@ export async function provisionOnboardedAgencyOwner(
           trialEnd: trialEnd,
         },
       });
+
+      // D. Seed 32 Starter Destinations for Agency
+      await destinationService.seedStarterDestinations(agency.id, tx);
     });
   } catch (txError: any) {
     // Handle Prisma unique constraint race conditions (P2002)

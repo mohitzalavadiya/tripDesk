@@ -4,9 +4,10 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { Hotel, ArrowLeft, Loader2, Plus, AlertCircle, Info } from "lucide-react";
+import { Hotel, ArrowLeft, Loader2, Plus, AlertCircle, Info, MapPin } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { DestinationSelect } from "@/components/shared/destination-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +15,9 @@ import { hotelClient } from "@/lib/api-client";
 import { toast } from "sonner";
 
 const createHotelSchema = Yup.object().shape({
+  destinationId: Yup.string()
+    .trim()
+    .required("Destination is required"),
   name: Yup.string()
     .trim()
     .required("Hotel name is required")
@@ -37,6 +41,7 @@ export default function NewHotelPage() {
 
   const formik = useFormik({
     initialValues: {
+      destinationId: "",
       name: "",
       category: "",
       address: "",
@@ -60,6 +65,7 @@ export default function NewHotelPage() {
         setSubmitting(true);
 
         const res = await hotelClient.createHotel({
+          destinationId: values.destinationId.trim(),
           name: values.name.trim(),
           category: values.category.trim() || undefined,
           address: values.address.trim() || undefined,
@@ -165,9 +171,24 @@ export default function NewHotelPage() {
                 </div>
               </div>
 
-              {/* Location Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                <div className="space-y-1.5 sm:col-span-3">
+              {/* Location & Destination Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">
+                    Destination <span className="text-red-500">*</span>
+                  </label>
+                  <DestinationSelect
+                    value={formik.values.destinationId}
+                    onChange={(val) => formik.setFieldValue("destinationId", val)}
+                    placeholder="Select agency destination (e.g. Munnar, Goa...)"
+                    error={getFieldError("destinationId")}
+                  />
+                  {getFieldError("destinationId") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("destinationId")}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700">
                     Street Address
                   </label>
@@ -182,7 +203,7 @@ export default function NewHotelPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">City / Destination</label>
+                  <label className="text-xs font-bold text-slate-700">City / Town</label>
                   <Input
                     placeholder="e.g. Munnar"
                     {...formik.getFieldProps("city")}
@@ -205,7 +226,7 @@ export default function NewHotelPage() {
                   )}
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700">Country</label>
                   <Input
                     placeholder="India"

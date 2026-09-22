@@ -1,4 +1,4 @@
-import { TripActivity, Activity } from "@prisma/client";
+import { TripActivity, Activity, TripDestination, Destination } from "@prisma/client";
 import {
   CreateTripActivityInput,
   UpdateTripActivityInput,
@@ -7,6 +7,7 @@ import { SingleResponse, ApiClientError } from "./customer-client";
 
 export interface TripActivityWithActivity extends TripActivity {
   activity: Activity | null;
+  tripDestination?: (TripDestination & { destination: Destination }) | null;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {

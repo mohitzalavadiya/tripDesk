@@ -10182,9 +10182,1582 @@ Verified existing database/auth state:
 
 ---
 
+# 156. DESTINATION FOUNDATION & STARTER SEED (DATABASE & SERVICE ARCHITECTURE)
+
+## 156.1 Strategic Executive Summary
+- **Objective:** Establish the agency-scoped Destination master model, idempotent 32-destination starter catalog seeding, and foundational relational schema for multi-destination trips and services without premature UI changes or financial regressions.
+- **Status:** **PASS — VERIFIED & CERTIFIED**.
+- **Scope Discipline:**
+  - Strict adherence to TripDesk single flexible Destination master concept (no artificial Country -> State -> City hierarchy models).
+  - No premature UI redesigns for hotel selection, activity selection, trip creation, or Excel mapping.
+  - Zero modifications to financial engines (Costing, RateSheets, Quotations, Invoices, Payments, Tax).
+
+## 156.2 Locked Architectural Decisions
+
+### 156.2.1 Destination Master Model (`Destination`)
+- **Concept:** One flexible agency-owned Destination master representing a travel/inventory grouping concept.
+- **Fields:**
+  - `id`: String (`@id @default(cuid())`)
+  - `agencyId`: String (required foreign key to `Agency`)
+  - `name`: String
+  - `country`: String (default `"India"`)
+  - `stateProvince`: String
+  - `cityArea`: String? (optional)
+  - `status`: `DestinationStatus` enum (`ACTIVE`, `INACTIVE`, default `ACTIVE`)
+  - `createdAt`: DateTime (`@default(now())`)
+  - `updatedAt`: DateTime (`@updatedAt`)
+- **Constraints & Indexes:**
+  - `@@unique([agencyId, name])` — Destination names are unique strictly per agency (not globally unique across all agencies).
+  - `@@index([agencyId])`
+  - `@@index([agencyId, status])`
+- **Lifecycle Rules:**
+  - Supports `ACTIVE` and `INACTIVE` states.
+  - Inactive destinations are hidden from normal new selections while preserving historical linkages.
+  - Hard deletion is blocked if referenced by Hotels, Activities, or TripDestinations (`deleteDestination` checks entity counts and throws `ValidationError`).
+
+### 156.2.2 Locked 32 Starter Destinations Catalog
+Every newly created agency receives the exact locked 32-destination starter catalog (all `country = "India"`, `status = ACTIVE`):
+1. Goa (Goa)
+2. Mumbai (Maharashtra)
+3. Mahabaleshwar (Maharashtra)
+4. Pune (Maharashtra)
+5. Jaipur (Rajasthan)
+6. Udaipur (Rajasthan)
+7. Jodhpur (Rajasthan)
+8. Jaisalmer (Rajasthan)
+9. Mount Abu (Rajasthan)
+10. Delhi (Delhi)
+11. Agra (Uttar Pradesh)
+12. Varanasi (Uttar Pradesh)
+13. Lucknow (Uttar Pradesh)
+14. Amritsar (Punjab)
+15. Srinagar (Jammu & Kashmir)
+16. Gulmarg (Jammu & Kashmir)
+17. Pahalgam (Jammu & Kashmir)
+18. Manali (Himachal Pradesh)
+19. Shimla (Himachal Pradesh)
+20. Dharamshala (Himachal Pradesh)
+21. Leh (Ladakh)
+22. Rishikesh (Uttarakhand)
+23. Nainital (Uttarakhand)
+24. Kochi (Kerala)
+25. Munnar (Kerala)
+26. Alappuzha (Kerala)
+27. Bengaluru (Karnataka)
+28. Mysuru (Karnataka)
+29. Hampi (Karnataka)
+30. Chennai (Tamil Nadu)
+31. Ahmedabad (Gujarat)
+32. Dwarka (Gujarat)
+
+- **Seeding Architecture:**
+  - Integrated into agency onboarding flow (`onboardingService.completeOnboarding`).
+  - Executed idempotently using `createMany` with `skipDuplicates: true`.
+  - Re-running seed operations is safe and produces 0 duplicates.
+
+### 156.2.3 TripDestination Multi-Destination Foundation (`TripDestination`)
+- **Architecture:** `Trip -> TripDestination -> Destination`
+- **Fields:**
+  - `id`: String (`@id @default(cuid())`)
+  - `tripId`: String (foreign key to `Trip`, `onDelete: Cascade`)
+  - `destinationId`: String (foreign key to `Destination`, `onDelete: Restrict`)
+  - `sequence`: Int
+  - `createdAt`: DateTime (`@default(now())`)
+  - `updatedAt`: DateTime (`@updatedAt`)
+- **Constraints & Indexes:**
+  - `@@unique([tripId, sequence])` — Sequence positions are unique within a trip.
+  - **Repeated Destinations Supported:** Trips can repeat destinations across different legs (e.g., Leg 1: Goa, Leg 2: Mumbai, Leg 3: Goa).
+  - `@@index([tripId])`
+  - `@@index([destinationId])`
+
+### 156.2.4 Service Relational Foundation
+- **Hotel (`Hotel`):** Added nullable `destinationId` foreign key and `destination Destination?` relation with `@@index([destinationId])`. Preserves `Hotel.city` as the actual geographic city.
+- **Activity (`Activity`):** Added nullable `destinationId` foreign key and `destination Destination?` relation with `@@index([destinationId])`.
+- **TripHotel (`TripHotel`):** Added nullable `tripDestinationId` foreign key and `tripDestination TripDestination?` relation with `@@index([tripDestinationId])`.
+- **TripActivity (`TripActivity`):** Added nullable `tripDestinationId` foreign key and `tripDestination TripDestination?` relation with `@@index([tripDestinationId])`.
+- **Vehicle (`Vehicle`):** Remains 100% destination-independent as finalized.
+
+### 156.2.5 Data Safety & Excel Import Rules
+- Existing development Hotel/Activity records may be recreated; no complex city-to-destination inference or silent backfill migration.
+- Excel Destination Mapping deferred to future phase:
+  - Exact/normalized matching without aggressive fuzzy algorithms.
+  - `Hotel.city` remains the physical geographic city.
+
+## 156.3 Implementation Components
+1. **Prisma Schema (`prisma/schema.prisma`):**
+   - Added `DestinationStatus` enum (`ACTIVE`, `INACTIVE`).
+   - Added `Destination` model and `TripDestination` model.
+   - Updated `Agency`, `Trip`, `Hotel`, `Activity`, `TripHotel`, `TripActivity` models with relations.
+2. **Validation (`src/lib/validation/destination-schema.ts`):**
+   - `createDestinationSchema`, `updateDestinationSchema`, `destinationQuerySchema`.
+3. **Service Layer (`src/lib/services/destination-service.ts`):**
+   - `seedStarterDestinations(agencyId)` — Idempotent 32 starter seed.
+   - `getDestinations(agencyId, params)` — Search, status filter, and sort.
+   - `getDestinationById(agencyId, id)` — Agency-scoped fetch.
+   - `createDestination(agencyId, data)` — Uniqueness enforcement & normalization.
+   - `updateDestination(agencyId, id, data)` — Status and field update.
+   - `deleteDestination(agencyId, id)` — Reference-checked delete protection.
+4. **API Routes:**
+   - `src/app/api/destinations/route.ts` (GET, POST with `requireReadAccess` / `requireWriteAccess`).
+   - `src/app/api/destinations/[id]/route.ts` (GET, PATCH, DELETE with tenant checks).
+5. **API Client (`src/lib/api-client/destination-client.ts`):**
+   - Typed client methods exported from `src/lib/api-client/index.ts`.
+6. **Onboarding Integration (`src/lib/services/onboarding-service.ts`):**
+   - Automatic seeding on agency onboarding completion.
+
+## 156.4 Quality Assurance & Verification Evidence
+- **Automated QA-14 Destination Foundation Suite (`prisma/test-qa-14-destination-foundation-seed.ts`):** `35/35` passed (100%).
+  - Group 1: Starter Catalog Seeding (32 items, exact names, states, India, ACTIVE).
+  - Group 2: Seed Idempotency (0 duplicates on re-run).
+  - Group 3: Agency Scoping & Isolation (Agency A cannot access Agency B destinations).
+  - Group 4: Per-Agency Name Uniqueness (Agency A dupes rejected, cross-agency identical names allowed).
+  - Group 5: Active/Inactive Status Transitions & Filtering.
+  - Group 6: TripDestination Sequence Uniqueness.
+  - Group 7: Repeated Destination Legs (Goa -> Mumbai -> Goa in single trip).
+  - Group 8: Service Relation Foundation (Hotel & Activity nullable destination links).
+  - Group 9: Trip Service Leg Link Foundation (TripHotel & TripActivity nullable tripDestination links).
+  - Group 10: Deletion Protection (Destinations referenced by Hotel/Activity/TripDestination cannot be deleted).
+- **Multi-Room Hotel Costing Suite (`prisma/test-qa-13-quotation-multi-room-costing.ts`):** `55/55` passed (100%).
+- **Tax Calculation Engine Suite (`prisma/test-tax-service.ts`):** `27/27` passed (100%).
+- **Quotation Tax Rules Suite (`prisma/test-quotation-tax.ts`):** `72/72` passed (100%).
+- **Tax V1 Full Lifecycle E2E Closure Suite (`prisma/test-tax-v1-e2e-closure.ts`):** `93/93` passed (100%).
+- **Total Verification Assertions Passed:** `282/282` (100% pass rate).
+- **TypeScript:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed (0 errors).
+
+**Verdict:**
+`PASS — DESTINATION FOUNDATION & STARTER SEED VERIFIED & CERTIFIED`
+
+---
+
+# 157. PHASE 158-A — HOTEL & ACTIVITY MASTER DESTINATION INTEGRATION
+
+## 157.1 Architecture & Scope
+Phase 158-A integrates the Phase 157 `Destination` foundation into the Hotel Master and Activity Master catalog layers:
+- **Scope Boundary:** Connects `Hotel.destinationId` and `Activity.destinationId` to agency-owned `Destination` records.
+- **Physical vs Logical Separation:** `Hotel.city` and `Activity.location` remain geographic strings; `destinationId` is the agency-scoped logical `Destination` catalog link. They are never merged or fuzzy-inferred.
+- **Strict Multi-Tenant Isolation:** Server-side validation guarantees an agency can only associate hotels and activities with destinations owned by that exact same agency (`agencyId`).
+- **Deferred to Later Phases:** TripDestination management, Trip service-selection destination filtering, `tripDestinationId`, Trip RateSheet picker, Rate override redesign, costing/quotation changes, Vehicle destination integration, Excel destination mapping, and standalone `/destinations` admin page.
+
+## 157.2 Key Implementation Components
+1. **Validation Layer (`src/lib/validation/`):**
+   - `hotel-schema.ts`: Added `destinationId` (nullable, optional) to `createHotelSchema`, `updateHotelSchema`, and `hotelListQuerySchema`.
+   - `activity-schema.ts`: Added `destinationId` (nullable, optional) to `createActivitySchema`, `updateActivitySchema`, and `activityListQuerySchema`.
+2. **Service Layer (`src/lib/services/`):**
+   - `hotel-service.ts`:
+     - Added `HotelWithRelations` type with `destination` relation.
+     - Added `destinationId` filtering and included `destination: { select: { id, name, state, country, status } }` in `listHotels`, `getHotelById`, `getHotelByCode`.
+     - Added strict tenant validation (`where: { id: destinationId, agencyId }`) in `createHotel` and `updateHotel`.
+   - `activity-service.ts`:
+     - Added `ActivityWithRelations` type with `destination` relation.
+     - Added `destinationId` filtering and included `destination: { select: { id, name, state, country, status } }` in `listActivities`, `getActivityById`.
+     - Added strict tenant validation (`where: { id: destinationId, agencyId }`) in `createActivity` and `updateActivity`.
+3. **API Client Layer (`src/lib/api-client/`):**
+   - `hotel-client.ts`: Added `destinationId` to `HotelListParams` and exported `HotelWithRelations`.
+   - `activity-client.ts`: Added `destinationId` to `ActivityListParams` and exported `ActivityWithRelations`.
+4. **Reusable UI Component (`src/components/shared/destination-select.tsx`):**
+   - Implemented `DestinationSelect` component that loads active destinations, gracefully handles unassigned / legacy / inactive destinations, and provides accessible search/select.
+5. **UI Master Pages:**
+   - `src/app/(dashboard)/hotels/new/page.tsx`: Integrated `DestinationSelect`.
+   - `src/app/(dashboard)/hotels/[id]/page.tsx`: Added Destination badge in hero micro-details, Destination field in profile card, and `DestinationSelect` in Edit Hotel modal.
+   - `src/app/(dashboard)/hotels/page.tsx`: Added Destination column to desktop table and badge to mobile cards.
+   - `src/app/(dashboard)/activities/new/page.tsx`: Integrated `DestinationSelect`.
+   - `src/app/(dashboard)/activities/[id]/page.tsx`: Added Destination badge in hero micro-details, Destination field in details card, and `DestinationSelect` in Edit Activity modal.
+   - `src/app/(dashboard)/activities/page.tsx`: Added Destination column to desktop table and badge to mobile cards.
+
+## 157.3 Quality Assurance & Verification
+- **Automated Test Suite (`prisma/test-qa-15-destination-master-integration.ts`):** `20/20` passed (100%).
+  - Hotel creation with valid destination link (same agency).
+  - Hotel update and unlinking (null).
+  - Hotel cross-agency destination rejection (strict multi-tenant isolation with `NotFoundError`).
+  - Hotel non-existent destination rejection.
+  - Activity creation with valid destination link (same agency).
+  - Activity update and unlinking (null).
+  - Activity cross-agency destination rejection (strict multi-tenant isolation with `NotFoundError`).
+  - Activity non-existent destination rejection.
+  - Physical city / location separation preserved.
+  - List filtering by `destinationId`.
+- **TypeScript Typecheck:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed (0 errors).
+
+**Verdict:**
+`PASS — PHASE 158-A IMPLEMENTATION COMPLETE & CERTIFIED`
+
+---
+
+# 158. PHASE 158-B — TRIPDESTINATION MANAGEMENT IMPLEMENTATION
+
+## 158.1 Architecture & Scope
+Phase 158-B implements the **TripDestination management layer** allowing Agency Owners to manage ordered, multi-destination itineraries for Trips:
+- **Multi-Destination Support:** A Trip can have 0, 1, or multiple destinations.
+- **Contiguous Sequence Ordering:** Destinations are ordered by a deterministic `sequence` (`1, 2, 3...`) with zero gaps.
+- **Repeated Destination Legs:** Legitimate repeated destinations (e.g., `Goa → Mumbai → Goa`) are supported via distinct `TripDestination` records with unique sequences under the same trip.
+- **Safe 2-Phase Transaction Resequencing:** Reordering and removal operations use a 2-phase negative-to-positive transaction strategy to completely avoid temporary collisions with the `@@unique([tripId, sequence])` database constraint.
+- **Strict Multi-Tenant Isolation:** Server-side context verification enforces that both the `Trip` and the referenced `Destination` belong to the authenticated user's `agencyId`. Cross-agency reads, writes, deletes, and reorders are strictly blocked.
+- **Master Reference Protection:** Removing a `TripDestination` removes only the trip assignment; the underlying `Destination` master catalog record remains 100% intact.
+- **Scope Boundaries Strictly Preserved:**
+  - No destination-specific dates/nights or day-by-day scheduling added.
+  - No Trip service-selection destination filtering (`Destination → Hotel`, `Destination → Activity`).
+  - No `tripDestinationId` links populated on `TripHotel` or `TripActivity` (reserved for later phase).
+  - No RateSheet pickers or rate override redesign (reserved for Phase 158-C).
+  - No changes to Trip costing, quotation, booking, invoice, or Vehicle models.
+
+## 158.2 Implementation Details
+1. **Validation Layer (`src/lib/validation/trip-destination-schema.ts`):**
+   - `tripDestinationRouteParamsSchema`: Validates `id` (tripId) and `destinationId` (tripDestinationId).
+   - `addTripDestinationSchema`: Validates non-empty `destinationId` and optional `notes` (max 500 chars).
+   - `reorderTripDestinationsSchema`: Validates non-empty `tripDestinationIds` array and rejects duplicate IDs.
+2. **Service Layer (`src/lib/services/trip-destination-service.ts`):**
+   - `listTripDestinations(agencyId, tripId)`: Agency-scoped query ordered by `sequence: "asc"`, includes destination details.
+   - `getTripDestinationById(agencyId, tripId, tripDestinationId)`: Agency-scoped single item retrieval.
+   - `addTripDestination(agencyId, tripId, data)`: Validates tenant ownership of Trip and Destination, computes `max(sequence) + 1`, and creates `TripDestination`.
+   - `removeTripDestination(agencyId, tripId, tripDestinationId)`: Deletes `TripDestination` and executes 2-phase resequencing on remaining items (`-(i+1)` then `i+1`).
+   - `reorderTripDestinations(agencyId, tripId, data)`: Validates that submitted IDs exactly match all existing trip destinations (no duplicates, no omissions, no foreign IDs) and executes 2-phase resequencing.
+3. **API Route Layer:**
+   - `src/app/api/trips/[id]/destinations/route.ts`: `GET` (list), `POST` (add with `requireWriteAccess`).
+   - `src/app/api/trips/[id]/destinations/reorder/route.ts`: `PATCH` & `POST` (reorder with `requireWriteAccess`).
+   - `src/app/api/trips/[id]/destinations/[destinationId]/route.ts`: `GET` (detail), `DELETE` (remove with `requireWriteAccess`).
+4. **API Client Layer (`src/lib/api-client/trip-destination-client.ts`):**
+   - Implemented `getTripDestinations`, `getTripDestination`, `addTripDestination`, `reorderTripDestinations`, and `deleteTripDestination`.
+   - Exported and re-exported from `src/lib/api-client/index.ts`.
+5. **UI Integration (`src/app/(dashboard)/trips/[id]/page.tsx`):**
+   - **Trip Destinations & Route Card:** Rendered in Overview tab showing:
+     - Header badge displaying destination count.
+     - Visual "Route Flow" breadcrumb bar (`1 Goa → 2 Mumbai → 3 Goa`).
+     - Ordered list of destination cards with sequence badges, state/country, and planning notes.
+     - Move Up / Move Down buttons for quick reordering.
+     - Remove button with confirmation dialog.
+     - Empty state with "Add First Destination" call-to-action.
+   - **Add Destination Modal:** Integrated `DestinationSelect` component with optional leg notes.
+   - **Header & Telemetry:** Added Destinations counter in top command header and right column workspace telemetry.
+
+## 158.3 Quality Assurance & Verification Evidence
+- **Automated QA-16 Test Suite (`prisma/test-qa-16-trip-destination-management.ts`):** `23/23` passed (100%).
+  - Group 1: Basic (0-destinations read, add first, add second, list sequence order).
+  - Group 2: Ordering (reorder destinations, contiguous 1..N sequence, persistent order).
+  - Group 3: Repeated Destinations (same destination added twice, unique IDs & sequences).
+  - Group 4: Remove (removal of middle destination, automatic 1..N resequencing, master intact).
+  - Group 5: Tenant Isolation (cross-agency add, read, delete, and reorder rejected).
+  - Group 6: Invalid Data (nonexistent destination, nonexistent trip, foreign ID, duplicate IDs in reorder rejected).
+  - Group 7: Regression (Trip relations intact, Hotel/Activity/Vehicle models intact, 32-destination starter catalog 100% preserved).
+  - Group 8: Data Cleanup (0 temporary agencies, 0 temporary trips residue).
+- **TypeScript Typecheck:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack (0 errors).
+
+**Verdict:**
+`PASS — PHASE 158-B IMPLEMENTATION COMPLETE & CERTIFIED`
+
+---
+
+# 159. PHASE 158-C — TRIP HOTEL/ACTIVITY DESTINATION FILTERING + RATESHEET SELECTION
+
+## 159.1 Architecture & Scope
+Phase 158-C completes the end-to-end integration between Trip Multi-Destination legs, Inventory Filtering, and Master RateSheet auto-selection/resolution for Hotels and Activities:
+- **Scope Boundary:**
+  - Connects `TripHotel.tripDestinationId` and `TripActivity.tripDestinationId` to specific `TripDestination` legs.
+  - Multi-destination trips allow choosing the specific `TripDestination` leg (`tripDestinationId`).
+  - Single-destination trips auto-derive the sole leg without forcing a redundant selector.
+  - Hotel and Activity dropdowns filter strictly to inventory matching `inventory.destinationId === selectedTripDestination.destinationId`.
+  - Dynamic lookup of active `RateSheet` records for Hotel (by date, room type, meal plan) and Activity (by date).
+  - RateSheet resolution logic: Auto-select if exactly 1 rate exists; provide selectable list if multiple rates exist; display clean empty state if 0 rates exist without hardcoded fallback defaults (e.g., removing legacy 3500/7000 fallbacks).
+  - Explicit controlled nightly rate override preserved for intentional overrides.
+  - Strict server-side validation enforcing full agency tenant isolation and matching `Hotel.destinationId === TripDestination.destinationId` and `Activity.destinationId === TripDestination.destinationId`.
+  - Rejection of foreign `tripDestinationId` belonging to other trips or other agencies.
+  - Asynchronous rate request race protection using request counters.
+- **Scope Boundaries Strictly Preserved:**
+  - Vehicle destination integration unchanged (Vehicle remains destination-independent in V1).
+  - No Excel import modifications.
+  - No Supplier management redesign (Supplier management remains deferred).
+  - No changes to costing engine, quotations, bookings, invoices, or tax calculation engine.
+  - 32-destination starter catalog and permanent test agency (`tripmadeeasy.in@gmail.com`) 100% preserved.
+
+## 159.2 Key Implementation Components
+1. **Validation Layer (`src/lib/validation/`):**
+   - `trip-hotel-schema.ts`: Added optional `tripDestinationId` to `createTripHotelSchema` and `updateTripHotelSchema`.
+   - `trip-activity-schema.ts`: Added optional `tripDestinationId` to `createTripActivitySchema` and `updateTripActivitySchema`.
+2. **Service Layer (`src/lib/services/`):**
+   - `trip-hotel-service.ts`:
+     - Included `tripDestination: { include: { destination: true } }` in `listTripHotels` and `getTripHotelById`.
+     - In `createTripHotel` and `updateTripHotel`, validated `tripDestinationId` against `tripId` and `agencyId`, validated matching `hotel.destinationId === tripDest.destinationId`, and persisted `tripDestinationId`.
+   - `trip-activity-service.ts`:
+     - Included `tripDestination: { include: { destination: true } }` in `listTripActivities` and `getTripActivityById`.
+     - In `createTripActivity` and `updateTripActivity`, validated `tripDestinationId`, validated matching `activity.destinationId === tripDest.destinationId`, and persisted `tripDestinationId`.
+3. **API Client Layer (`src/lib/api-client/`):**
+   - `trip-hotel-client.ts`: Updated `TripHotelWithHotel` to include `tripDestination?: (TripDestination & { destination: Destination }) | null`.
+   - `trip-activity-client.ts`: Updated `TripActivityWithActivity` to include `tripDestination?: (TripDestination & { destination: Destination }) | null`.
+4. **Trip Detail UI Integration (`src/app/(dashboard)/trips/[id]/page.tsx`):**
+   - Added destination leg selection dropdowns in both Add/Edit Hotel and Add/Edit Activity modals for multi-destination trips.
+   - For single-destination trips, auto-derived the sole leg without redundant selector.
+   - Dynamic inventory filtering: `getFilteredHotels` and `getFilteredActivities` filter choices by selected destination leg.
+   - Implemented `fetchApplicableHotelRates` and `fetchApplicableActivityRates` with asynchronous request counters (`hotelRateReqRef`, `activityRateReqRef`) preventing race condition overwrites.
+   - Dynamic RateSheet status badges (`Active Rate Applied: CP — ₹6,500/night`, `Standard: ₹1,200/adult`) and multi-rate dropdown selectors.
+   - Visual destination leg badges (`Goa (Leg 1)`, `Agra (Leg 2)`) rendered on Hotel and Activity cards in the workspace.
+
+## 159.3 Quality Assurance & Verification Evidence
+- **Automated QA-17 Test Suite (`prisma/test-qa-17-trip-service-destination-rate-selection.ts`):** `35/35` passed (100%).
+  - Group 1: Destination filtering (1 destination, multi-dest, repeated legs, hotel destination filter, activity destination filter, wrong-destination rejection).
+  - Group 2: TripDestination association (TripHotel & TripActivity store tripDestinationId, foreign trip leg rejection, cross-agency leg rejection).
+  - Group 3: Hotel RateSheet resolution (active rate return, expired rate exclusion, validity window, single rate auto-select, multi-rate list, 0-rate empty state, no hardcoded 3500/7000 defaults).
+  - Group 4: Activity RateSheet resolution (active rate return, unrelated rate exclusion, date validity, single rate pricing, multi-rate list, 0-rate safety).
+  - Group 5: Repeated destinations & leg integrity (Goa #1 vs Goa #3 distinct records, hotel/activity selection strictly tied to specific leg).
+  - Group 6: Tenant isolation (cross-agency hotel rejected, cross-agency activity rejected, cross-agency trip destination update rejected, cross-agency rate query isolated).
+  - Group 7: Regression checks (Trip relations intact, 32-destination starter catalog 100% preserved, Hotel/Activity masters intact, Vehicle destination-independent).
+  - Group 8: Data cleanup (0 temporary hotels, 0 temporary activities, 0 temporary trips, 0 temporary agencies residue).
+- **TypeScript Typecheck:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack (0 errors).
+- **Browser QA Verification:** Verified on Desktop (1440x900) and Mobile (390x844 viewports) — destination leg selection, hotel and activity filtering by destination, RateSheet lookup, and modal responsiveness verified.
+
+---
+
+# 160. PHASE 158-C UX CORRECTION — TRIP-LEVEL DESTINATION SELECTION + AUTOMATIC HOTEL/ACTIVITY FILTERING
+
+## 160.1 Architecture & Approved Flow
+Following user feedback after Phase 158-C, the destination flow was streamlined into a clean, trip-level UX before Phase 158-D E2E QA:
+- **Approved Core UX:**
+  - **Trip Creation (`/trips/new`):** The user selects the Trip's destinations directly at creation time using a multi-select interactive catalog with visual pills and sequence ordering controls (`[↑]`, `[↓]`, `[×]`).
+  - **Trip Destination Persistence:** Contiguous sequence records (`1, 2, 3...`) are created directly as `TripDestination` records on `createTrip`.
+  - **Hotel Flow (`/trips/[id]`):** Destination field is completely removed from Add/Edit Hotel modals. Hotels are automatically filtered against the Trip's unique destination set (`TripDestination.destinationId`). Destination name is clearly displayed alongside property names (`Taj Exotica Goa (Goa)`).
+  - **Activity Flow (`/trips/[id]`):** Destination field is completely removed from Add/Edit Activity modals. Activities are automatically filtered against the Trip's unique destination set. Destination name is displayed alongside activity names.
+  - **Vehicle Flow:** Remains 100% destination-independent.
+  - **Repeated Route Behavior:** Legitimate repeated destinations (e.g. `Goa → Mumbai → Goa`) preserve distinct `TripDestination` records with sequences `1, 2, 3`, while inventory queries deduplicate to the unique set (`Goa`, `Mumbai`) so catalog items appear exactly once without duplicate entries.
+  - **Exact Service-to-Leg Association Deferred:** No arbitrary assignment of hotels/activities to the first or last matching leg. The schema's nullable `tripDestinationId` field is preserved as `null` (or kept intact if edited).
+  - **RateSheet Architecture Preserved:** Dynamic RateSheet lookup, auto-selection for single active rates, selectable list for multiple rates, and empty state warnings for 0 rates remain 100% active and protected by asynchronous request counters.
+
+## 160.2 Implementation Changes
+1. **Validation Schema (`src/lib/validation/trip-schema.ts`):**
+   - Added `destinationIds: z.array(z.string().min(1)).optional()` to `createTripSchema`.
+2. **Backend Services (`src/lib/services/`):**
+   - `trip-service.ts`: `createTrip` validates tenant ownership and active status of `destinationIds`, and creates contiguous `tripDestinations` records. `getTripById` eager-loads `tripDestinations` with the `destination` relation in ascending sequence.
+   - `trip-hotel-service.ts`: `createTripHotel` and `updateTripHotel` validate hotel's `destinationId` against the Trip's destination set when destinations exist, preserving `tripDestinationId` as nullable.
+   - `trip-activity-service.ts`: `createTripActivity` and `updateTripActivity` validate activity's `destinationId` against the Trip's destination set when destinations exist, preserving `tripDestinationId` as nullable.
+3. **Trip Creation UI (`src/app/(dashboard)/trips/new/page.tsx`):**
+   - Fetches active agency destinations.
+   - Checkbox-style multi-select grid with search, pill badges, and sequence reordering (`Up`, `Down`, `Remove`).
+   - Integrated seamlessly with Formik `destinationIds`.
+4. **Trip Workspace UI (`src/app/(dashboard)/trips/[id]/page.tsx`):**
+   - Removed destination selectors from Add/Edit Hotel and Add/Edit Activity modals.
+   - `getFilteredHotels()` and `getFilteredActivities()` dynamically filter inventory by unique trip destination IDs without duplicating items.
+   - Select option labels render property and activity names with destination context.
+   - Clear zero-destination guidance rendered when a trip has no destinations configured.
+
+## 160.3 Verification & Quality Assurance Evidence
+- **Automated QA-18 Test Suite (`prisma/test-qa-18-trip-destination-ux-correction.ts`):** `35/35` passed (100%).
+  - Group 1: Trip creation with single, multiple, reordered, and zero destinations with contiguous sequences (1..N).
+  - Group 2: Hotel automatic filtering, multi-destination queries, wrong-destination rejection, destination labels, deduplication, zero-dest isolation, and cross-agency rejection.
+  - Group 3: Activity automatic filtering, multi-destination queries, wrong-destination rejection, deduplication, zero-dest isolation, and cross-agency rejection.
+  - Group 4: Repeated route (`Goa → Mumbai → Goa`) 3-leg sequence preservation, single inventory appearance, and deferred `tripDestinationId = null` without arbitrary leg assignment.
+  - Group 5: RateSheet regression (Hotel dynamic rates, multiple rates, zero rates, Activity rates, date validity, no hardcoded fallbacks).
+  - Group 6: Regression integrity (Vehicle destination independence, existing TripHotel/TripActivity integrity, Phase 155 costing preservation, 32 locked destinations intact, tenant isolation).
+  - Group 7: Automated cleanup of temporary records.
+- **Database Residue Audit:** Verified 0 temporary agencies, 0 temporary hotels, 0 temporary activities, 0 temporary trips; 32 locked starter destinations 100% intact.
+- **TypeScript Static Verification:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack (0 errors).
+## 160.4 Follow-up Note — `/trips/new` Destination UX Simplification
+- **Simplification Summary:**
+  - Replaced the large destination section and separate sequence controls with a **single compact multi-select dropdown field** (`DestinationMultiSelect`) directly within the Trip Information card in `/trips/new`.
+  - Trigger displays placeholder `Select destinations...` or comma-separated destination names (e.g., `Goa, Mumbai, Jaipur`) with a count badge.
+  - Dropdown popup provides live search and checkboxes to select/deselect active destinations cleanly on desktop and mobile.
+  - Selection order is naturally preserved into the submitted `destinationIds` array.
+  - Removed separate checkbox card grid, ↑/↓ buttons, and separate route management tables from the creation form.
+  - Full persistence to `TripDestination` contiguous sequences (`1, 2, 3...`) and automatic Hotel/Activity inventory filtering remain 100% active and verified.
+
+**Verdict:**
+`PHASE 158-C UX SIMPLIFICATION — COMPLETE`
+
+---
+
+# 161. HOTEL MASTER IMPROVEMENT & DESTINATION INTEGRATION
+
+## 161.1 Locked Business Rules & Architecture
+1. **Mandatory Fields for Hotel Master:**
+   - **Hotel Name:** Mandatory across creation, editing, and Excel import (`name`).
+   - **Destination:** Mandatory when creating a new Hotel (`destinationId`). Must be an active, agency-owned `Destination`.
+   - **City, State, Country:** Remain separate physical location attributes (e.g., Hotel: *Taj Exotica*, Destination: *Goa*, City: *Benaulim*). Destination is never treated as a replacement for City.
+   - **Address, Star Category, Contact, Description:** Preserved behavior.
+   - **Hotel Code:** Continues to be auto-generated (`HTL-XXXX`).
+2. **Existing Hotels & Legacy Records:**
+   - No destructive database migration or arbitrary backfill was performed.
+   - Existing hotels with `destinationId = null` remain valid and render safely with an `Unassigned` fallback in the UI.
+   - Editing an existing hotel safely loads and updates destination state without silent assignment.
+3. **Supplier Isolation:**
+   - Supplier Management remains **ON HOLD / deferred**. Supplier field is not reintroduced into the active Hotel Master UI.
+
+## 161.2 Hotel Excel Import Architecture
+- **Mandatory `Destination` Column:** Added `Destination` as a required column in the Hotel Excel template (`Hotels.xlsx`), instructions sheet, and import processing engine.
+- **Strict Matching Rules:**
+  - Agency-scoped lookup: only matches destinations owned by the authenticated agency.
+  - Normalized matching: strict whitespace trimming (`trim()`) and case-insensitive comparison (`toLowerCase()`).
+  - **No Fuzzy Matching:** Strict string equivalence only.
+  - **No Geographic Inference:** City/State are NOT used to infer Destination (e.g., `Panaji` does NOT automatically map to `Goa`).
+  - **No Silent Creation:** Missing or invalid destinations immediately fail row validation with clear error messages identifying the row and field.
+- **Hotel RateSheet Excel Independence:**
+  - `Hotel_Rates.xlsx` intentionally **DOES NOT** contain a `Destination` column. RateSheets link to Hotels via `Hotel Code`. The hierarchy remains `Destination → Hotel → RateSheet`.
+
+## 161.3 Hotel Table UI & UX Improvements
+- **Modern SaaS Master Table Layout (`/hotels`):**
+  - Clear header hierarchy: Hotel Name, Hotel Code, Destination, Location (City/State/Country), Star Category, Contact, Status badge, and Actions dropdown.
+  - Prominent Destination badge with MapPin icon and emerald tint for immediate visual recognition.
+  - Physical location displayed with secondary styling to distinguish clearly from travel Destination.
+  - Status badges with active/inactive indicators.
+  - Actions dropdown with clear Edit and safe Deactivate/Delete flows.
+- **Destination Filtering:**
+  - Added a dedicated Destination filter dropdown alongside the live property search bar in the table toolbar.
+  - Instant client-side filtering by Destination with clear filter reset controls.
+- **Form UI (`/hotels/new` & `/hotels/[id]`):**
+  - Integrated `DestinationSelect` component with search and active agency filtering.
+  - Field-level Formik/Yup validation messages (`Hotel name is required`, `Destination is required`).
+  - Required asterisks (`*`) clearly displayed on mandatory fields.
+- **Responsive Mobile UX:**
+  - Mobile card layout at 390×844 with clean typography, compact badges, and full action accessibility without horizontal overflow.
+
+## 161.4 Verification & Quality Assurance Evidence
+- **Automated QA-19 Test Suite (`prisma/test-qa-19-hotel-master-destination-excel.ts`):** `24/24` passed (100%).
+  - **Section 1 (Validation & Tenancy):** Missing Hotel Name rejected, missing Destination rejected on creation, valid Hotel + Destination created with auto code, cross-agency destination rejected, unknown destination ID rejected.
+  - **Section 2 (Excel Import):** Valid row parsed & imported with exact destination link and distinct city, missing name rejected, missing destination rejected, unknown destination rejected, whitespace trimming verified (`'   Goa   '` → `'Goa'`), case-insensitivity verified (`'gOa'` → `'Goa'`), non-inference verified (`Panaji` rejected), no silent destination creation, RateSheet Excel verified without destination column.
+  - **Section 3 (Existing Functionality & Integrations):** Existing hotel list loaded with agency tenancy, destination relation populated, null destination safe handling, edit hotel updates safely, soft-delete archive preserved, Trip Hotel destination matching and non-matching rejection verified, RateSheet auto-selection preserved without hardcoded pricing.
+- **Database Residue Audit:** Verified 0 temporary test records remaining; database clean state confirmed.
+- **TypeScript Static Verification:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack (0 errors).
+- **Browser UI QA Verification:** Verified on Desktop (1440×900) and Mobile (390×844) — table layout, Destination filter dropdown, Excel import modal, Add Hotel form validation, and responsive mobile rendering verified.
+
+## 161.5 Destination Selector Display Name UI Fix
+- **Issue:** `DestinationSelect` (`src/components/shared/destination-select.tsx`) previously rendered the raw Destination ID (`cly...` / `cm...`) inside the closed select trigger because `SelectValue` defaulted to running `formatEnumLabel(value)` on the string ID when no custom render function was provided.
+- **Root Cause & Fix:** Enhanced `DestinationSelect`'s `<SelectValue>` to pass a lookup function `(val: any) => match?.name`. It maps the selected Destination ID back to the human-readable Destination name (`destinations.find(d => d.id === val)` or `initialDestination`).
+- **Data & API Contract Invariant Preserved:**
+  - **UI Display:** Human-readable Destination name (e.g. `Goa`, `Mumbai`, `Bengaluru`).
+  - **Form State:** Destination ID (e.g. `cly...`).
+  - **API / Database:** Destination ID (e.g. `cly...`).
+- **Verified:**
+  - Add Hotel (`/hotels/new`): Selecting `Goa` or `Mumbai` visibly renders `Goa` / `Mumbai` in the trigger.
+  - Edit Hotel (`/hotels/[id]`): Opening an existing hotel renders its assigned Destination name (e.g., `Bengaluru`), and selecting `Goa` immediately updates display to `Goa`.
+  - Typecheck (`npx tsc --noEmit`) and QA-19 suite (`24/24` passed) verified with zero regressions.
+
+---
+
+# 162. PHASE 158-D — END-TO-END QA CERTIFICATION
+
+## 162.1 Scope of E2E QA
+Phase 158-D performed an exhaustive end-to-end verification of the complete integrated business journey across Destination, Hotel Master, Activity Master, Trip Creation & Management, Dynamic RateSheet lookup, Costing/Pricing Engine, Quotation & Booking/Invoice pipelines, Excel Import flows, and Responsive Web UI.
+
+Verified End-to-End Relationship Flow:
+```text
+Destination Master (Locked 32 Starter Catalog)
+       ↓
+Trip Destination Selection (Simple Multi-Select Dropdown)
+       ↓
+TripDestination Records (Contiguous Sequences 1..N, Repeated Routes Support)
+       ↓
+Hotel / Activity Inventory Filtering (Filtered by Trip Destination Set)
+       ↓
+Hotel / Activity Selection & Dynamic RateSheet Lookup (1 Auto, Multi Choice, 0 Warning)
+       ↓
+Trip Costing & Pricing Engine (Phase 155 Room Multiplier Preservation)
+       ↓
+Quotation Generation & Customer Booking / Invoice Conversion (Persistent INV-XXXX Number)
+```
+
+Vehicle Independence Architecture:
+```text
+Trip → Vehicle → Vehicle RateSheet (Completely independent of Destination requirements)
+```
+
+## 162.2 QA-20 Automated Test Suite Matrix
+Comprehensive automated audit suite executed via `prisma/test-qa-20-phase-158d-e2e-qa.ts`:
+
+| Test ID | Category | Description | Result |
+|---|---|---|---|
+| **0.1** | Integrity | Permanent agency contains exactly 32 active locked starter destinations | **PASS** |
+| **1** | Destination | Trip with zero destinations creates 0 TripDestination records without synthetic routes | **PASS** |
+| **2** | Destination | Single destination trip creates exactly 1 TripDestination with sequence=1 | **PASS** |
+| **3** | Destination | Multiple destination trip creates contiguous sequence records (1: Goa, 2: Mumbai, 3: Jaipur) | **PASS** |
+| **4** | Destination | Repeated route (Goa → Mumbai → Goa) creates 3 distinct records with sequences 1, 2, 3 | **PASS** |
+| **5** | Hotel Master | Hotel creation rejected when Hotel Name is missing | **PASS** |
+| **6** | Hotel Master | Hotel creation rejected when Destination is missing | **PASS** |
+| **7** | Hotel Master | Valid Hotel created with auto-code, Destination=Goa, distinct City=Benaulim | **PASS** |
+| **8** | Hotel Master | Assigning another agency's Destination to Hotel is strictly rejected | **PASS** |
+| **9** | Hotel Master | Legacy Hotel with destinationId = null loads safely without crashes or synthetic backfill | **PASS** |
+| **10** | Hotel Master | Updating legacy Hotel destination to Mumbai persists accurately | **PASS** |
+| **11** | Hotel Master | Hotel list filtered by destinationId=Goa returns Goa hotels and excludes Mumbai hotels | **PASS** |
+| **12** | Hotel Excel | Valid Excel row parses correctly with matched destinationId and distinct physical city | **PASS** |
+| **12.1** | Hotel Excel | Excel row imports into DB with active destination relation | **PASS** |
+| **13** | Hotel Excel | Excel row with missing Hotel Name fails row validation | **PASS** |
+| **14** | Hotel Excel | Excel row with missing Destination fails row validation | **PASS** |
+| **15** | Hotel Excel | Destination matching ignores leading/trailing whitespace (`'   Goa   '` → `Goa`) | **PASS** |
+| **16** | Hotel Excel | Destination matching is case-insensitive (`'gOa'` → `Goa`) | **PASS** |
+| **17** | Hotel Excel | Geographic inference prevention (`Panaji` does NOT automatically map to `Goa`) | **PASS** |
+| **18** | Hotel Excel | Unknown destination fails row validation with clear error message | **PASS** |
+| **19** | Hotel Excel | Hotel RateSheet Excel template intentionally DOES NOT contain Destination column | **PASS** |
+| **20** | Inventory | Assigning matching destination hotel (Goa hotel to Goa/Mumbai/Jaipur trip) succeeds | **PASS** |
+| **21** | Inventory | Assigning Agra hotel to Goa-only trip is strictly rejected with ValidationError | **PASS** |
+| **22** | RateSheet | Single applicable hotel RateSheet auto-selected with exact price (6500) | **PASS** |
+| **23** | RateSheet | Multiple rates for same room type returned for user choice | **PASS** |
+| **24** | RateSheet | Zero applicable rates returns unmatched state without hardcoded fallback pricing | **PASS** |
+| **25** | Activity | Activity created with agency Destination relation | **PASS** |
+| **26** | Activity | Activity assigned to matching trip destination successfully | **PASS** |
+| **27** | Activity | Assigning Jaipur activity to Goa-only trip is strictly rejected with ValidationError | **PASS** |
+| **28** | Vehicle | Vehicle assigned to trip completely independent of Destination requirements | **PASS** |
+| **29** | Tenancy | Cross-agency hotel rejected when attempting assignment to Agency A trip | **PASS** |
+| **30** | Tenancy | Cross-agency destination rejected when creating Agency A trip | **PASS** |
+| **31** | Costing | Phase 155 Room multiplier verified: 2 rooms × 3 nights @ 6500 = exactly 39,000 cost | **PASS** |
+| **32** | Quotation | Quotation generated accurately from trip itinerary services with positive total amount | **PASS** |
+| **33** | Invoice | Confirmed booking converts to invoice with persistent invoice number (`INV-XXXX`) | **PASS** |
+| **34** | Cleanup | Automated cleanup of all temporary test records verified | **PASS** |
+
+**QA-20 Automated Execution Summary:** `35/35 PASSED (100%), 0 FAILED`.
+
+## 162.3 Browser & Responsive UI Verification
+- **Desktop (1440 × 900) & Mobile (390 × 844) Viewports:**
+  - `/trips/new`: Compact `DestinationMultiSelect` dropdown renders smoothly with badge counter, search input, and multi-checkbox options. Zero horizontal overflow.
+  - `/trips/[id]`: Route overview renders sequence (`1 Goa → 2 Mumbai → 3 Jaipur`), Add Hotel dialog displays only matching destination inventory, Add Activity dialog filters by trip destinations.
+  - `/hotels`: Clean modern SaaS table layout, MapPin emerald Destination badge, dedicated Destination filter dropdown in table toolbar, Excel import modal with drag-and-drop.
+  - `/hotels/new` & `/hotels/[id]`: `DestinationSelect` displays human-readable Destination name (e.g., `Goa`, `Mumbai`, `Bengaluru`), submits Destination ID internally.
+- **Client-Side Performance & Navigation:**
+  - Client-side transitions across trips, hotels, costing, and quotations preserve QA-05/05B invariants with zero unintended full-page reloads (`window.location.reload()`).
+
+## 162.4 Regression Verification Against Previous Invariants
+- **QA-04 / QA-05 / QA-05B:** Client-side SPA navigation preserved across core workflows.
+- **QA-06A / QA-07A:** Multi-tenant agency boundary validation intact.
+- **QA-13 / DEV-05 / Phase 155:** Multi-room hotel costing calculation (`rooms × nights × rate`) verified without regression.
+- **QA-15 / QA-16 / QA-17:** Activity master destination association and rate tiers preserved.
+- **QA-18 / QA-19:** Hotel mandatory destination and Excel integration confirmed with zero residue.
+
+## 162.5 Database Residue & Clean State Audit
+- **Permanent Test Agency (`TripDesk Offical Test Agnecy`, `tripmadeeasy.in@gmail.com`):**
+  - Exactly 32 locked starter destinations.
+  - 100% active status (`ACTIVE`), 0 duplicates.
+  - 0 residue test hotels, 0 residue test trips, 0 residue test agencies created during Phase 158-D QA.
+
+## 162.6 Static Typing & Build Verification
+- **TypeScript Typecheck (`npx tsc --noEmit`):** PASSED (0 errors).
+- **Next.js Production Build (`npm run build`):** PASSED (0 errors).
+
+---
+
+# 163. FULL PERMANENT TEST AGENCY QA DATA CLEANUP
+
+## 163.1 Objective & Authority
+On September 17, 2026, an authorized full database cleanup was executed on the permanent test agency (`TripDesk Offical Test Agnecy`, `tripmadeeasy.in@gmail.com`, Agency ID: `cmu2g9rgq0000swtqbr5aie7x`) to remove all disposable QA, test, and historical business data in preparation for clean Hotel Master and RateSheet dataset imports.
+
+## 163.2 Preserved Entities (100% Intact)
+1. **Agency Record:** `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`) preserved.
+2. **Agency Owner:** `tripmadeeasy.in@gmail.com` (`AGENCY_OWNER`) preserved.
+3. **Platform Owner:** `mzpatel14@gmail.com` (`PLATFORM_OWNER`) preserved.
+4. **All Destinations:** Exactly **32 / 32** active starter destinations preserved without changes (0 duplicates).
+5. **All Vehicles:** Exactly **6 / 6** Vehicle Master records preserved with identical IDs.
+
+## 163.3 Deleted Disposable Entities
+Executed in a single relational transaction:
+- **Hotels:** 51 deleted (0 remaining)
+- **Hotel RateSheets:** 588 deleted (0 remaining)
+- **Activities & Activity RateSheets:** 0 deleted (0 remaining)
+- **Vehicle RateSheets:** 0 deleted (0 remaining)
+- **Trips:** 2 deleted (0 remaining)
+- **Trip Destinations:** 2 deleted (0 remaining)
+- **Trip Hotels:** 2 deleted (0 remaining)
+- **Trip Activities:** 1 deleted (0 remaining)
+- **Trip Vehicles:** 1 deleted (0 remaining)
+- **Travelers & Itinerary Items:** 6 deleted (0 remaining)
+- **Customers:** 1 deleted (0 remaining)
+- **Quotations & Quotation Items / Proposals / Milestones:** 16 deleted (0 remaining)
+- **Bookings, Invoices, Payments, Confirmations:** 0 remaining
+
+## 163.4 Cross-Agency Safety Audit
+- Verified that all other agencies in the system remained completely untouched with zero unintended deletions.
+
+# 164. RATESHEET EXCEL IMPORT VALIDATION ERROR CLASSIFICATION & EXISTING RATE VERIFICATION
+
+## 164.1 Bug Fix — Client-Facing Excel Validation Error Classification
+- **Issue:** During `POST /api/rate-sheets/import?action=preview`, client-facing Excel template and parsing errors (such as missing required columns like `Hotel Code`, empty sheet, row limit exceeded) were throwing generic `new Error(...)`.
+- **Root Cause:** In `src/lib/api/errors.ts`, `handleApiError` treats any generic `Error` not subclassing `ApiError` as an unhandled server error, returning HTTP 500 `INTERNAL_ERROR` (`"An unexpected error occurred while processing your request. Please try again later."`).
+- **Fix Implemented:** In `src/lib/excel/rate-excel-service.ts`, imported `ValidationError` from `@/lib/api` and replaced client-caused generic `new Error(...)` throws with `new ValidationError(...)`.
+- **Result:** Invalid/missing required headers now accurately return HTTP 400 with `{"code": "VALIDATION_ERROR", "message": "Invalid template headers. Missing required column(s): 'Hotel Code'. Please download and use the official sample template."}`.
+- **Excel Contract Invariants Preserved:**
+  - `Hotel Code` remains the strict required header (`/^hotel\s*code$/i`).
+  - `Hotel Code (Test Mapping)` was NOT added as an alias.
+  - Excel template structure remains unchanged.
+  - `Hotel_Rates.xlsx` intentionally continues to have **NO Destination column**.
+
+## 164.2 Permanent Test Agency Read-Only Rate Verification
+- **Agency:** `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`, `tripmadeeasy.in@gmail.com`).
+- **Inventory Counts:**
+  - **Hotels:** 22 (`HTL-0001` through `HTL-0022`, imported post-cleanup).
+  - **Hotel RateSheets:** Exactly 1 (`RAT-2026-00001`).
+  - **Vehicles:** 6 (preserved).
+  - **Vehicle RateSheets:** 0.
+  - **Destinations:** 32 (preserved).
+  - **Activity RateSheets:** 0.
+- **Single Existing Hotel RateSheet Details:**
+  - **ID:** `cmu5f9ili0000v4tqrrixq0ih`
+  - **Number:** `RAT-2026-00001`
+  - **Name:** `Amber Courtyard - Deluxe Room (Peak Season 2026-27)`
+  - **Hotel:** `Amber Courtyard` (`HTL-0006`, ID: `cmu5f7cw4000f74tqzuvxrs8h`)
+  - **Room Type:** `Deluxe Room`, **Meal Plan:** `CP`, **Inventory Type:** `HOTEL`
+  - **Cost Price:** `4500` INR, **Extra Adult:** `1500`, **Extra Child:** `800`
+  - **Validity:** `2026-09-01` to `2027-03-31` (`01-09-2026` to `31-03-2027`)
+  - **Status:** `ACTIVE`, **Priority:** `1`, **Source Type:** `MANUAL`
+  - **Timestamps:** Created `2026-09-17T11:04:09.318Z`, Updated `2026-09-17T11:23:45.882Z`
+- **Origin Determination:**
+  - Evidence confirms this rate sheet was created via the **manual UI creation workflow** (`POST /api/rate-sheets` with `sourceType: "MANUAL"`) 2 minutes after the 22 hotels were imported, and was not created via Excel bulk import.
+- **Safety Confirmation:**
+  - 0 RateSheets imported, 0 database mutations performed, existing rate preserved.
+
+## 164.3 Automated Verification
+- **QA-21 Test Suite (`prisma/test-qa-21-rate-excel-validation-error.ts`):** 22/22 assertions passed (100%).
+- **TypeScript Typecheck (`npx tsc --noEmit`):** Passed (0 errors).
+- **Production Build (`npm run build`):** Passed with Turbopack (0 errors).
+
+# 165. AUTHORIZED SINGLE-RECORD RATESHEET CLEANUP & DATABASE VERIFICATION
+
+## 165.1 Pre-Deletion Verification
+- **Target Record Verified:** Exactly 1 RateSheet record with ID `cmu5f9ili0000v4tqrrixq0ih` was verified read-only before deletion.
+- **Record Attributes Verified:**
+  - **ID:** `cmu5f9ili0000v4tqrrixq0ih`
+  - **RateSheet Number:** `RAT-2026-00001`
+  - **Name:** `Amber Courtyard - Deluxe Room (Peak Season 2026-27)`
+  - **Hotel:** `Amber Courtyard` (`HTL-0006`, ID: `cmu5f7cw4000f74tqzuvxrs8h`)
+  - **Room Type:** `Deluxe Room`, **Meal Plan:** `CP`, **Cost Price:** ₹4500, **Extra Adult:** ₹1500, **Extra Child:** ₹800
+  - **Season:** `Peak Season 2026-27`, **Valid From:** `2026-09-01`, **Valid To:** `2027-03-31`
+  - **Status:** `ACTIVE`, **Source Type:** `MANUAL`
+  - **Agency:** `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`)
+
+## 165.2 Targeted Deletion Execution
+- **Action:** Executed exact unique ID deletion targeting only record `cmu5f9ili0000v4tqrrixq0ih`.
+- **Records Affected:** Exactly **1**.
+
+## 165.3 Post-Deletion Verification & Database Safety
+- **Target Record Absence:** Confirmed `findUnique({ where: { id: "cmu5f9ili0000v4tqrrixq0ih" } })` returns `null`.
+- **Preserved Inventory Counts:**
+  - **Hotels:** Exactly **22 / 22** intact (including `Amber Courtyard` / `HTL-0006`).
+  - **Hotel RateSheets:** Exactly **0**.
+  - **Total RateSheets (All Types):** Exactly **0**.
+  - **Vehicles:** Exactly **6 / 6** intact.
+  - **Destinations:** Exactly **32 / 32** active starter destinations intact.
+- **Boundary Confirmation:** Rate Excel bulk import was **NOT** started. Zero workbooks were modified.
+
+# 166. HOTEL RATE EXCEL BULK TEST WORKBOOK CORRECTION & VALIDATION
+
+## 166.1 Workbook Preparation & Mapping Updates
+- **File Corrected:** `TripDesk_Hotel_Rates_Bulk_Test_Data_UPDATED.xlsx` (located in user Downloads).
+- **Header Alignment:** Replaced `Hotel Code (Test Mapping)` with the strict official importer header: `Hotel Code`.
+- **Code Mapping Replaced:** Successfully mapped all 22 placeholder test codes (`TEST-GOA-001` .. `TEST-DWK-001`) to the actual verified generated Hotel Codes in the database (`HTL-0001` through `HTL-0022`):
+  - `HTL-0001`: Seaside Palm Resort (Goa)
+  - `HTL-0002`: Coconut Grove Hotel (Goa)
+  - `HTL-0003`: Marine Gateway Hotel (Mumbai)
+  - `HTL-0004`: Harbour View Residency (Mumbai)
+  - `HTL-0005`: Pink City Palace (Jaipur)
+  - `HTL-0006`: Amber Courtyard (Jaipur)
+  - `HTL-0007`: Lake Palace View (Udaipur)
+  - `HTL-0008`: Blue Fort Residency (Jodhpur)
+  - `HTL-0009`: Capital Grand Hotel (Delhi)
+  - `HTL-0010`: Taj Gateway Inn (Agra)
+  - `HTL-0011`: Ganges Heritage Hotel (Varanasi)
+  - `HTL-0012`: Golden Temple View (Amritsar)
+  - `HTL-0013`: Dal Lake Retreat (Srinagar)
+  - `HTL-0014`: Himalayan Pine Resort (Manali)
+  - `HTL-0015`: Ridge Mountain Hotel (Shimla)
+  - `HTL-0016`: Ganga Riverside Stay (Rishikesh)
+  - `HTL-0017`: Harbour Heritage Kochi (Kochi)
+  - `HTL-0018`: Tea Valley Resort (Munnar)
+  - `HTL-0019`: Garden City Suites (Bengaluru)
+  - `HTL-0020`: Royal Palace Residency (Mysuru)
+  - `HTL-0021`: Sabarmati Grand Hotel (Ahmedabad)
+  - `HTL-0022`: Dwarka Coast Resort (Dwarka)
+
+## 166.2 Data Invariants & Contract Compliance
+- **Total Data Rows:** Exactly **66** rate definitions (22 Hotels × 3 rate tiers per hotel = 66).
+- **Hotel Code Frequency:** Each code `HTL-0001` through `HTL-0022` appears exactly **3 times**.
+- **Placeholder Residue:** Exactly **0** `TEST-*` placeholder codes remain in the main data sheet.
+- **Destination Invariant Preserved:** **0 Destination columns** (Destination is completely absent from RateSheet Excel per locked architectural rule).
+- **Rate Sheet Columns:** `Hotel Code`, `Room Type`, `Meal Plan`, `Rate Type`, `Cost Price`, `Extra Adult Rate`, `Extra Child Rate`, `Season Name`, `Valid From`, `Valid To`, `Priority`, `Status`, `Notes`.
+
+## 166.3 Programmatic Parser & Preview Simulation
+- Executed in-memory read-only simulation with `rateExcelService.parseAndPreview` against the permanent test agency (`TripDesk Offical Test Agnecy` / `cmu2g9rgq0000swtqbr5aie7x`).
+- **Results:**
+  - `canExecute`: **true**
+  - `totalRows`: **66**
+  - `validRows`: **66** (100% valid)
+  - `errorRows`: **0**
+  - `warningRows`: **0**
+
+## 166.4 Database Safety & Import Status
+- **Import Status:** **NOT IMPORTED** (Ready for controlled execution upon explicit authorization).
+- **Database Mutations:** Exactly **0** (0 RateSheets created, 22 Hotels preserved, 32 Destinations preserved, 6 Vehicles preserved).
+
+# 167. RATESHEET EXCEL CONTROLLED PREVIEW AUDIT
+
+## 167.1 Preview Execution & Method
+- **Method Executed:** `rateExcelService.parseAndPreview` (actual production importer service).
+- **Target Workbook:** `TripDesk_Hotel_Rates_Bulk_Test_Data_UPDATED.xlsx` (66 rate rows).
+- **Target Agency:** `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`).
+- **Import Mode Tested:** `UPDATE` / `SKIP`.
+
+## 167.2 Preview Summary Results
+- **Total Rows Processed:** **66**
+- **Valid Rows:** **66** (100% valid)
+- **Warning Rows:** **0**
+- **Error Rows:** **0**
+- **Execution Viability (`canExecute`):** **true**
+- **Planned Database Actions:** **66 create** (0 skips, 0 updates in current clean rate state).
+
+## 167.3 Hotel Resolution & Distribution Verification
+- **22 / 22 Hotel Codes Resolved:** Every single Hotel Code (`HTL-0001` through `HTL-0022`) resolved cleanly to the intended hotel property in the database.
+- **Distribution:** Each Hotel Code occurred exactly **3 times** in the preview dataset (`22 × 3 = 66`).
+- **Tenant Scoping:** 100% of resolved hotels belong to `agencyId: cmu2g9rgq0000swtqbr5aie7x` with **0** cross-agency resolutions.
+
+## 167.4 Field Mapping & Invariant Integrity
+- **Mapped Columns:** `Hotel Code`, `Room Type`, `Meal Plan`, `Season Name`, `Valid From` (DD-MM-YYYY), `Valid To` (DD-MM-YYYY), `Cost Price`, `Extra Adult Rate`, `Extra Child Rate`, `Notes`.
+- **Ignored Columns:** `Rate Type`, `Priority`, `Status` (handled per existing importer architecture).
+- **Destination Invariant:** 0 Destination columns in Rate Excel; resolved strictly through Hotel Master relation.
+
+## 167.5 Post-Preview Database State
+- **RateSheets:** Exactly **0** (0 mutations).
+- **Hotels:** Exactly **22** intact.
+- **Destinations:** Exactly **32** intact.
+- **Vehicles:** Exactly **6** intact.
+- **Execution Status:** **IMPORT NOT EXECUTED — WAITING FOR EXPLICIT AUTHORIZATION**.
+
+# 168. AUTHORIZED 66-ROW HOTEL RATESHEET IMPORT EXECUTION & POST-VERIFICATION
+
+## 168.1 Authorization & Pre-Import Guard Verification
+- **User Authorization:** Explicitly granted (`AUTHORIZATION: GRANTED`).
+- **Target Agency:** `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`).
+- **Source Workbook:** `C:\Users\hp\Downloads\TripDesk_Hotel_Rates_Bulk_Test_Data_UPDATED.xlsx`.
+- **Pre-Import Database Guard State:**
+  - **Hotels:** Exactly **22 / 22** verified intact.
+  - **Pre-Import RateSheets:** Exactly **0** (clean rate state).
+  - **Vehicles:** Exactly **6 / 6** verified intact.
+  - **Destinations:** Exactly **32 / 32** verified intact.
+  - **Workbook Parse & Preview Guard:** 66/66 total rows valid, 0 errors, 0 warnings, `canExecute: true`.
+
+## 168.2 Import Execution
+- **Service Invoked:** Production `rateExcelService.executeImport(buffer, agencyId, "SKIP")`.
+- **Execution Mode:** Direct transactional batch import (`tx.rateSheet.createMany`).
+- **Result Metrics:**
+  - `total`: **66**
+  - `imported`: **66**
+  - `updated`: **0**
+  - `skipped`: **0**
+  - `failed`: **0**
+  - `errors`: **[]**
+
+## 168.3 Post-Import Database Verification
+- **Created RateSheets:** Exactly **66** RateSheet records created (`RAT-2026-00001` through `RAT-2026-00066`).
+- **Hotel Linkage & Distribution (22 Hotels × 3 RateSheets each):**
+  - `HTL-0001`: Seaside Palm Resort — 3 rate sheets (`RAT-2026-00001`, `RAT-2026-00002`, `RAT-2026-00003`)
+  - `HTL-0002`: Coconut Grove Hotel — 3 rate sheets (`RAT-2026-00004`, `RAT-2026-00005`, `RAT-2026-00006`)
+  - `HTL-0003`: Marine Gateway Hotel — 3 rate sheets (`RAT-2026-00007`, `RAT-2026-00008`, `RAT-2026-00009`)
+  - `HTL-0004`: Harbour View Residency — 3 rate sheets (`RAT-2026-00010`, `RAT-2026-00011`, `RAT-2026-00012`)
+  - `HTL-0005`: Pink City Palace — 3 rate sheets (`RAT-2026-00013`, `RAT-2026-00014`, `RAT-2026-00015`)
+  - `HTL-0006`: Amber Courtyard — 3 rate sheets (`RAT-2026-00016`, `RAT-2026-00017`, `RAT-2026-00018`)
+  - `HTL-0007`: Lake Palace View — 3 rate sheets (`RAT-2026-00019`, `RAT-2026-00020`, `RAT-2026-00021`)
+  - `HTL-0008`: Blue Fort Residency — 3 rate sheets (`RAT-2026-00022`, `RAT-2026-00023`, `RAT-2026-00024`)
+  - `HTL-0009`: Capital Grand Hotel — 3 rate sheets (`RAT-2026-00025`, `RAT-2026-00026`, `RAT-2026-00027`)
+  - `HTL-0010`: Taj Gateway Inn — 3 rate sheets (`RAT-2026-00028`, `RAT-2026-00029`, `RAT-2026-00030`)
+  - `HTL-0011`: Ganges Heritage Hotel — 3 rate sheets (`RAT-2026-00031`, `RAT-2026-00032`, `RAT-2026-00033`)
+  - `HTL-0012`: Golden Temple View — 3 rate sheets (`RAT-2026-00034`, `RAT-2026-00035`, `RAT-2026-00036`)
+  - `HTL-0013`: Dal Lake Retreat — 3 rate sheets (`RAT-2026-00037`, `RAT-2026-00038`, `RAT-2026-00039`)
+  - `HTL-0014`: Himalayan Pine Resort — 3 rate sheets (`RAT-2026-00040`, `RAT-2026-00041`, `RAT-2026-00042`)
+  - `HTL-0015`: Ridge Mountain Hotel — 3 rate sheets (`RAT-2026-00043`, `RAT-2026-00044`, `RAT-2026-00045`)
+  - `HTL-0016`: Ganga Riverside Stay — 3 rate sheets (`RAT-2026-00046`, `RAT-2026-00047`, `RAT-2026-00048`)
+  - `HTL-0017`: Harbour Heritage Kochi — 3 rate sheets (`RAT-2026-00049`, `RAT-2026-00050`, `RAT-2026-00051`)
+  - `HTL-0018`: Tea Valley Resort — 3 rate sheets (`RAT-2026-00052`, `RAT-2026-00053`, `RAT-2026-00054`)
+  - `HTL-0019`: Garden City Suites — 3 rate sheets (`RAT-2026-00055`, `RAT-2026-00056`, `RAT-2026-00057`)
+  - `HTL-0020`: Royal Palace Residency — 3 rate sheets (`RAT-2026-00058`, `RAT-2026-00059`, `RAT-2026-00060`)
+  - `HTL-0021`: Sabarmati Grand Hotel — 3 rate sheets (`RAT-2026-00061`, `RAT-2026-00062`, `RAT-2026-00063`)
+  - `HTL-0022`: Dwarka Coast Resort — 3 rate sheets (`RAT-2026-00064`, `RAT-2026-00065`, `RAT-2026-00066`)
+- **Tenant Isolation:** 100% of all 66 RateSheets scoped to `cmu2g9rgq0000swtqbr5aie7x`. Exactly **0** cross-agency records.
+- **Destination Independence Preserved:** Zero RateSheets created or required direct Destination columns. Destination remains strictly a Hotel Master concern.
+- **Permanent Test Data Invariant:**
+  - **Hotels:** Exactly **22 / 22** intact.
+  - **Destinations:** Exactly **32 / 32** intact.
+  - **Vehicles:** Exactly **6 / 6** intact.
+  - **RateSheets:** Exactly **66 / 66** active.
+
+# 169. READ-ONLY POST-IMPORT RATESHEET QA & REGRESSION AUDIT
+
+## 169.1 Audit Execution & Methodology
+- **Audit Type:** Strict Read-Only Post-Import QA and Cross-Module Regression Verification.
+- **Target Agency:** `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`).
+- **Database Mutation Guard:** **0 database writes / updates / deletes executed during audit**.
+
+## 169.2 Database Integrity Baseline
+| Component | Baseline Count | Post-Audit Count | Status |
+| :--- | :---: | :---: | :--- |
+| **Hotels** | 22 | 22 | **PASS (100% Intact, 0 Duplicates)** |
+| **RateSheets** | 66 | 66 | **PASS (100% Intact, RAT-2026-00001 .. 00066)** |
+| **Destinations** | 32 | 32 | **PASS (100% Starter Catalog Intact)** |
+| **Vehicles** | 6 | 6 | **PASS (100% Intact)** |
+| **Cross-Agency Rates** | 0 | 0 | **PASS (Strict Tenant Scoping)** |
+
+## 169.3 Hotel Code Mapping & Distribution Verification
+- **22 / 22 Hotels Verified:** All 22 unique codes `HTL-0001` through `HTL-0022` verified with 0 duplicates.
+- **`HTL-0016` Confirmation:** Verified `HTL-0016` correctly maps to `Ganga Riverside Stay` (Rishikesh) with 3 RateSheets (`RAT-2026-00046`, `00047`, `00048`).
+- **`HTL-0015` Confirmation:** Verified `HTL-0015` correctly maps to `Ridge Mountain Hotel` (Shimla) with 3 RateSheets (`RAT-2026-00043`, `00044`, `00045`).
+- **Per-Hotel Distribution:** Exactly **22 / 22** Hotels have **3 RateSheets each** (`22 × 3 = 66`).
+
+## 169.4 Rate Lookup Engine & Hotel Isolation
+- **Lookup Verification:** Tested `rateSheetService.getApplicableHotelRate` across standard and premium validity windows:
+  - `HTL-0001` on `2026-05-15` (Deluxe / MAP) -> Resolved `RAT-2026-00002` (₹5,100, Premium Season) ✓
+  - `HTL-0001` on `2026-02-15` (Deluxe / CP) -> Resolved `RAT-2026-00001` (₹4,200, Standard Season) ✓
+- **Hotel Isolation:** Querying `HTL-0002` strictly resolves `HTL-0002` rates (`RAT-2026-00004`) with 0 cross-hotel leakage.
+
+## 169.5 Phase 155 Multi-Room Costing Regression
+- **Nightly Multi-Room Formula:** Verified `totalCost = nightlyRate × rooms × diffDays` in `tripCostingService`:
+  - 1 room × 2 nights × ₹3,500 = ₹7,000 ✓
+  - 2 rooms × 2 nights × ₹3,500 = ₹14,000 ✓
+  - 3 rooms × 2 nights × ₹3,500 = ₹21,000 ✓
+  - 4 rooms × 2 nights × ₹3,500 = ₹28,000 ✓
+
+## 169.6 Quotation, Booking & Public Redaction Security
+- **Public Proposal Redaction:** Verified public proposal projection in `quotationService.getPublicQuotationByToken` strips internal costs, nightly rate purchase prices, markups, and internal supplier notes.
+- **Tenant Scoping:** All API endpoints derive `agencyId` server-side from session auth guards (`requireReadAccess`, `requireWriteAccess`).
+- **TypeScript Integrity:** `npx tsc --noEmit` verified with **0 errors**.
+
+## 169.7 Final Audit Result
+- **Database Mutations During Audit:** Exactly **0**.
+- **Final RateSheet Count:** Exactly **66**.
+- **Final Verdict:** **POST-IMPORT QA PASSED — NO REGRESSIONS FOUND**.
+
+# 170. DESTINATION UI CONSISTENCY CHANGES & VERIFICATION
+
+## 170.1 Objective & Overview
+- Implemented targeted UI consistency improvements for Destination selection and filtering across the TripDesk workspace without altering backend schemas, database models, or tenancy rules.
+
+## 170.2 Change A: `/hotels` Destination Filter Dropdown Standardization
+- **File Modified:** [`src/app/(dashboard)/hotels/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/%28dashboard%29/hotels/page.tsx)
+- **Modifications:**
+  - Replaced the inconsistent native HTML `<select>` dropdown with the standard design system `Select` component (`@/components/ui/select`).
+  - Added `MapPin` icon, `rounded-xl`, consistent hover/focus rings (`focus-visible:ring-indigo-500/20`), and standard `SelectContent` popup.
+  - Maintained complete filtering functionality: `All Destinations` default, single destination selection, table filtering, and `Clear Filters` action.
+
+## 170.3 Change B: Trip Edit Destination UI Alignment
+- **File Modified:** [`src/app/(dashboard)/trips/[id]/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/%28dashboard%29/trips/%5Bid%5D/page.tsx)
+- **Modifications:**
+  - **Removed Standalone Card:** Completely removed the separate "Trip Destinations & Route" section, route summary bar, up/down reorder buttons, and standalone "Add Destination Modal".
+  - **Profile Grid Integration:** Added a clean `Destinations` entry to the main `Trip Profile Details` grid displaying assigned destination names as concise badges/labels.
+  - **Edit Modal Alignment:** Integrated the standard `DestinationMultiSelect` field inside the "Edit Trip Modal" matching the reference design of [`/trips/new`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/%28dashboard%29/trips/new/page.tsx).
+  - **Persistence & Sequence Integrity:** Implemented `syncTripDestinations` to safely synchronize multi-select changes to `TripDestination` records, preserving existing sequence ordering and multi-destination persistence.
+
+## 170.4 Data Safety & Architecture Invariants
+- **Database Schema:** Exactly **0** schema or migration changes.
+- **Database Baseline:** All permanent test data preserved intact (22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles).
+- **Tenant Isolation:** All destination queries and mutations remain strictly agency-scoped.
+
+## 170.5 Verification & QA Results
+- **TypeScript:** `npx tsc --noEmit` verified with **0 errors**.
+- **Browser Subagent QA:**
+  - `/hotels`: Verified filter dropdown styling, Goa filtering (2 properties), and All Destinations reset (22 properties) on desktop and mobile viewports (390×844).
+  - `/trips/new`: Verified `DestinationMultiSelect` popover search and multi-select behavior remain unchanged.
+  - `/trips/cmu5fhkk40006v4tqpd2k2kd4`: Verified removal of the separate route card, presence of Destinations in profile details, and functional `DestinationMultiSelect` inside the Edit Trip modal.
+- **Verdict:** **IMPLEMENTATION COMPLETE — DESTINATION UI CONSISTENCY VERIFIED**.
+
+# 171. COMPLETE QUOTATION UX, PRICING, PAYMENT SCHEDULE, PDF & LIVE-LINK PRODUCTION AUDIT
+
+## 171.1 Objective & Overview
+- Executed a deep production-readiness overhaul for the TripDesk Quotation Studio (`/trips/[id]/quotation`), price recalculation chain, payment milestone synchronization, customer-facing PDF, and public share token flows.
+
+## 171.2 Pricing Architecture & Pricing Semantics Guard
+- **Base Cost (`QuotationItem.costPrice`)**: Represents the net supplier procurement cost (from RateSheets, vehicle master, or manual supplier rates). Strictly internal to the agency for margin calculation (`markupAmount = subtotal * markupPct`).
+- **Base Cost Independence**: `QuotationItem.costPrice` is **NEVER** automatically rewritten when an agent edits the customer-facing `Quoted Unit Price`. Procurement cost remains strictly independent.
+- **Selling Price (`unitPrice` / `sellingPrice` / `totalPrice`)**: Customer-facing quoted unit and line-item prices.
+- **Pricing Propagation Chain**:
+  ```text
+  Quoted Unit Price
+          ↓
+  Item Selling Price (unitPrice × quantity)
+          ↓
+  Quotation Selling Subtotal
+          ↓
+  Quotation Markup Margin (sellingSubtotal - baseCostSubtotal)
+          ↓
+  Discount (%)
+          ↓
+  Statutory Tax / GST
+          ↓
+  Quotation Final Amount
+          ↓
+  Persisted Payment Milestones (Dynamically Synchronized)
+          ↓
+  Customer Preview / PDF / Public Live Link
+  ```
+
+## 171.3 Pricing Semantics & Invariance Rules
+- **Base Procurement Cost (`subtotal`)**: Persisted as $\sum (\text{costPrice})$ across all line items. Represents what the agency pays suppliers and remains strictly untouched during customer quoted price edits.
+- **Agency Markup Margin (`markupAmount`)**: Evaluated as $\text{Total Quoted Selling} - \text{subtotal}$.
+- **Signed Margin Support**: When customer quoted selling price is discounted below supplier cost (e.g., loss leaders or negotiated concessions), `markupAmount` and `markupPercentage` evaluate to negative values. The costing engine evaluates this state as `Loss Warning` (`status: "Loss"`). UI formats negative margin in rose styling (`-₹4,550`), while customer-facing documents and public links remain 100% sanitized.
+- **Quoted Selling Base**: $\text{subtotal} + \text{markupAmount} \equiv \sum (\text{line-item quoted selling prices})$.
+- **Taxable Amount**: $\max(0, (\text{subtotal} + \text{markupAmount}) - \text{discountAmount})$.
+- **Final Amount**: $\text{taxableAmount} + \text{taxAmount}$ (for `EXCLUSIVE` tax mode) or $\text{taxableAmount}$ (for `INCLUSIVE` tax mode).
+- **Consumer Consistency**: Verified across Quotation workspace, Option Packages, Customer Preview, React-PDF, Payment Schedule synchronization, Booking conversion (`booking.totalAmount = quotation.finalAmount`), and Profitability / Costing Engine.
+
+## 171.4 Payment Schedule Synchronization
+- **Root Cause Fixed**: Previously, `recalculateQuotationTotals` updated `quotation.finalAmount`, but left percentage-based milestone `amount` fields on `quotation_payment_milestones` frozen at draft creation values.
+- **Implementation (`syncPaymentMilestones`)**:
+  - Whenever line item prices, markups, discounts, or taxes alter `finalAmount`, all percentage milestones dynamically recompute `amount = Math.round((finalAmount * percentage) / 100)`.
+  - The rounding remainder is assigned to the final milestone, guaranteeing `sum(milestones.amount) === finalAmount` exactly.
+  - Recalculated milestones are persisted server-side in the database transaction.
+
+## 171.5 Empty Quotation UI Redesign
+- Replaced blank viewport when `!activeQuote` with a dedicated, professional TripDesk Empty Workspace Card displaying:
+  - Clear heading: *No Quotation Proposal Created Yet*.
+  - Feature overview: Costing Snapshot, Tiered Packages, Payment Schedule.
+  - Primary action: *Generate Initial Proposal* with loading spinner states.
+
+## 171.6 Line Item Modal Simplification
+- Replaced confusing competing editable price fields with a single, clear customer-facing **"Quoted Unit Price (₹) *"** input.
+- Added a dynamic real-time calculation box showing `Customer Quoted Total` and displaying internal `Base Procurement Cost` as a subtle non-editable badge.
+
+## 171.7 Customer-Facing PDF & Preview Privacy
+- **Stripped Markup Leakage**: Removed `"Agency Service & Planning ({markupPercentage}%)"` and raw markup margins from customer-facing previews (`preview/page.tsx`) and PDFs.
+- **Clean Commercial Presentation**: Customer sees clean tour package tariffs, inclusions/exclusions, statutory GST breakdown, payment milestone schedule, and prominent **TOTAL PROPOSAL INVESTMENT**.
+- **Public Share Security**: Verified `quotationService.getPublicQuotationByToken` strictly redacts `costPrice`, `markupPercentage`, `markupAmount`, and `internalNotes`.
+
+## 171.8 Verification & QA Test Matrix
+| Area | Test Description | Result |
+| :--- | :--- | :---: |
+| **Empty State** | Loaded when no quotation exists | **PASS** |
+| **Pricing** | Increase Quoted Unit Price (₹40,000 → ₹50,000) | **PASS** |
+| **Pricing** | Decrease Quoted Unit Price (₹50,000 → ₹35,000 — Below Base Cost) | **PASS** |
+| **Pricing** | Base Cost Independence (`costPrice` unchanged at ₹40,000) | **PASS** |
+| **Pricing** | Signed Margin Calculation (`markupAmount = -₹4,550` on below-cost quote) | **PASS** |
+| **Payment Schedule** | Dynamic milestone synchronization & persistence (`sum === finalAmount`) | **PASS** |
+| **Preview** | Latest total & no internal markup leak | **PASS** |
+| **PDF** | Professional format & zero commercial leakage | **PASS** |
+| **Public Live Link** | Real-time latest data & strict redaction | **PASS** |
+| **Quotation → Booking** | Compatibility & correct total snapshot | **PASS** |
+| **TypeScript** | `npx tsc --noEmit` (0 errors) | **PASS** |
+| **Production Build** | `npm run build` (all routes static/dynamic compiled) | **PASS** |
+| **Permanent Data** | 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles intact | **PASS** |
+
+## 171.9 Final Verdict
+- **QUOTATION FLOW VERIFIED — PRODUCTION READY**
+
+---
+
+# 172. READ-ONLY QUOTATION PRICING MODEL & CUSTOMER PDF FORMAT AUDIT
+
+## 172.1 Audit Baseline & Architectural Findings
+- **Pricing Model Alignment**: Identified previous hybrid pricing model where line items maintained individual quoted prices alongside package-level markup.
+- **Audit Recommendation for Phase 173**:
+  1. Standardize quotation line items to strictly reflect RateSheet unit rates. Line items do NOT have independent markup or selling price inputs.
+  2. Apply Agency Markup ONCE at the package/quotation level over aggregate RateSheet base subtotal.
+  3. Redact intermediate pricing breakdowns and non-final monetary amounts from customer-facing surfaces (Customer Preview, Public Proposal Link, Quotation PDF).
+  4. Redesign Customer Quotation PDF into an original, multi-section travel-itinerary document with a strict single monetary value rule (`FINAL QUOTATION AMOUNT: ₹XX,XXX`).
+
+---
+
+# 173. QUOTATION PRICING MODEL & CUSTOMER-FACING ITINERARY PDF REDESIGN
+
+## 173.1 Core Architecture & Single Package Markup Rule
+- **RateSheet Rate as Single Unit Rate**:
+  - For each quotation line item, `unitPrice` is sourced directly and read-only from the selected hotel/vehicle/activity RateSheet.
+  - Line items do NOT have individual markups or independent selling prices (`QuotationItem.markupPercentage = 0`).
+  - $\text{Line Item Base Amount} = \text{RateSheet Rate} \times \text{Quantity}$.
+  - `QuotationItem.costPrice = QuotationItem.sellingPrice = QuotationItem.totalPrice = Line Item Base Amount`.
+- **Package-Level Markup (Applied ONCE)**:
+  $$\text{Subtotal} = \sum (\text{Line Item Base Amounts})$$
+  $$\text{Agency Markup Amount} = \text{Math.round}((\text{Subtotal} \times \text{Quotation Markup \%}) / 100)$$
+  $$\text{Gross Package Amount} = \text{Subtotal} + \text{Agency Markup Amount}$$
+  $$\text{Discount Amount} = \text{Math.round}((\text{Gross Package Amount} \times \text{Discount \%}) / 100)$$
+  $$\text{Taxable Amount} = \max(0, \text{Gross Package Amount} - \text{Discount Amount})$$
+  $$\text{Final Quotation Amount} = \text{TaxService.calculate}(\text{Taxable Amount}, \text{Tax Rate}, \text{Tax Mode})$$
+
+## 173.2 Dynamic Payment Milestone Synchronization
+- `syncPaymentMilestones(id, finalAmount)` dynamically synchronizes all percentage-based milestones upon quotation recalculation.
+- Remainder distribution guarantees $\sum (\text{milestones.amount}) \equiv \text{finalAmount}$ exactly to the rupee.
+- `updateQuotation` automatically returns the refreshed quotation object with updated payment milestones.
+
+## 173.3 Customer-Facing Financial Redaction
+- **Customer Preview (`/trips/[id]/quotation/preview`)**:
+  - Displays package services, non-price quantity badges, itinerary schedule, inclusions/exclusions, milestone percentages, and **Total Final Quotation Amount** exclusively.
+  - Line prices, subtotals, markups, discounts, and tax breakdowns are strictly omitted.
+- **Public Share Proposal (`/q/[shareToken]`)**:
+  - Sanitized public DTO completely redacts internal costs, subtotals, line item rates, markups, discounts, and milestone currency amounts.
+  - Displays package tier options, day-wise itinerary, inclusions/exclusions, milestone percentages, and **Total Package Investment** exclusively.
+- **Public API (`/api/quotations/public/[token]`)**:
+  - Server-side redaction ensures zero confidential financial leakage over the network.
+
+## 173.4 Customer-Facing Travel Itinerary PDF Redesign
+- **Original TripDesk Design**: Rebuilt `QuotationPdfService` into an original, elegant, multi-section travel-itinerary proposal with modern typography, card styling, and brand palettes.
+- **Structured Sections**:
+  1. Cover / Hero Banner (Agency branding, title, quotation number, version, prepared for, travel dates, validity).
+  2. Trip Overview Card (Travel dates, group size, validity).
+  3. Travel Consultant Greeting (if present).
+  4. Day-Wise Tour Itinerary (Day badge, date, title, location, detailed description).
+  5. Hotel Accommodations (Hotel, city, room type, meal plan, check-in, check-out, nights, rooms — non-price).
+  6. Transportation & Transfers (Vehicle, type, capacity, notes — non-price).
+  7. Sightseeing & Activities (Excursion name, city, date, description — non-price).
+  8. Package Inclusions & Exclusions (Two-column emerald/rose structured cards).
+  9. Payment Schedule (Stage names and percentages only — strictly zero currency amounts).
+  10. Booking Policies & Terms (Cancellation policy, terms and conditions).
+  11. **FINAL QUOTATION AMOUNT**: The **ONLY** monetary section in the entire PDF document, rendered as a prominent dark hero card with emerald final amount.
+  12. Global Header / Footer (Agency contact details and `Page X of Y` on all pages).
+
+## 173.5 Verification & QA Test Results
+- **Automated Verification Suite (`prisma/test-phase173-pricing-pdf.ts`)**:
+  - Scenario A: RateSheet single unit rate sourcing & aggregate subtotal (PASS)
+  - Scenario B: Package markup applied once at quotation level (PASS)
+  - Scenario C: Discount and statutory tax recalculation (PASS)
+  - Scenario D: Dynamic payment milestone synchronization (PASS)
+  - Scenario E: Public proposal DTO security redaction (PASS)
+  - Scenario F: Customer PDF generation & single monetary value rule (PASS)
+  - Result: **54 PASSED, 0 FAILED (TOTAL: 54)**.
+- **TypeScript Compilation**: `npx tsc --noEmit` (0 errors).
+- **Target Trip & Agency**: Verified on Trip `cmu5fhkk40006v4tqpd2k2kd4` and Agency `cmu2g9rgq0000swtqbr5aie7x`.
+- **Permanent Test Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% intact.
+
+---
+
+# 174. PHASE 174 — CUSTOMER QUOTATION / ITINERARY UI REFERENCE ALIGNMENT
+
+**Status**: `PHASE 174 — IMPLEMENTATION COMPLETE — QA PASSED`  
+**Date**: September 2026  
+**Primary Surfaces**:
+1. Agency Owner Quotation Preview (`/trips/[id]/quotation/preview/page.tsx`)
+2. Public Quotation Link (`/q/[shareToken]/page.tsx`)
+3. Customer Quotation PDF (`src/lib/services/quotation-pdf-service.ts` & `/api/quotations/[id]/pdf`, `/api/quotations/public/[token]/pdf`)
+
+---
+
+## 174.1 Objective & Information Architecture Alignment
+Phase 174 successfully aligned the 3 customer-facing quotation representations around a unified, reference-inspired 14-section travel document information architecture using original TripDesk design system aesthetics:
+
+1. **Brand Header & Hero**: Agency identity, logo, quotation title, quotation number, version, dates, duration (`X Nights / Y Days`), group size, customer name.
+2. **Trip Overview**: Personal travel consultant greeting, structured trip metadata bar (Prepared For, Dates, Duration, Group Size, Validity).
+3. **Tour Highlights Bar**: Summary pills derived dynamically from trip services (e.g. `X Selected Stays`, `Private Transport Included`, `Y Sightseeing Activities`, `Z Tour Days`).
+4. **Destination Route Sequence**: Chronological transit route rendered from `TripDestination` records ordered by `sequence` (e.g., `Ahmedabad → Goa → Mumbai`), supporting multiple and repeated destinations without artificial duplication or collapsing.
+5. **Day-by-Day Itinerary**: Modern day-wise timeline cards detailing day numbers, dates, titles, locations, and descriptions.
+6. **Accommodation & Stay Details**: Structured hotel cards detailing hotel name, destination/city, room type, meal plan, stay dates, nights, and room counts (strictly non-financial).
+7. **Transportation & Logistics**: Dedicated vehicle cards detailing category, capacity, chauffeur, and logistics notes (strictly non-financial).
+8. **Sightseeing & Experiences**: Structured activity cards with excursion names, destinations, dates, and descriptions (strictly non-financial).
+9. **Coverage (Inclusions vs Exclusions)**: Unified, clean 2-column layout (Emerald Inclusions vs Rose Exclusions). Redundant raw quotation line-item table dump was completely eliminated.
+10. **Important Notes & Advisories**: Structured customer-facing advisory notes.
+11. **Booking Policies & Terms**: Terms & Conditions and Cancellation Policy cards.
+12. **Payment Milestone Schedule**: Structured payment milestones displaying stage titles, percentages (%), and due dates (strictly zero ₹ currency amounts).
+13. **FINAL QUOTATION AMOUNT**: Solitary hero banner presenting the single authoritative customer-facing quotation amount (`finalAmount`).
+14. **Agency Contact Footer**: Polished footer with agency name, phone, email, address, and branding.
+
+---
+
+## 174.2 Non-Negotiable Invariants & Pricing Integrity
+- **RateSheet Base & Single Package Markup Rule (Phase 173 Locked)**:
+  - $\text{RateSheet Base} \to \text{Package Markup} \to \text{Gross} \to \text{Discount} \to \text{Tax} \to \text{Final Amount}$ remains the strict pricing formula.
+  - RateSheet unit rates remain fixed and read-only.
+  - Agency markup is applied once at the aggregate package level.
+- **Single Monetary Value Rule**:
+  - Across Preview, Public Link, and PDF, **EXACTLY ONE** monetary value is rendered: the `FINAL QUOTATION AMOUNT`.
+  - All line-item rates, cost prices, selling prices, subtotals, markup %, markup amounts, discount amounts, taxable amounts, tax breakdowns (GST/CGST/SGST/IGST), and milestone currency amounts are strictly omitted.
+- **Package-Tier Pricing Restriction**:
+  - Tier selection cards in the public quotation preserve tier names, badges, descriptions, inclusions, vehicle notes, and selection functionality, but **NO individual package tier prices** are displayed.
+- **Security & Public DTO Sanitization**:
+  - `quotation-service.ts` and `quotation-client.ts` enforce strict public data sanitization.
+  - `tripDestinations` relation is securely exposed in the public payload with customer-safe fields (`destinationName`, `sequence`, `stayNights`, `notes`) without exposing internal commercial fields or unnecessary IDs.
+
+---
+
+## 174.3 PDF Engine Refinements (`QuotationPdfService`)
+- Sourced `destinations` from `trip.tripDestinations` sorted by sequence.
+- Added dynamic Tour Highlights bar with summary pills.
+- Added Destination Route sequence badges with clean arrow indicators.
+- Sourced structured hotels, vehicles, and activities from `trip.tripHotels`, `trip.tripVehicles`, and `trip.tripActivities`.
+- Replaced redundant line-item dump with structured Inclusions vs Exclusions.
+- Verified strict single monetary value output: programmatic PDF uncompressed stream hex inspection confirms exactly 1 ₹ currency symbol occurrence corresponding to `FINAL QUOTATION AMOUNT`.
+- Verified clean page breaks and document layout across multi-page proposals.
+
+---
+
+## 174.4 Verification & QA Results
+- **Automated Verification Suite (`prisma/qa-phase174-alignment-check.ts`)**:
+  - Sourcing & Route sequence verification: PASS
+  - Public DTO commercial redaction & security: PASS
+  - Package tier price redaction: PASS
+  - Preview single monetary value: PASS
+  - Public Link single monetary value: PASS
+  - Customer PDF single monetary value & text scan: PASS
+  - Result: **70 PASSED, 0 FAILED**.
+- **Phase 173 Pricing & Milestone Regression Suite (`prisma/qa-phase173-full-check.ts`)**:
+  - Result: **71 PASSED, 0 FAILED**.
+- **TypeScript Validation**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS** (All static and dynamic routes compiled without errors).
+- **Responsive Viewport QA**: Verified on Desktop ($1440 \times 900$), Tablet ($768 \times 1024$), and Mobile ($390 \times 844$).
+- **Database & Baseline Integrity**:
+  - Zero schema modifications to `prisma/schema.prisma`.
+  - Permanent test agency (`cmu2g9rgq0000swtqbr5aie7x`) and master baseline data remain 100% intact:
+    - **22 Hotels**
+    - **66 RateSheets**
+    - **32 Destinations**
+    - **6 Vehicles**
+
+---
+
+## 174.5 Files Modified
+- `src/lib/services/quotation-service.ts`: Expanded query relations (`tripDestinations`, `tripHotels`, `tripVehicles`, `tripActivities`) across `getQuotation`, `getQuotationsByTripId`, `getPublicQuotationByToken`, `createQuotation`, `updateQuotation`, `generateQuotationFromTrip`, and `createQuotationVersion`.
+- `src/lib/api-client/quotation-client.ts`: Updated `QuotationWithRelations` and `PublicQuotationPayload` types and public sanitization boundary.
+- `src/lib/services/quotation-pdf-service.ts`: Implemented 14-section information architecture, route sequence, tour highlights bar, structured services, and single-money verification.
+- `src/app/api/quotations/[id]/pdf/route.ts`: Updated PDF generator invocation to pass structured destinations.
+- `src/app/api/quotations/public/[token]/pdf/route.ts`: Updated public PDF generator invocation to pass structured destinations.
+- `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx`: Refactored into unified 14-section travel document presentation, removed redundant line-item table.
+- `src/app/q/[shareToken]/page.tsx`: Refactored into unified 14-section travel document presentation, removed tier price displays while preserving selection.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 174 implementation documentation.
+
+---
+
+# 175A. PHASE 175A — PDF VISUAL PARITY AUDIT & FIX
+
+**Status**: `PHASE 175A — PDF VISUAL FIX COMPLETE`  
+**Date**: September 2026  
+**Primary Surface**: `src/lib/services/quotation-pdf-service.ts`
+
+---
+
+## 175A.1 Objective & Visual Parity Problem Statement
+While the customer quotation preview (`/trips/[id]/quotation/preview`) was successfully aligned in Phase 174, the downloaded customer PDF had substantial visual discrepancies compared to the Web Preview:
+1. Fractured hero header (tiny 88pt dark bar separated from a grey overview box).
+2. Raw emoji icons (`🏨`, `🚗`) in Helvetica font which did not render cleanly in PDFKit.
+3. Unstructured text lists instead of rounded card containers with subtle borders.
+4. Hard-coded clipping (`slice(0, 6)`) on package inclusions and exclusions.
+5. Inconsistent vertical spacing and card height budgeting leading to poor page flow.
+
+Phase 175A completely overhauled `QuotationPdfService` to achieve 1:1 visual parity with the Web Preview while respecting A4 print layout conventions.
+
+---
+
+## 175A.2 Key PDF Visual Improvements
+- **Unified Dark Hero Card**:
+  - Implemented a single continuous Slate-900 hero block (140-152pt) with rounded corners (`r=10`).
+  - Integrated agency identity, subtext, top-right quotation reference capsule (`Q-XXXX • vX`), `TAILORED HOLIDAY PROPOSAL` category badge, bold white trip title, subtitle, and an embedded 4-column structured metadata bar (`PREPARED FOR`, `TRAVEL DATES & DURATION`, `GROUP SIZE`, `VALIDITY`).
+- **Advisor Greeting Card**:
+  - Soft indigo container (`#EEF2FF` fill, `#C7D2FE` border) with uppercase header and clean formatted consultant text.
+- **Tour Highlights Bar**:
+  - Clean slate card (`#F8FAFC` fill, `#E2E8F0` border) with neatly formatted bullet pills.
+- **Destination Route Sequence**:
+  - Soft purple container (`#FAF5FF` fill, `#E9D5FF` border) with `TOUR ROUTE SEQUENCE:` header and chronological arrow-connected transit route.
+- **Day-by-Day Itinerary Cards**:
+  - Each day rendered in a distinct card container with dark `DAY X` pill badge, bold title, date, indigo location pill badge (`📍 Location`), and formatted description with generous line spacing.
+- **Structured Accommodations, Transport & Activities**:
+  - Structured cards with hotel name, destination/city, room category, meal plan, stay dates, and nights/rooms badges.
+  - Dedicated transport cards with vehicle category, capacity badge (`X Seater`), and chauffeur notes.
+  - Dedicated activity cards with excursion name, date badge, location, and description.
+- **2-Column Inclusions vs Exclusions**:
+  - Side-by-side emerald (`#ECFDF5`) and rose (`#FFF1F2`) cards with dynamic height budgeting, ensuring zero items are truncated.
+- **Milestones & Solitary Final Quotation Amount**:
+  - Structured milestone schedule (percentages only, strictly zero ₹ amounts).
+  - Prominent dark hero card with emerald final amount (`formatCurrency(finalAmount)`) as the **solitary customer-facing monetary value**.
+- **Global Header / Footer**:
+  - Clean divider rule with agency contact info on the left and `Page X of Y` on the right across all pages.
+
+---
+
+## 175A.3 Package Tiers Status (Explicit Boundary Rule)
+- **PACKAGE TIERS & OPTIONS WERE INTENTIONALLY NOT CHANGED**:
+  - Left 100% untouched and frozen.
+  - Zero modifications to tier names, descriptions, pricing formulas, tier selection logic, or database structures.
+  - Discussion and investigation of multi-tier price differentials remain deferred to a separate future phase.
+
+---
+
+## 175A.4 Verification & QA Results
+- **PDF Stream & Currency Scan**: Programmatic scan verified **EXACTLY 1 ₹ currency symbol occurrence** across the entire PDF, matching the final quotation amount. Zero commercial leak (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹` all absent).
+- **Phase 175A Test Suite**: 29/29 assertions passed.
+- **Phase 173 Full Regression Suite**: 71/71 assertions passed.
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS (Exit code 0)**.
+- **Permanent Baseline Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% intact.
+- **Protected Systems**: All 7 protected systems untouched.
+
+---
+
+## 175A.5 Files Modified
+- `src/lib/services/quotation-pdf-service.ts`: Redesigned A4 visual layout, unified hero, card containers, and typography.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175A documentation.
+
+---
+
+# SECTION 175B: PDF PROFESSIONAL RENDERING & TYPOGRAPHY REFINEMENT
+
+## 175B.1 Discovered Rendering Defects & Root Cause Analysis
+Following manual visual inspection of the Phase 175A generated PDF, several visual/rendering defects were identified:
+1. **Malformed Hotel/Activity/Vehicle Glyphs (`Ø<ßè`)**:
+   - **Root Cause**: PDFKit's default PostScript fonts (Helvetica / Helvetica-Bold) utilize single-byte WinAnsi / ISO-8859-1 encoding. Multi-byte UTF-8 emoji strings (such as `🏨`, `🚗`, `🎟`, `📍`, `✔`, `➔`) were interpreted as raw Latin1 byte sequences, rendering as garbled glyphs (e.g., `Ø<ßè Harbour Heritage Kochi`).
+   - **Solution**: Removed all multi-byte Unicode emojis from strings. Introduced PDF-safe typographic badges (`HOTEL`, `VEHICLE`, `ACTIVITY`), clean textual tags (`Location: ...`), clean ASCII bullets (`-`), and clean ASCII arrows (`>`).
+2. **Malformed Currency Glyph (`¹`)**:
+   - **Root Cause**: The Unicode Indian Rupee symbol `₹` (U+20B9) is not in the standard Helvetica WinAnsi character set. Byte 0xB9 in WinAnsi maps to superscript one (`¹`), causing `¹1,05,052.50` instead of a clean monetary display.
+   - **Solution**: Implemented `formatPdfCurrency(amount, currency)` which outputs standard `INR 1,05,052.50` (or `USD ...`) using Indian number formatting (`en-IN`), completely eliminating `¹` and guaranteeing PDF-safe character rendering.
+3. **Card Spacing, Border Collisions & Vertical Balance**:
+   - **Root Cause**: Fixed or tight card heights caused text lines to touch card borders; insufficient internal horizontal and vertical padding caused labels and values to crowd.
+   - **Solution**: Systematized card padding across all components (Hero: 18pt horizontal / 14pt vertical; Hotel: 48pt with 10pt padding; Vehicle: 38pt; Activity: 36pt; Inclusions/Exclusions: 12pt padding). Added dynamic height padding buffers so text never touches container borders.
+
+---
+
+## 175B.2 PDF Layout & Typography Refinements
+- **Typography & Font Hierarchy**: Standardized on clean Helvetica typography: Document Title (18pt Bold), Section Titles (11pt Bold, Uppercase), Card Titles (9.5-10pt Bold), Metadata (8pt), Badges (6.5-7pt Bold), Body/Descriptions (8-8.5pt, 1.4-1.6 lineGap).
+- **Hotel Cards**: High-contrast hierarchy featuring bold hotel name, destination, metadata row (`Room: ... | Meal Plan: ...`), stay dates (`Oct 1 - Oct 2`), and night/room badges (`1 Night(s) - 1 Room(s)`).
+- **Vehicle & Transportation**: Clean `VEHICLE` badge, vehicle model name, `X Seater` capacity badge, category, and logistics notes with consistent vertical alignment.
+- **Sightseeing & Activities**: Clean `ACTIVITY` badge, bold activity title, date pill badge, destination tag, and readable multi-line descriptions.
+- **Inclusions & Exclusions**: Balanced 2-column layout with emerald `INCLUDED SERVICES` vs rose `EXCLUDED SERVICES` cards, generous internal padding, and clean `-` bullet points.
+- **Payment Milestones**: Strict percentage-only breakdown (`STAGE X (Y%)`, title, due date) with zero currency amounts.
+- **Final Quotation Amount Card**: Prominent dark slate card with emerald amount `INR X,XX,XXX.XX`, generous padding, and zero competing monetary figures.
+
+---
+
+## 175B.3 Strict Boundary & Freeze Confirmations
+- **PACKAGE TIERS & OPTIONS REMAIN 100% UNTOUCHED & FROZEN**:
+  - No changes to package tier pricing, tier options, selection logic, tier definitions, or database models.
+- **PRICING ENGINE & COSTING LOGIC REMAIN UNTOUCHED**:
+  - RateSheet Base $\to$ Package Markup $\to$ Gross $\to$ Discount $\to$ Tax $\to$ Final calculation flow preserved with 100% mathematical fidelity.
+- **SINGLE CUSTOMER-FACING MONETARY VALUE RULE PRESERVED**:
+  - The customer PDF displays exactly ONE monetary value (Final Quotation Amount).
+  - All internal pricing fields (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹`) remain strictly redacted.
+
+---
+
+## 175B.4 Validation & Quality Assurance
+- **Glyph & Unicode Audit**: Verified zero malformed characters (`Ø<ßè`, `¹`, fallback glyphs) in generated PDF.
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` $\to$ **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+
+---
+
+## 175B.5 Files Modified
+- `src/lib/services/quotation-pdf-service.ts`: Implemented PDF-safe typography, `formatPdfCurrency`, typographic badges, and refined card padding/alignment.
+- `prisma/qa-phase173-full-check.ts`: Updated PDF currency scanner to recognize `INR` and rupee formatting.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175B documentation.
+
+---
+
+# SECTION 175C: PDF LAYOUT, PAGINATION & DYNAMIC CONTENT REFINEMENT
+
+## 175C.1 Layout & Pagination Audit & Root Cause Analysis
+Following inspection of generated quotation PDFs, three core layout and pagination issues were audited and resolved:
+1. **Static Marketing Text Removal / Dynamic Replacement**:
+   - **`Bespoke Itineraries & Luxury Holiday Packages`**: Was hardcoded as decorative marketing copy under the agency name. Replaced with dynamic agency contact information (`agency.phone | agency.email`) or cleanly omitted if not provided.
+   - **`TAILORED HOLIDAY PROPOSAL`**: Was a static generic badge. Replaced with neutral, data-driven label: `PACKAGE: ${packageName}` when a package option is selected, or `TRAVEL PROPOSAL`.
+2. **Section Title Alignment Bleed (`DAY-WISE TOUR ITINERARY` & `PAYMENT MILESTONE SCHEDULE`)**:
+   - **Root Cause**: Multi-column text calls (e.g. Route Sequence and Inclusions/Exclusions right column) updated PDFKit internal cursor `doc.x` to the middle/right of the page (`margin + 120` or `rightX + 12`). Subsequent `drawSectionHeader` calls invoked `doc.text()` without resetting `doc.x` or passing `margin` explicitly, causing headings to render from the middle of the page.
+   - **Solution**: Explicitly anchored all section headers to `margin` with `{ width: contentWidth }` and enforced `doc.x = margin` across all section transitions.
+3. **Premature Page Break Cascading (6 Pages Bloat Reduced to 1-2 Pages)**:
+   - **Root Cause**: Excessive fixed card heights, large arbitrary spacing gaps (combined `moveDown()` + Y-jumps), and oversized page break thresholds in `checkPageBreak(50)` on both headers and each individual card caused premature page breaks whenever `doc.y` exceeded ~700, leaving 100-150pt of unused blank space at the bottom of almost every page.
+   - **Solution**: Implemented an atomic `ensureSpace(neededHeight)` layout system with compact, content-driven heights, 4-6pt card gaps, and 10-14pt section gaps. Single-day/single-hotel trips fit on **1 page**, and full 7-day rich multi-hotel tours fit seamlessly across **2 pages** (down from 6).
+
+---
+
+## 175C.2 Strict Boundary & Freeze Confirmations
+- **PACKAGE TIERS & OPTIONS REMAIN 100% UNTOUCHED & FROZEN**:
+  - No changes to package tier pricing, tier options, selection logic, tier definitions, or database models.
+- **PRICING ENGINE & COSTING LOGIC REMAIN UNTOUCHED**:
+  - RateSheet Base $\to$ Package Markup $\to$ Gross $\to$ Discount $\to$ Tax $\to$ Final calculation flow preserved with 100% mathematical fidelity.
+- **SINGLE CUSTOMER-FACING MONETARY VALUE RULE PRESERVED**:
+  - Exactly ONE monetary value (Final Quotation Amount) formatted as `INR 1,05,052.50`.
+  - All internal pricing fields (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹`) remain strictly redacted.
+
+---
+
+## 175C.3 Validation & Quality Assurance
+- **Page Count Verification**:
+  - Single-day test quotation: Reduced from **6 pages $\to$ 1 page**.
+  - Multi-day (7-day, 3-hotel) rich quotation: Reduced from **6 pages $\to$ 2 pages**.
+- **Section Heading Alignment**: Confirmed 100% left-aligned anchor across all section titles.
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` $\to$ **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+
+---
+
+## 175C.4 Files Modified
+# SECTION 175D: DOWNLOAD PDF / EXPORT PDF MUST MATCH CUSTOMER PREVIEW
+
+**Status**: `PHASE 175D — PDF/PREVIEW PARITY PASSED`  
+**Date**: September 2026  
+**Primary Surface**: `src/lib/services/quotation-pdf-service.ts`
+
+---
+
+## 175D.1 Problem & Root Cause Analysis
+- **Problem**: The customer preview UI (`/trips/[id]/quotation/preview` and `/q/[shareToken]`) was visually structured into 14 distinct cards/sections, but the generated "Download PDF" / "Export PDF" had visual & structural discrepancies with the web preview (omission of package tier specifications when multiple options were configured, inconsistent spacing in cards, section header styling differences).
+- **Root Cause**:
+  1. Web Preview displayed a Package Tier Specifications overview (Tier Name, Subtitle, Hotel Notes, Vehicle Notes, and `[SELECTED TIER]` badge) when multiple package options existed, but PDF omitted tier specs completely.
+  2. PDF card styles, highlight capsules, route pills, and milestone cards required exact 1:1 structural alignment with the Web Preview components while maintaining A4 print dimensions.
+  3. Single customer monetary value rule needed strict preservation across PDF (zero individual tier prices displayed, only the solitary Final Quotation Amount).
+
+---
+
+## 175D.2 Exact Fixes Applied
+1. **Quotation PDF Service (`src/lib/services/quotation-pdf-service.ts`)**:
+   - Replicated Web Preview's 14-section visual structure:
+     - **Hero/Header Banner**: Slate-900 / Indigo-950 dark container with agency branding, quotation pill (`QT-XXXXX • vX`), dynamic package/travel proposal badge, bold trip title, proposal subtitle, and 4-column metadata grid (`PREPARED FOR`, `TRAVEL DATES`, `GROUP SIZE`, `VALIDITY`).
+     - **Advisor Greeting**: Soft indigo container (`#EEF2FF` fill, `#C7D2FE` border) with `GREETING FROM YOUR TRAVEL CONSULTANT` header and clean message.
+     - **Package Tier Specifications**: Multi-tier comparison cards showing Tier Name, Subtitle, Hotel Specs, Transport Specs, and `[SELECTED TIER]` badge (strictly with zero monetary values, preserving the single customer price rule).
+     - **Tour Highlights Bar**: Compact capsule pills for stays, vehicles, activities, and tour schedule.
+     - **Destination Route Sequence**: Soft purple container (`#FAF5FF`, `#E9D5FF` border) with `[City] > [City]` transit route.
+     - **Day-Wise Itinerary**: Day badges, dates, bold titles, location pills, and formatted descriptions.
+     - **Hotel Accommodations**: Bold hotel name, city tag, stay dates, night/room badges, and meal plan.
+     - **Transportation**: Vehicle model, seater capacity badge, type and logistics notes.
+     - **Sightseeing & Activities**: Activity title, date badge, location tag, and description.
+     - **Inclusions vs Exclusions**: Side-by-side emerald and rose 2-column cards without truncation.
+     - **Payment Milestones**: Stage cards with stage name, percentage, and due date (zero ₹ amounts).
+     - **Important Notes & Policies**: Advisories, cancellation policy, terms & conditions.
+     - **Final Quotation Amount Card**: Prominent dark slate card (`#0F172A`) with emerald amount (`INR X,XX,XXX.XX`).
+     - **Global Footer**: Agency contact info on left, page numbers on right.
+   - Enforced strict cursor resets (`doc.x = margin`) before every section to guarantee left alignment.
+   - Preserved atomic `ensureSpace()` pagination preventing unnecessary page fragmentations.
+
+---
+
+## 175D.3 Strict Boundary & Freeze Confirmations
+- **PACKAGE TIERS & OPTIONS REMAIN 100% UNTOUCHED & FROZEN**:
+  - No changes to package tier pricing, tier options, selection logic, tier definitions, or database models.
+- **PRICING ENGINE & COSTING LOGIC REMAIN UNTOUCHED**:
+  - RateSheet Base → Package Markup → Gross → Discount → Tax → Final calculation flow preserved with 100% mathematical fidelity.
+- **SINGLE CUSTOMER-FACING MONETARY VALUE RULE PRESERVED**:
+  - Exactly ONE monetary value (Final Quotation Amount) formatted as `INR 1,05,052.50`.
+  - All internal pricing fields (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹`) remain strictly redacted.
+
+---
+
+## 175D.4 Validation & Quality Assurance
+- **TypeScript**: `npx tsc --noEmit` → **0 errors**.
+- **Production Build**: `npm run build` → **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` → **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+- **Protected Systems**: All 7 protected systems untouched.
+
+---
+
+## 175D.5 Files Modified
+- `src/lib/services/quotation-pdf-service.ts`: Redesigned layout engine to achieve 1:1 visual parity with Web Preview.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175D documentation.
+
+---
+
+# SECTION 175E: PDF CONTENT CLEANUP & DYNAMIC HEADER LABELS
+
+**Status**: `PHASE 175E — PDF CONTENT CLEANUP PASSED`  
+**Date**: September 2026  
+**Primary Surface**: `src/lib/services/quotation-pdf-service.ts`
+
+---
+
+## 175E.1 Cleaned Up Content & Removed PDF Sections
+Per customer document guidelines, the following 3 sections were completely removed from the generated customer-facing PDF:
+1. **`TOUR ROUTE` / Destination Route Sequence**: Entirely removed from PDF rendering (database model, trip destinations, and web preview remain 100% intact).
+2. **`PAYMENT MILESTONE SCHEDULE`**: Entirely removed from PDF rendering (database model, milestone calculations, and financial synchronization remain 100% intact).
+3. **`TRAVEL PACKAGE OPTIONS`**: Entirely removed from PDF rendering (package tier database models, tier pricing, tier selection, and costing remain 100% intact).
+
+---
+
+## 175E.2 Dynamic Header Labels & Fallbacks
+1. **Replaced `Bespoke Itineraries & Luxury Holiday Packages`**:
+   - Replaced with dynamic agency contact information (`agency.phone | agency.email`).
+   - If contact information is unavailable, falls back cleanly to the neutral label: `TRIP PROPOSAL`.
+   - Zero hard-coded luxury/marketing slogans.
+2. **Replaced `Tailored Holiday Proposal`**:
+   - Dynamically renders `PACKAGE: ${selectedPackageOption.name.toUpperCase()}` when a package tier is selected.
+   - Falls back cleanly to `TRAVEL PROPOSAL` when no specific tier is selected.
+   - Zero marketing copy.
+
+---
+
+## 175E.3 Boundary & Freeze Confirmations
+- **PACKAGE TIERS & OPTIONS REMAIN 100% UNTOUCHED & FROZEN**:
+  - No changes to package tier database schema, tier selection, tier pricing logic, or web preview UI.
+- **CUSTOMER PREVIEW & PUBLIC WEB PROPOSAL UNCHANGED**:
+  - `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx` and `src/app/q/[shareToken]/page.tsx` remain untouched.
+- **PRICING ENGINE & SINGLE MONETARY VALUE RULE PRESERVED**:
+  - Customer PDF contains strictly ONE monetary value (`FINAL QUOTATION AMOUNT`).
+  - Zero commercial leakage (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹` all absent).
+
+---
+
+## 175E.4 Validation & Quality Assurance
+- **Targeted PDF String Verification**:
+  - Verified `TOUR ROUTE`, `PAYMENT MILESTONE SCHEDULE`, `TRAVEL PACKAGE OPTIONS`, `Bespoke Itineraries & Luxury Holiday Packages`, and `TAILORED HOLIDAY PROPOSAL` are **100% ABSENT** from generated PDF.
+  - Verified dynamic package badge (`PACKAGE: LUXURY HERITAGE`) and neutral fallback (`TRAVEL PROPOSAL`).
+  - Verified dynamic agency contact line and neutral fallback (`TRIP PROPOSAL`).
+- **TypeScript**: `npx tsc --noEmit` → **0 errors**.
+- **Production Build**: `npm run build` → **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` → **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+
+---
+
+## 175E.5 Files Modified
+- `src/lib/services/quotation-pdf-service.ts`: Removed 3 PDF sections, implemented dynamic header labels and neutral fallbacks.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175E documentation.
+
+---
+
+# SECTION 175F: CUSTOMER PREVIEW REGRESSION FIX & DYNAMIC HEADER LABELS
+
+**Status**: `PHASE 175F — PREVIEW REGRESSION FIX PASSED`  
+**Date**: September 2026  
+**Primary Surfaces**:
+- `src/lib/services/quotation-service.ts`
+- `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx`
+- `src/app/q/[shareToken]/page.tsx`
+
+---
+
+## 175F.1 Root Cause & Investigation
+- **Root Cause of Missing Service Details (Hotels, Vehicles, Activities)**:
+  - In `src/lib/services/quotation-service.ts`, the `getQuotations` and `getQuotationsByTripId` queries (used by `GET /api/trips/[id]/quotation` to feed the Customer Preview page) previously selected only basic trip scalar fields and omitted relations for `tripHotels`, `tripVehicles`, `tripActivities`, `tripDestinations`, and `agency` from Prisma's `include` block.
+  - As a consequence, `res.data.quotations[0].trip.tripHotels`, `tripVehicles`, and `tripActivities` returned `undefined`/empty arrays, causing the conditional rendering guards in the Preview page (`hotelsList.length > 0`, `vehiclesList.length > 0`, `activitiesList.length > 0`) to evaluate to false and hide those customer-safe service detail sections.
+- **Backend Fix Applied**:
+  - Updated `getQuotations` and `getQuotationsByTripId` in `src/lib/services/quotation-service.ts` to include `agency` and the full `trip` relation with nested `tripHotels` (including `hotel`), `tripVehicles` (including `vehicle`), `tripActivities` (including `activity`), and `tripDestinations` (including `destination`).
+  - Restored full data flow to `/trips/[id]/quotation/preview/page.tsx`.
+
+---
+
+## 175F.2 Dynamic Header Labels & Marketing Copy Removal
+1. **Replaced `Bespoke Itineraries & Luxury Holiday Packages`**:
+   - In both `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx` and `src/app/q/[shareToken]/page.tsx`, replaced hard-coded marketing copy with dynamic agency contact line (`agency.phone | agency.email`).
+   - If contact details are unavailable, falls back cleanly to neutral label `TRIP PROPOSAL`.
+2. **Replaced `Tailored Holiday Proposal`**:
+   - In both preview and public proposal pages, dynamically displays `PACKAGE: ${selectedPackageName.toUpperCase()}` when a package option is selected.
+   - When no package option is selected, falls back cleanly to neutral label `TRAVEL PROPOSAL`.
+   - Zero hard-coded luxury/bespoke slogans remain across the codebase.
+
+---
+
+## 175F.3 Preview Design & Pricing Security Intact
+- **Visual Design Preserved**:
+  - Header, hero gradient, trip overview metadata bar, day-by-day itinerary cards, hotel cards, vehicle cards, activity cards, and responsive layouts remained visually intact without any layout regression.
+- **Zero Commercial Information Leakage**:
+  - Customer Preview strictly renders only non-financial details for hotels (hotel name, city, room type, meal plan, check-in, check-out, nights), vehicles (vehicle name, type, capacity, notes), and activities (name, date, description).
+  - Internal pricing (`costPrice`, `unitPrice`, `sellingPrice`, `subtotal`, `markup`, `tax`, `milestone ₹`) strictly excluded.
+  - Final quotation amount remains the ONLY customer-facing price displayed.
+
+---
+
+## 175F.4 Validation & Quality Assurance
+- **TypeScript**: `npx tsc --noEmit` → **0 errors**.
+- **Production Build**: `npm run build` → **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` → **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+- **Hard-coded String Audit**: Verified 0 occurrences of `Bespoke Itineraries`, `Tailored Holiday Proposal`, or `TAILORED HOLIDAY PROPOSAL` across `src`.
+
+---
+
+## 175F.5 Files Modified
+- `src/lib/services/quotation-service.ts`: Added full `trip` relations (`tripHotels`, `tripVehicles`, `tripActivities`, `tripDestinations`) and `agency` to `getQuotations` and `getQuotationsByTripId`.
+- `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx`: Dynamic agency contact subtext, dynamic proposal badge text.
+- `src/app/q/[shareToken]/page.tsx`: Dynamic agency contact subtext, dynamic proposal badge text.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175F documentation.
+
+---
+
+---
+
+# 177. PHASE 177 DATABASE ROLLBACK RECORD
+
+## 177.1 Context & Rollback Scope
+- **Code Reversion**: Phase 177 experimental package tier code was reverted in Git.
+- **Database Audit**: Read-only audit confirmed that `prisma/schema.prisma` was in the clean pre-Phase-177 state, but the PostgreSQL table `quotation_package_options` still retained five extraneous columns introduced during Phase 177 via `prisma db push`:
+  - `packageType`
+  - `hotelIds`
+  - `vehicleIds`
+  - `activityIds`
+  - `selectedServices`
+- **Rollback Execution**:
+  - Executed authorized SQL dropping all five orphaned columns:
+    ```sql
+    ALTER TABLE "quotation_package_options"
+      DROP COLUMN IF EXISTS "packageType",
+      DROP COLUMN IF EXISTS "hotelIds",
+      DROP COLUMN IF EXISTS "vehicleIds",
+      DROP COLUMN IF EXISTS "activityIds",
+      DROP COLUMN IF EXISTS "selectedServices";
+    ```
+  - Regenerated Prisma Client (`npx prisma generate`) to synchronize DMMF definitions with `prisma/schema.prisma`.
+
+## 177.2 Data & Architecture Integrity
+- **0 Temporary Records**: All Phase 177 temporary QA test data was fully removed; 0 temporary records remain.
+- **Permanent Package Options Preserved**: All 6 pre-existing permanent package option records remain intact with zero financial or descriptive data loss.
+- **Permanent Master Data Preserved**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% intact for permanent test agency `cmu2g9rgq0000swtqbr5aie7x`.
+- **Zero Migration Artifacts**: No migrations were created, altered, or deleted (`_prisma_migrations` remains at 4 baseline migrations).
+
+## 177.3 Verification
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` $\to$ **71 / 71 assertions PASSED (100%)**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS (Exit code 0)**.
+- **Current Alignment**: Current codebase and PostgreSQL database are 100% aligned to pre-Phase-177 schema.
+
+---
+
+# 178. QUOTATION TIER SIMPLIFICATION (SEPTEMBER 2026)
+
+## 178.1 Objective & Architecture Overview
+The complex multi-package tier architecture (`QuotationPackageOption` model, option modals, auto-generation multipliers, package cards) was completely removed and replaced with a **simple Tier selection field** on the Quotation model.
+
+### Key Rules & Behavior:
+1. **Field on Quotation**: `tier: String @default("Deluxe")` on `Quotation` model.
+2. **Exactly 3 Allowed Options**:
+   - `Deluxe`
+   - `Ultra Deluxe`
+   - `Premium`
+3. **Default Selection**: `Deluxe` is selected by default on all new quotations.
+4. **Free Selection / Zero Restrictions**: User can change tier freely anytime with NO eligibility conditions, NO hotel/vehicle/activity dependencies, NO package conditions, and NO pricing limits.
+5. **Single Purpose — Quotation Naming**:
+   - The selected Tier is used **ONLY as part of the Quotation Name** (e.g., `Proposal for [TripTitle] - Deluxe`, `Proposal for [TripTitle] - Ultra Deluxe`, `Proposal for [TripTitle] - Premium`).
+   - Changing the Tier updates the quotation name suffix seamlessly.
+6. **Zero Pricing / Costing / Calculation Impact**:
+   - Tier does **NOT** alter subtotal, costing, markup, discount, tax, payment milestones, or final quotation amount.
+   - Line items, hotels, rooms, vehicles, and activities remain 100% manually selected and controlled.
+7. **Single Source of Truth**:
+   - All legacy package options tables (`quotation_package_options`), API routes, and UI tabs have been dropped.
+   - Public proposal and PDFKit generator display the simple tier badge (`TIER: DELUXE`) and solitary customer investment amount without separate package cards.
+
+## 178.2 Database & Schema Migration
+- **Prisma Schema (`prisma/schema.prisma`)**:
+  - Added `tier String @default("Deluxe")` to `Quotation`.
+  - Removed `selectedPackageOptionId`, `selectedPackageOption`, `packageOptions` from `Quotation`.
+  - Removed obsolete model `QuotationPackageOption`.
+- **Migration SQL (`prisma/migrations/20260922113500_simplify_quotation_tier/migration.sql`)**:
+  ```sql
+  ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "tier" TEXT NOT NULL DEFAULT 'Deluxe';
+  ALTER TABLE "quotations" DROP CONSTRAINT IF EXISTS "quotations_selectedPackageOptionId_fkey";
+  DROP INDEX IF EXISTS "quotations_selectedPackageOptionId_idx";
+  ALTER TABLE "quotations" DROP COLUMN IF EXISTS "selectedPackageOptionId";
+  DROP TABLE IF EXISTS "quotation_package_options" CASCADE;
+  ```
+
+## 178.3 Verification & Baseline Preservation
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **End-to-End Tier Flow**:
+  - Default selection `Deluxe` $\to$ Verified.
+  - Switch to `Ultra Deluxe` $\to$ Title synchronized to `... - Ultra Deluxe`, pricing unchanged.
+  - Switch to `Premium` $\to$ Title synchronized to `... - Premium`, pricing unchanged.
+  - Switch back to `Deluxe` $\to$ Title synchronized to `... - Deluxe`, pricing unchanged.
+  - Public view & PDF output $\to$ Verified clean tier rendering with solitary final quotation amount.
+- **Permanent Baseline Counts**:
+  - Destinations: **32** (100% intact)
+  - Hotels: **26** (22 permanent + 4 test, 100% intact)
+  - RateSheets: **66** (100% intact)
+  - Vehicles: **9** (6 permanent + 3 test, 100% intact)
+  - PLATFORM_OWNER: `mzpatel14@gmail.com` (100% intact)
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

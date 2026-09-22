@@ -1,6 +1,6 @@
 import "server-only";
 import prisma from "@/lib/prisma";
-import { NotFoundError } from "@/lib/api";
+import { NotFoundError, ValidationError } from "@/lib/api";
 import {
   CreateHotelInput,
   CreateHotelPayload,
@@ -9,8 +9,18 @@ import {
 } from "@/lib/validation/hotel-schema";
 import { Hotel, Prisma } from "@prisma/client";
 
+export type HotelWithRelations = Hotel & {
+  destination?: {
+    id: string;
+    name: string;
+    state: string | null;
+    country: string;
+    status: string;
+  } | null;
+};
+
 export interface PaginatedHotelsResult {
-  items: Hotel[];
+  items: HotelWithRelations[];
   total: number;
   page: number;
   limit: number;
@@ -56,7 +66,7 @@ export const hotelService = {
     agencyId: string,
     params: HotelListQueryInput
   ): Promise<PaginatedHotelsResult> {
-    const { page, limit, search, city, includeArchived } = params;
+    const { page = 1, limit = 50, search, city, destinationId, includeArchived } = params;
     const skip = (page - 1) * limit;
 
     const searchFilter = search
@@ -68,6 +78,7 @@ export const hotelService = {
             { state: { contains: search, mode: "insensitive" as const } },
             { category: { contains: search, mode: "insensitive" as const } },
             { address: { contains: search, mode: "insensitive" as const } },
+            { destination: { name: { contains: search, mode: "insensitive" as const } } },
           ],
         }
       : {};
@@ -76,17 +87,33 @@ export const hotelService = {
       ? { city: { contains: city, mode: "insensitive" as const } }
       : {};
 
+    const destinationFilter = destinationId
+      ? { destinationId }
+      : {};
+
     const where = {
       agencyId,
       ...(includeArchived ? {} : { archivedAt: null }),
       ...searchFilter,
       ...cityFilter,
+      ...destinationFilter,
     };
 
     const [items, total] = await Promise.all([
       prisma.hotel.findMany({
         where,
         orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+        include: {
+          destination: {
+            select: {
+              id: true,
+              name: true,
+              state: true,
+              country: true,
+              status: true,
+            },
+          },
+        },
         skip,
         take: limit,
       }),
@@ -107,12 +134,23 @@ export const hotelService = {
   /**
    * Retrieves a single hotel record by ID, strictly enforcing agency tenancy.
    */
-  async getHotelById(agencyId: string, hotelId: string, tx?: Prisma.TransactionClient): Promise<Hotel | null> {
+  async getHotelById(agencyId: string, hotelId: string, tx?: Prisma.TransactionClient): Promise<HotelWithRelations | null> {
     const db = tx || prisma;
     return db.hotel.findFirst({
       where: {
         id: hotelId,
         agencyId,
+      },
+      include: {
+        destination: {
+          select: {
+            id: true,
+            name: true,
+            state: true,
+            country: true,
+            status: true,
+          },
+        },
       },
     });
   },
@@ -120,7 +158,7 @@ export const hotelService = {
   /**
    * Retrieves a single hotel record by Hotel Code, strictly enforcing agency tenancy.
    */
-  async getHotelByCode(agencyId: string, hotelCode: string, tx?: Prisma.TransactionClient): Promise<Hotel | null> {
+  async getHotelByCode(agencyId: string, hotelCode: string, tx?: Prisma.TransactionClient): Promise<HotelWithRelations | null> {
     const db = tx || prisma;
     const normalizedCode = hotelCode.trim().toUpperCase();
     return db.hotel.findFirst({
@@ -128,6 +166,17 @@ export const hotelService = {
         agencyId,
         hotelCode: { equals: normalizedCode, mode: "insensitive" },
         archivedAt: null,
+      },
+      include: {
+        destination: {
+          select: {
+            id: true,
+            name: true,
+            state: true,
+            country: true,
+            status: true,
+          },
+        },
       },
     });
   },
@@ -165,6 +214,7 @@ export const hotelService = {
         website: true,
         notes: true,
         supplierId: true,
+        destinationId: true,
         archivedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -262,14 +312,38 @@ export const hotelService = {
 
   /**
    * Creates a new hotel master record under the authenticated agency with concurrency-safe Hotel Code generation.
+   * Validates destinationId server-side to guarantee strict tenant isolation.
    */
   async createHotel(
     agencyId: string,
     data: CreateHotelPayload & { hotelCode?: string | null },
     tx?: Prisma.TransactionClient
-  ): Promise<Hotel> {
+  ): Promise<HotelWithRelations> {
     const db = tx || prisma;
     const maxRetries = 5;
+
+    // Validate mandatory name
+    const cleanName = data.name?.trim();
+    if (!cleanName) {
+      throw new ValidationError("Hotel name is required.");
+    }
+
+    // Validate destinationId strictly against agency context
+    const cleanDestinationId = data.destinationId?.trim() || null;
+    if (!cleanDestinationId) {
+      throw new ValidationError("Destination is required when creating a new hotel.");
+    }
+
+    const destination = await db.destination.findFirst({
+      where: {
+        id: cleanDestinationId,
+        agencyId,
+      },
+    });
+
+    if (!destination) {
+      throw new NotFoundError("Destination not found or does not belong to your agency.");
+    }
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -278,6 +352,7 @@ export const hotelService = {
         return await db.hotel.create({
           data: {
             agencyId,
+            destinationId: cleanDestinationId,
             hotelCode: code,
             name: data.name.trim(),
             category: data.category?.trim() || null,
@@ -289,6 +364,17 @@ export const hotelService = {
             email: data.email?.trim() || null,
             website: data.website?.trim() || null,
             notes: data.notes?.trim() || null,
+          },
+          include: {
+            destination: {
+              select: {
+                id: true,
+                name: true,
+                state: true,
+                country: true,
+                status: true,
+              },
+            },
           },
         });
       } catch (err: any) {
@@ -305,13 +391,14 @@ export const hotelService = {
 
   /**
    * Updates an existing hotel master record, strictly verifying agency tenancy and preserving immutable hotelCode.
+   * Validates destinationId server-side to guarantee strict tenant isolation.
    */
   async updateHotel(
     agencyId: string,
     hotelId: string,
     data: UpdateHotelInput,
     tx?: Prisma.TransactionClient
-  ): Promise<Hotel> {
+  ): Promise<HotelWithRelations> {
     const db = tx || prisma;
     const existing = await db.hotel.findFirst({
       where: {
@@ -324,9 +411,27 @@ export const hotelService = {
       throw new NotFoundError("Hotel not found or does not belong to your agency.");
     }
 
+    // Validate destinationId if provided and not null/empty
+    if (data.destinationId !== undefined) {
+      const cleanDestinationId = data.destinationId?.trim() || null;
+      if (cleanDestinationId) {
+        const destination = await db.destination.findFirst({
+          where: {
+            id: cleanDestinationId,
+            agencyId,
+          },
+        });
+
+        if (!destination) {
+          throw new NotFoundError("Destination not found or does not belong to your agency.");
+        }
+      }
+    }
+
     return db.hotel.update({
       where: { id: hotelId },
       data: {
+        ...(data.destinationId !== undefined && { destinationId: data.destinationId?.trim() || null }),
         ...(data.name !== undefined && { name: data.name.trim() }),
         ...(data.category !== undefined && { category: data.category?.trim() || null }),
         ...(data.address !== undefined && { address: data.address?.trim() || null }),
@@ -337,6 +442,17 @@ export const hotelService = {
         ...(data.email !== undefined && { email: data.email?.trim() || null }),
         ...(data.website !== undefined && { website: data.website?.trim() || null }),
         ...(data.notes !== undefined && { notes: data.notes?.trim() || null }),
+      },
+      include: {
+        destination: {
+          select: {
+            id: true,
+            name: true,
+            state: true,
+            country: true,
+            status: true,
+          },
+        },
       },
     });
   },

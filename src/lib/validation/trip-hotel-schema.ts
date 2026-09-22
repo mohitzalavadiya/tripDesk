@@ -5,6 +5,12 @@ import { z } from "zod";
  */
 export const createTripHotelSchema = z
   .object({
+    tripDestinationId: z
+      .string()
+      .trim()
+      .optional()
+      .nullable()
+      .or(z.literal("")),
     hotelId: z.string().trim().min(1, "Hotel ID is required."),
     checkIn: z.coerce.date({ error: "Valid check-in date is required." }),
     checkOut: z.coerce.date({ error: "Valid check-out date is required." }),
@@ -55,6 +61,12 @@ export type CreateTripHotelInput = z.infer<typeof createTripHotelSchema>;
  */
 export const updateTripHotelSchema = z
   .object({
+    tripDestinationId: z
+      .string()
+      .trim()
+      .optional()
+      .nullable()
+      .or(z.literal("")),
     hotelId: z.string().trim().min(1, "Hotel ID cannot be empty.").optional(),
     checkIn: z.coerce.date().optional(),
     checkOut: z.coerce.date().optional(),

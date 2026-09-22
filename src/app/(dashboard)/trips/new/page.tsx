@@ -6,14 +6,22 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
-import { customerClient, tripClient } from "@/lib/api-client";
-import { Customer, TripStatus } from "@prisma/client";
+import { DestinationMultiSelect } from "@/components/shared/destination-multi-select";
+import { customerClient, tripClient, destinationClient } from "@/lib/api-client";
+import { Customer, Destination, TripStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Compass, Calendar, Users, Info, Loader2, AlertCircle, Plus } from "lucide-react";
+import {
+  Compass,
+  Calendar,
+  Info,
+  Loader2,
+  AlertCircle,
+  Plus,
+} from "lucide-react";
 
 const createTripValidationSchema = Yup.object().shape({
   customerId: Yup.string()
@@ -44,6 +52,7 @@ const createTripValidationSchema = Yup.object().shape({
       return end >= start;
     }),
   status: Yup.string().default("PLANNING"),
+  destinationIds: Yup.array().of(Yup.string()),
   notes: Yup.string().max(2000, "Notes cannot exceed 2000 characters"),
 });
 
@@ -69,18 +78,28 @@ function NewTripForm() {
 
   // State
   const [customers, setCustomers] = React.useState<Customer[]>([]);
+  const [destinations, setDestinations] = React.useState<Destination[]>([]);
   const [loadingCustomers, setLoadingCustomers] = React.useState(true);
+  const [loadingDestinations, setLoadingDestinations] = React.useState(true);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [apiError, setApiError] = React.useState<string | null>(null);
 
-  // Fetch real customers from API
+  // Fetch real customers and active destinations from API
   React.useEffect(() => {
-    async function loadCustomers() {
+    async function loadData() {
       try {
         setLoadingCustomers(true);
-        const res = await customerClient.getCustomers({ limit: 100 });
-        if (res.success && res.data) {
-          setCustomers(res.data);
+        setLoadingDestinations(true);
+        const [custRes, destRes] = await Promise.all([
+          customerClient.getCustomers({ limit: 100 }),
+          destinationClient.getDestinations({ limit: 100, status: "ACTIVE" }).catch(() => ({ success: true, data: [] as Destination[] })),
+        ]);
+
+        if (custRes.success && custRes.data) {
+          setCustomers(custRes.data);
+        }
+        if (destRes.success && destRes.data) {
+          setDestinations(destRes.data);
         }
       } catch (err: any) {
         if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
@@ -88,9 +107,10 @@ function NewTripForm() {
         }
       } finally {
         setLoadingCustomers(false);
+        setLoadingDestinations(false);
       }
     }
-    loadCustomers();
+    loadData();
   }, []);
 
   const formik = useFormik({
@@ -100,6 +120,7 @@ function NewTripForm() {
       startDate: "",
       endDate: "",
       status: "PLANNING" as TripStatus,
+      destinationIds: [] as string[],
       notes: "",
     },
     validationSchema: createTripValidationSchema,
@@ -119,6 +140,7 @@ function NewTripForm() {
           startDate: new Date(values.startDate),
           endDate: new Date(values.endDate),
           status: values.status as TripStatus,
+          destinationIds: values.destinationIds,
           notes: values.notes?.trim() || undefined,
         });
 
@@ -263,6 +285,24 @@ function NewTripForm() {
 
                 <div className="space-y-1 sm:col-span-2">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                    Destinations
+                  </label>
+                  <DestinationMultiSelect
+                    value={formik.values.destinationIds}
+                    onChange={(val) => formik.setFieldValue("destinationIds", val)}
+                    destinations={destinations}
+                    placeholder="Select destinations..."
+                    error={fieldError("destinationIds")}
+                  />
+                  {fieldError("destinationIds") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {fieldError("destinationIds")}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
                     Trip Status
                   </label>
                   <Select
@@ -299,8 +339,6 @@ function NewTripForm() {
                 </div>
               </div>
             </div>
-
-            {/* Travel Schedule dates Block */}
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-6">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Calendar className="h-5 w-5 text-indigo-600" />

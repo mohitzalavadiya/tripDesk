@@ -9,9 +9,11 @@ export type ImportMode = "SKIP" | "UPDATE" | "REJECT";
 export interface HotelPreviewRow {
   rowNumber: number;
   name: string;
+  destination: string;
+  destinationId?: string | null;
   category: string | null;
   address: string | null;
-  city: string;
+  city: string | null;
   state: string | null;
   country: string | null;
   phone: string | null;
@@ -79,9 +81,10 @@ export const hotelExcelService = {
       [],
       ["FIELD NAME", "REQUIRED", "DESCRIPTION", "SAMPLE VALUE"],
       ["Hotel Name", "YES", "Property name (1-200 characters)", "Grand Palace Resort"],
+      ["Destination", "YES", "Agency Destination name (must match existing active Destination)", "Kerala"],
       ["Category", "NO", "Star rating or property type", "5 Star Deluxe"],
       ["Address", "NO", "Street / Area address", "Beach Road, North Cliff"],
-      ["City", "YES", "City / Location name", "Varkala"],
+      ["City", "NO", "City / physical location name", "Varkala"],
       ["State", "NO", "State or province", "Kerala"],
       ["Country", "NO", "Country (defaults to India)", "India"],
       ["Phone", "NO", "Contact phone number", "+91 98765 43210"],
@@ -92,16 +95,18 @@ export const hotelExcelService = {
       ["IMPORTANT RULES:"],
       ["1. Do NOT add or change column headers in the 'Hotels' sheet."],
       ["2. Hotel Code is generated automatically by TripDesk (e.g. HTL-0001) and must NOT be entered."],
-      ["3. Hotel Name and City are required fields for every hotel row."],
-      ["4. Supplier and GST/tax are not included in this Hotel Master import format."],
-      ["5. Supported file format: .xlsx (Max 5 MB, Max 1,000 rows)."],
+      ["3. Hotel Name and Destination are required fields for every hotel row."],
+      ["4. Destination must match an existing active Destination in your TripDesk account (exact match, case-insensitive)."],
+      ["5. City represents the physical municipality (e.g. Benaulim) while Destination is the travel grouping (e.g. Goa)."],
+      ["6. Supplier and GST/tax are not included in this Hotel Master import format."],
+      ["7. Supported file format: .xlsx (Max 5 MB, Max 1,000 rows)."],
     ];
 
     const wsInstructions = XLSX.utils.aoa_to_sheet(instructionsData);
     wsInstructions["!cols"] = [
       { wch: 18 },
       { wch: 12 },
-      { wch: 45 },
+      { wch: 60 },
       { wch: 35 },
     ];
     XLSX.utils.book_append_sheet(wb, wsInstructions, "Instructions");
@@ -110,6 +115,7 @@ export const hotelExcelService = {
     const hotelsData = [
       [
         "Hotel Name",
+        "Destination",
         "Category",
         "Address",
         "City",
@@ -122,6 +128,7 @@ export const hotelExcelService = {
       ],
       [
         "Grand Palace Resort",
+        "Kerala",
         "5 Star",
         "Beach Road, North Cliff",
         "Varkala",
@@ -134,6 +141,7 @@ export const hotelExcelService = {
       ],
       [
         "Mountain Mist Valley",
+        "Kerala",
         "4 Star",
         "Pothamedu View Point Road",
         "Munnar",
@@ -146,6 +154,7 @@ export const hotelExcelService = {
       ],
       [
         "Thekkady Heritage Villa",
+        "Kerala",
         "3 Star Heritage",
         "Bypass Road, Kumily",
         "Thekkady",
@@ -158,6 +167,7 @@ export const hotelExcelService = {
       ],
       [
         "Royal Lake Palace",
+        "Kerala",
         "5 Star Deluxe",
         "Punnamada Finishing Point",
         "Alleppey",
@@ -173,6 +183,7 @@ export const hotelExcelService = {
     const wsHotels = XLSX.utils.aoa_to_sheet(hotelsData);
     wsHotels["!cols"] = [
       { wch: 26 },
+      { wch: 18 },
       { wch: 16 },
       { wch: 28 },
       { wch: 16 },
@@ -223,23 +234,12 @@ export const hotelExcelService = {
 
     // Header row validation
     const headerRow = rawRows[0].map((h: any) => String(h).trim());
-    const expectedHeaders = [
-      "Hotel Name",
-      "Category",
-      "Address",
-      "City",
-      "State",
-      "Country",
-      "Phone",
-      "Email",
-      "Website",
-      "Notes",
-    ];
 
     const nameIdx = headerRow.findIndex((h) => /^hotel\s*name$/i.test(h));
-    const cityIdx = headerRow.findIndex((h) => /^city$/i.test(h));
+    const destinationIdx = headerRow.findIndex((h) => /^destination$/i.test(h));
     const categoryIdx = headerRow.findIndex((h) => /^category$/i.test(h));
     const addressIdx = headerRow.findIndex((h) => /^address$/i.test(h));
+    const cityIdx = headerRow.findIndex((h) => /^city$/i.test(h));
     const stateIdx = headerRow.findIndex((h) => /^state$/i.test(h));
     const countryIdx = headerRow.findIndex((h) => /^country$/i.test(h));
     const phoneIdx = headerRow.findIndex((h) => /^phone$/i.test(h));
@@ -247,9 +247,9 @@ export const hotelExcelService = {
     const websiteIdx = headerRow.findIndex((h) => /^website$/i.test(h));
     const notesIdx = headerRow.findIndex((h) => /^notes$/i.test(h));
 
-    if (nameIdx === -1 || cityIdx === -1) {
+    if (nameIdx === -1 || destinationIdx === -1) {
       throw new Error(
-        `Invalid template headers. Missing required column(s): ${nameIdx === -1 ? "'Hotel Name' " : ""}${cityIdx === -1 ? "'City'" : ""}. Please download and use the official sample template.`
+        `Invalid template headers. Missing required column(s): ${nameIdx === -1 ? "'Hotel Name' " : ""}${destinationIdx === -1 ? "'Destination'" : ""}. Please download and use the official sample template.`
       );
     }
 
@@ -260,6 +260,20 @@ export const hotelExcelService = {
 
     if (dataRows.length > 1000) {
       throw new Error("The Excel file exceeds the maximum allowed limit of 1,000 data rows.");
+    }
+
+    // Preload agency active destinations for strict in-memory matching
+    const agencyDestinations = await prisma.destination.findMany({
+      where: { agencyId, status: "ACTIVE" },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    const destMap = new Map<string, string>(); // normalized (trim().toLowerCase()) -> id
+    for (const d of agencyDestinations) {
+      destMap.set(d.name.trim().toLowerCase(), d.id);
     }
 
     // Preload existing agency hotels for fast in-memory matching
@@ -300,7 +314,8 @@ export const hotelExcelService = {
       }
 
       const name = sanitizeCellValue(row[nameIdx]) || "";
-      const city = sanitizeCellValue(row[cityIdx]) || "";
+      const destination = destinationIdx !== -1 ? sanitizeCellValue(row[destinationIdx]) || "" : "";
+      const city = cityIdx !== -1 ? sanitizeCellValue(row[cityIdx]) : null;
       const category = categoryIdx !== -1 ? sanitizeCellValue(row[categoryIdx]) : null;
       const address = addressIdx !== -1 ? sanitizeCellValue(row[addressIdx]) : null;
       const state = stateIdx !== -1 ? sanitizeCellValue(row[stateIdx]) : null;
@@ -313,16 +328,28 @@ export const hotelExcelService = {
       const rowErrors: string[] = [];
       const rowWarnings: string[] = [];
 
-      // Required field validation
+      // Required Hotel Name validation
       if (!name) {
         rowErrors.push("Hotel Name is required.");
       } else if (name.length > 200) {
         rowErrors.push("Hotel Name exceeds maximum length of 200 characters.");
       }
 
-      if (!city) {
-        rowErrors.push("City is required.");
-      } else if (city.length > 100) {
+      // Required Destination validation & strict normalized matching
+      let matchedDestinationId: string | null = null;
+      if (!destination) {
+        rowErrors.push("Destination is required.");
+      } else {
+        const normDest = destination.trim().toLowerCase();
+        const foundDestId = destMap.get(normDest);
+        if (!foundDestId) {
+          rowErrors.push(`Unknown destination: '${destination}'. Destination must match an existing active Destination in your account.`);
+        } else {
+          matchedDestinationId = foundDestId;
+        }
+      }
+
+      if (city && city.length > 100) {
         rowErrors.push("City exceeds maximum length of 100 characters.");
       }
 
@@ -334,8 +361,8 @@ export const hotelExcelService = {
       }
 
       // In-file duplicate check
-      const fileKey = `${name.trim().toLowerCase()}|||${city.trim().toLowerCase()}`;
-      if (name && city) {
+      const fileKey = `${name.trim().toLowerCase()}|||${(city || "").trim().toLowerCase()}`;
+      if (name) {
         if (seenInFile.has(fileKey)) {
           const firstRow = seenInFile.get(fileKey)!;
           rowErrors.push(`Duplicate row in this file (matches Row ${firstRow} with same Hotel Name and City).`);
@@ -382,6 +409,8 @@ export const hotelExcelService = {
       previewRows.push({
         rowNumber,
         name,
+        destination,
+        destinationId: matchedDestinationId,
         category,
         address,
         city,
@@ -452,6 +481,17 @@ export const hotelExcelService = {
     // Execute valid rows inside a transaction
     await prisma.$transaction(
       async (tx) => {
+        // Preload active destinations
+        const agencyDestinations = await tx.destination.findMany({
+          where: { agencyId, status: "ACTIVE" },
+          select: { id: true, name: true },
+        });
+
+        const destMap = new Map<string, string>();
+        for (const d of agencyDestinations) {
+          destMap.set(d.name.trim().toLowerCase(), d.id);
+        }
+
         // Preload all agency hotels once to avoid O(N^2) roundtrips inside the transaction
         const existingHotels = await tx.hotel.findMany({
           where: { agencyId, archivedAt: null },
@@ -482,6 +522,7 @@ export const hotelExcelService = {
           try {
             const rowKey = `${row.name.trim().toLowerCase()}|||${(row.city || "").trim().toLowerCase()}`;
             const existing = existingMap.get(rowKey);
+            const destinationId = row.destinationId || (row.destination ? destMap.get(row.destination.trim().toLowerCase()) : null) || null;
 
             if (existing) {
               if (mode === "SKIP") {
@@ -493,9 +534,10 @@ export const hotelExcelService = {
                   where: { id: existing.id },
                   data: {
                     ...(row.name ? { name: row.name.trim() } : {}),
+                    ...(destinationId ? { destinationId } : {}),
                     ...(row.category !== null ? { category: row.category } : {}),
                     ...(row.address !== null ? { address: row.address } : {}),
-                    ...(row.city ? { city: row.city.trim() } : {}),
+                    ...(row.city !== null ? { city: row.city?.trim() || null } : {}),
                     ...(row.state !== null ? { state: row.state } : {}),
                     ...(row.country !== null ? { country: row.country } : {}),
                     ...(row.phone !== null ? { phone: row.phone } : {}),
@@ -520,11 +562,12 @@ export const hotelExcelService = {
 
               hotelsToCreate.push({
                 agencyId,
+                destinationId,
                 hotelCode,
                 name: row.name.trim(),
                 category: row.category,
                 address: row.address,
-                city: row.city.trim(),
+                city: row.city?.trim() || null,
                 state: row.state,
                 country: row.country || "India",
                 phone: row.phone,
