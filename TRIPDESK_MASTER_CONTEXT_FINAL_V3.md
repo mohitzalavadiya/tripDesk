@@ -11977,9 +11977,52 @@ Phase 179 introduced a persistent, multi-tenant internal notification engine des
 
 ---
 
+# 181. PHASE 181 — DESTINATION MASTER UI (September 2026)
+
+## 181.1 Architecture & Overview
+- **Objective**: Provide a dedicated master list & CRUD interface for Agency Owners to manage geographic destinations at `/destinations`.
+- **Navigation Placement**: Added `Destinations` (`href: "/destinations"`, `icon: MapPin`) under `RESOURCES` in `agencyNavigationConfig` ([src/lib/navigation.ts](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/navigation.ts)).
+- **Backend Reuse**: 100% reused existing Prisma `Destination` model, Zod validation schemas ([src/lib/validation/destination-schema.ts](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/validation/destination-schema.ts)), service layer ([src/lib/services/destination-service.ts](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/services/destination-service.ts)), API routes (`/api/destinations`, `/api/destinations/[id]`), and client SDK (`destinationClient`).
+
+---
+
+## 181.2 UI Components & Pages Implemented
+1. **Destination Master Page (`src/app/(dashboard)/destinations/page.tsx`)**:
+   - Command hero header with `MapPin` badge, total telemetry chip, title, description, and primary `Add Destination` action.
+   - Search toolbar with debounced 300ms query filter across `name`, `state`, `cityArea`, and `country`.
+   - Status dropdown filter (`ALL`, `ACTIVE`, `INACTIVE`) and filter reset button.
+   - Standard table displaying Destination & Region, City / Specific Area, Country, `StatusBadge`, and `Actions` dropdown menu.
+   - Action controls: `Edit Destination`, `Mark Active / Inactive`, and `Delete Destination`.
+   - State handling: `TableSkeleton` for loading, `ErrorState` with retry, `EmptyState` for zero/no-search results, `ReadOnlyBanner` for read-only subscriptions.
+   - Pagination footer with page indicator and `Prev`/`Next` buttons.
+   - Destructive deletion backed by `ConfirmDialog` with dependency error handling.
+2. **Add / Edit Destination Dialog (`src/components/destinations/destination-dialog.tsx`)**:
+   - Modal dialog component supporting both creation and updating of destination records.
+   - Controlled inputs for `name`, `state`, `country`, `cityArea`, and operational `status`.
+   - Client-side trimming and validation.
+   - Loading/submitting state with `Loader2` spinner.
+   - Conflict error feedback via `sonner` toast notifications.
+
+---
+
+## 181.3 Security & Tenant Isolation
+- Derived strictly server-side from session JWT via `requireReadAccess()` and `requireWriteAccess()`.
+- Zero client-supplied `agencyId` trust.
+- Dependency protection: Deletion blocked at service layer if referenced by Hotels, Activities, or TripDestinations; users advised to mark as Inactive.
+
+---
+
+## 181.4 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **Permanent Baseline**: 32 Destinations, 22 Hotels, 66 RateSheets, 6 Vehicles preserved without alteration.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
 
 
 

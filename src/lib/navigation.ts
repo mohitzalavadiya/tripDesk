@@ -5,6 +5,7 @@ import {
   Compass,
   FileText,
   Clock,
+  MapPin,
   Hotel,
   Car,
   Ticket,
@@ -100,6 +101,11 @@ export const agencyNavigationConfig: NavigationSection[] = [
   {
     title: "RESOURCES",
     items: [
+      {
+        label: "Destinations",
+        href: "/destinations",
+        icon: MapPin,
+      },
       {
         label: "Hotels",
         href: "/hotels",

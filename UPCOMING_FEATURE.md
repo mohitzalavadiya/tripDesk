@@ -41,17 +41,17 @@ Price should not show on quotation
 Agency Service & Planning (15%): should not show on quotation
 notification test
 
+Add QR and UPI for payment
+where i can show Announcements ? in notification
 
 **TODO**
 
-Add QR and UPI for payment
+Destination master UI
 
-some changes in activity. R&D 
-
+UI break in dashboard. Revenue & Profit and Upcoming Departures in both tab
 
 
 manage read only from frontend also
-where i can show Announcements ?
 subscription model changes
 
 remove usused code, imports and files
@@ -62,6 +62,7 @@ check no static data anywhere
 compalate QA. 
 
 responsive 320 screen
+some changes in activity. R&D 
 
 understand flow
 
