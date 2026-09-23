@@ -93,7 +93,6 @@ export class OperationsDocumentService {
                 hotel: true,
               },
             },
-            supplier: true,
           },
         },
       },
@@ -112,8 +111,9 @@ export class OperationsDocumentService {
       try {
         const doc = new PDFDocument({
           size: "A4",
-          margin: 40,
+          margin: 32,
           bufferPages: true,
+          compress: false,
           info: {
             Title: `Hotel Voucher - ${hotel?.name || "Hotel Accommodation"}`,
             Author: operation.agency.name,
@@ -128,238 +128,403 @@ export class OperationsDocumentService {
         doc.on("error", (err: Error) => reject(err));
 
         const pageWidth = 595.28;
-        const margin = 40;
-        const contentWidth = pageWidth - margin * 2;
+        const pageHeight = 841.89;
+        const margin = 32;
+        const contentWidth = pageWidth - margin * 2; // 531.28 pt
+        const bottomSafeLimit = pageHeight - 42;
 
-        // Theme colors
-        const primaryColor = "#0F766E"; // Teal 700
-        const darkColor = "#042F2E"; // Teal 950
-        const textDark = "#0F172A";
-        const textMuted = "#475569";
-        const bgLight = "#F8FAFC";
-        const borderLight = "#E2E8F0";
+        // Elegant Modern Color Palette aligned with Quotation PDF
+        const brandDark = "#0F172A"; // Slate 900
+        const brandAccent = "#0D9488"; // Teal 600
+        const brandLight = "#F0FDFA"; // Teal 50
+        const textDark = "#0F172A"; // Slate 900
+        const textMuted = "#475569"; // Slate 600
+        const textLight = "#94A3B8"; // Slate 400
+        const bgCard = "#F8FAFC"; // Slate 50
+        const borderLight = "#E2E8F0"; // Slate 200
+        const emeraldBg = "#ECFDF5";
+        const emeraldBorder = "#A7F3D0";
+        const emeraldText = "#065F46";
 
-        // Header Banner
-        doc.rect(margin, margin, contentWidth, 80).fill(darkColor);
+        // Page break helper
+        const ensureSpace = (neededHeight: number) => {
+          if (doc.y + neededHeight > bottomSafeLimit) {
+            doc.addPage();
+            doc.x = margin;
+            doc.y = margin + 8;
+            return true;
+          }
+          return false;
+        };
 
-        // Agency Branding
+        // Section Header Helper
+        const drawSectionHeader = (title: string, subtitle?: string, minContentHeight = 44) => {
+          ensureSpace(36 + minContentHeight);
+          doc.y += 16;
+          doc.x = margin;
+
+          doc.fillColor(textDark).fontSize(10.5).font("Helvetica-Bold").text(title, { characterSpacing: 0.5 });
+          if (subtitle) {
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(subtitle, { lineGap: 1 });
+          }
+
+          const lineY = doc.y + 4;
+          doc
+            .moveTo(margin, lineY)
+            .lineTo(margin + 32, lineY)
+            .strokeColor(brandAccent)
+            .lineWidth(2)
+            .stroke();
+
+          doc.y = lineY + 8;
+        };
+
+        // ─── HERO HEADER BANNER ──────────────────────────────────────────────
+        const agencyName = operation.agency.name || "TripDesk Travel Partner";
+        const agencyContact = [operation.agency.phone, operation.agency.email, operation.agency.address]
+          .filter(Boolean)
+          .join(" • ");
+
+        const leftWidth = contentWidth - 210;
+        doc.font("Helvetica-Bold").fontSize(14);
+        const nameH = doc.heightOfString(agencyName, { width: leftWidth });
+        doc.font("Helvetica").fontSize(7.5);
+        const contactH = agencyContact ? doc.heightOfString(agencyContact, { width: leftWidth }) : 0;
+        const leftContentH = nameH + contactH + 46;
+
+        // Right Badge text & dynamic height measurement
+        const docNumText = `VOUCHER #: ${documentNumber}`;
+        const dateText = `Issued: ${this.formatDate(new Date())}`;
+        const refText = `Trip Ref: ${operation.trip.tripNumber || "N/A"}`;
+        const statusText = hotelConf.status === "CONFIRMED" ? "CONFIRMED STAY" : `STATUS: ${hotelConf.status}`;
+
+        doc.font("Helvetica-Bold").fontSize(9.5);
+        const docNumH = doc.heightOfString(docNumText, { width: 155, align: "center" });
+
+        doc.font("Helvetica").fontSize(7.5);
+        const dateH = doc.heightOfString(dateText, { width: 155, align: "center" });
+        const refH = doc.heightOfString(refText, { width: 155, align: "center" });
+
+        const pillH = 14;
+        const totalRightContentH = docNumH + 3 + dateH + 2 + refH + 5 + pillH;
+        const minRightBoxH = totalRightContentH + 16;
+
+        const bannerHeight = Math.max(88, leftContentH, minRightBoxH + 28);
+
+        // Slate 900 Hero Container with rounded corners
+        doc.roundedRect(margin, margin, contentWidth, bannerHeight, 8).fill(brandDark);
+
+        // Left: Agency Branding
         doc
           .fillColor("#FFFFFF")
-          .fontSize(16)
+          .fontSize(14)
           .font("Helvetica-Bold")
-          .text(operation.agency.name, margin + 20, margin + 18, { width: 300 });
+          .text(agencyName, margin + 18, margin + 16, { width: leftWidth });
 
         doc
-          .fontSize(9)
-          .font("Helvetica")
           .fillColor("#99F6E4")
-          .text("OFFICIAL HOTEL ACCOMMODATION VOUCHER", margin + 20, margin + 40);
+          .fontSize(8.5)
+          .font("Helvetica-Bold")
+          .text("OFFICIAL HOTEL ACCOMMODATION VOUCHER", margin + 18, doc.y + 3);
 
-        doc
-          .fontSize(8)
-          .font("Helvetica")
-          .fillColor("#CCFBF1")
-          .text(
-            [operation.agency.phone, operation.agency.email].filter(Boolean).join(" | "),
-            margin + 20,
-            margin + 54
-          );
+        if (agencyContact) {
+          doc
+            .fillColor("#94A3B8")
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(agencyContact, margin + 18, doc.y + 4, { width: leftWidth, lineGap: 1 });
+        }
 
-        // Voucher Number Badge
+        // Right: Voucher Number & Status Pill
+        const rightX = margin + contentWidth - 190;
+        const rightY = margin + 14;
+        const rightBoxH = bannerHeight - 28;
+        doc.roundedRect(rightX, rightY, 175, rightBoxH, 6).fillAndStroke("#1E293B", "#334155");
+
+        const rightStartY = rightY + Math.max(8, (rightBoxH - totalRightContentH) / 2);
+        let curRightY = rightStartY;
+
         doc
           .fillColor("#FFFFFF")
-          .fontSize(10)
+          .fontSize(9.5)
           .font("Helvetica-Bold")
-          .text(`VOUCHER #: ${documentNumber}`, margin + contentWidth - 220, margin + 20, {
-            width: 200,
-            align: "right",
-          });
+          .text(docNumText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += docNumH + 3;
 
         doc
-          .fontSize(8)
+          .fillColor("#94A3B8")
+          .fontSize(7.5)
           .font("Helvetica")
-          .fillColor("#E0F2FE")
-          .text(`Issued: ${this.formatDate(new Date())}`, margin + contentWidth - 220, margin + 38, {
-            width: 200,
-            align: "right",
-          });
+          .text(dateText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += dateH + 2;
 
         doc
-          .fontSize(8)
+          .fillColor("#94A3B8")
+          .fontSize(7.5)
           .font("Helvetica")
-          .text(`Trip Ref: ${operation.trip.tripNumber || "N/A"}`, margin + contentWidth - 220, margin + 50, {
-            width: 200,
-            align: "right",
-          });
+          .text(refText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += refH + 5;
 
-        doc.y = margin + 95;
-
-        // Section: Guest & Booking Details
+        // Status Badge Pill
+        const pillX = rightX + (175 - 125) / 2;
+        doc.roundedRect(pillX, curRightY, 125, pillH, 7).fillAndStroke("#064E3B", "#059669");
         doc
-          .rect(margin, doc.y, contentWidth, 65)
-          .fillAndStroke(bgLight, borderLight);
+          .fillColor("#A7F3D0")
+          .fontSize(7)
+          .font("Helvetica-Bold")
+          .text(statusText, pillX, curRightY + 3.5, { width: 125, align: "center" });
 
-        const guestY = doc.y + 12;
+        doc.y = margin + bannerHeight + 14;
+
+        // ─── PRIMARY GUEST & TRAVELER DETAILS ────────────────────────────────
+        const leadGuestName = operation.trip.customer?.name || "Valued Guest";
+        const guestContact = [operation.trip.customer?.phone, operation.trip.customer?.email]
+          .filter(Boolean)
+          .join(" • ");
+        const coTravelers = operation.trip.travelers?.map((t) => t.name).join(", ");
+        const totalPax = operation.trip.travelers?.length || 1;
+
+        const colW = (contentWidth - 36) / 2;
+        doc.font("Helvetica").fontSize(8);
+        const travelersTextH = coTravelers ? doc.heightOfString(`Co-Travelers: ${coTravelers}`, { width: colW }) : 0;
+        const guestCardHeight = Math.max(58, 38 + travelersTextH);
+
+        ensureSpace(guestCardHeight);
+        doc.roundedRect(margin, doc.y, contentWidth, guestCardHeight, 6).fillAndStroke(bgCard, borderLight);
+
+        const cardTopY = doc.y + 10;
+        // Left Column: Lead Guest
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("PRIMARY GUEST / LEAD TRAVELER", margin + 14, cardTopY);
+        doc.fillColor(textDark).fontSize(11).font("Helvetica-Bold").text(leadGuestName, margin + 14, cardTopY + 12);
+        if (guestContact) {
+          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text(guestContact, margin + 14, cardTopY + 26, { width: colW });
+        }
+
+        // Right Column: Party Info
+        const rightColX = margin + colW + 22;
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("PARTY & ITINERARY REFERENCE", rightColX, cardTopY);
         doc
-          .fillColor(primaryColor)
+          .fillColor(textDark)
           .fontSize(9)
           .font("Helvetica-Bold")
-          .text("PRIMARY GUEST / TRAVELER DETAILS", margin + 15, guestY);
+          .text(`Total Travelers: ${totalPax} Pax`, rightColX, cardTopY + 12);
+        if (coTravelers) {
+          doc
+            .fillColor(textMuted)
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(`Co-Travelers: ${coTravelers}`, rightColX, cardTopY + 25, { width: colW, lineGap: 1 });
+        }
 
+        doc.y = cardTopY + guestCardHeight - 2;
+
+        // ─── HOTEL RESERVATION DETAILS ───────────────────────────────────────
+        drawSectionHeader("HOTEL RESERVATION & ACCOMMODATION", "Official verified stay details and room arrangements", 150);
+
+        const hotelNameStr = hotel?.name || "Hotel Accommodation";
+        const hotelLocationStr = [hotel?.address, hotel?.city, hotel?.state, hotel?.country].filter(Boolean).join(", ");
+        const checkInDate = hotelConf.checkIn || hotelConf.tripHotel?.checkIn;
+        const checkOutDate = hotelConf.checkOut || hotelConf.tripHotel?.checkOut;
+        const roomTypeStr = hotelConf.roomDetails || hotelConf.tripHotel?.roomType || "Standard Room";
+        const roomCount = hotelConf.tripHotel?.rooms || 1;
+        const mealPlanStr = hotelConf.mealPlan || hotelConf.tripHotel?.mealPlan || "Room Only";
+
+        // Calculate nights
+        let nightsCount = 1;
+        if (checkInDate && checkOutDate) {
+          const diff = new Date(checkOutDate).getTime() - new Date(checkInDate).getTime();
+          nightsCount = Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)));
+        }
+
+        doc.font("Helvetica-Bold").fontSize(12.5);
+        const hNameH = doc.heightOfString(hotelNameStr, { width: contentWidth - 32 });
+        doc.font("Helvetica").fontSize(8);
+        const hLocH = hotelLocationStr ? doc.heightOfString(hotelLocationStr, { width: contentWidth - 32 }) : 0;
+        const stayBoxHeight = hNameH + hLocH + 130;
+
+        ensureSpace(stayBoxHeight);
+        const stayBoxY = doc.y;
+        doc.roundedRect(margin, stayBoxY, contentWidth, stayBoxHeight, 6).fillAndStroke("#FFFFFF", borderLight);
+
+        // Hotel Name & Address
         doc
           .fillColor(textDark)
-          .fontSize(11)
+          .fontSize(12.5)
           .font("Helvetica-Bold")
-          .text(operation.trip.customer.name, margin + 15, guestY + 14);
+          .text(hotelNameStr, margin + 16, stayBoxY + 14, { width: contentWidth - 32 });
 
-        const travelersList = operation.trip.travelers.map((t) => t.name).join(", ");
-        doc
-          .fillColor(textMuted)
-          .fontSize(8)
-          .font("Helvetica")
-          .text(
-            `Travelers: ${travelersList || operation.trip.customer.name} | Contact: ${operation.trip.customer.phone || "On File"}`,
-            margin + 15,
-            guestY + 30,
-            { width: contentWidth - 30 }
-          );
-
-        doc.y = guestY + 60;
-
-        // Section: Hotel & Stay Details Box
-        doc.moveDown(0.8);
-        doc
-          .fillColor(darkColor)
-          .fontSize(12)
-          .font("Helvetica-Bold")
-          .text("HOTEL RESERVATION DETAILS");
-
-        const detailsBoxY = doc.y + 6;
-        doc
-          .rect(margin, detailsBoxY, contentWidth, 160)
-          .fillAndStroke("#FFFFFF", borderLight);
-
-        // Hotel Name
-        doc
-          .fillColor(textDark)
-          .fontSize(13)
-          .font("Helvetica-Bold")
-          .text(hotel?.name || "Hotel Property", margin + 15, detailsBoxY + 14, { width: contentWidth - 30 });
-
-        if (hotel?.city || hotel?.address) {
+        if (hotelLocationStr) {
           doc
             .fillColor(textMuted)
             .fontSize(8)
             .font("Helvetica")
-            .text(
-              [hotel.address, hotel.city, hotel.state].filter(Boolean).join(", "),
-              margin + 15,
-              detailsBoxY + 32,
-              { width: contentWidth - 30 }
-            );
+            .text(hotelLocationStr, margin + 16, doc.y + 2, { width: contentWidth - 32 });
         }
 
-        // Divider
+        // Horizontal Separator
+        const sepY = doc.y + 10;
         doc
-          .moveTo(margin + 15, detailsBoxY + 48)
-          .lineTo(margin + contentWidth - 15, detailsBoxY + 48)
+          .moveTo(margin + 16, sepY)
+          .lineTo(margin + contentWidth - 16, sepY)
           .strokeColor(borderLight)
           .lineWidth(1)
           .stroke();
 
-        // 4-Column Grid for Dates & Room
-        const colY = detailsBoxY + 58;
-        const col1 = margin + 15;
-        const col2 = margin + 140;
-        const col3 = margin + 265;
-        const col4 = margin + 390;
+        // 4-Column Stay Grid
+        const gridY = sepY + 10;
+        const colWidth = (contentWidth - 32) / 4;
+        const c1 = margin + 16;
+        const c2 = c1 + colWidth;
+        const c3 = c2 + colWidth;
+        const c4 = c3 + colWidth;
 
         // Col 1: Check-in
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("CHECK-IN DATE", col1, colY);
-        doc.fillColor(textDark).fontSize(10).font("Helvetica-Bold").text(this.formatDate(hotelConf.checkIn || hotelConf.tripHotel?.checkIn), col1, colY + 12);
-        doc.fillColor(textMuted).fontSize(7).font("Helvetica").text("Standard: 14:00 hrs", col1, colY + 26);
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("CHECK-IN", c1, gridY);
+        doc.fillColor(textDark).fontSize(9.5).font("Helvetica-Bold").text(this.formatDate(checkInDate), c1, gridY + 11);
+        doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text("From 14:00 hrs", c1, gridY + 24);
 
         // Col 2: Check-out
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("CHECK-OUT DATE", col2, colY);
-        doc.fillColor(textDark).fontSize(10).font("Helvetica-Bold").text(this.formatDate(hotelConf.checkOut || hotelConf.tripHotel?.checkOut), col2, colY + 12);
-        doc.fillColor(textMuted).fontSize(7).font("Helvetica").text("Standard: 11:00 hrs", col2, colY + 26);
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("CHECK-OUT", c2, gridY);
+        doc.fillColor(textDark).fontSize(9.5).font("Helvetica-Bold").text(this.formatDate(checkOutDate), c2, gridY + 11);
+        doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text("Until 11:00 hrs", c2, gridY + 24);
 
-        // Col 3: Room Type
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("ROOM TYPE & ROOMS", col3, colY);
-        doc.fillColor(textDark).fontSize(9).font("Helvetica-Bold").text(hotelConf.roomDetails || hotelConf.tripHotel?.roomType || "Standard Room", col3, colY + 12, { width: 115 });
-        doc.fillColor(textMuted).fontSize(7).font("Helvetica").text(`${hotelConf.tripHotel?.rooms || 1} Room(s)`, col3, colY + 26);
+        // Col 3: Duration & Rooms
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("DURATION & ROOMS", c3, gridY);
+        doc.fillColor(textDark).fontSize(9.5).font("Helvetica-Bold").text(`${nightsCount} Night(s) • ${roomCount} Room`, c3, gridY + 11, { width: colWidth - 8 });
+        doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(roomTypeStr, c3, gridY + 24, { width: colWidth - 8 });
 
         // Col 4: Meal Plan
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("MEAL PLAN", col4, colY);
-        doc.fillColor(textDark).fontSize(9).font("Helvetica-Bold").text(hotelConf.mealPlan || hotelConf.tripHotel?.mealPlan || "Room Only", col4, colY + 12, { width: 115 });
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("MEAL PLAN / BOARD", c4, gridY);
+        doc.fillColor(brandAccent).fontSize(9.5).font("Helvetica-Bold").text(mealPlanStr, c4, gridY + 11, { width: colWidth - 8 });
+        doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text("Pre-booked Plan", c4, gridY + 24);
 
         // Confirmation Bar inside Box
+        const confBarY = gridY + 44;
         doc
-          .rect(margin + 15, detailsBoxY + 105, contentWidth - 30, 42)
-          .fillAndStroke(bgLight, "#CBD5E1");
+          .roundedRect(margin + 16, confBarY, contentWidth - 32, 42, 6)
+          .fillAndStroke(bgCard, "#CBD5E1");
 
         doc
-          .fillColor(primaryColor)
-          .fontSize(8)
+          .fillColor("#0F766E")
+          .fontSize(7.5)
           .font("Helvetica-Bold")
-          .text("HOTEL CONFIRMATION NUMBER / BOOKING ID", margin + 25, detailsBoxY + 114);
+          .text("HOTEL CONFIRMATION NUMBER / BOOKING ID", margin + 28, confBarY + 8);
 
         doc
-          .fillColor(darkColor)
+          .fillColor(brandDark)
           .fontSize(12)
           .font("Helvetica-Bold")
-          .text(hotelConf.confirmationNumber || "CONFIRMED ON ARRIVAL", margin + 25, detailsBoxY + 126);
+          .text(hotelConf.confirmationNumber || "CONFIRMED ON ARRIVAL", margin + 28, confBarY + 20);
 
         doc
           .fillColor(textMuted)
           .fontSize(8)
           .font("Helvetica")
-          .text(`Status: ${hotelConf.status}`, margin + contentWidth - 160, detailsBoxY + 126, {
-            width: 130,
+          .text(`Operational Status: ${hotelConf.status}`, margin + contentWidth - 180, confBarY + 20, {
+            width: 150,
             align: "right",
           });
 
-        doc.y = detailsBoxY + 175;
+        doc.y = stayBoxY + stayBoxHeight + 14;
 
-        // Section: Important Guest Instructions
-        doc.moveDown(0.8);
+        // ─── IMPORTANT HOTEL GUIDELINES ──────────────────────────────────────
+        ensureSpace(90);
         doc
-          .fillColor(darkColor)
-          .fontSize(11)
+          .fillColor(textDark)
+          .fontSize(9.5)
           .font("Helvetica-Bold")
-          .text("IMPORTANT HOTEL CHECK-IN GUIDELINES");
+          .text("IMPORTANT HOTEL CHECK-IN GUIDELINES & POLICIES", margin, doc.y);
 
-        const instructions = [
-          "• Government-approved photo identification (Passport / Aadhaar / Driving License) is mandatory for all adult guests upon check-in.",
-          "• Early check-in or late check-out is subject to hotel availability and may incur additional charges directly payable to the hotel.",
-          "• Incidental expenses such as room service, laundry, telephone calls, mini-bar, and optional spa services are to be settled directly with hotel reception.",
-          "• Please present this official confirmation voucher along with your valid ID at the hotel reception desk.",
+        const guidelines = [
+          "• Government-approved photo identification (Passport, Aadhaar, Driving License, or Voter ID) is mandatory for all adult guests upon check-in.",
+          "• Early check-in or late check-out is strictly subject to hotel availability and may incur additional charges directly payable to the property.",
+          "• Incidental expenses such as telephone calls, room service, laundry, mini-bar, and optional spa services must be settled directly with the reception upon departure.",
+          "• Please present this official confirmation voucher along with valid photo ID at the hotel reception desk upon arrival.",
         ];
 
-        doc.moveDown(0.4);
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica");
-        for (const line of instructions) {
-          doc.text(line, { lineGap: 3 });
+        doc.y += 6;
+        doc.fillColor(textMuted).fontSize(7.5).font("Helvetica");
+        for (const line of guidelines) {
+          ensureSpace(16);
+          doc.text(line, margin, doc.y, { width: contentWidth, lineGap: 2.5 });
+          doc.y += 2;
         }
 
-        // Emergency & Support Footer
-        doc.rect(margin, 740, contentWidth, 55).fillAndStroke(bgLight, borderLight);
+        // ─── 24/7 SUPPORT & ASSISTANCE BOX ──────────────────────────────────
+        ensureSpace(60);
+        doc.y += 8;
+        const supportBoxY = doc.y;
+        doc.roundedRect(margin, supportBoxY, contentWidth, 54, 6).fillAndStroke(bgCard, borderLight);
+
         doc
-          .fillColor(darkColor)
+          .fillColor(brandDark)
           .fontSize(8)
           .font("Helvetica-Bold")
-          .text("24/7 GUEST OPERATIONS & CONCIERGE ASSISTANCE", margin + 15, 748);
+          .text("24/7 GUEST OPERATIONS & CONCIERGE ASSISTANCE", margin + 16, supportBoxY + 10);
 
         doc
           .fillColor(textMuted)
-          .fontSize(8)
+          .fontSize(7.5)
           .font("Helvetica")
           .text(
-            `For on-ground assistance or reservation modifications, please contact ${operation.agency.name} Concierge at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@tripdesk.com"}.`,
-            margin + 15,
-            760,
-            { width: contentWidth - 30 }
+            `For on-ground assistance, itinerary modifications, or urgent hotel coordination, please contact ${operation.agency.name} Concierge Desk at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@tripdesk.com"}.`,
+            margin + 16,
+            supportBoxY + 23,
+            { width: contentWidth - 32, lineGap: 1.5 }
           );
+
+        // ─── TWO-PASS PAGE NUMBERING & RUNNING FOOTER ────────────────────────
+        const range = doc.bufferedPageRange();
+        for (let i = 0; i < range.count; i++) {
+          doc.switchToPage(i);
+
+          // Top running header on multi-page documents
+          if (i > 0) {
+            doc
+              .fontSize(7)
+              .font("Helvetica")
+              .fillColor(textLight)
+              .text(`Hotel Voucher • ${documentNumber} • ${hotelNameStr}`, margin, margin - 14, {
+                width: contentWidth,
+                align: "left",
+              });
+            doc
+              .moveTo(margin, margin - 6)
+              .lineTo(margin + contentWidth, margin - 6)
+              .strokeColor(borderLight)
+              .lineWidth(0.5)
+              .stroke();
+          }
+
+          // Bottom Running Footer
+          const footerY = pageHeight - 34;
+          doc
+            .moveTo(margin, footerY)
+            .lineTo(margin + contentWidth, footerY)
+            .strokeColor(borderLight)
+            .lineWidth(0.75)
+            .stroke();
+
+          doc
+            .fontSize(7.5)
+            .font("Helvetica")
+            .fillColor(textLight)
+            .text(
+              `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
+              margin,
+              footerY + 8,
+              { width: contentWidth - 80, align: "left" }
+            );
+
+          doc
+            .fontSize(7.5)
+            .font("Helvetica-Bold")
+            .fillColor(textLight)
+            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+              width: 75,
+              align: "right",
+            });
+        }
 
         doc.end();
       } catch (err) {
@@ -434,8 +599,9 @@ export class OperationsDocumentService {
       try {
         const doc = new PDFDocument({
           size: "A4",
-          margin: 40,
+          margin: 32,
           bufferPages: true,
+          compress: false,
           info: {
             Title: `Vehicle Voucher - ${vehicle?.name || "Transport Service"}`,
             Author: operation.agency.name,
@@ -450,210 +616,370 @@ export class OperationsDocumentService {
         doc.on("error", (err: Error) => reject(err));
 
         const pageWidth = 595.28;
-        const margin = 40;
-        const contentWidth = pageWidth - margin * 2;
+        const pageHeight = 841.89;
+        const margin = 32;
+        const contentWidth = pageWidth - margin * 2; // 531.28 pt
+        const bottomSafeLimit = pageHeight - 42;
 
-        // Theme colors
-        const primaryColor = "#1D4ED8"; // Blue 700
-        const darkColor = "#1E293B"; // Slate 800
+        // Colors
+        const brandDark = "#0F172A"; // Slate 900
+        const brandAccent = "#2563EB"; // Blue 600
+        const brandLight = "#EFF6FF"; // Blue 50
         const textDark = "#0F172A";
         const textMuted = "#475569";
-        const bgLight = "#F8FAFC";
+        const textLight = "#94A3B8";
+        const bgCard = "#F8FAFC";
         const borderLight = "#E2E8F0";
 
-        // Header Banner
-        doc.rect(margin, margin, contentWidth, 80).fill(darkColor);
+        const ensureSpace = (neededHeight: number) => {
+          if (doc.y + neededHeight > bottomSafeLimit) {
+            doc.addPage();
+            doc.x = margin;
+            doc.y = margin + 8;
+            return true;
+          }
+          return false;
+        };
 
-        // Agency Branding
+        const drawSectionHeader = (title: string, subtitle?: string, minContentHeight = 44) => {
+          ensureSpace(36 + minContentHeight);
+          doc.y += 16;
+          doc.x = margin;
+
+          doc.fillColor(textDark).fontSize(10.5).font("Helvetica-Bold").text(title, { characterSpacing: 0.5 });
+          if (subtitle) {
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(subtitle, { lineGap: 1 });
+          }
+
+          const lineY = doc.y + 4;
+          doc
+            .moveTo(margin, lineY)
+            .lineTo(margin + 32, lineY)
+            .strokeColor(brandAccent)
+            .lineWidth(2)
+            .stroke();
+
+          doc.y = lineY + 8;
+        };
+
+        // ─── HERO HEADER BANNER ──────────────────────────────────────────────
+        const agencyName = operation.agency.name || "TripDesk Travel Partner";
+        const agencyContact = [operation.agency.phone, operation.agency.email, operation.agency.address]
+          .filter(Boolean)
+          .join(" • ");
+
+        const leftWidth = contentWidth - 210;
+        doc.font("Helvetica-Bold").fontSize(14);
+        const nameH = doc.heightOfString(agencyName, { width: leftWidth });
+        doc.font("Helvetica").fontSize(7.5);
+        const contactH = agencyContact ? doc.heightOfString(agencyContact, { width: leftWidth }) : 0;
+        const leftContentH = nameH + contactH + 46;
+
+        // Right Badge text & dynamic height measurement
+        const docNumText = `VOUCHER #: ${documentNumber}`;
+        const dateText = `Issued: ${this.formatDate(new Date())}`;
+        const refText = `Trip Ref: ${operation.trip.tripNumber || "N/A"}`;
+        const statusText = dispatch.status === "ASSIGNED" || dispatch.status === "CONFIRMED"
+          ? "DISPATCH CONFIRMED"
+          : `STATUS: ${dispatch.status}`;
+
+        doc.font("Helvetica-Bold").fontSize(9.5);
+        const docNumH = doc.heightOfString(docNumText, { width: 155, align: "center" });
+
+        doc.font("Helvetica").fontSize(7.5);
+        const dateH = doc.heightOfString(dateText, { width: 155, align: "center" });
+        const refH = doc.heightOfString(refText, { width: 155, align: "center" });
+
+        const pillH = 14;
+        const totalRightContentH = docNumH + 3 + dateH + 2 + refH + 5 + pillH;
+        const minRightBoxH = totalRightContentH + 16;
+
+        const bannerHeight = Math.max(88, leftContentH, minRightBoxH + 28);
+
+        doc.roundedRect(margin, margin, contentWidth, bannerHeight, 8).fill(brandDark);
+
         doc
           .fillColor("#FFFFFF")
-          .fontSize(16)
+          .fontSize(14)
           .font("Helvetica-Bold")
-          .text(operation.agency.name, margin + 20, margin + 18, { width: 300 });
+          .text(agencyName, margin + 18, margin + 16, { width: leftWidth });
 
         doc
-          .fontSize(9)
-          .font("Helvetica")
           .fillColor("#93C5FD")
-          .text("OFFICIAL TRANSPORTATION & DRIVER VOUCHER", margin + 20, margin + 40);
+          .fontSize(8.5)
+          .font("Helvetica-Bold")
+          .text("OFFICIAL TRANSPORTATION & CHAUFFEUR VOUCHER", margin + 18, doc.y + 3);
 
-        doc
-          .fontSize(8)
-          .font("Helvetica")
-          .fillColor("#BFDBFE")
-          .text(
-            [operation.agency.phone, operation.agency.email].filter(Boolean).join(" | "),
-            margin + 20,
-            margin + 54
-          );
+        if (agencyContact) {
+          doc
+            .fillColor("#94A3B8")
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(agencyContact, margin + 18, doc.y + 4, { width: leftWidth, lineGap: 1 });
+        }
 
-        // Voucher Number Badge
+        // Right Badge
+        const rightX = margin + contentWidth - 190;
+        const rightY = margin + 14;
+        const rightBoxH = bannerHeight - 28;
+        doc.roundedRect(rightX, rightY, 175, rightBoxH, 6).fillAndStroke("#1E293B", "#334155");
+
+        const rightStartY = rightY + Math.max(8, (rightBoxH - totalRightContentH) / 2);
+        let curRightY = rightStartY;
+
         doc
           .fillColor("#FFFFFF")
-          .fontSize(10)
+          .fontSize(9.5)
           .font("Helvetica-Bold")
-          .text(`VOUCHER #: ${documentNumber}`, margin + contentWidth - 220, margin + 20, {
-            width: 200,
-            align: "right",
-          });
+          .text(docNumText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += docNumH + 3;
 
         doc
-          .fontSize(8)
+          .fillColor("#94A3B8")
+          .fontSize(7.5)
           .font("Helvetica")
-          .fillColor("#E0F2FE")
-          .text(`Issued: ${this.formatDate(new Date())}`, margin + contentWidth - 220, margin + 38, {
-            width: 200,
-            align: "right",
-          });
+          .text(dateText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += dateH + 2;
 
         doc
-          .fontSize(8)
+          .fillColor("#94A3B8")
+          .fontSize(7.5)
           .font("Helvetica")
-          .text(`Trip Ref: ${operation.trip.tripNumber || "N/A"}`, margin + contentWidth - 220, margin + 50, {
-            width: 200,
-            align: "right",
-          });
+          .text(refText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += refH + 5;
 
-        doc.y = margin + 95;
-
-        // Section: Guest & Booking Details
+        const pillX = rightX + (175 - 125) / 2;
+        doc.roundedRect(pillX, curRightY, 125, pillH, 7).fillAndStroke("#1E3A8A", "#3B82F6");
         doc
-          .rect(margin, doc.y, contentWidth, 60)
-          .fillAndStroke(bgLight, borderLight);
-
-        const guestY = doc.y + 12;
-        doc
-          .fillColor(primaryColor)
-          .fontSize(9)
+          .fillColor("#BFDBFE")
+          .fontSize(7)
           .font("Helvetica-Bold")
-          .text("PASSENGER & TRIP DETAILS", margin + 15, guestY);
+          .text(statusText, pillX, curRightY + 3.5, { width: 125, align: "center" });
 
+        doc.y = margin + bannerHeight + 14;
+
+        // ─── PASSENGER DETAILS CARD ──────────────────────────────────────────
+        const leadGuestName = operation.trip.customer?.name || "Valued Passenger";
+        const guestContact = [operation.trip.customer?.phone, operation.trip.customer?.email]
+          .filter(Boolean)
+          .join(" • ");
+        const coTravelers = operation.trip.travelers?.map((t) => t.name).join(", ");
+        const totalPax = operation.trip.travelers?.length || 1;
+
+        const colW = (contentWidth - 36) / 2;
+        doc.font("Helvetica").fontSize(8);
+        const travelersTextH = coTravelers ? doc.heightOfString(`Passengers: ${coTravelers}`, { width: colW }) : 0;
+        const guestCardHeight = Math.max(58, 38 + travelersTextH);
+
+        ensureSpace(guestCardHeight);
+        doc.roundedRect(margin, doc.y, contentWidth, guestCardHeight, 6).fillAndStroke(bgCard, borderLight);
+
+        const cardTopY = doc.y + 10;
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("LEAD PASSENGER & CONTACT", margin + 14, cardTopY);
+        doc.fillColor(textDark).fontSize(11).font("Helvetica-Bold").text(leadGuestName, margin + 14, cardTopY + 12);
+        if (guestContact) {
+          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text(guestContact, margin + 14, cardTopY + 26, { width: colW });
+        }
+
+        const rightColX = margin + colW + 22;
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("BOOKING & LOGISTICS REFERENCE", rightColX, cardTopY);
         doc
           .fillColor(textDark)
-          .fontSize(11)
+          .fontSize(9)
           .font("Helvetica-Bold")
-          .text(operation.trip.customer.name, margin + 15, guestY + 14);
+          .text(`Passenger Count: ${totalPax} Pax`, rightColX, cardTopY + 12);
+        if (coTravelers) {
+          doc
+            .fillColor(textMuted)
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(`Passengers: ${coTravelers}`, rightColX, cardTopY + 25, { width: colW, lineGap: 1 });
+        }
 
-        const travelersList = operation.trip.travelers.map((t) => t.name).join(", ");
+        doc.y = cardTopY + guestCardHeight - 2;
+
+        // ─── ASSIGNED VEHICLE & CHAUFFEUR ────────────────────────────────────
+        drawSectionHeader("ASSIGNED VEHICLE & CHAUFFEUR LOGISTICS", "Official fleet allocation and transfer schedule", 160);
+
+        const vehicleNameStr = vehicle?.name || dispatch.tripVehicle?.vehicle?.name || "Private Dedicated Vehicle";
+        const vehicleNumberStr = dispatch.vehicleNumber || "ASSIGNED UPON DISPATCH";
+        const driverNameStr = dispatch.driverName || "Chauffeur details will be shared prior to departure";
+        const driverPhoneStr = dispatch.driverPhone || "Will be shared via SMS / WhatsApp";
+        const pickupDateStr = this.formatDate(dispatch.pickupDate || operation.trip.startDate);
+        const pickupTimeStr = this.formatTime(dispatch.pickupTime || "As per Schedule");
+        const pickupLocStr = dispatch.pickupLocation || "Scheduled Hotel / Airport Terminal";
+        const dropLocStr = dispatch.dropLocation || "As per Tour Itinerary";
+
+        // Dynamic height measurements for grid and route
+        const col3W = (contentWidth - 32) / 3;
+        doc.font("Helvetica-Bold").fontSize(10.5);
+        const dNameH = doc.heightOfString(driverNameStr, { width: col3W - 10 });
+        const dPhoneH = doc.heightOfString(driverPhoneStr, { width: col3W - 10 });
+        const gridContentH = Math.max(16, dNameH, dPhoneH);
+        const gridH = 12 + gridContentH;
+
+        // Clean route formatting without unicode arrow
+        const routeText = `From: ${pickupLocStr}\nTo: ${dropLocStr}`;
+        doc.font("Helvetica").fontSize(8);
+        const routeTextH = doc.heightOfString(routeText, { width: contentWidth - 52, lineGap: 2.5 });
+        const routeStripH = 34 + routeTextH + 10;
+
+        // Total calculated parent container height
+        const vBoxHeight = 14 + 14 + 12 + 21 + gridH + 12 + routeStripH + 14;
+
+        ensureSpace(vBoxHeight);
+        const vBoxY = doc.y;
+        doc.roundedRect(margin, vBoxY, contentWidth, vBoxHeight, 6).fillAndStroke("#FFFFFF", borderLight);
+
+        // Vehicle Title
+        doc
+          .fillColor(textDark)
+          .fontSize(12.5)
+          .font("Helvetica-Bold")
+          .text(vehicleNameStr, margin + 16, vBoxY + 14, { width: contentWidth - 32 });
+
         doc
           .fillColor(textMuted)
           .fontSize(8)
           .font("Helvetica")
-          .text(
-            `Travelers: ${travelersList || operation.trip.customer.name} | Phone: ${operation.trip.customer.phone || "On File"}`,
-            margin + 15,
-            guestY + 28,
-            { width: contentWidth - 30 }
-          );
+          .text("Dedicated Air-Conditioned Private Transport Service", margin + 16, vBoxY + 30);
 
-        doc.y = guestY + 55;
-
-        // Section: Vehicle & Chauffeur Details Box
-        doc.moveDown(0.8);
+        const sepY = vBoxY + 44;
         doc
-          .fillColor(darkColor)
-          .fontSize(12)
-          .font("Helvetica-Bold")
-          .text("ASSIGNED VEHICLE & CHAUFFEUR");
-
-        const vehicleBoxY = doc.y + 6;
-        doc
-          .rect(margin, vehicleBoxY, contentWidth, 150)
-          .fillAndStroke("#FFFFFF", borderLight);
-
-        // Vehicle Name
-        doc
-          .fillColor(textDark)
-          .fontSize(12)
-          .font("Helvetica-Bold")
-          .text(
-            vehicle?.name || dispatch.tripVehicle?.vehicle?.name || "Private Dedicated Vehicle",
-            margin + 15,
-            vehicleBoxY + 14
-          );
-
-        // 3-Column Grid: Vehicle Number, Driver Name, Driver Phone
-        const vGridY = vehicleBoxY + 40;
-        const vCol1 = margin + 15;
-        const vCol2 = margin + 180;
-        const vCol3 = margin + 350;
-
-        // Col 1: Vehicle Number
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("VEHICLE NUMBER / REGISTRATION", vCol1, vGridY);
-        doc.fillColor(darkColor).fontSize(11).font("Helvetica-Bold").text(dispatch.vehicleNumber || "ASSIGNED UPON DISPATCH", vCol1, vGridY + 12);
-
-        // Col 2: Driver Name
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("ASSIGNED CHAUFFEUR / DRIVER", vCol2, vGridY);
-        doc.fillColor(darkColor).fontSize(11).font("Helvetica-Bold").text(dispatch.driverName || "Driver to be confirmed", vCol2, vGridY + 12);
-
-        // Col 3: Driver Phone
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("CHAUFFEUR CONTACT NUMBER", vCol3, vGridY);
-        doc.fillColor(primaryColor).fontSize(11).font("Helvetica-Bold").text(dispatch.driverPhone || "Will be shared via SMS", vCol3, vGridY + 12);
-
-        // Divider
-        doc
-          .moveTo(margin + 15, vehicleBoxY + 80)
-          .lineTo(margin + contentWidth - 15, vehicleBoxY + 80)
+          .moveTo(margin + 16, sepY)
+          .lineTo(margin + contentWidth - 16, sepY)
           .strokeColor(borderLight)
           .lineWidth(1)
           .stroke();
 
-        // Pickup / Drop Route Row
-        const routeY = vehicleBoxY + 92;
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("PICKUP SCHEDULE & LOCATION", vCol1, routeY);
-        doc.fillColor(textDark).fontSize(9).font("Helvetica-Bold").text(
-          `${this.formatDate(dispatch.pickupDate)} at ${this.formatTime(dispatch.pickupTime)}`,
-          vCol1,
-          routeY + 12
-        );
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text(
-          `From: ${dispatch.pickupLocation || "Scheduled Hotel / Airport"} → To: ${dispatch.dropLocation || "As per Itinerary"}`,
-          vCol1,
-          routeY + 25,
-          { width: contentWidth - 30 }
-        );
+        // 3-Column Grid: Reg Plate, Driver Name, Driver Phone
+        const gridY = sepY + 10;
+        const vc1 = margin + 16;
+        const vc2 = vc1 + col3W;
+        const vc3 = vc2 + col3W;
 
-        doc.y = vehicleBoxY + 165;
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("VEHICLE REGISTRATION NUMBER", vc1, gridY);
+        doc.fillColor(brandDark).fontSize(10.5).font("Helvetica-Bold").text(vehicleNumberStr, vc1, gridY + 12);
 
-        // Section: Transfer Instructions
-        doc.moveDown(0.8);
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("ASSIGNED CHAUFFEUR / DRIVER", vc2, gridY);
+        doc.fillColor(brandDark).fontSize(10.5).font("Helvetica-Bold").text(driverNameStr, vc2, gridY + 12, { width: col3W - 10 });
+
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("CHAUFFEUR CONTACT NUMBER", vc3, gridY);
+        doc.fillColor(brandAccent).fontSize(10.5).font("Helvetica-Bold").text(driverPhoneStr, vc3, gridY + 12, { width: col3W - 10 });
+
+        // Route & Schedule Strip inside parent card
+        const routeStripY = gridY + gridH + 12;
         doc
-          .fillColor(darkColor)
-          .fontSize(11)
+          .roundedRect(margin + 16, routeStripY, contentWidth - 32, routeStripH, 6)
+          .fillAndStroke(bgCard, "#CBD5E1");
+
+        doc.fillColor("#1D4ED8").fontSize(7.5).font("Helvetica-Bold").text("PICKUP SCHEDULE & ROUTE ITINERARY", margin + 26, routeStripY + 8);
+        doc.fillColor(textDark).fontSize(9.5).font("Helvetica-Bold").text(`${pickupDateStr} at ${pickupTimeStr}`, margin + 26, routeStripY + 20);
+        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text(
+          routeText,
+          margin + 26,
+          routeStripY + 34,
+          { width: contentWidth - 52, lineGap: 2.5 }
+        );
+
+        doc.y = vBoxY + vBoxHeight + 14;
+
+        // ─── PASSENGER PICKUP GUIDELINES ─────────────────────────────────────
+        ensureSpace(90);
+        doc
+          .fillColor(textDark)
+          .fontSize(9.5)
           .font("Helvetica-Bold")
-          .text("PASSENGER PICKUP GUIDELINES");
+          .text("PASSENGER PICKUP GUIDELINES & LOGISTICS TERMS", margin, doc.y);
 
         const driverInstructions = [
-          "• Please be present at the designated pickup lobby / meeting point 10 minutes prior to scheduled departure.",
-          "• For airport / railway station arrivals, your chauffeur will display a personalized name board at the exit gate.",
-          "• Toll taxes, interstate permits, parking fees, and driver allowances for scheduled itinerary points are included.",
-          "• Any detour or extended night hours outside agreed trip schedule may incur standard excess charges.",
+          "• Please be present at the designated pickup hotel lobby or meeting point 10 minutes prior to scheduled departure.",
+          "• For airport and railway station pickups, your assigned chauffeur will display a personalized guest placard at the arrival exit gate.",
+          "• Standard parking fees, toll taxes, interstate state permits, and chauffeur allowances for scheduled itinerary points are fully included.",
+          "• Any unscheduled detour, additional sightseeing, or extended night duty outside agreed trip itinerary may incur standard excess charges.",
         ];
 
-        doc.moveDown(0.4);
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica");
+        doc.y += 6;
+        doc.fillColor(textMuted).fontSize(7.5).font("Helvetica");
         for (const line of driverInstructions) {
-          doc.text(line, { lineGap: 3 });
+          ensureSpace(16);
+          doc.text(line, margin, doc.y, { width: contentWidth, lineGap: 2.5 });
+          doc.y += 2;
         }
 
-        // Emergency & Support Footer
-        doc.rect(margin, 740, contentWidth, 55).fillAndStroke(bgLight, borderLight);
+        // ─── 24/7 FLEET DISPATCH SUPPORT BOX ─────────────────────────────────
+        ensureSpace(60);
+        doc.y += 8;
+        const supportBoxY = doc.y;
+        doc.roundedRect(margin, supportBoxY, contentWidth, 54, 6).fillAndStroke(bgCard, borderLight);
+
         doc
-          .fillColor(darkColor)
+          .fillColor(brandDark)
           .fontSize(8)
           .font("Helvetica-Bold")
-          .text("24/7 FLEET DISPATCH & EMERGENCY SUPPORT", margin + 15, 748);
+          .text("24/7 FLEET DISPATCH & EMERGENCY SUPPORT", margin + 16, supportBoxY + 10);
 
         doc
           .fillColor(textMuted)
-          .fontSize(8)
+          .fontSize(7.5)
           .font("Helvetica")
           .text(
-            `For real-time dispatch updates or driver coordination, contact ${operation.agency.name} Dispatch Desk at ${operation.agency.phone || "+91 98800 11223"}.`,
-            margin + 15,
-            760,
-            { width: contentWidth - 30 }
+            `For real-time dispatch updates, driver tracking, or schedule modifications, contact ${operation.agency.name} Transport Desk at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@tripdesk.com"}.`,
+            margin + 16,
+            supportBoxY + 23,
+            { width: contentWidth - 32, lineGap: 1.5 }
           );
+
+        // ─── TWO-PASS PAGE NUMBERING & RUNNING FOOTER ────────────────────────
+        const range = doc.bufferedPageRange();
+        for (let i = 0; i < range.count; i++) {
+          doc.switchToPage(i);
+
+          if (i > 0) {
+            doc
+              .fontSize(7)
+              .font("Helvetica")
+              .fillColor(textLight)
+              .text(`Transport Voucher • ${documentNumber} • ${vehicleNameStr}`, margin, margin - 14, {
+                width: contentWidth,
+                align: "left",
+              });
+            doc
+              .moveTo(margin, margin - 6)
+              .lineTo(margin + contentWidth, margin - 6)
+              .strokeColor(borderLight)
+              .lineWidth(0.5)
+              .stroke();
+          }
+
+          const footerY = pageHeight - 34;
+          doc
+            .moveTo(margin, footerY)
+            .lineTo(margin + contentWidth, footerY)
+            .strokeColor(borderLight)
+            .lineWidth(0.75)
+            .stroke();
+
+          doc
+            .fontSize(7.5)
+            .font("Helvetica")
+            .fillColor(textLight)
+            .text(
+              `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
+              margin,
+              footerY + 8,
+              { width: contentWidth - 80, align: "left" }
+            );
+
+          doc
+            .fontSize(7.5)
+            .font("Helvetica-Bold")
+            .fillColor(textLight)
+            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+              width: 75,
+              align: "right",
+            });
+        }
 
         doc.end();
       } catch (err) {
@@ -728,8 +1054,9 @@ export class OperationsDocumentService {
       try {
         const doc = new PDFDocument({
           size: "A4",
-          margin: 40,
+          margin: 32,
           bufferPages: true,
+          compress: false,
           info: {
             Title: `Activity Voucher - ${activity?.name || "Excursion Experience"}`,
             Author: operation.agency.name,
@@ -744,252 +1071,371 @@ export class OperationsDocumentService {
         doc.on("error", (err: Error) => reject(err));
 
         const pageWidth = 595.28;
-        const margin = 40;
-        const contentWidth = pageWidth - margin * 2;
+        const pageHeight = 841.89;
+        const margin = 32;
+        const contentWidth = pageWidth - margin * 2; // 531.28 pt
+        const bottomSafeLimit = pageHeight - 42;
 
-        // Theme colors
-        const primaryColor = "#7C3AED"; // Purple 600
-        const darkColor = "#2E1065"; // Purple 950
+        const brandDark = "#0F172A"; // Slate 900
+        const brandAccent = "#7C3AED"; // Purple 600
+        const brandLight = "#FAF5FF"; // Purple 50
         const textDark = "#0F172A";
         const textMuted = "#475569";
-        const bgLight = "#F8FAFC";
+        const textLight = "#94A3B8";
+        const bgCard = "#F8FAFC";
         const borderLight = "#E2E8F0";
 
-        // Header Banner
-        doc.rect(margin, margin, contentWidth, 80).fill(darkColor);
+        const ensureSpace = (neededHeight: number) => {
+          if (doc.y + neededHeight > bottomSafeLimit) {
+            doc.addPage();
+            doc.x = margin;
+            doc.y = margin + 8;
+            return true;
+          }
+          return false;
+        };
 
-        // Agency Branding
+        const drawSectionHeader = (title: string, subtitle?: string, minContentHeight = 44) => {
+          ensureSpace(36 + minContentHeight);
+          doc.y += 16;
+          doc.x = margin;
+
+          doc.fillColor(textDark).fontSize(10.5).font("Helvetica-Bold").text(title, { characterSpacing: 0.5 });
+          if (subtitle) {
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(subtitle, { lineGap: 1 });
+          }
+
+          const lineY = doc.y + 4;
+          doc
+            .moveTo(margin, lineY)
+            .lineTo(margin + 32, lineY)
+            .strokeColor(brandAccent)
+            .lineWidth(2)
+            .stroke();
+
+          doc.y = lineY + 8;
+        };
+
+        // ─── HERO HEADER BANNER ──────────────────────────────────────────────
+        const agencyName = operation.agency.name || "TripDesk Travel Partner";
+        const agencyContact = [operation.agency.phone, operation.agency.email, operation.agency.address]
+          .filter(Boolean)
+          .join(" • ");
+
+        const leftWidth = contentWidth - 210;
+        doc.font("Helvetica-Bold").fontSize(14);
+        const nameH = doc.heightOfString(agencyName, { width: leftWidth });
+        doc.font("Helvetica").fontSize(7.5);
+        const contactH = agencyContact ? doc.heightOfString(agencyContact, { width: leftWidth }) : 0;
+        const leftContentH = nameH + contactH + 46;
+
+        // Right Badge text & dynamic height measurement
+        const docNumText = `PASS #: ${documentNumber}`;
+        const dateText = `Issued: ${this.formatDate(new Date())}`;
+        const refText = `Trip Ref: ${operation.trip.tripNumber || "N/A"}`;
+        const statusText = activityConf.status === "CONFIRMED" ? "ADMISSION CONFIRMED" : `STATUS: ${activityConf.status}`;
+
+        doc.font("Helvetica-Bold").fontSize(9.5);
+        const docNumH = doc.heightOfString(docNumText, { width: 155, align: "center" });
+
+        doc.font("Helvetica").fontSize(7.5);
+        const dateH = doc.heightOfString(dateText, { width: 155, align: "center" });
+        const refH = doc.heightOfString(refText, { width: 155, align: "center" });
+
+        const pillH = 14;
+        const totalRightContentH = docNumH + 3 + dateH + 2 + refH + 5 + pillH;
+        const minRightBoxH = totalRightContentH + 16;
+
+        const bannerHeight = Math.max(88, leftContentH, minRightBoxH + 28);
+
+        doc.roundedRect(margin, margin, contentWidth, bannerHeight, 8).fill(brandDark);
+
         doc
           .fillColor("#FFFFFF")
-          .fontSize(16)
+          .fontSize(14)
           .font("Helvetica-Bold")
-          .text(operation.agency.name, margin + 20, margin + 18, { width: 300 });
+          .text(agencyName, margin + 18, margin + 16, { width: leftWidth });
 
         doc
-          .fontSize(9)
-          .font("Helvetica")
           .fillColor("#DDD6FE")
-          .text("OFFICIAL ACTIVITY & EXCURSION PASS", margin + 20, margin + 40);
+          .fontSize(8.5)
+          .font("Helvetica-Bold")
+          .text("OFFICIAL ACTIVITY & EXCURSION PASS", margin + 18, doc.y + 3);
 
-        doc
-          .fontSize(8)
-          .font("Helvetica")
-          .fillColor("#EDE9FE")
-          .text(
-            [operation.agency.phone, operation.agency.email].filter(Boolean).join(" | "),
-            margin + 20,
-            margin + 54
-          );
+        if (agencyContact) {
+          doc
+            .fillColor("#94A3B8")
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(agencyContact, margin + 18, doc.y + 4, { width: leftWidth, lineGap: 1 });
+        }
 
-        // Voucher Number Badge
+        // Right Badge
+        const rightX = margin + contentWidth - 190;
+        const rightY = margin + 14;
+        const rightBoxH = bannerHeight - 28;
+        doc.roundedRect(rightX, rightY, 175, rightBoxH, 6).fillAndStroke("#1E293B", "#334155");
+
+        const rightStartY = rightY + Math.max(8, (rightBoxH - totalRightContentH) / 2);
+        let curRightY = rightStartY;
+
         doc
           .fillColor("#FFFFFF")
-          .fontSize(10)
+          .fontSize(9.5)
           .font("Helvetica-Bold")
-          .text(`PASS #: ${documentNumber}`, margin + contentWidth - 220, margin + 20, {
-            width: 200,
-            align: "right",
-          });
+          .text(docNumText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += docNumH + 3;
 
         doc
-          .fontSize(8)
+          .fillColor("#94A3B8")
+          .fontSize(7.5)
           .font("Helvetica")
-          .fillColor("#E0F2FE")
-          .text(`Issued: ${this.formatDate(new Date())}`, margin + contentWidth - 220, margin + 38, {
-            width: 200,
-            align: "right",
-          });
+          .text(dateText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += dateH + 2;
 
         doc
-          .fontSize(8)
+          .fillColor("#94A3B8")
+          .fontSize(7.5)
           .font("Helvetica")
-          .text(`Trip Ref: ${operation.trip.tripNumber || "N/A"}`, margin + contentWidth - 220, margin + 50, {
-            width: 200,
-            align: "right",
-          });
+          .text(refText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += refH + 5;
 
-        doc.y = margin + 95;
-
-        // Section: Guest & Booking Details
+        const pillX = rightX + (175 - 125) / 2;
+        doc.roundedRect(pillX, curRightY, 125, pillH, 7).fillAndStroke("#4C1D95", "#8B5CF6");
         doc
-          .rect(margin, doc.y, contentWidth, 60)
-          .fillAndStroke(bgLight, borderLight);
+          .fillColor("#DDD6FE")
+          .fontSize(7)
+          .font("Helvetica-Bold")
+          .text(statusText, pillX, curRightY + 3.5, { width: 125, align: "center" });
 
-        const guestY = doc.y + 12;
+        doc.y = margin + bannerHeight + 14;
+
+        // ─── PARTICIPANT DETAILS CARD ────────────────────────────────────────
+        const leadGuestName = operation.trip.customer?.name || "Valued Guest";
+        const guestContact = [operation.trip.customer?.phone, operation.trip.customer?.email]
+          .filter(Boolean)
+          .join(" • ");
+        const coTravelers = operation.trip.travelers?.map((t) => t.name).join(", ");
+        const totalPax = operation.trip.travelers?.length || 1;
+
+        const colW = (contentWidth - 36) / 2;
+        doc.font("Helvetica").fontSize(8);
+        const travelersTextH = coTravelers ? doc.heightOfString(`Participants: ${coTravelers}`, { width: colW }) : 0;
+        const guestCardHeight = Math.max(58, 38 + travelersTextH);
+
+        ensureSpace(guestCardHeight);
+        doc.roundedRect(margin, doc.y, contentWidth, guestCardHeight, 6).fillAndStroke(bgCard, borderLight);
+
+        const cardTopY = doc.y + 10;
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("LEAD PARTICIPANT & CONTACT", margin + 14, cardTopY);
+        doc.fillColor(textDark).fontSize(11).font("Helvetica-Bold").text(leadGuestName, margin + 14, cardTopY + 12);
+        if (guestContact) {
+          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text(guestContact, margin + 14, cardTopY + 26, { width: colW });
+        }
+
+        const rightColX = margin + colW + 22;
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("PARTICIPATION ROSTER", rightColX, cardTopY);
         doc
-          .fillColor(primaryColor)
+          .fillColor(textDark)
           .fontSize(9)
           .font("Helvetica-Bold")
-          .text("PARTICIPANT / GUEST DETAILS", margin + 15, guestY);
+          .text(`Total Participants: ${totalPax} Pax`, rightColX, cardTopY + 12);
+        if (coTravelers) {
+          doc
+            .fillColor(textMuted)
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(`Participants: ${coTravelers}`, rightColX, cardTopY + 25, { width: colW, lineGap: 1 });
+        }
+
+        doc.y = cardTopY + guestCardHeight - 2;
+
+        // ─── EXCURSION & ENTRY PASS DETAILS ──────────────────────────────────
+        drawSectionHeader("EXCURSION & ADMISSION DETAILS", "Verified entry credentials and experience schedule", 150);
+
+        const activityTitleStr = activity?.name || activityConf.tripActivity?.activity?.name || "Sightseeing & Excursion Experience";
+        const locationStr = activity?.location || activityConf.tripActivity?.location || (activity as any)?.address || "Designated Activity Venue";
+        const activityDateStr = this.formatDate(activityConf.tripActivity?.date || operation.trip.startDate);
+        const activityTimeStr = activityConf.tripActivity?.time || "Standard Operating Hours";
+        const ticketNumStr = activityConf.ticketNumber || "TKT-CONFIRMED";
+        const confNumStr = activityConf.confirmationNumber || "CONFIRMED";
+
+        doc.font("Helvetica-Bold").fontSize(12.5);
+        const aNameH = doc.heightOfString(activityTitleStr, { width: contentWidth - 32 });
+        doc.font("Helvetica").fontSize(8);
+        const aLocH = locationStr ? doc.heightOfString(`Location / Meeting Point: ${locationStr}`, { width: contentWidth - 32 }) : 0;
+        const actBoxHeight = aNameH + aLocH + 130;
+
+        ensureSpace(actBoxHeight);
+        const actBoxY = doc.y;
+        doc.roundedRect(margin, actBoxY, contentWidth, actBoxHeight, 6).fillAndStroke("#FFFFFF", borderLight);
 
         doc
           .fillColor(textDark)
-          .fontSize(11)
+          .fontSize(12.5)
           .font("Helvetica-Bold")
-          .text(operation.trip.customer.name, margin + 15, guestY + 14);
+          .text(activityTitleStr, margin + 16, actBoxY + 14, { width: contentWidth - 32 });
 
-        const travelersList = operation.trip.travelers.map((t) => t.name).join(", ");
-        doc
-          .fillColor(textMuted)
-          .fontSize(8)
-          .font("Helvetica")
-          .text(
-            `Participants: ${travelersList || operation.trip.customer.name} | Total: ${operation.trip.travelers.length || 1} Pax`,
-            margin + 15,
-            guestY + 28,
-            { width: contentWidth - 30 }
-          );
-
-        doc.y = guestY + 55;
-
-        // Section: Activity Details Box
-        doc.moveDown(0.8);
-        doc
-          .fillColor(darkColor)
-          .fontSize(12)
-          .font("Helvetica-Bold")
-          .text("EXCURSION & ENTRY PASS INFORMATION");
-
-        const actBoxY = doc.y + 6;
-        doc
-          .rect(margin, actBoxY, contentWidth, 160)
-          .fillAndStroke("#FFFFFF", borderLight);
-
-        // Activity Title
-        doc
-          .fillColor(textDark)
-          .fontSize(13)
-          .font("Helvetica-Bold")
-          .text(
-            activity?.name || activityConf.tripActivity?.activity?.name || "Exclusive Sightseeing Tour",
-            margin + 15,
-            actBoxY + 14,
-            { width: contentWidth - 30 }
-          );
-
-        if (activity?.location || activityConf.tripActivity?.location) {
+        if (locationStr) {
           doc
             .fillColor(textMuted)
             .fontSize(8)
             .font("Helvetica")
-            .text(
-              `Location: ${activity?.location || activityConf.tripActivity?.location}`,
-              margin + 15,
-              actBoxY + 32,
-              { width: contentWidth - 30 }
-            );
+            .text(`Location / Meeting Point: ${locationStr}`, margin + 16, doc.y + 2, { width: contentWidth - 32 });
         }
 
-        // Divider
+        const sepY = doc.y + 10;
         doc
-          .moveTo(margin + 15, actBoxY + 48)
-          .lineTo(margin + contentWidth - 15, actBoxY + 48)
+          .moveTo(margin + 16, sepY)
+          .lineTo(margin + contentWidth - 16, sepY)
           .strokeColor(borderLight)
           .lineWidth(1)
           .stroke();
 
-        // 3-Column Grid: Date/Time, Ticket Number, Confirmation
-        const aGridY = actBoxY + 58;
-        const aCol1 = margin + 15;
-        const aCol2 = margin + 180;
-        const aCol3 = margin + 350;
+        // 3-Column Grid: Date & Time, E-Ticket #, Provider Confirmation
+        const gridY = sepY + 10;
+        const col3W = (contentWidth - 32) / 3;
+        const ac1 = margin + 16;
+        const ac2 = ac1 + col3W;
+        const ac3 = ac2 + col3W;
 
-        // Col 1: Date & Time
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("ACTIVITY DATE & TIME", aCol1, aGridY);
-        doc.fillColor(textDark).fontSize(10).font("Helvetica-Bold").text(
-          this.formatDate(activityConf.tripActivity?.date || operation.trip.startDate),
-          aCol1,
-          aGridY + 12
-        );
-        doc.fillColor(textMuted).fontSize(7).font("Helvetica").text(
-          activityConf.tripActivity?.time || "Standard Operating Hours",
-          aCol1,
-          aGridY + 26
-        );
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("ACTIVITY DATE & SCHEDULED TIME", ac1, gridY);
+        doc.fillColor(brandDark).fontSize(9.5).font("Helvetica-Bold").text(activityDateStr, ac1, gridY + 11);
+        doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(activityTimeStr, ac1, gridY + 24, { width: col3W - 8 });
 
-        // Col 2: Ticket Number
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("E-TICKET / PASS NUMBER", aCol2, aGridY);
-        doc.fillColor(primaryColor).fontSize(11).font("Helvetica-Bold").text(
-          activityConf.ticketNumber || "TKT-CONFIRMED",
-          aCol2,
-          aGridY + 12
-        );
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("E-TICKET / PASS NUMBER", ac2, gridY);
+        doc.fillColor(brandAccent).fontSize(10.5).font("Helvetica-Bold").text(ticketNumStr, ac2, gridY + 11);
+        doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text("Official Admission Pass", ac2, gridY + 24);
 
-        // Col 3: Provider Reference
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("CONFIRMATION NUMBER", aCol3, aGridY);
-        doc.fillColor(darkColor).fontSize(10).font("Helvetica-Bold").text(
-          activityConf.confirmationNumber || "CONFIRMED",
-          aCol3,
-          aGridY + 12
-        );
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("CONFIRMATION NUMBER", ac3, gridY);
+        doc.fillColor(brandDark).fontSize(10.5).font("Helvetica-Bold").text(confNumStr, ac3, gridY + 11);
+        doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(`Status: ${activityConf.status}`, ac3, gridY + 24);
 
-        // Entry Pass Banner inside Box
+        // Verification Bar inside Box
+        const confBarY = gridY + 44;
         doc
-          .rect(margin + 15, actBoxY + 105, contentWidth - 30, 42)
-          .fillAndStroke(bgLight, "#CBD5E1");
+          .roundedRect(margin + 16, confBarY, contentWidth - 32, 42, 6)
+          .fillAndStroke(bgCard, "#CBD5E1");
 
         doc
-          .fillColor(primaryColor)
-          .fontSize(8)
+          .fillColor("#7C3AED")
+          .fontSize(7.5)
           .font("Helvetica-Bold")
-          .text("VERIFIED RESERVATION STATUS", margin + 25, actBoxY + 114);
+          .text("VERIFIED RESERVATION STATUS", margin + 28, confBarY + 8);
 
         doc
-          .fillColor(darkColor)
+          .fillColor(brandDark)
           .fontSize(11)
           .font("Helvetica-Bold")
-          .text("PRE-PAID & GUARANTEED ADMISSION", margin + 25, actBoxY + 126);
+          .text("PRE-PAID & GUARANTEED ADMISSION", margin + 28, confBarY + 20);
 
         doc
           .fillColor(textMuted)
           .fontSize(8)
           .font("Helvetica")
-          .text(`Status: ${activityConf.status}`, margin + contentWidth - 160, actBoxY + 126, {
-            width: 130,
+          .text(`Operational Status: ${activityConf.status}`, margin + contentWidth - 180, confBarY + 20, {
+            width: 150,
             align: "right",
           });
 
-        doc.y = actBoxY + 175;
+        doc.y = actBoxY + actBoxHeight + 14;
 
-        // Section: Activity Guidelines
-        doc.moveDown(0.8);
+        // ─── ACTIVITY GUIDELINES ─────────────────────────────────────────────
+        ensureSpace(90);
         doc
-          .fillColor(darkColor)
-          .fontSize(11)
+          .fillColor(textDark)
+          .fontSize(9.5)
           .font("Helvetica-Bold")
-          .text("EXPERIENCE GUIDELINES & INSTRUCTIONS");
+          .text("EXPERIENCE GUIDELINES & ENTRY INSTRUCTIONS", margin, doc.y);
 
         const actInstructions = [
-          "• Please present this electronic or printed pass at the entry gate / tour guide meeting desk.",
-          "• Dress code: Modest, comfortable clothing and walking shoes recommended.",
-          "• Security check: Valid photo identification may be requested at entry.",
-          "• Please arrive 15 minutes prior to your scheduled time slot for briefing and entry formalities.",
+          "• Please present this electronic or printed pass at the entry gate, visitor center, or tour guide meeting desk.",
+          "• Dress code & gear: Comfortable walking shoes, sunscreen, and modest clothing recommended for outdoor excursions.",
+          "• Security check: A valid government photo ID may be requested by venue security prior to entry.",
+          "• Please arrive 15 minutes prior to your scheduled time slot for safety briefing and entry formalities.",
         ];
 
-        doc.moveDown(0.4);
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica");
+        doc.y += 6;
+        doc.fillColor(textMuted).fontSize(7.5).font("Helvetica");
         for (const line of actInstructions) {
-          doc.text(line, { lineGap: 3 });
+          ensureSpace(16);
+          doc.text(line, margin, doc.y, { width: contentWidth, lineGap: 2.5 });
+          doc.y += 2;
         }
 
-        // Support Footer
-        doc.rect(margin, 740, contentWidth, 55).fillAndStroke(bgLight, borderLight);
+        // ─── 24/7 SUPPORT BOX ────────────────────────────────────────────────
+        ensureSpace(60);
+        doc.y += 8;
+        const supportBoxY = doc.y;
+        doc.roundedRect(margin, supportBoxY, contentWidth, 54, 6).fillAndStroke(bgCard, borderLight);
+
         doc
-          .fillColor(darkColor)
+          .fillColor(brandDark)
           .fontSize(8)
           .font("Helvetica-Bold")
-          .text("24/7 GUEST SUPPORT & ASSISTANCE", margin + 15, 748);
+          .text("24/7 GUEST SUPPORT & ASSISTANCE", margin + 16, supportBoxY + 10);
 
         doc
           .fillColor(textMuted)
-          .fontSize(8)
+          .fontSize(7.5)
           .font("Helvetica")
           .text(
-            `For queries or immediate support during your excursion, call ${operation.agency.name} at ${operation.agency.phone || "+91 98800 11223"}.`,
-            margin + 15,
-            760,
-            { width: contentWidth - 30 }
+            `For queries, tour guide coordination, or immediate support during your excursion, call ${operation.agency.name} at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@tripdesk.com"}.`,
+            margin + 16,
+            supportBoxY + 23,
+            { width: contentWidth - 32, lineGap: 1.5 }
           );
+
+        // ─── TWO-PASS PAGE NUMBERING & RUNNING FOOTER ────────────────────────
+        const range = doc.bufferedPageRange();
+        for (let i = 0; i < range.count; i++) {
+          doc.switchToPage(i);
+
+          if (i > 0) {
+            doc
+              .fontSize(7)
+              .font("Helvetica")
+              .fillColor(textLight)
+              .text(`Activity Pass • ${documentNumber} • ${activityTitleStr}`, margin, margin - 14, {
+                width: contentWidth,
+                align: "left",
+              });
+            doc
+              .moveTo(margin, margin - 6)
+              .lineTo(margin + contentWidth, margin - 6)
+              .strokeColor(borderLight)
+              .lineWidth(0.5)
+              .stroke();
+          }
+
+          const footerY = pageHeight - 34;
+          doc
+            .moveTo(margin, footerY)
+            .lineTo(margin + contentWidth, footerY)
+            .strokeColor(borderLight)
+            .lineWidth(0.75)
+            .stroke();
+
+          doc
+            .fontSize(7.5)
+            .font("Helvetica")
+            .fillColor(textLight)
+            .text(
+              `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
+              margin,
+              footerY + 8,
+              { width: contentWidth - 80, align: "left" }
+            );
+
+          doc
+            .fontSize(7.5)
+            .font("Helvetica-Bold")
+            .fillColor(textLight)
+            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+              width: 75,
+              align: "right",
+            });
+        }
 
         doc.end();
       } catch (err) {
@@ -1077,8 +1523,9 @@ export class OperationsDocumentService {
       try {
         const doc = new PDFDocument({
           size: "A4",
-          margin: 40,
+          margin: 32,
           bufferPages: true,
+          compress: false,
           info: {
             Title: `Booking Confirmation - ${operation.trip.title}`,
             Author: operation.agency.name,
@@ -1094,209 +1541,379 @@ export class OperationsDocumentService {
 
         const pageWidth = 595.28;
         const pageHeight = 841.89;
-        const margin = 40;
-        const contentWidth = pageWidth - margin * 2;
+        const margin = 32;
+        const contentWidth = pageWidth - margin * 2; // 531.28 pt
+        const bottomSafeLimit = pageHeight - 42;
 
-        const checkPageBreak = (neededHeight: number) => {
-          if (doc.y + neededHeight > pageHeight - 65) {
+        const brandDark = "#0F172A"; // Slate 900
+        const brandAccent = "#0284C7"; // Sky 600
+        const textDark = "#0F172A";
+        const textMuted = "#475569";
+        const textLight = "#94A3B8";
+        const bgCard = "#F8FAFC";
+        const borderLight = "#E2E8F0";
+
+        const ensureSpace = (neededHeight: number) => {
+          if (doc.y + neededHeight > bottomSafeLimit) {
             doc.addPage();
+            doc.x = margin;
+            doc.y = margin + 8;
             return true;
           }
           return false;
         };
 
-        // Theme colors
-        const primaryColor = "#0369A1"; // Sky 700
-        const darkColor = "#082F49"; // Sky 950
-        const textDark = "#0F172A";
-        const textMuted = "#475569";
-        const bgLight = "#F8FAFC";
-        const borderLight = "#E2E8F0";
+        const drawSectionHeader = (title: string, subtitle?: string, minContentHeight = 44) => {
+          ensureSpace(36 + minContentHeight);
+          doc.y += 16;
+          doc.x = margin;
 
-        // Header Banner
-        doc.rect(margin, margin, contentWidth, 80).fill(darkColor);
+          doc.fillColor(textDark).fontSize(10.5).font("Helvetica-Bold").text(title, { characterSpacing: 0.5 });
+          if (subtitle) {
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(subtitle, { lineGap: 1 });
+          }
+
+          const lineY = doc.y + 4;
+          doc
+            .moveTo(margin, lineY)
+            .lineTo(margin + 32, lineY)
+            .strokeColor(brandAccent)
+            .lineWidth(2)
+            .stroke();
+
+          doc.y = lineY + 8;
+        };
+
+        // ─── HERO HEADER BANNER ──────────────────────────────────────────────
+        const agencyName = operation.agency.name || "TripDesk Travel Partner";
+        const agencyContact = [operation.agency.phone, operation.agency.email, operation.agency.address]
+          .filter(Boolean)
+          .join(" • ");
+
+        const leftWidth = contentWidth - 210;
+        doc.font("Helvetica-Bold").fontSize(14);
+        const nameH = doc.heightOfString(agencyName, { width: leftWidth });
+        doc.font("Helvetica").fontSize(7.5);
+        const contactH = agencyContact ? doc.heightOfString(agencyContact, { width: leftWidth }) : 0;
+        const leftContentH = nameH + contactH + 46;
+
+        // Right Badge text & dynamic height measurement
+        const docNumText = `CONFIRMATION #: ${documentNumber}`;
+        const dateText = `Date: ${this.formatDate(new Date())}`;
+        const refText = `Booking Ref: ${operation.booking?.bookingNumber || operation.trip.tripNumber || "N/A"}`;
+        const statusText = "BOOKING CONFIRMED";
+
+        doc.font("Helvetica-Bold").fontSize(9.5);
+        const docNumH = doc.heightOfString(docNumText, { width: 155, align: "center" });
+
+        doc.font("Helvetica").fontSize(7.5);
+        const dateH = doc.heightOfString(dateText, { width: 155, align: "center" });
+        const refH = doc.heightOfString(refText, { width: 155, align: "center" });
+
+        const pillH = 14;
+        const totalRightContentH = docNumH + 3 + dateH + 2 + refH + 5 + pillH;
+        const minRightBoxH = totalRightContentH + 16;
+
+        const bannerHeight = Math.max(88, leftContentH, minRightBoxH + 28);
+
+        doc.roundedRect(margin, margin, contentWidth, bannerHeight, 8).fill(brandDark);
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(16)
+          .fontSize(14)
           .font("Helvetica-Bold")
-          .text(operation.agency.name, margin + 20, margin + 18, { width: 300 });
+          .text(agencyName, margin + 18, margin + 16, { width: leftWidth });
 
         doc
-          .fontSize(9)
-          .font("Helvetica")
           .fillColor("#BAE6FD")
-          .text("OFFICIAL TRAVEL BOOKING CONFIRMATION", margin + 20, margin + 40);
+          .fontSize(8.5)
+          .font("Helvetica-Bold")
+          .text("OFFICIAL TRAVEL BOOKING CONFIRMATION", margin + 18, doc.y + 3);
 
-        doc
-          .fontSize(8)
-          .font("Helvetica")
-          .fillColor("#E0F2FE")
-          .text(
-            [operation.agency.phone, operation.agency.email].filter(Boolean).join(" | "),
-            margin + 20,
-            margin + 54
-          );
+        if (agencyContact) {
+          doc
+            .fillColor("#94A3B8")
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(agencyContact, margin + 18, doc.y + 4, { width: leftWidth, lineGap: 1 });
+        }
+
+        // Right Badge
+        const rightX = margin + contentWidth - 190;
+        const rightY = margin + 14;
+        const rightBoxH = bannerHeight - 28;
+        doc.roundedRect(rightX, rightY, 175, rightBoxH, 6).fillAndStroke("#1E293B", "#334155");
+
+        const rightStartY = rightY + Math.max(8, (rightBoxH - totalRightContentH) / 2);
+        let curRightY = rightStartY;
 
         doc
           .fillColor("#FFFFFF")
+          .fontSize(9.5)
+          .font("Helvetica-Bold")
+          .text(docNumText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += docNumH + 3;
+
+        doc
+          .fillColor("#94A3B8")
+          .fontSize(7.5)
+          .font("Helvetica")
+          .text(dateText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += dateH + 2;
+
+        doc
+          .fillColor("#94A3B8")
+          .fontSize(7.5)
+          .font("Helvetica")
+          .text(refText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += refH + 5;
+
+        const pillX = rightX + (175 - 125) / 2;
+        doc.roundedRect(pillX, curRightY, 125, pillH, 7).fillAndStroke("#064E3B", "#059669");
+        doc
+          .fillColor("#A7F3D0")
+          .fontSize(7)
+          .font("Helvetica-Bold")
+          .text(statusText, pillX, curRightY + 3.5, { width: 125, align: "center" });
+
+        doc.y = margin + bannerHeight + 14;
+
+        // ─── TRIP & CUSTOMER OVERVIEW CARD ───────────────────────────────────
+        const leadGuestName = operation.trip.customer?.name || "Valued Passenger";
+        const guestContact = [operation.trip.customer?.phone, operation.trip.customer?.email]
+          .filter(Boolean)
+          .join(" • ");
+        const coTravelers = operation.trip.travelers?.map((t) => t.name).join(", ");
+        const totalPax = operation.trip.travelers?.length || 1;
+        const tripDates = `${this.formatDate(operation.trip.startDate)} — ${this.formatDate(operation.trip.endDate)}`;
+
+        const colW = (contentWidth - 36) / 2;
+        doc.font("Helvetica-Bold").fontSize(11.5);
+        const titleH = doc.heightOfString(operation.trip.title, { width: colW });
+        const overviewCardHeight = Math.max(64, 38 + titleH);
+
+        ensureSpace(overviewCardHeight);
+        doc.roundedRect(margin, doc.y, contentWidth, overviewCardHeight, 6).fillAndStroke(bgCard, borderLight);
+
+        const cardTopY = doc.y + 10;
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("CONFIRMED TOUR ITINERARY", margin + 14, cardTopY);
+        doc.fillColor(textDark).fontSize(11.5).font("Helvetica-Bold").text(operation.trip.title, margin + 14, cardTopY + 12, { width: colW });
+        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text(`Travel Dates: ${tripDates}`, margin + 14, cardTopY + 12 + titleH + 2);
+
+        const rightColX = margin + colW + 22;
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("LEAD PASSENGER & PARTY", rightColX, cardTopY);
+        doc
+          .fillColor(textDark)
           .fontSize(10)
           .font("Helvetica-Bold")
-          .text(`CONFIRMATION #: ${documentNumber}`, margin + contentWidth - 220, margin + 20, {
-            width: 200,
-            align: "right",
-          });
+          .text(`${leadGuestName} • ${totalPax} Pax`, rightColX, cardTopY + 12);
+        if (guestContact) {
+          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text(guestContact, rightColX, cardTopY + 26, { width: colW });
+        }
+        if (coTravelers) {
+          doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(`Co-Travelers: ${coTravelers}`, rightColX, cardTopY + 38, { width: colW, lineGap: 1 });
+        }
 
-        doc
-          .fontSize(8)
-          .font("Helvetica")
-          .fillColor("#E0F2FE")
-          .text(`Date: ${this.formatDate(new Date())}`, margin + contentWidth - 220, margin + 38, {
-            width: 200,
-            align: "right",
-          });
+        doc.y = cardTopY + overviewCardHeight - 2;
 
-        doc
-          .fontSize(8)
-          .font("Helvetica")
-          .text(`Booking Ref: ${operation.booking?.bookingNumber || operation.trip.tripNumber || "N/A"}`, margin + contentWidth - 220, margin + 50, {
-            width: 200,
-            align: "right",
-          });
-
-        doc.y = margin + 95;
-
-        // Trip Overview Card
-        doc.rect(margin, doc.y, contentWidth, 75).fillAndStroke(bgLight, borderLight);
-        const cardY = doc.y + 12;
-
-        doc.fillColor(primaryColor).fontSize(9).font("Helvetica-Bold").text("CONFIRMED TOUR ITINERARY", margin + 15, cardY);
-        doc.fillColor(textDark).fontSize(12).font("Helvetica-Bold").text(operation.trip.title, margin + 15, cardY + 14);
-
-        const tripDates = `${this.formatDate(operation.trip.startDate)} — ${this.formatDate(operation.trip.endDate)}`;
-        const pax = `${operation.trip.travelers.length || 1} Traveler(s)`;
-        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text(
-          `Dates: ${tripDates} | Travelers: ${pax} (${operation.trip.customer.name})`,
-          margin + 15,
-          cardY + 32
-        );
-
-        doc.y = cardY + 70;
-
-        // 1. Accommodations Section
-        doc.moveDown(0.6);
-        doc.fillColor(darkColor).fontSize(11).font("Helvetica-Bold").text("1. ACCOMMODATION SUMMARY");
+        // ─── 1. ACCOMMODATION SUMMARY ────────────────────────────────────────
+        drawSectionHeader("1. ACCOMMODATION SUMMARY", "Confirmed hotel accommodations and stay details", 80);
 
         const hotels = operation.hotelConfirmations.length > 0
           ? operation.hotelConfirmations
           : operation.trip.tripHotels;
 
-        doc.moveDown(0.4);
         if (hotels.length === 0) {
-          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("No accommodation entries recorded.");
+          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("No accommodation entries recorded.", margin, doc.y);
+          doc.y += 12;
         } else {
           for (const h of hotels) {
-            checkPageBreak(50);
             const hotelName = (h as any).tripHotel?.hotel?.name || (h as any).hotel?.name || "Hotel Accommodation";
             const checkIn = this.formatDate((h as any).checkIn || (h as any).tripHotel?.checkIn);
             const checkOut = this.formatDate((h as any).checkOut || (h as any).tripHotel?.checkOut);
-            const roomType = (h as any).roomDetails || (h as any).tripHotel?.roomType || (h as any).roomType || "Standard";
+            const roomType = (h as any).roomDetails || (h as any).tripHotel?.roomType || (h as any).roomType || "Standard Room";
+            const mealPlan = (h as any).mealPlan || (h as any).tripHotel?.mealPlan || (h as any).mealPlan || "Room Only";
             const confNo = (h as any).confirmationNumber ? `Ref: ${(h as any).confirmationNumber}` : "Confirmed";
 
-            doc
-              .rect(margin, doc.y, contentWidth, 36)
-              .fillAndStroke("#FFFFFF", borderLight);
+            let nightsCount = 1;
+            const ci = (h as any).checkIn || (h as any).tripHotel?.checkIn;
+            const co = (h as any).checkOut || (h as any).tripHotel?.checkOut;
+            if (ci && co) {
+              const diff = new Date(co).getTime() - new Date(ci).getTime();
+              nightsCount = Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)));
+            }
 
-            const rowY = doc.y + 8;
-            doc.fillColor(textDark).fontSize(9).font("Helvetica-Bold").text(hotelName, margin + 10, rowY, { width: 220 });
-            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(`${checkIn} → ${checkOut} | ${roomType}`, margin + 10, rowY + 12);
+            const itemHeight = 44;
+            ensureSpace(itemHeight + 6);
+            const itemY = doc.y;
+            doc.roundedRect(margin, itemY, contentWidth, itemHeight, 6).fillAndStroke("#FFFFFF", borderLight);
 
-            doc.fillColor(primaryColor).fontSize(8).font("Helvetica-Bold").text(confNo, margin + contentWidth - 140, rowY + 6, { width: 130, align: "right" });
+            doc.fillColor(textDark).fontSize(9.5).font("Helvetica-Bold").text(hotelName, margin + 14, itemY + 8, { width: contentWidth - 170 });
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(
+              `Stay: ${checkIn} to ${checkOut} • ${nightsCount} Night(s) | Room: ${roomType} | Plan: ${mealPlan}`,
+              margin + 14,
+              itemY + 22,
+              { width: contentWidth - 170 }
+            );
 
-            doc.y = rowY + 34;
+            // Ref Badge
+            doc.roundedRect(margin + contentWidth - 144, itemY + 12, 130, 20, 4).fillAndStroke("#F0FDFA", "#99F6E4");
+            doc.fillColor("#0F766E").fontSize(8).font("Helvetica-Bold").text(confNo, margin + contentWidth - 144, itemY + 17, { width: 130, align: "center" });
+
+            doc.y = itemY + itemHeight + 6;
           }
         }
 
-        // 2. Transport Section
-        checkPageBreak(70);
-        doc.moveDown(0.6);
-        doc.fillColor(darkColor).fontSize(11).font("Helvetica-Bold").text("2. TRANSPORTATION & TRANSFERS");
+        // ─── 2. TRANSPORTATION & LOGISTICS ───────────────────────────────────
+        drawSectionHeader("2. TRANSPORTATION & LOGISTICS", "Dedicated vehicle allocations and transfer schedule", 80);
 
         const vehicles = operation.vehicleDispatches.length > 0
           ? operation.vehicleDispatches
           : operation.trip.tripVehicles;
 
-        doc.moveDown(0.4);
         if (vehicles.length === 0) {
-          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("No transport services scheduled.");
+          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("No transport services scheduled.", margin, doc.y);
+          doc.y += 12;
         } else {
           for (const v of vehicles) {
-            checkPageBreak(50);
             const vName = (v as any).vehicle?.name || (v as any).tripVehicle?.vehicle?.name || "Private Dedicated Vehicle";
-            const vPlate = (v as any).vehicleNumber ? `Reg: ${(v as any).vehicleNumber}` : "Private Vehicle";
-            const driver = (v as any).driverName ? `Driver: ${(v as any).driverName} (${(v as any).driverPhone || "Phone on file"})` : "Chauffeur allocated prior to pickup";
-            const pickup = (v as any).pickupDate ? `Pickup: ${this.formatDate((v as any).pickupDate)} at ${this.formatTime((v as any).pickupTime)}` : "As per daily itinerary";
+            const vPlate = (v as any).vehicleNumber ? `Reg: ${(v as any).vehicleNumber}` : "Dedicated Vehicle";
+            const driver = (v as any).driverName ? `Chauffeur: ${(v as any).driverName} (${(v as any).driverPhone || "Contact on file"})` : "Chauffeur allocated prior to pickup";
+            const pickup = (v as any).pickupDate ? `Pickup: ${this.formatDate((v as any).pickupDate)} at ${this.formatTime((v as any).pickupTime)}` : "As per Tour Schedule";
+            const routeStr = (v as any).pickupLocation && (v as any).dropLocation
+              ? `Route: ${(v as any).pickupLocation} to ${(v as any).dropLocation}`
+              : "Route: As per Tour Itinerary";
 
-            doc
-              .rect(margin, doc.y, contentWidth, 36)
-              .fillAndStroke("#FFFFFF", borderLight);
+            const itemHeight = 44;
+            ensureSpace(itemHeight + 6);
+            const itemY = doc.y;
+            doc.roundedRect(margin, itemY, contentWidth, itemHeight, 6).fillAndStroke("#FFFFFF", borderLight);
 
-            const rowY = doc.y + 8;
-            doc.fillColor(textDark).fontSize(9).font("Helvetica-Bold").text(`${vName} (${vPlate})`, margin + 10, rowY, { width: 260 });
-            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(`${pickup} | ${driver}`, margin + 10, rowY + 12);
+            doc.fillColor(textDark).fontSize(9.5).font("Helvetica-Bold").text(`${vName} (${vPlate})`, margin + 14, itemY + 8, { width: contentWidth - 160 });
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(
+              `${pickup} | ${routeStr} | ${driver}`,
+              margin + 14,
+              itemY + 22,
+              { width: contentWidth - 160 }
+            );
 
-            doc.fillColor(primaryColor).fontSize(8).font("Helvetica-Bold").text("CONFIRMED", margin + contentWidth - 110, rowY + 6, { width: 100, align: "right" });
+            doc.roundedRect(margin + contentWidth - 134, itemY + 12, 120, 20, 4).fillAndStroke("#EFF6FF", "#BFDBFE");
+            doc.fillColor("#1D4ED8").fontSize(8).font("Helvetica-Bold").text("ALLOCATED", margin + contentWidth - 134, itemY + 17, { width: 120, align: "center" });
 
-            doc.y = rowY + 34;
+            doc.y = itemY + itemHeight + 6;
           }
         }
 
-        // 3. Sightseeing & Activities
-        checkPageBreak(70);
-        doc.moveDown(0.6);
-        doc.fillColor(darkColor).fontSize(11).font("Helvetica-Bold").text("3. ACTIVITIES & EXPERIENCES");
+        // ─── 3. SIGHTSEEING & EXPERIENCES ────────────────────────────────────
+        drawSectionHeader("3. SIGHTSEEING & EXPERIENCES", "Confirmed entry passes and scheduled excursions", 80);
 
         const activities = operation.activityConfirmations.length > 0
           ? operation.activityConfirmations
           : operation.trip.tripActivities;
 
-        doc.moveDown(0.4);
         if (activities.length === 0) {
-          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("No excursion entries included.");
+          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("No excursion entries included.", margin, doc.y);
+          doc.y += 12;
         } else {
           for (const a of activities) {
-            checkPageBreak(50);
             const aName = (a as any).activity?.name || (a as any).tripActivity?.activity?.name || "Sightseeing Experience";
-            const ticket = (a as any).ticketNumber ? `Pass: ${(a as any).ticketNumber}` : "Reserved";
+            const ticket = (a as any).ticketNumber ? `Pass: ${(a as any).ticketNumber}` : "Admission Confirmed";
             const dateStr = this.formatDate((a as any).tripActivity?.date || operation.trip.startDate);
+            const venue = (a as any).activity?.location || (a as any).tripActivity?.location || "Designated Experience Venue";
 
-            doc
-              .rect(margin, doc.y, contentWidth, 36)
-              .fillAndStroke("#FFFFFF", borderLight);
+            const itemHeight = 44;
+            ensureSpace(itemHeight + 6);
+            const itemY = doc.y;
+            doc.roundedRect(margin, itemY, contentWidth, itemHeight, 6).fillAndStroke("#FFFFFF", borderLight);
 
-            const rowY = doc.y + 8;
-            doc.fillColor(textDark).fontSize(9).font("Helvetica-Bold").text(aName, margin + 10, rowY, { width: 260 });
-            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(`Scheduled Date: ${dateStr}`, margin + 10, rowY + 12);
+            doc.fillColor(textDark).fontSize(9.5).font("Helvetica-Bold").text(aName, margin + 14, itemY + 8, { width: contentWidth - 170 });
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(
+              `Scheduled: ${dateStr} | Venue: ${venue}`,
+              margin + 14,
+              itemY + 22,
+              { width: contentWidth - 170 }
+            );
 
-            doc.fillColor(primaryColor).fontSize(8).font("Helvetica-Bold").text(ticket, margin + contentWidth - 140, rowY + 6, { width: 130, align: "right" });
+            doc.roundedRect(margin + contentWidth - 144, itemY + 12, 130, 20, 4).fillAndStroke("#FAF5FF", "#E9D5FF");
+            doc.fillColor("#7C3AED").fontSize(8).font("Helvetica-Bold").text(ticket, margin + contentWidth - 144, itemY + 17, { width: 130, align: "center" });
 
-            doc.y = rowY + 34;
+            doc.y = itemY + itemHeight + 6;
           }
         }
 
-        // Important Information & Terms Footer
-        checkPageBreak(90);
-        doc.moveDown(0.8);
-        doc.rect(margin, doc.y, contentWidth, 65).fillAndStroke(bgLight, borderLight);
-        const footerBoxY = doc.y + 10;
+        // ─── IMPORTANT POLICIES & 24/7 SUPPORT ──────────────────────────────
+        ensureSpace(70);
+        doc.y += 8;
+        const footerBoxY = doc.y;
+        doc.roundedRect(margin, footerBoxY, contentWidth, 60, 6).fillAndStroke(bgCard, borderLight);
 
-        doc.fillColor(darkColor).fontSize(8).font("Helvetica-Bold").text("GENERAL TRAVEL & EMERGENCY INFORMATION", margin + 15, footerBoxY);
-        doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(
-          `• For 24/7 on-ground assistance during your trip, contact your dedicated travel coordinator at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@tripdesk.com"}.\n• Please carry valid government-issued photo identification for all travelers throughout the journey.\n• Standard check-in time is 14:00 hrs and check-out time is 11:00 hrs unless specified otherwise.`,
-          margin + 15,
-          footerBoxY + 14,
-          { width: contentWidth - 30, lineGap: 2 }
-        );
+        doc
+          .fillColor(brandDark)
+          .fontSize(8)
+          .font("Helvetica-Bold")
+          .text("IMPORTANT TRAVEL INFORMATION & 24/7 ASSISTANCE", margin + 16, footerBoxY + 10);
+
+        doc
+          .fillColor(textMuted)
+          .fontSize(7.5)
+          .font("Helvetica")
+          .text(
+            `• For 24/7 on-ground concierge support, contact ${operation.agency.name} at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@tripdesk.com"}.\n• Please carry valid government-approved photo identification (Passport / Aadhaar / Voter ID) for all guests throughout the trip.\n• Standard check-in time is 14:00 hrs and check-out time is 11:00 hrs unless specified otherwise by the hotel.`,
+            margin + 16,
+            footerBoxY + 22,
+            { width: contentWidth - 32, lineGap: 1.5 }
+          );
+
+        // ─── TWO-PASS PAGE NUMBERING & RUNNING FOOTER ────────────────────────
+        const range = doc.bufferedPageRange();
+        for (let i = 0; i < range.count; i++) {
+          doc.switchToPage(i);
+
+          if (i > 0) {
+            doc
+              .fontSize(7)
+              .font("Helvetica")
+              .fillColor(textLight)
+              .text(`Booking Confirmation • ${documentNumber} • ${operation.trip.title}`, margin, margin - 14, {
+                width: contentWidth,
+                align: "left",
+              });
+            doc
+              .moveTo(margin, margin - 6)
+              .lineTo(margin + contentWidth, margin - 6)
+              .strokeColor(borderLight)
+              .lineWidth(0.5)
+              .stroke();
+          }
+
+          const footerY = pageHeight - 34;
+          doc
+            .moveTo(margin, footerY)
+            .lineTo(margin + contentWidth, footerY)
+            .strokeColor(borderLight)
+            .lineWidth(0.75)
+            .stroke();
+
+          doc
+            .fontSize(7.5)
+            .font("Helvetica")
+            .fillColor(textLight)
+            .text(
+              `Generated securely via TripDesk • Official Booking Confirmation • ${operation.agency.name}`,
+              margin,
+              footerY + 8,
+              { width: contentWidth - 80, align: "left" }
+            );
+
+          doc
+            .fontSize(7.5)
+            .font("Helvetica-Bold")
+            .fillColor(textLight)
+            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+              width: 75,
+              align: "right",
+            });
+        }
 
         doc.end();
       } catch (err) {
@@ -1386,8 +2003,9 @@ export class OperationsDocumentService {
       try {
         const doc = new PDFDocument({
           size: "A4",
-          margin: 40,
+          margin: 32,
           bufferPages: true,
+          compress: false,
           info: {
             Title: `Travel Kit - ${operation.trip.title}`,
             Author: operation.agency.name,
@@ -1403,203 +2021,404 @@ export class OperationsDocumentService {
 
         const pageWidth = 595.28;
         const pageHeight = 841.89;
-        const margin = 40;
-        const contentWidth = pageWidth - margin * 2;
+        const margin = 32;
+        const contentWidth = pageWidth - margin * 2; // 531.28 pt
+        const bottomSafeLimit = pageHeight - 42;
 
-        const checkPageBreak = (neededHeight: number) => {
-          if (doc.y + neededHeight > pageHeight - 65) {
+        const brandDark = "#0F172A"; // Slate 900
+        const brandIndigo = "#4338CA"; // Indigo 700
+        const brandAccent = "#6366F1"; // Indigo 500
+        const textDark = "#0F172A";
+        const textMuted = "#475569";
+        const textLight = "#94A3B8";
+        const bgCard = "#F8FAFC";
+        const borderLight = "#E2E8F0";
+
+        const ensureSpace = (neededHeight: number) => {
+          if (doc.y + neededHeight > bottomSafeLimit) {
             doc.addPage();
+            doc.x = margin;
+            doc.y = margin + 8;
             return true;
           }
           return false;
         };
 
-        // Theme colors
-        const primaryColor = "#4F46E5"; // Indigo 600
-        const darkColor = "#1E1B4B"; // Indigo 950
-        const textDark = "#0F172A";
-        const textMuted = "#475569";
-        const bgLight = "#F8FAFC";
-        const borderLight = "#E2E8F0";
+        const drawSectionHeader = (title: string, subtitle?: string, minContentHeight = 44) => {
+          ensureSpace(36 + minContentHeight);
+          doc.y += 16;
+          doc.x = margin;
 
-        // ─────────────────────────────────────────────────────────────────────
-        // PAGE 1: COVER & TRIP BRIEF
-        // ─────────────────────────────────────────────────────────────────────
-        doc.rect(margin, margin, contentWidth, 120).fill(darkColor);
+          doc.fillColor(textDark).fontSize(10.5).font("Helvetica-Bold").text(title, { characterSpacing: 0.5 });
+          if (subtitle) {
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(subtitle, { lineGap: 1 });
+          }
+
+          const lineY = doc.y + 4;
+          doc
+            .moveTo(margin, lineY)
+            .lineTo(margin + 32, lineY)
+            .strokeColor(brandAccent)
+            .lineWidth(2)
+            .stroke();
+
+          doc.y = lineY + 8;
+        };
+
+        // ─── HERO HEADER BANNER ──────────────────────────────────────────────
+        const agencyName = operation.agency.name || "TripDesk Travel Partner";
+        const agencyContact = [operation.agency.phone, operation.agency.email, operation.agency.address]
+          .filter(Boolean)
+          .join(" • ");
+
+        const leftWidth = contentWidth - 210;
+        doc.font("Helvetica-Bold").fontSize(14);
+        const nameH = doc.heightOfString(agencyName, { width: leftWidth });
+        doc.font("Helvetica").fontSize(7.5);
+        const contactH = agencyContact ? doc.heightOfString(agencyContact, { width: leftWidth }) : 0;
+        const leftContentH = nameH + contactH + 48;
+
+        // Right Badge text & dynamic height measurement
+        const docNumText = `KIT #: ${documentNumber}`;
+        const dateText = `Issued: ${this.formatDate(new Date())}`;
+        const refText = `Booking: ${operation.booking?.bookingNumber || operation.trip.tripNumber || "CONFIRMED"}`;
+        const statusText = "TRAVEL READY";
+
+        doc.font("Helvetica-Bold").fontSize(9.5);
+        const docNumH = doc.heightOfString(docNumText, { width: 155, align: "center" });
+
+        doc.font("Helvetica").fontSize(7.5);
+        const dateH = doc.heightOfString(dateText, { width: 155, align: "center" });
+        const refH = doc.heightOfString(refText, { width: 155, align: "center" });
+
+        const pillH = 14;
+        const totalRightContentH = docNumH + 3 + dateH + 2 + refH + 5 + pillH;
+        const minRightBoxH = totalRightContentH + 16;
+
+        const bannerHeight = Math.max(92, leftContentH, minRightBoxH + 28);
+
+        doc.roundedRect(margin, margin, contentWidth, bannerHeight, 8).fill(brandDark);
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(20)
+          .fontSize(15)
           .font("Helvetica-Bold")
-          .text(operation.agency.name, margin + 25, margin + 25, { width: 350 });
+          .text(agencyName, margin + 18, margin + 16, { width: leftWidth });
 
         doc
-          .fontSize(11)
-          .font("Helvetica")
           .fillColor("#C7D2FE")
-          .text("COMPREHENSIVE TRAVEL KIT & OFFICIAL ITINERARY", margin + 25, margin + 55);
-
-        doc
           .fontSize(8.5)
-          .font("Helvetica")
-          .fillColor("#E0E7FF")
-          .text(
-            [operation.agency.phone, operation.agency.email, operation.agency.address].filter(Boolean).join(" | "),
-            margin + 25,
-            margin + 75,
-            { width: 450 }
-          );
+          .font("Helvetica-Bold")
+          .text("FINAL TRAVEL KIT & OFFICIAL ITINERARY PACK", margin + 18, doc.y + 3);
+
+        if (agencyContact) {
+          doc
+            .fillColor("#94A3B8")
+            .fontSize(7.5)
+            .font("Helvetica")
+            .text(agencyContact, margin + 18, doc.y + 4, { width: leftWidth, lineGap: 1 });
+        }
+
+        // Right Badge
+        const rightX = margin + contentWidth - 190;
+        const rightY = margin + 14;
+        const rightBoxH = bannerHeight - 28;
+        doc.roundedRect(rightX, rightY, 175, rightBoxH, 6).fillAndStroke("#1E293B", "#334155");
+
+        const rightStartY = rightY + Math.max(8, (rightBoxH - totalRightContentH) / 2);
+        let curRightY = rightStartY;
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(9)
+          .fontSize(9.5)
           .font("Helvetica-Bold")
-          .text(`KIT #: ${documentNumber}`, margin + contentWidth - 180, margin + 25, {
-            width: 160,
-            align: "right",
-          });
+          .text(docNumText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += docNumH + 3;
 
-        doc.y = margin + 140;
+        doc
+          .fillColor("#94A3B8")
+          .fontSize(7.5)
+          .font("Helvetica")
+          .text(dateText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += dateH + 2;
 
-        // Trip Overview Card
-        doc.rect(margin, doc.y, contentWidth, 90).fillAndStroke(bgLight, borderLight);
-        const coverBoxY = doc.y + 12;
+        doc
+          .fillColor("#94A3B8")
+          .fontSize(7.5)
+          .font("Helvetica")
+          .text(refText, rightX + 10, curRightY, { width: 155, align: "center" });
+        curRightY += refH + 5;
 
-        doc.fillColor(primaryColor).fontSize(10).font("Helvetica-Bold").text("JOURNEY OVERVIEW", margin + 20, coverBoxY);
-        doc.fillColor(textDark).fontSize(15).font("Helvetica-Bold").text(operation.trip.title, margin + 20, coverBoxY + 16, { width: contentWidth - 40 });
+        const pillX = rightX + (175 - 125) / 2;
+        doc.roundedRect(pillX, curRightY, 125, pillH, 7).fillAndStroke("#312E81", "#6366F1");
+        doc
+          .fillColor("#E0E7FF")
+          .fontSize(7)
+          .font("Helvetica-Bold")
+          .text(statusText, pillX, curRightY + 3.5, { width: 125, align: "center" });
 
+        doc.y = margin + bannerHeight + 14;
+
+        // ─── JOURNEY OVERVIEW CARD ───────────────────────────────────────────
+        const leadGuestName = operation.trip.customer?.name || "Valued Passenger";
+        const guestContact = [operation.trip.customer?.phone, operation.trip.customer?.email]
+          .filter(Boolean)
+          .join(" • ");
+        const coTravelers = operation.trip.travelers?.map((t) => t.name).join(", ");
+        const totalPax = operation.trip.travelers?.length || 1;
         const tripDates = `${this.formatDate(operation.trip.startDate)} — ${this.formatDate(operation.trip.endDate)}`;
-        doc.fillColor(textMuted).fontSize(8.5).font("Helvetica").text(
-          `Travel Dates: ${tripDates} | Booking Ref: ${operation.booking?.bookingNumber || operation.trip.tripNumber || "CONFIRMED"}`,
-          margin + 20,
-          coverBoxY + 40
-        );
 
-        const travelerNames = operation.trip.travelers.map((t) => t.name).join(", ");
-        doc.fillColor(textMuted).fontSize(8.5).font("Helvetica").text(
-          `Guests: ${travelerNames || operation.trip.customer.name} (Primary Contact: ${operation.trip.customer.name}, ${operation.trip.customer.phone || "On File"})`,
-          margin + 20,
-          coverBoxY + 56
-        );
+        const colW = (contentWidth - 36) / 2;
+        doc.font("Helvetica-Bold").fontSize(12);
+        const titleH = doc.heightOfString(operation.trip.title, { width: colW });
+        const journeyCardHeight = Math.max(68, 40 + titleH);
 
-        doc.y = coverBoxY + 95;
+        ensureSpace(journeyCardHeight);
+        doc.roundedRect(margin, doc.y, contentWidth, journeyCardHeight, 6).fillAndStroke(bgCard, borderLight);
 
-        // Day-by-Day Itinerary Header
-        doc.moveDown(0.8);
-        doc.fillColor(darkColor).fontSize(13).font("Helvetica-Bold").text("DAY-BY-DAY JOURNEY ITINERARY");
+        const cardTopY = doc.y + 10;
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("JOURNEY TITLE & DURATION", margin + 14, cardTopY);
+        doc.fillColor(textDark).fontSize(12).font("Helvetica-Bold").text(operation.trip.title, margin + 14, cardTopY + 12, { width: colW });
+        doc.fillColor(textMuted).fontSize(8).font("Helvetica").text(`Travel Dates: ${tripDates}`, margin + 14, cardTopY + 12 + titleH + 2);
+
+        const rightColX = margin + colW + 22;
+        doc.fillColor("#64748B").fontSize(7.5).font("Helvetica-Bold").text("GUEST ROSTER & CONTACT", rightColX, cardTopY);
+        doc
+          .fillColor(textDark)
+          .fontSize(10)
+          .font("Helvetica-Bold")
+          .text(`${leadGuestName} • ${totalPax} Pax`, rightColX, cardTopY + 12);
+        if (guestContact) {
+          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text(guestContact, rightColX, cardTopY + 26, { width: colW });
+        }
+        if (coTravelers) {
+          doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(`Travelers: ${coTravelers}`, rightColX, cardTopY + 38, { width: colW, lineGap: 1 });
+        }
+
+        doc.y = cardTopY + journeyCardHeight - 2;
+
+        // ─── DAY-BY-DAY ITINERARY ────────────────────────────────────────────
+        drawSectionHeader("DAY-BY-DAY TOUR ITINERARY", "Complete scheduled day-wise programme and experiences", 100);
 
         const days = operation.trip.itineraryItems;
         if (days.length === 0) {
-          doc.moveDown(0.4);
-          doc.fillColor(textMuted).fontSize(9).font("Helvetica").text("Itinerary schedule is prepared and coordinated on ground.");
+          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("Itinerary schedule is prepared and coordinated on ground.", margin, doc.y);
+          doc.y += 12;
         } else {
           for (const day of days) {
-            checkPageBreak(80);
-            doc.moveDown(0.6);
+            const desc = day.description || "Sightseeing, transfers, and leisure activities as planned.";
+            doc.font("Helvetica").fontSize(8);
+            const descH = doc.heightOfString(desc, { width: contentWidth - 28, lineGap: 2.5 });
+            const totalDayBoxH = 24 + descH + 16;
 
-            doc.rect(margin, doc.y, contentWidth, 24).fill(primaryColor);
-            const dayHeadY = doc.y + 6;
+            ensureSpace(totalDayBoxH + 6);
+            const dayCardY = doc.y;
 
-            doc.fillColor("#FFFFFF").fontSize(9).font("Helvetica-Bold").text(
+            // Day Header Pill
+            doc.roundedRect(margin, dayCardY, contentWidth, 22, 4).fill(brandIndigo);
+            doc.fillColor("#FFFFFF").fontSize(8.5).font("Helvetica-Bold").text(
               `DAY ${day.dayNumber}: ${day.title}`,
               margin + 12,
-              dayHeadY,
+              dayCardY + 6,
               { width: contentWidth - 24 }
             );
 
-            const dayBoxY = doc.y + 24;
-            const desc = day.description || "Sightseeing and leisure activities as planned.";
-            doc.font("Helvetica").fontSize(8.5);
-            const textHeight = doc.heightOfString(desc, { width: contentWidth - 24 });
-            const boxHeight = Math.max(textHeight + 20, 36);
+            // Day Description Box
+            doc
+              .roundedRect(margin, dayCardY + 22, contentWidth, descH + 16, 4)
+              .fillAndStroke("#FFFFFF", borderLight);
 
-            doc.rect(margin, dayBoxY, contentWidth, boxHeight).fillAndStroke("#FFFFFF", borderLight);
-            doc.fillColor(textDark).text(desc, margin + 12, dayBoxY + 10, {
-              width: contentWidth - 24,
-              lineGap: 3,
-            });
+            doc.fillColor(textDark).fontSize(8).font("Helvetica").text(
+              desc,
+              margin + 14,
+              dayCardY + 30,
+              { width: contentWidth - 28, lineGap: 2.5 }
+            );
 
-            doc.y = dayBoxY + boxHeight + 4;
+            doc.y = dayCardY + totalDayBoxH + 6;
           }
         }
 
-        // Accommodations & Stay Summary
-        checkPageBreak(120);
-        doc.moveDown(1.0);
-        doc.fillColor(darkColor).fontSize(13).font("Helvetica-Bold").text("HOTEL ACCOMMODATION VOUCHERS");
+        // ─── CONFIRMED HOTEL ACCOMMODATIONS ──────────────────────────────────
+        drawSectionHeader("CONFIRMED HOTEL ACCOMMODATIONS", "Hotel check-in details, room arrangements, and meal plans", 80);
 
         const hotels = operation.hotelConfirmations.length > 0
           ? operation.hotelConfirmations
           : operation.trip.tripHotels;
 
-        for (const h of hotels) {
-          checkPageBreak(60);
-          const hotelName = (h as any).tripHotel?.hotel?.name || (h as any).hotel?.name || "Hotel Property";
-          const checkIn = this.formatDate((h as any).checkIn || (h as any).tripHotel?.checkIn);
-          const checkOut = this.formatDate((h as any).checkOut || (h as any).tripHotel?.checkOut);
-          const roomType = (h as any).roomDetails || (h as any).tripHotel?.roomType || (h as any).roomType || "Standard Room";
-          const mealPlan = (h as any).mealPlan || (h as any).tripHotel?.mealPlan || (h as any).mealPlan || "CP";
-          const confNo = (h as any).confirmationNumber || "CONFIRMED";
+        if (hotels.length === 0) {
+          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("No accommodation entries recorded.", margin, doc.y);
+          doc.y += 12;
+        } else {
+          for (const h of hotels) {
+            const hotelName = (h as any).tripHotel?.hotel?.name || (h as any).hotel?.name || "Hotel Property";
+            const checkIn = this.formatDate((h as any).checkIn || (h as any).tripHotel?.checkIn);
+            const checkOut = this.formatDate((h as any).checkOut || (h as any).tripHotel?.checkOut);
+            const roomType = (h as any).roomDetails || (h as any).tripHotel?.roomType || (h as any).roomType || "Standard Room";
+            const mealPlan = (h as any).mealPlan || (h as any).tripHotel?.mealPlan || (h as any).mealPlan || "Room Only";
+            const confNo = (h as any).confirmationNumber ? `Conf #: ${(h as any).confirmationNumber}` : "Confirmed";
 
-          doc.moveDown(0.4);
-          doc.rect(margin, doc.y, contentWidth, 42).fillAndStroke(bgLight, borderLight);
-          const rowY = doc.y + 8;
+            const itemHeight = 44;
+            ensureSpace(itemHeight + 6);
+            const itemY = doc.y;
+            doc.roundedRect(margin, itemY, contentWidth, itemHeight, 6).fillAndStroke(bgCard, borderLight);
 
-          doc.fillColor(textDark).fontSize(9.5).font("Helvetica-Bold").text(hotelName, margin + 12, rowY, { width: 240 });
-          doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(
-            `Stay: ${checkIn} → ${checkOut} | Room: ${roomType} | Plan: ${mealPlan}`,
-            margin + 12,
-            rowY + 14
-          );
+            doc.fillColor(textDark).fontSize(9.5).font("Helvetica-Bold").text(hotelName, margin + 14, itemY + 8, { width: contentWidth - 170 });
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(
+              `Stay: ${checkIn} to ${checkOut} | Room: ${roomType} | Plan: ${mealPlan}`,
+              margin + 14,
+              itemY + 22,
+              { width: contentWidth - 170 }
+            );
 
-          doc.fillColor(primaryColor).fontSize(8.5).font("Helvetica-Bold").text(`Conf #: ${confNo}`, margin + contentWidth - 150, rowY + 8, { width: 140, align: "right" });
-          doc.y = rowY + 38;
+            doc.roundedRect(margin + contentWidth - 144, itemY + 12, 130, 20, 4).fillAndStroke("#F0FDFA", "#99F6E4");
+            doc.fillColor("#0F766E").fontSize(8).font("Helvetica-Bold").text(confNo, margin + contentWidth - 144, itemY + 17, { width: 130, align: "center" });
+
+            doc.y = itemY + itemHeight + 6;
+          }
         }
 
-        // Transport & Driver Allocation
-        checkPageBreak(120);
-        doc.moveDown(1.0);
-        doc.fillColor(darkColor).fontSize(13).font("Helvetica-Bold").text("TRANSPORT & CHAUFFEUR ALLOCATION");
+        // ─── TRANSPORT & CHAUFFEUR ALLOCATION ────────────────────────────────
+        drawSectionHeader("TRANSPORTATION & CHAUFFEUR ALLOCATION", "Dedicated fleet logistics, chauffeur details, and pickup points", 80);
 
         const vehicles = operation.vehicleDispatches.length > 0
           ? operation.vehicleDispatches
           : operation.trip.tripVehicles;
 
-        for (const v of vehicles) {
-          checkPageBreak(60);
-          const vName = (v as any).vehicle?.name || (v as any).tripVehicle?.vehicle?.name || "Private Dedicated Fleet";
-          const vPlate = (v as any).vehicleNumber || "Assigned On Dispatch";
-          const driver = (v as any).driverName ? `${(v as any).driverName} (${(v as any).driverPhone || "Contact on file"})` : "Chauffeur details coordinated prior to arrival";
-          const pickup = (v as any).pickupDate ? `Pickup: ${this.formatDate((v as any).pickupDate)} at ${this.formatTime((v as any).pickupTime)}` : "Pickup as per itinerary";
+        if (vehicles.length === 0) {
+          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("No transport services scheduled.", margin, doc.y);
+          doc.y += 12;
+        } else {
+          for (const v of vehicles) {
+            const vName = (v as any).vehicle?.name || (v as any).tripVehicle?.vehicle?.name || "Private Dedicated Vehicle";
+            const vPlate = (v as any).vehicleNumber || "Assigned On Dispatch";
+            const driver = (v as any).driverName ? `Chauffeur: ${(v as any).driverName} (${(v as any).driverPhone || "Contact on file"})` : "Chauffeur details coordinated prior to arrival";
+            const pickup = (v as any).pickupDate ? `Pickup: ${this.formatDate((v as any).pickupDate)} at ${this.formatTime((v as any).pickupTime)}` : "Pickup as per itinerary";
+            const routeStr = (v as any).pickupLocation && (v as any).dropLocation
+              ? `Route: ${(v as any).pickupLocation} to ${(v as any).dropLocation}`
+              : "Route: As per Tour Itinerary";
 
-          doc.moveDown(0.4);
-          doc.rect(margin, doc.y, contentWidth, 42).fillAndStroke(bgLight, borderLight);
-          const rowY = doc.y + 8;
+            const itemHeight = 44;
+            ensureSpace(itemHeight + 6);
+            const itemY = doc.y;
+            doc.roundedRect(margin, itemY, contentWidth, itemHeight, 6).fillAndStroke(bgCard, borderLight);
 
-          doc.fillColor(textDark).fontSize(9.5).font("Helvetica-Bold").text(`${vName} (${vPlate})`, margin + 12, rowY, { width: 260 });
-          doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(
-            `${pickup} | Chauffeur: ${driver}`,
-            margin + 12,
-            rowY + 14
-          );
+            doc.fillColor(textDark).fontSize(9.5).font("Helvetica-Bold").text(`${vName} (${vPlate})`, margin + 14, itemY + 8, { width: contentWidth - 160 });
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(
+              `${pickup} | ${routeStr} | ${driver}`,
+              margin + 14,
+              itemY + 22,
+              { width: contentWidth - 160 }
+            );
 
-          doc.fillColor(primaryColor).fontSize(8.5).font("Helvetica-Bold").text("ALLOCATED", margin + contentWidth - 110, rowY + 8, { width: 100, align: "right" });
-          doc.y = rowY + 38;
+            doc.roundedRect(margin + contentWidth - 134, itemY + 12, 120, 20, 4).fillAndStroke("#EFF6FF", "#BFDBFE");
+            doc.fillColor("#1D4ED8").fontSize(8).font("Helvetica-Bold").text("ALLOCATED", margin + contentWidth - 134, itemY + 17, { width: 120, align: "center" });
+
+            doc.y = itemY + itemHeight + 6;
+          }
         }
 
-        // Emergency Contacts & Policies
-        checkPageBreak(100);
-        doc.moveDown(1.0);
-        doc.rect(margin, doc.y, contentWidth, 75).fillAndStroke("#F0FDF4", "#BBF7D0");
-        const helpBoxY = doc.y + 10;
+        // ─── ACTIVITIES & EXCURSION PASSES ───────────────────────────────────
+        drawSectionHeader("ACTIVITIES & EXCURSION PASSES", "Confirmed entry passes and sightseeing schedule", 80);
 
-        doc.fillColor("#166534").fontSize(9).font("Helvetica-Bold").text("24/7 GUEST CONCIERGE & EMERGENCY ASSISTANCE", margin + 15, helpBoxY);
-        doc.fillColor("#14532D").fontSize(8).font("Helvetica").text(
-          `• Dedicated Operations Desk: ${operation.agency.phone || "+91 98800 11223"} | Email: ${operation.agency.email || "concierge@tripdesk.com"}\n• Please carry valid government IDs for all passengers throughout the journey.\n• For flight or train delays, notify your coordinator promptly for seamless pickup rescheduling.`,
-          margin + 15,
-          helpBoxY + 16,
-          { width: contentWidth - 30, lineGap: 3 }
+        const activities = operation.activityConfirmations.length > 0
+          ? operation.activityConfirmations
+          : operation.trip.tripActivities;
+
+        if (activities.length === 0) {
+          doc.fillColor(textMuted).fontSize(8).font("Helvetica").text("No excursion entries included.", margin, doc.y);
+          doc.y += 12;
+        } else {
+          for (const a of activities) {
+            const aName = (a as any).activity?.name || (a as any).tripActivity?.activity?.name || "Sightseeing Experience";
+            const ticket = (a as any).ticketNumber ? `Pass: ${(a as any).ticketNumber}` : "Admission Confirmed";
+            const dateStr = this.formatDate((a as any).tripActivity?.date || operation.trip.startDate);
+            const venue = (a as any).activity?.location || (a as any).tripActivity?.location || "Designated Experience Venue";
+
+            const itemHeight = 44;
+            ensureSpace(itemHeight + 6);
+            const itemY = doc.y;
+            doc.roundedRect(margin, itemY, contentWidth, itemHeight, 6).fillAndStroke(bgCard, borderLight);
+
+            doc.fillColor(textDark).fontSize(9.5).font("Helvetica-Bold").text(aName, margin + 14, itemY + 8, { width: contentWidth - 170 });
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica").text(
+              `Scheduled: ${dateStr} | Venue: ${venue}`,
+              margin + 14,
+              itemY + 22,
+              { width: contentWidth - 170 }
+            );
+
+            doc.roundedRect(margin + contentWidth - 144, itemY + 12, 130, 20, 4).fillAndStroke("#FAF5FF", "#E9D5FF");
+            doc.fillColor("#7C3AED").fontSize(8).font("Helvetica-Bold").text(ticket, margin + contentWidth - 144, itemY + 17, { width: 130, align: "center" });
+
+            doc.y = itemY + itemHeight + 6;
+          }
+        }
+
+        // ─── 24/7 GUEST CONCIERGE & EMERGENCY ASSISTANCE ────────────────────
+        ensureSpace(70);
+        doc.y += 8;
+        const helpBoxY = doc.y;
+        doc.roundedRect(margin, helpBoxY, contentWidth, 60, 6).fillAndStroke("#F0FDF4", "#BBF7D0");
+
+        doc.fillColor("#166534").fontSize(8).font("Helvetica-Bold").text("24/7 GUEST CONCIERGE & EMERGENCY ASSISTANCE", margin + 16, helpBoxY + 10);
+        doc.fillColor("#14532D").fontSize(7.5).font("Helvetica").text(
+          `• Dedicated Operations Desk: ${operation.agency.phone || "+91 98800 11223"} | Email: ${operation.agency.email || "concierge@tripdesk.com"}\n• Please carry valid government photo IDs for all passengers throughout the journey.\n• For flight or train delays, notify your travel coordinator promptly for seamless pickup rescheduling.`,
+          margin + 16,
+          helpBoxY + 22,
+          { width: contentWidth - 32, lineGap: 1.5 }
         );
+
+        // ─── TWO-PASS PAGE NUMBERING & RUNNING FOOTER ────────────────────────
+        const range = doc.bufferedPageRange();
+        for (let i = 0; i < range.count; i++) {
+          doc.switchToPage(i);
+
+          if (i > 0) {
+            doc
+              .fontSize(7)
+              .font("Helvetica")
+              .fillColor(textLight)
+              .text(`Final Travel Kit • ${documentNumber} • ${operation.trip.title}`, margin, margin - 14, {
+                width: contentWidth,
+                align: "left",
+              });
+            doc
+              .moveTo(margin, margin - 6)
+              .lineTo(margin + contentWidth, margin - 6)
+              .strokeColor(borderLight)
+              .lineWidth(0.5)
+              .stroke();
+          }
+
+          const footerY = pageHeight - 34;
+          doc
+            .moveTo(margin, footerY)
+            .lineTo(margin + contentWidth, footerY)
+            .strokeColor(borderLight)
+            .lineWidth(0.75)
+            .stroke();
+
+          doc
+            .fontSize(7.5)
+            .font("Helvetica")
+            .fillColor(textLight)
+            .text(
+              `Generated securely via TripDesk • Final Travel Kit & Itinerary • ${operation.agency.name}`,
+              margin,
+              footerY + 8,
+              { width: contentWidth - 80, align: "left" }
+            );
+
+          doc
+            .fontSize(7.5)
+            .font("Helvetica-Bold")
+            .fillColor(textLight)
+            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+              width: 75,
+              align: "right",
+            });
+        }
 
         doc.end();
       } catch (err) {

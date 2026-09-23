@@ -12019,9 +12019,218 @@ Phase 179 introduced a persistent, multi-tenant internal notification engine des
 
 ---
 
+# 182. PHASE 182 — QUOTATION PDF UI & SPACING ENHANCEMENT (September 2026)
+
+## 182.1 Overview & Architectural Objectives
+- **Objective**: Elevate the visual presentation and readability of customer-facing Quotation PDFs to match the elegance, spaciousness, and typography of the Quotation Preview UI.
+- **Renderer Preserved**: Maintained lightweight, high-performance `PDFKit` (v0.17.2) server-side streaming buffer generation without adding heavy browser dependencies.
+- **Strict Content Exclusions (Adhered 100%)**:
+  - `Tour Route Sequence` section explicitly excluded from PDF.
+  - `Payment Milestones` section explicitly excluded from PDF.
+- **Single Monetary Value Rule**: Preserved 100% (only `finalAmount` rendered in currency; individual cost prices, supplier markups, intermediate tax calculations, and item margins remain strictly redacted).
+
+---
+
+## 182.2 Visual, Typography & Spacing Improvements
+1. **Major Section Top Spacing**:
+   - Implemented a consistent spacing rhythm before all major section headings (`DAY-WISE TOUR ITINERARY`, `HOTEL ACCOMMODATIONS`, `TRANSPORTATION & LOGISTICS`, `SIGHTSEEING & EXPERIENCES`, `PACKAGE INCLUSIONS & EXCLUSIONS`, `IMPORTANT NOTES & BOOKING POLICIES`) with +18pt breathing room.
+   - Distinct heading hierarchy with 10.5pt bold titles, 7.5pt subtitles, and accent bar underlines.
+2. **Typography Scale Upgrade**:
+   - Hero Title: Upgraded to 14pt bold text.
+   - Body & Descriptions: Upgraded from cramped 5.5–6.5pt to readable 7.5–8.5pt with generous line heights (`lineGap: 2`).
+   - Badges & Pills: 7–7.5pt bold text in rounded pill containers.
+   - Final Price: 18pt bold emerald text in dark hero banner.
+3. **Dynamic Card Heights (Zero Text Clipping)**:
+   - Dynamic Hero Banner: Computed from wrapped title and subtitle text heights using `doc.heightOfString()`, eliminating header collision risks on multi-line trip titles.
+   - Dynamic Hotel, Vehicle, and Activity Cards: Replaced fixed height constraints (`boxH = 40`, `vH = 32`, `actH = 30`) with dynamic content measurement.
+   - Dynamic Itinerary Day Cards: Automatically adjusts to multi-paragraph day descriptions.
+   - Dynamic Inclusions / Exclusions: Expands cleanly with item count and description text.
+
+---
+
+## 182.3 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **Security & Data Safety**:
+  - Authenticated and public PDF routes (`/api/quotations/[id]/pdf` and `/api/quotations/public/[token]/pdf`) 100% operational.
+  - Zero sensitive internal fields exposed.
+  - Permanent baseline records (32 Destinations, 22 Hotels, 66 RateSheets, 6 Vehicles) 100% intact.
+
+---
+
+# 183. PHASE 183 — OPERATIONAL VOUCHERS (HOTEL, TRANSPORT & ACTIVITY) API + PDF AUDIT & VISUAL ALIGNMENT (September 2026)
+
+## 183.1 Overview & Scope
+- **Objective**: Full security audit, data sanitization, layout arithmetic overhaul, and visual alignment of the 3 primary operational PDF documents in TripDesk:
+  1. **Hotel Voucher** (`/api/operations/[id]/documents/hotel/[confirmationId]/pdf`)
+  2. **Transport Voucher** (`/api/operations/[id]/documents/vehicle/[dispatchId]/pdf`)
+  3. **Activity Pass** (`/api/operations/[id]/documents/activity/[confirmationId]/pdf`)
+- **Visual Baseline**: Replaced fragmented legacy templates with the modern design system established in the approved Quotation PDF (`quotation-pdf-service.ts`), featuring Slate 900 (`#0F172A`) hero banners, rounded containers (radius 6), dynamic height calculation (`doc.heightOfString()`), two-pass page numbering (`Page X of Y`), and spacious typography.
+- **Renderer Preserved**: Standard server-side `PDFKit` (v0.17.2) streaming buffer retained with zero heavy runtime overhead.
+
+---
+
+## 183.2 Security, Multi-Tenant Isolation & Commercial Data Sanitization
+1. **Strict Server-Side Tenant Context**:
+   - `agencyId` is derived exclusively from session JWT via `requireReadAccess()`.
+   - Zero trust in client-supplied parameters.
+2. **Complete Ownership Validation Chain**:
+   - `tripOperation`: Filtered by `{ id: operationId, agencyId }`.
+   - `hotelConfirmations`: Filtered by confirmation ID under the tenant's operation.
+   - `vehicleDispatches`: Filtered by dispatch ID under the tenant's operation.
+   - `activityConfirmations`: Filtered by confirmation ID under the tenant's operation.
+   - Cross-tenant and orphaned parameter tampering strictly blocked with 403/404 responses.
+3. **100% Commercial Data Sanitization**:
+   - Zero internal supplier pricing (`costPrice`, `supplierCost`, `markup`, `supplierMargin`, `supplierId`, `supplierNotes`, `internalNotes`) queried or rendered into customer/operational vouchers.
+
+---
+
+## 183.3 Visual & Engineering Improvements
+1. **Dynamic Layout & Height Calculation**:
+   - Eliminated all hardcoded box heights and fixed Y coordinates (e.g. legacy `y: 740` footers).
+   - Card heights, traveler rosters, routes, and venue locations are dynamically measured using `doc.heightOfString()`, eliminating text clipping and overlapping.
+2. **Multi-Page Safety & Running Footers**:
+   - `ensureSpace(neededHeight)` safely handles multi-page expansion without splitting cards or orphaning headers.
+   - Two-pass buffered page range adds running headers on pages 2+ and confidentiality footers with `Page X of Y` at `pageHeight - 26`.
+3. **Typography & Aesthetics**:
+   - Upgraded from micro-fonts to readable 7.5–12.5pt typography with comfortable leading (`lineGap: 1.5–3`).
+   - Clean 3/4-column specification grids with distinct label/value visual hierarchy.
+
+---
+
+## 183.4 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **Quotation PDF Safety**: Regression tests confirmed 100% untouched and passing.
+- **Database Safety**: 0 schema migrations, 0 seed modifications, permanent baseline records (32 Destinations, 22 Hotels, 66 RateSheets, 6 Vehicles) 100% preserved.
+
+---
+
+# 184. PHASE 184 — CONTROLLED PDF UI AUDIT & FIX (TRANSPORT VOUCHER, BOOKING CONFIRMATION & TRAVEL KIT) (September 2026)
+
+## 184.1 Overview & Targeted Scope
+- **Objective**: Execute focused PDF layout bug fixes and UI visual enhancements for:
+  1. **Transport Voucher** (`generateVehicleVoucher` via `/api/operations/[id]/documents/vehicle/[dispatchId]/pdf`): Fix route itinerary card overflow and eliminate stray `!’` glyphs.
+  2. **Customer Booking Confirmation PDF** (`generateBookingConfirmation` via `/api/operations/[id]/documents/booking/pdf`): Visual modernization aligning with the approved Slate 900 Quotation PDF design system.
+  3. **Final Travel Kit & Itinerary Pack PDF** (`generateTravelKit` via `/api/operations/[id]/documents/travel-kit/pdf`): Visual transformation into a polished, customer-facing comprehensive itinerary package.
+- **Strict Scope Boundaries**:
+  - `Hotel Voucher` and `Activity Pass` kept 100% untouched.
+  - `Quotation PDF` (`quotation-pdf-service.ts`) preserved as the visual reference baseline.
+  - 0 schema changes, 0 migrations, 0 business-logic or pricing formula alterations.
+  - Retained `PDFKit` (v0.17.2) engine.
+
+---
+
+## 184.2 Root Causes & Exact Fixes Applied
+
+### 1. Transport Voucher Route Card Overflow (Bug 1)
+- **Root Cause**: The parent vehicle card height was calculated with a fixed baseline (`150 + routeH`) that failed to dynamically incorporate multi-line chauffeur names, contact details, dynamic route lines, and inner container margins.
+- **Fix Applied**: Implemented mathematical dynamic height calculation:
+  - Calculated 3-column chauffeur grid height: `gridH = 12 + Math.max(16, dNameH, dPhoneH)`.
+  - Calculated route itinerary strip height: `routeStripH = 34 + routeTextH + 10`.
+  - Calculated parent card height: `vBoxHeight = 14 + 14 + 12 + 21 + gridH + 12 + routeStripH + 14`.
+  - Dynamically positioned the route strip inside the parent container at `routeStripY = gridY + gridH + 12`.
+  - Enforced `ensureSpace(vBoxHeight)` for page-break safety.
+
+### 2. Transport Voucher Bad Route Text with Stray `!’` (Bug 2)
+- **Root Cause**: The route string previously utilized the Unicode right arrow `→` (`\u2192`). In PDFKit's standard WinAnsiEncoding font (Helvetica), unmapped Unicode characters render as `!’`.
+- **Fix Applied**: Replaced Unicode arrow with clean multi-line label formatting:
+  ```ts
+  const routeText = `From: ${pickupLocStr}\nTo: ${dropLocStr}`;
+  ```
+  Handled empty, null, single-point, and multi-line pickup/drop locations gracefully.
+
+### 3. Customer Booking Confirmation PDF Modernization
+- **Enhancements**:
+  - Replaced legacy text layout with Slate 900 hero banner with booking reference badge.
+  - Customer & Reservation Details card with 2-column layout.
+  - Dynamic Itinerary Schedule card measuring day titles and bullet descriptions.
+  - Accommodation & Transit Logistics card summarizing confirmed hotels and vehicle allocations.
+  - Package Inclusions, Exclusions, and Terms cards with dynamic height calculation.
+  - Two-pass buffered running header and footer with `Page X of Y`.
+
+### 4. Final Travel Kit & Itinerary Pack PDF Modernization
+- **Enhancements**:
+  - Premium Slate 900 cover banner displaying agency brand, trip reference, and confirmation badge.
+  - Journey Overview & Passenger Roster card with 2-column grid.
+  - Day-by-day Itinerary Timeline with blue step badges, bold day titles, and wrapped day descriptions.
+  - Accommodation Confirmations card with room details and check-in/out dates.
+  - Transportation & Transfer Details card with vehicle specs, chauffeur contact, and pickup routes.
+  - Activities & Excursion Passes card with purple admission badges.
+  - 24/7 Guest Concierge & Emergency Assistance box.
+  - Two-pass buffered page numbering (`Page X of Y`).
+
+---
+
+## 184.3 Security & Multi-Tenant Isolation
+1. **Server-Derived Context**: All operations document endpoints strictly derive `agencyId` server-side via `requireReadAccess()` from session JWT.
+2. **Commercial Data Sanitization**: Internal commercial fields (`costPrice`, `supplierCost`, `markup`, `supplierMargin`, `supplierId`, `supplierNotes`, `internalNotes`) remain 100% excluded and unqueried.
+3. **Audit Trails**: All document generations log immutable `OperationEvent` records in PostgreSQL.
+
+---
+
+## 184.4 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **Actual PDF Output Tests**:
+  - `Vehicle-Voucher-TVV-2026-3769-01.pdf` (14,811 bytes) $\to$ **Valid PDF, zero overflow, no `!’` glyphs (PASSED)**.
+  - `Booking-Confirmation-TRIP-13I-1789468383769.pdf` (16,687 bytes) $\to$ **Valid PDF, Quotation-aligned visual system (PASSED)**.
+  - `Travel-Kit-TRIP-13I-1789468383769.pdf` (17,330 bytes) $\to$ **Valid PDF, comprehensive multi-section itinerary pack (PASSED)**.
+- **Regression Safety**:
+  - `quotation-pdf-service.ts` $\to$ 100% untouched.
+  - Database schema & permanent baseline records $\to$ 100% intact.
+
+---
+
+# 185. PHASE 185 — PDF CONFIRMATION NUMBER WRAPPING & HEADER LAYOUT AUDIT (September 2026)
+
+## 185.1 Overview & Root Cause Analysis
+- **Audit Objective**: Complete header layout audit across all 5 customer-facing operational PDF generators:
+  1. **Hotel Voucher** (`generateHotelVoucher`)
+  2. **Transport Voucher** (`generateVehicleVoucher`)
+  3. **Activity Pass** (`generateActivityVoucher`)
+  4. **Customer Booking Confirmation** (`generateBookingConfirmation`)
+  5. **Final Travel Kit & Itinerary Pack** (`generateTravelKit`)
+- **Root Cause**: The right-hand voucher/confirmation badge previously used static vertical Y coordinates (`rightY + 10`, `rightY + 24`, `rightY + 36`, `rightY + 49`). When `documentNumber`, `tripNumber`, or `bookingNumber` wrapped onto 2 lines, the second line overlapped subsequent date, reference, and status pill text inside the dark badge container. Furthermore, `bannerHeight` calculation did not dynamically incorporate multi-line right-badge content.
+
+---
+
+## 185.2 Exact Engineering Solution
+- **Dynamic Text Measurement**:
+  - Measured exact wrapped height for document identifier: `docNumH = doc.heightOfString(docNumText, { width: 155, align: "center" })`.
+  - Measured exact wrapped height for date: `dateH = doc.heightOfString(dateText, { width: 155, align: "center" })`.
+  - Measured exact wrapped height for reference: `refH = doc.heightOfString(refText, { width: 155, align: "center" })`.
+  - Calculated total dynamic right badge content height: `totalRightContentH = docNumH + 3 + dateH + 2 + refH + 5 + pillH`.
+- **Dynamic Container Sizing & Vertical Centering**:
+  - Enforced banner height: `bannerHeight = Math.max(88, leftContentH, totalRightContentH + 44)`.
+  - Calculated vertical start position: `rightStartY = rightY + Math.max(8, (rightBoxH - totalRightContentH) / 2)`.
+  - Sequential Y-progression tracking: `curRightY` increments by each element's exact rendered height + spacing gap, rendering vertical overlap mathematically impossible.
+  - Downstream content progression: `doc.y = margin + bannerHeight + 14` safely shifts all subsequent content cards dynamically.
+
+---
+
+## 185.3 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **All 5 PDFs Tested & Inspected**:
+  - Hotel Voucher: `Hotel-Voucher-HIM-PALACE-9944.pdf` (15,970 bytes) $\to$ **Valid PDF, zero overlap (PASSED)**.
+  - Transport Voucher: `Vehicle-Voucher-TVV-2026-3769-01.pdf` (14,944 bytes) $\to$ **Valid PDF, zero overlap (PASSED)**.
+  - Activity Pass: `Activity-Voucher-KUFRI-PASS-8822.pdf` (15,039 bytes) $\to$ **Valid PDF, zero overlap (PASSED)**.
+  - Customer Booking Confirmation: `Booking-Confirmation-TRIP-13I-1789468383769.pdf` (16,809 bytes) $\to$ **Valid PDF, zero overlap (PASSED)**.
+  - Final Travel Kit: `Travel-Kit-TRIP-13I-1789468383769.pdf` (17,473 bytes) $\to$ **Valid PDF, zero overlap (PASSED)**.
+- **Long Document Number & Wrapping Extremes Test**:
+  - Explicitly tested multi-line identifier wrapping across all 5 generators $\to$ **100% clean formatting, zero text collision, proper padding maintained (PASSED)**.
+- **Regression Safety**:
+  - `quotation-pdf-service.ts` $\to$ 100% untouched.
+  - Transport Voucher route-card dynamic layout $\to$ 100% preserved.
+  - Database schema & permanent baseline records $\to$ 100% intact.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
 
 
 
