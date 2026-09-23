@@ -55,20 +55,20 @@ export function UpcomingTripsList({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-2xs flex flex-col h-full space-y-4">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <div>
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-2xs flex flex-col h-full space-y-4">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-2">
+        <div className="min-w-0">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <Compass className="h-4 w-4 text-indigo-600" />
-            <span>Upcoming Departures</span>
+            <Compass className="h-4 w-4 text-indigo-600 shrink-0" />
+            <span className="truncate">Upcoming Departures</span>
           </h3>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 truncate">
             Operational readiness, document status, and departures.
           </p>
         </div>
         <Link
           href="/operations"
-          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
         >
           Operations Center <ArrowRight className="h-3 w-3" />
         </Link>
@@ -92,23 +92,23 @@ export function UpcomingTripsList({
             return (
               <div
                 key={trip.tripId}
-                className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/40 hover:bg-slate-100/60 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                className="p-3 sm:p-3.5 rounded-xl border border-slate-100 bg-slate-50/40 hover:bg-slate-100/60 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3"
               >
                 <div className="space-y-1 min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                     <Link
                       href={`/trips/${trip.tripId}`}
                       className="font-bold text-xs text-slate-900 hover:text-indigo-600 transition-colors truncate max-w-[200px]"
                     >
                       {trip.tripTitle}
                     </Link>
-                    <Badge variant="outline" className={`text-[10px] font-bold px-1.5 py-0 ${rBadgeColor}`}>
+                    <Badge variant="outline" className={`text-[10px] font-bold px-1.5 py-0 tabular-nums ${rBadgeColor}`}>
                       {rScore}% Ready
                     </Badge>
                     {trip.booking && (
                       <Badge
                         variant="outline"
-                        className={`text-[9px] font-mono font-bold px-1.5 py-0 ${
+                        className={`text-[9px] font-mono font-bold px-1.5 py-0 whitespace-nowrap ${
                           trip.booking.paymentStatus === "PAID"
                             ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                             : trip.booking.paymentStatus === "PARTIALLY_PAID"
@@ -121,22 +121,22 @@ export function UpcomingTripsList({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-3 text-[11px] text-slate-500 font-medium flex-wrap">
-                    <span>
+                  <div className="flex items-center gap-2 sm:gap-3 text-[11px] text-slate-500 font-medium flex-wrap">
+                    <span className="truncate">
                       Traveler: <strong className="text-slate-700 font-bold">{trip.customer.name}</strong>
                     </span>
                     <span>•</span>
-                    <span className="flex items-center gap-1 font-mono text-slate-600">
-                      <Calendar className="h-3 w-3 text-slate-400" />
+                    <span className="flex items-center gap-1 font-mono text-slate-600 whitespace-nowrap tabular-nums">
+                      <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
                       {formatDate(trip.startDate)} - {formatDate(trip.endDate)}
                     </span>
                     <span>•</span>
-                    <span className="text-slate-600 font-bold">{trip.destination}</span>
+                    <span className="text-slate-600 font-bold truncate">{trip.destination}</span>
                   </div>
                 </div>
 
                 {/* Document Readiness Badges & Actions */}
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                   <div className="flex items-center gap-1">
                     <span
                       title={`Hotel Voucher: ${trip.documents.hasHotelVoucher ? "Generated" : "Missing"}`}
@@ -183,7 +183,7 @@ export function UpcomingTripsList({
                   {trip.booking && (
                     <Link
                       href={`/bookings/${trip.booking.id}`}
-                      className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] transition-colors"
+                      className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] transition-colors whitespace-nowrap"
                     >
                       Booking
                     </Link>

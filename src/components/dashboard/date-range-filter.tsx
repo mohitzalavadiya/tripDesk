@@ -121,23 +121,23 @@ export function DateRangeFilter({
 
         {/* Custom Range Inputs */}
         {showCustomInputs && (
-          <form onSubmit={handleApplyCustom} className="flex items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0">
+          <form onSubmit={handleApplyCustom} className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0">
             <Input
               type="date"
               value={customStart}
               onChange={(e) => setCustomStart(e.target.value)}
-              className="h-8 text-xs w-[130px] bg-slate-50 border-slate-200"
+              className="h-8 text-xs flex-1 sm:w-[130px] min-w-[110px] bg-slate-50 border-slate-200"
               required
             />
-            <span className="text-slate-400 text-xs">to</span>
+            <span className="text-slate-400 text-xs shrink-0">to</span>
             <Input
               type="date"
               value={customEnd}
               onChange={(e) => setCustomEnd(e.target.value)}
-              className="h-8 text-xs w-[130px] bg-slate-50 border-slate-200"
+              className="h-8 text-xs flex-1 sm:w-[130px] min-w-[110px] bg-slate-50 border-slate-200"
               required
             />
-            <Button size="sm" type="submit" disabled={loading} className="h-8 text-xs px-3 bg-indigo-600 hover:bg-indigo-700 font-bold">
+            <Button size="sm" type="submit" disabled={loading} className="h-8 text-xs px-3 bg-indigo-600 hover:bg-indigo-700 font-bold shrink-0">
               Apply
             </Button>
           </form>
