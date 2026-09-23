@@ -11741,9 +11741,290 @@ The complex multi-package tier architecture (`QuotationPackageOption` model, opt
 
 ---
 
+# 179. INTERNAL DASHBOARD NOTIFICATION V1 (SEPTEMBER 2026)
+
+## 179.1 Architectural Overview & Scope Isolation
+Phase 179 introduced a persistent, multi-tenant internal notification engine designed specifically for internal platform operators (`PLATFORM_OWNER`) and travel agency operators (`AGENCY_OWNER`).
+
+### Strict System Separation:
+- **Internal Dashboard Notifications (`UserNotification`)**:
+  - Target: Authenticated internal users (`User.id`).
+  - Scoping: `PLATFORM_OWNER` (`agencyId = null`) vs `AGENCY_OWNER` (`agencyId` matching agency).
+  - UI: Topbar Bell Popover (`NotificationsPopover`) across authenticated dashboards.
+  - Storage: Database table `user_notifications`.
+- **Customer Notification Engine (`CustomerNotification`)**:
+  - Target: External travelers/clients via public links (`/trip/[secureToken]`, `/q/[shareToken]`, `/b/[secureToken]`).
+  - Completely preserved and unaffected.
+- **Communication Ledger (`/communications`, `CommunicationLog`)**:
+  - Outbound multi-channel delivery audit ledger (Email, SMS, WhatsApp).
+  - Completely preserved and unaffected.
+- **Operations Timeline (`OperationEvent`) & Audit Log (`PlatformAuditLog`)**:
+  - Tour operational milestones and security audit logging.
+  - Completely preserved and unaffected.
+
+---
+
+## 179.2 Event Matrix & Recipient Targeting
+
+| Event / Action | Internal Recipient | Notification Type (`UserNotificationType`) | Navigation Link | Idempotency Pattern |
+| :--- | :--- | :--- | :--- | :--- |
+| Agency Sign-up / Onboarding | `PLATFORM_OWNER` | `AGENCY_SIGNUP` | `/admin/agencies` | `agency-signup-${agencyId}` |
+| Manual Subscription Payment Submitted | `PLATFORM_OWNER` | `SUBSCRIPTION_PAYMENT_SUBMITTED` | `/admin/subscriptions` | `sub-pay-sub-${paymentId}` |
+| Subscription Payment Verified | `AGENCY_OWNER` | `SUBSCRIPTION_PAYMENT_VERIFIED` | `/subscription` | `sub-pay-verify-${paymentId}` |
+| Subscription Payment Rejected | `AGENCY_OWNER` | `SUBSCRIPTION_PAYMENT_REJECTED` | `/subscription` | `sub-pay-reject-${paymentId}` |
+| Agency Account Suspended / Reactivated | `AGENCY_OWNER` | `AGENCY_STATUS_CHANGED` | `/subscription` or `/dashboard` | `agency-[status]-${agencyId}-${timestamp}` |
+| Public Quotation Accepted | `AGENCY_OWNER` | `QUOTATION_ACCEPTED` | `/quotations/${quotationId}` | `quote-accept-${quotationId}` |
+| Public Quotation Revision Requested | `AGENCY_OWNER` | `QUOTATION_CHANGE_REQUESTED` | `/quotations/${quotationId}` | `quote-changes-${quotationId}-${timestamp}` |
+| Booking Created / Converted | `AGENCY_OWNER` | `BOOKING_CREATED` | `/bookings/${bookingId}` | `booking-created-${bookingId}` |
+| Customer Payment Received & Logged | `AGENCY_OWNER` | `PAYMENT_RECEIVED` | `/bookings/${bookingId}` | `payment-recv-${paymentId}` |
+| Customer Enquiry Created | `AGENCY_OWNER` | `CUSTOMER_ENQUIRY_CREATED` | `/enquiries/${enquiryId}` | `enquiry-created-${enquiryId}` |
+| Platform Announcement Broadcast | All active `AGENCY_OWNER`s | `PLATFORM_ANNOUNCEMENT` | `/dashboard` | `announcement-${announcementId}` |
+
+---
+
+## 179.3 Database Schema & Index Design
+- **PostgreSQL Enum**: `UserNotificationType` with all 11 event types.
+- **Model `UserNotification` (`user_notifications`)**:
+  - `id`: String `@id @default(cuid())`
+  - `userId`: String (Foreign Key to `User.id`, `onDelete: Cascade`)
+  - `agencyId`: String? (Foreign Key to `Agency.id`, `onDelete: Cascade`, null for Platform Owners)
+  - `role`: `UserRole` (`PLATFORM_OWNER` or `AGENCY_OWNER`)
+  - `type`: `UserNotificationType`
+  - `title`: String
+  - `message`: Text
+  - `linkUrl`: String?
+  - `isRead`: Boolean `@default(false)`
+  - `readAt`: DateTime?
+  - `idempotencyKey`: String?
+  - `metadata`: Json?
+  - `createdAt`: DateTime `@default(now())`
+  - `updatedAt`: DateTime `@updatedAt`
+- **Compound & Unique Indexes**:
+  - `@@unique([userId, idempotencyKey])`: Guarantees zero duplicate notifications per user.
+  - `@@index([userId, isRead, createdAt])`: Ultra-fast query index for user list & unread count badge.
+  - `@@index([agencyId, isRead, createdAt])`: Tenant-scoped query index.
+- **Migration SQL**: Applied via `prisma/migrations/20260922124500_add_user_notifications/migration.sql`.
+
+---
+
+## 179.4 API & Service Architecture
+- **Service Layer (`src/lib/services/internal-notification-service.ts`)**:
+  - `createNotification(input)`: Atomic idempotent notification creation with error containment.
+  - `notifyPlatformOwners(payload)`: Dispatches to all users with role `PLATFORM_OWNER` (`agencyId = null`).
+  - `notifyAgencyOwner(agencyId, payload)`: Dispatches to all `AGENCY_OWNER` users of the target agency.
+  - `notifyAllAgencyOwners(payload)`: Broadcasts to all active `AGENCY_OWNER` users across the platform.
+  - `listNotifications(userId, query)`: Paginated query supporting `unreadOnly` and `type` filters.
+  - `getUnreadCount(userId)`: Fast unread counter for the topbar badge.
+  - `markAsRead(userId, notificationId)`: Secure single-notification read updater with ownership enforcement.
+  - `markAllAsRead(userId)`: Bulk read updater for all notifications belonging to the user.
+- **API Endpoints**:
+  - `GET /api/notifications`: Returns `{ data: UserNotificationItemView[], meta: { total, unreadCount, page, limit, totalPages } }`.
+  - `PATCH /api/notifications/[id]/read`: Marks a single notification as read.
+  - `POST /api/notifications/read-all`: Marks all unread notifications for the session user as read.
+- **Client SDK (`src/lib/api-client/notification-client.ts`)**:
+  - Type-safe wrapper for UI popover with full error handling.
+
+---
+
+## 179.5 UI & User Experience (`NotificationsPopover`)
+- **Live Badge**: Dynamic unread counter badge on the topbar bell icon; hidden when count is 0.
+- **Background Polling**: 30-second interval automatic polling with cleanup on unmount.
+- **Category Iconography & Visual Hierarchy**:
+  - Specific colored icons for Booking (blue ticket), Quotation (emerald receipt), Payment (green credit card), Enquiry (purple spark), Subscription (amber shield), and System Announcement (sky megaphone).
+  - Blue unread dot indicator + soft blue background highlight for unread items.
+- **Interactive Navigation**:
+  - Clicking any notification marks it as read instantly and navigates to the associated deep-link.
+- **Mark All as Read Action**: One-click button in the popover header to dismiss all unread items.
+- **Role-Aware Footers**: Contextual link directing Platform Owners to `/admin/audit-logs` and Agency Owners to `/communications`.
+
+---
+
+## 179.6 Verification & QA Results
+- **Automated E2E Suite**: Full lifecycle verification completed (`100% GREEN`):
+  - Platform Owner notification creation, listing, read, and deduplication verified.
+  - Agency Owner notification creation across all business events verified.
+  - Read/unread badge decrement and `markAllAsRead` verified.
+  - Strict tenant and role isolation verified (cross-access strictly blocked).
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **Permanent Baseline Preservation**:
+  - Destinations: **32** (100% intact)
+  - Hotels: **22** permanent (100% intact)
+  - RateSheets: **66** (100% intact)
+  - Vehicles: **6** permanent (100% intact)
+  - PLATFORM_OWNER: `mzpatel14@gmail.com` (100% intact)
+
+---
+
+## 179.7 Final Verification & Subscription URL Cleanup (September 2026)
+- **Audit Verdict**: Strict read-only audit classified as **PASS WITH NON-BLOCKING NOTES**.
+- **URL Correction Applied**:
+  - `SUBSCRIPTION_PAYMENT_VERIFIED` navigation target corrected from `/settings/subscription` to canonical `/subscription`.
+  - `SUBSCRIPTION_PAYMENT_REJECTED` navigation target corrected from `/settings/subscription` to canonical `/subscription`.
+  - `AGENCY_STATUS_CHANGED` (suspension) navigation target aligned to `/subscription`.
+- **Delivery Mechanism Clarification**:
+  - Explicitly classified as 30-second **polling-based notification refresh** in topbar popover (no WebSockets/Supabase Realtime).
+- **Verification**:
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Exit code 0 (PASSED)**.
+  - Zero database mutations occurred during cleanup.
+
+---
+
+# 180. PHASE 180 — PLATFORM BILLING SETTINGS: UPI + BANK DETAILS + QR CODE MANAGEMENT (September 2026)
+
+## 180.1 Architecture & Objectives
+1. **Centrally Managed Platform Billing**:
+   - Replaced hard-coded client payment instructions with a typed, global SaaS singleton model `PlatformBillingSettings`.
+   - Enabled `PLATFORM_OWNER` to manage official UPI VPA, UPI business display name, direct bank transfer details (Account Holder, Bank Name, Account Number, IFSC Code, Branch Name), and official QR Code image.
+   - Provided `AGENCY_OWNER` with dynamic, display-safe payment instructions in `/subscription` payment modal with 1-click copy helpers and QR scanning.
+2. **Zero Payment Flow Disruption**:
+   - Preserved manual UPI/bank payment workflow, UTR reference entry, `SubscriptionPayment` record creation, `PENDING` status flow, Platform Owner verification/rejection, and `SUBSCRIPTION_PAYMENT_SUBMITTED` notifications.
+   - Maintained absolute integrity of historical `SubscriptionPayment` audit records.
+
+---
+
+## 180.2 Database Model & Migration
+1. **Prisma Model (`prisma/schema.prisma`)**:
+   ```prisma
+   model PlatformBillingSettings {
+     id             String   @id @default("default")
+     upiId          String?
+     upiDisplayName String?
+     accountHolder  String?
+     bankName       String?
+     accountNumber  String?
+     ifscCode       String?
+     branchName     String?
+     qrCodeUrl      String?
+     qrStoragePath  String?
+     updatedBy      String?
+     createdAt      DateTime @default(now())
+     updatedAt      DateTime @updatedAt
+
+     @@map("platform_billing_settings")
+   }
+   ```
+2. **Migration & Idempotent Seeding**:
+   - Migration: `20260922150000_add_platform_billing_settings/migration.sql`.
+   - Preserved exact verified constants into the singleton row upon creation:
+     - `upiId`: `tripdesk.billing@icici`
+     - `upiDisplayName`: `TripDesk Billing`
+     - `accountHolder`: `TripDesk SaaS Technologies Pvt Ltd`
+     - `bankName`: `ICICI Bank`
+     - `accountNumber`: `002105009844`
+     - `ifscCode`: `ICIC0000021`
+     - `branchName`: `MG Road Branch`
+
+---
+
+## 180.3 QR Storage Lifecycle & Security
+1. **Storage Infrastructure**:
+   - Stored in Supabase Storage bucket `platform-assets` under `platform/billing/qr-[timestamp].[ext]`.
+   - Database stores public CDN reference `qrCodeUrl` and object path `qrStoragePath`.
+2. **Safe Replacement Lifecycle**:
+   - Order: Validate MIME & size $\to$ Upload new QR $\to$ Confirm upload $\to$ Update DB singleton $\to$ Only after DB update, clean up previous storage object.
+   - Clean deletion: `DELETE /api/admin/billing-settings/qr` clears DB reference and removes object from storage.
+3. **Server Validation**:
+   - MIME types: `image/png`, `image/jpeg`, `image/jpg`, `image/webp`.
+   - Max file size: 2 MB.
+
+---
+
+## 180.4 API Architecture & Access Control
+1. **Platform Owner APIs**:
+   - `GET /api/admin/billing-settings`: Retrieves full settings (RBAC: `requirePlatformOwnerContext()`).
+   - `PATCH /api/admin/billing-settings`: Validates and updates text & banking fields (Zod schema validation + `PlatformAuditLog` audit entry).
+   - `POST /api/admin/billing-settings/qr`: Multipart upload handler for QR image.
+   - `DELETE /api/admin/billing-settings/qr`: Removes QR image from storage and resets DB fields.
+2. **Agency Owner APIs**:
+   - `GET /api/subscription/billing-settings`: Returns display-safe billing instructions (`getRequestContext()`).
+   - Included directly in `subscriptionService.getAgencySubscription()` overview for zero-latency loading.
+
+---
+
+## 180.5 UI Implementation
+1. **Platform Owner Admin Settings (`src/app/admin/settings/page.tsx`)**:
+   - Dedicated "Platform Billing & Payment Instructions" management card.
+   - Form inputs for UPI ID, Display Name, Account Holder, Bank Name, Account Number, IFSC, Branch.
+   - QR Code manager with live preview, upload dropzone/file picker, replace action, and remove action.
+2. **Agency Owner Subscription Modal (`src/app/(dashboard)/subscription/page.tsx`)**:
+   - Replaced static JSX with dynamic `billingSettings`.
+   - Renders QR Code preview with "Scan & Pay via UPI App" if uploaded.
+   - 1-click copy buttons for UPI ID, Account Number, and IFSC Code.
+   - Graceful fallback when no QR code is uploaded (clean UPI + Bank table).
+
+---
+
+## 180.6 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Prisma Client**: `npx prisma generate` $\to$ **Client generated (PASSED)**.
+- **Migration**: `npx prisma migrate deploy` $\to$ **Applied successfully (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 (PASSED)**.
+- **Historical Data**: All `SubscriptionPayment` records remain 100% intact.
+- **Permanent Baseline**: Permanent Platform Owner, Agency Owner (`TripDesk Offical Test Agnecy`), 32 Destinations, 22 Hotels, 66 RateSheets, 6 Vehicles preserved without alteration.
+
+---
+
+## 180.7 UI Cleanup — Native QR Delete Confirmation Replacement (September 2026)
+- **Problem**: Platform Owner QR removal in `/admin/settings` triggered a native browser `window.confirm()` dialog.
+- **Solution**: Replaced native dialog with TripDesk's standard application-level `ConfirmDialog` component.
+- **Behavior**:
+  - Clicking "Remove QR" opens the modal dialog with destructive action styling.
+  - "Cancel" closes the dialog with zero state change.
+  - "Remove QR" executes `adminClient.deleteBillingQr()`, updates state, and dismisses the dialog.
+- **Verification**: Zero native `alert()` or `confirm()` remain in the billing settings flow. Build & TypeScript passed with 0 errors.
+
+---
+
+# 181. PHASE 181 — DESTINATION MASTER UI (September 2026)
+
+## 181.1 Architecture & Overview
+- **Objective**: Provide a dedicated master list & CRUD interface for Agency Owners to manage geographic destinations at `/destinations`.
+- **Navigation Placement**: Added `Destinations` (`href: "/destinations"`, `icon: MapPin`) under `RESOURCES` in `agencyNavigationConfig` ([src/lib/navigation.ts](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/navigation.ts)).
+- **Backend Reuse**: 100% reused existing Prisma `Destination` model, Zod validation schemas ([src/lib/validation/destination-schema.ts](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/validation/destination-schema.ts)), service layer ([src/lib/services/destination-service.ts](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/services/destination-service.ts)), API routes (`/api/destinations`, `/api/destinations/[id]`), and client SDK (`destinationClient`).
+
+---
+
+## 181.2 UI Components & Pages Implemented
+1. **Destination Master Page (`src/app/(dashboard)/destinations/page.tsx`)**:
+   - Command hero header with `MapPin` badge, total telemetry chip, title, description, and primary `Add Destination` action.
+   - Search toolbar with debounced 300ms query filter across `name`, `state`, `cityArea`, and `country`.
+   - Status dropdown filter (`ALL`, `ACTIVE`, `INACTIVE`) and filter reset button.
+   - Standard table displaying Destination & Region, City / Specific Area, Country, `StatusBadge`, and `Actions` dropdown menu.
+   - Action controls: `Edit Destination`, `Mark Active / Inactive`, and `Delete Destination`.
+   - State handling: `TableSkeleton` for loading, `ErrorState` with retry, `EmptyState` for zero/no-search results, `ReadOnlyBanner` for read-only subscriptions.
+   - Pagination footer with page indicator and `Prev`/`Next` buttons.
+   - Destructive deletion backed by `ConfirmDialog` with dependency error handling.
+2. **Add / Edit Destination Dialog (`src/components/destinations/destination-dialog.tsx`)**:
+   - Modal dialog component supporting both creation and updating of destination records.
+   - Controlled inputs for `name`, `state`, `country`, `cityArea`, and operational `status`.
+   - Client-side trimming and validation.
+   - Loading/submitting state with `Loader2` spinner.
+   - Conflict error feedback via `sonner` toast notifications.
+
+---
+
+## 181.3 Security & Tenant Isolation
+- Derived strictly server-side from session JWT via `requireReadAccess()` and `requireWriteAccess()`.
+- Zero client-supplied `agencyId` trust.
+- Dependency protection: Deletion blocked at service layer if referenced by Hotels, Activities, or TripDestinations; users advised to mark as Inactive.
+
+---
+
+## 181.4 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **Permanent Baseline**: 32 Destinations, 22 Hotels, 66 RateSheets, 6 Vehicles preserved without alteration.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+
+
 
 
 

@@ -27,6 +27,7 @@ import {
 } from "@/lib/services/operations-service";
 import { customerNotificationService } from "@/lib/services/customer-notification-service";
 import { communicationService } from "@/lib/services/communication-service";
+import { internalNotificationService } from "@/lib/services/internal-notification-service";
 
 export type BookingWithRelations = Booking & {
   customer: {
@@ -508,6 +509,21 @@ export const bookingService = {
       communicationService.notifyBookingConfirmed(agencyId, booking.id).catch((err) => {
         console.warn("[Communication Non-blocking Notice] Failed to notify booking confirmed:", err?.message || err);
       });
+
+      internalNotificationService.notifyAgencyOwner(agencyId, {
+        type: "BOOKING_CREATED",
+        title: "New Booking Created",
+        message: `Booking #${booking.bookingNumber} created for ₹${Number(booking.totalAmount).toLocaleString("en-IN")}.`,
+        linkUrl: `/bookings/${booking.id}`,
+        metadata: {
+          bookingId: booking.id,
+          bookingNumber: booking.bookingNumber,
+          totalAmount: Number(booking.totalAmount),
+        },
+        idempotencyKey: `booking-created-${booking.id}`,
+      }).catch((err) => {
+        console.warn("[BookingService] Failed to notify agency owner of booking creation:", err);
+      });
     } catch {
       // Non-blocking operations synchronization
     }
@@ -645,6 +661,22 @@ export const bookingService = {
 
       communicationService.notifyBookingConfirmed(agencyId, booking.id).catch((err) => {
         console.warn("[Communication Non-blocking Notice] Failed to notify booking confirmed:", err?.message || err);
+      });
+
+      internalNotificationService.notifyAgencyOwner(agencyId, {
+        type: "BOOKING_CREATED",
+        title: "Quotation Converted to Booking",
+        message: `Booking #${booking.bookingNumber} created from Quotation #${quotation.quotationNumber}.`,
+        linkUrl: `/bookings/${booking.id}`,
+        metadata: {
+          bookingId: booking.id,
+          bookingNumber: booking.bookingNumber,
+          quotationId: quotation.id,
+          totalAmount: Number(booking.totalAmount),
+        },
+        idempotencyKey: `booking-created-${booking.id}`,
+      }).catch((err) => {
+        console.warn("[BookingService] Failed to notify agency owner of booking conversion:", err);
       });
     } catch {
       // Non-blocking operations sync

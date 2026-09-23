@@ -2,6 +2,8 @@ import prisma from "@/lib/prisma";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { SupabaseClient, User } from "@supabase/supabase-js";
 import { destinationService } from "@/lib/services/destination-service";
+import { internalNotificationService } from "@/lib/services/internal-notification-service";
+import { UserNotificationType } from "@prisma/client";
 
 export interface OnboardingResult {
   success: boolean;
@@ -158,8 +160,28 @@ export async function provisionOnboardedAgencyOwner(
         },
       });
     }
-  } catch (metaErr) {
-    console.warn("Could not wipe temporary metadata after onboarding:", metaErr);
+  } catch (cleanErr) {
+    console.warn("Failed to wipe onboarding staging metadata (non-fatal):", cleanErr);
+  }
+
+  // 7. Internal Notification Trigger for Platform Owner
+  try {
+    internalNotificationService.notifyPlatformOwners({
+      type: UserNotificationType.AGENCY_SIGNUP,
+      title: "New agency registered",
+      message: `${agencyName} has registered and started a 7-day trial.`,
+      linkUrl: `/admin/agencies`,
+      idempotencyKeyPrefix: `agency-signup-${user.id}`,
+      metadata: {
+        agencyName,
+        agencyEmail,
+        ownerName,
+      },
+    }).catch((err) => {
+      console.warn("[AGENCY_SIGNUP notification non-blocking warning]", err);
+    });
+  } catch {
+    // Non-blocking notification
   }
 
   return { success: true, alreadyOnboarded: false };

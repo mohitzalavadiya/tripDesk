@@ -288,6 +288,20 @@ enum FollowUpType {
   OTHER
 }
 
+enum UserNotificationType {
+  AGENCY_SIGNUP
+  SUBSCRIPTION_PAYMENT_SUBMITTED
+  SUBSCRIPTION_PAYMENT_VERIFIED
+  SUBSCRIPTION_PAYMENT_REJECTED
+  AGENCY_STATUS_CHANGED
+  QUOTATION_ACCEPTED
+  QUOTATION_CHANGE_REQUESTED
+  BOOKING_CREATED
+  PAYMENT_RECEIVED
+  CUSTOMER_ENQUIRY_CREATED
+  PLATFORM_ANNOUNCEMENT
+}
+
 enum FollowUpStatus {
   PENDING
   COMPLETED
@@ -410,6 +424,7 @@ model Agency {
   invoices              Invoice[]
   invoiceSequences      InvoiceSequence[]
   taxProfile            AgencyTaxProfile?
+  userNotifications     UserNotification[]
 
   @@map("agencies")
 }
@@ -431,7 +446,8 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  agency Agency? @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  agency            Agency?            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  userNotifications UserNotification[]
 
   @@index([agencyId])
   @@map("users")
@@ -2183,4 +2199,56 @@ model TaxRate {
 
   @@map("tax_rates")
 }
+
+// ═════════════════════════════════════════════════════════════════════
+// 41. USER NOTIFICATION (INTERNAL DASHBOARD NOTIFICATIONS)
+// ═════════════════════════════════════════════════════════════════════
+
+model UserNotification {
+  id             String               @id @default(cuid())
+  userId         String
+  agencyId       String?
+  role           UserRole
+  type           UserNotificationType
+  title          String
+  message        String
+  linkUrl        String?
+  isRead         Boolean              @default(false)
+  readAt         DateTime?
+  idempotencyKey String?
+  metadata       Json?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agency Agency? @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, isRead, createdAt])
+  @@index([agencyId, isRead, createdAt])
+  @@map("user_notifications")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 42. PLATFORM BILLING SETTINGS (SAAS SUBSCRIPTION PAYMENT INSTRUCTIONS)
+// ═════════════════════════════════════════════════════════════════════
+
+model PlatformBillingSettings {
+  id             String   @id @default("default")
+  upiId          String?
+  upiDisplayName String?
+  accountHolder  String?
+  bankName       String?
+  accountNumber  String?
+  ifscCode       String?
+  branchName     String?
+  qrCodeUrl      String?
+  qrStoragePath  String?
+  updatedBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("platform_billing_settings")
+}
+
 
