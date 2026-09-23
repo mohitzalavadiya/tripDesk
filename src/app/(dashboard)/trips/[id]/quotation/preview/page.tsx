@@ -326,7 +326,7 @@ export default function TripQuotationPreviewPage() {
             </div>
 
             {/* 4. Destination Route Sequence */}
-            {sortedDestinations.length > 0 && (
+            {/* {sortedDestinations.length > 0 && (
               <div className="space-y-3">
                 <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
                   <MapPin className="h-4 w-4 text-indigo-600" />
@@ -345,7 +345,7 @@ export default function TripQuotationPreviewPage() {
                   ))}
                 </div>
               </div>
-            )}
+            )} */}
 
             {/* 5. Day-by-Day Itinerary */}
             {itineraryItems.length > 0 && (
@@ -562,7 +562,7 @@ export default function TripQuotationPreviewPage() {
             )}
 
             {/* 12. Payment Schedule (PERCENTAGES ONLY) */}
-            {milestones.length > 0 && (
+            {/* {milestones.length > 0 && (
               <div className="space-y-3">
                 <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-1.5">
                   <CreditCard className="h-4 w-4 text-indigo-600" />
@@ -587,7 +587,7 @@ export default function TripQuotationPreviewPage() {
                   ))}
                 </div>
               </div>
-            )}
+            )} */}
 
             {/* 13. FINAL QUOTATION AMOUNT (THE ONLY MONETARY SECTION) */}
             <div className="p-6 sm:p-8 bg-slate-900 text-white rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4">

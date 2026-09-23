@@ -395,7 +395,7 @@ export default function PublicQuotationPage() {
             </div>
 
             {/* 4. Destination Route Sequence */}
-            {sortedDestinations.length > 0 && (
+            {/* {sortedDestinations.length > 0 && (
               <div className="space-y-3">
                 <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
                   <MapPin className="h-4 w-4 text-indigo-600" />
@@ -414,7 +414,7 @@ export default function PublicQuotationPage() {
                   ))}
                 </div>
               </div>
-            )}
+            )} */}
 
             {/* 5. Day-by-Day Itinerary Schedule */}
             {quotation.trip.itineraryItems.length > 0 && (
@@ -619,7 +619,7 @@ export default function PublicQuotationPage() {
             )}
 
             {/* 10. Payment Milestone Schedule (PERCENTAGES ONLY) */}
-            {milestones.length > 0 && (
+            {/* {milestones.length > 0 && (
               <div className="space-y-4">
                 <div className="border-b border-slate-200 pb-3">
                   <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -660,7 +660,7 @@ export default function PublicQuotationPage() {
                   ))}
                 </div>
               </div>
-            )}
+            )} */}
 
             {/* 11. Important Notes & Policies */}
             {(importantNotes.length > 0 || quotation.cancellationPolicy || quotation.terms) && (
