@@ -27,9 +27,6 @@ Add hotel and rate for test
 in Gender give dropdown
 clean database
 
-
-you already know we build a tripdesk. so my old chat is reach the limit so i want to start new chat foe this project. i want to contunie project in new chat without breaking anythings. i have file TRIPDESK_MASTER_CONTEXT_FINAL_V3.md   for whole project. whole flow, what we build, what we dicide everythings. so i give you this file review it and then we continue
-
 Hotel and rate issue in costing
 Add destination field for trip
 
@@ -43,15 +40,20 @@ notification test
 
 Add QR and UPI for payment
 where i can show Announcements ? in notification
+Destination master UI
+UI break in dashboard. Revenue & Profit and Upcoming Departures in both tab
 
 **TODO**
 
-Destination master UI
-
-UI break in dashboard. Revenue & Profit and Upcoming Departures in both tab
-
+Login and signup test for formik alert
 
 manage read only from frontend also
+
+itinerary builder
+https://pickyourtrail.com/itineraries/6-night-bali-thrills-serenity-at-40k-per-person
+
+Chatbot implement
+
 subscription model changes
 
 remove usused code, imports and files
@@ -63,10 +65,10 @@ compalate QA.
 
 responsive 320 screen
 some changes in activity. R&D 
+whatsapp and email msg checking in all steps
 
 understand flow
 
-Chatbot implement
 
 
 **ONHOLD**

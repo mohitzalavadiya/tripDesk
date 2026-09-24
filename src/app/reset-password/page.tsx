@@ -2,16 +2,60 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useActionState } from "react";
-import { resetPasswordAction } from "@/actions/auth-actions";
+import { useFormik } from "formik";
+import * as Yup from "yup";
+import { resetPasswordAction, AuthActionResult } from "@/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Compass, Lock, AlertCircle, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Compass, Lock, AlertCircle, ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
+
+const resetPasswordValidationSchema = Yup.object().shape({
+  password: Yup.string()
+    .required("New password is required.")
+    .min(6, "Password must be at least 6 characters."),
+  confirmPassword: Yup.string()
+    .required("Please confirm your new password.")
+    .oneOf([Yup.ref("password")], "Passwords do not match."),
+});
 
 export default function ResetPasswordPage() {
-  const [state, formAction, isPending] = useActionState(resetPasswordAction, {});
+  const [serverResult, setServerResult] = React.useState<AuthActionResult | null>(null);
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
+
+  const formik = useFormik({
+    initialValues: {
+      password: "",
+      confirmPassword: "",
+    },
+    validationSchema: resetPasswordValidationSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      setServerResult(null);
+      setSubmitting(true);
+
+      const formData = new FormData();
+      formData.append("password", values.password);
+      formData.append("confirmPassword", values.confirmPassword);
+
+      try {
+        const res = await resetPasswordAction({}, formData);
+        if (res?.error) {
+          setServerResult(res);
+        }
+      } catch (err: any) {
+        if (err?.message?.includes("NEXT_REDIRECT") || err?.digest?.startsWith("NEXT_REDIRECT")) {
+          throw err;
+        }
+        setServerResult({ error: err?.message || "Failed to reset password. Please try again." });
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
+
+  const getFieldError = (field: keyof typeof formik.values) => {
+    return formik.touched[field] && formik.errors[field] ? formik.errors[field] : null;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-4 text-slate-900">
@@ -28,24 +72,26 @@ export default function ResetPasswordPage() {
           </p>
         </div>
 
-        {state?.error && (
+        {serverResult?.error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl p-3 flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-            <span>{state.error}</span>
+            <span>{serverResult.error}</span>
           </div>
         )}
 
-        <form action={formAction} className="space-y-4 text-xs">
+        <form onSubmit={formik.handleSubmit} noValidate className="space-y-4 text-xs">
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-700">New Password</label>
+            <label className="font-bold text-slate-700">New Password <span className="text-red-500">*</span></label>
             <div className="relative">
               <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
               <Input
                 type={showPassword ? "text" : "password"}
                 name="password"
                 placeholder="Minimum 6 characters"
-                required
-                className="pl-9 pr-9 h-9.5 text-xs font-medium"
+                value={formik.values.password}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                className={`pl-9 pr-9 h-9.5 text-xs font-medium ${getFieldError("password") ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
               />
               <button
                 type="button"
@@ -60,18 +106,25 @@ export default function ResetPasswordPage() {
                 )}
               </button>
             </div>
+            {getFieldError("password") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                {getFieldError("password")}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-700">Confirm New Password</label>
+            <label className="font-bold text-slate-700">Confirm New Password <span className="text-red-500">*</span></label>
             <div className="relative">
               <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
               <Input
                 type={showConfirmPassword ? "text" : "password"}
                 name="confirmPassword"
                 placeholder="Re-enter new password"
-                required
-                className="pl-9 pr-9 h-9.5 text-xs font-medium"
+                value={formik.values.confirmPassword}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                className={`pl-9 pr-9 h-9.5 text-xs font-medium ${getFieldError("confirmPassword") ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
               />
               <button
                 type="button"
@@ -86,14 +139,26 @@ export default function ResetPasswordPage() {
                 )}
               </button>
             </div>
+            {getFieldError("confirmPassword") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                {getFieldError("confirmPassword")}
+              </p>
+            )}
           </div>
 
           <Button
             type="submit"
-            disabled={isPending}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-10 rounded-xl shadow-xs cursor-pointer transition-all disabled:opacity-50 mt-2"
+            disabled={formik.isSubmitting}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-10 rounded-xl shadow-xs cursor-pointer transition-all disabled:opacity-50 mt-2 flex items-center justify-center gap-2"
           >
-            {isPending ? "Updating Password..." : "Update Password & Log In"}
+            {formik.isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Updating Password...</span>
+              </>
+            ) : (
+              <span>Update Password & Log In</span>
+            )}
           </Button>
         </form>
 
@@ -109,3 +174,4 @@ export default function ResetPasswordPage() {
     </div>
   );
 }
+

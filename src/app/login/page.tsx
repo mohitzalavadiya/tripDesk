@@ -3,11 +3,22 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useActionState } from "react";
-import { loginAction } from "@/actions/auth-actions";
+import { useFormik } from "formik";
+import * as Yup from "yup";
+import { loginAction, AuthActionResult } from "@/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Compass, AlertCircle, CheckCircle2, Lock, Mail, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Compass, AlertCircle, CheckCircle2, Lock, Mail, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
+
+const loginValidationSchema = Yup.object().shape({
+  email: Yup.string()
+    .trim()
+    .required("Email address is required.")
+    .email("Please enter a valid email address."),
+  password: Yup.string()
+    .required("Password is required.")
+    .min(6, "Password must be at least 6 characters."),
+});
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -16,8 +27,43 @@ function LoginForm() {
   const verifiedSuccess = searchParams.get("verified") === "true";
   const urlError = searchParams.get("error");
 
-  const [state, formAction, isPending] = useActionState(loginAction, {});
+  const [serverResult, setServerResult] = React.useState<AuthActionResult | null>(null);
   const [showPassword, setShowPassword] = React.useState(false);
+
+  const formik = useFormik({
+    initialValues: {
+      email: "",
+      password: "",
+    },
+    validationSchema: loginValidationSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      setServerResult(null);
+      setSubmitting(true);
+
+      const formData = new FormData();
+      formData.append("email", values.email.trim());
+      formData.append("password", values.password);
+      formData.append("redirectTo", redirectTo);
+
+      try {
+        const res = await loginAction({}, formData);
+        if (res?.error || res?.unverified) {
+          setServerResult(res);
+        }
+      } catch (err: any) {
+        if (err?.message?.includes("NEXT_REDIRECT") || err?.digest?.startsWith("NEXT_REDIRECT")) {
+          throw err;
+        }
+        setServerResult({ error: err?.message || "An unexpected error occurred during sign in." });
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
+
+  const getFieldError = (field: keyof typeof formik.values) => {
+    return formik.touched[field] && formik.errors[field] ? formik.errors[field] : null;
+  };
 
   return (
     <div className="max-w-md w-full bg-white rounded-3xl p-7 sm:p-9 shadow-2xl space-y-6 animate-in fade-in-0 zoom-in-95 duration-200">
@@ -54,7 +100,7 @@ function LoginForm() {
         </div>
       )}
 
-      {state?.unverified ? (
+      {serverResult?.unverified ? (
         <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xl p-3.5 space-y-2.5">
           <div className="flex items-start gap-2.5">
             <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
@@ -67,17 +113,17 @@ function LoginForm() {
           </div>
           <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between">
             <Link
-              href={`/verify-email?email=${encodeURIComponent(state.email || "")}`}
+              href={`/verify-email?email=${encodeURIComponent(serverResult.email || "")}`}
               className="text-amber-900 font-bold hover:underline inline-flex items-center gap-1"
             >
               Go to Verification Screen &rarr;
             </Link>
           </div>
         </div>
-      ) : state?.error ? (
+      ) : serverResult?.error ? (
         <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl p-3 flex items-center gap-2">
           <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-          <span>{state.error}</span>
+          <span>{serverResult.error}</span>
         </div>
       ) : urlError && !verifiedSuccess && !resetSuccess ? (
         <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl p-3 flex items-center gap-2">
@@ -93,26 +139,31 @@ function LoginForm() {
       ) : null}
 
       {/* Form */}
-      <form action={formAction} className="space-y-4 text-xs">
-        <input type="hidden" name="redirectTo" value={redirectTo} />
-
+      <form onSubmit={formik.handleSubmit} noValidate className="space-y-4 text-xs">
         <div className="space-y-1.5">
-          <label className="font-bold text-slate-700">Email Address</label>
+          <label className="font-bold text-slate-700">Email Address <span className="text-red-500">*</span></label>
           <div className="relative">
-            <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
             <Input
               type="email"
               name="email"
               placeholder="name@agency.com"
-              required
-              className="pl-9 h-9.5 text-xs font-medium"
+              value={formik.values.email}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              className={`pl-9 h-9.5 text-xs font-medium ${getFieldError("email") ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
             />
           </div>
+          {getFieldError("email") && (
+            <p className="text-[11px] text-red-500 font-semibold mt-0.5 animate-in fade-in-0 duration-150">
+              {getFieldError("email")}
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="font-bold text-slate-700">Password</label>
+            <label className="font-bold text-slate-700">Password <span className="text-red-500">*</span></label>
             <Link
               href="/forgot-password"
               className="text-[11px] font-semibold text-purple-600 hover:text-purple-700"
@@ -126,8 +177,10 @@ function LoginForm() {
               type={showPassword ? "text" : "password"}
               name="password"
               placeholder="••••••••"
-              required
-              className="pl-9 pr-9 h-9.5 text-xs font-medium"
+              value={formik.values.password}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              className={`pl-9 pr-9 h-9.5 text-xs font-medium ${getFieldError("password") ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
             />
             <button
               type="button"
@@ -142,14 +195,26 @@ function LoginForm() {
               )}
             </button>
           </div>
+          {getFieldError("password") && (
+            <p className="text-[11px] text-red-500 font-semibold mt-0.5 animate-in fade-in-0 duration-150">
+              {getFieldError("password")}
+            </p>
+          )}
         </div>
 
         <Button
           type="submit"
-          disabled={isPending}
-          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-10 rounded-xl shadow-xs cursor-pointer transition-all disabled:opacity-50 mt-2"
+          disabled={formik.isSubmitting}
+          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-10 rounded-xl shadow-xs cursor-pointer transition-all disabled:opacity-50 mt-2 flex items-center justify-center gap-2"
         >
-          {isPending ? "Authenticating..." : "Sign In to Workspace"}
+          {formik.isSubmitting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Authenticating...</span>
+            </>
+          ) : (
+            <span>Sign In to Workspace</span>
+          )}
         </Button>
       </form>
 
@@ -182,3 +247,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

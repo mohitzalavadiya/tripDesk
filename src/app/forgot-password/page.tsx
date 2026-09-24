@@ -2,14 +2,49 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useActionState } from "react";
-import { requestPasswordResetAction } from "@/actions/auth-actions";
+import { useFormik } from "formik";
+import * as Yup from "yup";
+import { requestPasswordResetAction, AuthActionResult } from "@/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Compass, Mail, AlertCircle, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Compass, Mail, AlertCircle, CheckCircle2, ArrowLeft, Loader2 } from "lucide-react";
+
+const forgotPasswordValidationSchema = Yup.object().shape({
+  email: Yup.string()
+    .trim()
+    .required("Registered email address is required.")
+    .email("Please enter a valid email address."),
+});
 
 export default function ForgotPasswordPage() {
-  const [state, formAction, isPending] = useActionState(requestPasswordResetAction, {});
+  const [serverResult, setServerResult] = React.useState<AuthActionResult | null>(null);
+
+  const formik = useFormik({
+    initialValues: {
+      email: "",
+    },
+    validationSchema: forgotPasswordValidationSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      setServerResult(null);
+      setSubmitting(true);
+
+      const formData = new FormData();
+      formData.append("email", values.email.trim());
+
+      try {
+        const res = await requestPasswordResetAction({}, formData);
+        setServerResult(res);
+      } catch (err: any) {
+        setServerResult({ error: err?.message || "Failed to send reset link. Please try again." });
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
+
+  const getFieldError = (field: keyof typeof formik.values) => {
+    return formik.touched[field] && formik.errors[field] ? formik.errors[field] : null;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-4 text-slate-900">
@@ -26,7 +61,7 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
 
-        {state?.success && (
+        {serverResult?.success && (
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl p-3.5 flex items-start gap-2.5">
             <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
             <div>
@@ -38,35 +73,49 @@ export default function ForgotPasswordPage() {
           </div>
         )}
 
-        {state?.error && (
+        {serverResult?.error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl p-3 flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-            <span>{state.error}</span>
+            <span>{serverResult.error}</span>
           </div>
         )}
 
-        {!state?.success && (
-          <form action={formAction} className="space-y-4 text-xs">
+        {!serverResult?.success && (
+          <form onSubmit={formik.handleSubmit} noValidate className="space-y-4 text-xs">
             <div className="space-y-1.5">
-              <label className="font-bold text-slate-700">Registered Email Address</label>
+              <label className="font-bold text-slate-700">Registered Email Address <span className="text-red-500">*</span></label>
               <div className="relative">
-                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
                 <Input
                   type="email"
                   name="email"
                   placeholder="name@agency.com"
-                  required
-                  className="pl-9 h-9.5 text-xs font-medium"
+                  value={formik.values.email}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  className={`pl-9 h-9.5 text-xs font-medium ${getFieldError("email") ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                 />
               </div>
+              {getFieldError("email") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                  {getFieldError("email")}
+                </p>
+              )}
             </div>
 
             <Button
               type="submit"
-              disabled={isPending}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-10 rounded-xl shadow-xs cursor-pointer transition-all disabled:opacity-50 mt-2"
+              disabled={formik.isSubmitting}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-10 rounded-xl shadow-xs cursor-pointer transition-all disabled:opacity-50 mt-2 flex items-center justify-center gap-2"
             >
-              {isPending ? "Sending Reset Link..." : "Send Password Reset Link"}
+              {formik.isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Sending Reset Link...</span>
+                </>
+              ) : (
+                <span>Send Password Reset Link</span>
+              )}
             </Button>
           </form>
         )}
@@ -83,3 +132,4 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
+
