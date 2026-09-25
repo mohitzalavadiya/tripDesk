@@ -64,6 +64,9 @@ export function NotificationsPopover() {
       if (res.success && res.data) {
         setNotifications(res.data.data || []);
         setUnreadCount(res.data.meta?.unreadCount || 0);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("tripdesk:chat-unread-updated"));
+        }
       }
     } catch {
       // Non-blocking background fetch

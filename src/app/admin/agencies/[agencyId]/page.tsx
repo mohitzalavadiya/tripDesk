@@ -29,6 +29,7 @@ import {
   Users,
   Compass,
   Sparkles,
+  MessageSquare,
 } from "lucide-react";
 import { adminClient } from "@/lib/api-client/admin-client";
 import { Agency360Details } from "@/lib/services/admin-service";
@@ -155,6 +156,14 @@ export default function AgencyDetailsPage() {
             <ArrowLeft className="h-4 w-4" /> Back to Agencies
           </Link>
           <div className="flex items-center gap-2">
+            <Link href={`/admin/chat?agencyId=${agencyId}`}>
+              <Button
+                size="sm"
+                className="h-8 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-xs"
+              >
+                <MessageSquare className="h-3.5 w-3.5 mr-1" /> Open Support Chat
+              </Button>
+            </Link>
             {identity.status === "ACTIVE" ? (
               <Button
                 variant="outline"

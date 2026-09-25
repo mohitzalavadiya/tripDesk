@@ -300,6 +300,7 @@ enum UserNotificationType {
   PAYMENT_RECEIVED
   CUSTOMER_ENQUIRY_CREATED
   PLATFORM_ANNOUNCEMENT
+  PLATFORM_CHAT_MESSAGE
 }
 
 enum FollowUpStatus {
@@ -425,6 +426,8 @@ model Agency {
   invoiceSequences      InvoiceSequence[]
   taxProfile            AgencyTaxProfile?
   userNotifications     UserNotification[]
+  platformChatConversation PlatformChatConversation?
+  platformChatMessages     PlatformChatMessage[]
 
   @@map("agencies")
 }
@@ -446,8 +449,9 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  agency            Agency?            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  userNotifications UserNotification[]
+  agency               Agency?               @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  userNotifications    UserNotification[]
+  platformChatMessages PlatformChatMessage[]
 
   @@index([agencyId])
   @@map("users")
@@ -2250,5 +2254,54 @@ model PlatformBillingSettings {
 
   @@map("platform_billing_settings")
 }
+
+// ═════════════════════════════════════════════════════════════════════
+// 43. PLATFORM CHAT CONVERSATION (PLATFORM OWNER ↔ AGENCY SUPPORT)
+// ═════════════════════════════════════════════════════════════════════
+
+model PlatformChatConversation {
+  id                    String                @id @default(cuid())
+  agencyId              String                @unique
+  lastMessageAt         DateTime?
+  lastMessageSnippet    String?
+  lastMessageSenderRole UserRole?
+  agencyLastReadAt      DateTime?
+  platformLastReadAt    DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  agency                Agency                @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  messages              PlatformChatMessage[]
+
+  @@index([agencyId])
+  @@index([lastMessageAt])
+  @@map("platform_chat_conversations")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 44. PLATFORM CHAT MESSAGE (PERSISTENT SUPPORT MESSAGES)
+// ═════════════════════════════════════════════════════════════════════
+
+model PlatformChatMessage {
+  id              String                   @id @default(cuid())
+  conversationId  String
+  agencyId        String
+  senderUserId    String
+  senderRole      UserRole
+  messageText     String                   @db.Text
+  clientMessageId String?
+  createdAt       DateTime                 @default(now())
+
+  conversation    PlatformChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  agency          Agency                   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  senderUser      User                     @relation(fields: [senderUserId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, clientMessageId])
+  @@index([conversationId, createdAt])
+  @@index([agencyId, createdAt])
+  @@index([senderUserId])
+  @@map("platform_chat_messages")
+}
+
 
 

@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { agencyNavigationConfig, adminNavigationConfig } from "@/lib/navigation";
 import { useAuth } from "@/context/auth-context";
+import { usePlatformChatUnreadCount } from "@/hooks/use-platform-chat";
 
 interface MobileNavProps {
   open: boolean;
@@ -30,6 +31,7 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
   const { currentUser, isPlatformOwner } = useAuth();
   const isPlatform = isPlatformOwner || pathname.startsWith("/admin");
   const navSections = isPlatform ? adminNavigationConfig : agencyNavigationConfig;
+  const { unreadCount: chatUnreadCount } = usePlatformChatUnreadCount();
 
   interface BottomNavItem {
     label: string;
@@ -119,6 +121,8 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                       const isActive =
                         pathname === item.href ||
                         (item.href !== "/admin" && item.href !== "/dashboard" && pathname.startsWith(item.href));
+                      const isSupportChat = item.href === "/support" || item.href === "/admin/chat";
+                      const hasUnread = isSupportChat && chatUnreadCount > 0;
 
                       return (
                         <Link
@@ -134,18 +138,28 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                               : "text-slate-400 hover:text-white hover:bg-sidebar-accent/50"
                           )}
                         >
-                          <Icon
-                            className={cn(
-                              "h-4 w-4 shrink-0 transition-colors",
-                              isActive
-                                ? isPlatform
-                                  ? "text-purple-400"
-                                  : "text-indigo-400"
-                                : "text-slate-400 group-hover:text-white"
+                          <div className="relative shrink-0 flex items-center justify-center">
+                            <Icon
+                              className={cn(
+                                "h-4 w-4 shrink-0 transition-colors",
+                                isActive
+                                  ? isPlatform
+                                    ? "text-purple-400"
+                                    : "text-indigo-400"
+                                  : "text-slate-400 group-hover:text-white"
+                              )}
+                            />
+                            {hasUnread && (
+                              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-purple-500 ring-1 ring-sidebar animate-pulse" />
                             )}
-                          />
+                          </div>
                           <span className="truncate flex-1">{item.label}</span>
-                          {item.badge && (
+                          {hasUnread ? (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 leading-none bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+                              {chatUnreadCount > 1 ? `${chatUnreadCount} new` : "New"}
+                            </span>
+                          ) : item.badge ? (
                             <span
                               className={cn(
                                 "text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0 leading-none select-none",
@@ -157,7 +171,7 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                             >
                               {item.badge}
                             </span>
-                          )}
+                          ) : null}
                         </Link>
                       );
                     })}
@@ -193,9 +207,14 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
               <button
                 key={idx}
                 onClick={item.onClick}
-                className="flex flex-1 flex-col items-center justify-center py-1 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+                className="flex flex-1 flex-col items-center justify-center py-1 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer relative"
               >
-                <Icon className="h-5 w-5" />
+                <div className="relative">
+                  <Icon className="h-5 w-5" />
+                  {item.label === "More" && chatUnreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-purple-600 ring-2 ring-white" />
+                  )}
+                </div>
                 <span className="text-[10px] font-medium mt-1">{item.label}</span>
               </button>
             );

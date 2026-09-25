@@ -231,3 +231,12 @@ export async function requireWriteAccess(): Promise<AgencyOwnerRequestContext> {
   }
   return context;
 }
+
+/**
+ * Guard: Enforces Agency Owner access to Platform Support Chat.
+ * Allows authenticated Agency Owners to chat with Platform Support even if trial/subscription is EXPIRED or CANCELLED.
+ */
+export async function requireAgencyOwnerChatAccess(): Promise<AgencyOwnerRequestContext> {
+  return requireAgencyOwnerContext();
+}
+
