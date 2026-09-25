@@ -59,6 +59,7 @@ export type BookingWithRelations = Booking & {
     }>;
     tripVehicles?: Array<{
       id: string;
+      vehicleId?: string | null;
       vehicle?: { id: string; name: string; type: string; capacity: number } | null;
       vehicleName: string;
       vehicleType: string;
@@ -66,14 +67,19 @@ export type BookingWithRelations = Booking & {
       endDate?: Date | null;
       pickupLocation?: string | null;
       dropLocation?: string | null;
+      driverName?: string | null;
+      driverPhone?: string | null;
+      capacity?: number | null;
     }>;
     tripActivities?: Array<{
       id: string;
+      activityId?: string | null;
       activity?: { id: string; name: string; location: string | null } | null;
       name: string;
       date?: Date | null;
       time?: string | null;
       location?: string | null;
+      numberOfParticipants?: number | null;
     }>;
   };
   quotation?: {
@@ -307,6 +313,7 @@ export const bookingService = {
             vehicleDispatches: {
               include: {
                 vehicle: true,
+                tripVehicle: true,
               },
               orderBy: { createdAt: "asc" },
             },

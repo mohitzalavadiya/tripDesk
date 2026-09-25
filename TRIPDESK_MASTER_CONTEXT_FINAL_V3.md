@@ -12464,6 +12464,37 @@ Execute a comprehensive UI/UX audit, component architecture cleanup, and respons
 
 ---
 
+# SECTION 190 — BOOKING DETAIL `trip` vs `tripOperation` AUDIT & DATA SOURCE CORRECTION [VERIFIED & CLOSED]
+
+## 190.1 Architectural Source-of-Truth Distinction
+1. **`trip` (Authoritative for Booked Specifications & Itinerary Data):**
+   - Holds core business data: `title`, `tripNumber`, `startDate`, `endDate`, `status`, `travelers`.
+   - Authoritative for booked itinerary items:
+     - `tripHotels`: Booked accommodations with hotel name, city, check-in date, check-out date, room type, meal plan, room count.
+     - `tripVehicles`: Booked fleet/transport with vehicle name, vehicle type, travel dates, pickup/drop locations, initial driver assignments, capacity.
+     - `tripActivities`: Booked activities/sightseeing with activity name, scheduled date, time, location, participant count.
+2. **`tripOperation` (Authoritative for Operational Execution & Dispatch):**
+   - Holds operational lifecycle and supplier coordination data:
+     - `operationalReadiness`: Calculated departure checklist and blocker validation.
+     - `hotelConfirmations`: Supplier voucher confirmation numbers, confirmation status (`CONFIRMED`, `PENDING`), supplier notes.
+     - `vehicleDispatches`: Chauffeur assignments (`driverName`, `driverPhone`), registration plate numbers, dispatch statuses (`ASSIGNED`, `ON_DUTY`, `CONFIRMED`).
+     - `activityConfirmations`: Voucher/ticket confirmation numbers, confirmation status.
+     - `issues` & `events`: Operational blockers and audit timeline.
+
+## 190.2 Root Cause & Resolution
+- **Issue**: The Booking Detail page (`/bookings/[id]`) was querying only `booking.tripOperation` for its services tables (Hotels, Transport, Activities). If operations had not been initialized or was partially filled, booked services from the trip (`tripHotels`, `tripVehicles`, `tripActivities`) were hidden or displayed as "No confirmation records initialized yet".
+- **Fix**:
+  1. Updated `src/app/(dashboard)/bookings/[id]/page.tsx` to read the booked service specifications from `booking.trip` (`tripHotels`, `tripVehicles`, `tripActivities`) as the primary service items, merging each with its corresponding operational confirmation status from `booking.tripOperation` (`hotelConfirmations`, `vehicleDispatches`, `activityConfirmations`).
+  2. Included `tripVehicle: true` in `vehicleDispatches` under `bookingService.getBooking` and synchronized TypeScript definitions in `booking-client.ts` and `booking-service.ts`.
+  3. Added safe fallback to `booking.trip?.startDate` and `booking.trip?.endDate` for travel dates display.
+
+## 190.3 Verification
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Production build compiled successfully with exit code 0 (PASSED)**.
+- Existing authorization and agency tenant isolation fully preserved.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

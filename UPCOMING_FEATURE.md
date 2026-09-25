@@ -43,14 +43,17 @@ where i can show Announcements ? in notification
 Destination master UI
 UI break in dashboard. Revenue & Profit and Upcoming Departures in both tab
 Login and signup test for formik alert
+Chatbot implement
 
 **TODO**
 
 
-Chatbot implement
 
 vehical rate issue in trip
 from when you decide activity include or exclude
+
+quatation preview mobile screen is need to fix
+quatation pdf UI changes
 
 manage read only from frontend also
 
