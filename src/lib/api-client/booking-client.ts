@@ -55,6 +55,7 @@ export type BookingWithRelations = Booking & {
     }>;
     tripVehicles?: Array<{
       id: string;
+      vehicleId?: string | null;
       vehicle?: { id: string; name: string; type: string; capacity: number } | null;
       vehicleName: string;
       vehicleType: string;
@@ -62,14 +63,19 @@ export type BookingWithRelations = Booking & {
       endDate?: Date | string | null;
       pickupLocation?: string | null;
       dropLocation?: string | null;
+      driverName?: string | null;
+      driverPhone?: string | null;
+      capacity?: number | null;
     }>;
     tripActivities?: Array<{
       id: string;
+      activityId?: string | null;
       activity?: { id: string; name: string; location: string | null } | null;
       name: string;
       date?: Date | string | null;
       time?: string | null;
       location?: string | null;
+      numberOfParticipants?: number | null;
     }>;
   };
   quotation?: {
@@ -101,6 +107,7 @@ export type BookingWithRelations = Booking & {
     operationEndDate?: Date | string | null;
     hotelConfirmations: Array<{
       id: string;
+      tripHotelId?: string | null;
       confirmationNumber: string | null;
       status: string;
       confirmedAt: string | null;
@@ -113,6 +120,8 @@ export type BookingWithRelations = Booking & {
     }>;
     vehicleDispatches: Array<{
       id: string;
+      tripVehicleId?: string | null;
+      vehicleId?: string | null;
       driverName: string | null;
       driverPhone: string | null;
       vehicleNumber: string | null;
@@ -122,17 +131,22 @@ export type BookingWithRelations = Booking & {
       dropLocation: string | null;
       status: string;
       vehicle?: any;
+      tripVehicle?: any;
     }>;
     activityConfirmations: Array<{
       id: string;
-      passNumber: string | null;
+      tripActivityId?: string | null;
+      confirmationNumber?: string | null;
+      ticketNumber?: string | null;
+      passNumber?: string | null;
       status: string;
       confirmedAt: string | null;
-      activityDate: string | null;
-      activityTime: string | null;
-      activityLocation: string | null;
+      activityDate?: string | null;
+      activityTime?: string | null;
+      activityLocation?: string | null;
       supplier?: { id: string; name: string } | null;
       activity?: any;
+      tripActivity?: any;
     }>;
     issues: Array<{
       id: string;

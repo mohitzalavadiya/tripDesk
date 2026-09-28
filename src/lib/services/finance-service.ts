@@ -1,5 +1,6 @@
 import "server-only";
 import prisma from "@/lib/prisma";
+import { tripCostingService } from "./trip-costing-service";
 import {
   Payment,
   PaymentMethod,
@@ -70,16 +71,23 @@ export interface CustomerOutstandingItem {
 export interface SupplierOutstandingItem {
   payableId: string;
   payableNumber: string;
-  supplierId: string;
+  supplierId?: string | null;
   supplierName: string;
   supplierType: string;
+  payeeName?: string | null;
+  origin?: string;
   description: string;
   serviceType: string;
+  tripId?: string | null;
   tripNumber?: string | null;
+  tripTitle?: string | null;
+  bookingId?: string | null;
+  bookingNumber?: string | null;
   plannedAmount: number;
   actualAmount: number;
   paidAmount: number;
   outstandingAmount: number;
+  overpaidAmount?: number;
   dueDate: string | null;
   status: SupplierPayableStatus;
   isOverdue: boolean;
@@ -188,8 +196,8 @@ export interface BookingFinanceBreakdown {
   netCashPosition: number;
   isFinalized: boolean;
   customerPayments: Payment[];
-  supplierPayables: (SupplierPayable & { supplier: { name: string; type: string | null } })[];
-  supplierPayments: (SupplierPayment & { supplier: { name: string } })[];
+  supplierPayables: (SupplierPayable & { supplier?: { name: string; type: string | null } | null })[];
+  supplierPayments: (SupplierPayment & { supplier?: { name: string } | null })[];
   expenses: OperationalExpense[];
 }
 
@@ -592,27 +600,53 @@ export const financeService = {
   },
 
   // ═════════════════════════════════════════════════════════════════════
-  // SUPPLIER PAYABLES & DISBURSEMENTS WORKFLOWS
+  // SUPPLIER / UNIFIED PAYABLES & DISBURSEMENTS WORKFLOWS
   // ═════════════════════════════════════════════════════════════════════
 
   /**
-   * Create Supplier Payable
+   * Create Supplier / Unified Payable (Manual or Service-Origin)
    */
   async createSupplierPayable(
     agencyId: string,
     input: CreateSupplierPayableInput,
     userId?: string
   ): Promise<SupplierPayable> {
-    const supplier = await prisma.supplier.findFirst({
-      where: { id: input.supplierId, agencyId, archivedAt: null },
-    });
-    if (!supplier) throw new Error("Supplier not found or does not belong to your agency.");
+    let supplierName: string | null = null;
+    if (input.supplierId) {
+      const supplier = await prisma.supplier.findFirst({
+        where: { id: input.supplierId, agencyId, archivedAt: null },
+      });
+      if (!supplier) throw new Error("Supplier not found or does not belong to your agency.");
+      supplierName = supplier.name;
+    }
+
+    const resolvedPayee = input.payeeName || supplierName;
+    if (!resolvedPayee) {
+      throw new Error("Payee Name is required.");
+    }
+
+    let linkedTripId: string | null = null;
+    let linkedBookingId: string | null = null;
 
     if (input.bookingId) {
       const booking = await prisma.booking.findFirst({
         where: { id: input.bookingId, agencyId, archivedAt: null },
       });
       if (!booking) throw new Error("Booking not found or does not belong to your agency.");
+      if (input.tripId && input.tripId !== booking.tripId) {
+        throw new Error("Mismatched booking and trip relationship.");
+      }
+      linkedBookingId = booking.id;
+      linkedTripId = booking.tripId;
+    } else if (input.tripId) {
+      const trip = await prisma.trip.findFirst({
+        where: { id: input.tripId, agencyId, archivedAt: null },
+      });
+      if (!trip) throw new Error("Trip not found or does not belong to your agency.");
+      linkedTripId = trip.id;
+      linkedBookingId = null;
+    } else {
+      throw new Error("Payable must be linked to a Trip or Booking.");
     }
 
     if (input.tripOperationId) {
@@ -623,19 +657,11 @@ export const financeService = {
       await this.verifyOperationNotFinalized(agencyId, input.tripOperationId);
     }
 
-    if (input.tripId) {
-      const trip = await prisma.trip.findFirst({
-        where: { id: input.tripId, agencyId, archivedAt: null },
-      });
-      if (!trip) throw new Error("Trip not found or does not belong to your agency.");
-    }
-
     // Idempotency check for supplier payable
     if (input.idempotencyKey) {
       const existing = await prisma.supplierPayable.findFirst({
         where: {
           agencyId,
-          supplierId: input.supplierId,
           archivedAt: null,
           notes: { contains: `[idempotency:${input.idempotencyKey}]` },
         },
@@ -645,6 +671,7 @@ export const financeService = {
 
     const payableNumber = await this.generateNextPayableNumber(agencyId);
     const actual = input.actualAmount > 0 ? input.actualAmount : input.plannedAmount;
+    const planned = input.plannedAmount > 0 ? input.plannedAmount : actual;
 
     const notesWithIdempotency = input.idempotencyKey
       ? `${input.notes || ""} [idempotency:${input.idempotencyKey}]`.trim()
@@ -653,16 +680,18 @@ export const financeService = {
     return prisma.supplierPayable.create({
       data: {
         agencyId,
-        supplierId: input.supplierId,
-        bookingId: input.bookingId,
-        tripOperationId: input.tripOperationId,
-        tripId: input.tripId,
+        supplierId: input.supplierId || null,
+        payeeName: resolvedPayee,
+        origin: input.origin || "MANUAL",
+        bookingId: linkedBookingId,
+        tripOperationId: input.tripOperationId || null,
+        tripId: linkedTripId,
         payableNumber,
-        serviceType: input.serviceType,
-        serviceReferenceId: input.serviceReferenceId,
+        serviceType: input.serviceType || "MANUAL",
+        serviceReferenceId: input.serviceReferenceId || null,
         description: input.description,
         currency: input.currency || "INR",
-        plannedAmount: new Prisma.Decimal(input.plannedAmount),
+        plannedAmount: new Prisma.Decimal(planned),
         actualAmount: new Prisma.Decimal(actual),
         paidAmount: new Prisma.Decimal(0),
         outstandingAmount: new Prisma.Decimal(actual),
@@ -674,35 +703,182 @@ export const financeService = {
   },
 
   /**
-   * Record Supplier Payment (Disbursement)
+   * Update Payable (Automatic or Manual - Editable!)
+   * Preserves plannedAmount (original generated snapshot) while modifying actualAmount.
+   * Tracks edit audit history in notes and OperationEvent.
+   */
+  async updateSupplierPayable(
+    agencyId: string,
+    id: string,
+    input: UpdateSupplierPayableInput,
+    userId?: string
+  ): Promise<SupplierPayable> {
+    const payable = await prisma.supplierPayable.findFirst({
+      where: { id, agencyId, archivedAt: null },
+    });
+    if (!payable) throw new Error("Payable record not found.");
+
+    if (payable.tripOperationId) {
+      await this.verifyOperationNotFinalized(agencyId, payable.tripOperationId);
+    }
+
+    const currentActual = Number(payable.actualAmount);
+    const currentPaid = Number(payable.paidAmount);
+    const newActual = input.actualAmount !== undefined ? input.actualAmount : currentActual;
+    const newPlanned = input.plannedAmount !== undefined ? input.plannedAmount : Number(payable.plannedAmount);
+    const newOutstanding = Math.max(0, newActual - currentPaid);
+
+    let newStatus = input.status || payable.status;
+    if (!input.status) {
+      if (currentPaid >= newActual && newActual > 0) {
+        newStatus = SupplierPayableStatus.PAID;
+      } else if (currentPaid > 0) {
+        newStatus = SupplierPayableStatus.PARTIALLY_PAID;
+      } else if (payable.status !== SupplierPayableStatus.CANCELLED) {
+        newStatus = SupplierPayableStatus.PENDING;
+      }
+    }
+
+    let updatedNotes = input.notes !== undefined ? input.notes : payable.notes;
+    if (input.actualAmount !== undefined && input.actualAmount !== currentActual) {
+      const nowStr = new Date().toISOString().split("T")[0];
+      const editLog = `[Edited ${nowStr}: Amount changed from ₹${currentActual.toLocaleString("en-IN")} to ₹${newActual.toLocaleString("en-IN")}${input.reason ? ` (${input.reason})` : ""}${userId ? ` by ${userId}` : ""}]`;
+      updatedNotes = updatedNotes ? `${updatedNotes} | ${editLog}` : editLog;
+    }
+
+    const updated = await prisma.supplierPayable.update({
+      where: { id: payable.id },
+      data: {
+        payeeName: input.payeeName !== undefined ? input.payeeName : payable.payeeName,
+        description: input.description !== undefined ? input.description : payable.description,
+        plannedAmount: new Prisma.Decimal(newPlanned),
+        actualAmount: new Prisma.Decimal(newActual),
+        outstandingAmount: new Prisma.Decimal(newOutstanding),
+        dueDate: input.dueDate !== undefined ? (input.dueDate ? new Date(input.dueDate) : null) : payable.dueDate,
+        status: newStatus,
+        notes: updatedNotes,
+      },
+    });
+
+    if (payable.tripOperationId && input.actualAmount !== undefined && input.actualAmount !== currentActual) {
+      try {
+        await prisma.operationEvent.create({
+          data: {
+            agencyId,
+            tripOperationId: payable.tripOperationId,
+            eventType: "SUPPLIER_PAYABLE_UPDATED",
+            description: `Updated payable ${payable.payableNumber} (${payable.description}) amount from ₹${currentActual.toLocaleString("en-IN")} to ₹${newActual.toLocaleString("en-IN")}.${input.reason ? ` Reason: ${input.reason}` : ""}`,
+            metadata: {
+              payableId: payable.id,
+              previousActualAmount: currentActual,
+              newActualAmount: newActual,
+              plannedAmount: Number(payable.plannedAmount),
+              reason: input.reason,
+              userId,
+            },
+            createdBy: userId,
+          },
+        });
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    return updated;
+  },
+
+  /**
+   * Delete / Soft-Cancel Payable (Preserves History)
+   */
+  async deleteSupplierPayable(
+    agencyId: string,
+    id: string,
+    reason?: string,
+    userId?: string
+  ): Promise<{ success: boolean }> {
+    const payable = await prisma.supplierPayable.findFirst({
+      where: { id, agencyId, archivedAt: null },
+      include: { payments: { where: { archivedAt: null } } },
+    });
+    if (!payable) throw new Error("Payable not found.");
+
+    if (payable.payments.length > 0) {
+      throw new Error("Cannot delete a payable that has payments recorded. Please cancel or adjust the amount instead.");
+    }
+
+    const cancellationNote = reason ? ` [Cancelled: ${reason}]` : " [Cancelled]";
+    const updatedNotes = payable.notes ? `${payable.notes}${cancellationNote}` : cancellationNote.trim();
+
+    await prisma.supplierPayable.update({
+      where: { id: payable.id },
+      data: { archivedAt: new Date(), status: SupplierPayableStatus.CANCELLED, notes: updatedNotes },
+    });
+
+    if (payable.tripOperationId) {
+      try {
+        await prisma.operationEvent.create({
+          data: {
+            agencyId,
+            tripOperationId: payable.tripOperationId,
+            eventType: "SUPPLIER_PAYABLE_CANCELLED",
+            description: `Cancelled payable ${payable.payableNumber} (${payable.description}). ${reason ? `Reason: ${reason}` : ""}`,
+            metadata: {
+              payableId: payable.id,
+              payableNumber: payable.payableNumber,
+              amount: Number(payable.actualAmount),
+              reason,
+            },
+            createdBy: userId,
+          },
+        });
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    return { success: true };
+  },
+
+  /**
+   * Record Supplier / Payable Payment (Disbursement)
    */
   async recordSupplierPayment(
     agencyId: string,
     input: RecordSupplierPaymentInput,
     userId?: string
   ): Promise<SupplierPayment> {
-    const supplier = await prisma.supplier.findFirst({
-      where: { id: input.supplierId, agencyId, archivedAt: null },
-    });
-    if (!supplier) throw new Error("Supplier not found.");
+    let supplierName: string | null = null;
+    if (input.supplierId) {
+      const supplier = await prisma.supplier.findFirst({
+        where: { id: input.supplierId, agencyId, archivedAt: null },
+      });
+      if (supplier) {
+        supplierName = supplier.name;
+      }
+    }
 
-    let payable: SupplierPayable | null = null;
+    let payable: any = null;
     if (input.payableId) {
       payable = await prisma.supplierPayable.findFirst({
         where: { id: input.payableId, agencyId, archivedAt: null },
+        include: { supplier: true },
       });
-      if (!payable) throw new Error("Supplier payable record not found.");
+      if (!payable) throw new Error("Payable record not found.");
       if (payable.tripOperationId) {
         await this.verifyOperationNotFinalized(agencyId, payable.tripOperationId);
       }
+      if (!supplierName) {
+        supplierName = payable.supplier?.name || null;
+      }
     }
+
+    const resolvedPayee = input.payeeName || payable?.payeeName || supplierName || "Payee";
 
     // Idempotency check for supplier payment
     if (input.referenceNumber || input.idempotencyKey) {
       const existing = await prisma.supplierPayment.findFirst({
         where: {
           agencyId,
-          supplierId: input.supplierId,
           archivedAt: null,
           ...(input.referenceNumber ? { referenceNumber: input.referenceNumber } : {}),
           ...(input.idempotencyKey
@@ -723,9 +899,10 @@ export const financeService = {
       const payment = await tx.supplierPayment.create({
         data: {
           agencyId,
-          supplierId: input.supplierId,
-          payableId: input.payableId,
-          bookingId: input.bookingId || payable?.bookingId,
+          supplierId: input.supplierId || payable?.supplierId || null,
+          payeeName: resolvedPayee,
+          payableId: input.payableId || null,
+          bookingId: input.bookingId || payable?.bookingId || null,
           paymentNumber,
           amount: new Prisma.Decimal(input.amount),
           currency: input.currency || "INR",
@@ -767,14 +944,14 @@ export const financeService = {
               agencyId,
               tripOperationId: payable.tripOperationId,
               eventType: "SUPPLIER_PAYMENT_RECORDED",
-              description: `Disbursed supplier payment ${paymentNumber} of ₹${input.amount.toLocaleString(
+              description: `Disbursed payment ${paymentNumber} of ₹${input.amount.toLocaleString(
                 "en-IN"
-              )} to ${supplier.name}.`,
+              )} to ${resolvedPayee}.`,
               metadata: {
                 paymentId: payment.id,
                 paymentNumber,
                 payableId: payable.id,
-                supplierName: supplier.name,
+                payeeName: resolvedPayee,
                 amount: input.amount,
               },
               createdBy: userId,
@@ -785,6 +962,170 @@ export const financeService = {
 
       return payment;
     });
+  },
+
+  /**
+   * Automatically generate service payables for a Booking from its Trip's hotels & vehicles.
+   * Authoritative Costing: Reuses tripCostingService for exact RateSheet & snapshot resolution.
+   * Strict Idempotency: Multiple invocations will not duplicate existing payables for the same service items.
+   * Activities: Strictly remain non-priced (₹0) and are skipped.
+   */
+  async generateBookingServicePayables(
+    agencyId: string,
+    bookingId: string,
+    txClient?: Prisma.TransactionClient
+  ): Promise<SupplierPayable[]> {
+    const db = txClient || prisma;
+    const booking = await db.booking.findFirst({
+      where: { id: bookingId, agencyId, archivedAt: null },
+      include: {
+        trip: {
+          include: {
+            tripHotels: {
+              include: { hotel: true },
+            },
+            tripVehicles: {
+              include: { vehicle: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!booking || !booking.trip) {
+      return [];
+    }
+
+    // Authoritative Costing Calculation
+    let costing = null;
+    try {
+      costing = await tripCostingService.calculateTripCosting(agencyId, booking.tripId);
+    } catch {
+      // Fallback if trip costing calculation fails
+    }
+
+    const createdPayables: SupplierPayable[] = [];
+
+    // 1. Hotel Service Payables
+    for (const th of booking.trip.tripHotels) {
+      const checkInTime = new Date(th.checkIn).getTime();
+      const checkOutTime = new Date(th.checkOut).getTime();
+      const diffDays = Math.max(1, Math.ceil((checkOutTime - checkInTime) / (1000 * 60 * 60 * 24)));
+      const rooms = th.rooms || 1;
+
+      // Authoritative cost lookup from costing service
+      const matchedHotelCost = costing?.hotels.find((h) => h.id === th.id);
+      let cost = matchedHotelCost ? matchedHotelCost.totalCost : 0;
+
+      // Fallback to snapshot
+      if (cost === 0) {
+        cost = th.totalAmount ? Number(th.totalAmount) : 0;
+      }
+      if (cost === 0 && th.nightlyRate) {
+        cost = Number(th.nightlyRate) * rooms * diffDays;
+      }
+
+      if (cost > 0) {
+        // Strict Idempotency Check
+        const existing = await db.supplierPayable.findFirst({
+          where: {
+            agencyId,
+            bookingId: booking.id,
+            serviceReferenceId: th.id,
+            archivedAt: null,
+          },
+        });
+
+        if (!existing) {
+          const payableNumber = await this.generateNextPayableNumber(agencyId);
+          const hotelName = matchedHotelCost?.hotelName || th.hotel?.name || "Hotel Provider";
+          const desc = `Hotel: ${hotelName} (${th.roomType || "Room"}, ${diffDays} night(s), ${rooms} room(s))`;
+
+          const p = await db.supplierPayable.create({
+            data: {
+              agencyId,
+              bookingId: booking.id,
+              tripId: booking.tripId,
+              supplierId: th.hotel?.supplierId || null,
+              payeeName: hotelName,
+              origin: "AUTOMATIC",
+              serviceType: "HOTEL",
+              serviceReferenceId: th.id,
+              description: desc,
+              payableNumber,
+              currency: booking.currency || "INR",
+              plannedAmount: new Prisma.Decimal(cost),
+              actualAmount: new Prisma.Decimal(cost),
+              paidAmount: new Prisma.Decimal(0),
+              outstandingAmount: new Prisma.Decimal(cost),
+              dueDate: th.checkIn ? new Date(th.checkIn) : null,
+              status: SupplierPayableStatus.PENDING,
+            },
+          });
+          createdPayables.push(p);
+        }
+      }
+    }
+
+    // 2. Vehicle Service Payables
+    for (const tv of booking.trip.tripVehicles) {
+      // Authoritative cost lookup from costing service
+      const matchedVehicleCost = costing?.vehicles.find((v) => v.id === tv.id);
+      let cost = matchedVehicleCost ? matchedVehicleCost.totalCost : 0;
+
+      // Fallback to snapshot
+      if (cost === 0) {
+        cost = tv.totalRate ? Number(tv.totalRate) : 0;
+      }
+      if (cost === 0 && tv.ratePerKm && tv.estimatedKm) {
+        cost = Number(tv.ratePerKm) * Number(tv.estimatedKm);
+      }
+
+      if (cost > 0) {
+        // Strict Idempotency Check
+        const existing = await db.supplierPayable.findFirst({
+          where: {
+            agencyId,
+            bookingId: booking.id,
+            serviceReferenceId: tv.id,
+            archivedAt: null,
+          },
+        });
+
+        if (!existing) {
+          const payableNumber = await this.generateNextPayableNumber(agencyId);
+          const vehicleName = matchedVehicleCost?.vehicleName || tv.vehicle?.name || tv.vehicleType || "Vehicle Provider";
+          const desc = `Vehicle: ${vehicleName} (${tv.pricingType || "Standard"})`;
+
+          const p = await db.supplierPayable.create({
+            data: {
+              agencyId,
+              bookingId: booking.id,
+              tripId: booking.tripId,
+              supplierId: tv.vehicle?.supplierId || null,
+              payeeName: vehicleName,
+              origin: "AUTOMATIC",
+              serviceType: "VEHICLE",
+              serviceReferenceId: tv.id,
+              description: desc,
+              payableNumber,
+              currency: booking.currency || "INR",
+              plannedAmount: new Prisma.Decimal(cost),
+              actualAmount: new Prisma.Decimal(cost),
+              paidAmount: new Prisma.Decimal(0),
+              outstandingAmount: new Prisma.Decimal(cost),
+              dueDate: tv.startDate ? new Date(tv.startDate) : (booking.travelStartDate || null),
+              status: SupplierPayableStatus.PENDING,
+            },
+          });
+          createdPayables.push(p);
+        }
+      }
+    }
+
+    // 3. Activities: Strictly ₹0, skipped.
+
+    return createdPayables;
   },
 
   // ═════════════════════════════════════════════════════════════════════
@@ -1013,12 +1354,14 @@ export const financeService = {
         },
         include: {
           supplier: { select: { name: true } },
+          payable: { select: { id: true, payableNumber: true, payeeName: true, description: true } },
           booking: { select: { id: true, bookingNumber: true, trip: { select: { id: true, title: true } } } },
         },
         orderBy: { paymentDate: "desc" },
       });
 
       for (const sp of supplierPayments) {
+        const partyName = sp.payeeName || sp.payable?.payeeName || sp.supplier?.name || "Payee";
         items.push({
           id: sp.id,
           transactionNumber: sp.paymentNumber,
@@ -1030,13 +1373,13 @@ export const financeService = {
           paymentMethod: sp.paymentMethod,
           status: sp.status,
           referenceNumber: sp.referenceNumber,
-          partyName: sp.supplier.name,
+          partyName,
           partyType: "SUPPLIER",
           bookingId: sp.booking?.id,
           bookingNumber: sp.booking?.bookingNumber,
           tripId: sp.booking?.trip?.id,
           tripTitle: sp.booking?.trip?.title,
-          description: sp.notes,
+          description: sp.notes || sp.payable?.description || "Payable disbursement",
         });
       }
     }
@@ -1165,7 +1508,7 @@ export const financeService = {
           archivedAt: null,
           createdAt: { gte: start, lte: end },
         },
-        include: { supplier: true, trip: true },
+        include: { supplier: true, trip: true, booking: true },
       }),
       prisma.supplierPayment.findMany({
         where: {
@@ -1244,25 +1587,36 @@ export const financeService = {
       const actual = Number(sp.actualAmount);
       const paid = Number(sp.paidAmount);
       const outstanding = Number(sp.outstandingAmount);
+      const overpaid = Math.max(0, paid - actual);
 
       supplierPayable += actual;
       supplierPaid += paid;
 
-      if (outstanding > 0) {
-        const isOverdue = sp.dueDate ? new Date(sp.dueDate).getTime() < Date.now() : false;
+      if (outstanding > 0 || sp.status !== SupplierPayableStatus.PAID) {
+        const isOverdue = sp.dueDate && sp.status !== SupplierPayableStatus.CANCELLED
+          ? new Date(sp.dueDate).getTime() < Date.now() && outstanding > 0
+          : false;
+        const resolvedName = sp.payeeName || sp.supplier?.name || "Payee";
         supplierPayableItems.push({
           payableId: sp.id,
           payableNumber: sp.payableNumber,
           supplierId: sp.supplierId,
-          supplierName: sp.supplier?.name || "Supplier",
-          supplierType: sp.supplier?.type || "General Supplier",
+          supplierName: resolvedName,
+          supplierType: sp.supplier?.type || sp.serviceType || "General Supplier",
+          payeeName: resolvedName,
+          origin: sp.origin || "AUTOMATIC",
           description: sp.description,
           serviceType: sp.serviceType,
-          tripNumber: sp.trip?.tripNumber,
+          tripId: sp.tripId,
+          tripNumber: sp.trip?.tripNumber || "N/A",
+          tripTitle: sp.trip?.title,
+          bookingId: sp.bookingId,
+          bookingNumber: sp.booking?.bookingNumber,
           plannedAmount: Number(sp.plannedAmount),
           actualAmount: actual,
           paidAmount: paid,
           outstandingAmount: outstanding,
+          overpaidAmount: overpaid,
           dueDate: sp.dueDate ? sp.dueDate.toISOString() : null,
           status: sp.status,
           isOverdue,

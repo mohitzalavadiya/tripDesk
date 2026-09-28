@@ -128,6 +128,7 @@ export type QuotationWithRelations = Quotation & {
     tripActivities?: Array<{
       id: string;
       name: string;
+      type?: string | null;
       date?: Date | string | null;
       description?: string | null;
       notes?: string | null;
@@ -318,6 +319,7 @@ export interface PublicQuotationPayload {
     tripActivities?: Array<{
       id: string;
       name: string;
+      type?: string | null;
       date?: string | Date | null;
       description?: string | null;
       notes?: string | null;

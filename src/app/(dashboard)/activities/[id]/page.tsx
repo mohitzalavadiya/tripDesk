@@ -50,13 +50,7 @@ import { toast } from "sonner";
 const editActivitySchema = Yup.object().shape({
   name: Yup.string().trim().required("Activity name is required").max(200),
   destinationId: Yup.string().nullable().optional(),
-  location: Yup.string().trim().max(200),
   description: Yup.string().trim().max(2000),
-  duration: Yup.string().trim().max(100),
-  type: Yup.string().oneOf(Object.values(ActivityType)),
-  adultPrice: Yup.number().min(0).nullable(),
-  childPrice: Yup.number().min(0).nullable(),
-  price: Yup.number().min(0).nullable(),
   notes: Yup.string().trim().max(2000),
 });
 
@@ -100,13 +94,7 @@ export default function ActivityProfilePage() {
     initialValues: {
       name: activity?.name || "",
       destinationId: activity?.destinationId || "",
-      location: activity?.location || "",
       description: activity?.description || "",
-      duration: activity?.duration || "Half Day",
-      type: activity?.type || ActivityType.INCLUDED,
-      adultPrice: activity?.adultPrice !== null && activity?.adultPrice !== undefined ? String(activity.adultPrice) : "",
-      childPrice: activity?.childPrice !== null && activity?.childPrice !== undefined ? String(activity.childPrice) : "",
-      price: activity?.price !== null && activity?.price !== undefined ? String(activity.price) : "",
       notes: activity?.notes || "",
     },
     enableReinitialize: true,
@@ -117,13 +105,7 @@ export default function ActivityProfilePage() {
         await activityClient.updateActivity(activityId, {
           name: values.name.trim(),
           destinationId: values.destinationId || null,
-          location: values.location.trim() || undefined,
           description: values.description.trim() || undefined,
-          duration: values.duration.trim() || undefined,
-          type: values.type as ActivityType,
-          adultPrice: values.adultPrice !== "" ? Number(values.adultPrice) : undefined,
-          childPrice: values.childPrice !== "" ? Number(values.childPrice) : undefined,
-          price: values.price !== "" ? Number(values.price) : undefined,
           notes: values.notes.trim() || undefined,
         });
 
@@ -209,7 +191,7 @@ export default function ActivityProfilePage() {
               </Link>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-purple-50 text-purple-700 border border-purple-100">
                 <Ticket className="h-3 w-3 text-purple-500" />
-                Excursion Profile
+                Activity Master Profile
               </span>
             </div>
 
@@ -217,31 +199,18 @@ export default function ActivityProfilePage() {
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
                 {activity.name}
               </h1>
-              <span className="text-xs font-semibold text-slate-500">
-                {activity.type} • {activity.duration || "Half Day"}
-              </span>
             </div>
 
             {/* Micro details */}
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-              {activity.destination && (
+              {activity.destination ? (
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full">
                   <Compass className="h-3.5 w-3.5 text-emerald-600" />
                   {activity.destination.name}
                   {activity.destination.state ? ` (${activity.destination.state})` : ""}
                 </span>
-              )}
-              {activity.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                  {activity.location}
-                </span>
-              )}
-              {activity.duration && (
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5 text-slate-400" />
-                  {activity.duration}
-                </span>
+              ) : (
+                <span className="text-slate-400 italic">No assigned destination</span>
               )}
             </div>
           </div>
@@ -293,36 +262,6 @@ export default function ActivityProfilePage() {
                 <span className="text-slate-400 italic">Unassigned</span>
               )}
             </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Category / Type</span>
-              <span className="text-slate-800 font-semibold">{activity.type}</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Location</span>
-              <span className="text-slate-800 font-medium">{activity.location || "Unspecified"}</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Duration</span>
-              <span className="text-slate-800 font-medium">{activity.duration || "-"}</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Adult Price</span>
-              <span className="text-slate-800 font-semibold">
-                {activity.adultPrice !== null && activity.adultPrice !== undefined ? `₹${Number(activity.adultPrice)} / adult` : "-"}
-              </span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Child Price</span>
-              <span className="text-slate-800 font-medium">
-                {activity.childPrice !== null && activity.childPrice !== undefined ? `₹${Number(activity.childPrice)} / child` : "-"}
-              </span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Flat Group Price</span>
-              <span className="text-slate-800 font-medium">
-                {activity.price !== null && activity.price !== undefined ? `₹${Number(activity.price)}` : "-"}
-              </span>
-            </div>
           </div>
 
           {activity.description && (
@@ -351,7 +290,7 @@ export default function ActivityProfilePage() {
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base">Edit Activity</DialogTitle>
                 <DialogDescription className="text-slate-500 text-xs mt-1">
-                  Modify experience description, duration, and tariffs.
+                  Modify activity name, destination, description, and internal agency notes.
                 </DialogDescription>
               </DialogHeader>
 
@@ -380,58 +319,11 @@ export default function ActivityProfilePage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Inclusion Type</label>
-                    <Select
-                      value={editActivityFormik.values.type}
-                      onValueChange={(val) => {
-                        if (val) {
-                          editActivityFormik.setFieldValue("type", val);
-                          editActivityFormik.setFieldTouched("type", true);
-                        }
-                      }}
-                    >
-                      <SelectTrigger className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${getFieldError("type") ? "border-red-500 focus:ring-red-500" : ""}`}>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={ActivityType.INCLUDED}>Included in Package</SelectItem>
-                        <SelectItem value={ActivityType.OPTIONAL}>Optional / Add-on</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {getFieldError("type") && (
-                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("type")}</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Duration</label>
-                    <Input
-                      {...editActivityFormik.getFieldProps("duration")}
-                      className={inputCls("duration")}
-                    />
-                    {getFieldError("duration") && (
-                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("duration")}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Location</label>
-                  <Input
-                    {...editActivityFormik.getFieldProps("location")}
-                    className={inputCls("location")}
-                  />
-                  {getFieldError("location") && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("location")}</p>
-                  )}
-                </div>
-
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Description</label>
                   <Textarea
                     {...editActivityFormik.getFieldProps("description")}
-                    rows={2}
+                    rows={4}
                     className={`bg-slate-50/50 border-slate-200 text-xs ${getFieldError("description") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                   />
                   {getFieldError("description") && (
@@ -439,50 +331,11 @@ export default function ActivityProfilePage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Adult Price (₹)</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      {...editActivityFormik.getFieldProps("adultPrice")}
-                      className={inputCls("adultPrice")}
-                    />
-                    {getFieldError("adultPrice") && (
-                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("adultPrice")}</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Child Price (₹)</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      {...editActivityFormik.getFieldProps("childPrice")}
-                      className={inputCls("childPrice")}
-                    />
-                    {getFieldError("childPrice") && (
-                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("childPrice")}</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Flat Price (₹)</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      {...editActivityFormik.getFieldProps("price")}
-                      className={inputCls("price")}
-                    />
-                    {getFieldError("price") && (
-                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("price")}</p>
-                    )}
-                  </div>
-                </div>
-
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Notes</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Internal Notes</label>
                   <Textarea
                     {...editActivityFormik.getFieldProps("notes")}
-                    rows={2}
+                    rows={3}
                     className={`bg-slate-50/50 border-slate-200 text-xs ${getFieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                   />
                   {getFieldError("notes") && (

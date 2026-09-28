@@ -10,6 +10,8 @@ import {
   DispatchStatus,
   IssuePriority,
   IssueStatus,
+  SupplierPayable,
+  SupplierPayment,
 } from "@prisma/client";
 import {
   CreateTripOperationInput,
@@ -245,6 +247,12 @@ export type OperationDetailWithRelations = TripOperation & {
   activityConfirmations: ActivityConfirmationWithDetails[];
   issues: OperationalIssue[];
   events: OperationEvent[];
+  supplierPayables?: Array<
+    SupplierPayable & {
+      payments?: SupplierPayment[];
+      supplier?: { id: string; name: string; type?: string | null; phone?: string | null } | null;
+    }
+  >;
 };
 
 export const operationsClient = {

@@ -168,7 +168,7 @@ export const tripActivityService = {
         time: data.time || null,
         location: data.location || null,
         numberOfParticipants: data.numberOfParticipants ?? 1,
-        type: data.type,
+        type: data.type || "INCLUDED",
         adultPrice: data.adultPrice !== undefined && data.adultPrice !== null ? data.adultPrice : null,
         childPrice: data.childPrice !== undefined && data.childPrice !== null ? data.childPrice : null,
         totalPrice: data.totalPrice !== undefined && data.totalPrice !== null ? data.totalPrice : null,

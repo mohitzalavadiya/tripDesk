@@ -23,8 +23,10 @@ export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
     const { searchParams } = request.nextUrl;
+    const search = searchParams.get("search") || undefined;
     const supplierId = searchParams.get("supplierId") || undefined;
     const payableId = searchParams.get("payableId") || undefined;
+    const bookingId = searchParams.get("bookingId") || undefined;
 
     const payments = await prisma.supplierPayment.findMany({
       where: {
@@ -32,10 +34,23 @@ export async function GET(request: NextRequest) {
         archivedAt: null,
         ...(supplierId ? { supplierId } : {}),
         ...(payableId ? { payableId } : {}),
+        ...(bookingId ? { bookingId } : {}),
+        ...(search
+          ? {
+              OR: [
+                { payeeName: { contains: search, mode: "insensitive" } },
+                { paymentNumber: { contains: search, mode: "insensitive" } },
+                { referenceNumber: { contains: search, mode: "insensitive" } },
+                { notes: { contains: search, mode: "insensitive" } },
+                { supplier: { name: { contains: search, mode: "insensitive" } } },
+              ],
+            }
+          : {}),
       },
       include: {
         supplier: { select: { id: true, name: true, type: true } },
-        payable: true,
+        payable: { select: { id: true, payableNumber: true, payeeName: true, description: true, serviceType: true } },
+        booking: { select: { id: true, bookingNumber: true, trip: { select: { id: true, tripNumber: true, title: true } } } },
       },
       orderBy: { paymentDate: "desc" },
     });

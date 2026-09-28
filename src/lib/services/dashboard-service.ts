@@ -1163,7 +1163,9 @@ export const dashboardService = {
     const outstanding = Number(payableAgg._sum.outstandingAmount || 0);
     const overdue = Number(overdueAgg._sum.outstandingAmount || 0);
 
-    const supplierIds = topSuppliersGroup.map((g) => g.supplierId).filter(Boolean);
+    const supplierIds = topSuppliersGroup
+      .map((g) => g.supplierId)
+      .filter((id): id is string => Boolean(id));
     const suppliers = await prisma.supplier.findMany({
       where: { id: { in: supplierIds } },
       select: { id: true, name: true, type: true },
@@ -1172,10 +1174,10 @@ export const dashboardService = {
     const supplierMap = new Map(suppliers.map((s) => [s.id, s]));
 
     const topSuppliers: TopSupplierPayableItem[] = topSuppliersGroup.map((g) => {
-      const sInfo = supplierMap.get(g.supplierId);
+      const sInfo = g.supplierId ? supplierMap.get(g.supplierId) : undefined;
       return {
-        supplierId: g.supplierId,
-        supplierName: sInfo?.name || "Supplier",
+        supplierId: g.supplierId || "custom",
+        supplierName: sInfo?.name || "Other Payee / Vendor",
         supplierType: sInfo?.type || "Vendor",
         plannedAmount: Number(g._sum.plannedAmount || 0),
         paidAmount: Number(g._sum.paidAmount || 0),

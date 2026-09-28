@@ -28,6 +28,7 @@ import {
 import { customerNotificationService } from "@/lib/services/customer-notification-service";
 import { communicationService } from "@/lib/services/communication-service";
 import { internalNotificationService } from "@/lib/services/internal-notification-service";
+import { financeService } from "@/lib/services/finance-service";
 
 export type BookingWithRelations = Booking & {
   customer: {
@@ -59,6 +60,7 @@ export type BookingWithRelations = Booking & {
     }>;
     tripVehicles?: Array<{
       id: string;
+      vehicleId?: string | null;
       vehicle?: { id: string; name: string; type: string; capacity: number } | null;
       vehicleName: string;
       vehicleType: string;
@@ -66,14 +68,19 @@ export type BookingWithRelations = Booking & {
       endDate?: Date | null;
       pickupLocation?: string | null;
       dropLocation?: string | null;
+      driverName?: string | null;
+      driverPhone?: string | null;
+      capacity?: number | null;
     }>;
     tripActivities?: Array<{
       id: string;
+      activityId?: string | null;
       activity?: { id: string; name: string; location: string | null } | null;
       name: string;
       date?: Date | null;
       time?: string | null;
       location?: string | null;
+      numberOfParticipants?: number | null;
     }>;
   };
   quotation?: {
@@ -307,6 +314,7 @@ export const bookingService = {
             vehicleDispatches: {
               include: {
                 vehicle: true,
+                tripVehicle: true,
               },
               orderBy: { createdAt: "asc" },
             },
@@ -520,9 +528,13 @@ export const bookingService = {
           bookingNumber: booking.bookingNumber,
           totalAmount: Number(booking.totalAmount),
         },
-        idempotencyKey: `booking-created-${booking.id}`,
       }).catch((err) => {
-        console.warn("[BookingService] Failed to notify agency owner of booking creation:", err);
+        console.warn("[BookingService] Failed to notify agency owner:", err);
+      });
+
+      // Auto-generate service payables (Hotels, Vehicles) for the booking
+      await financeService.generateBookingServicePayables(agencyId, booking.id).catch((err) => {
+        console.warn("[BookingService] Failed to auto-generate booking service payables:", err);
       });
     } catch {
       // Non-blocking operations synchronization
@@ -677,6 +689,11 @@ export const bookingService = {
         idempotencyKey: `booking-created-${booking.id}`,
       }).catch((err) => {
         console.warn("[BookingService] Failed to notify agency owner of booking conversion:", err);
+      });
+
+      // Auto-generate service payables (Hotels, Vehicles) for the booking
+      await financeService.generateBookingServicePayables(agencyId, booking.id).catch((err) => {
+        console.warn("[BookingService] Failed to auto-generate booking service payables:", err);
       });
     } catch {
       // Non-blocking operations sync

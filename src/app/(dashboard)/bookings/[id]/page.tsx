@@ -423,6 +423,10 @@ export default function BookingDetailPage() {
   const activityConfirmations = booking.tripOperation?.activityConfirmations || [];
   const events = booking.tripOperation?.events || [];
 
+  const tripHotels = booking.trip?.tripHotels || [];
+  const tripVehicles = booking.trip?.tripVehicles || [];
+  const tripActivities = booking.trip?.tripActivities || [];
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
@@ -473,7 +477,7 @@ export default function BookingDetailPage() {
             <div className="flex items-center gap-4 text-xs text-slate-500">
               <span className="flex items-center gap-1">
                 <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                Travel: <strong>{formatDateDisplay(booking.travelStartDate)} → {formatDateDisplay(booking.travelEndDate)}</strong>
+                Travel: <strong>{formatDateDisplay(booking.travelStartDate || booking.trip?.startDate)} → {formatDateDisplay(booking.travelEndDate || booking.trip?.endDate)}</strong>
               </span>
               <span>•</span>
               <span className="flex items-center gap-1">
@@ -681,12 +685,12 @@ export default function BookingDetailPage() {
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2 flex items-center gap-1.5">
                     <Hotel className="h-3.5 w-3.5 text-slate-400" />
-                    <span>Hotel Accommodations ({hotelConfirmations.length})</span>
+                    <span>Hotel Accommodations ({tripHotels.length > 0 ? tripHotels.length : hotelConfirmations.length})</span>
                   </h4>
 
-                  {hotelConfirmations.length === 0 ? (
+                  {tripHotels.length === 0 && hotelConfirmations.length === 0 ? (
                     <p className="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-xl">
-                      No hotel confirmation records initialized yet.
+                      No hotel accommodations booked for this trip.
                     </p>
                   ) : (
                     <div className="border border-slate-100 rounded-xl overflow-hidden">
@@ -700,33 +704,74 @@ export default function BookingDetailPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {hotelConfirmations.map((h) => (
-                            <TableRow key={h.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
-                              <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
-                                {h.tripHotel?.hotel?.name || "Hotel Accommodation"}
-                                {h.tripHotel?.hotel?.city && (
-                                  <span className="text-[10px] text-slate-400 block">{h.tripHotel.hotel.city}</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="py-2.5 px-3 text-slate-600">
-                                {h.roomDetails || h.tripHotel?.roomType || "Standard"} • {h.mealPlan || h.tripHotel?.mealPlan || "EP"}
-                              </TableCell>
-                              <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
-                                {h.confirmationNumber || "Pending"}
-                              </TableCell>
-                              <TableCell className="py-2.5 px-3 text-right">
-                                <Badge
-                                  className={`text-[10px] font-bold ${
-                                    h.status === "CONFIRMED"
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : "bg-amber-100 text-amber-800"
-                                  }`}
-                                >
-                                  {h.status}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {tripHotels.length > 0
+                            ? tripHotels.map((th) => {
+                                const conf = hotelConfirmations.find(
+                                  (h) => (h as any).tripHotelId === th.id || h.tripHotel?.id === th.id
+                                );
+                                const hotelName = th.hotel?.name || conf?.tripHotel?.hotel?.name || "Hotel Accommodation";
+                                const hotelCity = th.hotel?.city || conf?.tripHotel?.hotel?.city;
+                                const roomDetails = `${th.rooms ? `${th.rooms} x ` : ""}${th.roomType || conf?.roomDetails || "Standard"} • ${th.mealPlan || conf?.mealPlan || "EP"}`;
+                                const confNumber = conf?.confirmationNumber || "Pending";
+                                const status = conf?.status || (booking.tripOperation ? "PENDING" : "UNINITIALIZED");
+
+                                return (
+                                  <TableRow key={th.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                    <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                      {hotelName}
+                                      <span className="text-[10px] text-slate-400 block font-normal">
+                                        {hotelCity ? `${hotelCity} • ` : ""}{formatDateDisplay(th.checkIn)} → {formatDateDisplay(th.checkOut)}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-600">
+                                      {roomDetails}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
+                                      {confNumber}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-right">
+                                      <Badge
+                                        className={`text-[10px] font-bold ${
+                                          status === "CONFIRMED"
+                                            ? "bg-emerald-100 text-emerald-800"
+                                            : status === "UNINITIALIZED"
+                                            ? "bg-slate-100 text-slate-600"
+                                            : "bg-amber-100 text-amber-800"
+                                        }`}
+                                      >
+                                        {status}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            : hotelConfirmations.map((h) => (
+                                <TableRow key={h.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                  <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                    {h.tripHotel?.hotel?.name || "Hotel Accommodation"}
+                                    {h.tripHotel?.hotel?.city && (
+                                      <span className="text-[10px] text-slate-400 block">{h.tripHotel.hotel.city}</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-slate-600">
+                                    {h.roomDetails || h.tripHotel?.roomType || "Standard"} • {h.mealPlan || h.tripHotel?.mealPlan || "EP"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
+                                    {h.confirmationNumber || "Pending"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-right">
+                                    <Badge
+                                      className={`text-[10px] font-bold ${
+                                        h.status === "CONFIRMED"
+                                          ? "bg-emerald-100 text-emerald-800"
+                                          : "bg-amber-100 text-amber-800"
+                                      }`}
+                                    >
+                                      {h.status}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
                         </TableBody>
                       </Table>
                     </div>
@@ -737,12 +782,12 @@ export default function BookingDetailPage() {
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2 flex items-center gap-1.5">
                     <Car className="h-3.5 w-3.5 text-slate-400" />
-                    <span>Transport & Fleet Dispatches ({vehicleDispatches.length})</span>
+                    <span>Transport & Fleet Dispatches ({tripVehicles.length > 0 ? tripVehicles.length : vehicleDispatches.length})</span>
                   </h4>
 
-                  {vehicleDispatches.length === 0 ? (
+                  {tripVehicles.length === 0 && vehicleDispatches.length === 0 ? (
                     <p className="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-xl">
-                      No vehicle dispatch allocations initialized yet.
+                      No vehicle or transport services booked for this trip.
                     </p>
                   ) : (
                     <div className="border border-slate-100 rounded-xl overflow-hidden">
@@ -756,30 +801,77 @@ export default function BookingDetailPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {vehicleDispatches.map((v) => (
-                            <TableRow key={v.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
-                              <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
-                                {v.vehicle?.name || "Private Dedicated Vehicle"}
-                              </TableCell>
-                              <TableCell className="py-2.5 px-3 text-slate-600">
-                                {v.driverName ? `${v.driverName} (${v.driverPhone || "N/A"})` : "Driver to be assigned"}
-                              </TableCell>
-                              <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
-                                {v.vehicleNumber || "Pending"}
-                              </TableCell>
-                              <TableCell className="py-2.5 px-3 text-right">
-                                <Badge
-                                  className={`text-[10px] font-bold ${
-                                    v.status === "CONFIRMED" || v.status === "ASSIGNED"
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : "bg-amber-100 text-amber-800"
-                                  }`}
-                                >
-                                  {v.status}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {tripVehicles.length > 0
+                            ? tripVehicles.map((tv) => {
+                                const disp = vehicleDispatches.find(
+                                  (v) => (v as any).tripVehicleId === tv.id || (v as any).tripVehicle?.id === tv.id || (tv.vehicleId && v.vehicleId === tv.vehicleId)
+                                );
+                                const vehicleName = tv.vehicleName || tv.vehicle?.name || disp?.vehicle?.name || "Private Dedicated Vehicle";
+                                const routeOrDates = tv.pickupLocation && tv.dropLocation
+                                  ? `${tv.pickupLocation} → ${tv.dropLocation}`
+                                  : tv.startDate
+                                  ? formatDateDisplay(tv.startDate)
+                                  : tv.vehicleType || tv.vehicle?.type || "Dedicated Transport";
+                                const driverInfo = disp?.driverName
+                                  ? `${disp.driverName}${disp.driverPhone ? ` (${disp.driverPhone})` : ""}`
+                                  : tv.driverName
+                                  ? `${tv.driverName}${tv.driverPhone ? ` (${tv.driverPhone})` : ""}`
+                                  : "Driver to be assigned";
+                                const plateNumber = disp?.vehicleNumber || "Pending";
+                                const status = disp?.status || (tv.driverName ? "ASSIGNED" : booking.tripOperation ? "PENDING" : "UNINITIALIZED");
+
+                                return (
+                                  <TableRow key={tv.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                    <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                      {vehicleName}
+                                      <span className="text-[10px] text-slate-400 block font-normal">{routeOrDates}</span>
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-600">
+                                      {driverInfo}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
+                                      {plateNumber}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-right">
+                                      <Badge
+                                        className={`text-[10px] font-bold ${
+                                          status === "CONFIRMED" || status === "ASSIGNED" || status === "ON_DUTY" || status === "COMPLETED"
+                                            ? "bg-emerald-100 text-emerald-800"
+                                            : status === "UNINITIALIZED"
+                                            ? "bg-slate-100 text-slate-600"
+                                            : "bg-amber-100 text-amber-800"
+                                        }`}
+                                      >
+                                        {status}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            : vehicleDispatches.map((v) => (
+                                <TableRow key={v.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                  <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                    {(v as any).tripVehicle?.vehicleName || v.vehicle?.name || "Private Dedicated Vehicle"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-slate-600">
+                                    {v.driverName ? `${v.driverName} (${v.driverPhone || "N/A"})` : "Driver to be assigned"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
+                                    {v.vehicleNumber || "Pending"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-right">
+                                    <Badge
+                                      className={`text-[10px] font-bold ${
+                                        v.status === "CONFIRMED" || v.status === "ASSIGNED"
+                                          ? "bg-emerald-100 text-emerald-800"
+                                          : "bg-amber-100 text-amber-800"
+                                      }`}
+                                    >
+                                      {v.status}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
                         </TableBody>
                       </Table>
                     </div>
@@ -787,11 +879,11 @@ export default function BookingDetailPage() {
                 </div>
 
                 {/* Activities */}
-                {activityConfirmations.length > 0 && (
+                {(tripActivities.length > 0 || activityConfirmations.length > 0) && (
                   <div>
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2 flex items-center gap-1.5">
                       <Ticket className="h-3.5 w-3.5 text-slate-400" />
-                      <span>Activity Passes & Sightseeing ({activityConfirmations.length})</span>
+                      <span>Activity Passes & Sightseeing ({tripActivities.length > 0 ? tripActivities.length : activityConfirmations.length})</span>
                     </h4>
 
                     <div className="border border-slate-100 rounded-xl overflow-hidden">
@@ -799,36 +891,73 @@ export default function BookingDetailPage() {
                         <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
                           <TableRow>
                             <TableHead className="py-2 px-3">Activity</TableHead>
-                            <TableHead className="py-2 px-3">Location</TableHead>
+                            <TableHead className="py-2 px-3">Location & Schedule</TableHead>
                             <TableHead className="py-2 px-3">Pass / Voucher #</TableHead>
                             <TableHead className="py-2 px-3 text-right">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {activityConfirmations.map((a) => (
-                            <TableRow key={a.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
-                              <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
-                                {a.activity?.name || "Sightseeing Activity"}
-                              </TableCell>
-                              <TableCell className="py-2.5 px-3 text-slate-600">
-                                {a.activityLocation || a.activity?.location || "Destination"}
-                              </TableCell>
-                              <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
-                                {a.passNumber || "Pending"}
-                              </TableCell>
-                              <TableCell className="py-2.5 px-3 text-right">
-                                <Badge
-                                  className={`text-[10px] font-bold ${
-                                    a.status === "CONFIRMED"
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : "bg-amber-100 text-amber-800"
-                                  }`}
-                                >
-                                  {a.status}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {tripActivities.length > 0
+                            ? tripActivities.map((ta) => {
+                                const conf = activityConfirmations.find(
+                                  (a) => (a as any).tripActivityId === ta.id || (a as any).tripActivity?.id === ta.id || (ta.activityId && (a as any).activityId === ta.activityId)
+                                );
+                                const actName = ta.name || ta.activity?.name || conf?.activity?.name || "Sightseeing Activity";
+                                const locationAndDate = `${ta.location || ta.activity?.location || conf?.tripActivity?.location || conf?.activity?.location || "Destination"}${ta.date ? ` • ${formatDateDisplay(ta.date)}` : ""}${ta.time ? ` (${ta.time})` : ""}${ta.numberOfParticipants ? ` • ${ta.numberOfParticipants} pax` : ""}`;
+                                const voucherNumber = conf?.confirmationNumber || conf?.ticketNumber || (conf as any)?.passNumber || "Pending";
+                                const status = conf?.status || (booking.tripOperation ? "PENDING" : "UNINITIALIZED");
+
+                                return (
+                                  <TableRow key={ta.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                    <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                      {actName}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-600">
+                                      {locationAndDate}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
+                                      {voucherNumber}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-right">
+                                      <Badge
+                                        className={`text-[10px] font-bold ${
+                                          status === "CONFIRMED"
+                                            ? "bg-emerald-100 text-emerald-800"
+                                            : status === "UNINITIALIZED"
+                                            ? "bg-slate-100 text-slate-600"
+                                            : "bg-amber-100 text-amber-800"
+                                        }`}
+                                      >
+                                        {status}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            : activityConfirmations.map((a) => (
+                                <TableRow key={a.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                  <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                    {a.activity?.name || (a as any).tripActivity?.name || "Sightseeing Activity"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-slate-600">
+                                    {a.activityLocation || a.activity?.location || (a as any).tripActivity?.location || "Destination"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
+                                    {a.confirmationNumber || a.ticketNumber || (a as any).passNumber || "Pending"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-right">
+                                    <Badge
+                                      className={`text-[10px] font-bold ${
+                                        a.status === "CONFIRMED"
+                                          ? "bg-emerald-100 text-emerald-800"
+                                          : "bg-amber-100 text-amber-800"
+                                      }`}
+                                    >
+                                      {a.status}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
                         </TableBody>
                       </Table>
                     </div>

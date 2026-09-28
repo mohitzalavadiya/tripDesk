@@ -47,6 +47,7 @@ export function RecordSupplierPaymentDialog({
   const [loadingData, setLoadingData] = React.useState(false);
 
   const [supplierId, setSupplierId] = React.useState("");
+  const [payeeName, setPayeeName] = React.useState("");
   const [payableId, setPayableId] = React.useState(defaultPayableId || "");
   const [amount, setAmount] = React.useState("");
   const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>(PaymentMethod.BANK_TRANSFER);
@@ -72,7 +73,8 @@ export function RecordSupplierPaymentDialog({
             setPayableId(defaultPayableId);
             const found = pending.find((p) => p.id === defaultPayableId);
             if (found) {
-              setSupplierId(found.supplierId);
+              setSupplierId(found.supplierId || "");
+              setPayeeName(found.payeeName || (found as any).supplier?.name || "");
               if (Number(found.outstandingAmount) > 0) {
                 setAmount(String(found.outstandingAmount));
               }
@@ -85,10 +87,11 @@ export function RecordSupplierPaymentDialog({
   }, [open, defaultPayableId]);
 
   const handlePayableChange = (id: string) => {
-    setPayableId(id);
+    setPayableId(id === "none" ? "" : id);
     const found = payables.find((p) => p.id === id);
     if (found) {
-      setSupplierId(found.supplierId);
+      setSupplierId(found.supplierId || "");
+      setPayeeName(found.payeeName || (found as any).supplier?.name || "");
       if (Number(found.outstandingAmount) > 0) {
         setAmount(String(found.outstandingAmount));
       }
@@ -99,8 +102,9 @@ export function RecordSupplierPaymentDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supplierId) {
-      toast.error("Please select a supplier.");
+    const effectivePayee = payeeName.trim() || (suppliers.find(s => s.id === supplierId)?.name || "");
+    if (!supplierId && !effectivePayee) {
+      toast.error("Please select a supplier or enter a payee name.");
       return;
     }
     const numAmount = parseFloat(amount);
@@ -112,7 +116,8 @@ export function RecordSupplierPaymentDialog({
     setLoading(true);
     try {
       await financeClient.recordSupplierPayment({
-        supplierId,
+        supplierId: supplierId || null,
+        payeeName: effectivePayee || null,
         payableId: payableId || null,
         amount: numAmount,
         currency: "INR",
@@ -123,7 +128,7 @@ export function RecordSupplierPaymentDialog({
         notes: notes || null,
       });
 
-      toast.success("Supplier disbursement recorded!");
+      toast.success("Payable disbursement recorded!");
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (err: any) {
@@ -138,10 +143,10 @@ export function RecordSupplierPaymentDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">
-            Record Supplier Disbursement
+            Record Payable Disbursement
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Log outgoing payment to hotel, fleet operator, activity vendor, or guide.
+            Log outgoing payment to hotel, fleet operator, activity vendor, or local guide.
           </DialogDescription>
         </DialogHeader>
 
@@ -150,59 +155,80 @@ export function RecordSupplierPaymentDialog({
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Link to Payable (Optional)</Label>
             <Select
-              value={payableId}
-              onValueChange={(val) => {
-                if (val) handlePayableChange(val);
-              }}
+              value={payableId || "none"}
+              onValueChange={(val) => handlePayableChange(val || "")}
               disabled={loadingData}
             >
               <SelectTrigger className="text-xs h-9">
                 <SelectValue placeholder="Choose Outstanding Payable (or Direct)">
                   {(val: string | null) => {
-                    if (!val || val === "none") return "Direct Supplier Payment (No Payable)";
+                    if (!val || val === "none") return "Direct Payment (No Payable Selected)";
                     const p = payables.find((item) => item.id === val);
-                    return p ? `${p.payableNumber} — ${p.supplier?.name || "Supplier"} (${p.serviceType}, Due: ${formatCurrency(Number(p.outstandingAmount))})` : val;
+                    const name = p?.payeeName || (p as any)?.supplier?.name || "Vendor";
+                    return p ? `${p.payableNumber} — ${name} (${p.serviceType}, Due: ${formatCurrency(Number(p.outstandingAmount))})` : val;
                   }}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Direct Supplier Payment (No Payable)</SelectItem>
-                {payables.map((p) => (
-                  <SelectItem key={p.id} value={p.id} className="text-xs">
-                    {p.payableNumber} — {p.supplier?.name || "Supplier"} ({p.serviceType}, Due: {formatCurrency(Number(p.outstandingAmount))})
-                  </SelectItem>
-                ))}
+                <SelectItem value="none">Direct Payment (No Payable Selected)</SelectItem>
+                {payables.map((p) => {
+                  const name = p.payeeName || (p as any).supplier?.name || "Vendor";
+                  return (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">
+                      {p.payableNumber} — {name} ({p.serviceType}, Due: {formatCurrency(Number(p.outstandingAmount))})
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Supplier Selection */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Supplier / Vendor *</Label>
-            <Select
-              value={supplierId}
-              onValueChange={(val) => {
-                if (val) setSupplierId(val);
-              }}
-              disabled={loadingData}
-            >
-              <SelectTrigger className="text-xs h-9">
-                <SelectValue placeholder="Choose Supplier">
-                  {(val: string | null) => {
-                    if (!val) return undefined;
-                    const s = suppliers.find((item) => item.id === val);
-                    return s ? `${s.name} (${s.type || "Vendor"})` : val;
-                  }}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {suppliers.map((s) => (
-                  <SelectItem key={s.id} value={s.id} className="text-xs">
-                    {s.name} ({s.type || "Vendor"})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Supplier / Payee Selection */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Catalogue Supplier</Label>
+              <Select
+                value={supplierId || "none"}
+                onValueChange={(val) => {
+                  const sId = !val || val === "none" ? "" : val;
+                  setSupplierId(sId);
+                  if (sId) {
+                    const sup = suppliers.find((s) => s.id === sId);
+                    if (sup) setPayeeName(sup.name);
+                  }
+                }}
+                disabled={loadingData}
+              >
+                <SelectTrigger className="text-xs h-9">
+                  <SelectValue placeholder="Select Supplier (Optional)">
+                    {(val: string | null) => {
+                      if (!val || val === "none") return "No Catalogue Supplier";
+                      const s = suppliers.find((item) => item.id === val);
+                      return s ? `${s.name}` : val;
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Catalogue Supplier</SelectItem>
+                  {suppliers.map((s) => (
+                    <SelectItem key={s.id} value={s.id} className="text-xs">
+                      {s.name} ({s.type || "Vendor"})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Payee Name *</Label>
+              <Input
+                placeholder="e.g. ABC Hotel / Rajesh Kumar"
+                value={payeeName}
+                onChange={(e) => setPayeeName(e.target.value)}
+                className="text-xs h-9"
+                required={!supplierId}
+              />
+            </div>
           </div>
 
           {/* Selected Payable Info */}

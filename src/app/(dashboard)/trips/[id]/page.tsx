@@ -290,24 +290,11 @@ export default function TripDetailPage() {
   const [isAddActivityOpen, setIsAddActivityOpen] = React.useState(false);
   const [isEditActivityOpen, setIsEditActivityOpen] = React.useState(false);
   const [selectedTripActivityId, setSelectedTripActivityId] = React.useState<string | null>(null);
-  const [activityFormTripDestinationId, setActivityFormTripDestinationId] = React.useState("");
   const [activityFormActivityId, setActivityFormActivityId] = React.useState("");
-  const [activityFormName, setActivityFormName] = React.useState("Sightseeing Tour");
+  const [activityFormName, setActivityFormName] = React.useState("");
   const [activityFormDescription, setActivityFormDescription] = React.useState("");
-  const [activityFormDate, setActivityFormDate] = React.useState("");
-  const [activityFormTime, setActivityFormTime] = React.useState("09:00 AM");
-  const [activityFormLocation, setActivityFormLocation] = React.useState("");
-  const [activityFormParticipants, setActivityFormParticipants] = React.useState(2);
   const [activityFormType, setActivityFormType] = React.useState<ActivityType>(ActivityType.INCLUDED);
-  const [activityFormAdultPrice, setActivityFormAdultPrice] = React.useState("");
-  const [activityFormChildPrice, setActivityFormChildPrice] = React.useState("");
-  const [activityFormTotalPrice, setActivityFormTotalPrice] = React.useState("");
-  const [activityFormNotes, setActivityFormNotes] = React.useState("");
   const [activitySaving, setActivitySaving] = React.useState(false);
-  const [activityAvailableRates, setActivityAvailableRates] = React.useState<RateSheetWithRelations[]>([]);
-  const [activityFormRateSheetId, setActivityFormRateSheetId] = React.useState<string | null>(null);
-  const [activityRateLoading, setActivityRateLoading] = React.useState(false);
-  const [activityRateMessage, setActivityRateMessage] = React.useState<string | null>(null);
 
   // Helper to sync TripDestinations on edit save
   const syncTripDestinations = async (
@@ -1041,107 +1028,20 @@ export default function TripDetailPage() {
   };
 
   // ──────────────────────── TRIP ACTIVITY HANDLERS ─────────────────────────
-  const activityRateReqRef = React.useRef(0);
-  const fetchApplicableActivityRates = React.useCallback(
-    async (aId: string, scheduledDate: string, currentParticipants?: number) => {
-      if (!aId) {
-        setActivityAvailableRates([]);
-        setActivityFormRateSheetId(null);
-        setActivityRateMessage(null);
-        return;
-      }
-      const reqId = ++activityRateReqRef.current;
-      setActivityRateLoading(true);
-      setActivityRateMessage(null);
-      try {
-        const res = await rateSheetClient.getRateSheets({
-          inventoryType: "ACTIVITY",
-          activityId: aId,
-          status: "ACTIVE",
-          validDate: scheduledDate ? new Date(scheduledDate) : undefined,
-          limit: 100,
-        });
-
-        if (reqId !== activityRateReqRef.current) return;
-
-        const pax = currentParticipants ?? activityFormParticipants;
-
-        if (res.success && res.data) {
-          const rates = res.data;
-          setActivityAvailableRates(rates);
-
-          if (rates.length === 0) {
-            setActivityFormRateSheetId(null);
-            setActivityRateMessage("No active master rate sheet found for this activity on scheduled date.");
-          } else if (rates.length === 1) {
-            const singleRate = rates[0];
-            setActivityFormRateSheetId(singleRate.id);
-            const adultCost = singleRate.adultCost ? Number(singleRate.adultCost) : Number(singleRate.costPrice);
-            const childCost = singleRate.childCost ? Number(singleRate.childCost) : null;
-            setActivityFormAdultPrice(String(adultCost));
-            if (childCost !== null) setActivityFormChildPrice(String(childCost));
-            setActivityFormTotalPrice(String(adultCost * pax));
-            setActivityRateMessage(null);
-          } else {
-            const match = rates[0];
-            setActivityFormRateSheetId(match.id);
-            const adultCost = match.adultCost ? Number(match.adultCost) : Number(match.costPrice);
-            const childCost = match.childCost ? Number(match.childCost) : null;
-            setActivityFormAdultPrice(String(adultCost));
-            if (childCost !== null) setActivityFormChildPrice(String(childCost));
-            setActivityFormTotalPrice(String(adultCost * pax));
-            setActivityRateMessage(null);
-          }
-        }
-      } catch {
-        if (reqId === activityRateReqRef.current) {
-          setActivityAvailableRates([]);
-          setActivityRateMessage("Failed to load activity rate sheets.");
-        }
-      } finally {
-        if (reqId === activityRateReqRef.current) {
-          setActivityRateLoading(false);
-        }
-      }
-    },
-    [activityFormParticipants]
-  );
-
   const handleOpenAddActivity = () => {
-    const actDate = trip?.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "";
-    const pax = travelers.length || 2;
-
     const filtered = getFilteredActivities();
     const act = filtered[0] || null;
 
-    setActivityFormTripDestinationId("");
     setActivityFormActivityId(act?.id || "");
-    setActivityFormName(act?.name || "Sightseeing Tour");
+    setActivityFormName(act?.name || "");
     setActivityFormDescription(act?.description || "");
-    setActivityFormDate(actDate);
-    setActivityFormTime("09:00 AM");
-    setActivityFormLocation(act?.location || "");
-    setActivityFormParticipants(pax);
-    setActivityFormType(act?.type || ActivityType.INCLUDED);
-    setActivityFormAdultPrice(act?.adultPrice ? String(act.adultPrice) : "");
-    setActivityFormChildPrice(act?.childPrice ? String(act.childPrice) : "");
-    setActivityFormTotalPrice(act?.adultPrice ? String(Number(act.adultPrice) * pax) : "");
-    setActivityFormNotes("");
-    setActivityAvailableRates([]);
-    setActivityFormRateSheetId(null);
-    setActivityRateMessage(null);
+    setActivityFormType(ActivityType.INCLUDED);
     setIsAddActivityOpen(true);
-
-    if (act?.id) {
-      fetchApplicableActivityRates(act.id, actDate, pax);
-    }
   };
 
   const handleSelectMasterActivity = (actId: string | null) => {
     if (!actId) {
       setActivityFormActivityId("");
-      setActivityAvailableRates([]);
-      setActivityFormRateSheetId(null);
       return;
     }
     setActivityFormActivityId(actId);
@@ -1149,15 +1049,7 @@ export default function TripDetailPage() {
     if (ma) {
       setActivityFormName(ma.name);
       setActivityFormDescription(ma.description || "");
-      setActivityFormLocation(ma.location || "");
-      setActivityFormType(ma.type);
-      if (ma.adultPrice) {
-        setActivityFormAdultPrice(String(ma.adultPrice));
-        setActivityFormTotalPrice(String(Number(ma.adultPrice) * activityFormParticipants));
-      }
-      if (ma.childPrice) setActivityFormChildPrice(String(ma.childPrice));
     }
-    fetchApplicableActivityRates(actId, activityFormDate, activityFormParticipants);
   };
 
   const handleSaveAddActivity = async (e: React.FormEvent) => {
@@ -1170,56 +1062,29 @@ export default function TripDetailPage() {
     try {
       setActivitySaving(true);
       await tripActivityClient.createTripActivity(id, {
-        tripDestinationId: undefined,
         activityId: activityFormActivityId || undefined,
         name: activityFormName.trim(),
         description: activityFormDescription.trim() || undefined,
-        date: activityFormDate ? new Date(activityFormDate) : undefined,
-        time: activityFormTime.trim() || undefined,
-        location: activityFormLocation.trim() || undefined,
-        numberOfParticipants: Number(activityFormParticipants),
         type: activityFormType,
-        adultPrice: activityFormAdultPrice !== "" ? Number(activityFormAdultPrice) : undefined,
-        childPrice: activityFormChildPrice !== "" ? Number(activityFormChildPrice) : undefined,
-        totalPrice: activityFormTotalPrice !== "" ? Number(activityFormTotalPrice) : undefined,
-        notes: activityFormNotes.trim() || undefined,
       });
 
-      toast.success("Activity assigned to trip.");
+      toast.success("Activity added to trip.");
       setIsAddActivityOpen(false);
       await fetchTripDetails();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to assign activity.");
+      toast.error(err?.message || "Failed to add activity.");
     } finally {
       setActivitySaving(false);
     }
   };
 
   const handleOpenEditActivity = (ta: TripActivityWithActivity) => {
-    const actDate = ta.date ? new Date(ta.date).toISOString().split("T")[0] : "";
-
     setSelectedTripActivityId(ta.id);
-    setActivityFormTripDestinationId(ta.tripDestinationId || "");
     setActivityFormActivityId(ta.activityId || "");
     setActivityFormName(ta.name);
     setActivityFormDescription(ta.description || "");
-    setActivityFormDate(actDate);
-    setActivityFormTime(ta.time || "");
-    setActivityFormLocation(ta.location || "");
-    setActivityFormParticipants(ta.numberOfParticipants || 1);
     setActivityFormType(ta.type);
-    setActivityFormAdultPrice(ta.adultPrice !== null && ta.adultPrice !== undefined ? String(ta.adultPrice) : "");
-    setActivityFormChildPrice(ta.childPrice !== null && ta.childPrice !== undefined ? String(ta.childPrice) : "");
-    setActivityFormTotalPrice(ta.totalPrice !== null && ta.totalPrice !== undefined ? String(ta.totalPrice) : "");
-    setActivityFormNotes(ta.notes || "");
-    setActivityAvailableRates([]);
-    setActivityFormRateSheetId(null);
-    setActivityRateMessage(null);
     setIsEditActivityOpen(true);
-
-    if (ta.activityId) {
-      fetchApplicableActivityRates(ta.activityId, actDate, ta.numberOfParticipants || 1);
-    }
   };
 
   const handleSaveEditActivity = async (e: React.FormEvent) => {
@@ -1229,26 +1094,17 @@ export default function TripDetailPage() {
     try {
       setActivitySaving(true);
       await tripActivityClient.updateTripActivity(id, selectedTripActivityId, {
-        tripDestinationId: activityFormTripDestinationId || null,
         activityId: activityFormActivityId || undefined,
         name: activityFormName.trim(),
         description: activityFormDescription.trim() || undefined,
-        date: activityFormDate ? new Date(activityFormDate) : undefined,
-        time: activityFormTime.trim() || undefined,
-        location: activityFormLocation.trim() || undefined,
-        numberOfParticipants: Number(activityFormParticipants),
         type: activityFormType,
-        adultPrice: activityFormAdultPrice !== "" ? Number(activityFormAdultPrice) : undefined,
-        childPrice: activityFormChildPrice !== "" ? Number(activityFormChildPrice) : undefined,
-        totalPrice: activityFormTotalPrice !== "" ? Number(activityFormTotalPrice) : undefined,
-        notes: activityFormNotes.trim() || undefined,
       });
 
-      toast.success("Activity assignment updated.");
+      toast.success("Activity updated.");
       setIsEditActivityOpen(false);
       await fetchTripDetails();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to update activity assignment.");
+      toast.error(err?.message || "Failed to update activity.");
     } finally {
       setActivitySaving(false);
     }
@@ -2021,94 +1877,63 @@ export default function TripDetailPage() {
               <EmptyState
                 icon={Ticket}
                 title="No activities assigned to this trip"
-                description="Assign experiences, entry passes, or adventure sports from your agency database to this itinerary."
-                actionText="Assign Activity"
+                description="Add included package activities or excluded (pay on site) suggestions to this itinerary."
+                actionText="Add Activity"
                 onAction={handleOpenAddActivity}
               />
             ) : (
-              <div className="space-y-4">
-                {tripActivities.map((ta) => (
-                  <div
-                    key={ta.id}
-                    className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-3 hover:shadow-xs transition-all"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded-md uppercase">
-                            {ta.type}
-                          </span>
-                          <h4 className="font-bold text-slate-900 text-sm">{ta.name}</h4>
-                          {ta.tripDestination && (
-                            <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
-                              <MapPin className="h-2.5 w-2.5" /> Leg {ta.tripDestination.sequence}: {ta.tripDestination.destination?.name}
-                            </span>
-                          )}
+              <div className="space-y-3">
+                {tripActivities.map((ta) => {
+                  const isIncluded = ta.type === ActivityType.INCLUDED;
+                  return (
+                    <div
+                      key={ta.id}
+                      className="bg-white rounded-xl border border-slate-200 p-4.5 shadow-2xs space-y-2 hover:shadow-xs transition-all"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {isIncluded ? (
+                              <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600" />
+                                Included in Package
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <Info className="h-2.5 w-2.5 text-amber-600" />
+                                Not Included (Pay on Site)
+                              </span>
+                            )}
+                            <h4 className="font-bold text-slate-900 text-sm">{ta.name}</h4>
+                          </div>
                         </div>
-                        {(ta.date || ta.time) && (
-                          <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
-                            <Calendar className="h-3 w-3 text-slate-400" />
-                            {formatDateDisplay(ta.date)} {ta.time ? `• ${ta.time}` : ""}
-                          </span>
-                        )}
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenEditActivity(ta)}
+                            disabled={isReadOnly}
+                            className="p-1.5 rounded-md border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          >
+                            <Edit2 className="h-3 w-3" /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTripActivity(ta.id, ta.name)}
+                            disabled={isReadOnly}
+                            className="p-1.5 rounded-md border border-slate-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          >
+                            <Trash2 className="h-3 w-3" /> Remove
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleOpenEditActivity(ta)}
-                          disabled={isReadOnly}
-                          className="p-1.5 rounded-md border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                        >
-                          <Edit2 className="h-3 w-3" /> Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTripActivity(ta.id, ta.name)}
-                          disabled={isReadOnly}
-                          className="p-1.5 rounded-md border border-slate-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                        >
-                          <Trash2 className="h-3 w-3" /> Remove
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-600 pt-1">
-                      {ta.location && (
-                        <div>
-                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Location</span>
-                          <span className="text-slate-800 font-medium">{ta.location}</span>
-                        </div>
-                      )}
-                      <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Participants</span>
-                        <span className="text-slate-800 font-medium">{ta.numberOfParticipants} Pax</span>
-                      </div>
-                      {ta.adultPrice !== null && ta.adultPrice !== undefined && (
-                        <div>
-                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Rate</span>
-                          <span className="text-slate-800 font-medium">₹{Number(ta.adultPrice)} / pax</span>
-                        </div>
-                      )}
-                      {ta.totalPrice !== null && ta.totalPrice !== undefined && (
-                        <div>
-                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Tariff</span>
-                          <strong className="text-slate-900 font-bold">₹{Number(ta.totalPrice)}</strong>
-                        </div>
+                      {ta.description && (
+                        <p className="text-xs text-slate-600 leading-relaxed pt-0.5">
+                          {ta.description}
+                        </p>
                       )}
                     </div>
-
-                    {ta.description && (
-                      <p className="text-xs text-slate-600 leading-relaxed pt-1">
-                        {ta.description}
-                      </p>
-                    )}
-
-                    {ta.notes && (
-                      <p className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                        {ta.notes}
-                      </p>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -3440,209 +3265,124 @@ export default function TripDetailPage() {
 
         {/* ─── TRIP ACTIVITY DIALOGS ─── */}
         <Dialog open={isAddActivityOpen} onOpenChange={setIsAddActivityOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-5 shadow-xl">
             <form onSubmit={handleSaveAddActivity}>
               <DialogHeader>
-                <DialogTitle className="text-slate-900 font-bold text-base">Assign Activity to Trip</DialogTitle>
-                <DialogDescription className="text-slate-500 text-xs mt-1">
-                  Select an excursion or entry pass from inventory.
+                <DialogTitle className="text-slate-900 font-bold text-base">Add Activity</DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-0.5">
+                  Select from catalogue or enter a custom activity name.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-3.5 mt-4 text-xs">
-                {/* Activity Pre-fill (Filtered automatically by Trip destinations) */}
+              <div className="space-y-3 mt-3.5 text-xs">
+                {/* Option A: Select from Activity Master */}
                 {(() => {
                   const filtered = getFilteredActivities();
-                  if (tripDestinations.length === 0) {
-                    return (
-                      <div className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
-                        Add destinations to this Trip to see destination-specific Activities.
-                      </div>
-                    );
-                  }
                   return filtered.length > 0 ? (
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Pre-fill from Inventory</label>
+                    <div className="space-y-1 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80">
+                      <label className="text-[10px] font-bold text-indigo-700 uppercase flex items-center gap-1">
+                        <Ticket className="h-3 w-3" /> Select from Catalogue (Optional)
+                      </label>
                       <Select value={activityFormActivityId} onValueChange={(val) => handleSelectMasterActivity(val)}>
-                        <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
-                          <SelectValue placeholder="Choose activity...">
+                        <SelectTrigger className="h-8.5 bg-white border-slate-200 text-xs">
+                          <SelectValue placeholder="Choose from catalogue...">
                             {(val: string | null) => {
                               if (!val) return undefined;
                               const a = masterActivities.find((item) => item.id === val);
-                              return a ? `${a.name} (${a.destination?.name || a.type})` : val;
+                              return a ? `${a.name}${a.destination ? ` (${a.destination.name})` : ""}` : val;
                             }}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent className="bg-white border-slate-200">
                           {filtered.map((a) => (
                             <SelectItem key={a.id} value={a.id} className="text-xs">
-                              {a.name} <span className="text-slate-400 font-normal">({a.destination?.name || a.type})</span>
+                              {a.name} {a.destination && <span className="text-slate-400 font-normal">({a.destination.name})</span>}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                  ) : (
-                    <p className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                      No catalog activities found for trip destinations. You can type activity details manually below.
-                    </p>
-                  );
+                  ) : null;
                 })()}
 
-                {/* RateSheet Resolution State */}
-                {activityRateLoading ? (
-                  <div className="flex items-center gap-2 text-xs text-indigo-600 bg-indigo-50/60 p-2.5 rounded-lg border border-indigo-100">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" /> Fetching applicable master rate sheets...
-                  </div>
-                ) : activityRateMessage ? (
-                  <div className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                    {activityRateMessage}
-                  </div>
-                ) : activityAvailableRates.length > 1 ? (
-                  <div className="space-y-1 bg-indigo-50/40 p-3 rounded-xl border border-indigo-100">
-                    <label className="text-[10px] font-bold text-indigo-700 uppercase">Applicable Master Rate Sheet ({activityAvailableRates.length} available)</label>
-                    <Select
-                      value={activityFormRateSheetId || ""}
-                      onValueChange={(val) => {
-                        if (!val) return;
-                        setActivityFormRateSheetId(val);
-                        const selectedRate = activityAvailableRates.find((r) => r.id === val);
-                        if (selectedRate) {
-                          const adultCost = selectedRate.adultCost ? Number(selectedRate.adultCost) : Number(selectedRate.costPrice);
-                          const childCost = selectedRate.childCost ? Number(selectedRate.childCost) : null;
-                          setActivityFormAdultPrice(String(adultCost));
-                          if (childCost !== null) setActivityFormChildPrice(String(childCost));
-                          setActivityFormTotalPrice(String(adultCost * activityFormParticipants));
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="h-9 bg-white border-indigo-200 text-xs">
-                        <SelectValue placeholder="Choose rate plan...">
-                          {(val: string | null) => {
-                            if (!val) return undefined;
-                            const r = activityAvailableRates.find((item) => item.id === val);
-                            const cost = r ? (r.adultCost ?? r.costPrice) : 0;
-                            return r ? `${r.name} - ₹${Number(cost)}/pax` : val;
-                          }}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-slate-200">
-                        {activityAvailableRates.map((r) => {
-                          const cost = r.adultCost ?? r.costPrice;
-                          return (
-                            <SelectItem key={r.id} value={r.id} className="text-xs">
-                              {r.name} - ₹${Number(cost)}/pax
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : activityAvailableRates.length === 1 ? (
-                  <div className="flex items-center justify-between text-xs bg-emerald-50/80 text-emerald-800 p-2.5 rounded-lg border border-emerald-200">
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                      <span>Master Rate: <strong>{activityAvailableRates[0].name}</strong> (₹{Number(activityAvailableRates[0].adultCost ?? activityAvailableRates[0].costPrice)}/pax)</span>
-                    </div>
-                    <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Auto-selected</span>
-                  </div>
-                ) : null}
-
+                {/* Option B: Activity Name */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Activity Name *</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Activity Name <span className="text-red-500">*</span>
+                  </label>
                   <Input
+                    placeholder="e.g. Sunset Boat Cruise, Museum Entry, Jeep Safari..."
                     value={activityFormName}
-                    onChange={(e) => setActivityFormName(e.target.value)}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    onChange={(e) => {
+                      setActivityFormName(e.target.value);
+                      if (activityFormActivityId) {
+                        const matching = masterActivities.find((a) => a.id === activityFormActivityId);
+                        if (matching && matching.name !== e.target.value) {
+                          setActivityFormActivityId("");
+                        }
+                      }
+                    }}
+                    className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
                     required
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Scheduled Date</label>
-                    <Input
-                      type="date"
-                      value={activityFormDate}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setActivityFormDate(val);
-                        if (activityFormActivityId) {
-                          fetchApplicableActivityRates(activityFormActivityId, val, activityFormParticipants);
-                        }
-                      }}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Timing / Slot</label>
-                    <Input
-                      value={activityFormTime}
-                      onChange={(e) => setActivityFormTime(e.target.value)}
-                      placeholder="09:00 AM"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
+                {/* Inclusion Status Selector */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Inclusion <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setActivityFormType(ActivityType.INCLUDED)}
+                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                        activityFormType === ActivityType.INCLUDED
+                          ? "bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-500/20 text-emerald-950"
+                          : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <CheckCircle2 className={`h-3.5 w-3.5 ${activityFormType === ActivityType.INCLUDED ? "text-emerald-600" : "text-slate-400"}`} />
+                        <span>Included</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                        Covered in trip package.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActivityFormType(ActivityType.EXCLUDED)}
+                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                        activityFormType === ActivityType.EXCLUDED
+                          ? "bg-amber-50/80 border-amber-300 ring-2 ring-amber-500/20 text-amber-950"
+                          : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <Info className={`h-3.5 w-3.5 ${activityFormType === ActivityType.EXCLUDED ? "text-amber-600" : "text-slate-400"}`} />
+                        <span>Not Included</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                        Customer pays at destination.
+                      </p>
+                    </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Location</label>
-                    <Input
-                      value={activityFormLocation}
-                      onChange={(e) => setActivityFormLocation(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Participants (Pax)</label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={activityFormParticipants}
-                      onChange={(e) => {
-                        const pax = parseInt(e.target.value) || 1;
-                        setActivityFormParticipants(pax);
-                        if (activityFormAdultPrice) {
-                          setActivityFormTotalPrice(String(Number(activityFormAdultPrice) * pax));
-                        }
-                      }}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Adult Price (₹)</label>
-                    <Input
-                      type="number"
-                      value={activityFormAdultPrice}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setActivityFormAdultPrice(val);
-                        if (val) {
-                          setActivityFormTotalPrice(String(Number(val) * activityFormParticipants));
-                        }
-                      }}
-                      placeholder="Enter price"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Total Tariff (₹)</label>
-                    <Input
-                      type="number"
-                      value={activityFormTotalPrice}
-                      onChange={(e) => setActivityFormTotalPrice(e.target.value)}
-                      placeholder="0"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
+                {/* Description */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Description (Optional)</label>
+                  <Textarea
+                    placeholder="Brief highlights or instructions for customer..."
+                    rows={2}
+                    value={activityFormDescription}
+                    onChange={(e) => setActivityFormDescription(e.target.value)}
+                    className="bg-slate-50/50 border-slate-200 text-xs resize-none"
+                  />
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogFooter className="mt-5 flex justify-end gap-2">
                 <DialogClose
                   render={
                     <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
@@ -3654,9 +3394,9 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={activitySaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl shadow-xs"
                 >
-                  {activitySaving ? "Assigning..." : "Assign Activity"}
+                  {activitySaving ? "Adding..." : "Add Activity"}
                 </Button>
               </DialogFooter>
             </form>
@@ -3664,52 +3404,82 @@ export default function TripDetailPage() {
         </Dialog>
 
         <Dialog open={isEditActivityOpen} onOpenChange={setIsEditActivityOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-5 shadow-xl">
             <form onSubmit={handleSaveEditActivity}>
               <DialogHeader>
-                <DialogTitle className="text-slate-900 font-bold text-base">Edit Activity Assignment</DialogTitle>
+                <DialogTitle className="text-slate-900 font-bold text-base">Edit Activity</DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-0.5">
+                  Update activity name, inclusion status, and description.
+                </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-3.5 mt-4 text-xs">
+              <div className="space-y-3 mt-3.5 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Activity Name *</label>
+                  <label className="text-xs font-bold text-slate-700">
+                    Activity Name <span className="text-red-500">*</span>
+                  </label>
                   <Input
                     value={activityFormName}
                     onChange={(e) => setActivityFormName(e.target.value)}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
                     required
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Scheduled Date</label>
-                    <Input
-                      type="date"
-                      value={activityFormDate}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setActivityFormDate(val);
-                        if (activityFormActivityId) {
-                          fetchApplicableActivityRates(activityFormActivityId, val, activityFormParticipants);
-                        }
-                      }}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
+                {/* Inclusion Status Selector */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Inclusion <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setActivityFormType(ActivityType.INCLUDED)}
+                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                        activityFormType === ActivityType.INCLUDED
+                          ? "bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-500/20 text-emerald-950"
+                          : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <CheckCircle2 className={`h-3.5 w-3.5 ${activityFormType === ActivityType.INCLUDED ? "text-emerald-600" : "text-slate-400"}`} />
+                        <span>Included</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                        Covered in package.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActivityFormType(ActivityType.EXCLUDED)}
+                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                        activityFormType === ActivityType.EXCLUDED
+                          ? "bg-amber-50/80 border-amber-300 ring-2 ring-amber-500/20 text-amber-950"
+                          : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <Info className={`h-3.5 w-3.5 ${activityFormType === ActivityType.EXCLUDED ? "text-amber-600" : "text-slate-400"}`} />
+                        <span>Not Included</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                        Customer pays at destination.
+                      </p>
+                    </button>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Total Tariff (₹)</label>
-                    <Input
-                      type="number"
-                      value={activityFormTotalPrice}
-                      onChange={(e) => setActivityFormTotalPrice(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Description (Optional)</label>
+                  <Textarea
+                    rows={2}
+                    value={activityFormDescription}
+                    onChange={(e) => setActivityFormDescription(e.target.value)}
+                    className="bg-slate-50/50 border-slate-200 text-xs resize-none"
+                  />
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogFooter className="mt-5 flex justify-end gap-2">
                 <DialogClose
                   render={
                     <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
@@ -3721,9 +3491,9 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={activitySaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl shadow-xs"
                 >
-                  {activitySaving ? "Saving..." : "Save"}
+                  {activitySaving ? "Saving..." : "Save Changes"}
                 </Button>
               </DialogFooter>
             </form>

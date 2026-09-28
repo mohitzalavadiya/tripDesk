@@ -151,7 +151,7 @@ export const activityService = {
         location: data.location || null,
         description: data.description || null,
         duration: data.duration || null,
-        type: data.type,
+        type: data.type || "INCLUDED",
         adultPrice: data.adultPrice !== undefined && data.adultPrice !== null ? data.adultPrice : null,
         childPrice: data.childPrice !== undefined && data.childPrice !== null ? data.childPrice : null,
         price: data.price !== undefined && data.price !== null ? data.price : null,

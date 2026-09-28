@@ -72,7 +72,8 @@ export function formatTravelerType(type?: string | null): string {
 
 const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   INCLUDED: "Included",
-  OPTIONAL: "Optional",
+  EXCLUDED: "Not Included",
+  OPTIONAL: "Not Included",
 };
 
 export function formatActivityType(type?: string | null): string {
@@ -521,13 +522,27 @@ export default function CustomerTripDetailPage() {
                   className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-2xs space-y-3"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-                      {formatActivityType(a.type)}
+                    <span
+                      className={`text-[10px] font-bold tracking-wider px-2.5 py-1 rounded-full border ${
+                        a.type === "EXCLUDED"
+                          ? "text-amber-800 bg-amber-50 border-amber-200"
+                          : "text-emerald-700 bg-emerald-50 border-emerald-100"
+                      }`}
+                    >
+                      {a.type === "EXCLUDED" ? "Not Included (Pay on Site)" : "Included in Package"}
                     </span>
-                    <StatusBadge status={a.status || "CONFIRMED"} label="Confirmed" />
+                    {a.type === "INCLUDED" && (
+                      <StatusBadge status={a.status || "CONFIRMED"} label="Confirmed" />
+                    )}
                   </div>
 
                   <h3 className="text-base font-bold text-slate-900">{a.activityName}</h3>
+
+                  {a.type === "EXCLUDED" && (
+                    <p className="text-[11px] text-amber-700 bg-amber-50/60 border border-amber-100/80 rounded-xl p-2.5">
+                      ℹ️ <strong>Direct Pay:</strong> Not included in package price. Tickets or admission are payable directly by guest at location.
+                    </p>
+                  )}
 
                   <div className="space-y-1.5 text-xs text-slate-600 font-medium">
                     {a.location && (

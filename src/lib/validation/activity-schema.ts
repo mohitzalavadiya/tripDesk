@@ -17,17 +17,17 @@ export const createActivitySchema = z.object({
     .trim()
     .min(1, "Activity name is required.")
     .max(200, "Activity name must be at most 200 characters."),
-  location: z
-    .string()
-    .trim()
-    .max(200, "Location must be at most 200 characters.")
-    .optional()
-    .nullable()
-    .or(z.literal("")),
   description: z
     .string()
     .trim()
     .max(2000, "Description must be at most 2000 characters.")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  location: z
+    .string()
+    .trim()
+    .max(200, "Location must be at most 200 characters.")
     .optional()
     .nullable()
     .or(z.literal("")),
@@ -41,7 +41,7 @@ export const createActivitySchema = z.object({
   type: z
     .nativeEnum(ActivityType)
     .optional()
-    .default(ActivityType.INCLUDED),
+    .nullable(),
   adultPrice: z.coerce
     .number()
     .min(0, "Adult price cannot be negative.")

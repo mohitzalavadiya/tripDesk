@@ -43,14 +43,23 @@ where i can show Announcements ? in notification
 Destination master UI
 UI break in dashboard. Revenue & Profit and Upcoming Departures in both tab
 Login and signup test for formik alert
+Chatbot implement
+from when you decide activity include or exclude
 
 **TODO**
 
 
-Chatbot implement
 
 vehical rate issue in trip
-from when you decide activity include or exclude
+
+payable supplier like hotel
+
+Invoice all hotel and activity amount need to check(need to add Agency Markup) Qty	Rate	Amount also want to check
+Invoice UI need to check (Header)
+if we not add any tax then GST (0% Exempt): should not show in invoice
+
+quatation preview mobile screen is need to fix
+quatation pdf UI changes
 
 manage read only from frontend also
 

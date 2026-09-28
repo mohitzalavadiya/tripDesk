@@ -73,6 +73,7 @@ enum VehiclePricingType {
 
 enum ActivityType {
   INCLUDED
+  EXCLUDED
   OPTIONAL
 }
 
@@ -1750,12 +1751,14 @@ model OperationEvent {
 model SupplierPayable {
   id                 String                @id @default(cuid())
   agencyId           String
-  supplierId         String
+  supplierId         String?
+  payeeName          String?
+  origin             String                @default("AUTOMATIC") // AUTOMATIC, MANUAL
   bookingId          String?
   tripOperationId    String?
   tripId             String?
   payableNumber      String                @default("")
-  serviceType        String                @default("HOTEL") // HOTEL, VEHICLE, ACTIVITY, OTHER
+  serviceType        String                @default("HOTEL") // HOTEL, VEHICLE, OTHER, MANUAL
   serviceReferenceId String?
   description        String
   currency           String                @default("INR")
@@ -1771,7 +1774,7 @@ model SupplierPayable {
   updatedAt          DateTime              @updatedAt
 
   agency        Agency            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  supplier      Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplier      Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   booking       Booking?          @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   tripOperation TripOperation?    @relation(fields: [tripOperationId], references: [id], onDelete: SetNull)
   trip          Trip?             @relation(fields: [tripId], references: [id], onDelete: SetNull)
@@ -1794,7 +1797,8 @@ model SupplierPayable {
 model SupplierPayment {
   id              String                @id @default(cuid())
   agencyId        String
-  supplierId      String
+  supplierId      String?
+  payeeName       String?
   payableId       String?
   bookingId       String?
   paymentNumber   String                @default("")
@@ -1811,7 +1815,7 @@ model SupplierPayment {
   updatedAt       DateTime              @updatedAt
 
   agency   Agency           @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  supplier Supplier         @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplier Supplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   payable  SupplierPayable? @relation(fields: [payableId], references: [id], onDelete: SetNull)
   booking  Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
 

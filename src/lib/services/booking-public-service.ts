@@ -251,8 +251,8 @@ export const bookingPublicService = {
         })),
         activities: (booking.trip.tripActivities || []).map((ta: any) => ({
           id: ta.id,
-          activityName: ta.activity?.name || ta.name || "Activity",
-          type: ta.activity?.type || "Sightseeing",
+          activityName: ta.name || ta.activity?.name || "Activity",
+          type: ta.type || "INCLUDED",
           location: ta.activity?.location || null,
           date: ta.date || booking.trip.startDate,
           participantsCount: (ta.adults || 0) + (ta.children || 0) || 1,
