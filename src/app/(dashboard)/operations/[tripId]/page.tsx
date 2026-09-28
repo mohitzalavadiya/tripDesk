@@ -52,6 +52,10 @@ import { ServiceReconciliationCard } from "@/components/operations/service-recon
 import { PostTourReviewCard } from "@/components/operations/post-tour-review-card";
 import { FinancialReconciliationCard } from "@/components/operations/financial-reconciliation-card";
 import { FinalizationChecklistCard } from "@/components/operations/finalization-checklist-card";
+import { EditPayableDialog } from "@/components/finance/edit-payable-dialog";
+import { RecordSupplierPaymentDialog } from "@/components/finance/record-supplier-payment-dialog";
+import { AddOtherCostModal } from "@/components/operations/add-other-cost-modal";
+import { OtherCostsCard } from "@/components/operations/other-costs-card";
 import { OperationsClosureSummary } from "@/lib/api-client";
 import { PageHeader } from "@/components/shared/page-header";
 import { PageSkeleton, CardSkeleton, TableSkeleton } from "@/components/shared/loading-skeletons";
@@ -129,8 +133,15 @@ export default function TripOperationsDetailPage() {
 
   // Active Tab
   const [activeTab, setActiveTab] = React.useState<
-    "overview" | "accommodations" | "fleet" | "activities" | "issues" | "documents" | "timeline" | "closure"
+    "overview" | "accommodations" | "fleet" | "activities" | "other-costs" | "issues" | "documents" | "timeline" | "closure"
   >("overview");
+
+  // Payable & Payment modal states
+  const [selectedPayableForEdit, setSelectedPayableForEdit] = React.useState<any | null>(null);
+  const [isEditPayableOpen, setIsEditPayableOpen] = React.useState(false);
+  const [selectedPayableForPayment, setSelectedPayableForPayment] = React.useState<any | null>(null);
+  const [isRecordPaymentOpen, setIsRecordPaymentOpen] = React.useState(false);
+  const [isAddOtherCostOpen, setIsAddOtherCostOpen] = React.useState(false);
 
   // Modals state
   const [selectedDispatchForDriver, setSelectedDispatchForDriver] =
@@ -616,6 +627,18 @@ export default function TripOperationsDetailPage() {
               { id: "accommodations", label: `Accommodations (${operation.hotelConfirmations?.length || 0})` },
               { id: "fleet", label: `Fleet & Dispatch (${operation.vehicleDispatches?.length || 0})` },
               { id: "activities", label: `Activities (${operation.activityConfirmations?.length || 0})` },
+              {
+                id: "other-costs",
+                label: `Other Costs (${
+                  (operation.supplierPayables || []).filter(
+                    (p) =>
+                      p.origin === "MANUAL" ||
+                      p.serviceType === "MANUAL" ||
+                      p.serviceType === "OTHER" ||
+                      (!p.serviceReferenceId && p.serviceType !== "HOTEL" && p.serviceType !== "VEHICLE")
+                  ).length
+                })`,
+              },
               { id: "issues", label: `Issues Tracker (${operation.issues?.length || 0})` },
               { id: "documents", label: `Documents & Vouchers (${documentsSummary?.documents?.length || 5})` },
               { id: "timeline", label: `Live Timeline (${timeline.length})` },
@@ -861,17 +884,31 @@ export default function TripOperationsDetailPage() {
                     }
                     return true;
                   })
-                  .map((hotelConf) => (
-                    <HotelConfirmationCard
-                      key={hotelConf.id}
-                      hotelConfirmation={hotelConf}
-                      isReadOnly={isReadOnly}
-                      onOpenDialog={(hotel, mode) => {
-                        setHotelForDialog(hotel);
-                        setHotelDialogMode(mode);
-                      }}
-                    />
-                  ))}
+                  .map((hotelConf) => {
+                    const payable = (operation.supplierPayables || []).find(
+                      (p) => p.serviceReferenceId === hotelConf.tripHotelId
+                    );
+                    return (
+                      <HotelConfirmationCard
+                        key={hotelConf.id}
+                        hotelConfirmation={hotelConf}
+                        isReadOnly={isReadOnly}
+                        onOpenDialog={(hotel, mode) => {
+                          setHotelForDialog(hotel);
+                          setHotelDialogMode(mode);
+                        }}
+                        payable={payable}
+                        onEditPayable={(p) => {
+                          setSelectedPayableForEdit(p);
+                          setIsEditPayableOpen(true);
+                        }}
+                        onRecordPayment={(p) => {
+                          setSelectedPayableForPayment(p);
+                          setIsRecordPaymentOpen(true);
+                        }}
+                      />
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -982,19 +1019,33 @@ export default function TripOperationsDetailPage() {
                     }
                     return true;
                   })
-                  .map((dispatch) => (
-                    <VehicleDispatchCard
-                      key={dispatch.id}
-                      dispatch={dispatch}
-                      isReadOnly={isReadOnly}
-                      onAssignDriver={(d) => setSelectedDispatchForDriver(d)}
-                      onReportDelay={(d) => setSelectedDispatchForDelay(d)}
-                      onConfirmDispatch={handleConfirmDispatch}
-                      onStartDuty={handleStartDuty}
-                      onCompleteDuty={handleCompleteDuty}
-                      onCancelDispatch={handleCancelDispatch}
-                    />
-                  ))}
+                  .map((dispatch) => {
+                    const payable = (operation.supplierPayables || []).find(
+                      (p) => p.serviceReferenceId === dispatch.tripVehicleId
+                    );
+                    return (
+                      <VehicleDispatchCard
+                        key={dispatch.id}
+                        dispatch={dispatch}
+                        isReadOnly={isReadOnly}
+                        onAssignDriver={(d) => setSelectedDispatchForDriver(d)}
+                        onReportDelay={(d) => setSelectedDispatchForDelay(d)}
+                        onConfirmDispatch={handleConfirmDispatch}
+                        onStartDuty={handleStartDuty}
+                        onCompleteDuty={handleCompleteDuty}
+                        onCancelDispatch={handleCancelDispatch}
+                        payable={payable}
+                        onEditPayable={(p) => {
+                          setSelectedPayableForEdit(p);
+                          setIsEditPayableOpen(true);
+                        }}
+                        onRecordPayment={(p) => {
+                          setSelectedPayableForPayment(p);
+                          setIsRecordPaymentOpen(true);
+                        }}
+                      />
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -1126,6 +1177,23 @@ export default function TripOperationsDetailPage() {
               </div>
             )}
           </div>
+        )}
+
+        {/* ─── TAB: OTHER COSTS ───────────────────────────────────────────── */}
+        {activeTab === "other-costs" && (
+          <OtherCostsCard
+            payables={operation.supplierPayables || []}
+            isReadOnly={isReadOnly}
+            onAddOtherCost={() => setIsAddOtherCostOpen(true)}
+            onEditPayable={(p) => {
+              setSelectedPayableForEdit(p);
+              setIsEditPayableOpen(true);
+            }}
+            onRecordPayment={(p) => {
+              setSelectedPayableForPayment(p);
+              setIsRecordPaymentOpen(true);
+            }}
+          />
         )}
 
         {/* ─── TAB 5: ISSUES TRACKER ──────────────────────────────────────── */}
@@ -1545,6 +1613,42 @@ export default function TripOperationsDetailPage() {
           }
         }}
       />
+      {/* ─── PAYABLE & FINANCIAL MODALS ───────────────────────────────────── */}
+      {isEditPayableOpen && selectedPayableForEdit && (
+        <EditPayableDialog
+          open={isEditPayableOpen}
+          onOpenChange={setIsEditPayableOpen}
+          payable={selectedPayableForEdit}
+          payableId={selectedPayableForEdit.id}
+          onSuccess={() => {
+            fetchOperationData();
+          }}
+        />
+      )}
+
+      {isRecordPaymentOpen && selectedPayableForPayment && (
+        <RecordSupplierPaymentDialog
+          open={isRecordPaymentOpen}
+          onOpenChange={setIsRecordPaymentOpen}
+          defaultPayableId={selectedPayableForPayment.id}
+          onSuccess={() => {
+            fetchOperationData();
+          }}
+        />
+      )}
+
+      {isAddOtherCostOpen && operation && (
+        <AddOtherCostModal
+          open={isAddOtherCostOpen}
+          onOpenChange={setIsAddOtherCostOpen}
+          tripId={operation.tripId}
+          tripOperationId={operation.id}
+          bookingId={operation.bookingId}
+          onSuccess={() => {
+            fetchOperationData();
+          }}
+        />
+      )}
     </div>
   );
 }

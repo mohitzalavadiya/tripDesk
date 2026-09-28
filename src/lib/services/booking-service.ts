@@ -28,6 +28,7 @@ import {
 import { customerNotificationService } from "@/lib/services/customer-notification-service";
 import { communicationService } from "@/lib/services/communication-service";
 import { internalNotificationService } from "@/lib/services/internal-notification-service";
+import { financeService } from "@/lib/services/finance-service";
 
 export type BookingWithRelations = Booking & {
   customer: {
@@ -527,9 +528,13 @@ export const bookingService = {
           bookingNumber: booking.bookingNumber,
           totalAmount: Number(booking.totalAmount),
         },
-        idempotencyKey: `booking-created-${booking.id}`,
       }).catch((err) => {
-        console.warn("[BookingService] Failed to notify agency owner of booking creation:", err);
+        console.warn("[BookingService] Failed to notify agency owner:", err);
+      });
+
+      // Auto-generate service payables (Hotels, Vehicles) for the booking
+      await financeService.generateBookingServicePayables(agencyId, booking.id).catch((err) => {
+        console.warn("[BookingService] Failed to auto-generate booking service payables:", err);
       });
     } catch {
       // Non-blocking operations synchronization
@@ -684,6 +689,11 @@ export const bookingService = {
         idempotencyKey: `booking-created-${booking.id}`,
       }).catch((err) => {
         console.warn("[BookingService] Failed to notify agency owner of booking conversion:", err);
+      });
+
+      // Auto-generate service payables (Hotels, Vehicles) for the booking
+      await financeService.generateBookingServicePayables(agencyId, booking.id).catch((err) => {
+        console.warn("[BookingService] Failed to auto-generate booking service payables:", err);
       });
     } catch {
       // Non-blocking operations sync

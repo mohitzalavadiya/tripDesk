@@ -29,6 +29,8 @@ import { OutstandingBalancesCard } from "@/components/finance/outstanding-balanc
 import { FinanceTransactionTable } from "@/components/finance/finance-transaction-table";
 import { RecordPaymentDialog } from "@/components/finance/record-payment-dialog";
 import { RecordSupplierPaymentDialog } from "@/components/finance/record-supplier-payment-dialog";
+import { RecordPayableDialog } from "@/components/finance/record-payable-dialog";
+import { EditPayableDialog } from "@/components/finance/edit-payable-dialog";
 import { CreateExpenseDialog } from "@/components/finance/create-expense-dialog";
 import {
   financeClient,
@@ -64,6 +66,10 @@ export default function FinanceDashboardPage() {
 
   const [supplierPaymentDialogOpen, setSupplierPaymentDialogOpen] = React.useState(false);
   const [selectedPayableForPayment, setSelectedPayableForPayment] = React.useState<string | undefined>();
+
+  const [recordPayableDialogOpen, setRecordPayableDialogOpen] = React.useState(false);
+  const [editPayableDialogOpen, setEditPayableDialogOpen] = React.useState(false);
+  const [selectedPayableForEdit, setSelectedPayableForEdit] = React.useState<string | null>(null);
 
   const [expenseDialogOpen, setExpenseDialogOpen] = React.useState(false);
 
@@ -128,6 +134,15 @@ export default function FinanceDashboardPage() {
     setSupplierPaymentDialogOpen(true);
   };
 
+  const handleRecordPayable = () => {
+    setRecordPayableDialogOpen(true);
+  };
+
+  const handleEditPayable = (payableId: string) => {
+    setSelectedPayableForEdit(payableId);
+    setEditPayableDialogOpen(true);
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
       <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
@@ -141,6 +156,12 @@ export default function FinanceDashboardPage() {
             icon: ArrowDownLeft,
           }}
           secondaryActions={[
+            {
+              label: "Add Payable",
+              onClick: handleRecordPayable,
+              icon: Plus,
+              variant: "outline",
+            },
             {
               label: "Pay Supplier",
               onClick: () => handleRecordSupplierPayment(),
@@ -232,6 +253,8 @@ export default function FinanceDashboardPage() {
               supplierPayables={data.supplierPayables}
               onRecordCustomerPayment={handleRecordCustomerPayment}
               onRecordSupplierPayment={handleRecordSupplierPayment}
+              onRecordPayable={handleRecordPayable}
+              onEditPayable={handleEditPayable}
             />
           </div>
         )}
@@ -259,6 +282,25 @@ export default function FinanceDashboardPage() {
           open={paymentDialogOpen}
           onOpenChange={setPaymentDialogOpen}
           defaultBookingId={selectedBookingForPayment}
+          onSuccess={() => {
+            loadDashboard(true);
+            loadTransactions();
+          }}
+        />
+
+        <RecordPayableDialog
+          open={recordPayableDialogOpen}
+          onOpenChange={setRecordPayableDialogOpen}
+          onSuccess={() => {
+            loadDashboard(true);
+            loadTransactions();
+          }}
+        />
+
+        <EditPayableDialog
+          open={editPayableDialogOpen}
+          onOpenChange={setEditPayableDialogOpen}
+          payableId={selectedPayableForEdit}
           onSuccess={() => {
             loadDashboard(true);
             loadTransactions();

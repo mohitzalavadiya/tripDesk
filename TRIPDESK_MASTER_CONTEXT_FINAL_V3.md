@@ -12564,9 +12564,253 @@ Execute a comprehensive UI/UX audit, component architecture cleanup, and respons
 
 ---
 
+# SECTION 192: UNIFIED PAYABLES ARCHITECTURE (SERVICE, MANUAL, MULTI-PAYMENT, FINANCE & SAFETY)
+
+## 192.1 Core Architectural Principles & Invariants
+1. **Single Source of Truth (Unified Payables Ledger)**:
+   - All outgoing provider obligations are managed exclusively through `SupplierPayable` (`supplier_payables`) and paid via `SupplierPayment` (`supplier_payments`).
+   - Zero duplicate tables or fragmented models (e.g. no separate `HotelPayable`, `VehiclePayable`, or `Disbursement` tables).
+2. **Complete Financial Isolation**:
+   - **Customer Inflows**: Invoices, Customer Payments (`Payment`), and Receivables track customer collections.
+   - **Provider Outflows**: Supplier Payables (`SupplierPayable`) and Supplier Payments (`SupplierPayment`) track outgoing disbursements to vendors and service providers.
+   - Mutating a payable or recording a disbursement strictly never alters customer quotations, booking selling prices, customer invoices, taxes, or customer payment balances.
+3. **Immutability of Historical Pricing Snapshots**:
+   - Automatic payables capture a snapshot of cost obligations (Hotel: nightly rate × rooms × nights; Vehicle: total rate via authoritative `tripCostingService`) at Booking confirmation.
+   - Later changes to Master RateSheets do not retroactively alter confirmed payables.
+   - `plannedAmount` preserves the original generated obligation.
+   - `actualAmount` tracks the current payable obligation when edited by the agency coordinator.
+4. **Activity Cost Isolation**:
+   - In accordance with Section 191, Activities remain non-priced (₹0 cost) and strictly never generate automatic service payables.
+5. **Flexible Ad-hoc Payees**:
+   - Both `SupplierPayable` and `SupplierPayment` support ad-hoc custom payees via `payeeName` when a registered `supplierId` is not present, enabling manual payables for guides, tolls, parking, and miscellaneous trip expenses without forcing dummy Master Supplier creation.
+
+---
+
+## 192.2 Database Model Evolution & Durable Migration
+- **Schema Changes (`prisma/schema.prisma`)**:
+  - `SupplierPayable`:
+    - `supplierId`: `String?` (made nullable to support manual payables and custom vendors).
+    - `payeeName`: `String?` (stores custom payee name when `supplierId` is null).
+    - `origin`: `String @default("AUTOMATIC")` (identifies `"AUTOMATIC"` service payables vs `"MANUAL"` trip/booking payables).
+    - `plannedAmount`: `Decimal @default(0) @db.Decimal(12, 2)` (original snapshot).
+    - `actualAmount`: `Decimal @default(0) @db.Decimal(12, 2)` (current obligation).
+  - `SupplierPayment`:
+    - `supplierId`: `String?` (made nullable).
+    - `payeeName`: `String?` (stores custom payee name).
+- **Durable Prisma Migration History**:
+  - Migration folder: `prisma/migrations/20260928120000_unified_payables_architecture/migration.sql`
+  - Applied and tracked in `_prisma_migrations` via Prisma Migrate.
+- **Data Safety**: All existing `SupplierPayable` and `SupplierPayment` records retained intact with existing relations preserved.
+
+---
+
+## 192.3 Automatic Service Payable Generation & Authoritative Costing
+- **Trigger**: Automatic payables are generated on Booking creation via `generateBookingServicePayables` in `src/lib/services/finance-service.ts`, invoked during `createBooking` and `convertQuotationToBooking` in `src/lib/services/booking-service.ts`.
+- **Authoritative Costing Calculation**:
+  - Integrates with `tripCostingService.calculateTripCosting(agencyId, booking.tripId)` for exact RateSheet & snapshot resolution.
+  - **Hotels**: Generated per hotel booking. `plannedAmount = actualAmount = matchedCost`. Linked to `hotelId`, `bookingId`, and hotel supplier where available.
+  - **Vehicles**: Generated per vehicle booking. `plannedAmount = actualAmount = authoritativeVehicleCost`. Linked to `vehicleId`, `bookingId`, and vehicle supplier.
+  - **Activities**: Explicitly skipped. No payables generated for activity legs.
+  - **Origin**: Marked with `origin: "AUTOMATIC"`.
+- **Strict Idempotency**:
+  - `generateBookingServicePayables` validates existence by `serviceReferenceId` (`th.id` / `tv.id`). Re-executing generation skips existing payables with zero duplicate creation.
+
+---
+
+## 192.4 Manual Payables & Relationship Validation
+- **Trip-Level Payables**:
+  - Attached directly to a `tripId` with `bookingId = null`.
+  - Suitable for guide charges, road permits, tolls, entrance fees, and group logistics.
+  - Created via `RecordPayableDialog` or `POST /api/finance/supplier-payables`.
+- **Booking-Level Payables**:
+  - Attached to both `tripId` and `bookingId`.
+  - Validates that `booking.tripId === input.tripId` and `booking.agencyId === agencyId` to prevent cross-agency or mismatched attachments.
+- **Payee Resolution**:
+  - Can be linked to a Master Supplier (`supplierId`) or a custom payee string (`payeeName`).
+  - Marked with `origin: "MANUAL"`.
+
+---
+
+## 192.5 Editable Payables & Audit History
+- **Editable Properties**:
+  - Automatic and manual payables can be edited via `EditPayableDialog` or `PATCH /api/finance/supplier-payables/[id]`.
+  - Modifiable fields: `actualAmount` (current payable obligation), `dueDate`, `notes`, `payeeName`, `reason`.
+- **Planned vs Actual Preservation**:
+  - `plannedAmount` preserves the initial generated amount (e.g. ₹21,000).
+  - `actualAmount` reflects edited agreement (e.g. ₹19,500).
+- **Edit Audit Trail**:
+  - Changes to `actualAmount` automatically append a timestamped audit record to `notes` (e.g. `[Edited YYYY-MM-DD: Amount changed from ₹21,000 to ₹19,500 (Reason: ...)]`).
+  - Automatically logs a `SUPPLIER_PAYABLE_UPDATED` event to `OperationEvent` when linked to an operation.
+- **Soft-Cancellation**:
+  - `DELETE /api/finance/supplier-payables/[id]` soft-cancels the payable (`status: CANCELLED`, `archivedAt: new Date()`) and records the cancellation reason, preserving all financial history.
+
+---
+
+## 192.6 Multi-Payment Disbursements, Balances & Overpayment
+- **Disbursement Flow**:
+  - Multiple partial payments can be recorded against a single payable over time via `RecordSupplierPaymentDialog` or `POST /api/finance/supplier-payments`.
+  - Each payment records `amount`, `paymentDate`, `paymentMethod`, `referenceNumber`, `notes`, `paidBy`, and linked relations.
+- **Status & Balance Calculations**:
+  - `paidAmount` = `SUM(payments.amount)`
+  - `outstandingAmount` = `MAX(0, actualAmount - paidAmount)`
+  - `overpaidAmount` = `MAX(0, paidAmount - actualAmount)`
+  - Status lifecycle: `PENDING` $\to$ `PARTIALLY_PAID` $\to$ `PAID`.
+  - Overdue is derived dynamically (`dueDate < now && outstandingAmount > 0`) without corrupting payment status.
+  - Overpayments preserve true total paid and all individual payment records without negative balance corruption.
+
+---
+
+## 192.7 Finance & Payments UI Integration
+1. **Finance Dashboard (`/finance`)**:
+   - Displays Revenue, Outflow Payables, Gross Margin, Outstanding Receivables, Outstanding Payables.
+   - Outstanding Payables card: Displays payee name, origin badges (`AUTOMATIC` vs `MANUAL`), amounts, status, due date, Edit action, and Quick Pay action.
+   - Quick action: "+ Record Payable" modal for manual payables.
+2. **Payments Center (`/payments`)**:
+   - Refactored into two dedicated tabs:
+     - **Tab 1: Customer Collections (Inflow)**: Customer invoice receipts, customer names, payment methods, and "+ Log Payment" modal.
+     - **Tab 2: Payable Disbursements (Outflow)**: Outgoing disbursements, payee names, linked payables, origin badges, payment references, and "+ Record Disbursement" modal.
+
+---
+
+## 192.8 Verification & QA Test Results
+- **Comprehensive 28-Assertion Automated QA Suite Executed**:
+  - `[PASS]` 1 & 2: Historical payable and payment records preserved.
+  - `[PASS]` 3: Automatic Hotel payable generation with correct calculation.
+  - `[PASS]` 4: Automatic Vehicle payable generation with authoritative vehicle costing.
+  - `[PASS]` 5: Activities strictly ₹0 / skipped.
+  - `[PASS]` 6 & 6b: Automatic payable generation strict idempotency (0 duplicates on re-run).
+  - `[PASS]` 7 & 8: Planned amount preserved while actual amount edited with audit trail.
+  - `[PASS]` 9: Manual Trip-level payable with ad-hoc payee and `bookingId = null`.
+  - `[PASS]` 10: Manual Booking-level payable with relationship verification.
+  - `[PASS]` 11 & 12: Partial disbursements and `PARTIALLY_PAID` status transition.
+  - `[PASS]` 13: Full disbursement settlement and `PAID` status transition.
+  - `[PASS]` 14: Overpayment handling (Paid = ₹21,500, Outstanding = 0, 3 separate payments intact).
+  - `[PASS]` 15: Overdue dynamically derived without corrupting `PENDING` status.
+  - `[PASS]` 16: Soft-cancellation preserves payable record, timestamp, and reason.
+  - `[PASS]` 17 & 18: Booking selling price mutation does NOT mutate confirmed provider payables.
+  - `[PASS]` 19: Customer Invoice totals strictly isolated from payable edits.
+  - `[PASS]` 20: Customer Payment does not settle supplier payable obligation.
+  - `[PASS]` 21: Supplier Payment does not mutate or settle customer receivables.
+  - `[PASS]` 22: Cross-tenant payable read strictly rejected.
+  - `[PASS]` 23: Cross-tenant payable update strictly rejected.
+  - `[PASS]` 24: Cross-tenant payment disbursement strictly rejected.
+  - `[PASS]` 25: Mismatched Booking and Trip relationship strictly rejected.
+  - `[PASS]` 26: Payments page clean separation (Inflow Collections vs Outflow Disbursements).
+  - `[PASS]` 27: Finance dashboard KPI integration verified.
+  - `[PASS]` 28: Public routes contain zero supplier payables, provider costs, or margin leakage.
+- **Compiler & Build Checks**:
+  - `npx prisma generate` $\to$ **Client v7.9.1 generated (PASSED)**.
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Exit code 0 across all 72 routes (PASSED)**.
+
+---
+
+# SECTION 193: OPERATIONS-FIRST PAYABLES UX REDESIGN
+
+## 193.1 Core Architecture & Principles
+- **Context Ownership**:
+  - **Operations (`/operations/[tripId]`)**: Single operational source of truth. Service providers (Hotels, Vehicles, Other Costs) display live obligations, negotiated costs, deposits paid, and balances due directly on voucher/dispatch cards.
+  - **Payments (`/payments`)**: Central settlement and money movement registry (Customer Payments & Supplier Payments).
+  - **Finance (`/finance`)**: High-level financial reporting, profit margin analysis, receivables/payables ageing, and executive oversight.
+- **Unified Ledger Single Source of Truth**:
+  - Reuses the existing `SupplierPayable` and `SupplierPayment` database tables.
+  - Zero schema changes, zero migrations, zero duplicate ledgers.
+  - `plannedAmount` = original generated cost snapshot (preserved).
+  - `actualAmount` = current editable payable obligation.
+
+---
+
+## 193.2 Service Card Integration
+1. **Hotel Operations (`HotelConfirmationCard`)**:
+   - Matches payable deterministically via `SupplierPayable.serviceReferenceId === HotelConfirmation.tripHotelId`.
+   - Compact **Supplier & Cost** section displays Calculated Cost (`plannedAmount`), Current Payable (`actualAmount`), Paid (`paidAmount`), Outstanding (`outstandingAmount`), Status, and Due Date.
+   - Quick Actions: `Edit Payable` (opens existing `EditPayableDialog`) and `Record Payment` (opens existing `RecordSupplierPaymentDialog`).
+2. **Vehicle Operations (`VehicleDispatchCard`)**:
+   - Matches payable via `SupplierPayable.serviceReferenceId === VehicleDispatch.tripVehicleId`.
+   - Displays identical compact Supplier & Cost section with Edit/Payment actions.
+3. **Activity Operations (`ActivityConfirmationCard`)**:
+   - Strictly preserved as non-priced / ₹0 with no payable generation.
+
+---
+
+## 193.3 Other Costs (Manual Payables in Operations)
+- Dedicated **"Other Costs"** tab added to `/operations/[tripId]`.
+- Operational entry point for non-hotel/vehicle obligations (local tour guides, monument fees, entry permits, tolls).
+- Modal `AddOtherCostModal` creates `SupplierPayable` records with `origin: "MANUAL"`, `serviceType: "MANUAL"`, `tripId: operation.tripId`, `tripOperationId: operation.id`, and optional `bookingId`.
+- Other costs display full status, amounts, and support `Edit Payable` and `Record Payment` workflows.
+
+---
+
+## 193.4 Payments & Finance UI Streamlining
+1. **Payments Center (`/payments`)**:
+   - Terminology cleaned up to intuitive agency standards:
+     - `Customer Collections (Inflow)` $\to$ **`Customer Payments`**
+     - `Payable Disbursements (Outflow)` $\to$ **`Supplier Payments`**
+2. **Finance Dashboard (`/finance`)**:
+   - Refocused on reporting and control.
+   - Prominent `+ Add Payable` button removed from `OutstandingBalancesCard` header (relocated to Operations $\to$ Other Costs).
+   - Retains complete supplier outstanding list, overdue badges, trip links, and secondary Edit / Pay controls.
+
+---
+
+## 193.5 Server Query Adjustment & Typing
+- `operationsService.getOperationById` and `getOperationByTripId` updated to include active `supplierPayables` (with linked `payments` and `supplier`).
+- `OperationDetailWithRelations` updated to include `supplierPayables` relation.
+- All financial calculations (Gross Profit, Recognized Revenue, Selling Price, Invoices, Customer Payments) remain 100% isolated and intact.
+
+---
+
+# SECTION 194: UNIFIED PAYMENTS TABLE UX (CUSTOMER & SUPPLIER IN ONE TABLE)
+
+## 194.1 Overview & Architecture
+- **Single Master Payments Table**:
+  - Removed separate tab views (`Customer Payments` vs `Supplier Payments`) on `/payments`.
+  - Replaced with a single, consolidated ledger presenting all agency money movements (Customer Collections / Inflow and Supplier Disbursements / Outflow) chronologically in one table.
+- **Direction & Type Differentiation**:
+  - Added dedicated **Direction / Type** column with badges:
+    - **Customer (IN)**: Emerald badge with `ArrowDownLeft` icon representing money received from customers.
+    - **Supplier (OUT)**: Purple badge with `ArrowUpRight` icon representing money paid/disbursed to vendors/suppliers.
+  - Formatted Amounts:
+    - Customer payments display with a green `+ ₹Amount` indicator.
+    - Supplier payments display with a purple/slate `- ₹Amount` indicator.
+- **Data & Model Isolation**:
+  - Pure **UI presentation unification**.
+  - Database models (`Payment` for customer receipts and `SupplierPayment` for vendor disbursements), APIs, services, and calculations remain 100% separate and unchanged.
+  - Zero database schema or migration changes.
+
+---
+
+## 194.2 Top Summary & KPI Metrics
+- Top Command Header displays a 3-part financial metrics summary:
+  1. **Total Received (Inflow)**: Total money collected from customers with transaction count.
+  2. **Total Disbursed (Outflow)**: Total money paid to vendors/suppliers with transaction count.
+  3. **Net Cash Balance**: Real-time cash position (`Total Received - Total Disbursed`).
+- Quick Actions:
+  - `Log Customer Payment`: Opens existing booking payment dialog.
+  - `Record Supplier Payment`: Opens existing `RecordSupplierPaymentDialog`.
+
+---
+
+## 194.3 Multi-Dimensional Filter Suite
+- **Omni-Search Bar**: Real-time debounced search across payment references, UTR numbers, customer names, vendor names, booking numbers, and receipts.
+- **Direction Pill Filter**: Toggle between `All (Total)`, `Customer (IN)`, and `Supplier (OUT)`.
+- **Payment Method Filter**: Filter by UPI, Bank Transfer, Cash, Card, Cheque, or Other.
+- **Status Filter**: Filter by Completed, Pending, Refunded, Failed, or Cancelled.
+- **Pagination & Reset**: Client-side clean pagination with active filter reset button.
+
+---
+
+## 194.4 Verification & Build Results
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 72 routes (PASSED)**.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+
 
 
 

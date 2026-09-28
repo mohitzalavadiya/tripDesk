@@ -415,6 +415,14 @@ export const operationsService = {
           },
           orderBy: { createdAt: "asc" },
         },
+        supplierPayables: {
+          where: { archivedAt: null },
+          include: {
+            payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+            supplier: { select: { id: true, name: true, type: true, phone: true } },
+          },
+          orderBy: { createdAt: "asc" },
+        },
         issues: {
           orderBy: [{ status: "asc" }, { priority: "desc" }, { createdAt: "desc" }],
         },
@@ -428,6 +436,25 @@ export const operationsService = {
     if (!operation) {
       throw new NotFoundError("TripOperation");
     }
+
+    // Also fetch any trip-level payables that may not have tripOperationId set
+    const tripPayables = await prisma.supplierPayable.findMany({
+      where: {
+        agencyId,
+        tripId: operation.tripId,
+        archivedAt: null,
+      },
+      include: {
+        payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+        supplier: { select: { id: true, name: true, type: true, phone: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const payablesMap = new Map<string, any>();
+    (operation.supplierPayables || []).forEach((p) => payablesMap.set(p.id, p));
+    tripPayables.forEach((p) => payablesMap.set(p.id, p));
+    (operation as any).supplierPayables = Array.from(payablesMap.values());
 
     return operation;
   },
@@ -467,12 +494,40 @@ export const operationsService = {
           },
           orderBy: { createdAt: "asc" },
         },
+        supplierPayables: {
+          where: { archivedAt: null },
+          include: {
+            payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+            supplier: { select: { id: true, name: true, type: true, phone: true } },
+          },
+          orderBy: { createdAt: "asc" },
+        },
         issues: {
           orderBy: [{ status: "asc" }, { priority: "desc" }, { createdAt: "desc" }],
         },
         events: { orderBy: { createdAt: "desc" }, take: 50 },
       },
     });
+
+    if (operation) {
+      const tripPayables = await prisma.supplierPayable.findMany({
+        where: {
+          agencyId,
+          tripId: operation.tripId,
+          archivedAt: null,
+        },
+        include: {
+          payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+          supplier: { select: { id: true, name: true, type: true, phone: true } },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+
+      const payablesMap = new Map<string, any>();
+      (operation.supplierPayables || []).forEach((p) => payablesMap.set(p.id, p));
+      tripPayables.forEach((p) => payablesMap.set(p.id, p));
+      (operation as any).supplierPayables = Array.from(payablesMap.values());
+    }
 
     return operation;
   },

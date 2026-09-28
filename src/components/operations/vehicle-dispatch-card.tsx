@@ -21,7 +21,10 @@ import {
   ExternalLink,
   ShieldAlert,
   Download,
+  CreditCard,
+  Edit,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/costing-engine";
 
 interface VehicleDispatchCardProps {
   dispatch: VehicleDispatchWithDetails;
@@ -32,6 +35,9 @@ interface VehicleDispatchCardProps {
   onStartDuty: (dispatch: VehicleDispatchWithDetails) => void;
   onCompleteDuty: (dispatch: VehicleDispatchWithDetails) => void;
   onCancelDispatch: (dispatch: VehicleDispatchWithDetails) => void;
+  payable?: any | null;
+  onEditPayable?: (payable: any) => void;
+  onRecordPayment?: (payable: any) => void;
 }
 
 export function VehicleDispatchCard({
@@ -43,6 +49,9 @@ export function VehicleDispatchCard({
   onStartDuty,
   onCompleteDuty,
   onCancelDispatch,
+  payable,
+  onEditPayable,
+  onRecordPayment,
 }: VehicleDispatchCardProps) {
   const [copied, setCopied] = React.useState(false);
 
@@ -248,6 +257,100 @@ export function VehicleDispatchCard({
           <p className="text-[11px] text-amber-900 leading-relaxed">
             {dispatch.notes}
           </p>
+        </div>
+      )}
+
+      {/* ─── SUPPLIER & COST (UNIFIED PAYABLE) ──────────────────────────── */}
+      {payable && (
+        <div className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                <CreditCard className="h-3.5 w-3.5 text-slate-500" />
+                Supplier & Cost
+              </span>
+              {payable.payeeName && (
+                <span className="text-xs font-semibold text-slate-700">
+                  • {payable.payeeName}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
+                  payable.status === "PAID"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : payable.status === "PARTIALLY_PAID"
+                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                    : payable.status === "CANCELLED"
+                    ? "bg-slate-100 text-slate-500 border-slate-200"
+                    : "bg-blue-50 text-blue-700 border-blue-200"
+                }`}
+              >
+                {payable.status === "PARTIALLY_PAID"
+                  ? "Partially Paid"
+                  : payable.status === "PAID"
+                  ? "Paid"
+                  : payable.status === "CANCELLED"
+                  ? "Cancelled"
+                  : "Pending"}
+              </span>
+              {payable.dueDate && (
+                <span className="text-[11px] text-slate-500 font-medium">
+                  Due: {new Date(payable.dueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-200/70 text-xs">
+            <div>
+              <p className="text-[10px] text-slate-500 font-medium">Calculated Cost</p>
+              <p className="font-semibold text-slate-700">{formatCurrency(Number(payable.plannedAmount || 0))}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 font-medium">Current Payable</p>
+              <p className="font-bold text-slate-900">{formatCurrency(Number(payable.actualAmount || 0))}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 font-medium">Paid</p>
+              <p className="font-semibold text-emerald-600">{formatCurrency(Number(payable.paidAmount || 0))}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 font-medium">Outstanding</p>
+              <p className={`font-bold ${Number(payable.outstandingAmount) > 0 ? "text-amber-600" : "text-slate-700"}`}>
+                {formatCurrency(Number(payable.outstandingAmount || 0))}
+              </p>
+            </div>
+          </div>
+
+          {!isReadOnly && (onEditPayable || onRecordPayment) && (
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-200/50 flex-wrap">
+              {onEditPayable && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onEditPayable(payable)}
+                  className="h-7 text-[11px] px-2.5 font-semibold text-slate-700 hover:bg-slate-200/60 cursor-pointer"
+                >
+                  <Edit className="h-3 w-3 mr-1 text-slate-500" />
+                  Edit Payable
+                </Button>
+              )}
+              {onRecordPayment && Number(payable.outstandingAmount) > 0 && payable.status !== "CANCELLED" && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => onRecordPayment(payable)}
+                  className="h-7 text-[11px] px-2.5 font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-2xs cursor-pointer"
+                >
+                  <CreditCard className="h-3 w-3 mr-1" />
+                  Record Payment
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

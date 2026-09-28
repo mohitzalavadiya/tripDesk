@@ -44,13 +44,13 @@ Destination master UI
 UI break in dashboard. Revenue & Profit and Upcoming Departures in both tab
 Login and signup test for formik alert
 Chatbot implement
+from when you decide activity include or exclude
 
 **TODO**
 
 
 
 vehical rate issue in trip
-from when you decide activity include or exclude
 
 payable supplier like hotel
 

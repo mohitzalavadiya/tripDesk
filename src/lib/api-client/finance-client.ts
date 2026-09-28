@@ -139,18 +139,24 @@ export const financeClient = {
   },
 
   /**
-   * List Supplier Payables
+   * List Supplier / Unified Payables
    */
   async getSupplierPayables(params?: {
+    search?: string;
     supplierId?: string;
     bookingId?: string;
     tripId?: string;
+    origin?: string;
+    serviceType?: string;
     status?: SupplierPayableStatus;
   }): Promise<SingleResponse<SupplierPayable[]>> {
     const q = new URLSearchParams();
+    if (params?.search) q.set("search", params.search);
     if (params?.supplierId) q.set("supplierId", params.supplierId);
     if (params?.bookingId) q.set("bookingId", params.bookingId);
     if (params?.tripId) q.set("tripId", params.tripId);
+    if (params?.origin) q.set("origin", params.origin);
+    if (params?.serviceType) q.set("serviceType", params.serviceType);
     if (params?.status) q.set("status", params.status);
 
     const qs = q.toString() ? `?${q.toString()}` : "";
@@ -162,7 +168,18 @@ export const financeClient = {
   },
 
   /**
-   * Record Supplier Payable
+   * Get Single Supplier / Unified Payable
+   */
+  async getSupplierPayableById(id: string): Promise<SingleResponse<SupplierPayable>> {
+    const res = await fetch(`/api/finance/supplier-payables/${encodeURIComponent(id)}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    return handleResponse<SingleResponse<SupplierPayable>>(res);
+  },
+
+  /**
+   * Record Supplier / Unified Payable
    */
   async createSupplierPayable(
     data: CreateSupplierPayableInput
@@ -176,15 +193,46 @@ export const financeClient = {
   },
 
   /**
+   * Update Supplier / Unified Payable
+   */
+  async updateSupplierPayable(
+    id: string,
+    data: UpdateSupplierPayableInput
+  ): Promise<SingleResponse<SupplierPayable>> {
+    const res = await fetch(`/api/finance/supplier-payables/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    return handleResponse<SingleResponse<SupplierPayable>>(res);
+  },
+
+  /**
+   * Delete / Soft-Cancel Supplier Payable
+   */
+  async deleteSupplierPayable(id: string, reason?: string): Promise<SingleResponse<{ success: boolean }>> {
+    const qs = reason ? `?reason=${encodeURIComponent(reason)}` : "";
+    const res = await fetch(`/api/finance/supplier-payables/${encodeURIComponent(id)}${qs}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+    });
+    return handleResponse<SingleResponse<{ success: boolean }>>(res);
+  },
+
+  /**
    * List Supplier Payments
    */
   async getSupplierPayments(params?: {
+    search?: string;
     supplierId?: string;
     payableId?: string;
+    bookingId?: string;
   }): Promise<SingleResponse<SupplierPayment[]>> {
     const q = new URLSearchParams();
+    if (params?.search) q.set("search", params.search);
     if (params?.supplierId) q.set("supplierId", params.supplierId);
     if (params?.payableId) q.set("payableId", params.payableId);
+    if (params?.bookingId) q.set("bookingId", params.bookingId);
 
     const qs = q.toString() ? `?${q.toString()}` : "";
     const res = await fetch(`/api/finance/supplier-payments${qs}`, {

@@ -81,15 +81,17 @@ export const refundCustomerPaymentSchema = z.object({
 export type RefundCustomerPaymentInput = z.infer<typeof refundCustomerPaymentSchema>;
 
 // ═════════════════════════════════════════════════════════════════════
-// SUPPLIER PAYABLE SCHEMAS
+// SUPPLIER / UNIFIED PAYABLE SCHEMAS
 // ═════════════════════════════════════════════════════════════════════
 
 export const createSupplierPayableSchema = z.object({
-  supplierId: z.string().min(1, "Supplier ID is required"),
+  supplierId: z.string().optional().nullable(),
+  payeeName: z.string().optional().nullable(),
+  origin: z.enum(["AUTOMATIC", "MANUAL"]).default("MANUAL"),
   bookingId: z.string().optional().nullable(),
   tripOperationId: z.string().optional().nullable(),
   tripId: z.string().optional().nullable(),
-  serviceType: z.string().default("HOTEL"),
+  serviceType: z.string().default("MANUAL"),
   serviceReferenceId: z.string().optional().nullable(),
   description: z.string().min(2, "Description is required"),
   currency: z.string().default("INR"),
@@ -103,12 +105,14 @@ export const createSupplierPayableSchema = z.object({
 export type CreateSupplierPayableInput = z.infer<typeof createSupplierPayableSchema>;
 
 export const updateSupplierPayableSchema = z.object({
+  payeeName: z.string().optional().nullable(),
   description: z.string().min(2).optional(),
   plannedAmount: z.coerce.number().min(0).optional(),
   actualAmount: z.coerce.number().min(0).optional(),
   dueDate: z.string().datetime().or(z.string().min(10)).optional().nullable(),
   status: z.nativeEnum(SupplierPayableStatus).optional(),
   notes: z.string().max(1000).optional().nullable(),
+  reason: z.string().max(500).optional().nullable(),
 });
 
 export type UpdateSupplierPayableInput = z.infer<typeof updateSupplierPayableSchema>;
@@ -118,7 +122,8 @@ export type UpdateSupplierPayableInput = z.infer<typeof updateSupplierPayableSch
 // ═════════════════════════════════════════════════════════════════════
 
 export const recordSupplierPaymentSchema = z.object({
-  supplierId: z.string().min(1, "Supplier ID is required"),
+  supplierId: z.string().optional().nullable(),
+  payeeName: z.string().optional().nullable(),
   payableId: z.string().optional().nullable(),
   bookingId: z.string().optional().nullable(),
   amount: z.coerce.number().positive("Disbursement amount must be greater than 0"),

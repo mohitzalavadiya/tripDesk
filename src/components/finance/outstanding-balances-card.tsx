@@ -20,6 +20,7 @@ import {
   SupplierOutstandingItem,
 } from "@/lib/services/finance-service";
 import { formatCurrency } from "@/lib/costing-engine";
+import { Pencil } from "lucide-react";
 
 interface OutstandingBalancesCardProps {
   customerReceivables: {
@@ -36,6 +37,8 @@ interface OutstandingBalancesCardProps {
   };
   onRecordCustomerPayment?: (bookingId: string) => void;
   onRecordSupplierPayment?: (payableId: string) => void;
+  onRecordPayable?: () => void;
+  onEditPayable?: (payableId: string) => void;
 }
 
 export function OutstandingBalancesCard({
@@ -43,19 +46,25 @@ export function OutstandingBalancesCard({
   supplierPayables,
   onRecordCustomerPayment,
   onRecordSupplierPayment,
+  onRecordPayable,
+  onEditPayable,
 }: OutstandingBalancesCardProps) {
   const [activeTab, setActiveTab] = React.useState<"customers" | "suppliers">("customers");
 
   return (
     <Card className="border-border bg-card shadow-sm">
       <CardHeader>
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Coins className="h-4 w-4 text-amber-500" />
-          Outstanding Balances & Collections
-        </CardTitle>
-        <CardDescription className="text-xs">
-          Track receivables from travelers and payables owed to service vendors.
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Coins className="h-4 w-4 text-amber-500" />
+              Outstanding Balances & Collections
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Track receivables from travelers and payables owed to service vendors.
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -223,17 +232,31 @@ export function OutstandingBalancesCard({
                       <div className="text-[11px] text-muted-foreground">
                         Paid: {formatCurrency(item.paidAmount)} / {formatCurrency(item.actualAmount)}
                       </div>
-                      {onRecordSupplierPayment && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs gap-1"
-                          onClick={() => onRecordSupplierPayment(item.payableId)}
-                        >
-                          <Plus className="h-3 w-3" />
-                          Pay Vendor
-                        </Button>
-                      )}
+                      <div className="flex items-center justify-end gap-1.5">
+                        {onEditPayable && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs px-2 gap-1"
+                            onClick={() => onEditPayable(item.payableId)}
+                            title="Edit Payable"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Edit
+                          </Button>
+                        )}
+                        {onRecordSupplierPayment && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1"
+                            onClick={() => onRecordSupplierPayment(item.payableId)}
+                          >
+                            <Plus className="h-3 w-3" />
+                            Pay Vendor
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
