@@ -44,11 +44,11 @@ export const createTripActivitySchema = z.object({
     .int("Participants must be an integer.")
     .min(1, "Participants must be at least 1.")
     .optional()
-    .default(1),
+    .nullable(),
   type: z
     .nativeEnum(ActivityType)
     .optional()
-    .default(ActivityType.INCLUDED),
+    .nullable(),
   adultPrice: z.coerce
     .number()
     .min(0, "Adult price cannot be negative.")

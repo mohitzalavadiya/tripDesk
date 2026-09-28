@@ -12495,6 +12495,75 @@ Execute a comprehensive UI/UX audit, component architecture cleanup, and respons
 
 ---
 
+# SECTION 191 — ACTIVITY ARCHITECTURE AUDIT & CONTROLLED SIMPLIFICATION [VERIFIED & CLOSED]
+
+## 191.1 Locked Business Architecture & Core Principles
+1. **Simplified Activity Concept**:
+   - Activities represent experiential items on a Trip with a binary package status: **`INCLUDED`** vs **`EXCLUDED`** (rendered on client and proposal views as **`Not Included`**).
+   - **No Activity Pricing / Financials**: Activities contribute ₹0 to package costing and have no rates, tariffs, markup, discount, tax, or payment fields.
+   - **No Timetable / Capacity Tracking**: Activities have no mandatory time, duration, location coordinates, supplier selector, or inventory constraints.
+2. **Activity Master (Reusable Catalogue)**:
+   - Contains: `Activity Name` (required), `Destination` (required, linked to existing Destination Master), `Description` (optional), internal agency `Notes` (optional), and `Status` (`ACTIVE` / `INACTIVE`).
+   - Tenant-isolated and owned per agency.
+   - Strictly contains no pricing, tariff, supplier, or permanent Include/Exclude default.
+3. **Trip Activity (Trip Inclusions & Exclusions)**:
+   - Belongs to an individual Trip.
+   - Supports two entry mechanisms:
+     - **Option A (Select from Catalogue)**: Choose from the agency's destination-filtered Activity Master list.
+     - **Option B (Manual One-off Entry)**: Type custom activity name directly without silently creating master records.
+   - Inclusion Status:
+     - **`INCLUDED`**: Included in the package price. Initialized in Operations as an `ActivityConfirmation` requirement.
+     - **`EXCLUDED`**: Not included in package price (guest purchases/pays directly on location). Excluded activities do not generate blocker confirmation tasks in operations.
+4. **Customer-Facing & Proposal Display**:
+   - Customer Portal (`/customer/trips/[tripId]`), Secure Token View (`/trip/[secureToken]`), Proposal View (`/q/[shareToken]`), and Preview (`/trips/[id]/quotation/preview`) cleanly render activity badges:
+     - **`Included`** / **`Included in Package`** (emerald badge).
+     - **`Not Included`** / **`Not Included (Pay on Site)`** (amber badge) with informational subtext: *"Ticket/admission directly payable by guest at the activity location"*.
+   - Never exposes internal pricing or cost concepts.
+
+## 191.2 Database & Codebase Changes
+- **Prisma Schema (`prisma/schema.prisma`)**:
+  - Updated `ActivityType` enum to `enum ActivityType { INCLUDED EXCLUDED OPTIONAL }` (preserving `OPTIONAL` for legacy DB safety without exposing it to active UI).
+  - Regenerated Prisma Client v7.9.1 via `npx prisma generate`.
+- **Validation Schemas (`src/lib/validation/activity-schema.ts` & `src/lib/validation/trip-activity-schema.ts`)**:
+  - Streamlined validation schemas around `name`, `destinationId`, `description`, `notes`, `type` (`INCLUDED` | `EXCLUDED`).
+  - Retained nullable legacy fields for backward compatibility with existing DB columns.
+- **Service Layer**:
+  - `src/lib/services/trip-costing-service.ts`: Set `activitiesTotal = 0` and removed monetary accumulation from trip costing.
+  - `src/lib/services/operations-service.ts`: Filtered `trip.tripActivities` so `ActivityConfirmation` records are only generated for `INCLUDED` activities.
+  - `src/lib/services/travel-document-service.ts`: Updated voucher generation to support custom one-off trip activities (`ta.name`).
+  - `src/lib/services/trip-public-service.ts` & `src/lib/services/booking-public-service.ts`: Serialized `activityName` and `type` (`INCLUDED` vs `EXCLUDED`).
+- **UI Streamlining**:
+  - Master pages (`/activities`, `/activities/new`, `/activities/[id]`): Simplified into clean table and forms without tariff/duration/pricing inputs.
+  - Trip Activity tab (`/trips/[id]`): Added dual-mode modal (Catalogue select vs Manual entry + Include/Not Included toggle).
+  - Customer & Quotation views (`/customer/trips/[tripId]`, `/q/[shareToken]`, `/trip/[secureToken]`, `/trips/[id]/quotation/preview`): Synchronized inclusion badges.
+
+## 191.3 Data Safety & Baseline Protection
+- **Permanent QA Baseline Preserved**: 32 Destinations, 22 Hotels, 66 RateSheets, 6 Vehicles, Agency Owner test agency, and Platform Owner intact.
+- **Historical Data Safety**: All 14 existing `TripActivity` records and 3 `Activity` records in the database were verified as `INCLUDED` and preserved without data loss or breaking schema alterations.
+- **Zero Parallel Systems**: Refactored existing models and services directly without creating duplicate tables or APIs.
+
+## 191.5 Activity Add Bug Fix & Modal UI Simplification [VERIFIED & CLOSED]
+- **PostgreSQL Enum Alignment**:
+  - Root cause: In PostgreSQL, enum `"ActivityType"` previously contained only `('INCLUDED', 'OPTIONAL')`. Inserting `type: "EXCLUDED"` caused a DB enum violation.
+  - Fix: Migrated PostgreSQL enum to include `'EXCLUDED'` (`ALTER TYPE "ActivityType" ADD VALUE 'EXCLUDED'`). Live database enum now aligns with Prisma schema: `['INCLUDED', 'OPTIONAL', 'EXCLUDED']`.
+- **Trip Activity Add API Bug Resolved**:
+  - `POST /api/trips/[id]/activities` now successfully handles `{ name, description, type: "EXCLUDED" }` for manual and catalogue activities.
+- **UI Simplification & Compact Modal**:
+  - Replaced bulky Add/Edit Activity modal with a compact, ultra-clean dialog (`max-w-md`) fitting standard viewports without vertical scrolling.
+  - **Removed `Assign to Itinerary Leg (Optional)` completely** from form state, payload, and dialog JSX.
+  - **Removed internal notes** from dialogs and simplified card view in the Activities tab.
+  - Binary inclusion selector: **Included in Package** (emerald) vs **Not Included (Pay on Site)** (amber).
+  - Catalogue selector automatically fills name and description while allowing one-click custom manual entry.
+- **Costing & Operations Intact**:
+  - Activities strictly contribute ₹0 to package costing.
+  - Operations continues generating `ActivityConfirmation` for `INCLUDED` activities and skipping `EXCLUDED`.
+- **Validation**:
+  - 8/8 automated test cases passed (Manual Included/Excluded, Catalogue Included/Excluded, Edit, Costing ₹0, Operations filtering, Tenant isolation).
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Exit code 0 across all routes (PASSED)**.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

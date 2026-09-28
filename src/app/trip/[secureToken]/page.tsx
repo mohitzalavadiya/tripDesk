@@ -1024,20 +1024,40 @@ export default function CustomerTripPortalPage() {
             </div>
 
             <div className="space-y-2.5">
-              {trip.activities.map((a) => (
-                <div
-                  key={a.id}
-                  className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/50 border border-slate-200/80 text-xs"
-                >
-                  <div className="space-y-0.5">
-                    <span className="font-bold text-slate-900">{a.activityName}</span>
-                    <p className="text-slate-500">{a.location} • {formatDate(a.date)}</p>
+              {trip.activities.map((a) => {
+                const isExcluded = a.type === "EXCLUDED" || a.type === "OPTIONAL";
+                return (
+                  <div
+                    key={a.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl bg-slate-50/50 border border-slate-200/80 text-xs gap-2"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">{a.activityName}</span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            isExcluded
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          }`}
+                        >
+                          {isExcluded ? "Not Included" : "Included"}
+                        </span>
+                      </div>
+                      {isExcluded ? (
+                        <p className="text-amber-700 text-[11px]">Directly payable on location by guest</p>
+                      ) : (
+                        a.location && <p className="text-slate-500">{a.location}</p>
+                      )}
+                    </div>
+                    {a.participantsCount && (
+                      <span className="font-semibold text-slate-700 bg-white px-2.5 py-1 rounded-md border border-slate-200 self-start sm:self-center">
+                        {a.participantsCount} Participants
+                      </span>
+                    )}
                   </div>
-                  <span className="font-semibold text-slate-700 bg-white px-2.5 py-1 rounded-md border border-slate-200">
-                    {a.participantsCount} Participants
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

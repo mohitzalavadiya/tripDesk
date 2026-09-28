@@ -454,21 +454,35 @@ export default function TripQuotationPreviewPage() {
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {activitiesList.map((act) => (
-                    <div key={act.id} className="p-3.5 bg-white border border-slate-200/80 rounded-2xl shadow-2xs space-y-1 text-xs">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <h4 className="font-extrabold text-slate-900">{act.name || act.activity?.name || "Excursion"}</h4>
-                        {act.date && (
-                          <span className="text-[10px] text-slate-400 font-medium shrink-0">
-                            {new Date(act.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  {activitiesList.map((act) => {
+                    const isExcluded = act.type === "EXCLUDED" || act.type === "OPTIONAL";
+                    return (
+                      <div key={act.id} className="p-3.5 bg-white border border-slate-200/80 rounded-2xl shadow-2xs space-y-2 text-xs">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h4 className="font-extrabold text-slate-900">{act.name || act.activity?.name || "Excursion"}</h4>
+                            {act.description && (
+                              <p className="text-slate-600 text-[11px] leading-relaxed mt-1">{act.description}</p>
+                            )}
+                          </div>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 border ${
+                              isExcluded
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            }`}
+                          >
+                            {isExcluded ? "Not Included" : "Included"}
                           </span>
+                        </div>
+                        {isExcluded && (
+                          <p className="text-[10px] text-amber-700 bg-amber-50/50 rounded-lg p-1.5 border border-amber-100">
+                            Ticket/admission directly payable by guest on location.
+                          </p>
                         )}
                       </div>
-                      {act.description && (
-                        <p className="text-slate-600 text-[11px] leading-relaxed">{act.description}</p>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

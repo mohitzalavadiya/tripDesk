@@ -455,7 +455,7 @@ export class TravelDocumentService {
           });
 
           if (!existing) {
-            const activityName = ac.tripActivity?.activity?.name || "Activity Sightseeing";
+            const activityName = ac.tripActivity?.name || ac.tripActivity?.activity?.name || "Activity Sightseeing";
             const docNum = await this.generateNextDocumentNumber(agencyId, TravelDocumentType.ACTIVITY_VOUCHER);
             const doc = await prisma.travelDocument.create({
               data: {
@@ -850,7 +850,7 @@ export class TravelDocumentService {
           customer,
           tripNumber: document.trip?.tripNumber || "TRIP",
           bookingNumber: document.booking?.bookingNumber,
-          activityName: activity?.name || "Sightseeing & Activity",
+          activityName: ac?.tripActivity?.name || activity?.name || "Sightseeing & Activity",
           activityLocation: activity?.location || undefined,
           activityDate: document.trip?.startDate,
           ticketNumber: ac?.ticketNumber,

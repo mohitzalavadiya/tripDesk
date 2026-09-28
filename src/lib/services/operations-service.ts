@@ -243,10 +243,11 @@ export const operationsService = {
         });
       }
 
-      // Populate Activity Confirmations from tripActivities
-      if (trip.tripActivities.length > 0) {
+      // Populate Activity Confirmations from INCLUDED tripActivities only (Excluded activities are directly paid/managed by guest)
+      const includedActivities = trip.tripActivities.filter((ta) => ta.type === "INCLUDED");
+      if (includedActivities.length > 0) {
         await tx.activityConfirmation.createMany({
-          data: trip.tripActivities.map((ta) => ({
+          data: includedActivities.map((ta) => ({
             agencyId,
             tripOperationId: operation.id,
             tripActivityId: ta.id,

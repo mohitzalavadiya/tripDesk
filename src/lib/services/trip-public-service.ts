@@ -238,8 +238,8 @@ export const tripPublicService = {
       })),
       activities: (trip.tripActivities || []).map((ta: any) => ({
         id: ta.id,
-        activityName: ta.activity?.name || ta.name || "Activity",
-        type: ta.activity?.type || "Sightseeing",
+        activityName: ta.name || ta.activity?.name || "Activity",
+        type: ta.type || "INCLUDED",
         location: ta.activity?.location || null,
         duration: ta.activity?.duration || null,
         date: ta.date || trip.startDate,

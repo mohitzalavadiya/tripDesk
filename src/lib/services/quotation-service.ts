@@ -122,6 +122,7 @@ export type QuotationWithRelations = Quotation & {
     tripActivities?: Array<{
       id: string;
       name: string;
+      type?: string | null;
       date?: Date | null;
       description?: string | null;
       notes?: string | null;

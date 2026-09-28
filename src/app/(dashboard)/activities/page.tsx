@@ -284,11 +284,9 @@ export default function ActivitiesPage() {
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">
-                      <TableHead className="py-3 px-4 font-bold text-slate-600 w-[260px]">Activity & Type</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600 w-[300px]">Activity Name</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Destination</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Location</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Duration</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Pricing Tariff</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">Description</TableHead>
                       <TableHead className="py-3 px-4 w-[80px] text-right font-bold text-slate-600">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -308,7 +306,6 @@ export default function ActivitiesPage() {
                               <span className="font-semibold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">
                                 {act.name}
                               </span>
-                              <span className="text-[10px] text-slate-500">{act.type}</span>
                             </div>
                           </div>
                         </TableCell>
@@ -317,40 +314,17 @@ export default function ActivitiesPage() {
                           {act.destination ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md">
                               <Compass className="h-3 w-3 text-emerald-600 shrink-0" />
-                              <span className="truncate max-w-[130px]">{act.destination.name}</span>
+                              <span className="truncate max-w-[150px]">{act.destination.name}</span>
                             </span>
                           ) : (
-                            <span className="text-slate-400 text-xs">-</span>
+                            <span className="text-slate-400 text-xs italic">Unassigned</span>
                           )}
                         </TableCell>
 
                         <TableCell className="py-3.5 px-4">
-                          <div className="flex items-center gap-1 text-xs text-slate-700">
-                            <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                            <span>{act.location || "Unspecified"}</span>
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="py-3.5 px-4">
-                          <div className="flex items-center gap-1 text-xs text-slate-600">
-                            <Clock className="h-3.5 w-3.5 text-slate-400" />
-                            <span>{act.duration || "Half Day"}</span>
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="py-3.5 px-4">
-                          <div className="flex flex-col text-xs text-slate-700">
-                            {act.adultPrice !== null && act.adultPrice !== undefined ? (
-                              <span className="font-semibold">₹{Number(act.adultPrice)} / adult</span>
-                            ) : act.price !== null && act.price !== undefined ? (
-                              <span className="font-semibold">₹{Number(act.price)} flat</span>
-                            ) : (
-                              <span className="text-slate-400">Custom / Inquire</span>
-                            )}
-                            {act.childPrice !== null && act.childPrice !== undefined && (
-                              <span className="text-[10px] text-slate-500">₹{Number(act.childPrice)} / child</span>
-                            )}
-                          </div>
+                          <span className="text-xs text-slate-600 line-clamp-1 max-w-md">
+                            {act.description || <span className="text-slate-400 italic">No description</span>}
+                          </span>
                         </TableCell>
 
                         <TableCell className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
@@ -401,26 +375,21 @@ export default function ActivitiesPage() {
                   <div
                     key={act.id}
                     onClick={() => router.push(`/activities/${act.id}`)}
-                    className="p-4 space-y-2.5 hover:bg-slate-50/50 cursor-pointer active:bg-slate-100 transition-colors"
+                    className="p-4 space-y-2 hover:bg-slate-50/50 cursor-pointer active:bg-slate-100 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <h4 className="font-bold text-slate-900 text-xs">{act.name}</h4>
-                        <p className="text-[11px] text-slate-500">{act.type} • {act.duration || "Half Day"}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        {act.destination && (
-                          <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 flex items-center font-medium">
-                            <Compass className="h-2.5 w-2.5" />
-                            {act.destination.name}
-                          </Badge>
-                        )}
-                        {act.adultPrice !== null && (
-                          <Badge variant="outline" className="text-[10px] bg-slate-50">
-                            ₹{Number(act.adultPrice)}
-                          </Badge>
+                        {act.description && (
+                          <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{act.description}</p>
                         )}
                       </div>
+                      {act.destination && (
+                        <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 flex items-center font-medium shrink-0">
+                          <Compass className="h-2.5 w-2.5" />
+                          {act.destination.name}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 ))}

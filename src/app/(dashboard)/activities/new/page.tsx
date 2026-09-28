@@ -28,13 +28,7 @@ const createActivitySchema = Yup.object().shape({
     .required("Activity name is required")
     .max(200, "Name cannot exceed 200 characters"),
   destinationId: Yup.string().nullable().optional(),
-  location: Yup.string().trim().max(200, "Location cannot exceed 200 characters"),
   description: Yup.string().trim().max(2000, "Description cannot exceed 2000 characters"),
-  duration: Yup.string().trim().max(100, "Duration cannot exceed 100 characters"),
-  type: Yup.string().oneOf(Object.values(ActivityType)).default(ActivityType.INCLUDED),
-  adultPrice: Yup.number().typeError("Price must be a number").min(0, "Cannot be negative").nullable(),
-  childPrice: Yup.number().typeError("Price must be a number").min(0, "Cannot be negative").nullable(),
-  price: Yup.number().typeError("Price must be a number").min(0, "Cannot be negative").nullable(),
   notes: Yup.string().trim().max(2000, "Notes cannot exceed 2000 characters"),
 });
 
@@ -47,13 +41,7 @@ export default function NewActivityPage() {
     initialValues: {
       name: "",
       destinationId: "",
-      location: "",
       description: "",
-      duration: "Half Day",
-      type: ActivityType.INCLUDED,
-      adultPrice: "",
-      childPrice: "",
-      price: "",
       notes: "",
     },
     validationSchema: createActivitySchema,
@@ -70,13 +58,7 @@ export default function NewActivityPage() {
         const res = await activityClient.createActivity({
           name: values.name.trim(),
           destinationId: values.destinationId || null,
-          location: values.location.trim() || undefined,
           description: values.description.trim() || undefined,
-          duration: values.duration.trim() || undefined,
-          type: values.type as ActivityType,
-          adultPrice: values.adultPrice !== "" ? Number(values.adultPrice) : undefined,
-          childPrice: values.childPrice !== "" ? Number(values.childPrice) : undefined,
-          price: values.price !== "" ? Number(values.price) : undefined,
           notes: values.notes.trim() || undefined,
         });
 
@@ -118,8 +100,8 @@ export default function NewActivityPage() {
         {isReadOnly && <ReadOnlyBanner moduleName="Activities & Excursions" />}
 
         <PageHeader
-          title="Add Activity / Tour"
-          description="Register a new sightseeing day-tour, entry ticket, or adventure activity."
+          title="Add Activity / Experience"
+          description="Register a reusable sightseeing activity or experience to your master catalogue."
           breadcrumbs={[
             { label: "Activities", href: "/activities" },
             { label: "New Activity" },
@@ -139,7 +121,7 @@ export default function NewActivityPage() {
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-5">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-2">
                 <Ticket className="h-4 w-4 text-indigo-600" />
-                <span>Excursion Details</span>
+                <span>Activity Details</span>
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -148,48 +130,12 @@ export default function NewActivityPage() {
                     Activity Name <span className="text-red-500">*</span>
                   </label>
                   <Input
-                    placeholder="e.g. Scuba Diving at Grande Island, Desert Safari with BBQ Dinner..."
+                    placeholder="e.g. Amber Fort Tour, Scuba Diving, Desert Safari, River Rafting..."
                     {...formik.getFieldProps("name")}
                     className={inputCls("name")}
                   />
                   {getFieldError("name") && (
                     <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("name")}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Inclusion Category</label>
-                  <Select
-                    value={formik.values.type}
-                    onValueChange={(val) => {
-                      if (val) {
-                        formik.setFieldValue("type", val);
-                        formik.setFieldTouched("type", true);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className={`h-9.5 text-xs bg-slate-50/50 border-slate-200 ${getFieldError("type") ? "border-red-500 focus:ring-red-500" : ""}`}>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ActivityType.INCLUDED}>Included in Package</SelectItem>
-                      <SelectItem value={ActivityType.OPTIONAL}>Optional / Add-on</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {getFieldError("type") && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("type")}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Duration</label>
-                  <Input
-                    placeholder="e.g. 2 Hours, Half Day, Full Day..."
-                    {...formik.getFieldProps("duration")}
-                    className={inputCls("duration")}
-                  />
-                  {getFieldError("duration") && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("duration")}</p>
                   )}
                 </div>
 
@@ -209,22 +155,10 @@ export default function NewActivityPage() {
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">Location / Landmark</label>
-                  <Input
-                    placeholder="e.g. Calangute Beach, North Goa"
-                    {...formik.getFieldProps("location")}
-                    className={inputCls("location")}
-                  />
-                  {getFieldError("location") && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("location")}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700">Description</label>
                   <Textarea
-                    placeholder="Overview of the experience, inclusions, itinerary highlights..."
-                    rows={3}
+                    placeholder="Overview of the experience, attractions visited, timing suggestions..."
+                    rows={4}
                     {...formik.getFieldProps("description")}
                     className={`text-xs bg-slate-50/50 border-slate-200 ${getFieldError("description") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                   />
@@ -235,62 +169,11 @@ export default function NewActivityPage() {
               </div>
             </div>
 
-            {/* Tariff Card */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-5">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">
-                Pricing & Tariffs
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Adult Price (₹)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="e.g. 1500"
-                    {...formik.getFieldProps("adultPrice")}
-                    className={inputCls("adultPrice")}
-                  />
-                  {getFieldError("adultPrice") && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("adultPrice")}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Child Price (₹)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="e.g. 800"
-                    {...formik.getFieldProps("childPrice")}
-                    className={inputCls("childPrice")}
-                  />
-                  {getFieldError("childPrice") && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("childPrice")}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Flat Group Price (₹)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Optional flat rate"
-                    {...formik.getFieldProps("price")}
-                    className={inputCls("price")}
-                  />
-                  {getFieldError("price") && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("price")}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
             {/* Notes Card */}
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-3">
               <label className="text-xs font-bold text-slate-700">Internal Agency Notes</label>
               <Textarea
-                placeholder="Vendor terms, cancellation policy, timing recommendations..."
+                placeholder="Vendor contact info, peak season tips, customer guidelines..."
                 rows={3}
                 {...formik.getFieldProps("notes")}
                 className={`text-xs bg-slate-50/50 border-slate-200 ${getFieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""}`}

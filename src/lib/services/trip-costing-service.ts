@@ -257,63 +257,23 @@ export const tripCostingService = {
       };
     });
 
-    // 5. Calculate Activity Costings from Pre-Fetched Batch Rates
+    // 5. Activities (Non-Monetary Descriptive List: Included / Excluded)
     let activitiesTotal = 0;
     const activities: ActivityCostItem[] = trip.tripActivities.map((ta) => {
-      let adultPrice = ta.adultPrice ? Number(ta.adultPrice) : 0;
-      let childPrice = ta.childPrice ? Number(ta.childPrice) : 0;
-      const participants = ta.numberOfParticipants || travelersCount;
-      let totalCost = ta.totalPrice ? Number(ta.totalPrice) : 0;
-      let rateSource: "RATE_SHEET" | "TRIP_SNAPSHOT" = "TRIP_SNAPSHOT";
-      let rateSheetId: string | undefined = undefined;
-      let rateSheetNumber: string | null | undefined = undefined;
-      let supplierName: string | null | undefined = undefined;
-      let seasonName: string | null | undefined = undefined;
-
-      if (ta.activityId) {
-        const matchedRate = activityRateMap.get(ta.id) || { matched: false, currency: "INR", costPrice: 0, priority: 0 };
-
-        if (matchedRate.matched) {
-          rateSource = "RATE_SHEET";
-          rateSheetId = matchedRate.rateSheetId;
-          rateSheetNumber = matchedRate.rateSheetNumber;
-          supplierName = matchedRate.supplierName;
-          seasonName = matchedRate.seasonName;
-
-          if (matchedRate.adultCost !== null || matchedRate.childCost !== null) {
-            adultPrice = matchedRate.adultCost ?? 0;
-            childPrice = matchedRate.childCost ?? 0;
-            const effectiveAdults = adultsCount > 0 ? adultsCount : participants;
-            totalCost = (adultPrice * effectiveAdults) + (childPrice * childrenCount);
-          } else if (matchedRate.costPrice > 0) {
-            totalCost = matchedRate.costPrice;
-          }
-        }
-      }
-
-      if (rateSource === "TRIP_SNAPSHOT" && totalCost === 0) {
-        if (adultPrice > 0 || childPrice > 0) {
-          const effectiveAdults = adultsCount > 0 ? adultsCount : participants;
-          totalCost = (adultPrice * effectiveAdults) + (childPrice * childrenCount);
-        }
-      }
-
-      activitiesTotal += totalCost;
-
       return {
         id: ta.id,
         activityId: ta.activityId,
         activityName: ta.name,
         type: ta.type,
-        numberOfParticipants: participants,
-        adultPrice,
-        childPrice,
-        totalCost: Math.round(totalCost * 100) / 100,
-        rateSource,
-        rateSheetId,
-        rateSheetNumber,
-        supplierName,
-        seasonName,
+        numberOfParticipants: 1,
+        adultPrice: 0,
+        childPrice: 0,
+        totalCost: 0,
+        rateSource: "TRIP_SNAPSHOT",
+        rateSheetId: undefined,
+        rateSheetNumber: undefined,
+        supplierName: undefined,
+        seasonName: undefined,
       };
     });
 

@@ -73,6 +73,7 @@ enum VehiclePricingType {
 
 enum ActivityType {
   INCLUDED
+  EXCLUDED
   OPTIONAL
 }
 
