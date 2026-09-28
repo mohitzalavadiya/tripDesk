@@ -181,6 +181,11 @@ export const agencyNavigationConfig: NavigationSection[] = [
         href: "/subscription",
         icon: CreditCard,
       },
+      {
+        label: "Support Chat",
+        href: "/support",
+        icon: MessageSquare,
+      },
     ],
   },
 ];
@@ -196,6 +201,11 @@ export const adminNavigationConfig: NavigationSection[] = [
         label: "Admin Dashboard",
         href: "/admin",
         icon: LayoutDashboard,
+      },
+      {
+        label: "Support Chat",
+        href: "/admin/chat",
+        icon: MessageSquare,
       },
       {
         label: "Agencies",

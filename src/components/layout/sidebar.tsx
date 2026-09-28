@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { PlaneTakeoff, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
 import { agencyNavigationConfig, adminNavigationConfig, secondaryNavigation } from "@/lib/navigation";
 import { useAuth } from "@/context/auth-context";
+import { usePlatformChatUnreadCount } from "@/hooks/use-platform-chat";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -24,6 +25,7 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
   const { currentUser, isPlatformOwner } = useAuth();
   const isPlatform = isPlatformOwner || pathname.startsWith("/admin");
   const navSections = isPlatform ? adminNavigationConfig : agencyNavigationConfig;
+  const { unreadCount: chatUnreadCount } = usePlatformChatUnreadCount();
 
   return (
     <TooltipProvider delay={0}>
@@ -86,6 +88,8 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href || (item.href !== "/admin" && item.href !== "/dashboard" && pathname.startsWith(item.href));
+                  const isSupportChat = item.href === "/support" || item.href === "/admin/chat";
+                  const hasUnread = isSupportChat && chatUnreadCount > 0;
 
                   return (
                     <Tooltip key={item.label} disabled={!collapsed}>
@@ -111,16 +115,21 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                               />
                             )}
 
-                            <Icon
-                              className={cn(
-                                "h-5 w-5 shrink-0 transition-colors",
-                                isActive
-                                  ? isPlatform
-                                    ? "text-purple-400"
-                                    : "text-indigo-400"
-                                  : "text-slate-400 group-hover:text-white"
+                            <div className="relative shrink-0 flex items-center justify-center">
+                              <Icon
+                                className={cn(
+                                  "h-5 w-5 shrink-0 transition-colors",
+                                  isActive
+                                    ? isPlatform
+                                      ? "text-purple-400"
+                                      : "text-indigo-400"
+                                    : "text-slate-400 group-hover:text-white"
+                                )}
+                              />
+                              {hasUnread && (
+                                <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-purple-500 ring-2 ring-sidebar animate-pulse" />
                               )}
-                            />
+                            </div>
 
                             {!collapsed && (
                               <span className="truncate flex-1 animate-in fade-in duration-150">
@@ -128,7 +137,14 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                               </span>
                             )}
 
-                            {!collapsed && item.badge && (
+                            {!collapsed && hasUnread && (
+                              <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 leading-none bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+                                {chatUnreadCount > 1 ? `${chatUnreadCount} new` : "New"}
+                              </span>
+                            )}
+
+                            {!collapsed && !hasUnread && item.badge && (
                               <span
                                 className={cn(
                                   "text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0 leading-none select-none",
@@ -151,6 +167,11 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                         {item.label}
                         {item.badge && (
                           <span className="ml-1.5 font-bold text-slate-400">({item.badge})</span>
+                        )}
+                        {hasUnread && (
+                          <span className="ml-1.5 font-bold text-purple-400">
+                            ({chatUnreadCount > 1 ? `${chatUnreadCount} unread` : "Unread"})
+                          </span>
                         )}
                       </TooltipContent>
                     </Tooltip>

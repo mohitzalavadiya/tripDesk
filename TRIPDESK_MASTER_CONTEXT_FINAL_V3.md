@@ -12381,6 +12381,89 @@ Execute a comprehensive UI/UX audit, component architecture cleanup, and respons
 
 ---
 
+## 189. Platform Owner ↔ Agency Owner Support Chat (Phase 189) — CLOSED
+
+- **Status**: **COMPLETED / CLOSED** (Fully verified in production code; final manual two-browser verification completed and confirmed by user).
+- **Objective & Scope**:
+  - Implemented a private, persistent, real-time, two-way communication channel between `PLATFORM_OWNER` and `AGENCY_OWNER`.
+  - Core use cases: Onboarding guidance, trial assistance, support questions, plan discussions, payment support, conversion assistance.
+  - Exactly one persistent, lazy-created conversation per agency (`@@unique([agencyId])`).
+- **Database Models & Constraints**:
+  - `PlatformChatConversation`:
+    - Exactly one conversation per agency enforced via database uniqueness `@@unique([agencyId])`.
+    - Fields: `id`, `agencyId`, `status`, `lastMessageAt`, `lastMessageSnippet`, `lastMessageSenderRole`, `agencyLastReadAt`, `platformLastReadAt`, `createdAt`, `updatedAt`.
+    - Indexes: `@@index([agencyId])`, `@@index([lastMessageAt])`, `@@index([status])`.
+  - `PlatformChatMessage`:
+    - Fields: `id`, `conversationId`, `agencyId`, `senderUserId`, `senderRole`, `messageText`, `clientMessageId`, `createdAt`.
+    - Constraints: `@@unique([conversationId, clientMessageId])` for idempotent message sending, optimistic reconciliation, and duplicate prevention.
+    - Indexes: `@@index([conversationId, createdAt])`, `@@index([agencyId])`, `@@index([senderUserId])`.
+    - Storage convention: Absolute UTC timestamps (`TIMESTAMP(3)`).
+- **Read State & Drift Prevention**:
+  - Uses conversation-level timestamp boundaries (`agencyLastReadAt` and `platformLastReadAt`) instead of mutable per-message flags or mutable counters.
+  - Unread counts are dynamically and recoverably computed from persistent database records where `createdAt > <lastReadAt>` and sender is the counterpart.
+  - Zero unread counter drift across multi-tab sessions, reconnects, or duplicate realtime events.
+- **Security & Row Level Security (RLS)**:
+  - Strict server-derived identity: `senderUserId`, `senderRole`, and `agencyId` are determined strictly from the authenticated Supabase session and Prisma user context.
+  - Client-supplied identity is never trusted.
+  - PostgreSQL Row Level Security (RLS) is active on `platform_chat_conversations` and `platform_chat_messages`:
+    - Platform Owners have global access to all agency chat records.
+    - Agency Owners are strictly isolated to their own `agencyId`.
+    - Direct client-side writes are prohibited; all writes flow through authenticated Next.js API routes (`/api/chat/...`).
+    - Evaluated securely via `SECURITY DEFINER` function `public.is_chat_participant(message_agency_id text)` with appropriate `GRANT SELECT ON platform_chat_messages TO authenticated` and `GRANT EXECUTE ON FUNCTION public.is_chat_participant TO authenticated`.
+  - Plain text rendering prevents HTML/XSS injection.
+- **Supabase Realtime Architecture**:
+  - Postgres Changes: Subscriptions listen exclusively to `postgres_changes` events (`INSERT` on `platform_chat_messages`) with conversation filter `conversationId=eq.${conversationId}`.
+  - Channel name: `platform-chat:${conversationId}`.
+  - Token Synchronization: Authenticated Supabase session token is synchronized on init and refreshed dynamically (`supabase.realtime.setAuth`).
+  - Two-Way Realtime Verification: Verified live two-way message delivery in real-time between Agency Owner (`/support`) and Platform Owner (`/admin/chat`) without page refreshes.
+  - Initialization race prevention: Initial message history fetch and Realtime subscription are merged with persistent ID and `clientMessageId` deduplication.
+  - Reconnection handling: Automatically backfills history on browser reconnect/online events.
+- **Timestamp Normalization & Deterministic Ordering**:
+  - Storage: Absolute UTC instant stored in PostgreSQL.
+  - Normalization: `normalizeIsoTimestamp` normalizes un-suffixed Realtime payload timestamps into UTC ISO strings ending in `Z` prior to Date parsing.
+  - Presentation: `formatChatTime` and `formatShortDate` render timestamps in the user's local browser timezone dynamically without hardcoded offsets.
+  - Ordering: `sortChatMessages` deterministically orders messages by `createdAt` epoch ASC (primary key) and `id` ASC (tiebreaker), ensuring messages never jump or invert upon Realtime arrival.
+- **Composer UX & Focus Behavior**:
+  - Deterministic focus restoration: After sending a message (via Enter or Send button), input focus is automatically restored via `inputRef` and non-blocking textarea states, allowing seamless sequential typing while preserving optimistic UI, empty validation, and multiline Shift+Enter.
+- **Sidebar & Mobile Support Chat Unread Indicator**:
+  - Integrated `usePlatformChatUnreadCount` into `Sidebar` and `MobileNav`.
+  - Displays a responsive unread indicator (pill/badge when expanded, glowing indicator dot on icon when collapsed or in mobile drawer) when unread messages exist.
+  - Synchronizes on route changes, `markAsRead` actions, Realtime chat events, and existing 30s background notification refreshes without creating polling loops or second state systems.
+  - Multi-conversation handling: For Platform Owner, aggregates all unread agency conversations and clears only when all relevant conversations are marked as read.
+- **Subscription Lifecycle & Chat Accessibility**:
+  - Implemented `requireAgencyOwnerChatAccess()`: Authenticated Agency Owners retain access to support chat even if their subscription is `EXPIRED` or `CANCELLED`, allowing them to communicate with the Platform Owner for plan upgrades, extensions, or billing support. Normal agency operational write access remains restricted as per subscription lifecycle rules.
+- **Notification Integration**:
+  - Reused existing `UserNotification` model and `InternalNotificationService` with `UserNotificationType.PLATFORM_CHAT_MESSAGE`.
+  - Messages sent by Agency Owner notify the Platform Owner; messages sent by Platform Owner notify the Agency Owner.
+- **UI & Entry Points**:
+  - Agency Owner Support Chat: `/support` (accessible from navigation and sidebar).
+  - Platform Owner Centralized Chat: `/admin/chat` (split master-detail view with search, unread filtering, Agency 360 overview sidebar, and message timeline).
+  - Agency 360 Link: Quick "Open Support Chat" action added to `/admin/agencies/[agencyId]`.
+  - Responsive design: Full mobile 320px support, word wrapping, smooth auto-scroll, optimistic sending state, and connection health indicators.
+- **Intentionally Deferred / Out of Scope**:
+  - File attachments / media uploads.
+  - Typing indicators (Supabase Broadcast).
+  - Presence / online state indicators (Supabase Presence).
+  - Message reactions / emojis.
+  - Message editing / deletion.
+  - Voice / video calls.
+  - Multiple support departments / ticket assignment / SLA workflows.
+  - AI chatbot integration.
+  - Email / WhatsApp / SMS cross-channel delivery.
+  - Customer communications integration (strictly for Platform Owner ↔ Agency Owner).
+  - Subscription/billing mutations directly executed from chat.
+- **Final Verification & Closure**:
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Production build compiled successfully with exit code 0 (PASSED)**.
+  - User Manual Verification Confirmed:
+    1. Realtime live delivery in both directions without refresh.
+    2. Accurate timestamp presentation in local timezone.
+    3. Deterministic chronological message ordering.
+    4. Composer focus restoration after sending.
+    5. Support Chat sidebar unread indicator display and dismissal upon reading.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
