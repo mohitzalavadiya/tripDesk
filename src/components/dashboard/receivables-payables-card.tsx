@@ -77,23 +77,23 @@ export function ReceivablesPayablesCard({
 
           {/* Aging Summary Badges */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-3">
-            <div className="p-3 bg-rose-50/60 rounded-xl border border-rose-100 flex items-center justify-between sm:block">
-              <span className="text-[10px] uppercase font-bold text-rose-700 block">Total Due</span>
-              <strong className="text-sm sm:text-base text-rose-900 font-mono font-bold block sm:mt-0.5">
+            <div className="p-3 bg-rose-50/60 rounded-xl border border-rose-100 flex items-center justify-between sm:block min-w-0">
+              <span className="text-[10px] uppercase font-bold text-rose-700 block whitespace-nowrap">Total Due</span>
+              <strong className="text-sm sm:text-base text-rose-900 font-mono font-bold block sm:mt-0.5 tabular-nums whitespace-nowrap">
                 {formatRupees(receivables?.totalOutstanding)}
               </strong>
             </div>
 
-            <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-100 flex items-center justify-between sm:block">
-              <span className="text-[10px] uppercase font-bold text-amber-700 block">Overdue</span>
-              <strong className="text-sm sm:text-base text-amber-900 font-mono font-bold block sm:mt-0.5">
+            <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-100 flex items-center justify-between sm:block min-w-0">
+              <span className="text-[10px] uppercase font-bold text-amber-700 block whitespace-nowrap">Overdue</span>
+              <strong className="text-sm sm:text-base text-amber-900 font-mono font-bold block sm:mt-0.5 tabular-nums whitespace-nowrap">
                 {formatRupees(receivables?.overdueAmount)}
               </strong>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between sm:block">
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Overdue Count</span>
-              <strong className="text-sm sm:text-base text-slate-900 font-mono font-bold block sm:mt-0.5">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between sm:block min-w-0">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block whitespace-nowrap">Overdue Count</span>
+              <strong className="text-sm sm:text-base text-slate-900 font-mono font-bold block sm:mt-0.5 tabular-nums whitespace-nowrap">
                 {receivables?.overdueBookingsCount ?? 0} bookings
               </strong>
             </div>
@@ -121,8 +121,8 @@ export function ReceivablesPayablesCard({
                       <div className="text-[10px] text-slate-500 truncate">{r.bookingNumber} • {r.tripTitle}</div>
                     </div>
                     <div className="text-right font-mono shrink-0">
-                      <div className="font-bold text-rose-700">{formatRupees(r.balanceAmount)}</div>
-                      <div className="text-[10px] text-slate-400">Total: {formatRupees(r.totalAmount)}</div>
+                      <div className="font-bold text-rose-700 tabular-nums whitespace-nowrap">{formatRupees(r.balanceAmount)}</div>
+                      <div className="text-[10px] text-slate-400 tabular-nums whitespace-nowrap">Total: {formatRupees(r.totalAmount)}</div>
                     </div>
                   </Link>
                 ))}
@@ -147,23 +147,23 @@ export function ReceivablesPayablesCard({
 
           {/* Payables Summary Badges */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-3">
-            <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 flex items-center justify-between sm:block">
-              <span className="text-[10px] uppercase font-bold text-indigo-700 block">Total Cost</span>
-              <strong className="text-sm sm:text-base text-indigo-900 font-mono font-bold block sm:mt-0.5">
+            <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 flex items-center justify-between sm:block min-w-0">
+              <span className="text-[10px] uppercase font-bold text-indigo-700 block whitespace-nowrap">Total Cost</span>
+              <strong className="text-sm sm:text-base text-indigo-900 font-mono font-bold block sm:mt-0.5 tabular-nums whitespace-nowrap">
                 {formatRupees(payables?.totalPayable)}
               </strong>
             </div>
 
-            <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 flex items-center justify-between sm:block">
-              <span className="text-[10px] uppercase font-bold text-emerald-700 block">Paid Out</span>
-              <strong className="text-sm sm:text-base text-emerald-900 font-mono font-bold block sm:mt-0.5">
+            <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 flex items-center justify-between sm:block min-w-0">
+              <span className="text-[10px] uppercase font-bold text-emerald-700 block whitespace-nowrap">Paid Out</span>
+              <strong className="text-sm sm:text-base text-emerald-900 font-mono font-bold block sm:mt-0.5 tabular-nums whitespace-nowrap">
                 {formatRupees(payables?.paidAmount)}
               </strong>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between sm:block">
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Outstanding</span>
-              <strong className="text-sm sm:text-base text-slate-900 font-mono font-bold block sm:mt-0.5">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between sm:block min-w-0">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block whitespace-nowrap">Outstanding</span>
+              <strong className="text-sm sm:text-base text-slate-900 font-mono font-bold block sm:mt-0.5 tabular-nums whitespace-nowrap">
                 {formatRupees(payables?.outstandingAmount)}
               </strong>
             </div>
@@ -190,8 +190,8 @@ export function ReceivablesPayablesCard({
                       <div className="text-[10px] text-slate-500 truncate">{s.supplierType}</div>
                     </div>
                     <div className="text-right font-mono shrink-0">
-                      <div className="font-bold text-indigo-700">{formatRupees(s.outstandingAmount)}</div>
-                      <div className="text-[10px] text-slate-400">Total: {formatRupees(s.plannedAmount)}</div>
+                      <div className="font-bold text-indigo-700 tabular-nums whitespace-nowrap">{formatRupees(s.outstandingAmount)}</div>
+                      <div className="text-[10px] text-slate-400 tabular-nums whitespace-nowrap">Total: {formatRupees(s.plannedAmount)}</div>
                     </div>
                   </div>
                 ))}

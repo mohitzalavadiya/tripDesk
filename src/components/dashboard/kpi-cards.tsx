@@ -63,30 +63,30 @@ export function KpiCards({ summary, loading = false }: KpiCardsProps) {
   const crm = summary?.crm;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* 4 Primary Executive KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {/* 1. Total Booking Value & Revenue */}
         <Link
           href="/bookings"
-          className="group relative flex flex-col justify-between p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all duration-200"
+          className="group relative flex flex-col justify-between p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all duration-200"
         >
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 Total Bookings
               </span>
-              <div className="h-8 w-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="h-8 w-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
                 <IndianRupee className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-slate-900 tracking-tight mt-2">
+            <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-2 tabular-nums whitespace-nowrap truncate">
               {formatRupees(fin?.totalBookingValue)}
             </div>
           </div>
-          <div className="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-50 mt-3">
-            <span>Collected: <strong className="text-emerald-700 font-bold">{formatRupees(fin?.amountCollected)}</strong></span>
-            <span className="text-indigo-600 font-semibold flex items-center group-hover:translate-x-0.5 transition-transform">
+          <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-slate-500 pt-2.5 sm:pt-3 border-t border-slate-100 mt-2.5 sm:mt-3">
+            <span className="whitespace-nowrap">Collected: <strong className="text-emerald-700 font-bold tabular-nums">{formatRupees(fin?.amountCollected)}</strong></span>
+            <span className="text-indigo-600 font-semibold flex items-center group-hover:translate-x-0.5 transition-transform whitespace-nowrap">
               Bookings <ArrowUpRight className="h-3 w-3 ml-0.5" />
             </span>
           </div>
@@ -95,80 +95,80 @@ export function KpiCards({ summary, loading = false }: KpiCardsProps) {
         {/* 2. Outstanding Receivables & Balance */}
         <Link
           href="/payments"
-          className="group relative flex flex-col justify-between p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-rose-300 transition-all duration-200"
+          className="group relative flex flex-col justify-between p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-rose-300 transition-all duration-200"
         >
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 Receivables
               </span>
-              <div className="h-8 w-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="h-8 w-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
                 <CreditCard className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-rose-700 tracking-tight mt-2">
+            <div className="text-xl sm:text-2xl font-black text-rose-700 tracking-tight mt-2 tabular-nums whitespace-nowrap truncate">
               {formatRupees(fin?.outstandingReceivables)}
             </div>
           </div>
-          <div className="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-50 mt-3">
-            <span>Payables: <strong className="text-slate-700 font-bold">{formatRupees(fin?.supplierOutstanding)}</strong></span>
-            <span className="text-rose-600 font-semibold flex items-center group-hover:translate-x-0.5 transition-transform">
+          <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-slate-500 pt-2.5 sm:pt-3 border-t border-slate-100 mt-2.5 sm:mt-3">
+            <span className="whitespace-nowrap">Payables: <strong className="text-slate-700 font-bold tabular-nums">{formatRupees(fin?.supplierOutstanding)}</strong></span>
+            <span className="text-rose-600 font-semibold flex items-center group-hover:translate-x-0.5 transition-transform whitespace-nowrap">
               Ledger <ArrowUpRight className="h-3 w-3 ml-0.5" />
             </span>
           </div>
         </Link>
 
         {/* 3. Estimated Profit & Margin */}
-        <div className="flex flex-col justify-between p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
+        <div className="flex flex-col justify-between p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-emerald-300 transition-all duration-200">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 Gross Profit
               </span>
-              <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                 <TrendingUp className="h-4 w-4" />
               </div>
             </div>
-            <div className="flex items-baseline gap-2 mt-2">
-              <span className="text-2xl font-black text-emerald-700 tracking-tight">
+            <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2 mt-2">
+              <span className="text-xl sm:text-2xl font-black text-emerald-700 tracking-tight tabular-nums whitespace-nowrap">
                 {formatRupees(fin?.grossProfit)}
               </span>
-              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold whitespace-nowrap">
                 {fin?.grossMarginPercent ?? 0}% Margin
               </Badge>
             </div>
           </div>
-          <div className="text-xs text-slate-500 pt-3 border-t border-slate-50 mt-3">
-            <span>Cost: <strong className="text-slate-700 font-bold">{formatRupees(fin?.supplierPayable)}</strong></span>
+          <div className="text-xs text-slate-500 pt-2.5 sm:pt-3 border-t border-slate-100 mt-2.5 sm:mt-3">
+            <span className="whitespace-nowrap">Cost: <strong className="text-slate-700 font-bold tabular-nums">{formatRupees(fin?.supplierPayable)}</strong></span>
           </div>
         </div>
 
         {/* 4. Sales Conversion & Funnel Won */}
         <Link
           href="/enquiries"
-          className="group relative flex flex-col justify-between p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-purple-300 transition-all duration-200"
+          className="group relative flex flex-col justify-between p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-purple-300 transition-all duration-200"
         >
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 Booking Conversion
               </span>
-              <div className="h-8 w-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="h-8 w-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
                 <ShieldCheck className="h-4 w-4" />
               </div>
             </div>
-            <div className="flex items-baseline gap-2 mt-2">
-              <span className="text-2xl font-black text-purple-900 tracking-tight">
+            <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2 mt-2">
+              <span className="text-xl sm:text-2xl font-black text-purple-900 tracking-tight tabular-nums whitespace-nowrap">
                 {sales?.bookingConversionRate ?? 0}%
               </span>
-              <span className="text-xs font-bold text-slate-500">
+              <span className="text-xs font-bold text-slate-500 whitespace-nowrap">
                 ({sales?.confirmedBookings ?? 0} Won)
               </span>
             </div>
           </div>
-          <div className="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-50 mt-3">
-            <span>Enquiries: <strong className="text-slate-700 font-bold">{sales?.newEnquiries ?? 0} new</strong></span>
-            <span className="text-purple-600 font-semibold flex items-center group-hover:translate-x-0.5 transition-transform">
+          <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-slate-500 pt-2.5 sm:pt-3 border-t border-slate-100 mt-2.5 sm:mt-3">
+            <span className="whitespace-nowrap">Enquiries: <strong className="text-slate-700 font-bold">{sales?.newEnquiries ?? 0} new</strong></span>
+            <span className="text-purple-600 font-semibold flex items-center group-hover:translate-x-0.5 transition-transform whitespace-nowrap">
               CRM <ArrowUpRight className="h-3 w-3 ml-0.5" />
             </span>
           </div>
@@ -176,43 +176,43 @@ export function KpiCards({ summary, loading = false }: KpiCardsProps) {
       </div>
 
       {/* Secondary Operations & CRM Fast Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Compass className="h-4 w-4 text-indigo-600" />
-            <span className="text-xs font-bold text-slate-700">Upcoming Trips</span>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="p-3 bg-white sm:bg-slate-50/80 rounded-xl border border-slate-200/80 sm:border-slate-100 flex items-center justify-between gap-1.5 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 truncate">
+            <Compass className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+            <span className="text-xs font-bold text-slate-700 truncate">Upcoming Trips</span>
           </div>
-          <Badge variant="outline" className="bg-white text-indigo-700 font-bold text-xs">
+          <Badge variant="outline" className="bg-white text-indigo-700 font-bold text-xs shrink-0 tabular-nums">
             {ops?.upcomingTripsCount ?? 0}
           </Badge>
         </div>
 
-        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            <span className="text-xs font-bold text-slate-700">Ready Trips</span>
+        <div className="p-3 bg-white sm:bg-slate-50/80 rounded-xl border border-slate-200/80 sm:border-slate-100 flex items-center justify-between gap-1.5 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 truncate">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+            <span className="text-xs font-bold text-slate-700 truncate">Ready Trips</span>
           </div>
-          <Badge variant="outline" className="bg-white text-emerald-700 font-bold text-xs">
+          <Badge variant="outline" className="bg-white text-emerald-700 font-bold text-xs shrink-0 tabular-nums">
             {ops?.operationallyReadyTripsCount ?? 0}
           </Badge>
         </div>
 
-        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-amber-600" />
-            <span className="text-xs font-bold text-slate-700">Due Follow-ups</span>
+        <div className="p-3 bg-white sm:bg-slate-50/80 rounded-xl border border-slate-200/80 sm:border-slate-100 flex items-center justify-between gap-1.5 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 truncate">
+            <Clock className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+            <span className="text-xs font-bold text-slate-700 truncate">Due Follow-ups</span>
           </div>
-          <Badge variant="outline" className="bg-white text-amber-700 font-bold text-xs">
+          <Badge variant="outline" className="bg-white text-amber-700 font-bold text-xs shrink-0 tabular-nums">
             {crm?.followUpsDueTodayCount ?? 0}
           </Badge>
         </div>
 
-        <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-rose-600" />
-            <span className="text-xs font-bold text-slate-700">Overdue Leads</span>
+        <div className="p-3 bg-white sm:bg-slate-50/80 rounded-xl border border-slate-200/80 sm:border-slate-100 flex items-center justify-between gap-1.5 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 truncate">
+            <AlertTriangle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+            <span className="text-xs font-bold text-slate-700 truncate">Overdue Leads</span>
           </div>
-          <Badge variant="outline" className="bg-white text-rose-700 font-bold text-xs">
+          <Badge variant="outline" className="bg-white text-rose-700 font-bold text-xs shrink-0 tabular-nums">
             {crm?.overdueFollowUpsCount ?? 0}
           </Badge>
         </div>

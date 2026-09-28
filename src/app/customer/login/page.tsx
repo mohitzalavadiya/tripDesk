@@ -2,11 +2,21 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useFormik } from "formik";
+import * as Yup from "yup";
 import { customerPortalClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Compass, ShieldCheck, ArrowRight, Loader2, Sparkles, KeyRound } from "lucide-react";
+import { Compass, ShieldCheck, ArrowRight, Loader2, KeyRound, AlertCircle } from "lucide-react";
+
+const customerLoginValidationSchema = Yup.object().shape({
+  bookingNumber: Yup.string()
+    .trim()
+    .required("Booking Reference or Travel Pass Token is required.")
+    .min(3, "Reference must be at least 3 characters."),
+  phone: Yup.string().trim().max(30, "Phone number cannot exceed 30 characters."),
+});
 
 export default function CustomerLoginPage() {
   return (
@@ -28,40 +38,42 @@ function CustomerLoginForm() {
   const searchParams = useSearchParams();
   const tokenParam = searchParams.get("token") || searchParams.get("b") || "";
 
-  const [bookingNumber, setBookingNumber] = React.useState(tokenParam);
-  const [phone, setPhone] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [serverError, setServerError] = React.useState<string | null>(null);
+
+  const formik = useFormik({
+    initialValues: {
+      bookingNumber: tokenParam,
+      phone: "",
+    },
+    enableReinitialize: true,
+    validationSchema: customerLoginValidationSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      setServerError(null);
+      setSubmitting(true);
+
+      try {
+        await customerPortalClient.access(values.bookingNumber.trim(), values.phone.trim() || undefined);
+        toast.success("Welcome back! Loading your travel itinerary...");
+        router.push("/customer");
+      } catch (err: any) {
+        const msg = err?.message || "Invalid booking reference or phone number.";
+        setServerError(msg);
+        toast.error(msg);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
 
   // Auto-authenticate if token passed in URL
   React.useEffect(() => {
     if (tokenParam) {
-      handleAccess(tokenParam, "");
+      formik.submitForm();
     }
   }, [tokenParam]);
 
-  const handleAccess = async (identifier: string, phoneNumber?: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      await customerPortalClient.access(identifier, phoneNumber || undefined);
-      toast.success("Welcome back! Loading your travel itinerary...");
-      router.push("/customer");
-    } catch (err: any) {
-      setError(err?.message || "Invalid booking reference or phone number.");
-      toast.error(err?.message || "Could not access booking.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bookingNumber.trim()) {
-      toast.error("Please enter your Booking Reference or Travel Token.");
-      return;
-    }
-    handleAccess(bookingNumber.trim(), phone.trim());
+  const getFieldError = (field: keyof typeof formik.values) => {
+    return formik.touched[field] && formik.errors[field] ? formik.errors[field] : null;
   };
 
   return (
@@ -79,13 +91,14 @@ function CustomerLoginForm() {
           </p>
         </div>
 
-        {error && (
-          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200/80 text-rose-800 text-xs font-semibold text-center">
-            {error}
+        {serverError && (
+          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200/80 text-rose-800 text-xs font-semibold text-center flex items-center justify-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{serverError}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={formik.handleSubmit} noValidate className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
               Booking Reference or Pass Token <span className="text-red-500">*</span>
@@ -93,14 +106,20 @@ function CustomerLoginForm() {
             <div className="relative">
               <Input
                 type="text"
-                value={bookingNumber}
-                onChange={(e) => setBookingNumber(e.target.value)}
+                name="bookingNumber"
+                value={formik.values.bookingNumber}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
                 placeholder="e.g. BKG-2026-001 or Share Token"
-                className="h-11 rounded-xl text-xs font-semibold pl-10 border-slate-200 focus:border-indigo-500"
-                required
+                className={`h-11 rounded-xl text-xs font-semibold pl-10 border-slate-200 focus:border-indigo-500 ${getFieldError("bookingNumber") ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
               />
-              <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+              <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
             </div>
+            {getFieldError("bookingNumber") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                {getFieldError("bookingNumber")}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -109,19 +128,26 @@ function CustomerLoginForm() {
             </label>
             <Input
               type="text"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              name="phone"
+              value={formik.values.phone}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
               placeholder="e.g. +91 9876543210"
-              className="h-11 rounded-xl text-xs font-semibold border-slate-200 focus:border-indigo-500"
+              className={`h-11 rounded-xl text-xs font-semibold border-slate-200 focus:border-indigo-500 ${getFieldError("phone") ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
             />
+            {getFieldError("phone") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                {getFieldError("phone")}
+              </p>
+            )}
           </div>
 
           <Button
             type="submit"
-            disabled={loading}
-            className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
+            disabled={formik.isSubmitting}
+            className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            {loading ? (
+            {formik.isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Verifying Access...</span>
@@ -143,3 +169,4 @@ function CustomerLoginForm() {
     </div>
   );
 }
+

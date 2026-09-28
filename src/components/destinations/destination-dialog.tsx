@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { useFormik } from "formik";
+import * as Yup from "yup";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +35,17 @@ interface DestinationDialogProps {
   isReadOnly?: boolean;
 }
 
+const destinationValidationSchema = Yup.object().shape({
+  name: Yup.string()
+    .trim()
+    .required("Destination name is required.")
+    .max(100, "Destination name must be 100 characters or less."),
+  country: Yup.string().trim().max(100, "Country cannot exceed 100 characters."),
+  state: Yup.string().trim().max(100, "State cannot exceed 100 characters."),
+  cityArea: Yup.string().trim().max(100, "City/Area cannot exceed 100 characters."),
+  status: Yup.mixed<DestinationStatus>().oneOf(Object.values(DestinationStatus)),
+});
+
 export function DestinationDialog({
   open,
   onOpenChange,
@@ -42,77 +55,54 @@ export function DestinationDialog({
 }: DestinationDialogProps) {
   const isEdit = Boolean(destination);
 
-  const [name, setName] = React.useState("");
-  const [country, setCountry] = React.useState("India");
-  const [state, setState] = React.useState("");
-  const [cityArea, setCityArea] = React.useState("");
-  const [status, setStatus] = React.useState<DestinationStatus>(DestinationStatus.ACTIVE);
-  const [submitting, setSubmitting] = React.useState(false);
-
-  // Sync state when dialog opens or destination changes
-  React.useEffect(() => {
-    if (open) {
-      if (destination) {
-        setName(destination.name || "");
-        setCountry(destination.country || "India");
-        setState(destination.state || "");
-        setCityArea(destination.cityArea || "");
-        setStatus(destination.status || DestinationStatus.ACTIVE);
-      } else {
-        setName("");
-        setCountry("India");
-        setState("");
-        setCityArea("");
-        setStatus(DestinationStatus.ACTIVE);
-      }
-    }
-  }, [open, destination]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (isReadOnly) {
-      toast.error("Subscription expired. Modifications are restricted to read-only mode.");
-      return;
-    }
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      toast.error("Destination name is required.");
-      return;
-    }
-
-    if (trimmedName.length > 100) {
-      toast.error("Destination name must be 100 characters or less.");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-
-      const payload = {
-        name: trimmedName,
-        country: country.trim() || "India",
-        state: state.trim() || undefined,
-        cityArea: cityArea.trim() || undefined,
-        status,
-      };
-
-      if (isEdit && destination) {
-        await destinationClient.updateDestination(destination.id, payload);
-        toast.success(`Destination "${trimmedName}" updated successfully.`);
-      } else {
-        await destinationClient.createDestination(payload);
-        toast.success(`Destination "${trimmedName}" created successfully.`);
+  const formik = useFormik({
+    initialValues: {
+      name: destination?.name || "",
+      country: destination?.country || "India",
+      state: destination?.state || "",
+      cityArea: destination?.cityArea || "",
+      status: destination?.status || DestinationStatus.ACTIVE,
+    },
+    enableReinitialize: true,
+    validationSchema: destinationValidationSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      if (isReadOnly) {
+        toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+        return;
       }
 
-      onOpenChange(false);
-      if (onSuccess) onSuccess();
-    } catch (err: any) {
-      toast.error(getErrorMessage(err, isEdit ? "Failed to update destination." : "Failed to create destination."));
-    } finally {
-      setSubmitting(false);
-    }
+      try {
+        setSubmitting(true);
+        const trimmedName = values.name.trim();
+
+        const payload = {
+          name: trimmedName,
+          country: values.country.trim() || "India",
+          state: values.state.trim() || undefined,
+          cityArea: values.cityArea.trim() || undefined,
+          status: values.status,
+        };
+
+        if (isEdit && destination) {
+          await destinationClient.updateDestination(destination.id, payload);
+          toast.success(`Destination "${trimmedName}" updated successfully.`);
+        } else {
+          await destinationClient.createDestination(payload);
+          toast.success(`Destination "${trimmedName}" created successfully.`);
+        }
+
+        onOpenChange(false);
+        if (onSuccess) onSuccess();
+      } catch (err: any) {
+        toast.error(getErrorMessage(err, isEdit ? "Failed to update destination." : "Failed to create destination."));
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
+
+  const getFieldError = (field: keyof typeof formik.values) => {
+    return formik.touched[field] && formik.errors[field] ? formik.errors[field] : null;
   };
 
   return (
@@ -136,7 +126,7 @@ export function DestinationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+        <form onSubmit={formik.handleSubmit} noValidate className="space-y-4 pt-2">
           {/* Destination Name */}
           <div className="space-y-1.5">
             <Label htmlFor="dest-name" className="text-xs font-semibold text-slate-700">
@@ -144,15 +134,21 @@ export function DestinationDialog({
             </Label>
             <Input
               id="dest-name"
+              name="name"
               placeholder="e.g. Manali, Goa, Jaipur, Srinagar"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="text-xs h-9"
+              value={formik.values.name}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              className={`text-xs h-9 ${getFieldError("name") ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
               maxLength={100}
               autoFocus
-              required
-              disabled={submitting || isReadOnly}
+              disabled={formik.isSubmitting || isReadOnly}
             />
+            {getFieldError("name") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                {getFieldError("name")}
+              </p>
+            )}
           </div>
 
           {/* State / Region & Country */}
@@ -163,13 +159,20 @@ export function DestinationDialog({
               </Label>
               <Input
                 id="dest-state"
+                name="state"
                 placeholder="e.g. Himachal Pradesh"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                className="text-xs h-9"
+                value={formik.values.state}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                className={`text-xs h-9 ${getFieldError("state") ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                 maxLength={100}
-                disabled={submitting || isReadOnly}
+                disabled={formik.isSubmitting || isReadOnly}
               />
+              {getFieldError("state") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                  {getFieldError("state")}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -178,13 +181,20 @@ export function DestinationDialog({
               </Label>
               <Input
                 id="dest-country"
+                name="country"
                 placeholder="e.g. India"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="text-xs h-9"
+                value={formik.values.country}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                className={`text-xs h-9 ${getFieldError("country") ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                 maxLength={100}
-                disabled={submitting || isReadOnly}
+                disabled={formik.isSubmitting || isReadOnly}
               />
+              {getFieldError("country") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                  {getFieldError("country")}
+                </p>
+              )}
             </div>
           </div>
 
@@ -195,13 +205,20 @@ export function DestinationDialog({
             </Label>
             <Input
               id="dest-city"
+              name="cityArea"
               placeholder="e.g. Old Manali, North Goa, Candolim"
-              value={cityArea}
-              onChange={(e) => setCityArea(e.target.value)}
-              className="text-xs h-9"
+              value={formik.values.cityArea}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              className={`text-xs h-9 ${getFieldError("cityArea") ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
               maxLength={100}
-              disabled={submitting || isReadOnly}
+              disabled={formik.isSubmitting || isReadOnly}
             />
+            {getFieldError("cityArea") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                {getFieldError("cityArea")}
+              </p>
+            )}
           </div>
 
           {/* Status (For Edit mode and toggleable on Create) */}
@@ -210,11 +227,11 @@ export function DestinationDialog({
               Operational Status
             </Label>
             <Select
-              value={status}
+              value={formik.values.status}
               onValueChange={(val) => {
-                if (val) setStatus(val as DestinationStatus);
+                if (val) formik.setFieldValue("status", val as DestinationStatus);
               }}
-              disabled={submitting || isReadOnly}
+              disabled={formik.isSubmitting || isReadOnly}
             >
               <SelectTrigger id="dest-status" className="text-xs h-9">
                 <SelectValue />
@@ -237,7 +254,7 @@ export function DestinationDialog({
               size="sm"
               className="text-xs h-8 px-3 rounded-lg"
               onClick={() => onOpenChange(false)}
-              disabled={submitting}
+              disabled={formik.isSubmitting}
             >
               Cancel
             </Button>
@@ -245,9 +262,9 @@ export function DestinationDialog({
               type="submit"
               size="sm"
               className="text-xs h-8 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
-              disabled={submitting || isReadOnly || !name.trim()}
+              disabled={formik.isSubmitting || isReadOnly}
             >
-              {submitting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              {formik.isSubmitting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
               {isEdit ? "Save Changes" : "Create Destination"}
             </Button>
           </DialogFooter>
@@ -256,3 +273,4 @@ export function DestinationDialog({
     </Dialog>
   );
 }
+

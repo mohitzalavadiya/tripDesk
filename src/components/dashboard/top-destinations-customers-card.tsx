@@ -40,14 +40,14 @@ export function TopDestinationsCustomersCard({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* 1. Top Destinations */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-2xs space-y-4">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 shadow-2xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div>
+          <div className="min-w-0">
             <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-indigo-600" />
-              <span>Top Destinations</span>
+              <MapPin className="h-4 w-4 text-indigo-600 shrink-0" />
+              <span className="truncate">Top Destinations</span>
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 truncate">
               Most popular destinations by bookings and revenue.
             </p>
           </div>
@@ -64,18 +64,18 @@ export function TopDestinationsCustomersCard({
                 key={d.destination}
                 className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-100/70 transition-colors text-xs"
               >
-                <div className="flex items-center gap-2.5">
-                  <span className="h-5 w-5 rounded-md bg-indigo-50 text-indigo-700 font-mono font-bold flex items-center justify-center text-[10px]">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                  <span className="h-5 w-5 rounded-md bg-indigo-50 text-indigo-700 font-mono font-bold flex items-center justify-center text-[10px] shrink-0">
                     #{i + 1}
                   </span>
-                  <div>
-                    <strong className="text-slate-800 font-bold">{d.destination}</strong>
-                    <span className="text-[10px] text-slate-500 block">
+                  <div className="min-w-0 flex-1">
+                    <strong className="text-slate-800 font-bold truncate block">{d.destination}</strong>
+                    <span className="text-[10px] text-slate-500 truncate block">
                       {d.bookingsCount} bookings • {d.percentageOfRevenue}% of revenue
                     </span>
                   </div>
                 </div>
-                <div className="text-right font-mono font-bold text-slate-900">
+                <div className="text-right font-mono font-bold text-slate-900 tabular-nums whitespace-nowrap shrink-0">
                   {formatRupees(d.revenue)}
                 </div>
               </div>
@@ -85,18 +85,18 @@ export function TopDestinationsCustomersCard({
       </div>
 
       {/* 2. Top High-Value Customers */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-2xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div>
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-6 shadow-2xs space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-2">
+          <div className="min-w-0">
             <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-amber-600" />
-              <span>Top Customers</span>
+              <Trophy className="h-4 w-4 text-amber-600 shrink-0" />
+              <span className="truncate">Top Customers</span>
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 truncate">
               Leading clients by total spend and booking volume.
             </p>
           </div>
-          <Link href="/customers" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer">
+          <Link href="/customers" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap">
             Directory <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
@@ -113,18 +113,18 @@ export function TopDestinationsCustomersCard({
                 href={`/customers/${c.customerId}`}
                 className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-100/70 transition-colors text-xs cursor-pointer"
               >
-                <div className="flex items-center gap-2.5">
-                  <span className="h-5 w-5 rounded-md bg-amber-50 text-amber-700 font-mono font-bold flex items-center justify-center text-[10px]">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                  <span className="h-5 w-5 rounded-md bg-amber-50 text-amber-700 font-mono font-bold flex items-center justify-center text-[10px] shrink-0">
                     #{i + 1}
                   </span>
-                  <div>
-                    <strong className="text-slate-800 font-bold">{c.name}</strong>
-                    <span className="text-[10px] text-slate-500 block">
+                  <div className="min-w-0 flex-1">
+                    <strong className="text-slate-800 font-bold truncate block">{c.name}</strong>
+                    <span className="text-[10px] text-slate-500 truncate block">
                       {c.bookingsCount} bookings • {c.phone}
                     </span>
                   </div>
                 </div>
-                <div className="text-right font-mono font-bold text-emerald-700">
+                <div className="text-right font-mono font-bold text-emerald-700 tabular-nums whitespace-nowrap shrink-0">
                   {formatRupees(c.totalSpend)}
                 </div>
               </Link>

@@ -99,7 +99,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
-      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+      <div className="max-w-[1550px] w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6">
         {/* 1. Page Header */}
         <PageHeader
           title="Executive Dashboard"
@@ -144,112 +144,102 @@ export default function DashboardPage() {
         {/* 2. Main Dashboard Content Grid */}
         <div className="space-y-6">
           {/* Date Filter & Tab Bar */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Tab Navigation */}
-          <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200/80 shadow-2xs">
-            {[
-              { id: "OVERVIEW", label: "Overview", icon: LayoutDashboard },
-              { id: "FINANCE", label: "Finance & Profit", icon: CreditCard },
-              { id: "OPERATIONS", label: "Operations", icon: Compass },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Date Range Selector */}
-          <DateRangeFilter
-            preset={preset}
-            startDate={startDate}
-            endDate={endDate}
-            onPresetChange={handlePresetChange}
-            onCustomRangeChange={handleCustomRangeChange}
-            loading={loading}
-          />
-        </div>
-
-        {/* Global Executive KPI Cards */}
-        <KpiCards summary={data?.summary} loading={loading} />
-
-        {/* TAB 1: OVERVIEW */}
-        {activeTab === "OVERVIEW" && (
-          <div className="space-y-6">
-            {/* Sales Funnel + Revenue Chart */}
-            <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-              <div className="lg:col-span-1">
-                <SalesFunnelCard funnel={data?.funnel} loading={loading} />
-              </div>
-              <div className="lg:col-span-2">
-                <RevenueChart analytics={data?.revenueTrend} loading={loading} />
-              </div>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+            {/* Tab Navigation */}
+            <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200/80 shadow-2xs overflow-x-auto no-scrollbar max-w-full">
+              {[
+                { id: "OVERVIEW", label: "Overview", icon: LayoutDashboard },
+                { id: "FINANCE", label: "Finance & Profit", icon: CreditCard },
+                { id: "OPERATIONS", label: "Operations", icon: Compass },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+                      isActive
+                        ? "bg-indigo-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Receivables & Payables */}
-            <ReceivablesPayablesCard
-              receivables={financeData?.receivables}
-              payables={financeData?.payables}
+            {/* Date Range Selector */}
+            <DateRangeFilter
+              preset={preset}
+              startDate={startDate}
+              endDate={endDate}
+              onPresetChange={handlePresetChange}
+              onCustomRangeChange={handleCustomRangeChange}
               loading={loading}
             />
+          </div>
 
-            {/* Upcoming Departures & Communications */}
-            <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <UpcomingTripsList trips={opsData?.upcomingDepartures} loading={loading} />
+          {/* Global Executive KPI Cards (Available across all tabs for consistent high-level context) */}
+          <KpiCards summary={data?.summary} loading={loading} />
+
+          {/* TAB 1: OVERVIEW — Executive Snapshot without duplicate detailed finance sections */}
+          {activeTab === "OVERVIEW" && (
+            <div className="space-y-6">
+              {/* Sales Funnel + Top Destinations & Customers */}
+              <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+                <div className="lg:col-span-1">
+                  <SalesFunnelCard funnel={data?.funnel} loading={loading} />
+                </div>
+                <div className="lg:col-span-2">
+                  <TopDestinationsCustomersCard
+                    destinations={data?.destinations}
+                    customers={data?.customers}
+                    loading={loading}
+                  />
+                </div>
               </div>
-              <div className="space-y-6">
-                <CommunicationHealthCard
-                  communication={data?.summary.communication}
-                  loading={loading}
-                />
+
+              {/* Upcoming Departures & Communications */}
+              <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                  <UpcomingTripsList trips={opsData?.upcomingDepartures} loading={loading} />
+                </div>
+                <div className="space-y-6">
+                  <CommunicationHealthCard
+                    communication={data?.summary.communication}
+                    loading={loading}
+                  />
+                </div>
               </div>
             </div>
+          )}
 
-            {/* Top Destinations & VIP Customers */}
-            <TopDestinationsCustomersCard
-              destinations={data?.destinations}
-              customers={data?.customers}
-              loading={loading}
-            />
-          </div>
-        )}
+          {/* TAB 2: FINANCE & PROFITABILITY — In-Depth Revenue, Gross Margin & Receivables Suite */}
+          {activeTab === "FINANCE" && (
+            <div className="space-y-6">
+              <RevenueChart analytics={data?.revenueTrend} loading={loading} />
+              <ReceivablesPayablesCard
+                receivables={financeData?.receivables}
+                payables={financeData?.payables}
+                loading={loading}
+              />
+            </div>
+          )}
 
-        {/* TAB 2: FINANCE & PROFITABILITY */}
-        {activeTab === "FINANCE" && (
-          <div className="space-y-6">
-            <RevenueChart analytics={data?.revenueTrend} loading={loading} />
-            <ReceivablesPayablesCard
-              receivables={financeData?.receivables}
-              payables={financeData?.payables}
-              loading={loading}
-            />
-          </div>
-        )}
-
-        {/* TAB 3: OPERATIONS & DEPARTURES */}
-        {activeTab === "OPERATIONS" && (
-          <div className="space-y-6">
-            <UpcomingTripsList trips={opsData?.upcomingDepartures} loading={loading} />
-            <CommunicationHealthCard
-              communication={data?.summary.communication}
-              loading={loading}
-            />
-          </div>
-        )}
+          {/* TAB 3: OPERATIONS & DEPARTURES — Readiness Scores & Communication Delivery Suite */}
+          {activeTab === "OPERATIONS" && (
+            <div className="space-y-6">
+              <UpcomingTripsList trips={opsData?.upcomingDepartures} loading={loading} />
+              <CommunicationHealthCard
+                communication={data?.summary.communication}
+                loading={loading}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
