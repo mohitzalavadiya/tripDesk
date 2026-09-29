@@ -174,7 +174,8 @@ export const invoicePdfService = {
         rightY += 15;
 
         doc.fillColor(textMuted).fontSize(8.5).font("Helvetica");
-        doc.text(`Status: ${invoice.status.replace("_", " ")}`, rightColX, rightY, {
+        const statusText = (invoice.status || "ISSUED").replace(/_/g, " ");
+        doc.text(`Status: ${statusText}`, rightColX, rightY, {
           align: "right",
           width: rightColW,
         });
@@ -425,9 +426,9 @@ export const invoicePdfService = {
         // ═════════════════════════════════════════════════════════════════════
         const subtotalAmount = Number(invoice.subtotal || 0);
         const discountAmount = Number(invoice.discountAmount || 0);
-        const totalAmount = Number(invoice.booking?.totalAmount ?? invoice.totalAmount ?? 0);
-        const paidAmount = Number(invoice.booking?.paidAmount ?? invoice.paidAmount ?? 0);
-        const balanceAmount = Number(invoice.booking?.balanceAmount ?? invoice.balanceAmount ?? 0);
+        const totalAmount = Number(invoice.totalAmount ?? invoice.booking?.totalAmount ?? 0);
+        const paidAmount = Number(invoice.paidAmount ?? invoice.booking?.paidAmount ?? 0);
+        const balanceAmount = Number(invoice.balanceAmount ?? invoice.booking?.balanceAmount ?? 0);
 
         // Tax Snapshot Fields from Invoice (with fallback to booking)
         const rawTaxRate = invoice.taxRate ?? (invoice.booking as any)?.taxRate ?? null;

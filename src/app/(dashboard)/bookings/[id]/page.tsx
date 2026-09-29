@@ -44,6 +44,7 @@ import {
   Send,
   Receipt,
   ChevronDown,
+  RefreshCw,
 } from "lucide-react";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -590,6 +591,40 @@ export default function BookingDetailPage() {
                       >
                         <Download className="mr-2 h-3.5 w-3.5 text-slate-500" />
                         Download Invoice PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setConfirmAction({
+                            title: "Regenerate Invoice?",
+                            description: "This will refresh the invoice using the latest booking details and financial values. The existing invoice number will remain unchanged.",
+                            confirmText: "Regenerate Invoice",
+                            variant: "default",
+                            action: async () => {
+                              try {
+                                setActionLoading(true);
+                                const res = await fetch(`/api/invoices/${activeInvoice.id}/regenerate`, {
+                                  method: "POST",
+                                });
+                                const json = await res.json();
+                                if (!res.ok) {
+                                  throw new Error(json.error?.message || json.message || "Failed to regenerate invoice.");
+                                }
+                                toast.success("Invoice regenerated successfully with latest booking values.");
+                                setConfirmAction(null);
+                                await fetchBooking();
+                              } catch (err: any) {
+                                toast.error(err?.message || "Failed to regenerate invoice.");
+                              } finally {
+                                setActionLoading(false);
+                              }
+                            },
+                          });
+                        }}
+                        disabled={isReadOnly || actionLoading || activeInvoice.status === "CANCELLED"}
+                        className="text-xs cursor-pointer rounded-md"
+                      >
+                        <RefreshCw className="mr-2 h-3.5 w-3.5 text-slate-500" />
+                        Regenerate Invoice
                       </DropdownMenuItem>
                     </>
                   ) : (booking.status === BookingStatus.CONFIRMED ||
@@ -1522,32 +1557,75 @@ export default function BookingDetailPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 pt-1">
-                    <Link href={`/invoices/${activeInvoice.id}`} className="flex-1">
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center gap-2">
+                      <Link href={`/invoices/${activeInvoice.id}`} className="flex-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                        >
+                          <FileText className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                          View Invoice
+                        </Button>
+                      </Link>
+                      <a
+                        href={`/api/invoices/${activeInvoice.id}/pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1"
+                      >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                        >
+                          <Download className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                          Download PDF
+                        </Button>
+                      </a>
+                    </div>
+
+                    {activeInvoice.status !== "CANCELLED" && (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                        onClick={() => {
+                          setConfirmAction({
+                            title: "Regenerate Invoice?",
+                            description:
+                              "This will refresh the invoice using the latest booking details and financial values. The existing invoice number will remain unchanged.",
+                            confirmText: "Regenerate Invoice",
+                            variant: "default",
+                            action: async () => {
+                              try {
+                                setActionLoading(true);
+                                const res = await fetch(`/api/invoices/${activeInvoice.id}/regenerate`, {
+                                  method: "POST",
+                                });
+                                const json = await res.json();
+                                if (!res.ok) {
+                                  throw new Error(json.error?.message || json.message || "Failed to regenerate invoice.");
+                                }
+                                toast.success("Invoice regenerated successfully with latest booking values.");
+                                setConfirmAction(null);
+                                await fetchBooking();
+                              } catch (err: any) {
+                                toast.error(err?.message || "Failed to regenerate invoice.");
+                              } finally {
+                                setActionLoading(false);
+                              }
+                            },
+                          });
+                        }}
+                        disabled={isReadOnly || actionLoading}
+                        className="w-full bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer text-slate-700"
+                        title="Refresh invoice snapshot from latest booking/quotation state while keeping the same invoice number"
                       >
-                        <FileText className="h-3.5 w-3.5 mr-1 text-slate-500" />
-                        View Invoice
+                        <RefreshCw className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                        Regenerate Invoice
                       </Button>
-                    </Link>
-                    <a
-                      href={`/api/invoices/${activeInvoice.id}/pdf`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1"
-                    >
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer"
-                      >
-                        <Download className="h-3.5 w-3.5 mr-1 text-slate-500" />
-                        Download PDF
-                      </Button>
-                    </a>
+                    )}
                   </div>
                 </div>
               ) : (booking.status === BookingStatus.CONFIRMED ||
