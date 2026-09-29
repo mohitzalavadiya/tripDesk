@@ -70,7 +70,7 @@ export function AssignDriverModal({
           status: targetStatus,
         });
 
-        toast.success(`Chauffeur ${values.driverName} saved successfully!`);
+        toast.success(`Driver ${values.driverName} saved successfully!`);
         if (onSuccess) onSuccess();
         onClose();
       } catch (err: any) {
@@ -104,7 +104,7 @@ export function AssignDriverModal({
               <UserCheck className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">Assign Chauffeur & Vehicle</h3>
+              <h3 className="text-base font-bold text-slate-900">Assign Driver & Vehicle</h3>
               <p className="text-xs text-slate-500 font-medium truncate max-w-[280px]">
                 {dispatch.tripVehicle?.vehicleName || dispatch.vehicle?.name || "Vehicle Dispatch"}
               </p>
@@ -147,7 +147,7 @@ export function AssignDriverModal({
             {/* Driver Name */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">
-                Chauffeur / Driver Name <span className="text-red-500">*</span>
+                Driver (Chauffeur) Name <span className="text-red-500">*</span>
               </label>
               <Input
                 placeholder="e.g. Rajesh Kumar"

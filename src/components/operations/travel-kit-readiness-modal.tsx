@@ -157,7 +157,7 @@ export function TravelKitReadinessModal({
                 </span>
               </div>
 
-              {/* Activities */}
+              {/* Activity status in Travel Kit readiness checklist is intentionally hidden since Activity is a trip inclusion/catalogue item rather than an operational confirmation service.
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
                 <div className="flex items-center gap-2 text-slate-700">
                   <Ticket className="h-4 w-4 text-slate-400" />
@@ -173,6 +173,7 @@ export function TravelKitReadinessModal({
                   {confirmedActivities} / {totalActivities} confirmed
                 </span>
               </div>
+              */}
 
               {/* Issues */}
               <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">

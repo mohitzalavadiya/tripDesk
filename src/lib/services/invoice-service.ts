@@ -230,6 +230,85 @@ export const invoiceService = {
             },
           });
 
+          // Derive customer-facing service selling amounts (including internal markup without exposing it as a line item)
+          const quoteSubtotal = Number(booking.quotation?.subtotal || 0);
+          const quoteMarkup = Number(booking.quotation?.markupAmount || 0);
+          const sellingSubtotal = Math.max(0, quoteSubtotal + quoteMarkup);
+          const quoteDiscount = Number(booking.quotation?.discountAmount || 0);
+          const discountPct = Number(booking.quotation?.discountPercentage || 0);
+
+          let computedItems: Array<{
+            description: string;
+            quantity: number;
+            rate: number;
+            amount: number;
+            sortOrder: number;
+          }> = [];
+
+          const validQuotationItems = (booking.quotation?.items || []).filter(
+            (qi) => qi.type !== "ACTIVITY" && qi.sourceType !== "TRIP_ACTIVITY"
+          );
+
+          if (validQuotationItems.length > 0) {
+            if (quoteSubtotal > 0 && quoteMarkup !== 0) {
+              const multiplier = sellingSubtotal / quoteSubtotal;
+              computedItems = validQuotationItems.map((qi, idx) => {
+                const qty = qi.quantity || 1;
+                const baseCost = Number(qi.costPrice || (Number(qi.unitPrice || qi.sellingPrice || 0) * qty));
+                const itemSelling = Math.round(baseCost * multiplier * 100) / 100;
+                const rate = Math.round((itemSelling / qty) * 100) / 100;
+                const amount = Math.round(rate * qty * 100) / 100;
+                return {
+                  description: qi.name || qi.description || "Package Service",
+                  quantity: qty,
+                  rate,
+                  amount,
+                  sortOrder: idx,
+                };
+              });
+
+              // Odd-paise reconciliation to ensure line items sum exactly to sellingSubtotal
+              const allocatedSum = Math.round(computedItems.reduce((acc, it) => acc + it.amount, 0) * 100) / 100;
+              const diff = Math.round((sellingSubtotal - allocatedSum) * 100) / 100;
+              if (diff !== 0 && computedItems.length > 0) {
+                let maxIdx = 0;
+                for (let i = 1; i < computedItems.length; i++) {
+                  if (computedItems[i].amount > computedItems[maxIdx].amount) maxIdx = i;
+                }
+                computedItems[maxIdx].amount = Math.round((computedItems[maxIdx].amount + diff) * 100) / 100;
+                computedItems[maxIdx].rate = Math.round((computedItems[maxIdx].amount / computedItems[maxIdx].quantity) * 100) / 100;
+              }
+            } else {
+              computedItems = validQuotationItems.map((qi, idx) => {
+                const qty = qi.quantity || 1;
+                const amount = Number(qi.totalPrice || qi.costPrice || (Number(qi.unitPrice || 0) * qty) || Number(qi.sellingPrice || 0));
+                const rate = Number(qi.unitPrice) > 0 && Number(qi.unitPrice) * qty === amount
+                  ? Number(qi.unitPrice)
+                  : Math.round((amount / qty) * 100) / 100;
+                return {
+                  description: qi.name || qi.description || "Package Service",
+                  quantity: qty,
+                  rate,
+                  amount,
+                  sortOrder: idx,
+                };
+              });
+            }
+          } else {
+            const singleAmt = Number(booking.taxableAmount ?? booking.totalAmount);
+            computedItems = [
+              {
+                description: `Package Booking — ${booking.bookingNumber}`,
+                quantity: 1,
+                rate: singleAmt,
+                amount: singleAmt,
+                sortOrder: 0,
+              },
+            ];
+          }
+
+          const invoiceSubtotal = Math.round(computedItems.reduce((acc, it) => acc + it.amount, 0) * 100) / 100;
+
           if (existingActive) {
             // If existing active invoice was missing invoiceNumber (e.g. legacy draft), allocate number
             let invoiceNumber = existingActive.invoiceNumber;
@@ -237,11 +316,28 @@ export const invoiceService = {
               invoiceNumber = await invoiceSequenceService.getNextInvoiceNumber(agencyId, tx);
             }
 
+            // Synchronize line items
+            await tx.invoiceItem.deleteMany({ where: { invoiceId: existingActive.id } });
+            await tx.invoiceItem.createMany({
+              data: computedItems.map((it) => ({
+                invoiceId: existingActive.id,
+                description: it.description,
+                quantity: it.quantity,
+                rate: new Prisma.Decimal(it.rate),
+                amount: new Prisma.Decimal(it.amount),
+                sortOrder: it.sortOrder,
+              })),
+            });
+
             // Synchronize latest Booking financial state, tax snapshot & payment state onto existing Invoice
             const updated = await tx.invoice.update({
               where: { id: existingActive.id },
               data: {
                 invoiceNumber,
+                subtotal: new Prisma.Decimal(invoiceSubtotal || totalAmount),
+                discountAmount: new Prisma.Decimal(quoteDiscount),
+                discountType: discountPct > 0 ? DiscountType.PERCENTAGE : quoteDiscount > 0 ? DiscountType.FIXED : null,
+                discountValue: discountPct > 0 ? new Prisma.Decimal(discountPct) : quoteDiscount > 0 ? new Prisma.Decimal(quoteDiscount) : null,
                 totalAmount: new Prisma.Decimal(totalAmount),
                 paidAmount: new Prisma.Decimal(netPaid),
                 balanceAmount: new Prisma.Decimal(balanceAmount),
@@ -357,31 +453,6 @@ export const invoiceService = {
               }
             : null;
 
-          // Raw items from quotation or booking
-          let rawItems: { description: string; quantity: number; rate: number }[] = [];
-          if (booking.quotation?.items && booking.quotation.items.length > 0) {
-            rawItems = booking.quotation.items.map((qi) => ({
-              description: qi.name || qi.description || "Package Item",
-              quantity: qi.quantity || 1,
-              rate: Number(qi.sellingPrice || qi.unitPrice || 0),
-            }));
-          } else {
-            rawItems = [
-              {
-                description: `Package Booking - ${booking.bookingNumber}`,
-                quantity: 1,
-                rate: Number(booking.totalAmount),
-              },
-            ];
-          }
-
-          const { subtotal, discountAmount, items } = invoiceService.calculateFinancials(
-            rawItems,
-            null,
-            null,
-            netPaid
-          );
-
           const now = new Date();
           let defaultDueDate = new Date(now);
           defaultDueDate.setDate(defaultDueDate.getDate() + 7);
@@ -395,10 +466,10 @@ export const invoiceService = {
               invoiceDate: now,
               dueDate: defaultDueDate,
               currency: booking.currency || "INR",
-              subtotal: new Prisma.Decimal(subtotal || totalAmount),
-              discountType: null,
-              discountValue: null,
-              discountAmount: new Prisma.Decimal(discountAmount || 0),
+              subtotal: new Prisma.Decimal(invoiceSubtotal || totalAmount),
+              discountType: discountPct > 0 ? DiscountType.PERCENTAGE : quoteDiscount > 0 ? DiscountType.FIXED : null,
+              discountValue: discountPct > 0 ? new Prisma.Decimal(discountPct) : quoteDiscount > 0 ? new Prisma.Decimal(quoteDiscount) : null,
+              discountAmount: new Prisma.Decimal(quoteDiscount || 0),
               taxableAmount: booking.taxableAmount !== null ? new Prisma.Decimal(booking.taxableAmount) : null,
               taxAmount: booking.taxAmount !== null ? new Prisma.Decimal(booking.taxAmount) : null,
               taxRate: booking.taxRate !== null ? new Prisma.Decimal(booking.taxRate) : null,
@@ -414,7 +485,7 @@ export const invoiceService = {
               bookingSnapshot: JSON.parse(JSON.stringify(bookingSnapshot)),
               agencySnapshot: agencySnapshot ? JSON.parse(JSON.stringify(agencySnapshot)) : undefined,
               items: {
-                create: items.map((it) => ({
+                create: computedItems.map((it) => ({
                   description: it.description,
                   quantity: it.quantity,
                   rate: new Prisma.Decimal(it.rate),

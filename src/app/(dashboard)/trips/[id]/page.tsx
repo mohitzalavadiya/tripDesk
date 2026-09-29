@@ -279,9 +279,10 @@ export default function TripDetailPage() {
   const [vehicleFormDrop, setVehicleFormDrop] = React.useState("");
   const [vehicleFormDriverName, setVehicleFormDriverName] = React.useState("");
   const [vehicleFormDriverPhone, setVehicleFormDriverPhone] = React.useState("");
-  const [vehicleFormPricingType, setVehicleFormPricingType] = React.useState<VehiclePricingType>(VehiclePricingType.TOTAL);
+  const [vehicleFormPricingType, setVehicleFormPricingType] = React.useState<VehiclePricingType>(VehiclePricingType.FIXED);
   const [vehicleFormRatePerKm, setVehicleFormRatePerKm] = React.useState("");
   const [vehicleFormEstimatedKm, setVehicleFormEstimatedKm] = React.useState("");
+  const [vehicleFormActualKm, setVehicleFormActualKm] = React.useState("");
   const [vehicleFormTotalRate, setVehicleFormTotalRate] = React.useState("");
   const [vehicleFormNotes, setVehicleFormNotes] = React.useState("");
   const [vehicleSaving, setVehicleSaving] = React.useState(false);
@@ -885,20 +886,21 @@ export default function TripDetailPage() {
 
   // ──────────────────────── TRIP VEHICLE HANDLERS ─────────────────────────
   const handleOpenAddVehicle = () => {
-    setVehicleFormVehicleId(masterVehicles[0]?.id || "");
-    setVehicleFormName(masterVehicles[0]?.name || "Sedan");
-    setVehicleFormType(masterVehicles[0]?.type || "Sedan");
-    setVehicleFormCapacity(masterVehicles[0]?.capacity || 4);
+    setVehicleFormVehicleId("");
+    setVehicleFormName("");
+    setVehicleFormType("Sedan");
+    setVehicleFormCapacity(4);
     setVehicleFormStartDate(trip?.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "");
     setVehicleFormEndDate(trip?.endDate ? new Date(trip.endDate).toISOString().split("T")[0] : "");
-    setVehicleFormPickup("Airport Pickup");
-    setVehicleFormDrop("Hotel Drop");
-    setVehicleFormDriverName(masterVehicles[0]?.driverName || "");
-    setVehicleFormDriverPhone(masterVehicles[0]?.driverPhone || "");
-    setVehicleFormPricingType(VehiclePricingType.TOTAL);
-    setVehicleFormRatePerKm(masterVehicles[0]?.ratePerKm ? String(masterVehicles[0].ratePerKm) : "18");
-    setVehicleFormEstimatedKm("250");
-    setVehicleFormTotalRate("4500");
+    setVehicleFormPickup(tripDestinations[0]?.destination.name || "");
+    setVehicleFormDrop(tripDestinations[tripDestinations.length - 1]?.destination.name || "");
+    setVehicleFormDriverName("");
+    setVehicleFormDriverPhone("");
+    setVehicleFormPricingType(VehiclePricingType.FIXED);
+    setVehicleFormRatePerKm("");
+    setVehicleFormEstimatedKm("");
+    setVehicleFormActualKm("");
+    setVehicleFormTotalRate("");
     setVehicleFormNotes("");
     setIsAddVehicleOpen(true);
   };
@@ -911,10 +913,6 @@ export default function TripDetailPage() {
       setVehicleFormName(mv.name);
       setVehicleFormType(mv.type);
       setVehicleFormCapacity(mv.capacity);
-      setVehicleFormDriverName(mv.driverName || "");
-      setVehicleFormDriverPhone(mv.driverPhone || "");
-      setVehicleFormPricingType(mv.pricingType);
-      if (mv.ratePerKm) setVehicleFormRatePerKm(String(mv.ratePerKm));
     }
   };
 
@@ -941,6 +939,7 @@ export default function TripDetailPage() {
         pricingType: vehicleFormPricingType,
         ratePerKm: vehicleFormRatePerKm !== "" ? Number(vehicleFormRatePerKm) : undefined,
         estimatedKm: vehicleFormEstimatedKm !== "" ? Number(vehicleFormEstimatedKm) : undefined,
+        actualKm: vehicleFormActualKm !== "" ? Number(vehicleFormActualKm) : undefined,
         totalRate: vehicleFormTotalRate !== "" ? Number(vehicleFormTotalRate) : undefined,
         notes: vehicleFormNotes.trim() || undefined,
       });
@@ -970,6 +969,7 @@ export default function TripDetailPage() {
     setVehicleFormPricingType(tv.pricingType);
     setVehicleFormRatePerKm(tv.ratePerKm !== null && tv.ratePerKm !== undefined ? String(tv.ratePerKm) : "");
     setVehicleFormEstimatedKm(tv.estimatedKm !== null && tv.estimatedKm !== undefined ? String(tv.estimatedKm) : "");
+    setVehicleFormActualKm((tv as any).actualKm !== null && (tv as any).actualKm !== undefined ? String((tv as any).actualKm) : "");
     setVehicleFormTotalRate(tv.totalRate !== null && tv.totalRate !== undefined ? String(tv.totalRate) : "");
     setVehicleFormNotes(tv.notes || "");
     setIsEditVehicleOpen(true);
@@ -995,6 +995,7 @@ export default function TripDetailPage() {
         pricingType: vehicleFormPricingType,
         ratePerKm: vehicleFormRatePerKm !== "" ? Number(vehicleFormRatePerKm) : undefined,
         estimatedKm: vehicleFormEstimatedKm !== "" ? Number(vehicleFormEstimatedKm) : undefined,
+        actualKm: vehicleFormActualKm !== "" ? Number(vehicleFormActualKm) : undefined,
         totalRate: vehicleFormTotalRate !== "" ? Number(vehicleFormTotalRate) : undefined,
         notes: vehicleFormNotes.trim() || undefined,
       });
@@ -1815,6 +1816,42 @@ export default function TripDetailPage() {
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-600 pt-1">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Rate Basis</span>
+                        <span className="font-semibold text-slate-800">
+                          {tv.pricingType === "PER_KM" ? "Per KM" : "Fixed Amount"}
+                        </span>
+                      </div>
+                      {tv.pricingType === "PER_KM" ? (
+                        <>
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-bold">Rate / KM</span>
+                            <span className="text-slate-800 font-medium">₹{Number(tv.ratePerKm || 0)}/km</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-bold">KM (Est / Act)</span>
+                            <span className="text-slate-800 font-medium">
+                              {Number(tv.estimatedKm || 0)} km {((tv as any).actualKm !== null && (tv as any).actualKm !== undefined) ? `(Act: ${Number((tv as any).actualKm)} km)` : ""}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                              {((tv as any).actualKm !== null && (tv as any).actualKm !== undefined) ? "Final Cost" : "Est. Cost"}
+                            </span>
+                            <strong className="text-slate-900 font-bold">
+                              ₹{Number(tv.ratePerKm || 0) * Number(((tv as any).actualKm !== null && (tv as any).actualKm !== undefined) ? (tv as any).actualKm : (tv.estimatedKm || 0))}
+                            </strong>
+                          </div>
+                        </>
+                      ) : (
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Fixed Amount</span>
+                          <strong className="text-slate-900 font-bold">₹{Number(tv.totalRate || 0)}</strong>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs text-slate-600 pt-1 border-t border-slate-100">
                       {tv.pickupLocation && (
                         <div>
                           <span className="text-slate-400 block text-[10px] uppercase font-bold">Pickup</span>
@@ -1829,14 +1866,8 @@ export default function TripDetailPage() {
                       )}
                       {tv.driverName && (
                         <div>
-                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Chauffeur</span>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Driver (Chauffeur)</span>
                           <span className="text-slate-800 font-medium">{tv.driverName} {tv.driverPhone ? `(${tv.driverPhone})` : ""}</span>
-                        </div>
-                      )}
-                      {tv.totalRate !== null && tv.totalRate !== undefined && (
-                        <div>
-                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Tariff</span>
-                          <strong className="text-slate-900 font-bold">₹{Number(tv.totalRate)}</strong>
                         </div>
                       )}
                     </div>
@@ -2086,10 +2117,10 @@ export default function TripDetailPage() {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                         <div className="flex flex-wrap items-center gap-2.5">
                           <span className="font-black text-sm text-slate-900">
-                            {q.quotationNumber || `Quotation v${q.version}`}
+                            {q.quotationNumber || `Quotation V${q.version}`}
                           </span>
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                            Version {q.version}
+                            V{q.version}
                           </span>
                           <QuotationStatusBadge status={q.status} />
                         </div>
@@ -3007,30 +3038,45 @@ export default function TripDetailPage() {
 
         {/* ─── TRIP VEHICLE DIALOGS ─── */}
         <Dialog open={isAddVehicleOpen} onOpenChange={setIsAddVehicleOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-5 shadow-xl">
             <form onSubmit={handleSaveAddVehicle}>
-              <DialogHeader>
+              <DialogHeader className="pb-1">
                 <DialogTitle className="text-slate-900 font-bold text-base">Assign Vehicle to Trip</DialogTitle>
-                <DialogDescription className="text-slate-500 text-xs mt-1">
-                  Select a fleet model or enter transport transfer details.
+                <DialogDescription className="text-slate-500 text-xs mt-0.5">
+                  Select a fleet model or enter transport details manually.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-3.5 mt-4 text-xs">
+              <div className="space-y-3 mt-3 text-xs">
+                {/* 1. Fleet Master Selector (Optional) */}
                 {masterVehicles.length > 0 && (
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Pre-fill from Agency Fleet</label>
-                    <Select value={vehicleFormVehicleId} onValueChange={(val) => handleSelectMasterVehicle(val)}>
-                      <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
-                        <SelectValue placeholder="Choose vehicle model...">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Fleet Master (Optional)
+                    </label>
+                    <Select
+                      value={vehicleFormVehicleId || "manual"}
+                      onValueChange={(val) => {
+                        if (val === "manual") {
+                          setVehicleFormVehicleId("");
+                        } else {
+                          handleSelectMasterVehicle(val);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-8.5 bg-slate-50/50 border-slate-200 text-xs">
+                        <SelectValue placeholder="Manual Entry (No Master)">
                           {(val: string | null) => {
-                            if (!val) return undefined;
+                            if (!val || val === "manual") return "Manual Entry (No Master)";
                             const v = masterVehicles.find((item) => item.id === val);
                             return v ? `${v.name} (${v.type} • ${v.capacity} Seats)` : val;
                           }}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
+                        <SelectItem value="manual" className="text-xs text-slate-500 italic">
+                          Manual Entry (No Master)
+                        </SelectItem>
                         {masterVehicles.map((v) => (
                           <SelectItem key={v.id} value={v.id} className="text-xs">
                             {v.name} ({v.type} • {v.capacity} Seats)
@@ -3041,118 +3087,146 @@ export default function TripDetailPage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* 2. Vehicle Name */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vehicle Name *</label>
+                  <Input
+                    value={vehicleFormName}
+                    placeholder="e.g. Innova Crysta"
+                    onChange={(e) => setVehicleFormName(e.target.value)}
+                    className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
+                </div>
+
+                {/* Type + Capacity */}
+                <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Vehicle Name *</label>
-                    <Input
-                      value={vehicleFormName}
-                      onChange={(e) => setVehicleFormName(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Vehicle Type *</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vehicle Type *</label>
                     <Input
                       value={vehicleFormType}
+                      placeholder="e.g. SUV, Sedan, Bus"
                       onChange={(e) => setVehicleFormType(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
                       required
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Start Date</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Capacity (Seats)</label>
                     <Input
-                      type="date"
-                      value={vehicleFormStartDate}
-                      onChange={(e) => setVehicleFormStartDate(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">End Date</label>
-                    <Input
-                      type="date"
-                      value={vehicleFormEndDate}
-                      onChange={(e) => setVehicleFormEndDate(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      type="number"
+                      min={1}
+                      value={vehicleFormCapacity}
+                      onChange={(e) => setVehicleFormCapacity(Number(e.target.value) || 1)}
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Pickup Location</label>
-                    <Input
-                      value={vehicleFormPickup}
-                      onChange={(e) => setVehicleFormPickup(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
+                {/* 3 & 4. Rate Basis & Conditional Pricing */}
+                <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Rate Basis *</label>
+                    <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setVehicleFormPricingType(VehiclePricingType.FIXED)}
+                        className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                          vehicleFormPricingType === VehiclePricingType.FIXED
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Fixed
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVehicleFormPricingType(VehiclePricingType.PER_KM)}
+                        className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                          vehicleFormPricingType === VehiclePricingType.PER_KM
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Per KM
+                      </button>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Drop Location</label>
-                    <Input
-                      value={vehicleFormDrop}
-                      onChange={(e) => setVehicleFormDrop(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
+
+                  {vehicleFormPricingType === VehiclePricingType.FIXED ? (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fixed Amount (₹) *</label>
+                      <Input
+                        type="number"
+                        placeholder="e.g. 15000"
+                        value={vehicleFormTotalRate}
+                        onChange={(e) => setVehicleFormTotalRate(e.target.value)}
+                        className="h-8.5 bg-white border-slate-200 text-xs"
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rate / KM (₹) *</label>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 18"
+                          value={vehicleFormRatePerKm}
+                          onChange={(e) => setVehicleFormRatePerKm(e.target.value)}
+                          className="h-8.5 bg-white border-slate-200 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estimated KM *</label>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 650"
+                          value={vehicleFormEstimatedKm}
+                          onChange={(e) => setVehicleFormEstimatedKm(e.target.value)}
+                          className="h-8.5 bg-white border-slate-200 text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 6. Calculated Cost Preview */}
+                  <div className="pt-2 flex items-center justify-between text-[11px] border-t border-slate-200">
+                    <span className="text-slate-500 font-medium">Estimated Cost:</span>
+                    <span className="font-bold text-indigo-700">
+                      {vehicleFormPricingType === VehiclePricingType.FIXED
+                        ? `₹${Number(vehicleFormTotalRate || 0).toLocaleString("en-IN")}`
+                        : `₹${(
+                            Number(vehicleFormRatePerKm || 0) * Number(vehicleFormEstimatedKm || 0)
+                          ).toLocaleString("en-IN")}`}
+                    </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* 5. Driver Name + Phone */}
+                <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Driver Name</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Driver Name</label>
                     <Input
                       value={vehicleFormDriverName}
+                      placeholder="Driver name (optional)"
                       onChange={(e) => setVehicleFormDriverName(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Driver Phone</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Driver Phone</label>
                     <Input
                       value={vehicleFormDriverPhone}
+                      placeholder="Driver phone (optional)"
                       onChange={(e) => setVehicleFormDriverPhone(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Rate/KM (₹)</label>
-                    <Input
-                      type="number"
-                      value={vehicleFormRatePerKm}
-                      onChange={(e) => setVehicleFormRatePerKm(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Est. KM</label>
-                    <Input
-                      type="number"
-                      value={vehicleFormEstimatedKm}
-                      onChange={(e) => setVehicleFormEstimatedKm(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Total Rate (₹)</label>
-                    <Input
-                      type="number"
-                      value={vehicleFormTotalRate}
-                      onChange={(e) => setVehicleFormTotalRate(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              {/* 7. Footer: Cancel / Add Vehicle */}
+              <DialogFooter className="mt-5 flex justify-end gap-2">
                 <DialogClose
                   render={
                     <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
@@ -3166,7 +3240,7 @@ export default function TripDetailPage() {
                   size="sm"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
                 >
-                  {vehicleSaving ? "Assigning..." : "Assign Vehicle"}
+                  {vehicleSaving ? "Assigning..." : "Add Vehicle"}
                 </Button>
               </DialogFooter>
             </form>
@@ -3174,75 +3248,170 @@ export default function TripDetailPage() {
         </Dialog>
 
         <Dialog open={isEditVehicleOpen} onOpenChange={setIsEditVehicleOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-5 shadow-xl">
             <form onSubmit={handleSaveEditVehicle}>
-              <DialogHeader>
+              <DialogHeader className="pb-1">
                 <DialogTitle className="text-slate-900 font-bold text-base">Edit Vehicle Assignment</DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-0.5">
+                  Update vehicle specifications, driver assignment, or commercial rates.
+                </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-3.5 mt-4 text-xs">
-                <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3 mt-3 text-xs">
+                {/* Vehicle Name */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vehicle Name *</label>
+                  <Input
+                    value={vehicleFormName}
+                    placeholder="e.g. Innova Crysta"
+                    onChange={(e) => setVehicleFormName(e.target.value)}
+                    className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
+                </div>
+
+                {/* Type + Capacity */}
+                <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Vehicle Name *</label>
-                    <Input
-                      value={vehicleFormName}
-                      onChange={(e) => setVehicleFormName(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Vehicle Type *</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vehicle Type *</label>
                     <Input
                       value={vehicleFormType}
+                      placeholder="e.g. SUV, Sedan, Bus"
                       onChange={(e) => setVehicleFormType(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
                       required
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Pickup Location</label>
-                    <Input
-                      value={vehicleFormPickup}
-                      onChange={(e) => setVehicleFormPickup(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Drop Location</label>
-                    <Input
-                      value={vehicleFormDrop}
-                      onChange={(e) => setVehicleFormDrop(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Driver Name</label>
-                    <Input
-                      value={vehicleFormDriverName}
-                      onChange={(e) => setVehicleFormDriverName(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Total Tariff (₹)</label>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Capacity (Seats)</label>
                     <Input
                       type="number"
-                      value={vehicleFormTotalRate}
-                      onChange={(e) => setVehicleFormTotalRate(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      min={1}
+                      value={vehicleFormCapacity}
+                      onChange={(e) => setVehicleFormCapacity(Number(e.target.value) || 1)}
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Rate Basis & Conditional Pricing */}
+                <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Rate Basis *</label>
+                    <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setVehicleFormPricingType(VehiclePricingType.FIXED)}
+                        className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                          vehicleFormPricingType === VehiclePricingType.FIXED
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Fixed
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVehicleFormPricingType(VehiclePricingType.PER_KM)}
+                        className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                          vehicleFormPricingType === VehiclePricingType.PER_KM
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Per KM
+                      </button>
+                    </div>
+                  </div>
+
+                  {vehicleFormPricingType === VehiclePricingType.FIXED ? (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fixed Amount (₹) *</label>
+                      <Input
+                        type="number"
+                        value={vehicleFormTotalRate}
+                        onChange={(e) => setVehicleFormTotalRate(e.target.value)}
+                        className="h-8.5 bg-white border-slate-200 text-xs"
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rate / KM (₹) *</label>
+                        <Input
+                          type="number"
+                          value={vehicleFormRatePerKm}
+                          onChange={(e) => setVehicleFormRatePerKm(e.target.value)}
+                          className="h-8.5 bg-white border-slate-200 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Est. KM *</label>
+                        <Input
+                          type="number"
+                          value={vehicleFormEstimatedKm}
+                          onChange={(e) => setVehicleFormEstimatedKm(e.target.value)}
+                          className="h-8.5 bg-white border-slate-200 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Actual KM</label>
+                        <Input
+                          type="number"
+                          placeholder="Post-trip"
+                          value={vehicleFormActualKm}
+                          onChange={(e) => setVehicleFormActualKm(e.target.value)}
+                          className="h-8.5 bg-white border-slate-200 text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Live Cost Calculation Preview */}
+                  <div className="pt-2 flex items-center justify-between text-[11px] border-t border-slate-200">
+                    <span className="text-slate-500 font-medium">
+                      Calculated Vehicle Cost{" "}
+                      {vehicleFormPricingType === VehiclePricingType.PER_KM && vehicleFormActualKm
+                        ? "(from Actual KM)"
+                        : vehicleFormPricingType === VehiclePricingType.PER_KM
+                        ? "(from Est. KM)"
+                        : ""}:
+                    </span>
+                    <span className="font-bold text-indigo-700">
+                      {vehicleFormPricingType === VehiclePricingType.FIXED
+                        ? `₹${Number(vehicleFormTotalRate || 0).toLocaleString("en-IN")}`
+                        : `₹${(
+                            Number(vehicleFormRatePerKm || 0) *
+                            Number(vehicleFormActualKm !== "" ? vehicleFormActualKm : vehicleFormEstimatedKm || 0)
+                          ).toLocaleString("en-IN")}`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Driver Name + Phone */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Driver Name</label>
+                    <Input
+                      value={vehicleFormDriverName}
+                      placeholder="Optional driver name"
+                      onChange={(e) => setVehicleFormDriverName(e.target.value)}
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Driver Phone</label>
+                    <Input
+                      value={vehicleFormDriverPhone}
+                      placeholder="Optional driver phone"
+                      onChange={(e) => setVehicleFormDriverPhone(e.target.value)}
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
                     />
                   </div>
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogFooter className="mt-5 flex justify-end gap-2">
                 <DialogClose
                   render={
                     <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
@@ -3256,7 +3425,7 @@ export default function TripDetailPage() {
                   size="sm"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
                 >
-                  {vehicleSaving ? "Saving..." : "Save"}
+                  {vehicleSaving ? "Saving..." : "Save Changes"}
                 </Button>
               </DialogFooter>
             </form>

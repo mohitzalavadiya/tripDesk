@@ -276,8 +276,10 @@ export default function InvoiceDetailPage() {
     ? `${formatDate((invoice.bookingSnapshot as any).travelStartDate)} → ${formatDate((invoice.bookingSnapshot as any).travelEndDate)}`
     : "Dates TBD";
 
-  // Itemized line items derivation
-  const quotationItems = invoice.booking?.quotation?.items;
+  // Itemized line items derivation (Activity excluded per architecture)
+  const quotationItems = (invoice.booking?.quotation?.items || []).filter(
+    (qi) => (qi as any).type !== "ACTIVITY" && (qi as any).sourceType !== "TRIP_ACTIVITY"
+  );
   const hasQuotationItems = quotationItems && quotationItems.length > 0;
   const hasInvoiceItems = invoice.items && invoice.items.length > 0;
 
@@ -323,83 +325,108 @@ export default function InvoiceDetailPage() {
   return (
     <div className="min-h-screen bg-slate-50/50 pb-16">
       <div className="max-w-[1050px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        {/* Top Breadcrumb & Action Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <Link
-              href={`/bookings/${invoice.bookingId}`}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-500">
-                  <Link href={`/bookings/${invoice.bookingId}`} className="hover:underline">
-                    Booking {invoice.booking?.bookingNumber || "Record"}
-                  </Link> /
-                </span>
-                <span className="text-xs font-bold text-slate-800 font-mono">
-                  {invoice.invoiceNumber || "Draft Invoice"}
-                </span>
-                {renderStatusBadge()}
-                {invoice.isOverdue && invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
-                  <Badge className="bg-rose-100 text-rose-800 border-rose-300 font-bold text-[10px]">
-                    OVERDUE
-                  </Badge>
-                )}
+        {/* Top Header Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            {/* Left: Nav + Title + Status Badges */}
+            <div className="flex items-start gap-3">
+              <Link
+                href={`/bookings/${invoice.bookingId}`}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs shrink-0 mt-0.5"
+                title="Back to Booking"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight">
+                    {invoice.invoiceNumber || "Draft Invoice"}
+                  </h1>
+                  {renderStatusBadge()}
+                  {invoice.isOverdue && invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
+                    <Badge className="bg-rose-100 text-rose-800 border-rose-300 font-bold text-[10px] px-2 py-0.5">
+                      OVERDUE
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Secondary Context Row */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 font-medium">
+                  <span className="flex items-center gap-1">
+                    Booking:{" "}
+                    <Link
+                      href={`/bookings/${invoice.bookingId}`}
+                      className="font-mono font-bold text-indigo-600 hover:underline inline-flex items-center gap-0.5"
+                    >
+                      {bookingNumber}
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </span>
+                  {customerName && (
+                    <>
+                      <span className="text-slate-300">•</span>
+                      <span>Customer: <strong className="text-slate-700">{customerName}</strong></span>
+                    </>
+                  )}
+                  {tripTitle && (
+                    <>
+                      <span className="text-slate-300">•</span>
+                      <span>Trip: <strong className="text-slate-700">{tripTitle}</strong></span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/bookings/${invoice.bookingId}`}>
+            {/* Right: Actions */}
+            <div className="flex flex-wrap items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+              <Link href={`/bookings/${invoice.bookingId}`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8.5 rounded-xl shadow-2xs cursor-pointer"
+                >
+                  <Layers className="h-3.5 w-3.5 mr-1 text-slate-400" />
+                  Booking Record
+                </Button>
+              </Link>
+
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => window.print()}
                 className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8.5 rounded-xl shadow-2xs cursor-pointer"
               >
-                <Layers className="h-3.5 w-3.5 mr-1 text-slate-400" />
-                Booking Record
+                <Printer className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                Print
               </Button>
-            </Link>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.print()}
-              className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8.5 rounded-xl shadow-2xs cursor-pointer"
-            >
-              <Printer className="h-3.5 w-3.5 mr-1 text-slate-500" />
-              Print
-            </Button>
-
-            <a
-              href={`/api/invoices/${invoice.id}/pdf`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8.5 rounded-xl shadow-2xs cursor-pointer"
+              <a
+                href={`/api/invoices/${invoice.id}/pdf`}
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                <Download className="h-3.5 w-3.5 mr-1 text-slate-500" />
-                Download PDF
-              </Button>
-            </a>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8.5 rounded-xl shadow-2xs cursor-pointer"
+                >
+                  <Download className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                  Download PDF
+                </Button>
+              </a>
 
-            {liveBalance > 0 && invoice.status !== "CANCELLED" && (
-              <Button
-                size="sm"
-                onClick={() => setShowPayModal(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8.5 px-3.5 rounded-xl shadow-xs gap-1.5 cursor-pointer"
-              >
-                <CreditCard className="h-3.5 w-3.5" />
-                Record Payment
-              </Button>
-            )}
+              {liveBalance > 0 && invoice.status !== "CANCELLED" && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowPayModal(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8.5 px-3.5 rounded-xl shadow-xs gap-1.5 cursor-pointer"
+                >
+                  <CreditCard className="h-3.5 w-3.5" />
+                  Record Payment
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -540,34 +567,7 @@ export default function InvoiceDetailPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody className="text-xs divide-y divide-slate-100">
-                  {hasQuotationItems ? (
-                    quotationItems.map((item, idx) => {
-                      const rate = Number(item.sellingPrice ?? item.unitPrice ?? 0);
-                      const amount = Number(item.totalPrice ?? (item.quantity * rate));
-                      return (
-                        <TableRow key={item.id || idx} className="hover:bg-slate-50/50">
-                          <TableCell className="py-3 px-4 text-center text-slate-400 font-mono text-[11px]">
-                            {idx + 1}
-                          </TableCell>
-                          <TableCell className="py-3 px-4">
-                            <strong className="text-slate-900 block font-semibold">{item.name}</strong>
-                            {item.description && (
-                              <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{item.description}</p>
-                            )}
-                          </TableCell>
-                          <TableCell className="py-3 px-4 text-right text-slate-700 font-mono">
-                            {item.quantity}
-                          </TableCell>
-                          <TableCell className="py-3 px-4 text-right text-slate-700 font-mono">
-                            {formatINR(rate)}
-                          </TableCell>
-                          <TableCell className="py-3 px-4 text-right font-bold text-slate-900 font-mono">
-                            {formatINR(amount)}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  ) : hasInvoiceItems ? (
+                  {hasInvoiceItems ? (
                     invoice.items.map((item, idx) => (
                       <TableRow key={item.id || idx} className="hover:bg-slate-50/50">
                         <TableCell className="py-3 px-4 text-center text-slate-400 font-mono text-[11px]">
@@ -587,6 +587,36 @@ export default function InvoiceDetailPage() {
                         </TableCell>
                       </TableRow>
                     ))
+                  ) : hasQuotationItems ? (
+                    quotationItems.map((item, idx) => {
+                      const qty = item.quantity || 1;
+                      const amount = Number(item.totalPrice ?? (item.sellingPrice !== null && item.sellingPrice !== undefined ? Number(item.sellingPrice) : (Number(item.unitPrice || 0) * qty)));
+                      const rate = Number(item.unitPrice) > 0 && Number(item.unitPrice) * qty === amount
+                        ? Number(item.unitPrice)
+                        : Math.round((amount / qty) * 100) / 100;
+                      return (
+                        <TableRow key={item.id || idx} className="hover:bg-slate-50/50">
+                          <TableCell className="py-3 px-4 text-center text-slate-400 font-mono text-[11px]">
+                            {idx + 1}
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <strong className="text-slate-900 block font-semibold">{item.name}</strong>
+                            {item.description && (
+                              <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{item.description}</p>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-3 px-4 text-right text-slate-700 font-mono">
+                            {qty}
+                          </TableCell>
+                          <TableCell className="py-3 px-4 text-right text-slate-700 font-mono">
+                            {formatINR(rate)}
+                          </TableCell>
+                          <TableCell className="py-3 px-4 text-right font-bold text-slate-900 font-mono">
+                            {formatINR(amount)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   ) : (
                     <TableRow className="hover:bg-slate-50/50">
                       <TableCell className="py-3 px-4 text-center text-slate-400 font-mono text-[11px]">
@@ -616,11 +646,11 @@ export default function InvoiceDetailPage() {
           {/* ══════════════════════════════════════════════════════════════ */}
           <div className="flex flex-col sm:flex-row sm:justify-end">
             <div className="w-full sm:w-88 bg-slate-50/90 rounded-2xl border border-slate-200/80 p-5 space-y-2.5 font-mono text-xs shadow-2xs">
-              {/* Taxable Amount */}
+              {/* Subtotal */}
               <div className="flex justify-between text-slate-600">
-                <span>Taxable Base:</span>
+                <span>Services Subtotal:</span>
                 <span className="font-semibold text-slate-900">
-                  {formatINR(invoice.taxableAmount !== null && invoice.taxableAmount !== undefined ? Number(invoice.taxableAmount) : subtotal)}
+                  {formatINR(invoice.subtotal || subtotal)}
                 </span>
               </div>
 
@@ -631,22 +661,26 @@ export default function InvoiceDetailPage() {
                 </div>
               )}
 
+              {/* Taxable Base */}
+              <div className="flex justify-between text-slate-600">
+                <span>Taxable Base:</span>
+                <span className="font-semibold text-slate-900">
+                  {formatINR(invoice.taxableAmount !== null && invoice.taxableAmount !== undefined ? Number(invoice.taxableAmount) : subtotal - discountAmount)}
+                </span>
+              </div>
+
               {/* GST Breakdown */}
               {(() => {
                 const taxRate = Number(invoice.taxRate ?? (invoice.booking as any)?.taxRate ?? 0);
+                const taxAmount = Number(invoice.taxAmount ?? (invoice.booking as any)?.taxAmount ?? 0);
                 const taxMode = invoice.taxMode || (invoice.booking as any)?.taxMode || "EXCLUSIVE";
                 const gstTreatment = invoice.gstTreatment || (invoice.booking as any)?.gstTreatment || "INTRA_STATE";
                 const cgst = Number(invoice.cgstAmount ?? (invoice.booking as any)?.cgstAmount ?? 0);
                 const sgst = Number(invoice.sgstAmount ?? (invoice.booking as any)?.sgstAmount ?? 0);
                 const igst = Number(invoice.igstAmount ?? (invoice.booking as any)?.igstAmount ?? 0);
 
-                if (gstTreatment === "NON_GST_EXEMPT" || taxRate === 0) {
-                  return (
-                    <div className="flex justify-between text-slate-500 text-[11px] pt-1 border-t border-slate-200/60">
-                      <span>GST (0% Exempt):</span>
-                      <span>₹0.00</span>
-                    </div>
-                  );
+                if (gstTreatment === "NON_GST_EXEMPT" || taxRate === 0 || taxAmount === 0) {
+                  return null;
                 }
 
                 if (gstTreatment === "INTRA_STATE") {
@@ -677,7 +711,7 @@ export default function InvoiceDetailPage() {
                 return null;
               })()}
 
-              {invoice.taxMode === "INCLUSIVE" && Number(invoice.taxRate ?? 0) > 0 && (
+              {invoice.taxMode === "INCLUSIVE" && Number(invoice.taxRate ?? 0) > 0 && Number(invoice.taxAmount ?? 0) > 0 && (
                 <p className="text-[10px] text-indigo-600 font-sans italic text-right pt-0.5">
                   * Customer price includes {Number(invoice.taxRate)}% GST
                 </p>

@@ -34,8 +34,6 @@ export const vehicleService = {
             { name: { contains: search, mode: "insensitive" as const } },
             { type: { contains: search, mode: "insensitive" as const } },
             { registrationNumber: { contains: search, mode: "insensitive" as const } },
-            { driverName: { contains: search, mode: "insensitive" as const } },
-            { driverPhone: { contains: search, mode: "insensitive" as const } },
           ],
         }
       : {};
@@ -81,6 +79,9 @@ export const vehicleService = {
         id: vehicleId,
         agencyId,
       },
+      include: {
+        supplier: true,
+      },
     });
   },
 
@@ -95,11 +96,7 @@ export const vehicleService = {
         type: data.type,
         capacity: data.capacity ?? 4,
         registrationNumber: data.registrationNumber || null,
-        driverName: data.driverName || null,
-        driverPhone: data.driverPhone || null,
-        pricingType: data.pricingType,
-        baseRate: data.baseRate !== undefined && data.baseRate !== null ? data.baseRate : null,
-        ratePerKm: data.ratePerKm !== undefined && data.ratePerKm !== null ? data.ratePerKm : null,
+        supplierId: data.supplierId || null,
         notes: data.notes || null,
       },
     });
@@ -133,14 +130,8 @@ export const vehicleService = {
         ...(data.registrationNumber !== undefined && {
           registrationNumber: data.registrationNumber || null,
         }),
-        ...(data.driverName !== undefined && { driverName: data.driverName || null }),
-        ...(data.driverPhone !== undefined && { driverPhone: data.driverPhone || null }),
-        ...(data.pricingType !== undefined && { pricingType: data.pricingType }),
-        ...(data.baseRate !== undefined && {
-          baseRate: data.baseRate !== null ? data.baseRate : null,
-        }),
-        ...(data.ratePerKm !== undefined && {
-          ratePerKm: data.ratePerKm !== null ? data.ratePerKm : null,
+        ...(data.supplierId !== undefined && {
+          supplierId: data.supplierId || null,
         }),
         ...(data.notes !== undefined && { notes: data.notes || null }),
       },

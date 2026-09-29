@@ -3,11 +3,12 @@ import PDFDocument from "pdfkit";
 import { InvoiceWithDetails } from "./invoice-service";
 
 /**
- * Helper to format currency in Indian numbering format (INR ₹)
+ * Helper to format currency in Indian numbering format (INR Rs.)
+ * Uses standard ASCII characters to prevent PDF font encoding artifacts (such as stray ¹).
  */
 function formatINR(val: number | string | any): string {
   const num = Number(val) || 0;
-  return `₹${num.toLocaleString("en-IN", {
+  return `Rs. ${num.toLocaleString("en-IN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -62,6 +63,7 @@ export const invoicePdfService = {
         const pageWidth = 595.28;
         const pageHeight = 841.89;
         const contentWidth = pageWidth - margin * 2; // 515.28 pt
+        const bottomMargin = pageHeight - margin - 35; // Space for footer
 
         const brandPrimary = "#0F172A"; // Slate 900
         const brandAccent = "#4338CA"; // Indigo 700
@@ -76,11 +78,13 @@ export const invoicePdfService = {
         const isDraft = invoice.status === "DRAFT";
         const isCancelled = invoice.status === "CANCELLED";
 
-        // Multi-page helper: adds page with margin protection
-        const checkPageBreak = (neededHeight: number, onPageAdded?: () => void) => {
-          if (doc.y + neededHeight > pageHeight - 50) {
+        let currentY = margin;
+
+        // Controlled pagination helper: adds page with margin protection and explicit currentY tracking
+        const ensureSpace = (neededHeight: number): boolean => {
+          if (currentY + neededHeight > bottomMargin) {
             doc.addPage();
-            if (onPageAdded) onPageAdded();
+            currentY = margin;
             return true;
           }
           return false;
@@ -89,8 +93,6 @@ export const invoicePdfService = {
         // ═════════════════════════════════════════════════════════════════════
         // 1. HEADER & AGENCY BRANDING
         // ═════════════════════════════════════════════════════════════════════
-        let currentY = margin;
-
         const agencySnap = (invoice.agencySnapshot as any) || invoice.agency || {};
         const agencyName = agencySnap.name || "TripDesk Partner Agency";
         const agencyEmail = agencySnap.email || "";
@@ -193,7 +195,7 @@ export const invoicePdfService = {
         // Position after header
         currentY = Math.max(currentY, rightY) + 12;
 
-        // Elegant Divider
+        // Divider
         doc.strokeColor(borderLight).lineWidth(1).moveTo(margin, currentY).lineTo(margin + contentWidth, currentY).stroke();
         currentY += 14;
 
@@ -286,7 +288,10 @@ export const invoicePdfService = {
         // ═════════════════════════════════════════════════════════════════════
         // 3. SERVICE ITEMIZATION TABLE
         // ═════════════════════════════════════════════════════════════════════
-        const quotationItems = invoice.booking?.quotation?.items || [];
+        // Line items derivation (Activity excluded per architecture)
+        const quotationItems = (invoice.booking?.quotation?.items || []).filter(
+          (qi) => (qi as any).type !== "ACTIVITY" && (qi as any).sourceType !== "TRIP_ACTIVITY"
+        );
         const invoiceItems = invoice.items || [];
 
         interface TableLineItem {
@@ -300,27 +305,31 @@ export const invoicePdfService = {
 
         const itemsToRender: TableLineItem[] = [];
 
-        if (quotationItems.length > 0) {
-          quotationItems.forEach((item, idx) => {
-            const rate = Number(item.sellingPrice ?? item.unitPrice ?? 0);
-            const amount = Number(item.totalPrice ?? (item.quantity * rate));
-            itemsToRender.push({
-              index: idx + 1,
-              name: item.name,
-              description: item.description,
-              quantity: item.quantity,
-              rate,
-              amount,
-            });
-          });
-        } else if (invoiceItems.length > 0) {
+        if (invoiceItems.length > 0) {
           invoiceItems.forEach((item, idx) => {
             itemsToRender.push({
               index: idx + 1,
               name: item.description,
+              description: null,
               quantity: item.quantity,
               rate: Number(item.rate),
               amount: Number(item.amount),
+            });
+          });
+        } else if (quotationItems.length > 0) {
+          quotationItems.forEach((item, idx) => {
+            const qty = item.quantity || 1;
+            const amount = Number(item.totalPrice ?? (item.sellingPrice !== null && item.sellingPrice !== undefined ? Number(item.sellingPrice) : (Number(item.unitPrice || 0) * qty)));
+            const rate = Number(item.unitPrice) > 0 && Number(item.unitPrice) * qty === amount
+              ? Number(item.unitPrice)
+              : Math.round((amount / qty) * 100) / 100;
+            itemsToRender.push({
+              index: idx + 1,
+              name: item.name,
+              description: item.description,
+              quantity: qty,
+              rate,
+              amount,
             });
           });
         } else {
@@ -338,8 +347,8 @@ export const invoicePdfService = {
 
         const colNumW = 28;
         const colQtyW = 45;
-        const colRateW = 95;
-        const colAmtW = 100;
+        const colRateW = 100;
+        const colAmtW = 105;
         const colDescW = contentWidth - (colNumW + colQtyW + colRateW + colAmtW);
 
         const drawTableHeader = (yPos: number) => {
@@ -349,11 +358,11 @@ export const invoicePdfService = {
           doc.text("#", margin + 6, yPos + 6, { width: colNumW });
           doc.text("Description & Services", margin + colNumW + 6, yPos + 6, { width: colDescW });
           doc.text("Qty", margin + colNumW + colDescW, yPos + 6, { width: colQtyW, align: "center" });
-          doc.text("Rate (₹)", margin + colNumW + colDescW + colQtyW, yPos + 6, { width: colRateW - 8, align: "right" });
-          doc.text("Amount (₹)", margin + colNumW + colDescW + colQtyW + colRateW, yPos + 6, { width: colAmtW - 8, align: "right" });
+          doc.text("Rate (INR)", margin + colNumW + colDescW + colQtyW, yPos + 6, { width: colRateW - 8, align: "right" });
+          doc.text("Amount (INR)", margin + colNumW + colDescW + colQtyW + colRateW, yPos + 6, { width: colAmtW - 8, align: "right" });
         };
 
-        checkPageBreak(50);
+        ensureSpace(45);
         drawTableHeader(currentY);
         currentY += 22;
 
@@ -369,8 +378,7 @@ export const invoicePdfService = {
             rowHeight = Math.max(26, 16 + descHeight + 6);
           }
 
-          if (checkPageBreak(rowHeight)) {
-            currentY = margin;
+          if (ensureSpace(rowHeight)) {
             drawTableHeader(currentY);
             currentY += 22;
           }
@@ -410,11 +418,12 @@ export const invoicePdfService = {
           currentY += rowHeight;
         }
 
-        currentY += 12;
+        currentY += 14;
 
         // ═════════════════════════════════════════════════════════════════════
         // 4. FINANCIAL SUMMARY & TAX BREAKDOWN (DECISION #18 AUTHORITATIVE)
         // ═════════════════════════════════════════════════════════════════════
+        const subtotalAmount = Number(invoice.subtotal || 0);
         const discountAmount = Number(invoice.discountAmount || 0);
         const totalAmount = Number(invoice.booking?.totalAmount ?? invoice.totalAmount ?? 0);
         const paidAmount = Number(invoice.booking?.paidAmount ?? invoice.paidAmount ?? 0);
@@ -427,7 +436,7 @@ export const invoicePdfService = {
         const gstTreatment = invoice.gstTreatment || (invoice.booking as any)?.gstTreatment || "INTRA_STATE";
         
         const rawTaxable = invoice.taxableAmount ?? (invoice.booking as any)?.taxableAmount ?? null;
-        const taxableAmount = rawTaxable !== null ? Number(rawTaxable) : Number(invoice.subtotal);
+        const taxableAmount = rawTaxable !== null ? Number(rawTaxable) : subtotalAmount;
         
         const rawTaxAmt = invoice.taxAmount ?? (invoice.booking as any)?.taxAmount ?? null;
         const taxAmount = rawTaxAmt !== null ? Number(rawTaxAmt) : 0;
@@ -444,20 +453,18 @@ export const invoicePdfService = {
         const summaryW = 240;
         const summaryX = margin + contentWidth - summaryW;
         
-        let summaryH = 110;
-        if (discountAmount > 0) summaryH += 15;
+        let summaryH = 100;
+        if (discountAmount > 0) summaryH += 30; // subtotal + discount line
         if (gstTreatment === "INTRA_STATE" && taxAmount > 0) {
           summaryH += 30; // 2 lines: CGST and SGST
         } else if (gstTreatment === "INTER_STATE" && taxAmount > 0) {
           summaryH += 16; // 1 line: IGST
-        } else if (gstTreatment === "NON_GST_EXEMPT" || taxRate === 0) {
-          summaryH += 16; // 1 line: Exempt notice
         }
-        if (taxMode === "INCLUSIVE") {
+        if (taxMode === "INCLUSIVE" && taxRate > 0) {
           summaryH += 14;
         }
 
-        checkPageBreak(summaryH + 15);
+        ensureSpace(summaryH + 15);
 
         // Notes and Payment Instructions on the left
         const notesW = contentWidth - summaryW - 20;
@@ -489,42 +496,44 @@ export const invoicePdfService = {
         let sumLineY = currentY + 10;
         doc.fillColor(textMuted).fontSize(8.5).font("Helvetica");
 
-        // Taxable Base / Base Amount
-        doc.text("Taxable Base Amount:", summaryX + 12, sumLineY);
-        doc.text(formatINR(taxableAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
-        sumLineY += 15;
-
-        // Discount
+        // Subtotal & Discount (if applicable)
         if (discountAmount > 0) {
+          doc.text("Services Subtotal:", summaryX + 12, sumLineY);
+          doc.text(formatINR(subtotalAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+          sumLineY += 15;
+
           const discLabel =
             invoice.discountType === "PERCENTAGE"
-              ? `Discount (${Number(invoice.discountValue)}%):`
+              ? `Special Discount (${Number(invoice.discountValue)}%):`
               : "Special Discount:";
           doc.text(discLabel, summaryX + 12, sumLineY);
           doc.text(`- ${formatINR(discountAmount)}`, summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
           sumLineY += 15;
         }
 
-        // Itemized GST Breakdown
-        if (gstTreatment === "NON_GST_EXEMPT" || taxRate === 0) {
-          doc.text("GST (0% Exempt):", summaryX + 12, sumLineY);
-          doc.text("₹0.00", summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
-          sumLineY += 15;
-        } else if (gstTreatment === "INTRA_STATE") {
-          const halfRate = taxRate / 2;
-          const modeTag = taxMode === "INCLUSIVE" ? " (Incl.)" : "";
-          doc.text(`CGST (${halfRate}%)${modeTag}:`, summaryX + 12, sumLineY);
-          doc.text(formatINR(cgstAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
-          sumLineY += 15;
+        // Taxable Base Amount
+        doc.text("Taxable Base Amount:", summaryX + 12, sumLineY);
+        doc.text(formatINR(taxableAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+        sumLineY += 15;
 
-          doc.text(`SGST (${halfRate}%)${modeTag}:`, summaryX + 12, sumLineY);
-          doc.text(formatINR(sgstAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
-          sumLineY += 15;
-        } else if (gstTreatment === "INTER_STATE") {
-          const modeTag = taxMode === "INCLUSIVE" ? " (Incl.)" : "";
-          doc.text(`IGST (${taxRate}%)${modeTag}:`, summaryX + 12, sumLineY);
-          doc.text(formatINR(igstAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
-          sumLineY += 15;
+        // Itemized GST Breakdown (omit 0% exempt line when tax is 0)
+        if (taxAmount > 0) {
+          if (gstTreatment === "INTRA_STATE") {
+            const halfRate = taxRate / 2;
+            const modeTag = taxMode === "INCLUSIVE" ? " (Incl.)" : "";
+            doc.text(`CGST (${halfRate}%)${modeTag}:`, summaryX + 12, sumLineY);
+            doc.text(formatINR(cgstAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+            sumLineY += 15;
+
+            doc.text(`SGST (${halfRate}%)${modeTag}:`, summaryX + 12, sumLineY);
+            doc.text(formatINR(sgstAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+            sumLineY += 15;
+          } else if (gstTreatment === "INTER_STATE") {
+            const modeTag = taxMode === "INCLUSIVE" ? " (Incl.)" : "";
+            doc.text(`IGST (${taxRate}%)${modeTag}:`, summaryX + 12, sumLineY);
+            doc.text(formatINR(igstAmount), summaryX + 12, sumLineY, { width: summaryW - 24, align: "right" });
+            sumLineY += 15;
+          }
         }
 
         // Inclusive Note
@@ -550,7 +559,7 @@ export const invoicePdfService = {
         doc.text("Balance Due:", summaryX + 12, sumLineY + 4);
         doc.text(formatINR(balanceAmount), summaryX + 12, sumLineY + 4, { width: summaryW - 24, align: "right" });
 
-        currentY = Math.max(leftNotesY, currentY + summaryH) + 16;
+        currentY = Math.max(leftNotesY, currentY + summaryH) + 18;
 
         // ═════════════════════════════════════════════════════════════════════
         // 5. PAYMENT HISTORY LEDGER (EXCLUDES VOIDED / ARCHIVED)
@@ -560,31 +569,37 @@ export const invoicePdfService = {
         );
 
         if (activePayments.length > 0) {
-          checkPageBreak(50 + activePayments.length * 18);
-
-          doc.fillColor(brandPrimary).fontSize(9.5).font("Helvetica-Bold").text("Payment History & Receipts", margin, currentY);
-          currentY += 14;
-
           const pColDateW = 80;
           const pColNumW = 100;
           const pColMethodW = 85;
           const pColRefW = 120;
           const pColAmtW = contentWidth - (pColDateW + pColNumW + pColMethodW + pColRefW);
 
-          doc.rect(margin, currentY, contentWidth, 20).fill("#F1F5F9");
-          doc.fillColor(textMuted).fontSize(7.5).font("Helvetica-Bold");
-          doc.text("Date", margin + 8, currentY + 6, { width: pColDateW });
-          doc.text("Receipt / Payment #", margin + pColDateW + 8, currentY + 6, { width: pColNumW });
-          doc.text("Method", margin + pColDateW + pColNumW + 8, currentY + 6, { width: pColMethodW });
-          doc.text("Reference (Txn ID)", margin + pColDateW + pColNumW + pColMethodW + 8, currentY + 6, { width: pColRefW });
-          doc.text("Amount (₹)", margin + pColDateW + pColNumW + pColMethodW + pColRefW, currentY + 6, { width: pColAmtW - 8, align: "right" });
+          const drawPaymentTableHeader = (yPos: number) => {
+            doc.rect(margin, yPos, contentWidth, 20).fill("#F1F5F9");
+            doc.fillColor(textMuted).fontSize(7.5).font("Helvetica-Bold");
+            doc.text("Date", margin + 8, yPos + 6, { width: pColDateW });
+            doc.text("Receipt / Payment #", margin + pColDateW + 8, yPos + 6, { width: pColNumW });
+            doc.text("Method", margin + pColDateW + pColNumW + 8, yPos + 6, { width: pColMethodW });
+            doc.text("Reference (Txn ID)", margin + pColDateW + pColNumW + pColMethodW + 8, yPos + 6, { width: pColRefW });
+            doc.text("Amount (INR)", margin + pColDateW + pColNumW + pColMethodW + pColRefW, yPos + 6, { width: pColAmtW - 8, align: "right" });
+          };
 
+          // Keep section title + header + 1st row together (16 + 20 + 20 = 56pt)
+          ensureSpace(56);
+
+          doc.fillColor(brandPrimary).fontSize(9.5).font("Helvetica-Bold").text("Payment History & Receipts", margin, currentY);
+          currentY += 16;
+
+          drawPaymentTableHeader(currentY);
           currentY += 20;
 
           for (let pi = 0; pi < activePayments.length; pi++) {
             const pay = activePayments[pi];
-            if (checkPageBreak(20)) {
-              currentY = margin;
+            if (ensureSpace(20)) {
+              // Continued on new page - repeat table header!
+              drawPaymentTableHeader(currentY);
+              currentY += 20;
             }
 
             const pBg = pi % 2 === 0 ? "#FFFFFF" : bgLight;
@@ -662,3 +677,4 @@ export const invoicePdfService = {
     });
   },
 };
+

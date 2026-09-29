@@ -133,6 +133,32 @@ const PAYMENT_METHOD_MODAL_LABELS: Record<string, string> = {
   OTHER: "Other Method",
 };
 
+function formatDispatchStatus(status?: string | null): string {
+  if (!status) return "Unassigned";
+  switch (status) {
+    case "ON_DUTY":
+      return "On Duty";
+    case "IN_TRANSIT":
+      return "In Transit";
+    case "ASSIGNED":
+      return "Assigned";
+    case "CONFIRMED":
+      return "Confirmed";
+    case "COMPLETED":
+      return "Completed";
+    case "PENDING":
+      return "Pending";
+    case "UNINITIALIZED":
+      return "Unassigned";
+    case "CANCELLED":
+      return "Cancelled";
+    case "DELAYED":
+      return "Delayed";
+    default:
+      return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+}
+
 export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -795,7 +821,7 @@ export default function BookingDetailPage() {
                         <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
                           <TableRow>
                             <TableHead className="py-2 px-3">Vehicle</TableHead>
-                            <TableHead className="py-2 px-3">Chauffeur</TableHead>
+                            <TableHead className="py-2 px-3">Driver (Chauffeur)</TableHead>
                             <TableHead className="py-2 px-3">Plate #</TableHead>
                             <TableHead className="py-2 px-3 text-right">Dispatch Status</TableHead>
                           </TableRow>
@@ -842,7 +868,7 @@ export default function BookingDetailPage() {
                                             : "bg-amber-100 text-amber-800"
                                         }`}
                                       >
-                                        {status}
+                                        {formatDispatchStatus(status)}
                                       </Badge>
                                     </TableCell>
                                   </TableRow>
@@ -867,7 +893,7 @@ export default function BookingDetailPage() {
                                           : "bg-amber-100 text-amber-800"
                                       }`}
                                     >
-                                      {v.status}
+                                      {formatDispatchStatus(v.status)}
                                     </Badge>
                                   </TableCell>
                                 </TableRow>
@@ -883,7 +909,7 @@ export default function BookingDetailPage() {
                   <div>
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2 flex items-center gap-1.5">
                       <Ticket className="h-3.5 w-3.5 text-slate-400" />
-                      <span>Activity Passes & Sightseeing ({tripActivities.length > 0 ? tripActivities.length : activityConfirmations.length})</span>
+                      <span>Sightseeing & Activities ({tripActivities.length > 0 ? tripActivities.length : activityConfirmations.length})</span>
                     </h4>
 
                     <div className="border border-slate-100 rounded-xl overflow-hidden">
@@ -892,8 +918,10 @@ export default function BookingDetailPage() {
                           <TableRow>
                             <TableHead className="py-2 px-3">Activity</TableHead>
                             <TableHead className="py-2 px-3">Location & Schedule</TableHead>
-                            <TableHead className="py-2 px-3">Pass / Voucher #</TableHead>
-                            <TableHead className="py-2 px-3 text-right">Status</TableHead>
+                            {/* Operational Pass / Voucher # and Status columns preserved in comments per architecture rules */}
+                            {/* <TableHead className="py-2 px-3">Pass / Voucher #</TableHead> */}
+                            {/* <TableHead className="py-2 px-3 text-right">Status</TableHead> */}
+                            <TableHead className="py-2 px-3 text-right">Inclusion</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -904,8 +932,10 @@ export default function BookingDetailPage() {
                                 );
                                 const actName = ta.name || ta.activity?.name || conf?.activity?.name || "Sightseeing Activity";
                                 const locationAndDate = `${ta.location || ta.activity?.location || conf?.tripActivity?.location || conf?.activity?.location || "Destination"}${ta.date ? ` • ${formatDateDisplay(ta.date)}` : ""}${ta.time ? ` (${ta.time})` : ""}${ta.numberOfParticipants ? ` • ${ta.numberOfParticipants} pax` : ""}`;
-                                const voucherNumber = conf?.confirmationNumber || conf?.ticketNumber || (conf as any)?.passNumber || "Pending";
-                                const status = conf?.status || (booking.tripOperation ? "PENDING" : "UNINITIALIZED");
+                                const isExcluded = (ta as any).type === "EXCLUDED" || (ta as any).type === "OPTIONAL";
+                                // Operational pass details preserved for backward compatibility
+                                // const voucherNumber = conf?.confirmationNumber || conf?.ticketNumber || (conf as any)?.passNumber || "Pending";
+                                // const status = conf?.status || (booking.tripOperation ? "PENDING" : "UNINITIALIZED");
 
                                 return (
                                   <TableRow key={ta.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
@@ -915,49 +945,44 @@ export default function BookingDetailPage() {
                                     <TableCell className="py-2.5 px-3 text-slate-600">
                                       {locationAndDate}
                                     </TableCell>
-                                    <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
-                                      {voucherNumber}
-                                    </TableCell>
                                     <TableCell className="py-2.5 px-3 text-right">
-                                      <Badge
-                                        className={`text-[10px] font-bold ${
-                                          status === "CONFIRMED"
-                                            ? "bg-emerald-100 text-emerald-800"
-                                            : status === "UNINITIALIZED"
-                                            ? "bg-slate-100 text-slate-600"
-                                            : "bg-amber-100 text-amber-800"
+                                      <span
+                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                          isExcluded
+                                            ? "bg-amber-50 text-amber-800 border-amber-200"
+                                            : "bg-emerald-50 text-emerald-800 border-emerald-200"
                                         }`}
                                       >
-                                        {status}
-                                      </Badge>
+                                        {isExcluded ? "Not Included" : "Included"}
+                                      </span>
                                     </TableCell>
                                   </TableRow>
                                 );
                               })
-                            : activityConfirmations.map((a) => (
-                                <TableRow key={a.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
-                                  <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
-                                    {a.activity?.name || (a as any).tripActivity?.name || "Sightseeing Activity"}
-                                  </TableCell>
-                                  <TableCell className="py-2.5 px-3 text-slate-600">
-                                    {a.activityLocation || a.activity?.location || (a as any).tripActivity?.location || "Destination"}
-                                  </TableCell>
-                                  <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
-                                    {a.confirmationNumber || a.ticketNumber || (a as any).passNumber || "Pending"}
-                                  </TableCell>
-                                  <TableCell className="py-2.5 px-3 text-right">
-                                    <Badge
-                                      className={`text-[10px] font-bold ${
-                                        a.status === "CONFIRMED"
-                                          ? "bg-emerald-100 text-emerald-800"
-                                          : "bg-amber-100 text-amber-800"
-                                      }`}
-                                    >
-                                      {a.status}
-                                    </Badge>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
+                            : activityConfirmations.map((a) => {
+                                const isExcluded = (a as any).tripActivity?.type === "EXCLUDED" || (a as any).tripActivity?.type === "OPTIONAL";
+                                return (
+                                  <TableRow key={a.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                    <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                      {a.activity?.name || (a as any).tripActivity?.name || "Sightseeing Activity"}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-600">
+                                      {a.activityLocation || a.activity?.location || (a as any).tripActivity?.location || "Destination"}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-right">
+                                      <span
+                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                          isExcluded
+                                            ? "bg-amber-50 text-amber-800 border-amber-200"
+                                            : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                        }`}
+                                      >
+                                        {isExcluded ? "Not Included" : "Included"}
+                                      </span>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
                         </TableBody>
                       </Table>
                     </div>
@@ -1188,8 +1213,8 @@ export default function BookingDetailPage() {
                 </div>
               )}
 
-              {/* Payment Milestones & Schedule Breakdown */}
-              {schedule && schedule.milestones && schedule.milestones.length > 0 && (
+              {/* Payment Milestones & Schedule Breakdown (Temporarily hidden from UI per Phase Cleanup) */}
+              {/* {schedule && schedule.milestones && schedule.milestones.length > 0 && (
                 <div className="pt-2 border-t border-slate-100 space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
@@ -1269,7 +1294,7 @@ export default function BookingDetailPage() {
                     </Table>
                   </div>
                 </div>
-              )}
+              )} */}
             </div>
 
             {/* 3. Payment Transactions Table */}
@@ -1371,31 +1396,33 @@ export default function BookingDetailPage() {
               {events.length === 0 ? (
                 <p className="text-xs text-slate-400 italic">No operational events recorded yet.</p>
               ) : (
-                <div className="space-y-4 pt-1">
-                  {events.map((e, idx) => (
-                    <div key={e.id} className="flex gap-3 text-xs">
-                      <div className="flex flex-col items-center">
-                        <div className="h-6 w-6 rounded-full bg-indigo-50 border border-indigo-200 flex items-center justify-center shrink-0">
-                          <Sparkles className="h-3 w-3 text-indigo-600" />
+                <div className="overflow-x-auto -mx-2 px-2">
+                  <div className="space-y-4 pt-1 min-w-[360px]">
+                    {events.map((e, idx) => (
+                      <div key={e.id} className="flex gap-3 text-xs">
+                        <div className="flex flex-col items-center">
+                          <div className="h-6 w-6 rounded-full bg-indigo-50 border border-indigo-200 flex items-center justify-center shrink-0">
+                            <Sparkles className="h-3 w-3 text-indigo-600" />
+                          </div>
+                          {idx < events.length - 1 && <div className="w-px flex-1 bg-slate-200 my-1" />}
                         </div>
-                        {idx < events.length - 1 && <div className="w-px flex-1 bg-slate-200 my-1" />}
-                      </div>
-                      <div className="pb-3 flex-1">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <strong className="text-slate-900">{e.title}</strong>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {new Date(e.createdAt).toLocaleString("en-IN", {
-                              day: "numeric",
-                              month: "short",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
+                        <div className="pb-3 flex-1 min-w-0">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <strong className="text-slate-900 truncate">{e.title}</strong>
+                            <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                              {new Date(e.createdAt).toLocaleString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          {e.description && <p className="text-slate-600 mt-0.5 break-words">{e.description}</p>}
                         </div>
-                        {e.description && <p className="text-slate-600 mt-0.5">{e.description}</p>}
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

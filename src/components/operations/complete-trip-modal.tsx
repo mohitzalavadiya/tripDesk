@@ -129,7 +129,7 @@ export function CompleteTripModal({
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
             Operational Delivery Checklist
           </span>
-          <div className="grid grid-cols-3 gap-2 pt-1 text-slate-700">
+          <div className="grid grid-cols-2 gap-2 pt-1 text-slate-700">
             <div className="bg-white border border-slate-200/80 rounded-lg p-2.5 text-center">
               <Hotel className="h-3.5 w-3.5 mx-auto text-indigo-500 mb-1" />
               <span className="text-[10px] text-slate-400 font-semibold block">Hotels</span>
@@ -140,11 +140,14 @@ export function CompleteTripModal({
               <span className="text-[10px] text-slate-400 font-semibold block">Fleet & Driver</span>
               <span className="font-bold text-slate-900">{completedVehicles}/{totalVehicles} Dispatched</span>
             </div>
+            {/* Activity delivery checklist item intentionally hidden from Complete Trip Modal.
+                Activity is currently a trip inclusion/catalogue feature and not an operational delivery service.
             <div className="bg-white border border-slate-200/80 rounded-lg p-2.5 text-center">
               <Compass className="h-3.5 w-3.5 mx-auto text-purple-500 mb-1" />
               <span className="text-[10px] text-slate-400 font-semibold block">Activities</span>
               <span className="font-bold text-slate-900">{confirmedActivities}/{totalActivities} Delivered</span>
             </div>
+            */}
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-slate-500 pt-1">
             <FileCheck2 className="h-3.5 w-3.5 text-teal-600 shrink-0" />

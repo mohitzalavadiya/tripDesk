@@ -287,7 +287,7 @@ export default function VehiclesPage() {
                       <TableHead className="py-3 px-4 font-bold text-slate-600 w-[300px]">Vehicle & Type</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Capacity</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Registration</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Driver Contact</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">Notes</TableHead>
                       <TableHead className="py-3 px-4 w-[80px] text-right font-bold text-slate-600">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -326,19 +326,9 @@ export default function VehiclesPage() {
                         </TableCell>
 
                         <TableCell className="py-3.5 px-4">
-                          <div className="flex flex-col gap-0.5 text-xs text-slate-600">
-                            {v.driverName ? (
-                              <span className="font-medium text-slate-800">{v.driverName}</span>
-                            ) : (
-                              <span className="text-slate-400">Self-drive / Assigned on booking</span>
-                            )}
-                            {v.driverPhone && (
-                              <span className="flex items-center gap-1 text-[11px] text-slate-500">
-                                <Phone className="h-3 w-3 text-slate-400" />
-                                {v.driverPhone}
-                              </span>
-                            )}
-                          </div>
+                          <span className="text-xs text-slate-500 line-clamp-1 max-w-[200px]">
+                            {v.notes || "—"}
+                          </span>
                         </TableCell>
 
                         <TableCell className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>

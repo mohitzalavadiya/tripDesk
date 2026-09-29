@@ -12,36 +12,20 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/rate-sheets/lookup
- * Dynamic rate resolution engine endpoint: resolves applicable purchase rate for a travel date.
+ * Dynamic rate resolution engine endpoint: resolves applicable hotel purchase rate for a travel date.
  */
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
     const query = validateQueryParams(rateLookupQuerySchema, request.nextUrl.searchParams);
 
-    let result;
-    if (query.inventoryType === "HOTEL") {
-      result = await rateSheetService.getApplicableHotelRate(
-        context.agencyId,
-        query.inventoryId,
-        query.date,
-        query.roomType,
-        query.mealPlan
-      );
-    } else if (query.inventoryType === "VEHICLE") {
-      result = await rateSheetService.getApplicableVehicleRate(
-        context.agencyId,
-        query.inventoryId,
-        query.date,
-        query.pricingType
-      );
-    } else if (query.inventoryType === "ACTIVITY") {
-      result = await rateSheetService.getApplicableActivityRate(
-        context.agencyId,
-        query.inventoryId,
-        query.date
-      );
-    }
+    const result = await rateSheetService.getApplicableHotelRate(
+      context.agencyId,
+      query.inventoryId,
+      query.date,
+      query.roomType,
+      query.mealPlan
+    );
 
     return apiSuccess(result);
   } catch (error) {

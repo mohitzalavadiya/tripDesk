@@ -324,7 +324,11 @@ export default function DocumentCenterPage() {
                     <SelectItem value="ALL">All</SelectItem>
                     <SelectItem value="HOTEL_VOUCHER">Hotel Voucher</SelectItem>
                     <SelectItem value="VEHICLE_VOUCHER">Vehicle Voucher</SelectItem>
+                    {/* Activity Pass filter option intentionally hidden from Documents & Vouchers.
+                        Activity is currently a trip inclusion/catalogue feature and is not
+                        surfaced as an operational pass. Existing implementation is preserved.
                     <SelectItem value="ACTIVITY_VOUCHER">Activity Pass</SelectItem>
+                    */}
                     <SelectItem value="BOOKING_CONFIRMATION">Booking Confirmation</SelectItem>
                     <SelectItem value="CUSTOMER_ITINERARY">Travel Itinerary</SelectItem>
                     <SelectItem value="PAYMENT_RECEIPT">Payment Receipt</SelectItem>

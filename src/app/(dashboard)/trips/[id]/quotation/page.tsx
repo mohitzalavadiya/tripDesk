@@ -171,7 +171,10 @@ export default function TripQuotationEditorPage() {
     cancellationPolicy: "",
     importantNotes: "",
     terms: "",
+    privacyPolicy: "",
   });
+  const [markupInput, setMarkupInput] = React.useState("0");
+  const [discountInput, setDiscountInput] = React.useState("0");
   const [savingPolicies, setSavingPolicies] = React.useState(false);
 
   // Load trip quotations & live costing
@@ -232,7 +235,10 @@ export default function TripQuotationEditorPage() {
         cancellationPolicy: activeQuote.cancellationPolicy || "",
         importantNotes: activeQuote.importantNotes || "",
         terms: activeQuote.terms || "",
+        privacyPolicy: activeQuote.privacyPolicy || "",
       });
+      setMarkupInput(String(Number(activeQuote.markupPercentage || 0)));
+      setDiscountInput(String(Number(activeQuote.discountPercentage || 0)));
     }
   }, [activeQuote]);
 
@@ -257,7 +263,7 @@ export default function TripQuotationEditorPage() {
       });
 
       if (res.success && res.data) {
-        toast.success(`Proposal snapshot ${res.data.quotationNumber} (v${res.data.version}) created!`);
+        toast.success(`Proposal snapshot ${res.data.quotationNumber} (V${res.data.version}) created!`);
         await fetchTripQuotationData();
         setActiveQuoteId(res.data.id);
       }
@@ -275,7 +281,7 @@ export default function TripQuotationEditorPage() {
       setForkingVersion(true);
       const res = await quotationClient.createQuotationVersion(activeQuote.id);
       if (res.success && res.data) {
-        toast.success(`Forked new version v${res.data.version} successfully!`);
+        toast.success(`Forked new version V${res.data.version} successfully!`);
         await fetchTripQuotationData();
         setActiveQuoteId(res.data.id);
       }
@@ -624,6 +630,7 @@ export default function TripQuotationEditorPage() {
         cancellationPolicy: policyForm.cancellationPolicy || null,
         importantNotes: policyForm.importantNotes || null,
         terms: policyForm.terms || null,
+        privacyPolicy: policyForm.privacyPolicy || null,
       });
 
       if (res.success && res.data) {
@@ -682,7 +689,7 @@ export default function TripQuotationEditorPage() {
                 {activeQuote && <QuotationStatusBadge status={activeQuote.status} />}
                 {activeQuote && (
                   <Badge variant="outline" className="text-xs font-mono font-bold bg-indigo-50/50 text-indigo-700 border-indigo-200">
-                    {activeQuote.quotationNumber} • v{activeQuote.version}
+                    {activeQuote.quotationNumber} • V{activeQuote.version}
                   </Badge>
                 )}
               </div>
@@ -701,14 +708,14 @@ export default function TripQuotationEditorPage() {
                   <SelectValue placeholder="Select Version">
                     {(val) => {
                       const q = quotations.find((x) => x.id === val);
-                      return q ? `v${q.version} • ${formatCurrency(Number(q.finalAmount))} (${formatEnumLabel(q.status)})` : undefined;
+                      return q ? `V${q.version} • ${formatCurrency(Number(q.finalAmount))} (${formatEnumLabel(q.status)})` : undefined;
                     }}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-white border-slate-200">
                   {quotations.map((q) => (
                     <SelectItem key={q.id} value={q.id} className="text-xs">
-                      v{q.version} • {formatCurrency(Number(q.finalAmount))} ({formatEnumLabel(q.status)})
+                      V{q.version} • {formatCurrency(Number(q.finalAmount))} ({formatEnumLabel(q.status)})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -815,7 +822,7 @@ export default function TripQuotationEditorPage() {
                   <span>Costing Snapshot</span>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Automatic line items calculated from hotels, vehicles, and activities.
+                  Automatic line items calculated from hotels and vehicles.
                 </p>
               </div>
 
@@ -829,7 +836,8 @@ export default function TripQuotationEditorPage() {
                 </p>
               </div>
 
-              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5">
+              {/* Payment Schedule Promo (Temporarily hidden from UI per Phase Cleanup) */}
+              {/* <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5">
                 <div className="flex items-center gap-2 font-bold text-xs text-slate-900">
                   <CreditCard className="w-4 h-4 text-indigo-600 shrink-0" />
                   <span>Payment Schedule</span>
@@ -837,7 +845,7 @@ export default function TripQuotationEditorPage() {
                 <p className="text-[11px] text-slate-500 leading-relaxed">
                   Multi-stage milestones dynamically synchronized to proposal total.
                 </p>
-              </div>
+              </div> */}
             </div>
 
             <div className="pt-2">
@@ -905,7 +913,8 @@ export default function TripQuotationEditorPage() {
               <CheckCircle2 className="h-4 w-4" />
               Inclusions & Exclusions ({inclusions.length + exclusions.length})
             </button>
-            <button
+            {/* Payment Schedule Tab (Temporarily hidden from UI per Phase Cleanup) */}
+            {/* <button
               onClick={() => setActiveTab("milestones")}
               className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
                 activeTab === "milestones"
@@ -915,7 +924,7 @@ export default function TripQuotationEditorPage() {
             >
               <CreditCard className="h-4 w-4" />
               Payment Schedule ({milestones.length})
-            </button>
+            </button> */}
             <button
               onClick={() => setActiveTab("policies")}
               className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
@@ -968,7 +977,9 @@ export default function TripQuotationEditorPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {activeQuote.items.map((item) => {
+                      {activeQuote.items
+                        .filter((item) => item.type !== "ACTIVITY" && (item as any).sourceType !== "TRIP_ACTIVITY")
+                        .map((item) => {
                         const rateSheetRate = Number(
                           item.unitPrice && Number(item.unitPrice) > 0
                             ? item.unitPrice
@@ -1115,8 +1126,14 @@ export default function TripQuotationEditorPage() {
                         min={0}
                         max={500}
                         disabled={updatingPricing || isReadOnly}
-                        defaultValue={Number(activeQuote.markupPercentage)}
-                        onBlur={(e) => handleUpdatePricingRules({ markupPercentage: Number(e.target.value) || 0 })}
+                        value={markupInput}
+                        onChange={(e) => setMarkupInput(e.target.value)}
+                        onBlur={() => {
+                          const val = Number(markupInput) || 0;
+                          if (val !== Number(activeQuote.markupPercentage)) {
+                            handleUpdatePricingRules({ markupPercentage: val });
+                          }
+                        }}
                         className="h-7 w-16 text-right text-xs bg-slate-50 font-bold"
                       />
                       <span className="text-slate-500 font-bold">%</span>
@@ -1141,8 +1158,14 @@ export default function TripQuotationEditorPage() {
                         min={0}
                         max={100}
                         disabled={updatingPricing || isReadOnly}
-                        defaultValue={Number(activeQuote.discountPercentage)}
-                        onBlur={(e) => handleUpdatePricingRules({ discountPercentage: Number(e.target.value) || 0 })}
+                        value={discountInput}
+                        onChange={(e) => setDiscountInput(e.target.value)}
+                        onBlur={() => {
+                          const val = Number(discountInput) || 0;
+                          if (val !== Number(activeQuote.discountPercentage)) {
+                            handleUpdatePricingRules({ discountPercentage: val });
+                          }
+                        }}
                         className="h-7 w-16 text-right text-xs bg-slate-50 font-bold"
                       />
                       <span className="text-slate-500 font-bold">%</span>
@@ -1355,7 +1378,12 @@ export default function TripQuotationEditorPage() {
 
 
         {/* ─── TAB 3: STRUCTURED INCLUSIONS & EXCLUSIONS ─── */}
-        {activeQuote && activeTab === "inclusions" && (
+        {activeQuote && activeTab === "inclusions" && (() => {
+          const tripActivities = (activeQuote as any)?.trip?.tripActivities || costing?.activities || [];
+          const includedActivities = tripActivities.filter((a: any) => a.type === "INCLUDED" || a.type === "INCLUSION");
+          const notIncludedActivities = tripActivities.filter((a: any) => a.type === "EXCLUDED" || a.type === "OPTIONAL" || a.type === "EXCLUSION");
+
+          return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Inclusions Card */}
             <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
@@ -1379,10 +1407,10 @@ export default function TripQuotationEditorPage() {
                 </Button>
               </div>
 
-              {inclusions.length === 0 ? (
+              {inclusions.length === 0 && includedActivities.length === 0 ? (
                 <div className="text-center py-8 text-slate-400 text-xs">No inclusions added yet.</div>
               ) : (
-                <div className="space-y-2.5">
+                <div className="space-y-3">
                   {inclusions.map((item) => (
                     <div
                       key={item.id}
@@ -1413,6 +1441,37 @@ export default function TripQuotationEditorPage() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Included Activities Section */}
+                  {includedActivities.length > 0 && (
+                    <div className="pt-3 border-t border-emerald-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                          <Ticket className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Included Activities ({includedActivities.length})</span>
+                        </h5>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                          Package Inclusion
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {includedActivities.map((act: any) => (
+                          <div
+                            key={act.id}
+                            className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-200/50 flex items-center justify-between text-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                              <span className="font-semibold text-slate-900">{act.name || act.activityName || act.activity?.name || "Sightseeing Experience"}</span>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              Included
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1439,10 +1498,10 @@ export default function TripQuotationEditorPage() {
                 </Button>
               </div>
 
-              {exclusions.length === 0 ? (
+              {exclusions.length === 0 && notIncludedActivities.length === 0 ? (
                 <div className="text-center py-8 text-slate-400 text-xs">No exclusions added yet.</div>
               ) : (
-                <div className="space-y-2.5">
+                <div className="space-y-3">
                   {exclusions.map((item) => (
                     <div
                       key={item.id}
@@ -1473,14 +1532,49 @@ export default function TripQuotationEditorPage() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Not Included Activities Section */}
+                  {notIncludedActivities.length > 0 && (
+                    <div className="pt-3 border-t border-rose-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-[11px] font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                          <Ticket className="h-3.5 w-3.5 text-amber-600" />
+                          <span>Not Included Activities ({notIncludedActivities.length})</span>
+                        </h5>
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-full">
+                          Direct Venue Purchase
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {notIncludedActivities.map((act: any) => (
+                          <div
+                            key={act.id}
+                            className="p-2.5 bg-amber-50/60 rounded-xl border border-amber-200/50 flex items-center justify-between text-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                              <div>
+                                <span className="font-semibold text-slate-900">{act.name || act.activityName || act.activity?.name || "Sightseeing Experience"}</span>
+                                <p className="text-[10px] text-amber-700">Ticket directly payable at venue</p>
+                              </div>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              Not Included
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
-        )}
+          );
+        })()}
 
-        {/* ─── TAB 4: PAYMENT MILESTONES ─── */}
-        {activeQuote && activeTab === "milestones" && (
+        {/* ─── TAB 4: PAYMENT MILESTONES (Temporarily hidden from UI per Phase Cleanup) ─── */}
+        {/* {activeQuote && activeTab === "milestones" && (
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4 flex-wrap gap-3">
               <div>
@@ -1568,7 +1662,7 @@ export default function TripQuotationEditorPage() {
               </div>
             )}
           </div>
-        )}
+        )} */}
 
         {/* ─── TAB 5: TERMS & POLICIES ─── */}
         {activeQuote && activeTab === "policies" && (
@@ -1619,6 +1713,17 @@ export default function TripQuotationEditorPage() {
                   value={policyForm.importantNotes}
                   onChange={(e) => setPolicyForm({ ...policyForm, importantNotes: e.target.value })}
                   placeholder="Government ID rules, check-in timings, altitude advisories..."
+                  rows={3}
+                  className="text-xs bg-slate-50 resize-none"
+                />
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="font-bold text-slate-700">Privacy Policy</label>
+                <Textarea
+                  value={policyForm.privacyPolicy}
+                  onChange={(e) => setPolicyForm({ ...policyForm, privacyPolicy: e.target.value })}
+                  placeholder="Agency privacy policy and data handling terms..."
                   rows={3}
                   className="text-xs bg-slate-50 resize-none"
                 />

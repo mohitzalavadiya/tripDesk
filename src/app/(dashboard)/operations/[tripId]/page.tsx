@@ -600,8 +600,13 @@ export default function TripOperationsDetailPage() {
             </div>
 
             {/* Checklist items */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              {readiness.checks.map((check) => (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              {readiness.checks
+                .filter((check) => check.key !== "activities")
+                /* Activity Operations UI intentionally hidden.
+                   Activity is currently a trip inclusion/catalogue feature and is not
+                   surfaced as an operational readiness check. Existing implementation is preserved. */
+                .map((check) => (
                 <div
                   key={check.key}
                   className={`rounded-xl p-3 border text-xs space-y-0.5 ${check.passed ? "bg-emerald-50/50 border-emerald-100 text-emerald-900" : "bg-amber-50/50 border-amber-100 text-amber-900"}`}
@@ -626,7 +631,11 @@ export default function TripOperationsDetailPage() {
               { id: "overview", label: "Overview" },
               { id: "accommodations", label: `Accommodations (${operation.hotelConfirmations?.length || 0})` },
               { id: "fleet", label: `Fleet & Dispatch (${operation.vehicleDispatches?.length || 0})` },
+              /* Activity Operations UI intentionally hidden.
+                 Activity is currently a trip inclusion/catalogue feature and is not
+                 surfaced as an operational service. Existing implementation is preserved for possible future use.
               { id: "activities", label: `Activities (${operation.activityConfirmations?.length || 0})` },
+              */
               {
                 id: "other-costs",
                 label: `Other Costs (${
@@ -640,7 +649,12 @@ export default function TripOperationsDetailPage() {
                 })`,
               },
               { id: "issues", label: `Issues Tracker (${operation.issues?.length || 0})` },
-              { id: "documents", label: `Documents & Vouchers (${documentsSummary?.documents?.length || 5})` },
+              {
+                id: "documents",
+                label: `Documents & Vouchers (${
+                  documentsSummary?.documents?.filter((d: any) => d.type !== "ACTIVITY_VOUCHER")?.length ?? 4
+                })`,
+              },
               { id: "timeline", label: `Live Timeline (${timeline.length})` },
               {
                 id: "closure",
@@ -759,6 +773,10 @@ export default function TripOperationsDetailPage() {
                     </span>
                   </div>
 
+                  {/* Activity Operations UI intentionally hidden.
+                      Activity is currently a trip inclusion/catalogue feature and is not
+                      surfaced as an operational service. Existing implementation is preserved
+                      for possible future use.
                   <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl">
                     <span className="flex items-center gap-2 font-semibold text-slate-700">
                       <Ticket className="h-4 w-4 text-slate-400" />
@@ -768,6 +786,7 @@ export default function TripOperationsDetailPage() {
                       {operation.activityConfirmations?.filter((a) => a.status === "CONFIRMED").length}/{operation.activityConfirmations?.length || 0} Confirmed
                     </span>
                   </div>
+                  */}
 
                   <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl">
                     <span className="flex items-center gap-2 font-semibold text-slate-700">
@@ -1051,7 +1070,11 @@ export default function TripOperationsDetailPage() {
           </div>
         )}
 
-        {/* ─── TAB 4: ACTIVITIES ──────────────────────────────────────────── */}
+        {/* ─── TAB 4: ACTIVITIES (INTENTIONALLY HIDDEN) ────────────────────── */}
+        {/* Activity Operations UI intentionally hidden.
+            Activity is currently a trip inclusion/catalogue feature and is not
+            surfaced as an operational service. Existing implementation is preserved
+            for possible future use.
         {activeTab === "activities" && (
           <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
@@ -1065,7 +1088,6 @@ export default function TripOperationsDetailPage() {
               </div>
             </div>
 
-            {/* Activities KPI Counters */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Total</span>
@@ -1103,7 +1125,6 @@ export default function TripOperationsDetailPage() {
               </div>
             </div>
 
-            {/* Filter & Search Toolbar */}
             <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
               <div className="relative flex-1 w-full">
                 <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -1135,7 +1156,6 @@ export default function TripOperationsDetailPage() {
               </div>
             </div>
 
-            {/* Activities List */}
             {operation.activityConfirmations?.length === 0 ? (
               <div className="py-12 text-center text-xs text-slate-400">
                 No activities or excursions planned for this trip.
@@ -1178,6 +1198,7 @@ export default function TripOperationsDetailPage() {
             )}
           </div>
         )}
+        */}
 
         {/* ─── TAB: OTHER COSTS ───────────────────────────────────────────── */}
         {activeTab === "other-costs" && (
@@ -1362,11 +1383,16 @@ export default function TripOperationsDetailPage() {
             {/* Documents Grid */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Available Document Roster ({documentsSummary?.documents?.length || 0})
+                Available Document Roster ({documentsSummary?.documents?.filter((d: any) => d.type !== "ACTIVITY_VOUCHER")?.length || 0})
               </h4>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {documentsSummary?.documents?.map((docItem: any) => (
+                {documentsSummary?.documents
+                  ?.filter((docItem: any) => docItem.type !== "ACTIVITY_VOUCHER")
+                  /* Activity Pass document card intentionally hidden from Documents & Vouchers.
+                     Activity is currently a trip inclusion/catalogue feature and is not
+                     surfaced as an operational service. Existing implementation is preserved. */
+                  ?.map((docItem: any) => (
                   <div
                     key={docItem.id + docItem.type}
                     className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-col justify-between gap-3"
@@ -1504,6 +1530,7 @@ export default function TripOperationsDetailPage() {
         />
       )}
 
+      {/* Activity dialogs intentionally preserved but commented out
       {selectedActivityForDialog && (
         <ActivityConfirmationDialog
           operationId={operation.id}
@@ -1514,6 +1541,7 @@ export default function TripOperationsDetailPage() {
           onSuccess={fetchOperationData}
         />
       )}
+      */}
 
       {selectedDispatchForDriver && (
         <AssignDriverModal
@@ -1535,6 +1563,7 @@ export default function TripOperationsDetailPage() {
         />
       )}
 
+      {/*
       {selectedActivityForReschedule && (
         <RescheduleActivityModal
           operationId={operation.id}
@@ -1544,6 +1573,7 @@ export default function TripOperationsDetailPage() {
           onSuccess={fetchOperationData}
         />
       )}
+      */}
 
       <CreateIssueModal
         operationId={operation.id}

@@ -905,7 +905,7 @@ export const enquiryService = {
         events.push({
           id: `quot-${q.id}`,
           type: q.status === "ACCEPTED" ? "QUOTATION_ACCEPTED" : "QUOTATION_CREATED",
-          title: `Proposal ${q.quotationNumber} (v${q.version}) ${q.status}`,
+          title: `Proposal ${q.quotationNumber} (V${q.version}) ${q.status}`,
           description: `Quoted Amount: ₹${Number(q.finalAmount).toLocaleString("en-IN")}.`,
           timestamp: q.createdAt,
           referenceId: q.id,

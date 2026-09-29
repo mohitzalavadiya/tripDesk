@@ -5,7 +5,7 @@ import {
   CreateTripVehicleInput,
   UpdateTripVehicleInput,
 } from "@/lib/validation/trip-vehicle-schema";
-import { TripVehicle, Vehicle } from "@prisma/client";
+import { TripVehicle, Vehicle, Prisma } from "@prisma/client";
 
 export interface TripVehicleWithVehicle extends TripVehicle {
   vehicle: Vehicle | null;
@@ -124,6 +124,7 @@ export const tripVehicleService = {
         pricingType: data.pricingType,
         ratePerKm: data.ratePerKm !== undefined && data.ratePerKm !== null ? data.ratePerKm : null,
         estimatedKm: data.estimatedKm !== undefined && data.estimatedKm !== null ? data.estimatedKm : null,
+        actualKm: data.actualKm !== undefined && data.actualKm !== null ? data.actualKm : null,
         totalRate: data.totalRate !== undefined && data.totalRate !== null ? data.totalRate : null,
         notes: data.notes || null,
       },
@@ -133,6 +134,7 @@ export const tripVehicleService = {
 
   /**
    * Updates an existing Trip-Vehicle assignment.
+   * Synchronizes corresponding Unified Supplier Payable actual amount without touching customer invoices.
    */
   async updateTripVehicle(
     agencyId: string,
@@ -170,7 +172,7 @@ export const tripVehicleService = {
       }
     }
 
-    return prisma.tripVehicle.update({
+    const updated = await prisma.tripVehicle.update({
       where: { id: tripVehicleId },
       data: {
         ...(data.vehicleId !== undefined && { vehicleId: data.vehicleId || null }),
@@ -194,6 +196,9 @@ export const tripVehicleService = {
         ...(data.estimatedKm !== undefined && {
           estimatedKm: data.estimatedKm !== null ? data.estimatedKm : null,
         }),
+        ...(data.actualKm !== undefined && {
+          actualKm: data.actualKm !== null ? data.actualKm : null,
+        }),
         ...(data.totalRate !== undefined && {
           totalRate: data.totalRate !== null ? data.totalRate : null,
         }),
@@ -201,6 +206,53 @@ export const tripVehicleService = {
       },
       include: { vehicle: true },
     });
+
+    // Synchronize existing SupplierPayable if present
+    const ratePerKm = updated.ratePerKm ? Number(updated.ratePerKm) : 0;
+    const estimatedKm = updated.estimatedKm ? Number(updated.estimatedKm) : 0;
+    const actualKm = updated.actualKm ? Number(updated.actualKm) : null;
+    let cost = 0;
+    if (updated.pricingType === "PER_KM") {
+      const effectiveKm = actualKm !== null ? actualKm : estimatedKm;
+      cost = ratePerKm * effectiveKm;
+    } else {
+      cost = updated.totalRate ? Number(updated.totalRate) : 0;
+    }
+
+    if (cost > 0) {
+      const payable = await prisma.supplierPayable.findFirst({
+        where: {
+          agencyId,
+          serviceReferenceId: tripVehicleId,
+          serviceType: "VEHICLE",
+          archivedAt: null,
+        },
+      });
+
+      if (payable) {
+        const paid = Number(payable.paidAmount || 0);
+        const newOutstanding = Math.max(0, cost - paid);
+        let newStatus = payable.status;
+        if (paid >= cost && cost > 0) {
+          newStatus = "PAID";
+        } else if (paid > 0) {
+          newStatus = "PARTIALLY_PAID";
+        } else {
+          newStatus = "PENDING";
+        }
+
+        await prisma.supplierPayable.update({
+          where: { id: payable.id },
+          data: {
+            actualAmount: new Prisma.Decimal(cost),
+            outstandingAmount: new Prisma.Decimal(newOutstanding),
+            status: newStatus,
+          },
+        });
+      }
+    }
+
+    return updated;
   },
 
   /**

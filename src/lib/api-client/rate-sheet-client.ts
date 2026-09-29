@@ -36,8 +36,6 @@ export const rateSheetClient = {
     if (params?.inventoryType) searchParams.set("inventoryType", params.inventoryType);
     if (params?.supplierId) searchParams.set("supplierId", params.supplierId);
     if (params?.hotelId) searchParams.set("hotelId", params.hotelId);
-    if (params?.vehicleId) searchParams.set("vehicleId", params.vehicleId);
-    if (params?.activityId) searchParams.set("activityId", params.activityId);
     if (params?.status) searchParams.set("status", params.status);
     if (params?.seasonName) searchParams.set("seasonName", params.seasonName);
     if (params?.validDate) searchParams.set("validDate", new Date(params.validDate).toISOString());
@@ -77,14 +75,11 @@ export const rateSheetClient = {
    */
   async lookupRate(params: RateLookupQueryParams): Promise<SingleResponse<MatchedRateResult>> {
     const searchParams = new URLSearchParams();
-    searchParams.set("inventoryType", params.inventoryType);
+    if (params.inventoryType) searchParams.set("inventoryType", params.inventoryType);
     searchParams.set("inventoryId", params.inventoryId);
     searchParams.set("date", new Date(params.date).toISOString());
     if (params.roomType) searchParams.set("roomType", params.roomType);
     if (params.mealPlan) searchParams.set("mealPlan", params.mealPlan);
-    if (params.pricingType) searchParams.set("pricingType", params.pricingType);
-    if (params.adults !== undefined) searchParams.set("adults", String(params.adults));
-    if (params.children !== undefined) searchParams.set("children", String(params.children));
 
     const res = await fetch(`/api/rate-sheets/lookup?${searchParams.toString()}`, {
       method: "GET",

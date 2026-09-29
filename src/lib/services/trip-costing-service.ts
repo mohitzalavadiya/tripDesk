@@ -1,6 +1,5 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import { rateSheetService } from "./rate-sheet-service";
 
 export interface HotelCostItem {
@@ -30,12 +29,10 @@ export interface VehicleCostItem {
   pricingType: string;
   ratePerKm: number;
   estimatedKm: number;
+  actualKm?: number | null;
   totalCost: number;
-  rateSource: "RATE_SHEET" | "TRIP_SNAPSHOT";
-  rateSheetId?: string;
-  rateSheetNumber?: string | null;
+  rateSource: "TRIP_SNAPSHOT";
   supplierName?: string | null;
-  seasonName?: string | null;
 }
 
 export interface ActivityCostItem {
@@ -79,7 +76,8 @@ export interface TripCostingResult {
 export const tripCostingService = {
   /**
    * Calculate live trip resource costing from PostgreSQL database, dynamically
-   * resolving supplier purchase rates via the Rate Sheet Validity Engine.
+   * resolving hotel supplier purchase rates via the Rate Sheet Validity Engine,
+   * while vehicle costs are calculated directly from trip-specific commercial parameters.
    */
   async calculateTripCosting(agencyId: string, tripId: string): Promise<TripCostingResult | null> {
     const trip = await prisma.trip.findFirst({
@@ -107,7 +105,7 @@ export const tripCostingService = {
     const childrenCount = trip.travelers.filter((t) => t.type === "CHILD").length;
     const travelersCount = trip.travelers.length || 1;
 
-    // 1. Prepare Batch Items for Rate Sheet Resolution
+    // 1. Prepare Batch Items for Rate Sheet Resolution (Hotels)
     const hotelBatchItems = trip.tripHotels.map((th) => ({
       id: th.id,
       hotelId: th.hotelId,
@@ -116,28 +114,9 @@ export const tripCostingService = {
       mealPlan: th.mealPlan,
     }));
 
-    const vehicleBatchItems = trip.tripVehicles
-      .filter((tv) => tv.vehicleId)
-      .map((tv) => ({
-        id: tv.id,
-        vehicleId: tv.vehicleId!,
-        travelDate: tv.startDate || trip.startDate,
-        pricingType: tv.pricingType,
-      }));
-
-    const activityBatchItems = trip.tripActivities
-      .filter((ta) => ta.activityId)
-      .map((ta) => ({
-        id: ta.id,
-        activityId: ta.activityId!,
-        travelDate: ta.date || trip.startDate,
-      }));
-
-    // 2. Fetch Rate Resolutions in Concurrent Batch Queries (0 if category empty)
-    const [hotelRateMap, vehicleRateMap, activityRateMap] = await Promise.all([
+    // 2. Fetch Rate Resolutions in Concurrent Batch Queries
+    const [hotelRateMap] = await Promise.all([
       rateSheetService.getApplicableHotelRatesBatch(agencyId, hotelBatchItems),
-      rateSheetService.getApplicableVehicleRatesBatch(agencyId, vehicleBatchItems),
-      rateSheetService.getApplicableActivityRatesBatch(agencyId, activityBatchItems),
     ]);
 
     // 3. Calculate Hotel Costings from Pre-Fetched Batch Rates
@@ -195,47 +174,20 @@ export const tripCostingService = {
       };
     });
 
-    // 4. Calculate Vehicle Costings from Pre-Fetched Batch Rates
+    // 4. Calculate Vehicle Costings (Direct from TripVehicle commercial params)
     let vehiclesTotal = 0;
     const vehicles: VehicleCostItem[] = trip.tripVehicles.map((tv) => {
-      let ratePerKm = tv.ratePerKm ? Number(tv.ratePerKm) : 0;
+      const ratePerKm = tv.ratePerKm ? Number(tv.ratePerKm) : 0;
       const estimatedKm = tv.estimatedKm ? Number(tv.estimatedKm) : 0;
-      let totalCost = tv.totalRate ? Number(tv.totalRate) : 0;
-      let rateSource: "RATE_SHEET" | "TRIP_SNAPSHOT" = "TRIP_SNAPSHOT";
-      let rateSheetId: string | undefined = undefined;
-      let rateSheetNumber: string | null | undefined = undefined;
-      let supplierName: string | null | undefined = undefined;
-      let seasonName: string | null | undefined = undefined;
+      const actualKm = tv.actualKm ? Number(tv.actualKm) : null;
+      let totalCost = 0;
 
-      if (tv.vehicleId) {
-        const matchedRate = vehicleRateMap.get(tv.id) || { matched: false, currency: "INR", costPrice: 0, priority: 0 };
-
-        if (matchedRate.matched) {
-          rateSource = "RATE_SHEET";
-          rateSheetId = matchedRate.rateSheetId;
-          rateSheetNumber = matchedRate.rateSheetNumber;
-          supplierName = matchedRate.supplierName;
-          seasonName = matchedRate.seasonName;
-
-          if (tv.pricingType === "PER_KM" && matchedRate.ratePerKm) {
-            ratePerKm = matchedRate.ratePerKm;
-            totalCost = ratePerKm * (estimatedKm || matchedRate.minimumKm || 0);
-          } else if (matchedRate.totalRate) {
-            totalCost = matchedRate.totalRate;
-          } else if (matchedRate.costPrice > 0) {
-            totalCost = matchedRate.costPrice;
-          }
-
-          if (matchedRate.driverAllowance) {
-            totalCost += matchedRate.driverAllowance;
-          }
-        }
-      }
-
-      if (rateSource === "TRIP_SNAPSHOT") {
-        if (tv.pricingType === "PER_KM" && ratePerKm > 0 && estimatedKm > 0 && totalCost === 0) {
-          totalCost = ratePerKm * estimatedKm;
-        }
+      if (tv.pricingType === "PER_KM") {
+        const effectiveKm = actualKm !== null ? actualKm : estimatedKm;
+        totalCost = ratePerKm * effectiveKm;
+      } else {
+        // FIXED / TOTAL
+        totalCost = tv.totalRate ? Number(tv.totalRate) : 0;
       }
 
       vehiclesTotal += totalCost;
@@ -248,12 +200,9 @@ export const tripCostingService = {
         pricingType: tv.pricingType,
         ratePerKm,
         estimatedKm,
+        actualKm,
         totalCost: Math.round(totalCost * 100) / 100,
-        rateSource,
-        rateSheetId,
-        rateSheetNumber,
-        supplierName,
-        seasonName,
+        rateSource: "TRIP_SNAPSHOT",
       };
     });
 

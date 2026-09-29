@@ -231,7 +231,7 @@ export default function TripQuotationPreviewPage() {
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-mono font-bold text-indigo-200 border border-white/15">
                   <span>{quotation.quotationNumber}</span>
                   <span>•</span>
-                  <span>v{quotation.version}</span>
+                  <span>V{quotation.version}</span>
                 </div>
               </div>
             </div>
@@ -533,28 +533,33 @@ export default function TripQuotationPreviewPage() {
             )}
 
             {/* 10. Important Notes & Advisories */}
-            {importantNotes.length > 0 && (
+            {(importantNotes.length > 0 || quotation.importantNotes) && (
               <div className="p-5 bg-slate-50 border border-slate-200/80 rounded-3xl space-y-3 text-xs">
                 <h4 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
                   <Info className="h-4 w-4 text-indigo-600" />
                   Important Travel Notes & Advisories
                 </h4>
-                <ul className="space-y-2">
-                  {importantNotes.map((n) => (
-                    <li key={n.id} className="flex items-start gap-2">
-                      <span className="text-indigo-600 font-bold">•</span>
-                      <div>
-                        <strong className="text-slate-900">{n.title}:</strong>{" "}
-                        <span className="text-slate-600">{n.description}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                {quotation.importantNotes && (
+                  <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{quotation.importantNotes}</p>
+                )}
+                {importantNotes.length > 0 && (
+                  <ul className="space-y-2">
+                    {importantNotes.map((n) => (
+                      <li key={n.id} className="flex items-start gap-2">
+                        <span className="text-indigo-600 font-bold">•</span>
+                        <div>
+                          <strong className="text-slate-900">{n.title}:</strong>{" "}
+                          <span className="text-slate-600">{n.description}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 
             {/* 11. Policies / Terms */}
-            {(quotation.cancellationPolicy || quotation.terms) && (
+            {(quotation.cancellationPolicy || quotation.terms || quotation.privacyPolicy) && (
               <div className="p-5 bg-slate-50 border border-slate-200/80 rounded-3xl space-y-3 text-xs">
                 <h4 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
                   <ShieldCheck className="h-4 w-4 text-indigo-600" />
@@ -570,6 +575,12 @@ export default function TripQuotationPreviewPage() {
                   <div className="space-y-1 pt-2 border-t border-slate-200">
                     <strong className="text-slate-800 block">Terms & Conditions:</strong>
                     <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{quotation.terms}</p>
+                  </div>
+                )}
+                {quotation.privacyPolicy && (
+                  <div className="space-y-1 pt-2 border-t border-slate-200">
+                    <strong className="text-slate-800 block">Privacy Policy:</strong>
+                    <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{quotation.privacyPolicy}</p>
                   </div>
                 )}
               </div>

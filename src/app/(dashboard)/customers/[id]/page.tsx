@@ -903,7 +903,7 @@ export default function CustomerDetailPage() {
                       className="hover:bg-slate-50 cursor-pointer text-xs"
                     >
                       <TableCell className="font-mono font-bold text-slate-800">
-                        {q.quotationNumber} (v{q.version})
+                        {q.quotationNumber} (V{q.version})
                       </TableCell>
                       <TableCell className="font-semibold text-slate-900">{q.trip?.title || q.trip?.tripNumber}</TableCell>
                       <TableCell className="font-extrabold text-emerald-700">

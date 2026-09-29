@@ -43,6 +43,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       cancellationPolicy: quotation.cancellationPolicy,
       importantNotes: quotation.importantNotes,
       terms: quotation.terms,
+      privacyPolicy: quotation.privacyPolicy,
       agency: quotation.agency,
       customer: quotation.customer,
       trip: {

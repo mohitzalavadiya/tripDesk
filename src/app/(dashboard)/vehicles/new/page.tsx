@@ -36,11 +36,6 @@ const createVehicleSchema = Yup.object().shape({
     .min(1, "Capacity must be at least 1")
     .max(100, "Capacity cannot exceed 100"),
   registrationNumber: Yup.string().trim().max(50, "Registration number cannot exceed 50 characters"),
-  driverName: Yup.string().trim().max(100, "Driver name cannot exceed 100 characters"),
-  driverPhone: Yup.string().trim().max(30, "Driver phone cannot exceed 30 characters"),
-  pricingType: Yup.string().oneOf(["PER_KM", "PER_DAY", "FIXED", "INCLUDED"]).default("PER_KM"),
-  baseRate: Yup.number().typeError("Base rate must be a number").min(0, "Cannot be negative").nullable(),
-  ratePerKm: Yup.number().typeError("Rate per km must be a number").min(0, "Cannot be negative").nullable(),
   notes: Yup.string().trim().max(2000, "Notes cannot exceed 2000 characters"),
 });
 
@@ -55,11 +50,6 @@ export default function NewVehiclePage() {
       type: "Sedan",
       capacity: 4,
       registrationNumber: "",
-      driverName: "",
-      driverPhone: "",
-      pricingType: "PER_KM",
-      baseRate: "",
-      ratePerKm: "",
       notes: "",
     },
     validationSchema: createVehicleSchema,
@@ -78,11 +68,6 @@ export default function NewVehiclePage() {
           type: values.type.trim(),
           capacity: Number(values.capacity),
           registrationNumber: values.registrationNumber.trim() || undefined,
-          driverName: values.driverName.trim() || undefined,
-          driverPhone: values.driverPhone.trim() || undefined,
-          pricingType: values.pricingType as any,
-          baseRate: values.baseRate !== "" ? Number(values.baseRate) : undefined,
-          ratePerKm: values.ratePerKm !== "" ? Number(values.ratePerKm) : undefined,
           notes: values.notes.trim() || undefined,
         });
 
@@ -124,7 +109,7 @@ export default function NewVehiclePage() {
 
         <PageHeader
           title="Add Vehicle to Fleet"
-          description="Register a new vehicle, tempo traveller, coach, or chauffeur option in your inventory."
+          description="Register reusable vehicle/reference information in your master fleet."
           breadcrumbs={[
             { label: "Vehicles", href: "/vehicles" },
             { label: "New Vehicle" },
@@ -217,76 +202,6 @@ export default function NewVehiclePage() {
                   />
                   {getFieldError("registrationNumber") && (
                     <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("registrationNumber")}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Driver & Tariff Card */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-5">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">
-                Default Driver & Tariffs
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Driver Name</label>
-                  <Input
-                    placeholder="Assigned driver name (optional)"
-                    {...formik.getFieldProps("driverName")}
-                    className={inputCls("driverName")}
-                  />
-                  {getFieldError("driverName") && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("driverName")}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Driver Phone</label>
-                  <Input
-                    placeholder="+91..."
-                    {...formik.getFieldProps("driverPhone")}
-                    className={inputCls("driverPhone")}
-                  />
-                  {getFieldError("driverPhone") && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("driverPhone")}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Pricing Model</label>
-                  <Select
-                    value={formik.values.pricingType}
-                    onValueChange={(val) => formik.setFieldValue("pricingType", val)}
-                  >
-                    <SelectTrigger className={`h-9.5 text-xs bg-slate-50/50 border-slate-200 ${
-                      getFieldError("pricingType") ? "border-red-500 focus:ring-red-500" : ""
-                    }`}>
-                      <SelectValue placeholder="Select pricing model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="PER_KM">Per Kilometer (₹/km)</SelectItem>
-                      <SelectItem value="PER_DAY">Per Day Rate (₹/day)</SelectItem>
-                      <SelectItem value="FIXED">Fixed Trip Rate (₹)</SelectItem>
-                      <SelectItem value="INCLUDED">Included in Package</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {getFieldError("pricingType") && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("pricingType")}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Rate per KM (₹)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="e.g. 18.00"
-                    {...formik.getFieldProps("ratePerKm")}
-                    className={inputCls("ratePerKm")}
-                  />
-                  {getFieldError("ratePerKm") && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("ratePerKm")}</p>
                   )}
                 </div>
               </div>

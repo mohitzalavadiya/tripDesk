@@ -203,7 +203,10 @@ export function ServiceReconciliationCard({
         )}
       </div>
 
-      {/* 3. Activities & Excursions */}
+      {/* 3. Activities & Excursions (INTENTIONALLY HIDDEN) */}
+      {/* Activity reconciliation card intentionally hidden.
+          Activity is currently a trip inclusion/catalogue feature and is not
+          surfaced as an operational service. Existing implementation is preserved.
       <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
           <div className="flex items-center gap-2">
@@ -256,6 +259,7 @@ export function ServiceReconciliationCard({
           </div>
         )}
       </div>
+      */}
     </div>
   );
 }

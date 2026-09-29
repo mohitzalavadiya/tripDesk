@@ -391,7 +391,7 @@ export const customerService = {
       timeline.push({
         id: `quot-${q.id}`,
         type: q.status === "ACCEPTED" ? "QUOTATION_ACCEPTED" : "QUOTATION_CREATED",
-        title: `Quotation ${q.quotationNumber} (v${q.version}) ${q.status}`,
+        title: `Quotation ${q.quotationNumber} (V${q.version}) ${q.status}`,
         description: `Proposal generated for ₹${Number(q.finalAmount).toLocaleString("en-IN")}.`,
         timestamp: q.createdAt,
         referenceId: q.id,

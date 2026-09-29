@@ -190,8 +190,6 @@ export const supplierService = {
           where: { archivedAt: null },
           include: {
             hotel: { select: { id: true, name: true, city: true } },
-            vehicle: { select: { id: true, name: true, type: true } },
-            activity: { select: { id: true, name: true, location: true } },
           },
           orderBy: [{ validFrom: "desc" }, { createdAt: "desc" }],
         },

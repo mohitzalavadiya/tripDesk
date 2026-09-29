@@ -231,7 +231,11 @@ export function CommunicationModal({
             <SelectContent className="bg-white border-slate-200">
               <SelectItem value="DRIVER_PICKUP">🚗 Chauffeur & Pickup Details</SelectItem>
               <SelectItem value="HOTEL_VOUCHER">🏨 Hotel Check-in & Voucher</SelectItem>
+              {/* Activity Pass template option intentionally hidden from communication modal.
+                  Activity is currently a trip inclusion/catalogue feature and is not
+                  surfaced as an operational pass. Existing implementation is preserved.
               <SelectItem value="ACTIVITY_PASS">🎟️ Excursion & Activity E-Pass</SelectItem>
+              */}
               <SelectItem value="WELCOME_BRIEFING">🌟 Welcome Briefing & Itinerary</SelectItem>
               <SelectItem value="EMERGENCY_BROADCAST">⚠️ Operations Alert / Broadcast</SelectItem>
             </SelectContent>
