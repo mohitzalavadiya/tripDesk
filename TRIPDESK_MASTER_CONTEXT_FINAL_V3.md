@@ -13023,6 +13023,76 @@ Activity in TripDesk is strictly a non-costed, non-priced catalogue inclusion fe
 
 ---
 
+# PHASE 203 — REGENERATE INVOICE (SAME INVOICE NUMBER)
+
+## 203.1 Objective & Architecture
+Following the Phase 202 audit, Phase 203 introduces the user-triggered **Regenerate Invoice** capability:
+- **Same Record & Same Invoice Number**: When a Booking or Quotation is modified post-invoice issuance, the agency owner can explicitly trigger "Regenerate Invoice". The single persistent `Invoice` record (`@@unique([agencyId, bookingId])`) and its sequential `invoiceNumber` (`@@unique([agencyId, invoiceNumber])`) are 100% retained.
+- **NO Revision System**: Strictly NO `Rev 1`, `Rev 2`, revision models, revision numbers, or version suffixes.
+- **Snapshot Refresh**: Deletes and replaces child `InvoiceItem` records with the latest quotation line items (with odd-paise markup reconciliation), updates taxes, discounts, `customerSnapshot`, `bookingSnapshot`, and `agencySnapshot`.
+- **Payment & Receivable Preservation**: Preserves all completed `Payment` records attached to the booking, recalculates `paidAmount`, `balanceAmount`, and updates `InvoiceStatus` (`ISSUED`, `PARTIALLY_PAID`, `PAID`) within a single database transaction.
+- **Cancelled Invoices**: Regeneration of `CANCELLED` invoices is strictly rejected.
+
+## 203.2 Implementation Summary
+1. **Service Layer (`src/lib/services/invoice-service.ts`)**:
+   - Enhanced `getOrCreateInvoiceForBooking` to refresh `customerSnapshot`, `bookingSnapshot`, `agencySnapshot` alongside line items and totals.
+   - Added `invoiceService.regenerateInvoice(agencyId: string, invoiceId: string)` verifying invoice existence, tenant matching, and non-cancelled status before rebuilding the snapshot.
+2. **API Endpoint (`src/app/api/invoices/[id]/regenerate/route.ts`)**:
+   - `POST /api/invoices/[id]/regenerate` with server-derived `agencyId` via `requireWriteAccess()`.
+3. **UI Integration (`src/app/(dashboard)/invoices/[id]/page.tsx` & `src/app/(dashboard)/bookings/[id]/page.tsx`)**:
+   - Added **Regenerate Invoice** action button in the Invoice Detail header with `ConfirmDialog` confirmation before proceeding.
+   - Added contextual **Regenerate Invoice** action in Booking Details action menu.
+4. **PDF Integration (`src/lib/services/invoice-pdf-service.ts`)**:
+   - Streams high-resolution PDF directly from the refreshed invoice snapshot under the same `Invoice-${invoice.invoiceNumber}.pdf` filename.
+
+## 203.3 Quality Assurance & Build Validation
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 73+ routes (PASSED)**.
+
+---
+
+# PHASE 204 — MOVE REGENERATE INVOICE ACTION (UI ONLY)
+
+## 204.1 Objective & Changes
+- **Primary & Single Action Location**: **Regenerate Invoice** is available exclusively from **Booking Details $\to$ Invoice section** (and booking action menu) in `src/app/(dashboard)/bookings/[id]/page.tsx`.
+- **Removed from Invoice Surfaces**: Removed **Regenerate Invoice** button/dialog from the Invoice Detail page header and action menus in `src/app/(dashboard)/invoices/[id]/page.tsx`.
+- **Backend Architecture Preserved**: The underlying regeneration service (`invoiceService.regenerateInvoice`) and API (`POST /api/invoices/[id]/regenerate`) remain 100% authoritative and unchanged.
+- **Confirmation & Safety**: Triggered with standard `ConfirmDialog` preserving the existing Invoice ID, sequential Invoice Number, and existing customer payment records.
+
+## 204.2 Quality Assurance & Build Validation
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 73+ routes (PASSED)**.
+
+---
+
+# PHASE 205 — REGENERATE INVOICE BUG FIX (TAXABLE BASE, BOOKING INVOICE TOTAL & CONFIRMATION DIALOG)
+
+## 205.1 Purpose & Root Causes
+During real usage post-Phase 204, three specific defects were identified and resolved:
+1. **Bug 1 — Incorrect Taxable Base after Regeneration**:
+   - *Root Cause*: In `invoiceService.getOrCreateInvoiceForBooking()`, `taxableAmount`, `taxAmount`, `cgstAmount`, `sgstAmount`, `igstAmount`, and `totalAmount` were copying stale snapshot values from `booking` rather than dynamically recalculating via `TaxService` based on the updated `invoiceSubtotal` and `quoteDiscount`.
+   - *Fix*: Integrated `taxService.calculate({ amount: invoiceSubtotal, taxRate, taxMode, gstTreatment, discountAmount: quoteDiscount })` as the single authoritative calculation engine. Recomputed `taxableAmount`, `taxAmount`, `cgstAmount`, `sgstAmount`, `igstAmount`, `totalAmount`, `paidAmount`, `balanceAmount`, and `status` across both new invoice generation and regeneration.
+2. **Bug 2 — Booking Details Invoice Section Total Mismatch**:
+   - *Root Cause*: Invoice card and header summaries on Booking Details were reading stale total fields or prioritizing `booking.totalAmount` over the authoritative regenerated `Invoice.totalAmount`.
+   - *Fix*: Ensured `Invoice.totalAmount`, `Invoice.paidAmount`, `Invoice.balanceAmount`, and `Invoice.status` are the persisted source of truth in `invoice-service.ts`, `invoice-pdf-service.ts`, `invoices/[id]/page.tsx`, and `bookings/[id]/page.tsx`.
+3. **Bug 3 — Regenerate Confirmation Dialog Remaining Open**:
+   - *Root Cause*: In `src/app/(dashboard)/bookings/[id]/page.tsx`, the `ConfirmDialog` action callback did not reset `setConfirmAction(null)` on successful API response, leaving the dialog open indefinitely.
+   - *Fix*: Added `setActionLoading(true)` on confirm click, `setConfirmAction(null)` immediately on success before `await fetchBooking()`, and `setActionLoading(false)` in the `finally` block with proper error toast handling and double-click prevention.
+
+## 205.2 Architecture & Security Preserved
+- **Single Source of Truth**: Reuses existing `TaxService` (`tax-service.ts`) with deterministic odd-paise reconciliation for INTRA_STATE (CGST/SGST 50-50 split) and INTER_STATE (IGST 100%) across both EXCLUSIVE and INCLUSIVE modes.
+- **Zero Schema / Database Changes**: No new Prisma migrations, no schema alteration, no `prisma db push`.
+- **Identity & Records**: Retains the exact same `Invoice.id` and sequential `Invoice.invoiceNumber` (no Rev 1/Rev 2).
+- **Payment Integrity**: Completed `Payment` records remain untouched and linked.
+- **Tenant Isolation & Security**: Server-derived `agencyId` via `requireWriteAccess()` and CANCELLED invoice protection strictly enforced.
+
+## 205.3 Quality Assurance & Build Validation
+- **Automated QA Suite**: 51/51 test assertions passed (Exclusive tax hotel change, Inclusive tax discount & partial payment, PDF generation, security & cancelled invoice protection, activity exclusion, clean data teardown).
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 73+ routes (PASSED)**.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
