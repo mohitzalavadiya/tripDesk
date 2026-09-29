@@ -243,6 +243,7 @@ export interface PublicQuotationPayload {
   cancellationPolicy?: string | null;
   importantNotes?: string | null;
   terms?: string | null;
+  privacyPolicy?: string | null;
   customerFeedback?: string | null;
   customerFeedbackAt?: string | null;
   agency: {

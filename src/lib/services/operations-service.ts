@@ -1684,12 +1684,16 @@ export const operationsService = {
         passed: totalVehicles === 0 || confirmedVehicles === totalVehicles,
         details: `${confirmedVehicles}/${totalVehicles} assigned/confirmed`,
       },
+      /* Activity readiness check intentionally hidden.
+         Activity is currently a trip inclusion/catalogue feature and is not
+         surfaced as an operational readiness check. Existing implementation is preserved.
       {
         key: "activities",
         label: "Activity & Excursion Bookings",
         passed: totalActivities === 0 || confirmedActivities === totalActivities,
         details: `${confirmedActivities}/${totalActivities} confirmed`,
       },
+      */
       {
         key: "issues",
         label: "Operational Blockers & Issues",

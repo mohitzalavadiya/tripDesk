@@ -181,10 +181,10 @@ export function VehicleDispatchCard({
           </div>
         </div>
 
-        {/* Chauffeur Information */}
+        {/* Driver Information */}
         <div className="space-y-0.5">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-            Assigned Chauffeur
+            Assigned Driver (Chauffeur)
           </span>
           {dispatch.driverName ? (
             <div>
@@ -207,7 +207,7 @@ export function VehicleDispatchCard({
             </div>
           ) : (
             <span className="text-amber-700 font-semibold text-[11px] italic">
-              Unassigned — Chauffeur needed
+              Unassigned — Driver needed
             </span>
           )}
         </div>
@@ -419,7 +419,7 @@ export function VehicleDispatchCard({
                 className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold h-8 px-3.5 cursor-pointer shadow-2xs"
               >
                 <UserCheck className="h-3.5 w-3.5 mr-1" />
-                Assign Chauffeur & Vehicle
+                Assign Driver & Vehicle
               </Button>
             </>
           )}

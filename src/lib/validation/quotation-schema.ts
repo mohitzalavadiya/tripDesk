@@ -36,6 +36,7 @@ export const createQuotationSchema = z.object({
   importantNotes: z.string().trim().max(5000).optional().nullable(),
   internalNotes: z.string().trim().max(5000).optional().nullable(),
   terms: z.string().trim().max(5000).optional().nullable(),
+  privacyPolicy: z.string().trim().max(5000).optional().nullable(),
 });
 
 export type CreateQuotationInput = z.infer<typeof createQuotationSchema>;
@@ -71,6 +72,7 @@ export const updateQuotationSchema = z
     customerFeedback: z.string().trim().max(5000).optional().nullable(),
     internalNotes: z.string().trim().max(5000).optional().nullable(),
     terms: z.string().trim().max(5000).optional().nullable(),
+    privacyPolicy: z.string().trim().max(5000).optional().nullable(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided for update",
@@ -114,6 +116,7 @@ export const generateTripQuotationSchema = z.object({
   cancellationPolicy: z.string().trim().optional(),
   importantNotes: z.string().trim().optional(),
   terms: z.string().trim().optional(),
+  privacyPolicy: z.string().trim().optional(),
   validUntil: z.coerce.date().optional(),
   autoPopulateInclusions: z.boolean().default(true).optional(),
   generatePaymentSchedule: z.boolean().default(true).optional(),

@@ -405,7 +405,7 @@ export default function QuotationsPage() {
                                 {q.quotationNumber}
                               </span>
                               <span className="text-[11px] text-slate-500 truncate">
-                                {q.title || `v${q.version}`}
+                                {q.title || `V${q.version}`}
                               </span>
                             </div>
                           </div>

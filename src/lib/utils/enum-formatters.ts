@@ -153,7 +153,7 @@ export const ENUM_LABEL_MAP: Record<string, string> = {
   OPERATIONAL_ERROR: "Operational Error",
 
   // ─── Operational Communications & Reviews ───
-  DRIVER_PICKUP: "Chauffeur & Pickup Details",
+  DRIVER_PICKUP: "Driver (Chauffeur) & Pickup Details",
   HOTEL_VOUCHER: "Hotel Check-in & Voucher",
   ACTIVITY_PASS: "Excursion & Activity E-Pass",
   WELCOME_BRIEFING: "Welcome Briefing & Itinerary",

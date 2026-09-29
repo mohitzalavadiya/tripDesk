@@ -46,26 +46,47 @@ Login and signup test for formik alert
 Chatbot implement
 from when you decide activity include or exclude
 payable supplier like hotel
+vehical rate issue in trip
+Invoice all hotel and activity amount need to check(need to add Agency Markup)
+Invoice UI need to check (Header)
+Qty	Rate	Amount also want to check in invoice
+i got Pass / Voucher # and Status column in Activity Passes & Sightseeing of booking details (we can remove both column and add include exclude column)
+i got include tag in all activity in Sightseeing & Activities in quatation preview 
+
+also not need to show Activity in Costing & Pricing Snapshot of trips/cmumcvnec000e94tqruiop3yr/quotation page. add separate tab for acitive or manage in Inclusions & Exclusions tab
+
+we use V1, V2 for version in quatation so i got v1 and v2. like v is small. so fix it
+
+we have Proposal Branding & Policy Terms in quatation tab and in this tab we have Proposal Subtitle, Customer Welcome Note, Cancellation Policy and Important Traveler Notes. so in this field we need default some value. like create any subtitle and add. and make on common Cancellation Policy and add it. and also add one Privacy policy field and make default and add value later we can edit or change it
+
+add scroll in Booking & Operations Audit Timeline table.
+
+Activity also not need to show in invoice
 
 **TODO**
 
 
 
-vehical rate issue in trip
 
 
-Invoice all hotel and activity amount need to check(need to add Agency Markup) Qty	Rate	Amount also want to check
-Invoice UI need to check (Header)
-if we not add any tax then GST (0% Exempt): should not show in invoice
+
+
+
+
+
+
 
 quatation preview mobile screen is need to fix
 quatation pdf UI changes
+
+test Feedback &  Reviews page
 
 manage read only from frontend also
 
 itinerary builder
 https://pickyourtrail.com/itineraries/6-night-bali-thrills-serenity-at-40k-per-person
 
+if we not add any tax then GST (0% Exempt): should not show in invoice
 
 subscription model changes
 

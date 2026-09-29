@@ -208,7 +208,7 @@ export function DocumentPreviewModal({
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">{selectedItem.title}</h3>
-                    <p className="text-xs text-slate-500">{selectedItem.subtitle || "Private Chauffeur Driven Vehicle"}</p>
+                    <p className="text-xs text-slate-500">{selectedItem.subtitle || "Private Driver (Chauffeur) Driven Vehicle"}</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -233,7 +233,7 @@ export function DocumentPreviewModal({
                   <span className="font-bold text-slate-800">{selectedItem.pickupTime || "As per Flight/Train Arrival"}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Assigned Chauffeur</span>
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Assigned Driver (Chauffeur)</span>
                   <span className="font-bold text-slate-800">{selectedItem.driverName || "Driver details shared 4 hrs prior"}</span>
                 </div>
                 <div>

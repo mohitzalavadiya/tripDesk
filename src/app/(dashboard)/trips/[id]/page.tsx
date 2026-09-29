@@ -1866,7 +1866,7 @@ export default function TripDetailPage() {
                       )}
                       {tv.driverName && (
                         <div>
-                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Chauffeur</span>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Driver (Chauffeur)</span>
                           <span className="text-slate-800 font-medium">{tv.driverName} {tv.driverPhone ? `(${tv.driverPhone})` : ""}</span>
                         </div>
                       )}
@@ -2117,10 +2117,10 @@ export default function TripDetailPage() {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                         <div className="flex flex-wrap items-center gap-2.5">
                           <span className="font-black text-sm text-slate-900">
-                            {q.quotationNumber || `Quotation v${q.version}`}
+                            {q.quotationNumber || `Quotation V${q.version}`}
                           </span>
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                            Version {q.version}
+                            V{q.version}
                           </span>
                           <QuotationStatusBadge status={q.status} />
                         </div>

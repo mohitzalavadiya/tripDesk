@@ -12859,6 +12859,170 @@ Following Phase 195, Phase 196 completely streamlined the RateSheet system to be
 
 ---
 
+# 197. Assign Vehicle to Trip Modal UI Simplification
+
+## 197.1 Architectural Objective & Changes
+Streamlined the **Assign Vehicle to Trip** modal in `src/components/operations/assign-vehicle-modal.tsx`:
+1. **Compact Modal**: Reduced modal width to `max-w-md` with concise spacing.
+2. **Simplified Fields**: Optional Vehicle Master selector, required Vehicle Name, Vehicle Type, Capacity, and Registration Number. Manual vehicle entry supported without selecting Vehicle Master.
+3. **Compact Rate Basis Segmented Control**: Clean toggle between `Fixed` and `Per KM` with auto-calculated total transport cost.
+4. **Preserved Business Logic**: 100% compatibility with Phase 195 `TripVehicle` commercials and Unified Payables synchronization.
+
+---
+
+# 198. Invoice, Booking UI & Payment Schedule Cleanup
+
+## 198.1 Objectives & Architectural Summary
+Controlled cleanup across customer-facing invoice presentation, PDF generation, Booking UI, terminology, and temporary hiding of Payment Schedule UI without breaking underlying costing, quotation pricing, tax rules, or database models:
+
+1. **Invoice Total & Service Total Customer Reconciliation**:
+   - **Internal Agency Markup Protection**: Agency Markup remains strictly an internal commercial calculation and is never exposed as a customer-facing line item or percentage on the Invoice UI or PDF.
+   - **Reconciled Line Item Presentation**: `getOrCreateInvoiceForBooking` now allocates quotation package markup into individual invoice line item selling prices proportionately with odd-paise reconciliation (`itemsTotal === subtotal`).
+   - **Harmonious Customer-Facing Mathematical Flow**:
+     `Services Subtotal` $\to$ `Special Discount (if applicable)` $\to$ `Taxable Base Amount` $\to$ `Itemized GST (CGST/SGST or IGST if applicable)` $\to$ `Final Invoice Total`.
+   - **0% GST Exemption Presentation**: If tax is 0% or Non-GST Exempt, redundant 0% GST line items are omitted from customer summary cards and PDF invoices.
+
+2. **Invoice View Page Header UI Redesign**:
+   - Redesigned `src/app/(dashboard)/invoices/[id]/page.tsx` header with a clean, responsive hierarchy:
+     - Top row: Clean back navigation, invoice title, invoice number, and status badge.
+     - Secondary row: Associated booking number, customer name, and trip title context.
+     - Responsive action bar: Action buttons (`Record Payment`, `Download PDF`, `Preview Invoice`, `Issue Invoice`, `Cancel Invoice`) neatly grouped without wrapping issues or cramped title overlap.
+
+3. **Invoice PDF Fixes**:
+   - **Eradicated Stray `¹` Artifacts**: Fixed PDFKit WinAnsi encoding mismatch by formatting currency with standard ASCII `Rs.` / `INR` rather than raw UTF-8 `₹` (which was causing byte `0xB9` to render as superscript `¹`).
+   - **Clean Table Pagination & Header Repetition**: Refactored `checkPageBreak` to `ensureSpace(neededHeight)` with explicit `currentY` tracking. Both Services Itemization and Payment History tables automatically repeat their headers when crossing pages.
+   - **Prevented Orphaned Headers**: Payment History section heading, table header, and first row are kept together atomically.
+   - **Fixed Excess Blank Pages**: Eliminated phantom page break cascade caused by stale `doc.y` references. PDFs now render cleanly across only the exact number of pages required.
+
+4. **Booking Details — Dispatch Status & Terminology**:
+   - **Human-Friendly Dispatch Statuses**: Replaced raw database enums (`ON_DUTY` $\to$ `On Duty`, `IN_TRANSIT` $\to$ `In Transit`, `UNINITIALIZED` $\to$ `Unassigned`, `CONFIRMED` $\to$ `Confirmed`, `COMPLETED` $\to$ `Completed`, `PENDING` $\to$ `Pending`) in the Transport & Fleet Dispatches table.
+   - **Driver Terminology Clarification**: Updated user-facing occurrences of `Chauffeur` across booking tables, operation cards, and modals to `Driver (Chauffeur)` or `Driver` without altering database fields or API contracts.
+
+5. **Temporary Hiding of Payment Schedule / Milestone UI**:
+   - **Booking Details**: Safely commented out the `Payment Milestone Schedule & Allocation` card and badge counters from `src/app/(dashboard)/bookings/[id]/page.tsx`.
+   - **Quotation UI**: Safely commented out the `Payment Schedule` promo card, tab navigation button, and tab panel in `src/app/(dashboard)/trips/[id]/quotation/page.tsx`.
+   - **Full Feature Preservation**: All Prisma models (`QuotationPaymentMilestone`, `BookingPaymentMilestone`, `PaymentScheduleAllocation`), services, APIs, and business calculations remain completely intact for future re-enabling.
+
+## 198.2 Verification & Build Results
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASSED)**.
+
+---
+
+# 199. ACTIVITY UI VISIBILITY CLEANUP (2026-09-29)
+
+## 199.1 Purpose & Policy
+Activity in the TripDesk architecture is locked as a pure trip inclusion/catalogue feature (`INCLUDED` / `EXCLUDED` with labels `Included` / `Not Included`), non-priced and non-costed (₹0), with no supplier payables, RateSheets, or operational dispatch workflows.
+
+To align the user interface with this simplified architecture without deleting any underlying code, a **UI-only visibility cleanup** was performed by commenting out relevant surfaces.
+
+## 199.2 UI Surfaces Cleaned & Preserved
+1. **Operations Dashboard (`/operations`)**:
+   - Commented out pending activities count in operational attention calculation and pending action items.
+   - Commented out the `Activities` status check chip in the Operations Directory list while maintaining clean 3-column responsive grid layout for Hotels, Fleet, and Tickets.
+2. **Operations Trip Detail (`/operations/[tripId]`)**:
+   - Commented out `Activities` tab from the workspace tabs bar.
+   - Commented out the `Activities` line in the Overview tab component summary card.
+   - Commented out the `Activity & Excursion Bookings` check from the `Operational Readiness & Checklist` card and in `operations-service.ts` (`getReadiness`), re-balancing the UI checklist to a 3-column responsive layout (Hotels, Fleet, Issues).
+   - Commented out the `Tab 4: Activities` full workspace section.
+   - Commented out `ActivityConfirmationDialog` and `RescheduleActivityModal` triggers.
+   - Filtered out `ACTIVITY_VOUCHER` from the `Available Document Roster` in the Documents & Travel Kit tab so hidden passes do not leave empty cards or inflate document counts.
+3. **Operations Modals & Reconciliation**:
+   - **Complete Tour Modal (`complete-trip-modal.tsx`)**: Commented out the Activities item from the `Operational Delivery Checklist` and balanced the grid to 2 columns (Hotels & Fleet).
+   - **Travel Kit Readiness Modal (`travel-kit-readiness-modal.tsx`)**: Commented out Activities from the `Component Verification Breakdown`.
+   - **Service Reconciliation Card (`service-reconciliation-card.tsx`)**: Commented out the `3. Activities & Excursions Delivery` reconciliation card.
+   - **Communication Modal (`communication-modal.tsx`)**: Commented out `ACTIVITY_PASS` from the template scenario dropdown.
+4. **Documents & Vouchers (`/documents` & `/customer/trips/[tripId]/documents`)**:
+   - **Document Center (`/documents`)**: Commented out `Activity Pass` from the document type filter dropdown.
+   - **Customer Document Center**: Filtered out `ACTIVITY_PASS` from customer-facing document roster.
+
+## 199.3 Code & Feature Preservation Guarantee
+- **Zero Deletions**: No files, functions, components, API endpoints, Prisma models, or service logic were deleted.
+- **Activity Master & TripActivity Intact**: Activity catalogue (`/activities`), Master CRUD, and TripActivity selection/inclusion remain 100% intact and functional.
+- **TypeScript & Build**: `npx tsc --noEmit` and `npm run build` both passed with 0 errors.
+
+---
+
+# 200. ACTIVITY PRESENTATION & QUOTATION UI CLEANUP + QA (2026-09-29)
+
+## 200.1 Purpose & Architecture Alignment
+Activity in TripDesk is strictly a non-costed, non-priced catalogue inclusion feature:
+- `INCLUDED` internal state $\to$ Customer-facing badge: **Included** (emerald).
+- `EXCLUDED` internal state $\to$ Customer-facing badge: **Not Included** (amber with caption "Ticket/admission payable directly on location by guest").
+- Activity has ₹0 cost, ₹0 price, no RateSheet, no supplier payable, and no invoice line item impact.
+- Conceptual positioning: Activity belongs under **Inclusions & Exclusions**, not Costing/Pricing or Operations.
+
+## 200.2 Changes Implemented
+1. **Quotation Preview (`/trips/[id]/quotation/preview` & `/q/[shareToken]`)**:
+   - Customer-facing badges render **Included** (`INCLUDED`) and **Not Included** (`EXCLUDED`/`OPTIONAL`).
+   - No generic `Include`, `Exclude`, or `Optional` badges appear.
+   - Sightseeing & Activities renders with zero pricing, cost, or tax elements.
+2. **Booking Details Activity Table (`/bookings/[id]`)**:
+   - Removed user-facing columns: `Pass / Voucher #` and `Status` (code preserved in comments).
+   - Replaced with authoritative **Inclusion** column rendering **Included** or **Not Included** based on `TripActivity` inclusion state.
+   - No operational voucher status, booking status, supplier status, or financial figures are shown.
+3. **Invoice Line Items Exclusion (`invoice-service.ts`, `/invoices/[id]`, `invoice-pdf-service.ts`)**:
+   - Filtered out `type === "ACTIVITY"` and `sourceType === "TRIP_ACTIVITY"` from customer invoice item derivation and PDF generation.
+   - Financial Safety Verified: Zero impact on invoice subtotal, discount, taxable amount, GST, total amount, paid amount, and balance amount.
+4. **Costing & Pricing Snapshot (`/trips/[id]/quotation`)**:
+   - Filtered out `type === "ACTIVITY"` from the Quotation Line Items Snapshot table.
+   - Only financially relevant services (Hotels, Vehicles, Custom items) appear with RateSheet rates and line totals.
+5. **Inclusions & Exclusions Studio (`/trips/[id]/quotation`)**:
+   - Presented activities under the existing **Inclusions & Exclusions** tab:
+     - **Included Activities**: Listed with clean green badge under Package Inclusions.
+     - **Not Included Activities**: Listed with amber badge under Package Exclusions with direct venue note.
+6. **Quotation Version Labels (`V1`, `V2`, etc.)**:
+   - Normalized all user-facing quotation version badges and text across Quotation Studio, Quotation Preview, Share Token view, Trip Detail, Customer Details, and PDF generation from lowercase `v1`/`v2` to uppercase `V1`/`V2`.
+   - Numeric version values and sequencing remain unchanged.
+
+## 200.3 Quality Assurance & Verification
+- **Code Preservation**: Zero files, models, APIs, or database records deleted; legacy code preserved in clean comments.
+- **Multi-Tenant Security**: Multi-tenant isolation and server-authoritative role checks fully preserved.
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASSED)**.
+
+## 200.4 Focused Fix: Quotation Activity Inclusion Projection (2026-09-29)
+- **Root Cause**: In `src/lib/services/quotation-service.ts`, several Prisma `tripActivities.select` blocks omitted `type: true`. This caused `act.type` to be returned as `undefined` in quotation payloads, leading the presentation layer (`act.type === "EXCLUDED" || act.type === "OPTIONAL"`) to default excluded/optional activities to "Included".
+- **Fix Applied**: Added `type: true` to all 9 `tripActivities.select` projections across `getQuotationById`, `getQuotations`, `getQuotationByNumber`, `createQuotation`, `updateQuotation`, `updateQuotationStatus`, `generateQuotationFromCosting`, `createQuotationVersion`, and `getPublicQuotationByToken`.
+- **Inclusion Presentation Verified**:
+  - `INCLUDED` $\to$ **Included** (emerald badge).
+  - `EXCLUDED` $\to$ **Not Included** (amber badge with venue ticket note).
+  - `OPTIONAL` (legacy) $\to$ **Not Included**.
+- **Financial Safety**: Zero changes to financial logic, quotation totals, costing, or invoice calculations.
+- **Verification Results**:
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASSED)**.
+
+---
+
+# 201. PROPOSAL BRANDING & POLICY TERMS DEFAULTS + PRIVACY POLICY + AUDIT TIMELINE SCROLL (2026-09-29)
+
+## 201.1 Purpose & Scope
+1. **Proposal Branding & Policy Terms Defaults & Privacy Policy**:
+   - Established professional proposal defaults across:
+     - `Proposal Subtitle` $\to$ `"Your Personalized Travel Proposal"`
+     - `Customer Welcome Note` $\to$ `"Thank you for choosing us for your travel plans. We are pleased to present this personalized proposal and look forward to making your journey comfortable, enjoyable, and memorable."`
+     - `Cancellation Policy` $\to$ `"Cancellation and amendment charges may vary depending on the service provider, hotel, transport arrangement, activity, and applicable booking conditions. Any applicable cancellation or amendment charges will be communicated before processing the request. Refunds, where applicable, are subject to the terms and conditions of the respective service providers."`
+     - `Important Traveler Notes` $\to$ `"Please carry valid government-issued identification and any required travel documents. Hotel check-in and check-out times are subject to the property's policies. Travel times may vary due to traffic, weather, local conditions, or operational circumstances. Guests are advised to review the final itinerary and service details before travel."`
+     - `Privacy Policy` $\to$ `"Your personal information is used to arrange and manage your travel services and to provide related customer support. We take reasonable measures to protect your information and do not use it for purposes unrelated to your travel arrangements except where required or permitted by applicable law. Please contact the agency for any questions regarding the handling of your personal information."`
+   - **Quotation-Level Snapshot Rule**: Defaults automatically snapshot onto newly generated/created quotations while remaining fully editable per quotation. Existing historical quotations are preserved with zero bulk overwrites.
+   - **Privacy Policy Persistence**: Added `privacyPolicy String?` to Prisma `Quotation` model via migration `20260929165000_add_quotation_privacy_policy`.
+   - **Surfaces Updated**:
+     - Quotation Studio (`/trips/[id]/quotation` Tab 5 Terms & Policies)
+     - Internal Quotation Preview (`/trips/[id]/quotation/preview`)
+     - Public Customer Quotation (`/q/[shareToken]`)
+     - Quotation PDF (`quotation-pdf-service.ts`)
+2. **Booking & Operations Audit Timeline Responsive Horizontal Scroll**:
+   - Added container `overflow-x-auto` with clean minimum width (`min-w-[360px]`) and word wrap to the Booking & Operations Audit Timeline in `src/app/(dashboard)/bookings/[id]/page.tsx`.
+   - Responsive across desktop, tablet, and mobile with zero page-level horizontal overflow.
+3. **Financial Safety**: Zero changes to financial logic, quotation totals, costing, or invoice calculations.
+
+## 201.2 Quality Assurance & Build
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASSED)**.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

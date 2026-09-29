@@ -981,6 +981,7 @@ model Quotation {
   customerFeedbackAt DateTime?
   internalNotes      String?
   terms              String?
+  privacyPolicy      String?
   shareToken              String?
   sharedAt                DateTime?
   viewedAt                DateTime?

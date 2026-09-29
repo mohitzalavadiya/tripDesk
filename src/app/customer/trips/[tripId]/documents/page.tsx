@@ -117,7 +117,10 @@ export default function CustomerDocumentsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {documents.map((doc) => (
+          {documents
+            .filter((doc) => doc.type !== "ACTIVITY_PASS")
+            /* Activity Pass intentionally hidden from customer document center */
+            .map((doc) => (
             <div
               key={doc.id}
               className="bg-white rounded-3xl border border-slate-200/90 hover:border-indigo-500/40 p-6 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between space-y-4"

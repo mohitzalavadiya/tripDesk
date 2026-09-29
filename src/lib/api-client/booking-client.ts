@@ -76,6 +76,7 @@ export type BookingWithRelations = Booking & {
       time?: string | null;
       location?: string | null;
       numberOfParticipants?: number | null;
+      type?: string | null;
     }>;
   };
   quotation?: {

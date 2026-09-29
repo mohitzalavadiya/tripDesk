@@ -219,7 +219,7 @@ export default function PublicQuotationPage() {
                 {quotation.agency.name}
               </span>
               <span className="text-[10px] text-slate-500 font-mono">
-                {quotation.quotationNumber} • v{quotation.version}
+                {quotation.quotationNumber} • V{quotation.version}
               </span>
             </div>
           </div>
@@ -296,7 +296,7 @@ export default function PublicQuotationPage() {
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 text-[10px] sm:text-xs font-mono font-semibold tracking-wider text-indigo-200 border border-white/15">
                   <span>{quotation.quotationNumber}</span>
                   <span>•</span>
-                  <span>v{quotation.version}</span>
+                  <span>V{quotation.version}</span>
                 </div>
                 {isExpired && (
                   <div className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mt-1">
@@ -677,7 +677,7 @@ export default function PublicQuotationPage() {
             )} */}
 
             {/* 11. Important Notes & Policies */}
-            {(importantNotes.length > 0 || quotation.cancellationPolicy || quotation.terms) && (
+            {(importantNotes.length > 0 || quotation.importantNotes || quotation.cancellationPolicy || quotation.terms || quotation.privacyPolicy) && (
               <div className="space-y-4">
                 <div className="border-b border-slate-200 pb-3">
                   <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -687,20 +687,25 @@ export default function PublicQuotationPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  {importantNotes.length > 0 && (
+                  {(importantNotes.length > 0 || quotation.importantNotes) && (
                     <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
                       <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Traveler Advisories</h4>
-                      <ul className="space-y-2">
-                        {importantNotes.map((n) => (
-                          <li key={n.id} className="flex items-start gap-2">
-                            <Info className="h-3.5 w-3.5 text-indigo-600 shrink-0 mt-0.5" />
-                            <div>
-                              <strong className="text-slate-900">{n.title}:</strong>{" "}
-                              <span className="text-slate-600">{n.description}</span>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
+                      {quotation.importantNotes && (
+                        <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{quotation.importantNotes}</p>
+                      )}
+                      {importantNotes.length > 0 && (
+                        <ul className="space-y-2">
+                          {importantNotes.map((n) => (
+                            <li key={n.id} className="flex items-start gap-2">
+                              <Info className="h-3.5 w-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                              <div>
+                                <strong className="text-slate-900">{n.title}:</strong>{" "}
+                                <span className="text-slate-600">{n.description}</span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   )}
 
@@ -708,6 +713,20 @@ export default function PublicQuotationPage() {
                     <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
                       <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Cancellation Policy</h4>
                       <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{quotation.cancellationPolicy}</p>
+                    </div>
+                  )}
+
+                  {quotation.terms && (
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Terms & Conditions</h4>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{quotation.terms}</p>
+                    </div>
+                  )}
+
+                  {quotation.privacyPolicy && (
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Privacy Policy</h4>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{quotation.privacyPolicy}</p>
                     </div>
                   )}
                 </div>

@@ -26,6 +26,7 @@ export interface QuotationPdfData {
   cancellationPolicy?: string | null;
   importantNotes?: string | null;
   terms?: string | null;
+  privacyPolicy?: string | null;
   createdAt?: Date | string;
 
   agency?: {
@@ -140,7 +141,7 @@ export class QuotationPdfService {
           info: {
             Title: `${data.title || "Travel Itinerary Proposal"} - ${data.quotationNumber}`,
             Author: data.agency?.name || "TripDesk Travel Agency",
-            Subject: `Holiday Itinerary Proposal ${data.quotationNumber} v${data.version}`,
+            Subject: `Holiday Itinerary Proposal ${data.quotationNumber} V${data.version}`,
             Keywords: `Proposal: ${data.quotationNumber}, Traveler: ${data.customer?.name || "Valued Customer"}`,
             Creator: "TripDesk Travel Platform",
           },
@@ -308,7 +309,7 @@ export class QuotationPdfService {
           .fillColor("#FFFFFF")
           .fontSize(8)
           .font("Helvetica-Bold")
-          .text(`${data.quotationNumber}  •  v${data.version}`, pillX, pillY + 5.5, {
+          .text(`${data.quotationNumber}  •  V${data.version}`, pillX, pillY + 5.5, {
             width: pillW,
             align: "center",
           });
@@ -908,7 +909,7 @@ export class QuotationPdfService {
         // 9. IMPORTANT NOTES, POLICIES & TERMS
         // ═════════════════════════════════════════════
         const importantNotesList = data.proposalItems?.filter((p) => p.type === "IMPORTANT_NOTE") || [];
-        if (data.cancellationPolicy || data.terms || data.importantNotes || importantNotesList.length > 0) {
+        if (data.cancellationPolicy || data.terms || data.privacyPolicy || data.importantNotes || importantNotesList.length > 0) {
           drawSectionHeader("Important Notes & Booking Policies", "Key guidelines, advisory notes and terms");
 
           if (data.importantNotes || importantNotesList.length > 0) {
@@ -979,6 +980,26 @@ export class QuotationPdfService {
               .fontSize(7.5)
               .font("Helvetica")
               .text(data.terms, margin, doc.y + 2, {
+                width: contentWidth,
+                lineGap: 2,
+              });
+            doc.y += 6;
+            doc.x = margin;
+          }
+
+          if (data.privacyPolicy) {
+            ensureSpace(28);
+            doc
+              .fillColor(textDark)
+              .fontSize(8.5)
+              .font("Helvetica-Bold")
+              .text("Privacy Policy:", margin, doc.y, { width: contentWidth });
+
+            doc
+              .fillColor(textMuted)
+              .fontSize(7.5)
+              .font("Helvetica")
+              .text(data.privacyPolicy, margin, doc.y + 2, {
                 width: contentWidth,
                 lineGap: 2,
               });

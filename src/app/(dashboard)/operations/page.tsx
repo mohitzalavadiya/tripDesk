@@ -137,8 +137,11 @@ export default function OperationsDashboardPage() {
     operations.forEach((op) => {
       const pendingHotels = op.hotelConfirmations?.filter((h) => h.status === "PENDING").length || 0;
       const pendingVehicles = op.vehicleDispatches?.filter((v) => v.status === "PENDING").length || 0;
-      const pendingActivities = op.activityConfirmations?.filter((a) => a.status === "PENDING").length || 0;
-      pendingActions += pendingHotels + pendingVehicles + pendingActivities;
+      {/* Activity Operations UI intentionally hidden.
+          Activity is currently a trip inclusion/catalogue feature and is not
+          surfaced as an operational service. Existing implementation is preserved for possible future use. */}
+      // const pendingActivities = op.activityConfirmations?.filter((a) => a.status === "PENDING").length || 0;
+      pendingActions += pendingHotels + pendingVehicles;
     });
 
     const openIssues = operations.reduce(
@@ -205,15 +208,18 @@ export default function OperationsDashboardPage() {
     operations.forEach((op) => {
       const pendingHotels = op.hotelConfirmations?.filter((h) => h.status === "PENDING").length || 0;
       const pendingVehicles = op.vehicleDispatches?.filter((v) => v.status === "PENDING").length || 0;
-      const pendingActivities = op.activityConfirmations?.filter((a) => a.status === "PENDING").length || 0;
+      {/* Activity Operations UI intentionally hidden.
+          Activity is currently a trip inclusion/catalogue feature and is not
+          surfaced as an operational service. Existing implementation is preserved for possible future use. */}
+      // const pendingActivities = op.activityConfirmations?.filter((a) => a.status === "PENDING").length || 0;
       const openIssuesCount = op.issues?.length || 0;
 
-      const totalPending = pendingHotels + pendingVehicles + pendingActivities + openIssuesCount;
+      const totalPending = pendingHotels + pendingVehicles + openIssuesCount;
       if (totalPending > 0) {
         const parts: string[] = [];
         if (pendingHotels > 0) parts.push(`${pendingHotels} Hotel(s) unconfirmed`);
         if (pendingVehicles > 0) parts.push(`${pendingVehicles} Driver(s) unassigned`);
-        if (pendingActivities > 0) parts.push(`${pendingActivities} Activity unconfirmed`);
+        // if (pendingActivities > 0) parts.push(`${pendingActivities} Activity unconfirmed`);
         if (openIssuesCount > 0) parts.push(`${openIssuesCount} Open Issue(s)`);
 
         items.push({
@@ -493,7 +499,7 @@ export default function OperationsDashboardPage() {
                         </div>
 
                         {/* Status Check Chips */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 text-[11px]">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-[11px]">
                           <div className="bg-white border border-slate-100 rounded-lg px-2.5 py-1 text-slate-600">
                             <span className="text-[10px] text-slate-400 block font-semibold uppercase">Hotels</span>
                             <span className={`font-bold ${totalHotels > 0 && confirmedHotels === totalHotels ? "text-emerald-700" : "text-amber-700"}`}>
@@ -508,12 +514,17 @@ export default function OperationsDashboardPage() {
                             </span>
                           </div>
 
+                          {/* Activity Operations UI intentionally hidden.
+                              Activity is currently a trip inclusion/catalogue feature and is not
+                              surfaced as an operational service. Existing implementation is preserved
+                              for possible future use.
                           <div className="bg-white border border-slate-100 rounded-lg px-2.5 py-1 text-slate-600">
                             <span className="text-[10px] text-slate-400 block font-semibold uppercase">Activities</span>
                             <span className={`font-bold ${totalActivities > 0 && confirmedActivities === totalActivities ? "text-emerald-700" : "text-amber-700"}`}>
                               {confirmedActivities}/{totalActivities} Confirmed
                             </span>
                           </div>
+                          */}
 
                           <div className="bg-white border border-slate-100 rounded-lg px-2.5 py-1 text-slate-600">
                             <span className="text-[10px] text-slate-400 block font-semibold uppercase">Tickets</span>

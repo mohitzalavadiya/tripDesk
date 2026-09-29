@@ -17,6 +17,7 @@ import { communicationService } from "./communication-service";
 import { taxService } from "./tax-service";
 import { taxProfileService } from "./tax-profile-service";
 import { internalNotificationService } from "./internal-notification-service";
+import { DEFAULT_QUOTATION_TERMS } from "@/lib/constants/quotation-defaults";
 import {
   CreateQuotationInput,
   UpdateQuotationInput,
@@ -386,6 +387,7 @@ export const quotationService = {
                 select: {
                   id: true,
                   name: true,
+                  type: true,
                   date: true,
                   description: true,
                   notes: true,
@@ -520,6 +522,7 @@ export const quotationService = {
               select: {
                 id: true,
                 name: true,
+                type: true,
                 date: true,
                 description: true,
                 notes: true,
@@ -646,6 +649,7 @@ export const quotationService = {
               select: {
                 id: true,
                 name: true,
+                type: true,
                 date: true,
                 description: true,
                 notes: true,
@@ -741,15 +745,16 @@ export const quotationService = {
         sgstAmount: taxResult.sgstAmount,
         igstAmount: taxResult.igstAmount,
         finalAmount: taxResult.finalAmount,
-        proposalSubtitle: data.proposalSubtitle,
-        customerMessage: data.customerMessage,
+        proposalSubtitle: data.proposalSubtitle ?? DEFAULT_QUOTATION_TERMS.proposalSubtitle,
+        customerMessage: data.customerMessage ?? DEFAULT_QUOTATION_TERMS.customerMessage,
         inclusionsIntro: data.inclusionsIntro,
         exclusionsIntro: data.exclusionsIntro,
         paymentTerms: data.paymentTerms,
-        cancellationPolicy: data.cancellationPolicy,
-        importantNotes: data.importantNotes,
+        cancellationPolicy: data.cancellationPolicy ?? DEFAULT_QUOTATION_TERMS.cancellationPolicy,
+        importantNotes: data.importantNotes ?? DEFAULT_QUOTATION_TERMS.importantNotes,
         internalNotes: data.internalNotes,
         terms: data.terms,
+        privacyPolicy: data.privacyPolicy ?? DEFAULT_QUOTATION_TERMS.privacyPolicy,
         shareToken,
       },
       include: {
@@ -833,6 +838,7 @@ export const quotationService = {
               select: {
                 id: true,
                 name: true,
+                type: true,
                 date: true,
                 description: true,
                 notes: true,
@@ -951,6 +957,7 @@ export const quotationService = {
         ...(data.customerFeedback !== undefined ? { customerFeedback: data.customerFeedback } : {}),
         ...(data.internalNotes !== undefined ? { internalNotes: data.internalNotes } : {}),
         ...(data.terms !== undefined ? { terms: data.terms } : {}),
+        ...(data.privacyPolicy !== undefined ? { privacyPolicy: data.privacyPolicy } : {}),
       },
       include: {
         customer: { select: { id: true, name: true, phone: true, email: true } },
@@ -1033,6 +1040,7 @@ export const quotationService = {
               select: {
                 id: true,
                 name: true,
+                type: true,
                 date: true,
                 description: true,
                 notes: true,
@@ -1146,6 +1154,7 @@ export const quotationService = {
               select: {
                 id: true,
                 name: true,
+                type: true,
                 date: true,
                 description: true,
                 notes: true,
@@ -1279,6 +1288,7 @@ export const quotationService = {
       });
     }
 
+    /* Activity line item creation preserved in comments per locked catalogue architecture (Activity has no pricing/costing)
     for (const a of costing.activities) {
       const itemCost = Number(a.totalCost);
       const paxQty = a.numberOfParticipants || 1;
@@ -1299,6 +1309,7 @@ export const quotationService = {
         sortOrder: sortIdx++,
       });
     }
+    */
 
     // Auto-populate structured inclusions from live trip items
     const proposalItemsToCreate: Array<Prisma.QuotationProposalItemCreateWithoutQuotationInput> = [];
@@ -1413,7 +1424,7 @@ export const quotationService = {
           version: 1,
           tier: selectedTier,
           title: quotationTitle,
-          proposalSubtitle: options?.proposalSubtitle,
+          proposalSubtitle: options?.proposalSubtitle || DEFAULT_QUOTATION_TERMS.proposalSubtitle,
           status: QuotationStatus.DRAFT,
           validUntil: options?.validUntil ? new Date(options.validUntil) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
           currency: "INR",
@@ -1432,13 +1443,14 @@ export const quotationService = {
           sgstAmount: taxResult.sgstAmount,
           igstAmount: taxResult.igstAmount,
           finalAmount: taxResult.finalAmount,
-          customerMessage: options?.customerMessage || "Thank you for planning your holiday with us. Here is your customized itinerary proposal.",
+          customerMessage: options?.customerMessage || DEFAULT_QUOTATION_TERMS.customerMessage,
           inclusionsIntro: options?.inclusionsIntro,
           exclusionsIntro: options?.exclusionsIntro,
           paymentTerms: options?.paymentTerms,
-          cancellationPolicy: options?.cancellationPolicy,
-          importantNotes: options?.importantNotes,
+          cancellationPolicy: options?.cancellationPolicy || DEFAULT_QUOTATION_TERMS.cancellationPolicy,
+          importantNotes: options?.importantNotes || DEFAULT_QUOTATION_TERMS.importantNotes,
           terms: options?.terms,
+          privacyPolicy: options?.privacyPolicy || DEFAULT_QUOTATION_TERMS.privacyPolicy,
           shareToken,
           items: {
             create: itemsToCreate,
@@ -1531,6 +1543,7 @@ export const quotationService = {
                 select: {
                   id: true,
                   name: true,
+                  type: true,
                   date: true,
                   description: true,
                   notes: true,
@@ -1600,7 +1613,7 @@ export const quotationService = {
           quotationNumber: existing.quotationNumber,
           version: nextVersion,
           tier: existing.tier,
-          title: `Proposal v${nextVersion} for ${existing.title?.replace(/Proposal v\d+ for /i, "") || "Trip"}`,
+          title: `${existing.title?.replace(/Proposal [vV]\d+ for /i, "") || "Trip"}`,
           proposalSubtitle: existing.proposalSubtitle,
           status: QuotationStatus.DRAFT,
           validUntil: existing.validUntil ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : null,
@@ -1628,6 +1641,7 @@ export const quotationService = {
           importantNotes: existing.importantNotes,
           internalNotes: existing.internalNotes,
           terms: existing.terms,
+          privacyPolicy: existing.privacyPolicy,
           shareToken: newShareToken,
           items: {
             create: existing.items.map((i) => ({
@@ -1751,6 +1765,7 @@ export const quotationService = {
                 select: {
                   id: true,
                   name: true,
+                  type: true,
                   date: true,
                   description: true,
                   notes: true,
@@ -2557,6 +2572,7 @@ export const quotationService = {
               select: {
                 id: true,
                 name: true,
+                type: true,
                 date: true,
                 description: true,
                 notes: true,
@@ -2635,6 +2651,7 @@ export const quotationService = {
       cancellationPolicy: quotation.cancellationPolicy,
       importantNotes: quotation.importantNotes,
       terms: quotation.terms,
+      privacyPolicy: quotation.privacyPolicy,
       customerFeedback: quotation.customerFeedback,
       customerFeedbackAt: quotation.customerFeedbackAt,
       agency: quotation.agency,
