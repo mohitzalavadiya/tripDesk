@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { VehiclePricingType } from "@prisma/client";
 
 /**
  * Zod validation schema for creating a new Vehicle master record.
+ * Simplified to reusable fleet identity & reference specifications only.
  */
 export const createVehicleSchema = z.object({
   name: z
@@ -28,34 +28,12 @@ export const createVehicleSchema = z.object({
     .optional()
     .nullable()
     .or(z.literal("")),
-  driverName: z
+  supplierId: z
     .string()
     .trim()
-    .max(100, "Driver name must be at most 100 characters.")
     .optional()
     .nullable()
     .or(z.literal("")),
-  driverPhone: z
-    .string()
-    .trim()
-    .max(30, "Driver phone must be at most 30 characters.")
-    .optional()
-    .nullable()
-    .or(z.literal("")),
-  pricingType: z
-    .nativeEnum(VehiclePricingType)
-    .optional()
-    .default(VehiclePricingType.TOTAL),
-  baseRate: z.coerce
-    .number()
-    .min(0, "Base rate cannot be negative.")
-    .optional()
-    .nullable(),
-  ratePerKm: z.coerce
-    .number()
-    .min(0, "Rate per km cannot be negative.")
-    .optional()
-    .nullable(),
   notes: z
     .string()
     .trim()
@@ -97,31 +75,12 @@ export const updateVehicleSchema = z
       .optional()
       .nullable()
       .or(z.literal("")),
-    driverName: z
+    supplierId: z
       .string()
       .trim()
-      .max(100, "Driver name must be at most 100 characters.")
       .optional()
       .nullable()
       .or(z.literal("")),
-    driverPhone: z
-      .string()
-      .trim()
-      .max(30, "Driver phone must be at most 30 characters.")
-      .optional()
-      .nullable()
-      .or(z.literal("")),
-    pricingType: z.nativeEnum(VehiclePricingType).optional(),
-    baseRate: z.coerce
-      .number()
-      .min(0, "Base rate cannot be negative.")
-      .optional()
-      .nullable(),
-    ratePerKm: z.coerce
-      .number()
-      .min(0, "Rate per km cannot be negative.")
-      .optional()
-      .nullable(),
     notes: z
       .string()
       .trim()

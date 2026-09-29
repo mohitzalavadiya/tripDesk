@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Zod validation schema for creating a Rate Sheet.
+ * Zod validation schema for creating a Rate Sheet (Hotel only).
  */
 export const createRateSheetSchema = z
   .object({
@@ -10,13 +10,11 @@ export const createRateSheetSchema = z
       .trim()
       .min(1, "Rate sheet name is required.")
       .max(255, "Name must be at most 255 characters."),
-    inventoryType: z.enum(["HOTEL", "VEHICLE", "ACTIVITY"]),
+    inventoryType: z.enum(["HOTEL"]).default("HOTEL").optional(),
     supplierId: z.string().trim().optional().nullable().or(z.literal("")),
     
-    // Inventory references
+    // Inventory reference (Hotel only)
     hotelId: z.string().trim().optional().nullable().or(z.literal("")),
-    vehicleId: z.string().trim().optional().nullable().or(z.literal("")),
-    activityId: z.string().trim().optional().nullable().or(z.literal("")),
 
     // Hotel specifics
     roomType: z.string().trim().max(100).optional().nullable().or(z.literal("")),
@@ -41,58 +39,6 @@ export const createRateSheetSchema = z
     extraChildRate: z.coerce
       .number()
       .min(0, "Extra child rate must be non-negative.")
-      .optional()
-      .nullable(),
-
-    // Vehicle specifics
-    vehiclePricingType: z.enum(["PER_KM", "TOTAL"]).optional().nullable(),
-    ratePerKm: z.coerce
-      .number()
-      .min(0, "Rate per km must be non-negative.")
-      .optional()
-      .nullable(),
-    minimumKm: z.coerce
-      .number()
-      .min(0, "Minimum km must be non-negative.")
-      .optional()
-      .nullable(),
-    totalRate: z.coerce
-      .number()
-      .min(0, "Total rate must be non-negative.")
-      .optional()
-      .nullable(),
-    extraKmRate: z.coerce
-      .number()
-      .min(0, "Extra km rate must be non-negative.")
-      .optional()
-      .nullable(),
-    driverAllowance: z.coerce
-      .number()
-      .min(0, "Driver allowance must be non-negative.")
-      .optional()
-      .nullable(),
-    nightAllowance: z.coerce
-      .number()
-      .min(0, "Night allowance must be non-negative.")
-      .optional()
-      .nullable(),
-    tollIncluded: z.boolean().optional().default(false),
-    parkingIncluded: z.boolean().optional().default(false),
-
-    // Activity specifics
-    adultCost: z.coerce
-      .number()
-      .min(0, "Adult cost must be non-negative.")
-      .optional()
-      .nullable(),
-    childCost: z.coerce
-      .number()
-      .min(0, "Child cost must be non-negative.")
-      .optional()
-      .nullable(),
-    infantCost: z.coerce
-      .number()
-      .min(0, "Infant cost must be non-negative.")
       .optional()
       .nullable(),
 
@@ -126,11 +72,9 @@ export type CreateRateSheetPayload = z.input<typeof createRateSheetSchema>;
 export const updateRateSheetSchema = z
   .object({
     name: z.string().trim().min(1).max(255).optional(),
-    inventoryType: z.enum(["HOTEL", "VEHICLE", "ACTIVITY"]).optional(),
+    inventoryType: z.enum(["HOTEL"]).optional(),
     supplierId: z.string().trim().optional().nullable().or(z.literal("")),
     hotelId: z.string().trim().optional().nullable().or(z.literal("")),
-    vehicleId: z.string().trim().optional().nullable().or(z.literal("")),
-    activityId: z.string().trim().optional().nullable().or(z.literal("")),
 
     roomType: z.string().trim().max(100).optional().nullable().or(z.literal("")),
     mealPlan: z.string().trim().max(50).optional().nullable().or(z.literal("")),
@@ -142,20 +86,6 @@ export const updateRateSheetSchema = z
     costPrice: z.coerce.number().min(0).optional(),
     extraAdultRate: z.coerce.number().min(0).optional().nullable(),
     extraChildRate: z.coerce.number().min(0).optional().nullable(),
-
-    vehiclePricingType: z.enum(["PER_KM", "TOTAL"]).optional().nullable(),
-    ratePerKm: z.coerce.number().min(0).optional().nullable(),
-    minimumKm: z.coerce.number().min(0).optional().nullable(),
-    totalRate: z.coerce.number().min(0).optional().nullable(),
-    extraKmRate: z.coerce.number().min(0).optional().nullable(),
-    driverAllowance: z.coerce.number().min(0).optional().nullable(),
-    nightAllowance: z.coerce.number().min(0).optional().nullable(),
-    tollIncluded: z.boolean().optional(),
-    parkingIncluded: z.boolean().optional(),
-
-    adultCost: z.coerce.number().min(0).optional().nullable(),
-    childCost: z.coerce.number().min(0).optional().nullable(),
-    infantCost: z.coerce.number().min(0).optional().nullable(),
 
     taxPercentage: z.coerce.number().min(0).max(100).optional(),
     priority: z.coerce.number().int().optional(),
@@ -185,11 +115,9 @@ export type UpdateRateSheetPayload = z.input<typeof updateRateSheetSchema>;
  */
 export const rateSheetQuerySchema = z.object({
   search: z.string().trim().optional(),
-  inventoryType: z.enum(["HOTEL", "VEHICLE", "ACTIVITY"]).optional(),
+  inventoryType: z.enum(["HOTEL"]).optional(),
   supplierId: z.string().trim().optional(),
   hotelId: z.string().trim().optional(),
-  vehicleId: z.string().trim().optional(),
-  activityId: z.string().trim().optional(),
   status: z.enum(["DRAFT", "ACTIVE", "INACTIVE", "EXPIRED"]).optional(),
   validDate: z.coerce.date().optional(),
   seasonName: z.string().trim().optional(),
@@ -215,17 +143,14 @@ export const rateSheetIdParamSchema = z.object({
 });
 
 /**
- * Query schema for Rate Lookup / Preview Engine.
+ * Query schema for Rate Lookup / Preview Engine (Hotel only).
  */
 export const rateLookupQuerySchema = z.object({
-  inventoryType: z.enum(["HOTEL", "VEHICLE", "ACTIVITY"]),
+  inventoryType: z.enum(["HOTEL"]).default("HOTEL").optional(),
   inventoryId: z.string().trim().min(1, "Inventory ID is required."),
   date: z.coerce.date({ error: "Date is required." }),
   roomType: z.string().trim().optional(),
   mealPlan: z.string().trim().optional(),
-  pricingType: z.enum(["PER_KM", "TOTAL"]).optional(),
-  adults: z.coerce.number().int().min(0).default(1).optional(),
-  children: z.coerce.number().int().min(0).default(0).optional(),
 });
 
 export type RateLookupQueryParams = z.infer<typeof rateLookupQuerySchema>;

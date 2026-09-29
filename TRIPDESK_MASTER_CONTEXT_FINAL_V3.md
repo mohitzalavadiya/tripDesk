@@ -12806,9 +12806,63 @@ Execute a comprehensive UI/UX audit, component architecture cleanup, and respons
 
 ---
 
+# 195. Vehicle Architecture Simplification
+
+## 195.1 Overview & Architectural Objectives
+Simplified the Vehicle module by separating reusable vehicle specification/identity from commercial pricing and operational costing:
+1. **Vehicle Master (Specs-Only)**: Stripped of driver assignments (`defaultDriver`, `driverPhone`), tariffs, pricing types, base rates, and rate per km. Master records represent reusable fleet physical identity (Name, Type, Capacity, Registration Number, Supplier Link, Notes). All existing 9 master records preserved intact.
+2. **RateSheet Decoupling**: Completely removed `VEHICLE` inventory type from RateSheets (`RateInventoryType.VEHICLE` dropped, `vehicleId` and vehicle tariff fields removed). RateSheets are now dedicated solely to contracted Hotel and Activity tariffs.
+3. **Trip Vehicle Commercials**: All transport pricing and costing resides exclusively on `TripVehicle`. Supports:
+   - `FIXED`: Total fixed vehicle amount (`totalRate`).
+   - `PER_KM`: `ratePerKm`, `estimatedKm` (initial planning), and `actualKm` (post-trip odometer entry).
+   - Costing formula: `pricingType === 'PER_KM' ? ratePerKm * (actualKm ?? estimatedKm) : totalRate`.
+   - Trip vehicles can be prefilled from Vehicle Master OR added completely manually (`vehicleId: null`).
+4. **Operations & Unified Payables Synchronization**:
+   - `VehicleDispatchCard`: Displays Rate Basis, Rate, Estimated KM, Actual KM, and live calculated transport cost breakdown alongside Unified Payable details.
+   - Post-trip `actualKm` updates recalculate `actualAmount` on `SupplierPayable` without mutating frozen customer quotations, booking selling prices, invoices, or customer payments.
+5. **Database Migration**: Created and executed Prisma migration `20260929110000_simplify_vehicle_architecture` (No `prisma db push`).
+
+## 195.2 Verification & Build Results
+- `npx tsx --env-file=.env scratch/test_vehicle_architecture.ts` $\to$ **12/12 QA Test Assertions PASSED**.
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASSED)**.
+
+---
+
+# 196. RateSheet Hotel-Only Architecture & Activity Pricing Decoupling
+
+## 196.1 Architectural Objective & Changes
+Following Phase 195, Phase 196 completely streamlined the RateSheet system to be dedicated solely to **Hotel rates**:
+1. **Activity Decoupling from RateSheets**:
+   - `RateInventoryType.ACTIVITY` removed from the Prisma schema and validation engine (`RateInventoryType` is now `HOTEL`).
+   - Dropped `activityId`, `adultCost`, `childCost`, and `infantCost` columns from `rate_sheets` table via Prisma migration `20260929113000_make_ratesheet_hotel_only`.
+   - Removed `rateSheets` relation from `Activity` master model.
+   - Removed Activity lookup methods (`getApplicableActivityRatesBatch`, `getApplicableActivityRate`) from `rate-sheet-service.ts`.
+2. **RateSheet System Scope**:
+   - RateSheet is now strictly a **Hotel Tariff Engine** managing seasonal validity, meal plans, room categories, base cost prices, extra adult/child rates, and priority resolution.
+   - RateSheet UI (Listing, Create, Detail, and Lookup) streamlined to Hotel tariffs with all Activity options and indicators removed.
+   - RateSheet Excel import/sample logic remains 100% Hotel-focused.
+3. **Activity Architecture Preservation**:
+   - Activity Master remains a clean reusable catalogue.
+   - TripActivity remains strictly non-monetary inclusion tracking (`INCLUDED` vs `EXCLUDED`).
+   - Activities maintain zero costing (`activitiesTotal = 0`), zero rate sheets, and zero supplier payables.
+4. **Baseline & Regression Integrity**:
+   - All **68 Hotel RateSheets** preserved intact in the database.
+   - Vehicle architecture from Phase 195 preserved with zero regression.
+
+## 196.2 Verification & Build Results
+- `npx prisma migrate deploy` $\to$ **Migration `20260929113000_make_ratesheet_hotel_only` applied successfully**.
+- `npx prisma generate` $\to$ **Prisma Client generated cleanly**.
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASSED)**.
+- Database baseline check: **68 RateSheets, 28 Hotels, 33 Destinations, 5 Activities, 23 TripActivities, 9 Vehicles, 12 TripVehicles, 30 Payables** all verified intact.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
 
 
 

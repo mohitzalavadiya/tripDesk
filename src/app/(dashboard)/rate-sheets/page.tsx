@@ -24,8 +24,6 @@ import {
   ChevronRight,
   Loader2,
   Hotel,
-  Car,
-  Ticket,
   Truck,
   IndianRupee,
   HelpCircle,
@@ -208,10 +206,6 @@ export default function RateSheetsPage() {
     () => rateSheets.filter((r) => r.inventoryType === "HOTEL").length,
     [rateSheets]
   );
-  const transportTariffs = React.useMemo(
-    () => rateSheets.filter((r) => r.inventoryType === "VEHICLE").length,
-    [rateSheets]
-  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
@@ -238,10 +232,10 @@ export default function RateSheetsPage() {
 
             <div className="flex flex-wrap items-baseline gap-3">
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-                Rate Sheets & Supplier Tariffs
+                Rate Sheets & Hotel Tariffs
               </h1>
               <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
-                Central purchase rate engine for hotels, vehicles, and activities with seasonal validity
+                Central purchase rate engine for hotels with seasonal validity
               </span>
             </div>
           </div>
@@ -296,7 +290,7 @@ export default function RateSheetsPage() {
         </div>
 
         {/* KPI Telemetry Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
               <Sparkles className="h-5 w-5" />
@@ -326,16 +320,6 @@ export default function RateSheetsPage() {
               <h4 className="text-lg font-black text-slate-900">{hotelTariffs}</h4>
             </div>
           </div>
-
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-              <Car className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Fleet Rates</span>
-              <h4 className="text-lg font-black text-slate-900">{transportTariffs}</h4>
-            </div>
-          </div>
         </div>
 
         {/* Master Card (Search & Table) */}
@@ -361,30 +345,7 @@ export default function RateSheetsPage() {
                 )}
               </div>
 
-              {/* Type Filter Buttons */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                {[
-                  { id: "ALL", label: "All Items" },
-                  { id: "HOTEL", label: "Hotels" },
-                  { id: "VEHICLE", label: "Vehicles" },
-                  { id: "ACTIVITY", label: "Activities" },
-                ].map((type) => (
-                  <button
-                    key={type.id}
-                    onClick={() => {
-                      setTypeFilter(type.id);
-                      setPage(1);
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      typeFilter === type.id
-                        ? "bg-indigo-600 text-white shadow-2xs"
-                        : "bg-slate-100/70 text-slate-600 hover:bg-slate-200/60"
-                    }`}
-                  >
-                    {type.label}
-                  </button>
-                ))}
-              </div>
+
 
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold cursor-pointer">
@@ -427,7 +388,7 @@ export default function RateSheetsPage() {
                 description={
                   isFilterActive
                     ? "Try adjusting your search criteria."
-                    : "Add supplier rate sheets for hotels, vehicles, and activities with seasonal validity to automate trip costing."
+                    : "Add supplier rate sheets for hotels with seasonal validity to automate trip costing."
                 }
                 actionText={isFilterActive ? "Clear Filter" : "Add First Rate Sheet"}
                 onAction={isFilterActive ? handleClearFilters : () => router.push("/rate-sheets/new")}
@@ -466,13 +427,7 @@ export default function RateSheetsPage() {
                           <TableCell className="py-3 px-4 font-medium text-slate-900">
                             <div className="flex items-center gap-3">
                               <div className="h-8 w-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-xs shrink-0 border border-purple-100">
-                                {rs.inventoryType === "HOTEL" ? (
-                                  <Hotel className="h-4 w-4" />
-                                ) : rs.inventoryType === "VEHICLE" ? (
-                                  <Car className="h-4 w-4" />
-                                ) : (
-                                  <Ticket className="h-4 w-4" />
-                                )}
+                                <Hotel className="h-4 w-4" />
                               </div>
                               <div className="flex flex-col min-w-0">
                                 <div className="flex items-center gap-1.5">
@@ -496,10 +451,10 @@ export default function RateSheetsPage() {
                           <TableCell className="py-3 px-4 text-xs text-slate-700">
                             <div className="flex flex-col">
                               <span className="font-bold text-slate-900">
-                                {rs.hotel?.name || rs.vehicle?.name || rs.activity?.name || "Generic Tariff"}
+                                {rs.hotel?.name || "Generic Tariff"}
                               </span>
                               <span className="text-[11px] text-slate-500">
-                                {rs.roomType ? `${rs.roomType} • ${rs.mealPlan || "CP"}` : rs.vehiclePricingType ? `Pricing: ${rs.vehiclePricingType}` : rs.inventoryType}
+                                {rs.roomType ? `${rs.roomType} • ${rs.mealPlan || "CP"}` : rs.inventoryType}
                               </span>
                             </div>
                           </TableCell>
@@ -528,7 +483,7 @@ export default function RateSheetsPage() {
                             <div className="flex flex-col">
                               <span className="font-black text-emerald-700 text-xs">
                                 {formatCurrency(Number(rs.costPrice))}
-                                {rs.inventoryType === "HOTEL" ? " / night" : rs.inventoryType === "VEHICLE" && rs.ratePerKm ? " / km" : ""}
+                                {rs.inventoryType === "HOTEL" ? " / night" : ""}
                               </span>
                               {rs.extraAdultRate && (
                                 <span className="text-[10px] text-slate-500">

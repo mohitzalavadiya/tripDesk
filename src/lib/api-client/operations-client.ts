@@ -166,6 +166,12 @@ export type VehicleDispatchWithDetails = VehicleDispatch & {
     endDate?: Date | string | null;
     pickupLocation?: string | null;
     dropLocation?: string | null;
+    pricingType?: "PER_KM" | "FIXED" | string;
+    ratePerKm?: number | null;
+    estimatedKm?: number | null;
+    actualKm?: number | null;
+    totalRate?: number | null;
+    notes?: string | null;
   } | null;
   vehicle?: {
     id: string;

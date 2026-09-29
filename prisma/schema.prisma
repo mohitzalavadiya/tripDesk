@@ -69,6 +69,7 @@ enum TravelerType {
 enum VehiclePricingType {
   PER_KM
   TOTAL
+  FIXED
 }
 
 enum ActivityType {
@@ -313,8 +314,6 @@ enum FollowUpStatus {
 
 enum RateInventoryType {
   HOTEL
-  VEHICLE
-  ACTIVITY
 }
 
 enum RateStatus {
@@ -821,11 +820,6 @@ model Vehicle {
   type               String
   capacity           Int                @default(4)
   registrationNumber String?
-  driverName         String?
-  driverPhone        String?
-  pricingType        VehiclePricingType @default(TOTAL)
-  baseRate           Decimal?           @db.Decimal(10, 2)
-  ratePerKm          Decimal?           @db.Decimal(10, 2)
   notes              String?
   archivedAt         DateTime?
   createdAt          DateTime           @default(now())
@@ -834,7 +828,6 @@ model Vehicle {
   agency            Agency            @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   supplier          Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   tripVehicles      TripVehicle[]
-  rateSheets        RateSheet[]
   vehicleDispatches VehicleDispatch[]
 
   @@index([agencyId])
@@ -860,9 +853,10 @@ model TripVehicle {
   dropLocation   String?
   driverName     String?
   driverPhone    String?
-  pricingType    VehiclePricingType @default(TOTAL)
+  pricingType    VehiclePricingType @default(FIXED)
   ratePerKm      Decimal?           @db.Decimal(10, 2)
   estimatedKm    Decimal?           @db.Decimal(10, 2)
+  actualKm       Decimal?           @db.Decimal(10, 2)
   totalRate      Decimal?           @db.Decimal(10, 2)
   notes          String?
   createdAt      DateTime           @default(now())
@@ -903,7 +897,6 @@ model Activity {
   destination           Destination?           @relation(fields: [destinationId], references: [id], onDelete: Restrict)
   supplier              Supplier?              @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   tripActivities        TripActivity[]
-  rateSheets            RateSheet[]
   activityConfirmations ActivityConfirmation[]
 
   @@index([agencyId])
@@ -1485,12 +1478,10 @@ model RateSheet {
   supplierId         String?
   rateSheetNumber    String?
   name               String
-  inventoryType      RateInventoryType
+  inventoryType      RateInventoryType   @default(HOTEL)
   
-  // Specific inventory link (nullable based on inventoryType)
+  // Specific inventory link (Hotel only)
   hotelId            String?
-  vehicleId          String?
-  activityId         String?
 
   // Hotel specific
   roomType           String?
@@ -1506,22 +1497,6 @@ model RateSheet {
   costPrice          Decimal             @default(0) @db.Decimal(12, 2)
   extraAdultRate     Decimal?            @db.Decimal(12, 2)
   extraChildRate     Decimal?            @db.Decimal(12, 2)
-  
-  // Vehicle specific
-  vehiclePricingType VehiclePricingType?
-  ratePerKm          Decimal?            @db.Decimal(10, 2)
-  minimumKm          Decimal?            @db.Decimal(10, 2)
-  totalRate          Decimal?            @db.Decimal(12, 2)
-  extraKmRate        Decimal?            @db.Decimal(10, 2)
-  driverAllowance    Decimal?            @db.Decimal(10, 2)
-  nightAllowance     Decimal?            @db.Decimal(10, 2)
-  tollIncluded       Boolean             @default(false)
-  parkingIncluded    Boolean             @default(false)
-
-  // Activity specific
-  adultCost          Decimal?            @db.Decimal(12, 2)
-  childCost          Decimal?            @db.Decimal(12, 2)
-  infantCost         Decimal?            @db.Decimal(12, 2)
 
   // Metadata
   taxPercentage      Decimal?            @default(0) @db.Decimal(5, 2)
@@ -1537,14 +1512,10 @@ model RateSheet {
   agency             Agency              @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   supplier           Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   hotel              Hotel?              @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  vehicle            Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  activity           Activity?           @relation(fields: [activityId], references: [id], onDelete: Cascade)
 
   @@index([agencyId])
   @@index([supplierId])
   @@index([hotelId])
-  @@index([vehicleId])
-  @@index([activityId])
   @@index([agencyId, inventoryType])
   @@index([agencyId, status])
   @@index([agencyId, validFrom, validTo])

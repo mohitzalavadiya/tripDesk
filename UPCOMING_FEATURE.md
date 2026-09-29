@@ -45,6 +45,7 @@ UI break in dashboard. Revenue & Profit and Upcoming Departures in both tab
 Login and signup test for formik alert
 Chatbot implement
 from when you decide activity include or exclude
+payable supplier like hotel
 
 **TODO**
 
@@ -52,7 +53,6 @@ from when you decide activity include or exclude
 
 vehical rate issue in trip
 
-payable supplier like hotel
 
 Invoice all hotel and activity amount need to check(need to add Agency Markup) Qty	Rate	Amount also want to check
 Invoice UI need to check (Header)
@@ -77,7 +77,7 @@ check no static data anywhere
 compalate QA. 
 
 responsive 320 screen
-some changes in activity. R&D 
+
 whatsapp and email msg checking in all steps
 
 understand flow

@@ -7,19 +7,14 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import {
   Car,
-  Users,
   ArrowLeft,
-  Phone,
-  UserCheck,
   Edit,
   Trash2,
   Loader2,
   AlertCircle,
   Archive,
-  Info,
 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { getErrorMessage } from "@/lib/utils";
@@ -51,11 +46,6 @@ const editVehicleSchema = Yup.object().shape({
   type: Yup.string().trim().required("Vehicle type is required").max(50),
   capacity: Yup.number().required("Capacity is required").integer().min(1).max(100),
   registrationNumber: Yup.string().trim().max(50),
-  driverName: Yup.string().trim().max(100),
-  driverPhone: Yup.string().trim().max(30),
-  pricingType: Yup.string().oneOf(["PER_KM", "PER_DAY", "FIXED", "INCLUDED"]),
-  baseRate: Yup.number().min(0).nullable(),
-  ratePerKm: Yup.number().min(0).nullable(),
   notes: Yup.string().trim().max(2000),
 });
 
@@ -101,11 +91,6 @@ export default function VehicleProfilePage() {
       type: vehicle?.type || "Sedan",
       capacity: vehicle?.capacity || 4,
       registrationNumber: vehicle?.registrationNumber || "",
-      driverName: vehicle?.driverName || "",
-      driverPhone: vehicle?.driverPhone || "",
-      pricingType: vehicle?.pricingType || "PER_KM",
-      baseRate: vehicle?.baseRate ?? "",
-      ratePerKm: vehicle?.ratePerKm ?? "",
       notes: vehicle?.notes || "",
     },
     enableReinitialize: true,
@@ -118,11 +103,6 @@ export default function VehicleProfilePage() {
           type: values.type.trim(),
           capacity: Number(values.capacity),
           registrationNumber: values.registrationNumber.trim() || undefined,
-          driverName: values.driverName.trim() || undefined,
-          driverPhone: values.driverPhone.trim() || undefined,
-          pricingType: values.pricingType as any,
-          baseRate: values.baseRate !== "" ? Number(values.baseRate) : undefined,
-          ratePerKm: values.ratePerKm !== "" ? Number(values.ratePerKm) : undefined,
           notes: values.notes.trim() || undefined,
         });
 
@@ -228,18 +208,6 @@ export default function VehicleProfilePage() {
                   {vehicle.registrationNumber}
                 </span>
               )}
-              {vehicle.driverName && (
-                <span className="flex items-center gap-1">
-                  <UserCheck className="h-3.5 w-3.5 text-slate-400" />
-                  {vehicle.driverName}
-                </span>
-              )}
-              {vehicle.driverPhone && (
-                <span className="flex items-center gap-1">
-                  <Phone className="h-3.5 w-3.5 text-slate-400" />
-                  {vehicle.driverPhone}
-                </span>
-              )}
             </div>
           </div>
 
@@ -290,24 +258,6 @@ export default function VehicleProfilePage() {
               <span className="text-slate-400 block text-[11px]">Registration Number</span>
               <span className="text-slate-800 font-mono font-medium">{vehicle.registrationNumber || "Unassigned"}</span>
             </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Driver Name</span>
-              <span className="text-slate-800">{vehicle.driverName || "-"}</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Driver Phone</span>
-              <span className="text-slate-800">{vehicle.driverPhone || "-"}</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Pricing Model</span>
-              <span className="text-slate-800 font-medium">{vehicle.pricingType}</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Rate per KM</span>
-              <span className="text-slate-800 font-medium">
-                {vehicle.ratePerKm !== null && vehicle.ratePerKm !== undefined ? `₹${vehicle.ratePerKm}/km` : "-"}
-              </span>
-            </div>
           </div>
 
           {vehicle.notes && (
@@ -327,7 +277,7 @@ export default function VehicleProfilePage() {
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base">Edit Vehicle</DialogTitle>
                 <DialogDescription className="text-slate-500 text-xs mt-1">
-                  Modify vehicle specifications, driver assignment, and rates.
+                  Modify reusable vehicle fleet identity and specifications.
                 </DialogDescription>
               </DialogHeader>
 
@@ -398,74 +348,12 @@ export default function VehicleProfilePage() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Driver Name</label>
-                    <Input
-                      {...editVehicleFormik.getFieldProps("driverName")}
-                      className={inputCls("driverName")}
-                    />
-                    {getFieldError("driverName") && (
-                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("driverName")}</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Driver Phone</label>
-                    <Input
-                      {...editVehicleFormik.getFieldProps("driverPhone")}
-                      className={inputCls("driverPhone")}
-                    />
-                    {getFieldError("driverPhone") && (
-                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("driverPhone")}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Pricing Model</label>
-                    <Select
-                      value={editVehicleFormik.values.pricingType}
-                      onValueChange={(val) => editVehicleFormik.setFieldValue("pricingType", val)}
-                    >
-                      <SelectTrigger className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${
-                        getFieldError("pricingType") ? "border-red-500 focus:ring-red-500" : ""
-                      }`}>
-                        <SelectValue placeholder="Pricing type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PER_KM">Per KM</SelectItem>
-                        <SelectItem value="PER_DAY">Per Day</SelectItem>
-                        <SelectItem value="FIXED">Fixed</SelectItem>
-                        <SelectItem value="INCLUDED">Included</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {getFieldError("pricingType") && (
-                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("pricingType")}</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Rate per KM (₹)</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      {...editVehicleFormik.getFieldProps("ratePerKm")}
-                      className={inputCls("ratePerKm")}
-                    />
-                    {getFieldError("ratePerKm") && (
-                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("ratePerKm")}</p>
-                    )}
-                  </div>
-                </div>
-
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Notes</label>
                   <Textarea
-                    {...editVehicleFormik.getFieldProps("notes")}
                     rows={3}
-                    className={`bg-slate-50/50 border-slate-200 text-xs ${
-                      getFieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""
-                    }`}
+                    {...editVehicleFormik.getFieldProps("notes")}
+                    className={inputCls("notes", "bg-slate-50/50 border-slate-200 text-xs")}
                   />
                   {getFieldError("notes") && (
                     <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("notes")}</p>
@@ -473,38 +361,36 @@ export default function VehicleProfilePage() {
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogFooter className="mt-6">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold cursor-pointer">
                       Cancel
                     </Button>
                   }
                 />
                 <Button
                   type="submit"
-                  disabled={editVehicleFormik.isSubmitting}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  disabled={editVehicleFormik.isSubmitting || isReadOnly}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs cursor-pointer shadow-xs"
                 >
-                  {editVehicleFormik.isSubmitting ? "Saving..." : "Save Changes"}
+                  {editVehicleFormik.isSubmitting ? "Saving..." : "Update Vehicle"}
                 </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
 
-        {/* Confirmation Dialog */}
+        {/* Confirmation Dialog for Archiving */}
         <ConfirmDialog
           open={confirmOpen}
-          onOpenChange={(open) => {
-            if (!open && !isArchiving) setConfirmOpen(false);
-          }}
-          title="Archive vehicle?"
-          description={`Are you sure you want to archive "${vehicle?.name}"? Historical trip assignments will remain intact.`}
+          onOpenChange={setConfirmOpen}
+          title="Archive Vehicle"
+          description={`Are you sure you want to archive "${vehicle.name}"? Historical trips and assignments will be preserved.`}
           confirmText="Archive Vehicle"
-          variant="destructive"
           loading={isArchiving}
+          variant="destructive"
           onConfirm={handleArchive}
         />
       </div>

@@ -25,27 +25,19 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   ArrowLeft,
-  FileSpreadsheet,
   Calendar,
   Sparkles,
   Hotel as HotelIcon,
-  Car,
-  Ticket,
   Truck,
-  IndianRupee,
   Edit2,
   Trash2,
   MoreVertical,
   Loader2,
   AlertTriangle,
-  CheckCircle2,
-  ExternalLink,
-  ShieldCheck,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
@@ -78,14 +70,6 @@ export default function RateSheetDetailPage() {
   const [editCostPrice, setEditCostPrice] = React.useState("0");
   const [editExtraAdultRate, setEditExtraAdultRate] = React.useState("");
   const [editExtraChildRate, setEditExtraChildRate] = React.useState("");
-  const [editRatePerKm, setEditRatePerKm] = React.useState("");
-  const [editMinimumKm, setEditMinimumKm] = React.useState("");
-  const [editTotalRate, setEditTotalRate] = React.useState("");
-  const [editDriverAllowance, setEditDriverAllowance] = React.useState("");
-  const [editNightAllowance, setEditNightAllowance] = React.useState("");
-  const [editAdultCost, setEditAdultCost] = React.useState("");
-  const [editChildCost, setEditChildCost] = React.useState("");
-  const [editInfantCost, setEditInfantCost] = React.useState("");
   const [editPriority, setEditPriority] = React.useState(0);
   const [editTaxPercentage, setEditTaxPercentage] = React.useState(0);
   const [editNotes, setEditNotes] = React.useState("");
@@ -112,14 +96,6 @@ export default function RateSheetDetailPage() {
         setEditCostPrice(String(res.data.costPrice || 0));
         setEditExtraAdultRate(res.data.extraAdultRate ? String(res.data.extraAdultRate) : "");
         setEditExtraChildRate(res.data.extraChildRate ? String(res.data.extraChildRate) : "");
-        setEditRatePerKm(res.data.ratePerKm ? String(res.data.ratePerKm) : "");
-        setEditMinimumKm(res.data.minimumKm ? String(res.data.minimumKm) : "");
-        setEditTotalRate(res.data.totalRate ? String(res.data.totalRate) : "");
-        setEditDriverAllowance(res.data.driverAllowance ? String(res.data.driverAllowance) : "");
-        setEditNightAllowance(res.data.nightAllowance ? String(res.data.nightAllowance) : "");
-        setEditAdultCost(res.data.adultCost ? String(res.data.adultCost) : "");
-        setEditChildCost(res.data.childCost ? String(res.data.childCost) : "");
-        setEditInfantCost(res.data.infantCost ? String(res.data.infantCost) : "");
         setEditPriority(res.data.priority || 0);
         setEditTaxPercentage(res.data.taxPercentage ? Number(res.data.taxPercentage) : 0);
         setEditNotes(res.data.notes || "");
@@ -155,14 +131,6 @@ export default function RateSheetDetailPage() {
         costPrice: Number(editCostPrice),
         extraAdultRate: editExtraAdultRate ? Number(editExtraAdultRate) : null,
         extraChildRate: editExtraChildRate ? Number(editExtraChildRate) : null,
-        ratePerKm: editRatePerKm ? Number(editRatePerKm) : null,
-        minimumKm: editMinimumKm ? Number(editMinimumKm) : null,
-        totalRate: editTotalRate ? Number(editTotalRate) : null,
-        driverAllowance: editDriverAllowance ? Number(editDriverAllowance) : null,
-        nightAllowance: editNightAllowance ? Number(editNightAllowance) : null,
-        adultCost: editAdultCost ? Number(editAdultCost) : null,
-        childCost: editChildCost ? Number(editChildCost) : null,
-        infantCost: editInfantCost ? Number(editInfantCost) : null,
         priority: Number(editPriority),
         taxPercentage: Number(editTaxPercentage),
         notes: editNotes.trim() || null,
@@ -267,7 +235,7 @@ export default function RateSheetDetailPage() {
             </Link>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-purple-50 text-purple-700 border border-purple-100">
               <Sparkles className="h-3 w-3 text-purple-500" />
-              {rateSheet.inventoryType} Tariff
+              Hotel Tariff
             </span>
             <span className="text-slate-300">•</span>
             <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
@@ -291,13 +259,7 @@ export default function RateSheetDetailPage() {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 z-10">
             <div className="flex items-start gap-4">
               <div className="h-16 w-16 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold border border-purple-100 shadow-2xs shrink-0">
-                {rateSheet.inventoryType === "HOTEL" ? (
-                  <HotelIcon className="h-8 w-8" />
-                ) : rateSheet.inventoryType === "VEHICLE" ? (
-                  <Car className="h-8 w-8" />
-                ) : (
-                  <Ticket className="h-8 w-8" />
-                )}
+                <HotelIcon className="h-8 w-8" />
               </div>
 
               <div className="space-y-1">
@@ -377,9 +339,7 @@ export default function RateSheetDetailPage() {
             <span className="text-[11px] uppercase font-bold text-slate-400">Primary Purchase Rate</span>
             <h3 className="text-2xl font-black text-emerald-700">
               {formatCurrency(Number(rateSheet.costPrice))}
-              <span className="text-xs text-slate-500 font-normal">
-                {rateSheet.inventoryType === "HOTEL" ? " / room / night" : rateSheet.inventoryType === "VEHICLE" && rateSheet.ratePerKm ? " / km" : " base"}
-              </span>
+              <span className="text-xs text-slate-500 font-normal"> / room / night</span>
             </h3>
           </div>
 
@@ -405,11 +365,11 @@ export default function RateSheetDetailPage() {
           {/* Linked Inventory details */}
           <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-4">
             <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">
-              Contracted Inventory Resource
+              Contracted Hotel Resource
             </h3>
 
             <div className="space-y-3 text-xs">
-              {rateSheet.hotel && (
+              {rateSheet.hotel ? (
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400">Hotel Property</span>
                   <div className="flex items-center justify-between pt-1">
@@ -422,95 +382,25 @@ export default function RateSheetDetailPage() {
                     Room: <strong>{rateSheet.roomType || "Standard Room"}</strong> • Meal: <strong>{rateSheet.mealPlan || "CP"}</strong>
                   </p>
                 </div>
-              )}
-
-              {rateSheet.vehicle && (
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Assigned Vehicle</span>
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="font-bold text-slate-900 text-sm">{rateSheet.vehicle.name}</span>
-                    <Link href={`/vehicles/${rateSheet.vehicle.id}`} className="text-indigo-600 hover:underline text-xs font-semibold">
-                      View Fleet
-                    </Link>
-                  </div>
-                  <p className="text-slate-600 mt-1">
-                    Type: <strong>{rateSheet.vehicle.type}</strong> • Pricing Basis: <strong>{rateSheet.vehiclePricingType}</strong>
-                  </p>
-                </div>
-              )}
-
-              {rateSheet.activity && (
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Activity Excursion</span>
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="font-bold text-slate-900 text-sm">{rateSheet.activity.name}</span>
-                    <Link href={`/activities/${rateSheet.activity.id}`} className="text-indigo-600 hover:underline text-xs font-semibold">
-                      View Activity
-                    </Link>
-                  </div>
-                  <p className="text-slate-600 mt-1">
-                    Location: <strong>{rateSheet.activity.location || "Local"}</strong>
-                  </p>
-                </div>
+              ) : (
+                <p className="text-slate-500 italic">No specific hotel linked.</p>
               )}
 
               {/* Extra rates Breakdown */}
-              {rateSheet.inventoryType === "HOTEL" && (
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Extra Adult Rate</span>
-                    <p className="font-bold text-slate-800">
-                      {rateSheet.extraAdultRate ? formatCurrency(Number(rateSheet.extraAdultRate)) : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Extra Child Rate</span>
-                    <p className="font-bold text-slate-800">
-                      {rateSheet.extraChildRate ? formatCurrency(Number(rateSheet.extraChildRate)) : "—"}
-                    </p>
-                  </div>
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Extra Adult Rate</span>
+                  <p className="font-bold text-slate-800">
+                    {rateSheet.extraAdultRate ? formatCurrency(Number(rateSheet.extraAdultRate)) : "—"}
+                  </p>
                 </div>
-              )}
-
-              {rateSheet.inventoryType === "VEHICLE" && (
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Driver Allowance</span>
-                    <p className="font-bold text-slate-800">
-                      {rateSheet.driverAllowance ? formatCurrency(Number(rateSheet.driverAllowance)) : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Night Allowance</span>
-                    <p className="font-bold text-slate-800">
-                      {rateSheet.nightAllowance ? formatCurrency(Number(rateSheet.nightAllowance)) : "—"}
-                    </p>
-                  </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Extra Child Rate</span>
+                  <p className="font-bold text-slate-800">
+                    {rateSheet.extraChildRate ? formatCurrency(Number(rateSheet.extraChildRate)) : "—"}
+                  </p>
                 </div>
-              )}
-
-              {rateSheet.inventoryType === "ACTIVITY" && (
-                <div className="grid grid-cols-3 gap-3 pt-2 border-t border-slate-100">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Adult Cost</span>
-                    <p className="font-bold text-slate-800">
-                      {rateSheet.adultCost ? formatCurrency(Number(rateSheet.adultCost)) : formatCurrency(Number(rateSheet.costPrice))}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Child Cost</span>
-                    <p className="font-bold text-slate-800">
-                      {rateSheet.childCost ? formatCurrency(Number(rateSheet.childCost)) : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Infant Cost</span>
-                    <p className="font-bold text-slate-800">
-                      {rateSheet.infantCost ? formatCurrency(Number(rateSheet.infantCost)) : "Free"}
-                    </p>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -635,28 +525,26 @@ export default function RateSheetDetailPage() {
                   </div>
                 </div>
 
-                {rateSheet.inventoryType === "HOTEL" && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Extra Adult (₹)</label>
-                      <Input
-                        type="number"
-                        value={editExtraAdultRate}
-                        onChange={(e) => setEditExtraAdultRate(e.target.value)}
-                        className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Extra Child (₹)</label>
-                      <Input
-                        type="number"
-                        value={editExtraChildRate}
-                        onChange={(e) => setEditExtraChildRate(e.target.value)}
-                        className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                      />
-                    </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Extra Adult (₹)</label>
+                    <Input
+                      type="number"
+                      value={editExtraAdultRate}
+                      onChange={(e) => setEditExtraAdultRate(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
                   </div>
-                )}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Extra Child (₹)</label>
+                    <Input
+                      type="number"
+                      value={editExtraChildRate}
+                      onChange={(e) => setEditExtraChildRate(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Remarks & Notes</label>

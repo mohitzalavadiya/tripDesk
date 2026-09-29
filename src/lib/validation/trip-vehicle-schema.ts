@@ -3,6 +3,7 @@ import { VehiclePricingType } from "@prisma/client";
 
 /**
  * Zod validation schema for creating a Trip-Vehicle assignment.
+ * All commercial details live on TripVehicle.
  */
 export const createTripVehicleSchema = z
   .object({
@@ -56,7 +57,7 @@ export const createTripVehicleSchema = z
     pricingType: z
       .nativeEnum(VehiclePricingType)
       .optional()
-      .default(VehiclePricingType.TOTAL),
+      .default(VehiclePricingType.FIXED),
     ratePerKm: z.coerce
       .number()
       .min(0, "Rate per km cannot be negative.")
@@ -67,9 +68,14 @@ export const createTripVehicleSchema = z
       .min(0, "Estimated km cannot be negative.")
       .optional()
       .nullable(),
+    actualKm: z.coerce
+      .number()
+      .min(0, "Actual km cannot be negative.")
+      .optional()
+      .nullable(),
     totalRate: z.coerce
       .number()
-      .min(0, "Total rate cannot be negative.")
+      .min(0, "Total / Fixed rate cannot be negative.")
       .optional()
       .nullable(),
     notes: z
@@ -160,9 +166,14 @@ export const updateTripVehicleSchema = z
       .min(0, "Estimated km cannot be negative.")
       .optional()
       .nullable(),
+    actualKm: z.coerce
+      .number()
+      .min(0, "Actual km cannot be negative.")
+      .optional()
+      .nullable(),
     totalRate: z.coerce
       .number()
-      .min(0, "Total rate cannot be negative.")
+      .min(0, "Total / Fixed rate cannot be negative.")
       .optional()
       .nullable(),
     notes: z

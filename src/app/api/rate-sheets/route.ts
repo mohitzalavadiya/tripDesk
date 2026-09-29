@@ -50,10 +50,8 @@ export async function POST(request: NextRequest) {
 
     // Overlap validation check
     const overlapCheck = await rateSheetService.validateRateOverlap(context.agencyId, {
-      inventoryType: body.inventoryType,
+      inventoryType: "HOTEL",
       hotelId: body.hotelId,
-      vehicleId: body.vehicleId,
-      activityId: body.activityId,
       roomType: body.roomType,
       mealPlan: body.mealPlan,
       validFrom: new Date(body.validFrom),

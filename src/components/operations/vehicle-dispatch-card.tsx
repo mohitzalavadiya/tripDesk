@@ -248,6 +248,45 @@ export function VehicleDispatchCard({
         </div>
       </div>
 
+      {/* Vehicle Commercials & Rate Basis */}
+      {dispatch.tripVehicle && (
+        <div className="flex items-center justify-between gap-2 p-2.5 bg-slate-50/90 rounded-xl border border-slate-200/80 text-xs flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rate Basis:</span>
+            <span className="font-bold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded text-[11px]">
+              {dispatch.tripVehicle.pricingType === "PER_KM" ? "Per KM" : "Fixed Rate"}
+            </span>
+            {dispatch.tripVehicle.pricingType === "PER_KM" ? (
+              <span className="text-slate-600 text-[11px]">
+                ₹{dispatch.tripVehicle.ratePerKm || 0}/km • Est: {dispatch.tripVehicle.estimatedKm || 0} km
+                {dispatch.tripVehicle.actualKm !== null && dispatch.tripVehicle.actualKm !== undefined ? (
+                  <span className="font-bold text-indigo-700 ml-1">
+                    • Actual: {dispatch.tripVehicle.actualKm} km
+                  </span>
+                ) : (
+                  <span className="text-slate-400 italic ml-1">(Actual KM pending)</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-slate-600 text-[11px] font-medium">
+                Fixed: ₹{Number(dispatch.tripVehicle.totalRate || 0).toLocaleString("en-IN")}
+              </span>
+            )}
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Trip Vehicle Cost</span>
+            <span className="font-bold text-indigo-700 text-xs">
+              {dispatch.tripVehicle.pricingType === "PER_KM"
+                ? `₹${(
+                    Number(dispatch.tripVehicle.ratePerKm || 0) *
+                    Number(dispatch.tripVehicle.actualKm ?? dispatch.tripVehicle.estimatedKm ?? 0)
+                  ).toLocaleString("en-IN")}`
+                : `₹${Number(dispatch.tripVehicle.totalRate || 0).toLocaleString("en-IN")}`}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Operational Remarks & Special Instructions */}
       {dispatch.notes && (
         <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-3 text-xs text-amber-900 space-y-0.5">
