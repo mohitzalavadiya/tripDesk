@@ -7,9 +7,12 @@ import {
   DiscountType,
   BookingStatus,
   PaymentStatus,
+  TaxMode,
+  GstTreatment,
   Prisma,
 } from "@prisma/client";
 import { invoiceSequenceService } from "./invoice-sequence-service";
+import { taxService } from "./tax-service";
 import {
   UpdateDraftInvoiceInput,
   IssueInvoiceInput,
@@ -178,6 +181,101 @@ export const invoiceService = {
       throw new Error(`Invoices can only be created for CONFIRMED, ONGOING, or COMPLETED bookings. Current status is ${booking.status}.`);
     }
 
+    // Derive customer-facing service selling amounts (including internal markup without exposing it as a line item)
+    const quoteSubtotal = Number(booking.quotation?.subtotal || 0);
+    const quoteMarkup = Number(booking.quotation?.markupAmount || 0);
+    const sellingSubtotal = Math.max(0, quoteSubtotal + quoteMarkup);
+    const quoteDiscount = Number(booking.quotation?.discountAmount || 0);
+    const discountPct = Number(booking.quotation?.discountPercentage || 0);
+
+    let computedItems: Array<{
+      description: string;
+      quantity: number;
+      rate: number;
+      amount: number;
+      sortOrder: number;
+    }> = [];
+
+    const validQuotationItems = (booking.quotation?.items || []).filter(
+      (qi) => qi.type !== "ACTIVITY" && qi.sourceType !== "TRIP_ACTIVITY"
+    );
+
+    if (validQuotationItems.length > 0) {
+      if (quoteSubtotal > 0 && quoteMarkup !== 0) {
+        const multiplier = sellingSubtotal / quoteSubtotal;
+        computedItems = validQuotationItems.map((qi, idx) => {
+          const qty = qi.quantity || 1;
+          const baseCost = Number(qi.costPrice || (Number(qi.unitPrice || qi.sellingPrice || 0) * qty));
+          const itemSelling = Math.round(baseCost * multiplier * 100) / 100;
+          const rate = Math.round((itemSelling / qty) * 100) / 100;
+          const amount = Math.round(rate * qty * 100) / 100;
+          return {
+            description: qi.name || qi.description || "Package Service",
+            quantity: qty,
+            rate,
+            amount,
+            sortOrder: idx,
+          };
+        });
+
+        // Odd-paise reconciliation to ensure line items sum exactly to sellingSubtotal
+        const allocatedSum = Math.round(computedItems.reduce((acc, it) => acc + it.amount, 0) * 100) / 100;
+        const diff = Math.round((sellingSubtotal - allocatedSum) * 100) / 100;
+        if (diff !== 0 && computedItems.length > 0) {
+          let maxIdx = 0;
+          for (let i = 1; i < computedItems.length; i++) {
+            if (computedItems[i].amount > computedItems[maxIdx].amount) maxIdx = i;
+          }
+          computedItems[maxIdx].amount = Math.round((computedItems[maxIdx].amount + diff) * 100) / 100;
+          computedItems[maxIdx].rate = Math.round((computedItems[maxIdx].amount / computedItems[maxIdx].quantity) * 100) / 100;
+        }
+      } else {
+        computedItems = validQuotationItems.map((qi, idx) => {
+          const qty = qi.quantity || 1;
+          const amount = Number(qi.totalPrice || qi.costPrice || (Number(qi.unitPrice || 0) * qty) || Number(qi.sellingPrice || 0));
+          const rate = Number(qi.unitPrice) > 0 && Number(qi.unitPrice) * qty === amount
+            ? Number(qi.unitPrice)
+            : Math.round((amount / qty) * 100) / 100;
+          return {
+            description: qi.name || qi.description || "Package Service",
+            quantity: qty,
+            rate,
+            amount,
+            sortOrder: idx,
+          };
+        });
+      }
+    } else {
+      const singleAmt = Number(booking.taxableAmount ?? booking.totalAmount);
+      computedItems = [
+        {
+          description: `Package Booking — ${booking.bookingNumber}`,
+          quantity: 1,
+          rate: singleAmt,
+          amount: singleAmt,
+          sortOrder: 0,
+        },
+      ];
+    }
+
+    const invoiceSubtotal = Math.round(computedItems.reduce((acc, it) => acc + it.amount, 0) * 100) / 100;
+
+    // Determine tax settings from quotation (or fallback to booking)
+    const taxRate = Number(booking.quotation?.taxRate ?? booking.taxRate ?? 0);
+    const taxMode = (booking.quotation?.taxMode ?? booking.taxMode ?? TaxMode.EXCLUSIVE) as TaxMode;
+    const gstTreatment = (booking.quotation?.gstTreatment ?? booking.gstTreatment ?? GstTreatment.INTRA_STATE) as GstTreatment;
+
+    // Authoritative calculation of Taxable Base, GST split, and Total Amount
+    const taxResult = taxService.calculate({
+      amount: invoiceSubtotal,
+      taxRate,
+      taxMode,
+      gstTreatment,
+      discountAmount: quoteDiscount,
+    });
+
+    const totalAmount = Number(taxResult.finalAmount);
+
     // Calculate authoritative payment totals from booking's completed payments
     let netPaid = 0;
     for (const p of booking.payments) {
@@ -185,7 +283,6 @@ export const invoiceService = {
       netPaid += Math.max(0, net);
     }
     netPaid = Math.round(netPaid * 100) / 100;
-    const totalAmount = Number(booking.totalAmount);
     const balanceAmount = Math.max(0, Math.round((totalAmount - netPaid) * 100) / 100);
     const invoiceStatus = calculateInvoiceStatus(totalAmount, netPaid, false);
 
@@ -208,6 +305,10 @@ export const invoiceService = {
                   id: true,
                   bookingNumber: true,
                   status: true,
+                  bookingDate: true,
+                  travelStartDate: true,
+                  travelEndDate: true,
+                  currency: true,
                   totalAmount: true,
                   paidAmount: true,
                   balanceAmount: true,
@@ -219,9 +320,57 @@ export const invoiceService = {
                   cgstAmount: true,
                   sgstAmount: true,
                   igstAmount: true,
-                  currency: true,
-                  travelStartDate: true,
-                  travelEndDate: true,
+                  notes: true,
+                  customer: {
+                    select: {
+                      id: true,
+                      name: true,
+                      phone: true,
+                      email: true,
+                      address: true,
+                      city: true,
+                      state: true,
+                      country: true,
+                      postalCode: true,
+                    },
+                  },
+                  trip: {
+                    select: {
+                      id: true,
+                      title: true,
+                      tripNumber: true,
+                      startDate: true,
+                      endDate: true,
+                      travelers: {
+                        select: {
+                          id: true,
+                          name: true,
+                          type: true,
+                        },
+                      },
+                    },
+                  },
+                  quotation: {
+                    select: {
+                      id: true,
+                      quotationNumber: true,
+                      title: true,
+                      items: {
+                        where: { isOptional: false },
+                        orderBy: { sortOrder: "asc" },
+                        select: {
+                          id: true,
+                          name: true,
+                          description: true,
+                          quantity: true,
+                          sellingPrice: true,
+                          unitPrice: true,
+                          totalPrice: true,
+                          sortOrder: true,
+                        },
+                      },
+                    },
+                  },
                 },
               },
               agency: {
@@ -230,177 +379,7 @@ export const invoiceService = {
             },
           });
 
-          // Derive customer-facing service selling amounts (including internal markup without exposing it as a line item)
-          const quoteSubtotal = Number(booking.quotation?.subtotal || 0);
-          const quoteMarkup = Number(booking.quotation?.markupAmount || 0);
-          const sellingSubtotal = Math.max(0, quoteSubtotal + quoteMarkup);
-          const quoteDiscount = Number(booking.quotation?.discountAmount || 0);
-          const discountPct = Number(booking.quotation?.discountPercentage || 0);
-
-          let computedItems: Array<{
-            description: string;
-            quantity: number;
-            rate: number;
-            amount: number;
-            sortOrder: number;
-          }> = [];
-
-          const validQuotationItems = (booking.quotation?.items || []).filter(
-            (qi) => qi.type !== "ACTIVITY" && qi.sourceType !== "TRIP_ACTIVITY"
-          );
-
-          if (validQuotationItems.length > 0) {
-            if (quoteSubtotal > 0 && quoteMarkup !== 0) {
-              const multiplier = sellingSubtotal / quoteSubtotal;
-              computedItems = validQuotationItems.map((qi, idx) => {
-                const qty = qi.quantity || 1;
-                const baseCost = Number(qi.costPrice || (Number(qi.unitPrice || qi.sellingPrice || 0) * qty));
-                const itemSelling = Math.round(baseCost * multiplier * 100) / 100;
-                const rate = Math.round((itemSelling / qty) * 100) / 100;
-                const amount = Math.round(rate * qty * 100) / 100;
-                return {
-                  description: qi.name || qi.description || "Package Service",
-                  quantity: qty,
-                  rate,
-                  amount,
-                  sortOrder: idx,
-                };
-              });
-
-              // Odd-paise reconciliation to ensure line items sum exactly to sellingSubtotal
-              const allocatedSum = Math.round(computedItems.reduce((acc, it) => acc + it.amount, 0) * 100) / 100;
-              const diff = Math.round((sellingSubtotal - allocatedSum) * 100) / 100;
-              if (diff !== 0 && computedItems.length > 0) {
-                let maxIdx = 0;
-                for (let i = 1; i < computedItems.length; i++) {
-                  if (computedItems[i].amount > computedItems[maxIdx].amount) maxIdx = i;
-                }
-                computedItems[maxIdx].amount = Math.round((computedItems[maxIdx].amount + diff) * 100) / 100;
-                computedItems[maxIdx].rate = Math.round((computedItems[maxIdx].amount / computedItems[maxIdx].quantity) * 100) / 100;
-              }
-            } else {
-              computedItems = validQuotationItems.map((qi, idx) => {
-                const qty = qi.quantity || 1;
-                const amount = Number(qi.totalPrice || qi.costPrice || (Number(qi.unitPrice || 0) * qty) || Number(qi.sellingPrice || 0));
-                const rate = Number(qi.unitPrice) > 0 && Number(qi.unitPrice) * qty === amount
-                  ? Number(qi.unitPrice)
-                  : Math.round((amount / qty) * 100) / 100;
-                return {
-                  description: qi.name || qi.description || "Package Service",
-                  quantity: qty,
-                  rate,
-                  amount,
-                  sortOrder: idx,
-                };
-              });
-            }
-          } else {
-            const singleAmt = Number(booking.taxableAmount ?? booking.totalAmount);
-            computedItems = [
-              {
-                description: `Package Booking — ${booking.bookingNumber}`,
-                quantity: 1,
-                rate: singleAmt,
-                amount: singleAmt,
-                sortOrder: 0,
-              },
-            ];
-          }
-
-          const invoiceSubtotal = Math.round(computedItems.reduce((acc, it) => acc + it.amount, 0) * 100) / 100;
-
-          if (existingActive) {
-            // If existing active invoice was missing invoiceNumber (e.g. legacy draft), allocate number
-            let invoiceNumber = existingActive.invoiceNumber;
-            if (!invoiceNumber) {
-              invoiceNumber = await invoiceSequenceService.getNextInvoiceNumber(agencyId, tx);
-            }
-
-            // Synchronize line items
-            await tx.invoiceItem.deleteMany({ where: { invoiceId: existingActive.id } });
-            await tx.invoiceItem.createMany({
-              data: computedItems.map((it) => ({
-                invoiceId: existingActive.id,
-                description: it.description,
-                quantity: it.quantity,
-                rate: new Prisma.Decimal(it.rate),
-                amount: new Prisma.Decimal(it.amount),
-                sortOrder: it.sortOrder,
-              })),
-            });
-
-            // Synchronize latest Booking financial state, tax snapshot & payment state onto existing Invoice
-            const updated = await tx.invoice.update({
-              where: { id: existingActive.id },
-              data: {
-                invoiceNumber,
-                subtotal: new Prisma.Decimal(invoiceSubtotal || totalAmount),
-                discountAmount: new Prisma.Decimal(quoteDiscount),
-                discountType: discountPct > 0 ? DiscountType.PERCENTAGE : quoteDiscount > 0 ? DiscountType.FIXED : null,
-                discountValue: discountPct > 0 ? new Prisma.Decimal(discountPct) : quoteDiscount > 0 ? new Prisma.Decimal(quoteDiscount) : null,
-                totalAmount: new Prisma.Decimal(totalAmount),
-                paidAmount: new Prisma.Decimal(netPaid),
-                balanceAmount: new Prisma.Decimal(balanceAmount),
-                taxableAmount: booking.taxableAmount !== null ? new Prisma.Decimal(booking.taxableAmount) : null,
-                taxAmount: booking.taxAmount !== null ? new Prisma.Decimal(booking.taxAmount) : null,
-                taxRate: booking.taxRate !== null ? new Prisma.Decimal(booking.taxRate) : null,
-                taxMode: booking.taxMode ?? null,
-                gstTreatment: booking.gstTreatment ?? null,
-                cgstAmount: booking.cgstAmount !== null ? new Prisma.Decimal(booking.cgstAmount) : null,
-                sgstAmount: booking.sgstAmount !== null ? new Prisma.Decimal(booking.sgstAmount) : null,
-                igstAmount: booking.igstAmount !== null ? new Prisma.Decimal(booking.igstAmount) : null,
-                status: invoiceStatus,
-                currency: booking.currency || "INR",
-              },
-              include: {
-                items: { orderBy: { sortOrder: "asc" } },
-                payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
-                booking: {
-                  select: {
-                    id: true,
-                    bookingNumber: true,
-                    status: true,
-                    totalAmount: true,
-                    paidAmount: true,
-                    balanceAmount: true,
-                    taxableAmount: true,
-                    taxAmount: true,
-                    taxRate: true,
-                    taxMode: true,
-                    gstTreatment: true,
-                    cgstAmount: true,
-                    sgstAmount: true,
-                    igstAmount: true,
-                    currency: true,
-                    travelStartDate: true,
-                    travelEndDate: true,
-                  },
-                },
-                agency: {
-                  select: { id: true, name: true, email: true, phone: true, address: true, logo: true },
-                },
-              },
-            });
-
-            // Reconcile/link any payments of this booking that had invoiceId = null
-            await tx.payment.updateMany({
-              where: {
-                bookingId: booking.id,
-                invoiceId: null,
-                archivedAt: null,
-              },
-              data: {
-                invoiceId: updated.id,
-              },
-            });
-
-            return updated;
-          }
-
-          // If no active invoice exists: create persistent invoice
-          const invoiceNumber = await invoiceSequenceService.getNextInvoiceNumber(agencyId, tx);
-
-          // Build snapshots for compatibility
+          const taxProfile = (booking.agency as any)?.taxProfile || null;
           const customerSnapshot = booking.customer
             ? {
                 id: booking.customer.id,
@@ -425,7 +404,6 @@ export const invoiceService = {
             currency: booking.currency || "INR",
           };
 
-          const taxProfile = (booking.agency as any)?.taxProfile || null;
           const agencySnapshot = booking.agency
             ? {
                 id: booking.agency.id,
@@ -453,6 +431,156 @@ export const invoiceService = {
               }
             : null;
 
+          if (existingActive) {
+            if (existingActive.status === InvoiceStatus.CANCELLED) {
+              throw new Error("Cannot regenerate a cancelled invoice.");
+            }
+
+            // If existing active invoice was missing invoiceNumber (e.g. legacy draft), allocate number
+            let invoiceNumber = existingActive.invoiceNumber;
+            if (!invoiceNumber) {
+              invoiceNumber = await invoiceSequenceService.getNextInvoiceNumber(agencyId, tx);
+            }
+
+            // Synchronize line items
+            await tx.invoiceItem.deleteMany({ where: { invoiceId: existingActive.id } });
+            await tx.invoiceItem.createMany({
+              data: computedItems.map((it) => ({
+                invoiceId: existingActive.id,
+                description: it.description,
+                quantity: it.quantity,
+                rate: new Prisma.Decimal(it.rate),
+                amount: new Prisma.Decimal(it.amount),
+                sortOrder: it.sortOrder,
+              })),
+            });
+
+            // Synchronize latest Booking financial state, tax snapshot & payment state onto existing Invoice
+            const updated = await tx.invoice.update({
+              where: { id: existingActive.id },
+              data: {
+                invoiceNumber,
+                subtotal: new Prisma.Decimal(invoiceSubtotal),
+                discountAmount: new Prisma.Decimal(quoteDiscount),
+                discountType: discountPct > 0 ? DiscountType.PERCENTAGE : quoteDiscount > 0 ? DiscountType.FIXED : null,
+                discountValue: discountPct > 0 ? new Prisma.Decimal(discountPct) : quoteDiscount > 0 ? new Prisma.Decimal(quoteDiscount) : null,
+                totalAmount: new Prisma.Decimal(totalAmount),
+                paidAmount: new Prisma.Decimal(netPaid),
+                balanceAmount: new Prisma.Decimal(balanceAmount),
+                taxableAmount: taxResult.taxableAmount,
+                taxAmount: taxResult.taxAmount,
+                taxRate: taxResult.taxRate,
+                taxMode: taxResult.taxMode,
+                gstTreatment: taxResult.gstTreatment,
+                cgstAmount: taxResult.cgstAmount,
+                sgstAmount: taxResult.sgstAmount,
+                igstAmount: taxResult.igstAmount,
+                status: invoiceStatus,
+                currency: booking.currency || "INR",
+                customerSnapshot: customerSnapshot ?? undefined,
+                bookingSnapshot: bookingSnapshot ?? undefined,
+                agencySnapshot: agencySnapshot ?? undefined,
+              },
+              include: {
+                items: { orderBy: { sortOrder: "asc" } },
+                payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+                booking: {
+                  select: {
+                    id: true,
+                    bookingNumber: true,
+                    status: true,
+                    bookingDate: true,
+                    travelStartDate: true,
+                    travelEndDate: true,
+                    currency: true,
+                    totalAmount: true,
+                    paidAmount: true,
+                    balanceAmount: true,
+                    taxableAmount: true,
+                    taxAmount: true,
+                    taxRate: true,
+                    taxMode: true,
+                    gstTreatment: true,
+                    cgstAmount: true,
+                    sgstAmount: true,
+                    igstAmount: true,
+                    notes: true,
+                    customer: {
+                      select: {
+                        id: true,
+                        name: true,
+                        phone: true,
+                        email: true,
+                        address: true,
+                        city: true,
+                        state: true,
+                        country: true,
+                        postalCode: true,
+                      },
+                    },
+                    trip: {
+                      select: {
+                        id: true,
+                        title: true,
+                        tripNumber: true,
+                        startDate: true,
+                        endDate: true,
+                        travelers: {
+                          select: {
+                            id: true,
+                            name: true,
+                            type: true,
+                          },
+                        },
+                      },
+                    },
+                    quotation: {
+                      select: {
+                        id: true,
+                        quotationNumber: true,
+                        title: true,
+                        items: {
+                          where: { isOptional: false },
+                          orderBy: { sortOrder: "asc" },
+                          select: {
+                            id: true,
+                            name: true,
+                            description: true,
+                            quantity: true,
+                            sellingPrice: true,
+                            unitPrice: true,
+                            totalPrice: true,
+                            sortOrder: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                agency: {
+                  select: { id: true, name: true, email: true, phone: true, address: true, logo: true },
+                },
+              },
+            });
+
+            // Reconcile/link any payments of this booking that had invoiceId = null
+            await tx.payment.updateMany({
+              where: {
+                bookingId: booking.id,
+                invoiceId: null,
+                archivedAt: null,
+              },
+              data: {
+                invoiceId: updated.id,
+              },
+            });
+
+            return updated;
+          }
+
+          // If no active invoice exists: create persistent invoice
+          const invoiceNumber = await invoiceSequenceService.getNextInvoiceNumber(agencyId, tx);
+
           const now = new Date();
           let defaultDueDate = new Date(now);
           defaultDueDate.setDate(defaultDueDate.getDate() + 7);
@@ -466,18 +594,18 @@ export const invoiceService = {
               invoiceDate: now,
               dueDate: defaultDueDate,
               currency: booking.currency || "INR",
-              subtotal: new Prisma.Decimal(invoiceSubtotal || totalAmount),
+              subtotal: new Prisma.Decimal(invoiceSubtotal),
               discountType: discountPct > 0 ? DiscountType.PERCENTAGE : quoteDiscount > 0 ? DiscountType.FIXED : null,
               discountValue: discountPct > 0 ? new Prisma.Decimal(discountPct) : quoteDiscount > 0 ? new Prisma.Decimal(quoteDiscount) : null,
               discountAmount: new Prisma.Decimal(quoteDiscount || 0),
-              taxableAmount: booking.taxableAmount !== null ? new Prisma.Decimal(booking.taxableAmount) : null,
-              taxAmount: booking.taxAmount !== null ? new Prisma.Decimal(booking.taxAmount) : null,
-              taxRate: booking.taxRate !== null ? new Prisma.Decimal(booking.taxRate) : null,
-              taxMode: booking.taxMode ?? null,
-              gstTreatment: booking.gstTreatment ?? null,
-              cgstAmount: booking.cgstAmount !== null ? new Prisma.Decimal(booking.cgstAmount) : null,
-              sgstAmount: booking.sgstAmount !== null ? new Prisma.Decimal(booking.sgstAmount) : null,
-              igstAmount: booking.igstAmount !== null ? new Prisma.Decimal(booking.igstAmount) : null,
+              taxableAmount: taxResult.taxableAmount,
+              taxAmount: taxResult.taxAmount,
+              taxRate: taxResult.taxRate,
+              taxMode: taxResult.taxMode,
+              gstTreatment: taxResult.gstTreatment,
+              cgstAmount: taxResult.cgstAmount,
+              sgstAmount: taxResult.sgstAmount,
+              igstAmount: taxResult.igstAmount,
               totalAmount: new Prisma.Decimal(totalAmount),
               paidAmount: new Prisma.Decimal(netPaid),
               balanceAmount: new Prisma.Decimal(balanceAmount),
@@ -1311,5 +1439,35 @@ export const invoiceService = {
     throw new Error(
       "Replacement invoices are discontinued under Decision #18. One Booking retains one persistent invoice record."
     );
+  },
+
+  /**
+   * Explicitly regenerate an existing Invoice from latest Booking/Quotation state (Decision #18 & Phase 203).
+   * - Retains the exact same Invoice ID.
+   * - Retains the exact same Invoice Number (no Rev 1/Rev 2).
+   * - Replaces InvoiceItems with latest quotation items.
+   * - Recalculates subtotal, discount, tax, total, paid, balance, and status.
+   * - Preserves all existing completed Payment records.
+   * - Rejects CANCELLED invoices.
+   */
+  async regenerateInvoice(agencyId: string, invoiceId: string): Promise<InvoiceWithDetails> {
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: invoiceId, agencyId, archivedAt: null },
+      select: { id: true, agencyId: true, bookingId: true, status: true, invoiceNumber: true },
+    });
+
+    if (!invoice) {
+      throw new Error("Invoice not found or does not belong to this agency.");
+    }
+
+    if (invoice.status === InvoiceStatus.CANCELLED) {
+      throw new Error("Cannot regenerate a cancelled invoice.");
+    }
+
+    if (!invoice.bookingId) {
+      throw new Error("Invoice is not associated with a booking.");
+    }
+
+    return this.getOrCreateInvoiceForBooking(agencyId, invoice.bookingId);
   },
 };
