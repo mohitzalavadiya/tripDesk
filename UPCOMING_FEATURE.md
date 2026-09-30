@@ -63,20 +63,14 @@ add scroll in Booking & Operations Audit Timeline table.
 
 Activity also not need to show in invoice
 
+Re-generate Invoice
+
+
 **TODO**
 
 
-
-
-
-
-
-
-
-
-
-
 quatation preview mobile screen is need to fix
+
 quatation pdf UI changes
 
 test Feedback &  Reviews page

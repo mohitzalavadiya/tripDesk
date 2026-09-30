@@ -13023,6 +13023,104 @@ Activity in TripDesk is strictly a non-costed, non-priced catalogue inclusion fe
 
 ---
 
+# 206. QUOTATION PDF FULL UI & VISUAL REDESIGN (2026-09-30)
+
+## 206.1 Purpose & Scope
+- **Objective**: Complete presentation-only redesign of the generated Quotation PDF (`quotation-pdf-service.ts`) into a high-end, editorial-grade travel agency proposal document.
+- **Strict Scope Isolation**:
+  - **Quotation PDF Presentation Only**: Transformed from plain tabular layout to an editorial, structured travel proposal.
+  - **Zero Database Schema Changes**: No Prisma migrations, no schema mutations.
+  - **Zero Calculation Mutations**: Quotation totals, subtotal, discount, taxable base, GST split, markup, pricing engine, and invoice calculations remain strictly untouched.
+  - **Security & Non-Exposure**: Provider costs, buying rates, supplier payables, gross margins, and agency markups remain strictly non-exposed.
+  - **Activity Phase 200 Invariant**: Activities have zero financial impact and render with clean `Included` / `Not Included` badges without rates or voucher IDs.
+  - **Version Normalization**: Formatted strictly as uppercase `V1`, `V2`, `V3` (never lowercase `v1`).
+
+## 206.2 Architectural & Design Implementation
+1. **Dedicated Page 1 — Cover Page**:
+   - Agency branding banner with logo (or elegant vector monogram badge fallback).
+   - Prominent Proposal Title with dynamic Tier suffix (`Deluxe`, `Ultra Deluxe`, `Premium`).
+   - Customer details card (`Prepared for: Customer Name`, Contact details).
+   - Structured Trip Overview card (Destination route, Travel Dates, Duration in Days/Nights, Travelers/Pax count).
+   - Reference & validity bar (`Quotation Ref`, `Version V1/V2`, `Valid Until`).
+2. **Page 2+ Running Header & Footer System**:
+   - Running header on content pages: Agency Name, Quotation Number, and Version badge (`V1`).
+   - Running footer on all pages: Quotation Title, Version, and dynamic page numbering (`Page X of Y` via `doc.bufferedPageRange()`).
+3. **Trip At A Glance & Consultant Welcome**:
+   - Renders personalized `proposalSubtitle` and `customerMessage` welcome note snapshots.
+   - Clean summary grid for quick scanning.
+4. **Day-by-Day Itinerary Presentation**:
+   - Structured day cards with day badges (`Day 01`, `Day 02`), location tags, and itinerary descriptions.
+5. **Accommodation & Transport Cards**:
+   - Hotel cards with destination, room category, meal plan, stay dates, nights, and room counts.
+   - Transport cards with vehicle type, passenger capacity, and chauffeured service details.
+6. **Sightseeing & Excursions**:
+   - Editorial cards clearly displaying `Included` or `Not Included` status without financial clutter.
+7. **Inclusions & Exclusions Grid**:
+   - Two-column card layout cleanly separating what is included versus excluded.
+8. **Transparent Package Investment Breakdown**:
+   - Services / Package Amount, Special Discount, Taxable Base, GST Breakdown (CGST + SGST or IGST), and prominent Total Package Price.
+9. **Terms, Policies & Agency Closing**:
+   - Structured cards for Cancellation Policy, Important Traveler Notes, Privacy Policy, and Terms & Conditions.
+   - Professional closing card with agency contact details.
+
+## 206.3 Quality Assurance & Verification
+- **Test Suite**: Automated PDF generation QA suite (`scratch/test-quotation-pdf-qa.ts`) verified:
+  - Short Quotation (5-day tour): PASS (58,631 bytes).
+  - Long Multi-Day Expedition (14 days, multiple properties & vehicles): PASS (92,493 bytes).
+  - Inclusions & Exclusions formatting: PASS.
+  - Currency Formatting (`INR` without encoding glitches): PASS.
+  - Non-exposure of internal financials/markup: PASS.
+- **TypeScript Check**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASS)**.
+
+---
+
+# 207. QUOTATION PREVIEW & PUBLIC SHAREABLE RESPONSIVE UI AUDIT + FIX (2026-09-30)
+
+## 207.1 Purpose & Scope
+- **Objective**: Audit and enhance the responsive presentation of the **Internal Quotation Preview** (`/trips/[id]/quotation/preview`) and **Public Shareable Quotation** (`/q/[shareToken]`) across small/mobile viewports (320px, 360px, 375px, 390px, 430px) through tablet (768px) and desktop (1024px+).
+- **Desktop Parity**: Preserved existing rich desktop card designs, spacing, typography hierarchy, and branding intact.
+- **Strict Scope Isolation**: Zero database changes, zero calculation modifications, zero API contract changes, zero security/data exposure changes.
+
+## 207.2 Key Responsive Improvements Implemented
+1. **Top Floating Header Action Bar**:
+   - Replaced rigid horizontal action button row with responsive layout (`px-3 sm:px-8 py-2.5 sm:py-3`).
+   - Action buttons wrap gracefully and adapt labels cleanly (`Back to Editor` / `Back`, `Download PDF` / `PDF`, `Live Link`).
+   - Viewport switcher (`desktop`/`tablet`/`mobile`) elegantly adapts and remains hidden on physical mobile viewports.
+2. **Hero Header & Proposal Title**:
+   - Handled long quotation titles and agency names with `break-words` and responsive scale (`text-xl sm:text-3xl lg:text-5xl`).
+   - Agency contact and quotation reference badges wrap safely without colliding on 320px screens.
+3. **Trip Overview Metadata Bar**:
+   - Enhanced 2-column mobile to 4-column desktop grid with `min-w-0` and `gap-3 sm:gap-4` to prevent long travel date strings from clipping.
+4. **Highlights & Tour Badges**:
+   - Switched from rigid single flex-row to a clean 2-column mobile grid / centered desktop flex row with `min-w-0` and `truncate`.
+5. **Day-Wise Itinerary Cards**:
+   - Day badge + location tags wrap into a responsive header column on small mobile screens, preventing title/tag truncation.
+   - Long itinerary descriptions wrap cleanly with `whitespace-pre-wrap break-words`.
+6. **Hotel Accommodation & Transport Cards**:
+   - Check-in/check-out lines, meal plans, room types, and vehicle notes wrap safely into fluid multi-line spans on narrow screens.
+7. **Sightseeing / Activities Cards**:
+   - Activity titles and `Included` / `Not Included` status badges use `min-w-0 flex-1` and `shrink-0` to prevent badge compression.
+8. **Inclusions & Exclusions / Policies**:
+   - Responsive card padding (`p-4 sm:p-6`) and list items with `min-w-0 break-words`.
+9. **Total Package Price & Interactive Bottom Decision Bar**:
+   - Action buttons in public quotation (`PDF`, `WhatsApp`, `Request Changes`, `Accept Proposal`) use a responsive `grid grid-cols-2 sm:flex sm:flex-wrap` layout to completely prevent mobile horizontal overflow.
+10. **Accept & Revision Modals**:
+    - Dialog modals use `max-w-[94vw] sm:max-w-md` with responsive padding and touch-friendly controls.
+
+## 207.3 Validation & Quality Assurance
+- **Desktop Regression**: PASS (full layout, grid columns, and hierarchy preserved).
+- **Mobile QA (320px, 360px, 390px, 430px)**: PASS (0 horizontal overflow, 0 text clipping, 0 button collisions).
+- **Tablet QA (768px)**: PASS.
+- **Public Shareable Link (`/q/[shareToken]`)**: PASS.
+- **Internal Preview (`/trips/[id]/quotation/preview`)**: PASS.
+- **Security & Data Exposure**: PASS (zero provider costs, payables, or markups exposed).
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASS)**.
+- **Database / Schema**: No schema changes, no migrations.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
