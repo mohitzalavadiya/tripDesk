@@ -234,17 +234,17 @@ export default function InvoiceDetailPage() {
   }
 
   // Live Authoritative Financials
-  const liveTotal = invoice.booking?.totalAmount !== undefined
-    ? Number(invoice.booking.totalAmount)
-    : Number(invoice.totalAmount);
+  const liveTotal = invoice.totalAmount !== undefined && invoice.totalAmount !== null
+    ? Number(invoice.totalAmount)
+    : Number(invoice.booking?.totalAmount || 0);
 
-  const livePaid = invoice.booking?.paidAmount !== undefined
-    ? Number(invoice.booking.paidAmount)
-    : Number(invoice.paidAmount);
+  const livePaid = invoice.paidAmount !== undefined && invoice.paidAmount !== null
+    ? Number(invoice.paidAmount)
+    : Number(invoice.booking?.paidAmount || 0);
 
-  const liveBalance = invoice.booking?.balanceAmount !== undefined
-    ? Number(invoice.booking.balanceAmount)
-    : Number(invoice.balanceAmount);
+  const liveBalance = invoice.balanceAmount !== undefined && invoice.balanceAmount !== null
+    ? Number(invoice.balanceAmount)
+    : Number(invoice.booking?.balanceAmount || 0);
 
   const discountAmount = Number(invoice.discountAmount || 0);
   const subtotal = Number(invoice.subtotal || liveTotal + discountAmount);
