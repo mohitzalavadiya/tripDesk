@@ -13284,6 +13284,68 @@ During real usage post-Phase 204, three specific defects were identified and res
 
 ---
 
+# 210. PHASE 210 — CUSTOMER PAYMENT & PAYABLE DISBURSEMENT OVERPAYMENT VALIDATION & HARDENING (COMPLETED)
+
+## 210.1 Purpose & Architecture Overview
+- **Objective**: Prevent payment and disbursement entries exceeding current outstanding balances across both Customer Payments and Supplier Payable Disbursements, and simplify Payable Obligation editing rules.
+- **Locked Business Rules Enforced**:
+  - **Customer Payment**: `amount > 0 AND amount <= current customer outstanding balance`.
+  - **Payable Disbursement**: `amount > 0 AND amount <= current outstanding payable balance`.
+  - **Payable Obligation Edit**: `new actualAmount >= current paidAmount`. (User-facing "Reason for Adjustment" option completely removed from UI).
+  - **Exact Amounts**: Equal amounts (`amount == currentOutstanding`) are allowed.
+  - **Overpayments**: Rejection enforced (`amount > currentOutstanding` rejected).
+  - **Zero / Negative**: Rejection enforced (`amount <= 0` rejected).
+- **Core Principles Maintained**:
+  - **Zero Database Schema Changes**: Zero new models, zero new columns, zero Prisma migrations (`prisma db push` not required).
+  - **Architecture Preserved**: Existing distinction between Customer Payments (`Quotation -> Booking -> Invoice -> Customer Payment -> Receivable`) and Supplier Payables (`Trip / Booking -> Payable -> Supplier Payment -> Outstanding`) remains intact.
+  - **Two-Tier Validation**: Client-side immediate feedback (Formik/Yup, React dialog validation, page-level validation) combined with server-side authoritative protection inside PostgreSQL transaction.
+  - **Concurrency & Stale Dialog Protection**: PostgreSQL `SELECT ... FOR UPDATE` row-locking prevents concurrent overpayments, stale dialog submissions, and race conditions between payable edits and disbursements.
+  - **Paise / Decimal Precision**: Integer-cent/paise precision math prevents floating point rounding errors.
+
+## 210.2 Entry Points Updated
+1. **Customer Payment Client UI**:
+   - `src/components/booking/add-payment-modal.tsx`: Dynamic Formik / Yup schema validating `amount <= booking.pendingAmount`.
+   - `src/components/finance/record-payment-dialog.tsx`: Manual validation enforcing `numAmount <= selectedBooking.balanceAmount`.
+   - `src/app/(dashboard)/bookings/[id]/page.tsx` (**Booking Details -> Payment Transactions -> Log Payment**): Added client-side balance validation (`amt > currentBalance` check).
+2. **Payable Disbursement Client UI**:
+   - `src/components/booking/supplier-payment-modal.tsx`: Dynamic Formik / Yup schema validating `amount <= maxAmount`.
+   - `src/components/finance/record-supplier-payment-dialog.tsx`: Manual validation enforcing `numAmount <= selectedPayable.outstandingAmount`.
+3. **Payable Obligation Edit UI**:
+   - `src/components/finance/edit-payable-dialog.tsx` (**Operations -> Edit Payable Obligation**): Removed "Reason for Adjustment" option completely. Added client-side validation enforcing `numAmount >= paidAmount`.
+4. **Server Service Layer (`src/lib/services/finance-service.ts` & `src/lib/services/payment-service.ts`)**:
+   - `financeService.recordCustomerPayment`: Acquires row lock `SELECT "id" FROM "bookings" ... FOR UPDATE`, recalculates real-time active completed payment balance, and throws explicit error if requested amount exceeds current outstanding due.
+   - `financeService.recordSupplierPayment`: Acquires row lock `SELECT "id" FROM "supplier_payables" ... FOR UPDATE`, recalculates real-time payable balance, and throws explicit error if requested amount exceeds current outstanding payable.
+   - `paymentService.createPayment`: Acquires row lock `SELECT "id" FROM "bookings" ... FOR UPDATE`, recalculates real-time active completed payment balance, and throws explicit error if requested amount exceeds current outstanding due.
+   - `financeService.updateSupplierPayable`: Acquires row lock `SELECT "id" FROM "supplier_payables" ... FOR UPDATE` inside Prisma `$transaction`, recalculates fresh paid amount, and throws explicit error if `newActual < currentPaid`.
+
+## 210.3 Verification & Automated QA Matrix Results (`prisma/test-phase210-overpayment-qa.ts`)
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all routes (PASS)**.
+- **QA Suite Results (21/21 PASSED, 0 FAILED)**:
+  - **A1**: Customer Outstanding ₹15,000 $\to$ Payment ₹10,000 $\to$ **PASS** (New balance: ₹5,000).
+  - **A2**: Customer Outstanding ₹5,000 $\to$ Payment ₹5,000 $\to$ **PASS** (New balance: ₹0).
+  - **A3**: Customer Outstanding ₹15,000 $\to$ Payment ₹15,000.01 $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **A4**: Customer Outstanding ₹15,000 $\to$ Payment ₹20,000 $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **A5**: Customer Outstanding ₹0 $\to$ Payment ₹1 $\to$ **REJECTED** (`The booking is already fully paid...`).
+  - **A8**: Customer Stale Dialog submission $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **A9**: Customer Concurrent ₹10,000 + ₹10,000 against ₹15,000 $\to$ **1 Succeeded, 1 Rejected** (Total paid: ₹10,000).
+  - **B1**: Payable Outstanding ₹11,000 $\to$ Payment ₹8,000 $\to$ **PASS** (Outstanding remaining: ₹3,000).
+  - **B2**: Payable Outstanding ₹3,000 $\to$ Payment ₹3,000 $\to$ **PASS** (Outstanding: ₹0, Status: PAID).
+  - **B3**: Payable Outstanding ₹11,000 $\to$ Payment ₹11,000.01 $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **B4**: Payable Outstanding ₹11,000 $\to$ Payment ₹12,000 $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **B5**: Payable Outstanding ₹0 $\to$ Payment ₹1 $\to$ **REJECTED** (`The payable is already fully settled...`).
+  - **B8**: Payable Stale Dialog submission $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **B9**: Payable Concurrent ₹10,000 + ₹10,000 against ₹15,000 $\to$ **1 Succeeded, 1 Rejected** (Total paid: ₹10,000).
+  - **G**: Payable Edit Actual ₹7,999 (below Paid ₹8,000) $\to$ **REJECTED** (`Payable amount cannot be less than...`).
+  - **H**: Payable Edit Actual ₹8,000 (equal to Paid ₹8,000) $\to$ **PASS** (Outstanding: ₹0, Status: PAID).
+  - **I**: Payable Edit Actual ₹25,000 (above Paid ₹8,000) $\to$ **PASS** (Outstanding: ₹17,000).
+  - **K**: Payable Edit Stale Paid protection $\to$ **REJECTED** (`Payable amount cannot be less than...`).
+  - **R (Tenant Isolation - Payable Edit)**: Cross-agency payable edit attempt $\to$ **REJECTED** (`Payable record not found`).
+  - **Tenant Isolation (Customer Payment)**: Cross-agency payment attempt $\to$ **REJECTED** (`Booking not found...`).
+  - **Tenant Isolation (Supplier Disbursement)**: Cross-agency disbursement attempt $\to$ **REJECTED** (`Payable record not found...`).
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

@@ -199,6 +199,45 @@ export const paymentService = {
     });
 
     const payment = await prisma.$transaction(async (tx) => {
+      // 1. Acquire row lock on the Booking record to serialize concurrent payment submissions
+      await tx.$queryRaw`
+        SELECT "id" FROM "bookings" WHERE "id" = ${booking.id} AND "agencyId" = ${agencyId} FOR UPDATE
+      `;
+
+      // 2. Fetch fresh active completed payments inside transaction to calculate real-time authoritative balance
+      const freshBooking = await tx.booking.findUnique({
+        where: { id: booking.id },
+        select: { totalAmount: true },
+      });
+
+      const activePayments = await tx.payment.findMany({
+        where: { bookingId: booking.id, archivedAt: null, status: PaymentStatus.COMPLETED },
+        select: { amount: true, refundedAmount: true },
+      });
+
+      let totalPaid = 0;
+      let totalRefunded = 0;
+      for (const p of activePayments) {
+        totalPaid += Number(p.amount);
+        totalRefunded += Number(p.refundedAmount || 0);
+      }
+      const netPaid = Math.max(0, totalPaid - totalRefunded);
+      const totalAmount = freshBooking ? Number(freshBooking.totalAmount) : Number(booking.totalAmount);
+      const currentOutstanding = Math.max(0, Math.round((totalAmount - netPaid) * 100) / 100);
+      const requestedAmount = Math.round(data.amount * 100) / 100;
+
+      if (currentOutstanding <= 0) {
+        throw new Error("Cannot record payment. The booking is already fully paid with ₹0.00 outstanding due.");
+      }
+
+      if (requestedAmount > currentOutstanding) {
+        const formattedReq = requestedAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+        const formattedOut = currentOutstanding.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+        throw new Error(
+          `Payment amount cannot exceed the current outstanding due of ₹${formattedOut}. (Requested: ₹${formattedReq})`
+        );
+      }
+
       const p = await tx.payment.create({
         data: {
           agencyId,

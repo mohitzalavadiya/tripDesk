@@ -112,6 +112,13 @@ export function RecordSupplierPaymentDialog({
       toast.error("Please enter a valid positive disbursement amount.");
       return;
     }
+    if (selectedPayable) {
+      const currentOutstanding = Number(selectedPayable.outstandingAmount);
+      if (numAmount > currentOutstanding + 0.001) {
+        toast.error(`Payment amount cannot exceed the outstanding payable of ${formatCurrency(currentOutstanding)}.`);
+        return;
+      }
+    }
 
     setLoading(true);
     try {

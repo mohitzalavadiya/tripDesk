@@ -25,15 +25,21 @@ interface AddPaymentModalProps {
   onClose: () => void;
 }
 
-const paymentValidationSchema = Yup.object({
-  amount: Yup.number()
-    .required("Amount is required")
-    .positive("Amount must be greater than 0"),
-  date: Yup.string().required("Date is required"),
-  method: Yup.string().required("Payment method is required"),
-  transactionId: Yup.string().optional(),
-  notes: Yup.string().optional(),
-});
+const getPaymentValidationSchema = (pendingAmount: number) =>
+  Yup.object({
+    amount: Yup.number()
+      .required("Amount is required")
+      .positive("Amount must be greater than 0")
+      .test(
+        "max-outstanding",
+        `Payment amount cannot exceed the outstanding due of ${formatCurrency(pendingAmount)}`,
+        (val) => val === undefined || val === null || val <= pendingAmount
+      ),
+    date: Yup.string().required("Date is required"),
+    method: Yup.string().required("Payment method is required"),
+    transactionId: Yup.string().optional(),
+    notes: Yup.string().optional(),
+  });
 
 export function AddPaymentModal({
   booking,
@@ -50,7 +56,7 @@ export function AddPaymentModal({
       transactionId: "",
       notes: "",
     },
-    validationSchema: paymentValidationSchema,
+    validationSchema: React.useMemo(() => getPaymentValidationSchema(booking.pendingAmount), [booking.pendingAmount]),
     enableReinitialize: true,
     onSubmit: (values) => {
       try {

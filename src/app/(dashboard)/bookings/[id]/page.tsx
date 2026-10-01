@@ -308,6 +308,11 @@ export default function BookingDetailPage() {
       toast.error("Please enter a valid positive payment amount.");
       return;
     }
+    const currentBalance = Number(booking.balanceAmount);
+    if (amt > currentBalance + 0.001) {
+      toast.error(`Payment amount cannot exceed the outstanding due of ${formatCurrency(currentBalance)}.`);
+      return;
+    }
 
     try {
       setSavingPayment(true);

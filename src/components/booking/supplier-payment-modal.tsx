@@ -26,16 +26,22 @@ interface SupplierPaymentModalProps {
   onClose: () => void;
 }
 
-const supplierPaymentSchema = Yup.object({
-  supplierName: Yup.string().required("Supplier is required"),
-  amount: Yup.number()
-    .required("Amount is required")
-    .positive("Amount must be greater than 0"),
-  date: Yup.string().required("Date is required"),
-  method: Yup.string().required("Payment method is required"),
-  transactionId: Yup.string().optional(),
-  notes: Yup.string().optional(),
-});
+const getSupplierPaymentSchema = (maxAmount: number) =>
+  Yup.object({
+    supplierName: Yup.string().required("Supplier is required"),
+    amount: Yup.number()
+      .required("Amount is required")
+      .positive("Amount must be greater than 0")
+      .test(
+        "max-outstanding-payable",
+        `Payment amount cannot exceed the outstanding payable of ${formatCurrency(maxAmount)}`,
+        (val) => val === undefined || val === null || val <= maxAmount
+      ),
+    date: Yup.string().required("Date is required"),
+    method: Yup.string().required("Payment method is required"),
+    transactionId: Yup.string().optional(),
+    notes: Yup.string().optional(),
+  });
 
 export function SupplierPaymentModal({
   booking,
@@ -70,7 +76,10 @@ export function SupplierPaymentModal({
       transactionId: "",
       notes: "",
     },
-    validationSchema: supplierPaymentSchema,
+    validationSchema: React.useMemo(
+      () => getSupplierPaymentSchema(preselectedItem?.supplierCost || 10000),
+      [preselectedItem?.supplierCost]
+    ),
     enableReinitialize: true,
     onSubmit: (values) => {
       try {
