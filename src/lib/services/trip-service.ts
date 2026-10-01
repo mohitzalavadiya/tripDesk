@@ -17,6 +17,19 @@ export interface TripWithRelations extends Trip {
   tripHotels?: any[];
   tripVehicles?: any[];
   tripActivities?: any[];
+  publicShareLinks?: {
+    id: string;
+    tokenHash: string;
+    status: string;
+    createdAt: Date;
+  }[];
+  feedbacks?: {
+    id: string;
+    rating: number;
+    comments?: string | null;
+    serviceRecoveryStatus: string | null;
+    createdAt: Date;
+  }[];
   _count?: {
     travelers: number;
     itineraryItems: number;
@@ -145,7 +158,7 @@ export const tripService = {
    * Returns null if not found or if the record belongs to another agency.
    */
   async getTripById(agencyId: string, tripId: string): Promise<TripWithRelations | null> {
-    return prisma.trip.findFirst({
+    const trip = await prisma.trip.findFirst({
       where: {
         id: tripId,
         agencyId,
@@ -186,6 +199,28 @@ export const tripService = {
             updatedAt: true,
           },
         },
+        publicShareLinks: {
+          where: { status: "ACTIVE", revokedAt: null },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            tokenHash: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+        feedbacks: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            rating: true,
+            comments: true,
+            serviceRecoveryStatus: true,
+            createdAt: true,
+          },
+        },
         _count: {
           select: {
             travelers: true,
@@ -195,6 +230,97 @@ export const tripService = {
           },
         },
       },
+    });
+
+    if (!trip) {
+      return null;
+    }
+
+    return trip as TripWithRelations;
+  },
+
+  /**
+   * Explicitly retrieves or creates an active PublicShareLink for customer feedback link sharing.
+   * Strictly enforces:
+   * - Authenticated agency tenancy
+   * - Trip status must be COMPLETED
+   * - Reuses existing active link (status: ACTIVE, revokedAt: null)
+   * - Rejects if an existing link was REVOKED (does not silently recreate)
+   * - Race condition & duplicate prevention via transactional check and creation
+   */
+  async getOrCreateFeedbackLink(
+    agencyId: string,
+    tripId: string
+  ): Promise<{ id: string; tokenHash: string; status: string; createdAt: Date }> {
+    return await prisma.$transaction(async (tx) => {
+      // 1. Acquire trip-level row lock inside transaction to serialize concurrent requests for this trip
+      const lockedTrips = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+        SELECT "id", "status" FROM "trips" WHERE "id" = ${tripId} AND "agencyId" = ${agencyId} FOR UPDATE
+      `;
+
+      const lockedTrip = lockedTrips[0];
+
+      if (!lockedTrip) {
+        throw new NotFoundError("Trip");
+      }
+
+      if (lockedTrip.status !== "COMPLETED") {
+        throw new ValidationError("Feedback links can only be generated for completed trips.");
+      }
+
+      // 2. Re-check for existing active share link AFTER lock acquisition
+      const activeLink = await tx.publicShareLink.findFirst({
+        where: {
+          agencyId,
+          tripId,
+          status: "ACTIVE",
+          revokedAt: null,
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          tokenHash: true,
+          status: true,
+          createdAt: true,
+        },
+      });
+
+      if (activeLink) {
+        return activeLink;
+      }
+
+      // 3. Check if a revoked share link exists for this trip
+      const revokedLink = await tx.publicShareLink.findFirst({
+        where: {
+          agencyId,
+          tripId,
+          OR: [{ status: "REVOKED" }, { revokedAt: { not: null } }],
+        },
+        select: { id: true },
+      });
+
+      if (revokedLink) {
+        throw new ValidationError("Customer feedback link for this trip was explicitly revoked.");
+      }
+
+      // 4. Create new active share link safely
+      const tokenHash = `psl_${crypto.randomUUID().replace(/-/g, "")}`;
+      const newShareLink = await tx.publicShareLink.create({
+        data: {
+          agencyId,
+          tripId,
+          tokenHash,
+          status: "ACTIVE",
+        },
+        select: {
+          id: true,
+          tokenHash: true,
+          status: true,
+          createdAt: true,
+        },
+      });
+
+      return newShareLink;
     });
   },
 

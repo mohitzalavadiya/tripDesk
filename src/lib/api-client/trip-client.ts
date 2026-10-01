@@ -63,6 +63,18 @@ export const tripClient = {
   },
 
   /**
+   * Explicitly generates or retrieves an active PublicShareLink for feedback sharing on a completed trip.
+   */
+  async getOrCreateFeedbackLink(id: string): Promise<SingleResponse<{ shareLink: { id: string; tokenHash: string; status: string; createdAt: string }; tokenHash: string; url: string }>> {
+    const res = await fetch(`/api/trips/${encodeURIComponent(id)}/share-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    return handleResponse(res);
+  },
+
+  /**
    * Creates a new trip under the authenticated agency.
    */
   async createTrip(data: CreateTripInput): Promise<SingleResponse<Trip>> {

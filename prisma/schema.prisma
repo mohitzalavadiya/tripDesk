@@ -2009,6 +2009,8 @@ model AgencyCommunicationSetting {
   travelReminderDays   Int      @default(3)
   whatsappProvider     String   @default("MOCK")
   emailProvider        String   @default("MOCK")
+  googleReviewUrl      String?
+  tripAdvisorReviewUrl String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

@@ -35,6 +35,12 @@ export async function POST(
         serviceRating: body.serviceRating,
         hotelRating: body.hotelRating,
         driverRating: body.driverRating,
+        vehicleRating: body.vehicleRating,
+        activityRating: body.activityRating,
+        supportRating: body.supportRating,
+        positiveComment: body.positiveComment,
+        improvementComment: body.improvementComment,
+        travelAgain: body.travelAgain,
         comments: body.comments,
       }
     );

@@ -70,10 +70,28 @@ export default function FeedbackAndReviewsPage() {
   const [recoveryNotes, setRecoveryNotes] = React.useState("");
   const [savingRecovery, setSavingRecovery] = React.useState(false);
 
-  // Review URL Settings Modal
+  // Review URL Settings (Backed by AgencyCommunicationSetting in DB)
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
-  const [googleUrl, setGoogleUrl] = React.useState("https://g.page/r/tripdesk-holidays/review");
-  const [tripAdvisorUrl, setTripAdvisorUrl] = React.useState("https://www.tripadvisor.com/UserReview-tripdesk-holidays");
+  const [googleUrl, setGoogleUrl] = React.useState("");
+  const [tripAdvisorUrl, setTripAdvisorUrl] = React.useState("");
+  const [loadingSettings, setLoadingSettings] = React.useState(false);
+  const [savingSettings, setSavingSettings] = React.useState(false);
+
+  const fetchSettings = React.useCallback(async () => {
+    try {
+      setLoadingSettings(true);
+      const res = await fetch("/api/communication/settings");
+      const json = await res.json();
+      if (json.success && json.data) {
+        setGoogleUrl(json.data.googleReviewUrl || "");
+        setTripAdvisorUrl(json.data.tripAdvisorReviewUrl || "");
+      }
+    } catch (err) {
+      console.error("Failed to load review link settings:", err);
+    } finally {
+      setLoadingSettings(false);
+    }
+  }, []);
 
   const fetchFeedbacks = React.useCallback(async () => {
     setLoading(true);
@@ -99,7 +117,8 @@ export default function FeedbackAndReviewsPage() {
 
   React.useEffect(() => {
     fetchFeedbacks();
-  }, [fetchFeedbacks]);
+    fetchSettings();
+  }, [fetchFeedbacks, fetchSettings]);
 
   // Compute star distribution from live feedbacks
   const starCounts = React.useMemo(() => {
@@ -131,10 +150,32 @@ export default function FeedbackAndReviewsPage() {
     }
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSettingsOpen(false);
-    toast.success("Public review URLs updated successfully!");
+    setSavingSettings(true);
+    try {
+      const res = await fetch("/api/communication/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          googleReviewUrl: googleUrl.trim() || null,
+          tripAdvisorReviewUrl: tripAdvisorUrl.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to save review link settings.");
+      }
+
+      setGoogleUrl(json.data.googleReviewUrl || "");
+      setTripAdvisorUrl(json.data.tripAdvisorReviewUrl || "");
+      setIsSettingsOpen(false);
+      toast.success("Review link settings saved successfully!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save review settings.");
+    } finally {
+      setSavingSettings(false);
+    }
   };
 
   return (
@@ -428,36 +469,124 @@ export default function FeedbackAndReviewsPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Google Reviews Card */}
                 <div className="border border-slate-200/90 rounded-2xl p-5 bg-gradient-to-br from-white to-slate-50 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🌟</span>
-                    <h4 className="font-bold text-slate-900">Google Reviews URL</h4>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🌟</span>
+                      <h4 className="font-bold text-slate-900">Google Reviews URL</h4>
+                    </div>
+                    {googleUrl ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Configured
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                        Not Configured
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-500 font-mono break-all">{googleUrl}</p>
-                  <a
-                    href={googleUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center text-xs font-bold text-purple-600 hover:text-purple-700 gap-1"
-                  >
-                    Open Google Review Page <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
+                  {googleUrl ? (
+                    <>
+                      <p className="text-xs text-slate-600 font-mono break-all bg-white p-2.5 rounded-xl border border-slate-200/70">
+                        {googleUrl}
+                      </p>
+                      <div className="flex items-center gap-3 pt-1">
+                        <a
+                          href={googleUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center text-xs font-bold text-indigo-600 hover:text-indigo-700 gap-1"
+                        >
+                          Open Google Review Page <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(googleUrl);
+                            toast.success("Google review link copied to clipboard!");
+                          }}
+                          className="text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+                        >
+                          Copy Link
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-2 py-1">
+                      <p className="text-xs text-slate-400">
+                        No Google Review link configured. Add your Google Business Profile review link so guests can review you after their tour.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="h-7.5 text-xs font-bold rounded-xl"
+                      >
+                        Configure Google Link
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
+                {/* TripAdvisor Card */}
                 <div className="border border-slate-200/90 rounded-2xl p-5 bg-gradient-to-br from-white to-slate-50 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🦉</span>
-                    <h4 className="font-bold text-slate-900">TripAdvisor URL</h4>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🦉</span>
+                      <h4 className="font-bold text-slate-900">TripAdvisor URL</h4>
+                    </div>
+                    {tripAdvisorUrl ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Configured
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                        Not Configured
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-500 font-mono break-all">{tripAdvisorUrl}</p>
-                  <a
-                    href={tripAdvisorUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center text-xs font-bold text-emerald-600 hover:text-emerald-700 gap-1"
-                  >
-                    Open TripAdvisor Page <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
+                  {tripAdvisorUrl ? (
+                    <>
+                      <p className="text-xs text-slate-600 font-mono break-all bg-white p-2.5 rounded-xl border border-slate-200/70">
+                        {tripAdvisorUrl}
+                      </p>
+                      <div className="flex items-center gap-3 pt-1">
+                        <a
+                          href={tripAdvisorUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center text-xs font-bold text-emerald-600 hover:text-emerald-700 gap-1"
+                        >
+                          Open TripAdvisor Page <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(tripAdvisorUrl);
+                            toast.success("TripAdvisor review link copied to clipboard!");
+                          }}
+                          className="text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
+                        >
+                          Copy Link
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-2 py-1">
+                      <p className="text-xs text-slate-400">
+                        No TripAdvisor review link configured. Add your listing review link so guests can review you after their tour.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="h-7.5 text-xs font-bold rounded-xl"
+                      >
+                        Configure TripAdvisor Link
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -696,6 +825,10 @@ export default function FeedbackAndReviewsPage() {
               </button>
             </div>
 
+            <p className="text-slate-500 text-[11px] leading-relaxed">
+              Configure your public review links. When guests complete their post-tour feedback, they will be given direct action buttons to share their experience on Google and TripAdvisor.
+            </p>
+
             <form onSubmit={handleSaveSettings} className="space-y-3.5">
               <div className="space-y-1">
                 <label className="font-bold text-slate-700">Google Review Page URL</label>
@@ -705,6 +838,7 @@ export default function FeedbackAndReviewsPage() {
                   placeholder="https://g.page/r/..."
                   className="h-9 text-xs font-mono"
                 />
+                <p className="text-[10px] text-slate-400">Leave blank if you do not have a Google Business listing.</p>
               </div>
 
               <div className="space-y-1">
@@ -715,6 +849,7 @@ export default function FeedbackAndReviewsPage() {
                   placeholder="https://www.tripadvisor.com/UserReview-..."
                   className="h-9 text-xs font-mono"
                 />
+                <p className="text-[10px] text-slate-400">Leave blank if you do not have a TripAdvisor listing.</p>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
@@ -723,6 +858,7 @@ export default function FeedbackAndReviewsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setIsSettingsOpen(false)}
+                  disabled={savingSettings}
                   className="h-8.5 text-xs"
                 >
                   Cancel
@@ -730,9 +866,10 @@ export default function FeedbackAndReviewsPage() {
                 <Button
                   type="submit"
                   size="sm"
+                  disabled={savingSettings}
                   className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-8.5 px-4 rounded-xl cursor-pointer"
                 >
-                  Save Links
+                  {savingSettings ? "Saving Settings..." : "Save Review Links"}
                 </Button>
               </div>
             </form>

@@ -16,6 +16,7 @@ import {
   Hotel,
   Car,
   Compass,
+  ExternalLink,
 } from "lucide-react";
 
 export default function CustomerFeedbackPage() {
@@ -30,18 +31,25 @@ export default function CustomerFeedbackPage() {
   const [comments, setComments] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [submitted, setSubmitted] = React.useState(false);
+  const [reviewLinks, setReviewLinks] = React.useState<{
+    googleReviewUrl?: string | null;
+    tripAdvisorReviewUrl?: string | null;
+  } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setSubmitting(true);
-      await customerPortalClient.submitFeedback(tripId, {
+      const res = await customerPortalClient.submitFeedback(tripId, {
         rating,
         serviceRating,
         hotelRating,
         driverRating,
         comments,
       });
+      if (res?.reviewLinks) {
+        setReviewLinks(res.reviewLinks);
+      }
       setSubmitted(true);
       toast.success("Thank you! Your feedback has been recorded.");
     } catch (err: any) {
@@ -86,19 +94,65 @@ export default function CustomerFeedbackPage() {
 
       <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-xl shadow-slate-200/40 space-y-6">
         {submitted ? (
-          <div className="text-center py-12 space-y-4">
+          <div className="text-center py-8 space-y-5">
             <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-8 h-8" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900">Thank You for Your Feedback!</h2>
-            <p className="text-xs text-slate-500 max-w-md mx-auto">
-              Your valuable review helps us maintain the highest standards of hospitality and operational excellence.
-            </p>
-            <Link href={`/customer/trips/${tripId}`}>
-              <Button className="mt-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold">
-                Return to Trip Experience
-              </Button>
-            </Link>
+            <div className="space-y-1">
+              <h2 className="text-2xl font-black text-slate-900">Thank You for Your Feedback!</h2>
+              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                Your valuable review helps us maintain the highest standards of hospitality and operational excellence.
+              </p>
+            </div>
+
+            {/* ─── EXTERNAL PUBLIC REVIEW CTAs (IF CONFIGURED BY AGENCY) ───── */}
+            {(reviewLinks?.googleReviewUrl || reviewLinks?.tripAdvisorReviewUrl) && (
+              <div className="bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/40 rounded-2xl p-5 border border-indigo-100/90 text-left space-y-3 max-w-lg mx-auto">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                    Share Your Experience Publicly
+                  </h4>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Your voice matters! Help other travelers discover exceptional journeys by sharing your experience on Google or TripAdvisor.
+                </p>
+                <div className="flex flex-wrap gap-2.5 pt-1">
+                  {reviewLinks.googleReviewUrl && (
+                    <a
+                      href={reviewLinks.googleReviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                    >
+                      <span className="text-base">🌟</span>
+                      <span>Review us on Google</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                    </a>
+                  )}
+                  {reviewLinks.tripAdvisorReviewUrl && (
+                    <a
+                      href={reviewLinks.tripAdvisorReviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                    >
+                      <span className="text-base">🦉</span>
+                      <span>Review us on TripAdvisor</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2">
+              <Link href={`/customer/trips/${tripId}`}>
+                <Button className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold px-5">
+                  Return to Trip Experience
+                </Button>
+              </Link>
+            </div>
           </div>
         ) : (
           <>

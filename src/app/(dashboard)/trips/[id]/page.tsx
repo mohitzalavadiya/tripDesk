@@ -92,6 +92,9 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowRight,
+  Copy,
+  Check,
+  MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatTripStatus, TripStatusBadge } from "../page";
@@ -296,6 +299,73 @@ export default function TripDetailPage() {
   const [activityFormDescription, setActivityFormDescription] = React.useState("");
   const [activityFormType, setActivityFormType] = React.useState<ActivityType>(ActivityType.INCLUDED);
   const [activitySaving, setActivitySaving] = React.useState(false);
+
+  // Phase 209: Customer Feedback Link state & helpers
+  const [copiedFeedbackLink, setCopiedFeedbackLink] = React.useState(false);
+  const [isGeneratingFeedbackLink, setIsGeneratingFeedbackLink] = React.useState(false);
+
+  const activeShareLink = trip?.publicShareLinks?.find(
+    (psl: any) => psl.status === "ACTIVE" && !psl.revokedAt
+  );
+
+  const getTripFeedbackUrl = React.useCallback(() => {
+    if (!activeShareLink?.tokenHash) return "";
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}/trip/${activeShareLink.tokenHash}`;
+    }
+    return `/trip/${activeShareLink.tokenHash}`;
+  }, [activeShareLink]);
+
+  const handleCopyFeedbackLink = React.useCallback(async () => {
+    let url = getTripFeedbackUrl();
+
+    // If no active link exists yet, explicitly request generation via server mutation
+    if (!url) {
+      if (trip?.status !== TripStatus.COMPLETED) {
+        toast.error("Feedback link can only be generated for completed trips.");
+        return;
+      }
+
+      try {
+        setIsGeneratingFeedbackLink(true);
+        const res = await tripClient.getOrCreateFeedbackLink(id);
+        if (res.success && res.data?.shareLink) {
+          const newLink = res.data.shareLink;
+          setTrip((prev) => (prev ? { ...prev, publicShareLinks: [newLink as any] } : null));
+          url = `${window.location.origin}/trip/${newLink.tokenHash}`;
+        } else {
+          toast.error("Failed to obtain feedback link.");
+          return;
+        }
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to generate feedback link.");
+        return;
+      } finally {
+        setIsGeneratingFeedbackLink(false);
+      }
+    }
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = url;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopiedFeedbackLink(true);
+      toast.success("Feedback link copied.");
+      setTimeout(() => setCopiedFeedbackLink(false), 2500);
+    } catch (err) {
+      console.error("Failed to copy feedback link:", err);
+      toast.error("Failed to copy feedback link to clipboard.");
+    }
+  }, [id, trip?.status, getTripFeedbackUrl]);
 
   // Helper to sync TripDestinations on edit save
   const syncTripDestinations = async (
@@ -1250,6 +1320,33 @@ export default function TripDetailPage() {
 
           {/* Action buttons */}
           <div className="flex items-center gap-2.5 z-10">
+            {trip.status === TripStatus.COMPLETED && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isGeneratingFeedbackLink}
+                onClick={handleCopyFeedbackLink}
+                className="bg-amber-50 hover:bg-amber-100/80 border-amber-200 text-amber-900 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
+                title="Copy Customer Feedback Link"
+              >
+                {isGeneratingFeedbackLink ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1 text-amber-600 animate-spin" />
+                    Generating...
+                  </>
+                ) : copiedFeedbackLink ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="h-3.5 w-3.5 mr-1 text-amber-600" />
+                    {activeShareLink ? "Feedback Link" : "Get Feedback Link"}
+                  </>
+                )}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -1359,6 +1456,109 @@ export default function TripDetailPage() {
                     <p className="text-xs text-slate-700 bg-slate-50/70 p-3 rounded-lg border border-slate-100 whitespace-pre-wrap">
                       {trip.notes}
                     </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Customer Feedback & Review Link (Phase 209) */}
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-amber-50 text-amber-600 border border-amber-100">
+                      <MessageSquare className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        Customer Feedback & Review Link
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        {trip.status === TripStatus.COMPLETED
+                          ? "Share this secure link with the customer to collect feedback and external reviews."
+                          : "Customer feedback collection unlocks automatically once the trip status is set to Completed."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Submission Status Badge */}
+                  {trip.status === TripStatus.COMPLETED && (
+                    <div>
+                      {trip.feedbacks && trip.feedbacks.length > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <Check className="h-3 w-3" /> Feedback Received ({trip.feedbacks[0].rating}/5 ★)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          Pending Response
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {trip.status === TripStatus.COMPLETED ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <div className="flex-1 flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-600 truncate">
+                        <span className="truncate">
+                          {getTripFeedbackUrl() ||
+                            (isGeneratingFeedbackLink
+                              ? "Generating secure link..."
+                              : "Click 'Get Feedback Link' to generate customer feedback link.")}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isGeneratingFeedbackLink}
+                          onClick={handleCopyFeedbackLink}
+                          className="flex-1 sm:flex-initial h-9 text-xs font-semibold bg-white hover:bg-slate-50 border-slate-200 cursor-pointer"
+                        >
+                          {isGeneratingFeedbackLink ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 text-slate-500 animate-spin" />
+                              Generating...
+                            </>
+                          ) : copiedFeedbackLink ? (
+                            <>
+                              <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-600" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3.5 w-3.5 mr-1.5 text-slate-500" />
+                              {activeShareLink ? "Copy Feedback Link" : "Get Feedback Link"}
+                            </>
+                          )}
+                        </Button>
+                        {getTripFeedbackUrl() && (
+                          <a
+                            href={getTripFeedbackUrl()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center flex-1 sm:flex-initial h-9 px-3 text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-slate-700 shadow-2xs transition-colors cursor-pointer"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 mr-1.5 text-slate-500" />
+                            Open Link
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    {trip.feedbacks && trip.feedbacks.length > 0 && trip.feedbacks[0].comments && (
+                      <div className="bg-slate-50/80 rounded-lg p-3 border border-slate-100 text-xs text-slate-600 italic">
+                        &ldquo;{trip.feedbacks[0].comments}&rdquo;
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs text-slate-500">
+                    <span>
+                      Current Trip Status: <strong className="text-slate-700">{formatEnumLabel(trip.status)}</strong>
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Feedback available when status is Completed
+                    </span>
                   </div>
                 )}
               </div>

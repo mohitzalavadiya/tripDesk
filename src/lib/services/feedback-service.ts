@@ -24,6 +24,11 @@ export interface CustomerPublicFeedbackView {
   createdAt: string;
 }
 
+export interface PublicReviewLinksView {
+  googleReviewUrl?: string | null;
+  tripAdvisorReviewUrl?: string | null;
+}
+
 export interface PublicFeedbackStatusResponse {
   isEligible: boolean;
   reason?: string;
@@ -41,6 +46,7 @@ export interface PublicFeedbackStatusResponse {
   agency: {
     name: string;
   } | null;
+  reviewLinks?: PublicReviewLinksView | null;
 }
 
 export interface FeedbackStats {
@@ -394,7 +400,20 @@ export const feedbackService = {
       include: {
         trip: {
           include: {
-            agency: { select: { id: true, name: true, phone: true, email: true } },
+            agency: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                email: true,
+                communicationSetting: {
+                  select: {
+                    googleReviewUrl: true,
+                    tripAdvisorReviewUrl: true,
+                  },
+                },
+              },
+            },
             customer: { select: { id: true, name: true, phone: true, email: true } },
             tripOperation: true,
             bookings: {
@@ -418,7 +437,20 @@ export const feedbackService = {
         archivedAt: null,
       },
       include: {
-        agency: { select: { id: true, name: true, phone: true, email: true } },
+        agency: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            communicationSetting: {
+              select: {
+                googleReviewUrl: true,
+                tripAdvisorReviewUrl: true,
+              },
+            },
+          },
+        },
         customer: { select: { id: true, name: true, phone: true, email: true } },
         tripOperation: true,
         bookings: {
@@ -447,6 +479,7 @@ export const feedbackService = {
         trip: null,
         customer: null,
         agency: null,
+        reviewLinks: null,
       };
     }
 
@@ -498,6 +531,10 @@ export const feedbackService = {
       },
       agency: {
         name: trip.agency.name,
+      },
+      reviewLinks: {
+        googleReviewUrl: trip.agency?.communicationSetting?.googleReviewUrl || null,
+        tripAdvisorReviewUrl: trip.agency?.communicationSetting?.tripAdvisorReviewUrl || null,
       },
     };
   },
@@ -610,6 +647,10 @@ export const feedbackService = {
       travelAgain: feedbackRecord.travelAgain,
       comments: feedbackRecord.comments,
       createdAt: feedbackRecord.createdAt.toISOString(),
+      reviewLinks: {
+        googleReviewUrl: trip.agency?.communicationSetting?.googleReviewUrl || null,
+        tripAdvisorReviewUrl: trip.agency?.communicationSetting?.tripAdvisorReviewUrl || null,
+      },
     };
   },
 };

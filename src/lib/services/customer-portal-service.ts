@@ -871,15 +871,27 @@ export class CustomerPortalService {
   }
 
   /**
-   * 8. Submit customer trip feedback
+   * 8. Submit customer trip feedback (Idempotent Upsert)
    */
   async submitCustomerTripFeedback(
     customerId: string,
     agencyId: string,
     tripId: string,
-    input: CustomerFeedbackInput
+    input: {
+      rating: number;
+      serviceRating?: number;
+      hotelRating?: number;
+      driverRating?: number;
+      vehicleRating?: number;
+      activityRating?: number;
+      supportRating?: number;
+      positiveComment?: string;
+      improvementComment?: string;
+      travelAgain?: string;
+      comments?: string;
+    }
   ) {
-    // 1. Verify trip ownership
+    // 1. Verify trip ownership & completion
     const trip = await prisma.trip.findFirst({
       where: {
         id: tripId,
@@ -889,7 +901,23 @@ export class CustomerPortalService {
       },
       include: {
         tripOperation: true,
-        bookings: { take: 1 },
+        agency: {
+          select: {
+            id: true,
+            name: true,
+            communicationSetting: {
+              select: {
+                googleReviewUrl: true,
+                tripAdvisorReviewUrl: true,
+              },
+            },
+          },
+        },
+        bookings: {
+          where: { status: { not: "CANCELLED" } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
       },
     });
 
@@ -897,23 +925,70 @@ export class CustomerPortalService {
       throw new Error("TRIP_NOT_FOUND: Access denied or trip not found.");
     }
 
-    const bookingId = trip.bookings[0]?.id || null;
+    if (trip.status !== "COMPLETED") {
+      throw new Error("TRIP_NOT_COMPLETED: Feedback is only available after your tour is completed.");
+    }
 
-    // 2. Create customer feedback record
-    const feedback = await prisma.customerFeedback.create({
-      data: {
+    const bookingId = trip.bookings[0]?.id || null;
+    const isAttention = input.rating <= 3;
+
+    // 2. Check for existing submission (Idempotent update)
+    const existing = await prisma.customerFeedback.findFirst({
+      where: {
         agencyId,
-        customerId,
         tripId,
-        bookingId,
-        rating: Math.max(1, Math.min(5, input.rating || 5)),
-        serviceRating: input.serviceRating ? Math.max(1, Math.min(5, input.serviceRating)) : 5,
-        hotelRating: input.hotelRating ? Math.max(1, Math.min(5, input.hotelRating)) : 5,
-        driverRating: input.driverRating ? Math.max(1, Math.min(5, input.driverRating)) : 5,
-        comments: input.comments?.trim() || null,
-        source: "PORTAL",
+        customerId,
       },
     });
+
+    let feedbackRecord: any;
+
+    if (existing) {
+      feedbackRecord = await prisma.customerFeedback.update({
+        where: { id: existing.id },
+        data: {
+          rating: Math.max(1, Math.min(5, input.rating || 5)),
+          serviceRating: input.serviceRating ? Math.max(1, Math.min(5, input.serviceRating)) : input.rating,
+          hotelRating: input.hotelRating ? Math.max(1, Math.min(5, input.hotelRating)) : input.rating,
+          driverRating: input.driverRating ? Math.max(1, Math.min(5, input.driverRating)) : input.rating,
+          vehicleRating: input.vehicleRating ? Math.max(1, Math.min(5, input.vehicleRating)) : input.rating,
+          activityRating: input.activityRating ? Math.max(1, Math.min(5, input.activityRating)) : input.rating,
+          supportRating: input.supportRating ? Math.max(1, Math.min(5, input.supportRating)) : input.rating,
+          positiveComment: input.positiveComment?.trim() || null,
+          improvementComment: input.improvementComment?.trim() || null,
+          travelAgain: input.travelAgain || "Yes",
+          serviceRecoveryStatus: isAttention
+            ? "Follow-up Required"
+            : existing.serviceRecoveryStatus === "Resolved"
+            ? "Resolved"
+            : "Not Needed",
+          comments: input.comments?.trim() || input.positiveComment?.trim() || null,
+          source: "PORTAL",
+        },
+      });
+    } else {
+      feedbackRecord = await prisma.customerFeedback.create({
+        data: {
+          agencyId,
+          customerId,
+          tripId,
+          bookingId,
+          rating: Math.max(1, Math.min(5, input.rating || 5)),
+          serviceRating: input.serviceRating ? Math.max(1, Math.min(5, input.serviceRating)) : input.rating,
+          hotelRating: input.hotelRating ? Math.max(1, Math.min(5, input.hotelRating)) : input.rating,
+          driverRating: input.driverRating ? Math.max(1, Math.min(5, input.driverRating)) : input.rating,
+          vehicleRating: input.vehicleRating ? Math.max(1, Math.min(5, input.vehicleRating)) : input.rating,
+          activityRating: input.activityRating ? Math.max(1, Math.min(5, input.activityRating)) : input.rating,
+          supportRating: input.supportRating ? Math.max(1, Math.min(5, input.supportRating)) : input.rating,
+          positiveComment: input.positiveComment?.trim() || null,
+          improvementComment: input.improvementComment?.trim() || null,
+          travelAgain: input.travelAgain || "Yes",
+          serviceRecoveryStatus: isAttention ? "Follow-up Required" : "Not Needed",
+          comments: input.comments?.trim() || input.positiveComment?.trim() || null,
+          source: "PORTAL",
+        },
+      });
+    }
 
     // 3. Log an operational audit event if tripOperation exists
     if (trip.tripOperation) {
@@ -922,18 +997,36 @@ export class CustomerPortalService {
           agencyId,
           tripOperationId: trip.tripOperation.id,
           eventType: "CUSTOMER_FEEDBACK",
-          description: `Guest submitted post-tour feedback with ${input.rating}★ rating.`,
+          description: `Guest submitted post-tour feedback with ${input.rating}★ rating via Customer Portal.`,
           metadata: {
-            feedbackId: feedback.id,
+            feedbackId: feedbackRecord.id,
             rating: input.rating,
-            comments: input.comments,
+            isAttention,
           },
           createdBy: "Customer Portal",
         },
       });
     }
 
-    return feedback;
+    return {
+      id: feedbackRecord.id,
+      rating: feedbackRecord.rating,
+      serviceRating: feedbackRecord.serviceRating,
+      hotelRating: feedbackRecord.hotelRating,
+      driverRating: feedbackRecord.driverRating,
+      vehicleRating: feedbackRecord.vehicleRating,
+      activityRating: feedbackRecord.activityRating,
+      supportRating: feedbackRecord.supportRating,
+      positiveComment: feedbackRecord.positiveComment,
+      improvementComment: feedbackRecord.improvementComment,
+      travelAgain: feedbackRecord.travelAgain,
+      comments: feedbackRecord.comments,
+      createdAt: feedbackRecord.createdAt.toISOString(),
+      reviewLinks: {
+        googleReviewUrl: trip.agency?.communicationSetting?.googleReviewUrl || null,
+        tripAdvisorReviewUrl: trip.agency?.communicationSetting?.tripAdvisorReviewUrl || null,
+      },
+    };
   }
 
   /**

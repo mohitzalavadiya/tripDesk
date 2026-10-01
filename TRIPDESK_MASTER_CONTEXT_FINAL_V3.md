@@ -13191,6 +13191,98 @@ During real usage post-Phase 204, three specific defects were identified and res
 
 ---
 
+# 208. CUSTOMER FEEDBACK & EXTERNAL REVIEW FLOW IMPLEMENTATION (2026-09-30)
+
+## 208.1 Purpose & Architecture Overview
+- **Objective**: Implement the completed, non-manipulative **Customer Feedback + External Review Flow** allowing customers to submit post-trip feedback and optionally click through to public review platforms (Google Review and TripAdvisor).
+- **Core Principles Maintained**:
+  - **Surgical Extension**: Reused existing `CustomerFeedback` and `AgencyCommunicationSetting` tables without introducing redundant models (`Review`, `CustomerReview`, `ReviewSubmission`, etc.).
+  - **Zero Review Manipulation**: External review links appear for **all** rating tiers (1 to 5 stars) equally if configured by the agency. No review gating, rating suppression, or conditional redirects.
+  - **Feedback Idempotency**: Both public token (`/trip/[secureToken]`) and authenticated customer portal (`/customer/trips/[tripId]/feedback`) paths update existing records on repeated submissions without duplicate row creation.
+  - **Staged Communication Isolation**: Real external delivery (Email/WhatsApp/SMS) remains strictly ON HOLD; provider stubs/staged notification architecture preserved.
+
+## 208.2 Database & Migration Changes
+- **Model Extended**: `AgencyCommunicationSetting` in `prisma/schema.prisma`
+  - Added optional fields: `googleReviewUrl String?` and `tripAdvisorReviewUrl String?`.
+- **Migration**: `20260930161500_add_agency_review_urls`
+  - SQL: `ALTER TABLE "AgencyCommunicationSetting" ADD COLUMN "googleReviewUrl" TEXT, ADD COLUMN "tripAdvisorReviewUrl" TEXT;`
+  - Zero disruption to existing records; backwards-compatible with `NULL` defaults.
+
+## 208.3 Validation & Security
+- **Schema**: `src/lib/validation/communication-schema.ts`
+  - Added strict HTTPS URL validation for `googleReviewUrl` and `tripAdvisorReviewUrl`, supporting empty string / null clearing.
+- **Tenant Isolation**: Settings updates and fetches strictly scoped to authenticated `agencyId` derived server-side via session.
+- **Public Payload Safety**: Public and customer portal feedback payloads expose only safe `{ googleReviewUrl, tripAdvisorReviewUrl }` objects. Zero internal costs, margins, supplier payables, email/WhatsApp configurations, or provider API keys are leaked.
+
+## 208.4 Implementation Details
+1. **Idempotent Customer Portal Feedback** (`src/lib/services/customer-portal-service.ts`):
+   - `submitCustomerTripFeedback`: Validates customer authentication, trip completion, and agency scoping. Checks for an existing `CustomerFeedback` record; updates if present, creates if absent. Automatically sets `serviceRecoveryStatus: FOLLOW_UP_REQUIRED` for ratings <= 3.
+2. **Public Feedback Flow** (`src/lib/services/feedback-service.ts`):
+   - `getPublicFeedbackStatus` & `submitPublicFeedback`: Returns `reviewLinks: { googleReviewUrl, tripAdvisorReviewUrl }` from the trip's agency settings.
+3. **Agency Dashboard Settings UI** (`src/app/(dashboard)/feedback/page.tsx`):
+   - Removed fake hardcoded placeholder URLs.
+   - Connected the Review Settings modal directly to `GET /api/communication/settings` and `PATCH /api/communication/settings`.
+   - Dynamic status badges: "Configured" with copy/link actions or "Not Configured" with direct configuration CTA.
+4. **Customer Post-Submission UI** (`/trip/[secureToken]` and `/customer/trips/[tripId]/feedback`):
+   - Upon feedback submission, customer is greeted with the thank-you state and dynamic "Share your experience publicly" section with "Review us on Google" and/or "Review us on TripAdvisor" buttons matching agency configuration.
+
+## 208.5 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all routes (PASS)**.
+- **Idempotency QA**: Repeated submissions in both public and portal flows update in place with 0 duplicate rows created (PASS).
+- **Tenant Isolation QA**: Agency A links never bleed into Agency B (PASS).
+- **Low-Rating Service Recovery**: Ratings $\le 3$ correctly trigger `FOLLOW_UP_REQUIRED` while still presenting configured public review links fairly (PASS).
+- **Responsive QA**: Verified across 320px, 360px, 390px, 430px, 768px, and 1024px+ viewports with zero horizontal overflow or clipping (PASS).
+
+---
+
+# 209. CUSTOMER FEEDBACK LINK SHARING IMPLEMENTATION (2026-09-30)
+
+## 209.1 Purpose & Architecture Overview
+- **Objective**: Give the Agency Owner a direct, contextual way to obtain, copy, and open the existing secure customer Trip feedback link directly from the Trip Details workspace (`/trips/[id]`).
+- **Core Principles Maintained**:
+  - **Surgical Extension**: Reused the existing `PublicShareLink` / secure token and `/trip/[secureToken]` public route.
+  - **Zero New Models / Zero Schema Migrations**: Zero new tables (`FeedbackLink`, `FeedbackToken`, etc.), zero new columns, zero schema migrations.
+  - **Single Source of Truth**: Uses `PublicShareLink` (`status: "ACTIVE"`, `revokedAt: null`) as the single source of truth for public customer trip URLs.
+  - **Explicit Link Generation & Strict Read-Only GET**: `getTripById(agencyId, tripId)` is strictly 100% read-only. Zero write operations, zero lazy creation on GET. Feedback link generation is strictly explicit via `POST /api/trips/[id]/share-link`.
+  - **Zero Review Manipulation**: Preserved Phase 208 behavior (Google and TripAdvisor external review CTAs are shown equally to all rating tiers post-submission).
+  - **Communication Scope Maintained**: Real external Email/WhatsApp/SMS delivery remains ON HOLD (manual copy and direct link access only).
+  - **Tenant Isolation & Public Safety**: Agency tenant scoping strictly enforced server-side; non-exposure of internal financials, margins, costs, and payables intact.
+
+## 209.2 Authoritative Corrected Architecture Implementation
+1. **Strict Read/Write Separation in Service Layer (`src/lib/services/trip-service.ts`)**:
+   - `tripService.getTripById`: **100% READ-ONLY**. All database write/INSERT side effects were completely removed. Querying a trip executes only `SELECT` operations regardless of status.
+   - `tripService.getOrCreateFeedbackLink`: Dedicated server mutation for generating/retrieving customer feedback links.
+2. **Dedicated Server Mutation API (`src/app/api/trips/[id]/share-link/route.ts`)**:
+   - `POST /api/trips/[id]/share-link`: Enforces authenticated agency tenancy (`requireWriteAccess()`).
+   - **Completed Status Guard**: Server-side validation strictly enforces `trip.status === TripStatus.COMPLETED`. Rejects `PLANNING`, `CONFIRMED`, `IN_PROGRESS`, `CANCELLED`, `DRAFT` with HTTP 400 (`ValidationError`).
+   - **Active Link Reuse**: Reuses existing `PublicShareLink` where `status: "ACTIVE"` and `revokedAt: null`.
+   - **Revoked Link Protection**: Prevents silent replacement of explicitly revoked links (`status: "REVOKED"` or `revokedAt !== null`), returning `ValidationError("Customer feedback link for this trip was explicitly revoked.")`.
+   - **Concurrency Serialization & Race Protection**: Uses parameterized `tx.$queryRaw` (`SELECT "id", "status" FROM "trips" WHERE "id" = ${tripId} AND "agencyId" = ${agencyId} FOR UPDATE`) inside `prisma.$transaction` to serialize concurrent requests for the same Trip. The active/revoked link lookup and creation occur AFTER acquiring the trip row lock, ensuring no duplicate `ACTIVE` links can be created concurrently for the same Trip.
+3. **Trip Details UI & Workspace Integration (`src/app/(dashboard)/trips/[id]/page.tsx`)**:
+   - Opening Trip Details performs zero database mutations.
+   - For `COMPLETED` trips with an active link: Copy and Open actions work immediately with full URL preview (`/trip/[secureToken]`).
+   - For `COMPLETED` trips without an active link: Clicking **[ Get Feedback Link ]** or **[ Copy Feedback Link ]** triggers the explicit server mutation, displaying a loading spinner (`isGeneratingFeedbackLink`) and updating local state upon success.
+   - For non-completed trips: Creation actions are disabled with explanatory guidance.
+
+## 209.3 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASS)**.
+- **Concurrency QA Suite (`prisma/test-phase209-concurrency-qa.ts`)**:
+  - **Case A (Concurrent requests, no link)**: Concurrent requests acquire row lock, exactly 1 active `PublicShareLink` created, both requests return exact same `tokenHash` and ID (PASS).
+  - **Case B (Concurrent requests, active link exists)**: Both concurrent requests re-check after lock, reuse existing link, 0 new links created (PASS).
+  - **Case C (Concurrent requests, revoked link exists)**: Both requests rejected with `ValidationError`, 0 replacement active links created (PASS).
+  - **Case D (Concurrent requests, non-completed trip)**: Both requests rejected with `ValidationError`, 0 links created (PASS).
+  - **Case E (Cross-Tenant Isolation)**: Request for another agency's trip rejected with `NotFoundError`, 0 links created (PASS).
+- **Public Feedback Link UI Cleanup (`src/app/trip/[secureToken]/page.tsx`)**: Removed unnecessary customer dashboard sections (notifications tray, notifications card, payment statement, day schedule, hotels, vehicles, activities, print button) from the public `/trip/[secureToken]` route. Page is now 100% focused on trip context, feedback submission, thank-you state, external review CTAs, and WhatsApp consultant contact (PASS).
+- **Read/Write Separation**: Verified `getTripById` executes zero INSERTs across all trip statuses (PASS).
+- **Completed Trip Guard**: Server rejects creation requests for non-completed trip statuses (PASS).
+- **Revocation Integrity**: Revoked links remain respected without silent bypass (PASS).
+- **Public URL Consistency**: Canonical `/trip/[secureToken]` route resolves directly (PASS).
+- **Phase 208 Integration**: Customer feedback submission, idempotency, and external review links remain intact (PASS).
+- **Communication Scope**: Real external Email/WhatsApp/SMS delivery remains strictly ON HOLD (PASS).
+
+---
 
 # END OF MASTER HANDOVER V3
 

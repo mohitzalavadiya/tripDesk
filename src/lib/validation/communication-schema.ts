@@ -48,6 +48,26 @@ export const updateCommunicationSettingsSchema = z.object({
   travelReminderDays: z.number().int().min(1).max(30).optional(),
   whatsappProvider: z.string().optional(),
   emailProvider: z.string().optional(),
+  googleReviewUrl: z
+    .string()
+    .trim()
+    .url("Please enter a valid Google Review URL")
+    .refine((u) => u.startsWith("https://"), {
+      message: "Google Review URL must start with https://",
+    })
+    .or(z.literal(""))
+    .optional()
+    .nullable(),
+  tripAdvisorReviewUrl: z
+    .string()
+    .trim()
+    .url("Please enter a valid TripAdvisor Review URL")
+    .refine((u) => u.startsWith("https://"), {
+      message: "TripAdvisor Review URL must start with https://",
+    })
+    .or(z.literal(""))
+    .optional()
+    .nullable(),
 });
 
 export type UpdateCommunicationSettingsInput = z.infer<typeof updateCommunicationSettingsSchema>;
