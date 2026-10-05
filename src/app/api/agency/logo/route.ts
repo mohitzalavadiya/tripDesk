@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireWriteAccess } from "@/lib/api/context";
 import { entitlementService } from "@/lib/services/entitlement-service";
-import { prisma } from "@/lib/prisma";
+import { agencyLogoService } from "@/lib/services/agency-logo-service";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/agency/logo
- * Update custom agency logo. Server-side gated by requireWriteAccess and CUSTOM_AGENCY_LOGO entitlement.
+ * Multipart file upload for custom agency logo.
+ * Server-side gated by requireWriteAccess and CUSTOM_AGENCY_LOGO entitlement.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -17,26 +18,30 @@ export async function POST(request: NextRequest) {
     // Enforce CUSTOM_AGENCY_LOGO entitlement server-side
     await entitlementService.checkFeatureAllowed(agencyId, "CUSTOM_AGENCY_LOGO");
 
-    const body = await request.json();
-    const { logoUrl } = body;
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
 
-    if (typeof logoUrl !== "string") {
+    if (!file) {
       return NextResponse.json(
-        { success: false, error: "logoUrl must be a valid string." },
+        { success: false, error: "No file uploaded. Please select an image file (PNG, JPEG, or WEBP)." },
         { status: 400 }
       );
     }
 
-    const updatedAgency = await prisma.agency.update({
-      where: { id: agencyId },
-      data: { logo: logoUrl },
-      select: { id: true, name: true, logo: true },
-    });
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBuffer = Buffer.from(arrayBuffer);
+
+    const updatedAgency = await agencyLogoService.uploadLogo(
+      agencyId,
+      fileBuffer,
+      file.name,
+      file.type
+    );
 
     return NextResponse.json({
       success: true,
       data: updatedAgency,
-      message: "Agency logo updated successfully.",
+      message: "Agency logo uploaded successfully.",
     });
   } catch (error: any) {
     if (error.statusCode) {
@@ -47,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
     console.error("POST /api/agency/logo error:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to update agency logo" },
+      { success: false, error: error.message || "Failed to upload agency logo" },
       { status: 500 }
     );
   }
@@ -55,7 +60,8 @@ export async function POST(request: NextRequest) {
 
 /**
  * DELETE /api/agency/logo
- * Remove custom agency logo. Server-side gated by requireWriteAccess and CUSTOM_AGENCY_LOGO entitlement.
+ * Remove custom agency logo from database and storage.
+ * Server-side gated by requireWriteAccess and CUSTOM_AGENCY_LOGO entitlement.
  */
 export async function DELETE(_request: NextRequest) {
   try {
@@ -65,11 +71,7 @@ export async function DELETE(_request: NextRequest) {
     // Enforce CUSTOM_AGENCY_LOGO entitlement server-side
     await entitlementService.checkFeatureAllowed(agencyId, "CUSTOM_AGENCY_LOGO");
 
-    const updatedAgency = await prisma.agency.update({
-      where: { id: agencyId },
-      data: { logo: null },
-      select: { id: true, name: true, logo: true },
-    });
+    const updatedAgency = await agencyLogoService.deleteLogo(agencyId);
 
     return NextResponse.json({
       success: true,

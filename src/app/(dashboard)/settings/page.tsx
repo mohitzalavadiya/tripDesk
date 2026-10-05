@@ -43,9 +43,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
 
 export default function SettingsPage() {
-  const { isFeatureAllowed, overview } = useSubscription();
+  const { isFeatureAllowed, overview, isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
   const [activeTab, setActiveTab] = React.useState<"communication" | "tax" | "branding">("communication");
   const [settings, setSettings] = React.useState<CommunicationSettings | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -55,8 +57,12 @@ export default function SettingsPage() {
   // Logo & Branding state
   const [logoAllowed, setLogoAllowed] = React.useState(true);
   const [agencyLogoUrl, setAgencyLogoUrl] = React.useState<string | null>(null);
-  const [logoInputUrl, setLogoInputUrl] = React.useState("");
+  const [selectedLogoFile, setSelectedLogoFile] = React.useState<File | null>(null);
+  const [selectedLogoPreview, setSelectedLogoPreview] = React.useState<string | null>(null);
   const [savingLogo, setSavingLogo] = React.useState(false);
+  const [confirmRemoveLogoOpen, setConfirmRemoveLogoOpen] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Sync logo entitlement and URL from central subscription context
   React.useEffect(() => {
@@ -65,10 +71,10 @@ export default function SettingsPage() {
 
     if (overview?.logo?.customLogoUrl) {
       setAgencyLogoUrl(overview.logo.customLogoUrl);
-      setLogoInputUrl(overview.logo.customLogoUrl);
     } else if (overview?.agency?.logo) {
       setAgencyLogoUrl(overview.agency.logo);
-      setLogoInputUrl(overview.agency.logo);
+    } else {
+      setAgencyLogoUrl(null);
     }
   }, [isFeatureAllowed, overview]);
 
@@ -128,41 +134,86 @@ export default function SettingsPage() {
     }
   }, []);
 
-  const handleSaveLogo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!logoAllowed) {
-      toast.error("Custom agency logo is a Professional Feature. Please upgrade your plan.");
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("File exceeds 2MB limit. Please choose a smaller image.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
-    if (!logoInputUrl.trim()) {
-      toast.error("Please enter a valid image URL for your agency logo.");
+
+    const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+    if (!allowedTypes.includes(file.type.toLowerCase())) {
+      toast.error("Unsupported format. Please select a PNG, JPEG, or WEBP image.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    if (selectedLogoPreview) {
+      URL.revokeObjectURL(selectedLogoPreview);
+    }
+
+    setSelectedLogoFile(file);
+    setSelectedLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleCancelSelectedFile = () => {
+    if (selectedLogoPreview) {
+      URL.revokeObjectURL(selectedLogoPreview);
+    }
+    setSelectedLogoFile(null);
+    setSelectedLogoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleUploadLogo = async () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    if (!logoAllowed) {
+      toast.error("Custom agency logo is a Professional feature. Please upgrade your plan.");
+      return;
+    }
+    if (!selectedLogoFile) {
+      toast.error("Please select a logo image file to upload.");
       return;
     }
 
     setSavingLogo(true);
     try {
+      const formData = new FormData();
+      formData.append("file", selectedLogoFile);
+
       const res = await fetch("/api/agency/logo", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logoUrl: logoInputUrl.trim() }),
+        body: formData,
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error || "Failed to update agency logo.");
+        throw new Error(json.error || "Failed to upload agency logo.");
       }
 
       setAgencyLogoUrl(json.data.logo);
-      toast.success("Custom agency logo updated successfully!");
+      handleCancelSelectedFile();
+      await refreshSubscription();
+      toast.success("Custom agency logo uploaded successfully!");
     } catch (err: any) {
-      toast.error(err.message || "Failed to update agency logo.");
+      toast.error(err.message || "Failed to upload agency logo.");
     } finally {
       setSavingLogo(false);
     }
   };
 
-  const handleRemoveLogo = async () => {
+  const handleConfirmRemoveLogo = async () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
     if (!logoAllowed) {
-      toast.error("Custom agency logo is a Professional Feature. Please upgrade your plan.");
+      toast.error("Custom agency logo is a Professional feature. Please upgrade your plan.");
       return;
     }
 
@@ -177,7 +228,9 @@ export default function SettingsPage() {
       }
 
       setAgencyLogoUrl(null);
-      setLogoInputUrl("");
+      setConfirmRemoveLogoOpen(false);
+      handleCancelSelectedFile();
+      await refreshSubscription();
       toast.success("Custom agency logo removed.");
     } catch (err: any) {
       toast.error(err.message || "Failed to remove agency logo.");
@@ -1094,8 +1147,18 @@ export default function SettingsPage() {
                 )}
               </div>
 
+              {/* Hidden File Input */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                disabled={!logoAllowed || savingLogo}
+              />
+
               {/* Existing Logo Display */}
-              {agencyLogoUrl ? (
+              {agencyLogoUrl && !selectedLogoFile && (
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-6">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -1109,12 +1172,22 @@ export default function SettingsPage() {
                       {agencyLogoUrl}
                     </p>
                     {logoAllowed && (
-                      <div className="pt-2 flex items-center gap-2">
+                      <div className="pt-2 flex items-center justify-center sm:justify-start gap-2">
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={handleRemoveLogo}
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={savingLogo}
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 h-8 rounded-xl border-indigo-200 cursor-pointer"
+                        >
+                          <Upload className="h-3.5 w-3.5 mr-1" /> Change Logo
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setConfirmRemoveLogoOpen(true)}
                           disabled={savingLogo}
                           className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 h-8 rounded-xl border-rose-200 cursor-pointer"
                         >
@@ -1124,53 +1197,125 @@ export default function SettingsPage() {
                     )}
                   </div>
                 </div>
-              ) : (
-                <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-2">
-                  <ImageIcon className="h-8 w-8 text-slate-300 mx-auto" />
-                  <p className="text-xs font-semibold text-slate-600">No custom logo configured.</p>
-                  <p className="text-[11px] text-slate-400">
-                    Default TripDesk agency header will be rendered on documents until a custom logo is set.
-                  </p>
+              )}
+
+              {/* Staged File Preview Card */}
+              {selectedLogoFile && selectedLogoPreview && (
+                <div className="bg-indigo-50/40 border border-indigo-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-6">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={selectedLogoPreview}
+                    alt="New Logo Preview"
+                    className="max-h-20 max-w-48 object-contain bg-white p-2 rounded-xl border border-indigo-200 shadow-2xs"
+                  />
+                  <div className="space-y-1 text-center sm:text-left flex-1">
+                    <div className="flex items-center justify-center sm:justify-start gap-2">
+                      <span className="text-xs font-bold text-indigo-950 block">Ready to Upload</span>
+                      <span className="text-[10px] font-mono bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">
+                        {(selectedLogoFile.size / 1024).toFixed(1)} KB
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 font-medium">
+                      {selectedLogoFile.name}
+                    </p>
+                    <div className="pt-2 flex items-center justify-center sm:justify-start gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleUploadLogo}
+                        disabled={savingLogo}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold h-8 px-4 rounded-xl cursor-pointer"
+                      >
+                        {savingLogo ? "Uploading..." : "Confirm & Save Logo"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelSelectedFile}
+                        disabled={savingLogo}
+                        className="text-xs font-semibold text-slate-600 hover:text-slate-800 h-8 rounded-xl border-slate-200 cursor-pointer"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {/* Logo URL Upload Form */}
-              <form onSubmit={handleSaveLogo} className="space-y-4 pt-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                    <span>Logo Image URL (HTTPS)</span>
-                    {!logoAllowed && (
-                      <span className="text-[10px] text-amber-700 font-semibold flex items-center gap-1">
-                        <Lock className="h-3 w-3" /> Upgrade to Professional to update
-                      </span>
-                    )}
-                  </label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={logoInputUrl}
-                      onChange={(e) => setLogoInputUrl(e.target.value)}
-                      disabled={!logoAllowed || savingLogo}
-                      placeholder="https://example.com/logo.png"
-                      className="text-xs font-mono bg-white h-10"
-                    />
-                    <Button
-                      type="submit"
-                      disabled={!logoAllowed || savingLogo}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold h-10 px-5 rounded-xl shrink-0 cursor-pointer disabled:opacity-50"
-                    >
-                      {savingLogo ? "Saving..." : "Save Logo"}
-                    </Button>
+              {/* Upload Dropzone (when no file selected and no existing logo, or when changing) */}
+              {!agencyLogoUrl && !selectedLogoFile && (
+                <div
+                  onClick={() => {
+                    if (!logoAllowed) {
+                      toast.error("Custom agency logo is a Professional feature. Please upgrade your plan.");
+                      return;
+                    }
+                    fileInputRef.current?.click();
+                  }}
+                  className={`p-8 text-center rounded-2xl border-2 border-dashed transition-all cursor-pointer space-y-3 ${
+                    logoAllowed
+                      ? "bg-slate-50/70 border-slate-200 hover:bg-indigo-50/30 hover:border-indigo-300"
+                      : "bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed"
+                  }`}
+                >
+                  <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-2xs">
+                    <Upload className="h-6 w-6" />
                   </div>
-                  <p className="text-[10px] text-slate-400">
-                    Provide a direct HTTPS image URL for PNG, JPG, or SVG logos.
-                  </p>
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">
+                      {logoAllowed ? "Click to select a logo image" : "Custom Logo Locked on Starter"}
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Supports PNG, JPEG, or WEBP up to 2MB.
+                    </p>
+                  </div>
+                  {logoAllowed && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 h-8 px-4 rounded-xl"
+                    >
+                      Browse Files
+                    </Button>
+                  )}
                 </div>
-              </form>
+              )}
+
+              {/* Guidance Info */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-[11px] text-slate-600 space-y-1">
+                <p className="font-bold text-slate-800">Recommended Specifications:</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-slate-500">
+                  <li>Transparent PNG or high-contrast JPG/WEBP formatted in horizontal aspect ratio (e.g. 3:1 or 4:1).</li>
+                  <li>Maximum file size: 2MB. Files are securely hosted in agency-scoped storage.</li>
+                </ul>
+              </div>
             </div>
           </div>
         )}
       </div>
       </div>
+
+      {/* Confirm Remove Logo Modal */}
+      <ConfirmDialog
+        open={confirmRemoveLogoOpen}
+        onOpenChange={setConfirmRemoveLogoOpen}
+        title="Remove Custom Agency Logo"
+        description="Are you sure you want to remove your custom agency logo? Your customer quotations, booking vouchers, and share links will revert to the standard TripDesk agency header."
+        confirmText="Remove Logo"
+        variant="destructive"
+        loading={savingLogo}
+        onConfirm={handleConfirmRemoveLogo}
+      />
+
+      {/* Read-Only Mode Dialog */}
+      <ReadOnlyModeDialog
+        open={showReadOnlyDialog}
+        onOpenChange={setShowReadOnlyDialog}
+        reason={readOnlyReason}
+        actionName="Modifying agency branding and logo"
+      />
     </div>
   );
 }

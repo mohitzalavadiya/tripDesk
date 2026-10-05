@@ -13823,9 +13823,109 @@ The entitlement backend, transactional quota enforcement, and database-driven fe
 
 ---
 
+# 218. PHASE 218 — CUSTOM AGENCY LOGO REAL FILE UPLOAD & REPLACEMENT FLOW [CLOSED]
+
+## 218.1 Objective & Final Status
+- **Objective**:
+  1. Convert the legacy Custom Agency Logo URL-input mechanism into a real binary file upload, replacement, and removal flow.
+  2. Implement robust server-side binary validation: Enforce magic byte signatures for PNG, JPEG, and WEBP, strict 2MB file size limits, and explicitly disallow SVG files to prevent script injection / XSS vulnerabilities.
+  3. Integrate agency-scoped object storage via Supabase Storage (`agency-assets` bucket) under path convention `agencies/${agencyId}/logo/logo-${timestamp}-${random}.${ext}`.
+  4. Ensure safe replacement ordering: Validate new file $\to$ Upload new storage object $\to$ Update PostgreSQL `Agency.logo` $\to$ Safely delete old storage object (non-fatal cleanup).
+  5. Ensure safe removal flow: Set `Agency.logo` to `null` in PostgreSQL and clean up existing storage object idempotently.
+  6. Enforce strict server-side authorization via `requireWriteAccess()` (Phase 217 read-only and suspension protection) and `entitlementService.checkFeatureAllowed(agencyId, "CUSTOM_AGENCY_LOGO")`.
+  7. Update Agency Owner Settings UI (`src/app/(dashboard)/settings/page.tsx`) with a real file picker, local staged preview, file size pill, upload confirmation, active logo display, change logo trigger, removal with `ConfirmDialog`, and read-only blocking with `ReadOnlyModeDialog`.
+  8. Execute automated QA suite and ensure clean typecheck and production build.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 218.2 Architectural & Security Implementation Summary
+1. **Server-Side File Validation (`src/lib/services/agency-logo-service.ts`)**:
+   - `validateLogoFile()`: Validates file buffer length (1B to 2MB limit), whitelisted MIME types (`image/png`, `image/jpeg`, `image/webp`), and magic byte headers:
+     - PNG: `0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a`
+     - JPEG: `0xff, 0xd8, 0xff`
+     - WEBP: `RIFF....WEBP`
+   - Disallows SVG explicitly to prevent stored XSS / malicious active content.
+   - Throws structured `ApiError` codes (`EMPTY_FILE`, `FILE_TOO_LARGE`, `INVALID_FILE_TYPE`, `CORRUPTED_IMAGE`).
+2. **Agency-Scoped Storage & Tenant Isolation**:
+   - Bucket: `agency-assets` (public read).
+   - Storage Path: `agencies/${agencyId}/logo/logo-${Date.now()}-${random}.${ext}`.
+   - `extractAgencyLogoStoragePath()`: Validates that storage operations only resolve paths prefixed with `agencies/${agencyId}/logo/`, strictly preventing cross-tenant file deletion attempts.
+   - Never trusts client-supplied storage paths, file names, or agency IDs.
+3. **Safe Replacement Order & Failure Invariants**:
+   - Step 1: Validate new file buffer and magic bytes.
+   - Step 2: Upload new object into `agency-assets` bucket.
+   - Step 3: Update `Agency.logo` in PostgreSQL database.
+   - Step 4: If update succeeds and old logo resided in storage, delete old storage object.
+   - If upload fails: Existing DB record and old logo are untouched.
+   - If DB update fails: Newly uploaded orphan object is cleaned up, and old logo remains valid.
+   - If old storage deletion fails: DB update remains committed and new logo is preserved (non-fatal cleanup).
+4. **Safe Removal Flow (`DELETE /api/agency/logo`)**:
+   - Updates `Agency.logo` to `null` in PostgreSQL.
+   - Cleans up storage object if present; idempotent on repeat deletion.
+5. **Entitlement & Read-Only Hardening**:
+   - Gated server-side by `requireWriteAccess()` (Phase 217 suspension & expired subscription blocking).
+   - Gated server-side by `entitlementService.checkFeatureAllowed(agencyId, "CUSTOM_AGENCY_LOGO")`. Starter plan blocked (`403 FORBIDDEN`), Professional plan and active Trial allowed.
+6. **Settings Page UI Integration (`src/app/(dashboard)/settings/page.tsx`)**:
+   - Replaced URL text input with hidden `<input type="file" accept="image/png,image/jpeg,image/webp" />`.
+   - Staged preview card displays image preview, file name, and formatted file size in KB before upload.
+   - "Confirm & Save Logo" and "Cancel" actions for staged selection.
+   - Active logo card displays current logo image with "Change Logo" and "Remove Logo" buttons.
+   - Removal guarded by `ConfirmDialog` modal.
+   - Mutation triggers `refreshSubscription()` upon completion to synchronize context.
+   - Intercepted by `ReadOnlyModeDialog` if workspace is suspended or read-only.
+
+## 218.3 Database & Data Safety
+- **Database Schema**: Zero schema migrations required. Reused existing `Agency.logo String?` column safely.
+- **Backward Compatibility**: Legacy external URLs stored in `Agency.logo` remain viewable and can be safely replaced or deleted without throwing storage path errors.
+- **Baseline Data**: Zero production or QA baseline records altered or destroyed.
+
+## 218.4 Automated QA & Regression Test Matrix
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-218-logo-upload.ts` $\to$ **22/22 PASSED (100%)**
+  - Section 1 (Binary File Validation & Magic Bytes):
+    - Valid PNG magic bytes $\to$ PASS
+    - Valid JPEG magic bytes $\to$ PASS
+    - Valid WEBP magic bytes $\to$ PASS
+    - Corrupted / spoofed HTML $\to$ PASS (rejected with `CORRUPTED_IMAGE`)
+    - SVG format $\to$ PASS (rejected with `INVALID_FILE_TYPE`)
+    - Oversized file (>2MB) $\to$ PASS (rejected with `FILE_TOO_LARGE`)
+    - Empty file (0B) $\to$ PASS (rejected with `EMPTY_FILE`)
+  - Section 2 (Storage Path Resolution & Tenant Isolation):
+    - Scoped path extraction $\to$ PASS
+    - Cross-tenant storage path attempt $\to$ PASS (returns `null`, deletion blocked)
+    - Legacy external URL extraction $\to$ PASS (returns `null`, storage bypassed safely)
+  - Section 3 (Service Lifecycles):
+    - Initial logo upload & DB persistence $\to$ PASS
+    - Logo replacement with safe ordering $\to$ PASS
+    - Logo removal setting `Agency.logo = null` $\to$ PASS
+    - Repeated removal idempotency $\to$ PASS
+  - Section 4 (Entitlement & Read-Only Hardening):
+    - Starter plan blocked with 403 `FeatureNotAllowedError` $\to$ PASS
+    - `isFeatureAllowed` returns false on Starter $\to$ PASS
+    - Professional plan allowed $\to$ PASS
+    - Expired subscription blocked with 403 `ReadOnlyAccessError` $\to$ PASS
+    - Suspended agency status verified $\to$ PASS
+
+## 218.5 Files Changed / Added
+- `src/lib/services/agency-logo-service.ts` (New service for logo file validation, storage upload, safe replacement, and deletion)
+- `src/app/api/agency/logo/route.ts` (Refactored `POST` for `multipart/form-data` file upload and `DELETE` for logo removal)
+- `src/app/(dashboard)/settings/page.tsx` (Updated Agency Branding tab with real file picker, staged preview, change/remove flows, and `ConfirmDialog`)
+- `prisma/test-phase-218-logo-upload.ts` (Phase 218 automated QA test suite)
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` (Updated with Section 218)
+
+## 218.6 Known Limitations & Deferred Work
+- **Logo Display**: Logo rendering in quotations, proposal PDFs, customer portals, invoices, booking documents, and email templates remains deferred to future dedicated branding display phases.
+- **SVG Format**: SVG remains unsupported in this phase to prevent script injection / XSS risks until an SVG sanitization library is introduced.
+
+## 218.7 Closure
+**Phase 218 — CLOSED / PASS**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
 
 
 
