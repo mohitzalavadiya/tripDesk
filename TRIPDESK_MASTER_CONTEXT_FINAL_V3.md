@@ -13732,6 +13732,97 @@ The entitlement backend, transactional quota enforcement, and database-driven fe
 
 ---
 
+# 217. PHASE 217 — READ-ONLY MODE & AGENCY SUSPENSION HARDENING [CLOSED]
+
+## 217.1 Objective & Final Status
+- **Objective**:
+  1. Fix the backend security gap where a suspended agency owner with an active subscription could perform write/mutation actions, ensuring that `requireWriteAccess()` and server request context strictly enforce read-only status (`403 Forbidden` / `READ_ONLY_ACCESS`) when `Agency.status === 'SUSPENDED'`.
+  2. Protect custom agency logo upload and deletion mutation routes (`POST /api/agency/logo`, `DELETE /api/agency/logo`) with `requireWriteAccess()`.
+  3. Centralize frontend read-only state in `src/context/subscription-context.tsx` (`isReadOnly`, `readOnlyReason`, `canWrite`), establishing a clean precedence hierarchy where Read-Only Mode strictly supersedes Quota Exceeded states.
+  4. Create reusable `ReadOnlyModeDialog` and `ReadOnlyModeCard` components with differentiated UX messaging and action paths for Suspended accounts (WhatsApp Support CTA) vs Expired/Cancelled accounts (Renew Subscription CTA).
+  5. Proactively guard all listing pages (Trips, Quotations, Bookings, Hotels, Vehicles, Activities, Destinations, Rate Sheets, Customers) to intercept creation attempts before navigation or form rendering, and guard direct `/new` creation routes with `ReadOnlyModeCard`.
+  6. Guard quotation editor proposal generation, forking, and booking conversion flows against read-only state.
+  7. Preserve legitimate exceptions: Subscription renewal/payment requests (`POST /api/subscription/payment-request`), notification read statuses, and platform support communications.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 217.2 Architectural & UX Implementation Summary
+1. **Authoritative Server Guard Hardening (`src/lib/api/context.ts` & `src/app/api/agency/logo/route.ts`)**:
+   - `getRequestContext()`: Computes `isSuspendedAgency = isAgencyOwner && agency?.status === AgencyStatus.SUSPENDED` and forces `canWrite = false` and `hasFullAccess = false` whenever the agency is suspended, regardless of whether the subscription plan is Professional, Starter, or active Trial.
+   - `requireWriteAccess()`: Explicit check `if (context.agency.status === AgencyStatus.SUSPENDED)` throws `ReadOnlyAccessError("Your agency workspace is currently suspended. Creating or modifying business records is restricted. Please contact TripDesk support to reactivate your workspace.")`.
+   - `src/app/api/agency/logo/route.ts`: Updated `POST` and `DELETE` handlers to execute `await requireWriteAccess()` before performing logo modifications.
+2. **Centralized Frontend State & Hierarchy (`src/context/subscription-context.tsx`)**:
+   - Exposed `isReadOnly: boolean`, `readOnlyReason: ReadOnlyReason` (`"SUSPENDED" | "EXPIRED" | "CANCELLED" | "PAST_DUE" | "UNPAID" | null`), and `canWrite: boolean`.
+   - `canCreate(resourceKey)` returns `{ allowed: false, reason: "READ_ONLY_SUBSCRIPTION" }` when `isReadOnly` is true, ensuring read-only restrictions always take precedence over quota limit evaluations.
+3. **Reusable Read-Only UI Components**:
+   - `src/components/shared/read-only-mode-dialog.tsx`: Reusable modal dialog for listing pages and action triggers. Differentiates copy and CTA (Suspended $\to$ Contact Support via WhatsApp vs Expired $\to$ Upgrade / Renew Plan via `/subscription`).
+   - `src/components/shared/read-only-mode-card.tsx`: Reusable full-card view for direct `/new` routes, suppressing input forms when workspace is suspended or read-only.
+4. **Proactive Page & Workflow Interception**:
+   - `src/app/(dashboard)/trips/page.tsx` & `trips/new/page.tsx`: Intercepts "New Trip" button; displays `ReadOnlyModeDialog` or `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/quotations/page.tsx` & `quotations/new/page.tsx`: Intercepts "Generate Quotation"; displays `ReadOnlyModeDialog` or `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/bookings/page.tsx` & `bookings/new/page.tsx`: Intercepts "New Booking"; displays `ReadOnlyModeDialog` or `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/hotels/page.tsx` & `hotels/new/page.tsx`: Guarded with `ReadOnlyModeDialog` and `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/vehicles/page.tsx` & `vehicles/new/page.tsx`: Guarded with `ReadOnlyModeDialog` and `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/activities/page.tsx` & `activities/new/page.tsx`: Guarded with `ReadOnlyModeDialog` and `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/destinations/page.tsx`: Guarded with `ReadOnlyModeDialog`.
+   - `src/app/(dashboard)/rate-sheets/page.tsx` & `rate-sheets/new/page.tsx`: Guarded with `ReadOnlyModeDialog` and `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/customers/page.tsx`: Guarded with `ReadOnlyModeDialog`.
+   - `src/app/(dashboard)/trips/[id]/quotation/page.tsx`: Guarded "Generate Proposal", "Fork New Version", and "Convert to Booking" flows.
+5. **Legitimate Exceptions Preserved**:
+   - `POST /api/subscription/payment-request` remains available for suspended/expired agencies to submit offline payment proofs for reactivation.
+   - `PATCH /api/notifications` remains accessible for in-app alert status updates.
+   - Support communication channels remain open for account resolution.
+
+## 217.3 Database & System Safety
+- **Database Schema**: Zero schema modifications, zero migrations, no `prisma db push` or reset.
+- **Tenant Isolation**: Preserved. Session verified `agencyId` strictly enforced across all server handlers.
+- **External Dependencies**: Zero new libraries added.
+
+## 217.4 Automated QA & Regression Test Matrix
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-217-read-only-hardening.ts` $\to$ **43/43 PASSED (100%)**
+  - Section 1 (Server-Side Backend Guards):
+    - Active Agency + Active Subscription: PASS (write allowed)
+    - Active Agency + Active Trial: PASS (write allowed)
+    - Suspended Agency + Active Starter Subscription: PASS (write blocked, 403 ReadOnlyAccessError)
+    - Suspended Agency + Professional Subscription: PASS (write blocked, 403 ReadOnlyAccessError)
+    - Expired Subscription: PASS (write blocked, 403 ReadOnlyAccessError)
+    - Cancelled Subscription: PASS (write blocked, 403 ReadOnlyAccessError)
+  - Section 2 (Frontend Context State & Precedence Logic):
+    - Suspended Agency produces `isReadOnly=true` & `readOnlyReason='SUSPENDED'`: PASS
+    - Suspended Agency creation returns `READ_ONLY_SUBSCRIPTION` despite remaining quota: PASS
+    - Read-Only takes strict precedence over `QUOTA_EXCEEDED`: PASS
+    - Expired subscription prevents creation with `READ_ONLY_SUBSCRIPTION`: PASS
+    - Active subscription with quota space allows creation: PASS
+    - Active Starter at 20/20 returns `QUOTA_EXCEEDED`: PASS
+  - Section 3 (UI Presentation & CTAs):
+    - Suspended dialog styling, WhatsApp CTA, and external routing: PASS
+    - Expired dialog styling, `/subscription` CTA, and internal routing: PASS
+
+## 217.5 Files Changed / Added
+- `src/lib/api/context.ts` (Hardened `getRequestContext` and `requireWriteAccess` against `AgencyStatus.SUSPENDED`)
+- `src/app/api/agency/logo/route.ts` (Guarded POST/DELETE endpoints with `requireWriteAccess`)
+- `src/context/subscription-context.tsx` (Centralized `isReadOnly`, `readOnlyReason`, `canWrite`, precedence in `canCreate`)
+- `src/components/shared/read-only-mode-dialog.tsx` (New reusable dialog component)
+- `src/components/shared/read-only-mode-card.tsx` (New reusable guard card component)
+- `src/app/(dashboard)/trips/page.tsx` & `trips/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/quotations/page.tsx` & `quotations/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/bookings/page.tsx` & `bookings/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/hotels/page.tsx` & `hotels/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/vehicles/page.tsx` & `vehicles/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/activities/page.tsx` & `activities/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/destinations/page.tsx` (Read-only guards & modal UX)
+- `src/app/(dashboard)/rate-sheets/page.tsx` & `rate-sheets/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/customers/page.tsx` (Read-only guards & modal UX)
+- `src/app/(dashboard)/trips/[id]/quotation/page.tsx` (Proposal generation, version forking, and booking conversion guards)
+- `prisma/test-phase-217-read-only-hardening.ts` (Phase 217 automated QA test suite)
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 217.6 Closure
+**Phase 217 — CLOSED / PASS**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

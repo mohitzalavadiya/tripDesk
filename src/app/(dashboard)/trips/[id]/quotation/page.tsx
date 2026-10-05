@@ -42,6 +42,9 @@ import {
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
+import { useSubscription } from "@/context/subscription-context";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,17 +102,24 @@ export default function TripQuotationEditorPage() {
   const router = useRouter();
   const tripId = params.id as string;
 
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, canCreate, refreshSubscription } = useSubscription();
+
   // Data states
   const [quotations, setQuotations] = React.useState<QuotationWithRelations[]>([]);
   const [costing, setCosting] = React.useState<TripCostingResult | null>(null);
   const [activeQuoteId, setActiveQuoteId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+  const [showQuotaDialog, setShowQuotaDialog] = React.useState(false);
+  const [quotaEntityType, setQuotaEntityType] = React.useState<"QUOTATION" | "BOOKING">("QUOTATION");
   const [generating, setGenerating] = React.useState(false);
   const [forkingVersion, setForkingVersion] = React.useState(false);
   const [updatingPricing, setUpdatingPricing] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<ActiveTabType>("pricing");
+
+  const isReadOnly = isCentralReadOnly || localReadOnly;
 
   // Tax Rate Catalog states
   const [taxRates, setTaxRates] = React.useState<TaxRateItem[]>([]);
@@ -192,7 +202,7 @@ export default function TripQuotationEditorPage() {
       }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-        setIsReadOnly(true);
+        setLocalReadOnly(true);
       }
       setError(err?.message || "Failed to load trip quotations.");
     } finally {
@@ -244,8 +254,17 @@ export default function TripQuotationEditorPage() {
 
   // Generate Quotation Snapshot
   const handleGenerate = async () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    if (!activeQuote && !canCreate("QUOTATIONS").allowed) {
+      setQuotaEntityType("QUOTATION");
+      setShowQuotaDialog(true);
+      return;
+    }
     if (isReadOnly) {
-      toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+      toast.error("Modifications are restricted in read-only mode.");
       return;
     }
 
@@ -264,11 +283,18 @@ export default function TripQuotationEditorPage() {
 
       if (res.success && res.data) {
         toast.success(`Proposal snapshot ${res.data.quotationNumber} (V${res.data.version}) created!`);
+        refreshSubscription();
         await fetchTripQuotationData();
         setActiveQuoteId(res.data.id);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to generate proposal.");
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setLocalReadOnly(true);
+        refreshSubscription();
+        toast.error("Modifications restricted. Read-only mode is active.");
+      } else {
+        toast.error(err?.message || "Failed to generate proposal.");
+      }
     } finally {
       setGenerating(false);
     }
@@ -276,24 +302,59 @@ export default function TripQuotationEditorPage() {
 
   // Fork New Version
   const handleForkVersion = async () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    if (!canCreate("QUOTATIONS").allowed) {
+      setQuotaEntityType("QUOTATION");
+      setShowQuotaDialog(true);
+      return;
+    }
     if (!activeQuote || isReadOnly) return;
     try {
       setForkingVersion(true);
       const res = await quotationClient.createQuotationVersion(activeQuote.id);
       if (res.success && res.data) {
         toast.success(`Forked new version V${res.data.version} successfully!`);
+        refreshSubscription();
         await fetchTripQuotationData();
         setActiveQuoteId(res.data.id);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to create new quotation version.");
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setLocalReadOnly(true);
+        refreshSubscription();
+        toast.error("Modifications restricted. Read-only mode is active.");
+      } else {
+        toast.error(err?.message || "Failed to create new quotation version.");
+      }
     } finally {
       setForkingVersion(false);
     }
   };
 
+  const handleConvertToBooking = () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    if (!canCreate("BOOKINGS").allowed) {
+      setQuotaEntityType("BOOKING");
+      setShowQuotaDialog(true);
+      return;
+    }
+    if (activeQuote) {
+      router.push(`/bookings/new?quotationId=${activeQuote.id}&tripId=${tripId}`);
+    }
+  };
+
   // Status Change
   const handleStatusChange = async (newStatus: QuotationStatus) => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
     if (!activeQuote || isReadOnly) return;
     try {
       const res = await quotationClient.updateQuotation(activeQuote.id, { status: newStatus });
@@ -302,7 +363,13 @@ export default function TripQuotationEditorPage() {
         setQuotations((prev) => prev.map((q) => (q.id === activeQuote.id ? res.data! : q)));
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to update status.");
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setLocalReadOnly(true);
+        refreshSubscription();
+        toast.error("Modifications restricted. Read-only mode is active.");
+      } else {
+        toast.error(err?.message || "Failed to update status.");
+      }
     }
   };
 
@@ -769,7 +836,7 @@ export default function TripQuotationEditorPage() {
 
                 <Button
                   size="sm"
-                  onClick={() => router.push(`/bookings/new?quotationId=${activeQuote.id}&tripId=${tripId}`)}
+                  onClick={handleConvertToBooking}
                   className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
                 >
                   <CalendarCheck className="h-3.5 w-3.5 mr-1 text-emerald-600" />
@@ -2019,6 +2086,21 @@ export default function TripQuotationEditorPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Read-Only Mode Warning Dialog */}
+        <ReadOnlyModeDialog
+          open={showReadOnlyDialog}
+          onOpenChange={setShowReadOnlyDialog}
+          reason={readOnlyReason}
+          actionName="Editing or generating quotation proposals"
+        />
+
+        {/* Quota Exceeded Dialog */}
+        <QuotaExceededDialog
+          open={showQuotaDialog}
+          onOpenChange={setShowQuotaDialog}
+          resourceName={quotaEntityType === "QUOTATION" ? "Quotations" : "Bookings"}
+        />
 
         {/* Global Action Confirmation Modal */}
         <ConfirmDialog

@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { DestinationMultiSelect } from "@/components/shared/destination-multi-select";
 import { QuotaExceededCard } from "@/components/shared/quota-exceeded-card";
+import { ReadOnlyModeCard } from "@/components/shared/read-only-mode-card";
 import { useSubscription } from "@/context/subscription-context";
 import { customerClient, tripClient, destinationClient } from "@/lib/api-client";
 import { Customer, Destination, TripStatus } from "@prisma/client";
@@ -78,7 +79,15 @@ function NewTripForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerIdParam = searchParams.get("customerId");
-  const { canCreate, incrementUsage, refreshSubscription, loading: subscriptionLoading, overview } = useSubscription();
+  const {
+    canCreate,
+    incrementUsage,
+    refreshSubscription,
+    loading: subscriptionLoading,
+    overview,
+    isReadOnly: subReadOnly,
+    readOnlyReason,
+  } = useSubscription();
 
   // State
   const [customers, setCustomers] = React.useState<Customer[]>([]);
@@ -88,6 +97,7 @@ function NewTripForm() {
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [apiError, setApiError] = React.useState<string | null>(null);
 
+  const effectiveReadOnly = isReadOnly || subReadOnly;
   const decision = canCreate("TRIPS");
 
   // Fetch real customers and active destinations from API
@@ -212,8 +222,15 @@ function NewTripForm() {
           ]}
         />
 
-        {/* Direct URL Quota Exceeded Guard */}
-        {!subscriptionLoading && !decision.allowed && decision.reason === "QUOTA_EXCEEDED" ? (
+        {/* Direct URL Guards (Read-Only Mode takes precedence over Quota) */}
+        {!subscriptionLoading && effectiveReadOnly ? (
+          <ReadOnlyModeCard
+            resourceName="Trip"
+            reason={readOnlyReason}
+            backHref="/trips"
+            backLabel="Back to Trips"
+          />
+        ) : !subscriptionLoading && !decision.allowed && decision.reason === "QUOTA_EXCEEDED" ? (
           <QuotaExceededCard
             resourceName="Trip"
             currentUsage={decision.currentUsage}

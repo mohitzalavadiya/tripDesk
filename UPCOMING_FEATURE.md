@@ -70,8 +70,14 @@ quatation pdf UI changes
 
 test Feedback &  Reviews page
 
+add subscription flow
+
+
+
+
 **TODO**
 
+add agency logo
 
 manage read only from frontend also
 

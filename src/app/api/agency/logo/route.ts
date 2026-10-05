@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAgencyOwnerContext } from "@/lib/api/context";
+import { requireWriteAccess } from "@/lib/api/context";
 import { entitlementService } from "@/lib/services/entitlement-service";
 import { prisma } from "@/lib/prisma";
 
@@ -7,11 +7,11 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/agency/logo
- * Update custom agency logo. Server-side gated by CUSTOM_AGENCY_LOGO entitlement.
+ * Update custom agency logo. Server-side gated by requireWriteAccess and CUSTOM_AGENCY_LOGO entitlement.
  */
 export async function POST(request: NextRequest) {
   try {
-    const authContext = await requireAgencyOwnerContext();
+    const authContext = await requireWriteAccess();
     const agencyId = authContext.agencyId;
 
     // Enforce CUSTOM_AGENCY_LOGO entitlement server-side
@@ -55,11 +55,11 @@ export async function POST(request: NextRequest) {
 
 /**
  * DELETE /api/agency/logo
- * Remove custom agency logo. Server-side gated by CUSTOM_AGENCY_LOGO entitlement.
+ * Remove custom agency logo. Server-side gated by requireWriteAccess and CUSTOM_AGENCY_LOGO entitlement.
  */
 export async function DELETE(_request: NextRequest) {
   try {
-    const authContext = await requireAgencyOwnerContext();
+    const authContext = await requireWriteAccess();
     const agencyId = authContext.agencyId;
 
     // Enforce CUSTOM_AGENCY_LOGO entitlement server-side

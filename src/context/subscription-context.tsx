@@ -26,6 +26,8 @@ export interface UsageState {
   BOOKINGS: EntitlementUsageItem | null;
 }
 
+export type ReadOnlyReason = "SUSPENDED" | "EXPIRED" | "CANCELLED" | "PAST_DUE" | "UNPAID" | null;
+
 export interface QuotaDecision {
   allowed: boolean;
   reason?: "QUOTA_EXCEEDED" | "READ_ONLY_SUBSCRIPTION";
@@ -42,6 +44,9 @@ export interface SubscriptionContextType {
   usage: UsageState;
   loading: boolean;
   error: string | null;
+  isReadOnly: boolean;
+  readOnlyReason: ReadOnlyReason;
+  canWrite: boolean;
   refreshSubscription: () => Promise<void>;
   isFeatureAllowed: (featureKey: keyof EntitlementsState) => boolean;
   canCreate: (resourceKey: "TRIPS" | "QUOTATIONS" | "BOOKINGS") => QuotaDecision;
@@ -144,6 +149,35 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     [entitlements]
   );
 
+  const { isReadOnly, readOnlyReason } = React.useMemo(() => {
+    if (loading || !overview) {
+      return { isReadOnly: false, readOnlyReason: null as ReadOnlyReason };
+    }
+
+    if (overview.agency?.status === "SUSPENDED") {
+      return { isReadOnly: true, readOnlyReason: "SUSPENDED" as ReadOnlyReason };
+    }
+
+    const sub = overview.subscription;
+    if (!sub) {
+      return { isReadOnly: true, readOnlyReason: "EXPIRED" as ReadOnlyReason };
+    }
+
+    if (sub.status === "EXPIRED" || (sub.isTrialExpired && sub.status !== "ACTIVE")) {
+      return { isReadOnly: true, readOnlyReason: "EXPIRED" as ReadOnlyReason };
+    }
+
+    if (sub.status === "CANCELLED" || sub.status === "CANCELED") {
+      return { isReadOnly: true, readOnlyReason: "CANCELLED" as ReadOnlyReason };
+    }
+
+    if (sub.status === "PAST_DUE" || sub.status === "UNPAID") {
+      return { isReadOnly: true, readOnlyReason: "PAST_DUE" as ReadOnlyReason };
+    }
+
+    return { isReadOnly: false, readOnlyReason: null as ReadOnlyReason };
+  }, [loading, overview]);
+
   const canCreate = React.useCallback(
     (resourceKey: "TRIPS" | "QUOTATIONS" | "BOOKINGS"): QuotaDecision => {
       if (loading) {
@@ -157,13 +191,6 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         };
       }
 
-      const sub = overview?.subscription;
-      const isReadOnly =
-        sub?.status === "PAST_DUE" ||
-        sub?.status === "CANCELED" ||
-        sub?.status === "UNPAID" ||
-        (sub?.isTrialExpired && sub?.status !== "ACTIVE");
-
       if (isReadOnly) {
         return {
           allowed: false,
@@ -175,6 +202,8 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           loading: false,
         };
       }
+
+      const sub = overview?.subscription;
 
       const item = usage[resourceKey];
       if (!item) {
@@ -231,7 +260,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         loading: false,
       };
     },
-    [loading, overview, usage]
+    [isReadOnly, loading, overview, usage]
   );
 
   const incrementUsage = React.useCallback(
@@ -270,6 +299,9 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         usage,
         loading,
         error,
+        isReadOnly,
+        readOnlyReason,
+        canWrite: !isReadOnly,
         refreshSubscription: fetchSubscription,
         isFeatureAllowed,
         canCreate,
@@ -291,6 +323,9 @@ export function useSubscription(): SubscriptionContextType {
       usage: defaultUsage,
       loading: false,
       error: null,
+      isReadOnly: false,
+      readOnlyReason: null,
+      canWrite: true,
       refreshSubscription: async () => {},
       isFeatureAllowed: () => false,
       canCreate: (_resourceKey: "TRIPS" | "QUOTATIONS" | "BOOKINGS"): QuotaDecision => ({

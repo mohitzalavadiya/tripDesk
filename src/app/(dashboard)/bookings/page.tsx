@@ -35,6 +35,7 @@ import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
 import { useSubscription } from "@/context/subscription-context";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -81,7 +82,7 @@ const PAYMENT_FILTER_LABELS: Record<string, string> = {
 
 export default function BookingsDashboardPage() {
   const router = useRouter();
-  const { canCreate, overview } = useSubscription();
+  const { canCreate, overview, isReadOnly: subReadOnly, readOnlyReason } = useSubscription();
 
   // Data states
   const [bookings, setBookings] = React.useState<BookingWithRelations[]>([]);
@@ -90,16 +91,25 @@ export default function BookingsDashboardPage() {
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const [showQuotaDialog, setShowQuotaDialog] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+
+  const effectiveReadOnly = isReadOnly || subReadOnly;
 
   const handleNewBooking = () => {
-    if (isReadOnly) {
-      toast.error("Subscription expired. Booking modifications are restricted to read-only mode.");
+    if (effectiveReadOnly) {
+      setShowReadOnlyDialog(true);
       return;
     }
     const decision = canCreate("BOOKINGS");
-    if (!decision.allowed && decision.reason === "QUOTA_EXCEEDED") {
-      setShowQuotaDialog(true);
-      return;
+    if (!decision.allowed) {
+      if (decision.reason === "READ_ONLY_SUBSCRIPTION") {
+        setShowReadOnlyDialog(true);
+        return;
+      }
+      if (decision.reason === "QUOTA_EXCEEDED") {
+        setShowQuotaDialog(true);
+        return;
+      }
     }
     router.push("/bookings/new");
   };
@@ -595,6 +605,14 @@ export default function BookingsDashboardPage() {
           }
         }}
       />
+      {/* Read-Only Mode Dialog */}
+      <ReadOnlyModeDialog
+        open={showReadOnlyDialog}
+        onOpenChange={setShowReadOnlyDialog}
+        reason={readOnlyReason}
+        actionName="Creating new bookings"
+      />
+
       {/* Quota Exceeded Dialog */}
       <QuotaExceededDialog
         open={showQuotaDialog}

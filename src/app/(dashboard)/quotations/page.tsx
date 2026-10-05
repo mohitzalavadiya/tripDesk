@@ -34,6 +34,7 @@ import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
 import { useSubscription } from "@/context/subscription-context";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -119,7 +120,7 @@ export function QuotationStatusBadge({ status }: { status: QuotationStatus | str
 
 export default function QuotationsPage() {
   const router = useRouter();
-  const { canCreate, overview } = useSubscription();
+  const { canCreate, overview, isReadOnly: subReadOnly, readOnlyReason } = useSubscription();
 
   // Data states
   const [quotations, setQuotations] = React.useState<QuotationWithRelations[]>([]);
@@ -128,16 +129,25 @@ export default function QuotationsPage() {
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const [showQuotaDialog, setShowQuotaDialog] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+
+  const effectiveReadOnly = isReadOnly || subReadOnly;
 
   const handleGenerateQuotation = () => {
-    if (isReadOnly) {
-      toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+    if (effectiveReadOnly) {
+      setShowReadOnlyDialog(true);
       return;
     }
     const decision = canCreate("QUOTATIONS");
-    if (!decision.allowed && decision.reason === "QUOTA_EXCEEDED") {
-      setShowQuotaDialog(true);
-      return;
+    if (!decision.allowed) {
+      if (decision.reason === "READ_ONLY_SUBSCRIPTION") {
+        setShowReadOnlyDialog(true);
+        return;
+      }
+      if (decision.reason === "QUOTA_EXCEEDED") {
+        setShowQuotaDialog(true);
+        return;
+      }
     }
     router.push("/trips");
   };
@@ -666,6 +676,14 @@ export default function QuotationsPage() {
             }
           }}
         />
+        {/* Read-Only Mode Dialog */}
+        <ReadOnlyModeDialog
+          open={showReadOnlyDialog}
+          onOpenChange={setShowReadOnlyDialog}
+          reason={readOnlyReason}
+          actionName="Generating new quotations"
+        />
+
         {/* Quota Exceeded Dialog */}
         <QuotaExceededDialog
           open={showQuotaDialog}

@@ -24,6 +24,8 @@ import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { useSubscription } from "@/context/subscription-context";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,13 +52,25 @@ import { Compass } from "lucide-react";
 
 export default function ActivitiesPage() {
   const router = useRouter();
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
 
   // Data states
   const [activities, setActivities] = React.useState<ActivityWithRelations[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
   const [archivingId, setArchivingId] = React.useState<string | null>(null);
+
+  const isReadOnly = isCentralReadOnly || localReadOnly;
+
+  const handleAddActivity = () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    router.push("/activities/new");
+  };
 
   // Filter & Search states
   const [search, setSearch] = React.useState("");
@@ -96,7 +110,7 @@ export default function ActivitiesPage() {
       }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-        setIsReadOnly(true);
+        setLocalReadOnly(true);
       }
       setError(getErrorMessage(err, "Unable to load activity catalog. Please try again."));
     } finally {
@@ -127,8 +141,12 @@ export default function ActivitiesPage() {
 
   // Archive Activity
   const handleArchive = (id: string, name: string) => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
     if (isReadOnly) {
-      toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+      toast.error("Modifications are restricted in read-only mode.");
       return;
     }
 
@@ -147,8 +165,9 @@ export default function ActivitiesPage() {
           await fetchActivities();
         } catch (err: any) {
           if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-            setIsReadOnly(true);
-            toast.error("Subscription expired. Read-only mode is active.");
+            setLocalReadOnly(true);
+            refreshSubscription();
+            toast.error("Modifications restricted. Read-only mode is active.");
           } else {
             toast.error(getErrorMessage(err, "We couldn't archive the activity. Please try again."));
           }
@@ -210,8 +229,7 @@ export default function ActivitiesPage() {
           {/* Right Action Controls */}
           <div className="flex items-center gap-3 z-10 self-start lg:self-center">
             <Button
-              onClick={() => router.push("/activities/new")}
-              disabled={isReadOnly}
+              onClick={handleAddActivity}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
@@ -275,7 +293,7 @@ export default function ActivitiesPage() {
                     : "Add your first sightseeing tour or adventure activity to assign it to itineraries."
                 }
                 actionText={isFilterActive ? "Clear Filter" : "Add Activity"}
-                onAction={isFilterActive ? handleClearFilters : () => router.push("/activities/new")}
+                onAction={isFilterActive ? handleClearFilters : handleAddActivity}
               />
             </div>
           ) : !loading && !error && (
@@ -432,6 +450,14 @@ export default function ActivitiesPage() {
           </div>
         </div>
       </div>
+
+      {/* Read-Only Mode Warning Dialog */}
+      <ReadOnlyModeDialog
+        open={showReadOnlyDialog}
+        onOpenChange={setShowReadOnlyDialog}
+        reason={readOnlyReason}
+        actionLabel="Adding or modifying activities"
+      />
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

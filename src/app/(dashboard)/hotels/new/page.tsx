@@ -7,6 +7,8 @@ import * as Yup from "yup";
 import { Hotel, ArrowLeft, Loader2, Plus, AlertCircle, Info, MapPin } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ReadOnlyModeCard } from "@/components/shared/read-only-mode-card";
+import { useSubscription } from "@/context/subscription-context";
 import { DestinationSelect } from "@/components/shared/destination-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,8 +38,11 @@ const createHotelSchema = Yup.object().shape({
 
 export default function NewHotelPage() {
   const router = useRouter();
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
   const [apiError, setApiError] = React.useState<string | null>(null);
+
+  const isReadOnly = isCentralReadOnly || localReadOnly;
 
   const formik = useFormik({
     initialValues: {
@@ -56,7 +61,7 @@ export default function NewHotelPage() {
     validationSchema: createHotelSchema,
     onSubmit: async (values, { setSubmitting }) => {
       if (isReadOnly) {
-        toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+        toast.error("Modifications are restricted in read-only mode.");
         return;
       }
 
@@ -84,8 +89,9 @@ export default function NewHotelPage() {
         }
       } catch (err: any) {
         if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-          setIsReadOnly(true);
-          toast.error("Subscription expired. Read-only mode is active.");
+          setLocalReadOnly(true);
+          refreshSubscription();
+          toast.error("Modifications restricted. Read-only mode is active.");
         } else {
           setApiError(err?.message || "Failed to create hotel property.");
           toast.error(err?.message || "Failed to add hotel.");
@@ -113,7 +119,7 @@ export default function NewHotelPage() {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
         {/* Read-Only Banner */}
-        {isReadOnly && <ReadOnlyBanner moduleName="Hotel Creation" />}
+        {isReadOnly && !isCentralReadOnly && <ReadOnlyBanner moduleName="Hotel Creation" />}
 
         <PageHeader
           title="Add Contracted Hotel Property"
@@ -131,7 +137,17 @@ export default function NewHotelPage() {
           </div>
         )}
 
-        <div className="max-w-3xl mx-auto w-full">
+        {isCentralReadOnly ? (
+          <div className="max-w-3xl mx-auto">
+            <ReadOnlyModeCard
+              title="Hotel Creation Restricted"
+              description="Your agency workspace is currently in read-only mode. Adding new hotels is not permitted."
+              reason={readOnlyReason}
+              backHref="/hotels"
+              backLabel="Back to Hotels"
+            />
+          </div>
+        ) : (
           <form onSubmit={formik.handleSubmit} className="space-y-6">
             {/* Property Information Card */}
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-5">
@@ -331,7 +347,7 @@ export default function NewHotelPage() {
               </Button>
             </div>
           </form>
-        </div>
+        )}
       </div>
     </div>
   );

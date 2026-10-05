@@ -33,6 +33,8 @@ import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { useSubscription } from "@/context/subscription-context";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,14 +70,34 @@ import { Download } from "lucide-react";
 
 export default function RateSheetsPage() {
   const router = useRouter();
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
 
   // Data states
   const [rateSheets, setRateSheets] = React.useState<RateSheetWithRelations[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
   const [importModalOpen, setImportModalOpen] = React.useState(false);
   const [downloadingSample, setDownloadingSample] = React.useState(false);
+
+  const isReadOnly = isCentralReadOnly || localReadOnly;
+
+  const handleAddRateSheet = () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    router.push("/rate-sheets/new");
+  };
+
+  const handleImportExcel = () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    setImportModalOpen(true);
+  };
 
   // Search & Filter states
   const [search, setSearch] = React.useState("");
@@ -123,7 +145,7 @@ export default function RateSheetsPage() {
       }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-        setIsReadOnly(true);
+        setLocalReadOnly(true);
       }
       setError(getErrorMessage(err, "Unable to load rate sheets. Please try again."));
     } finally {
@@ -158,8 +180,12 @@ export default function RateSheetsPage() {
 
   // Handle Archive
   const handleArchive = (id: string, name: string, number?: string | null) => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
     if (isReadOnly) {
-      toast.error("Subscription expired. Read-only mode is active.");
+      toast.error("Modifications are restricted in read-only mode.");
       return;
     }
 
@@ -177,7 +203,13 @@ export default function RateSheetsPage() {
           setConfirmAction(null);
           await fetchRateSheets();
         } catch (err: any) {
-          toast.error(getErrorMessage(err, "We couldn't archive the rate sheet. Please try again."));
+          if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+            setLocalReadOnly(true);
+            refreshSubscription();
+            toast.error("Modifications restricted. Read-only mode is active.");
+          } else {
+            toast.error(getErrorMessage(err, "We couldn't archive the rate sheet. Please try again."));
+          }
         } finally {
           setActionLoading(false);
         }
@@ -270,8 +302,7 @@ export default function RateSheetsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setImportModalOpen(true)}
-              disabled={isReadOnly}
+              onClick={handleImportExcel}
               className="bg-white border-indigo-200 hover:bg-indigo-50 text-indigo-700 font-semibold text-xs h-9.5 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
               <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
@@ -279,8 +310,7 @@ export default function RateSheetsPage() {
             </Button>
 
             <Button
-              onClick={() => router.push("/rate-sheets/new")}
-              disabled={isReadOnly}
+              onClick={handleAddRateSheet}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
@@ -391,7 +421,7 @@ export default function RateSheetsPage() {
                     : "Add supplier rate sheets for hotels with seasonal validity to automate trip costing."
                 }
                 actionText={isFilterActive ? "Clear Filter" : "Add First Rate Sheet"}
-                onAction={isFilterActive ? handleClearFilters : () => router.push("/rate-sheets/new")}
+                onAction={isFilterActive ? handleClearFilters : handleAddRateSheet}
               />
             </div>
           ) : !loading && !error && (
@@ -626,6 +656,14 @@ export default function RateSheetsPage() {
           </div>
         </div>
       </div>
+
+      {/* Read-Only Mode Warning Dialog */}
+      <ReadOnlyModeDialog
+        open={showReadOnlyDialog}
+        onOpenChange={setShowReadOnlyDialog}
+        reason={readOnlyReason}
+        actionLabel="Adding or importing rate sheets"
+      />
 
       {/* Excel Import Modal */}
       <ExcelImportModal

@@ -8,6 +8,8 @@ import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { useSubscription } from "@/context/subscription-context";
 import {
   customerClient,
   CustomerWithCounts,
@@ -82,12 +84,24 @@ function getGradient(name: string) {
 
 export default function CustomersPage() {
   const router = useRouter();
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
 
   // Data states
   const [customers, setCustomers] = React.useState<CustomerWithCounts[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+
+  const isReadOnly = isCentralReadOnly || localReadOnly;
+
+  const handleAddCustomer = () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    router.push("/customers/new");
+  };
 
   // Search & Filter states
   const [search, setSearch] = React.useState("");
@@ -133,7 +147,7 @@ export default function CustomersPage() {
       }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-        setIsReadOnly(true);
+        setLocalReadOnly(true);
       }
       setError(getErrorMessage(err, "Unable to load customer directory. Please try again."));
     } finally {
@@ -166,8 +180,12 @@ export default function CustomersPage() {
 
   // Archive Customer
   const handleArchive = (id: string, name: string, customerNumber?: string | null) => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
     if (isReadOnly) {
-      toast.error("Subscription expired. Read-only mode is active.");
+      toast.error("Modifications are restricted in read-only mode.");
       return;
     }
 
@@ -185,7 +203,13 @@ export default function CustomersPage() {
           setConfirmAction(null);
           await fetchCustomers();
         } catch (err: any) {
-          toast.error(getErrorMessage(err, "We couldn't archive the customer. Please try again."));
+          if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+            setLocalReadOnly(true);
+            refreshSubscription();
+            toast.error("Modifications restricted. Read-only mode is active.");
+          } else {
+            toast.error(getErrorMessage(err, "We couldn't archive the customer. Please try again."));
+          }
         } finally {
           setActionLoading(false);
         }
@@ -244,8 +268,7 @@ export default function CustomersPage() {
           {/* Action Buttons */}
           <div className="flex items-center gap-3 z-10 self-start lg:self-center">
             <Button
-              onClick={() => router.push("/customers/new")}
-              disabled={isReadOnly}
+              onClick={handleAddCustomer}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
@@ -364,7 +387,7 @@ export default function CustomersPage() {
                     : "Add clients to track their inquiries, trip itineraries, costing proposals, and booking payments."
                 }
                 actionText={isFilterActive ? "Clear Filter" : "Add First Customer"}
-                onAction={isFilterActive ? handleClearFilters : () => router.push("/customers/new")}
+                onAction={isFilterActive ? handleClearFilters : handleAddCustomer}
               />
             </div>
           ) : !loading && !error && (
@@ -578,6 +601,14 @@ export default function CustomersPage() {
           </div>
         </div>
       </div>
+
+      {/* Read-Only Mode Warning Dialog */}
+      <ReadOnlyModeDialog
+        open={showReadOnlyDialog}
+        onOpenChange={setShowReadOnlyDialog}
+        reason={readOnlyReason}
+        actionLabel="Adding or modifying customers"
+      />
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

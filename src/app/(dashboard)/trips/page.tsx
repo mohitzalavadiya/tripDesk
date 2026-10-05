@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
 import { useSubscription } from "@/context/subscription-context";
 import { tripClient } from "@/lib/api-client";
 import { TripStatus } from "@prisma/client";
@@ -192,7 +193,7 @@ export function TripStatusBadge({ status }: { status: TripStatus | string }) {
 
 export default function TripsPage() {
   const router = useRouter();
-  const { canCreate, overview } = useSubscription();
+  const { canCreate, overview, isReadOnly: subReadOnly, readOnlyReason } = useSubscription();
 
   // Data states
   const [trips, setTrips] = React.useState<TripWithRelations[]>([]);
@@ -201,16 +202,25 @@ export default function TripsPage() {
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [archivingId, setArchivingId] = React.useState<string | null>(null);
   const [showQuotaDialog, setShowQuotaDialog] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+
+  const effectiveReadOnly = isReadOnly || subReadOnly;
 
   const handleNewTrip = () => {
-    if (isReadOnly) {
-      toast.error("Subscription expired. Trip modifications are restricted to read-only mode.");
+    if (effectiveReadOnly) {
+      setShowReadOnlyDialog(true);
       return;
     }
     const decision = canCreate("TRIPS");
-    if (!decision.allowed && decision.reason === "QUOTA_EXCEEDED") {
-      setShowQuotaDialog(true);
-      return;
+    if (!decision.allowed) {
+      if (decision.reason === "READ_ONLY_SUBSCRIPTION") {
+        setShowReadOnlyDialog(true);
+        return;
+      }
+      if (decision.reason === "QUOTA_EXCEEDED") {
+        setShowQuotaDialog(true);
+        return;
+      }
     }
     router.push("/trips/new");
   };
@@ -697,6 +707,14 @@ export default function TripsPage() {
           </div>
         </div>
       </div>
+
+      {/* Read-Only Mode Dialog */}
+      <ReadOnlyModeDialog
+        open={showReadOnlyDialog}
+        onOpenChange={setShowReadOnlyDialog}
+        reason={readOnlyReason}
+        actionName="Creating new trips"
+      />
 
       {/* Quota Exceeded Dialog */}
       <QuotaExceededDialog

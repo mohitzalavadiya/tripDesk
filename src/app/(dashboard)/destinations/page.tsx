@@ -22,6 +22,8 @@ import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { useSubscription } from "@/context/subscription-context";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { DestinationDialog } from "@/components/destinations/destination-dialog";
 import { getErrorMessage } from "@/lib/utils";
@@ -56,11 +58,16 @@ import { Destination, DestinationStatus } from "@prisma/client";
 import { toast } from "sonner";
 
 export default function DestinationsPage() {
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
+
   // Data states
   const [destinations, setDestinations] = React.useState<Destination[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+
+  const isReadOnly = isCentralReadOnly || localReadOnly;
 
   // Search & Filter states
   const [search, setSearch] = React.useState("");
@@ -116,7 +123,7 @@ export default function DestinationsPage() {
       }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-        setIsReadOnly(true);
+        setLocalReadOnly(true);
       }
       setError(getErrorMessage(err, "Unable to load destination catalog. Please try again."));
     } finally {
@@ -139,8 +146,12 @@ export default function DestinationsPage() {
 
   // Open Create Modal
   const handleCreate = () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
     if (isReadOnly) {
-      toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+      toast.error("Modifications are restricted in read-only mode.");
       return;
     }
     setEditingDestination(null);
@@ -149,8 +160,12 @@ export default function DestinationsPage() {
 
   // Open Edit Modal
   const handleEdit = (dest: Destination) => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
     if (isReadOnly) {
-      toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+      toast.error("Modifications are restricted in read-only mode.");
       return;
     }
     setEditingDestination(dest);
@@ -159,8 +174,12 @@ export default function DestinationsPage() {
 
   // Toggle Active / Inactive Status
   const handleToggleStatus = async (dest: Destination) => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
     if (isReadOnly) {
-      toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+      toast.error("Modifications are restricted in read-only mode.");
       return;
     }
 
@@ -178,14 +197,24 @@ export default function DestinationsPage() {
       );
       await fetchDestinations();
     } catch (err: any) {
-      toast.error(getErrorMessage(err, "Failed to update destination status."));
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setLocalReadOnly(true);
+        refreshSubscription();
+        toast.error("Modifications restricted. Read-only mode is active.");
+      } else {
+        toast.error(getErrorMessage(err, "Failed to update destination status."));
+      }
     }
   };
 
   // Delete Destination with ConfirmDialog
   const handleDelete = (dest: Destination) => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
     if (isReadOnly) {
-      toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+      toast.error("Modifications are restricted in read-only mode.");
       return;
     }
 
@@ -202,12 +231,18 @@ export default function DestinationsPage() {
           setConfirmAction(null);
           await fetchDestinations();
         } catch (err: any) {
-          toast.error(
-            getErrorMessage(
-              err,
-              "Cannot delete destination because it is actively referenced in the system. Change status to Inactive instead."
-            )
-          );
+          if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+            setLocalReadOnly(true);
+            refreshSubscription();
+            toast.error("Modifications restricted. Read-only mode is active.");
+          } else {
+            toast.error(
+              getErrorMessage(
+                err,
+                "Cannot delete destination because it is actively referenced in the system. Change status to Inactive instead."
+              )
+            );
+          }
         } finally {
           setActionLoading(false);
         }
@@ -266,7 +301,6 @@ export default function DestinationsPage() {
           <div className="flex items-center gap-3 z-10 self-start lg:self-center">
             <Button
               onClick={handleCreate}
-              disabled={isReadOnly}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
@@ -559,6 +593,14 @@ export default function DestinationsPage() {
           </div>
         </div>
       </div>
+
+      {/* Read-Only Mode Warning Dialog */}
+      <ReadOnlyModeDialog
+        open={showReadOnlyDialog}
+        onOpenChange={setShowReadOnlyDialog}
+        reason={readOnlyReason}
+        actionLabel="Adding or modifying destinations"
+      />
 
       {/* Add / Edit Destination Modal */}
       <DestinationDialog

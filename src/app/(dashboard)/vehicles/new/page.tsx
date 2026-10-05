@@ -7,6 +7,8 @@ import * as Yup from "yup";
 import { Car, ArrowLeft, Loader2, Plus, AlertCircle, Info } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ReadOnlyModeCard } from "@/components/shared/read-only-mode-card";
+import { useSubscription } from "@/context/subscription-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,8 +43,11 @@ const createVehicleSchema = Yup.object().shape({
 
 export default function NewVehiclePage() {
   const router = useRouter();
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
   const [apiError, setApiError] = React.useState<string | null>(null);
+
+  const isReadOnly = isCentralReadOnly || localReadOnly;
 
   const formik = useFormik({
     initialValues: {
@@ -55,7 +60,7 @@ export default function NewVehiclePage() {
     validationSchema: createVehicleSchema,
     onSubmit: async (values, { setSubmitting }) => {
       if (isReadOnly) {
-        toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+        toast.error("Modifications are restricted in read-only mode.");
         return;
       }
 
@@ -77,8 +82,9 @@ export default function NewVehiclePage() {
         }
       } catch (err: any) {
         if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-          setIsReadOnly(true);
-          toast.error("Subscription expired. Read-only mode is active.");
+          setLocalReadOnly(true);
+          refreshSubscription();
+          toast.error("Modifications restricted. Read-only mode is active.");
         } else {
           setApiError(err?.message || "Failed to create vehicle.");
           toast.error(err?.message || "Failed to add vehicle.");
@@ -105,7 +111,7 @@ export default function NewVehiclePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        {isReadOnly && <ReadOnlyBanner moduleName="Vehicle Fleet" />}
+        {isReadOnly && !isCentralReadOnly && <ReadOnlyBanner moduleName="Vehicle Fleet" />}
 
         <PageHeader
           title="Add Vehicle to Fleet"
@@ -123,7 +129,17 @@ export default function NewVehiclePage() {
           </div>
         )}
 
-        <div className="max-w-3xl mx-auto w-full">
+        {isCentralReadOnly ? (
+          <div className="max-w-3xl mx-auto">
+            <ReadOnlyModeCard
+              title="Vehicle Creation Restricted"
+              description="Your agency workspace is currently in read-only mode. Adding new vehicles to the fleet is not permitted."
+              reason={readOnlyReason}
+              backHref="/vehicles"
+              backLabel="Back to Vehicles"
+            />
+          </div>
+        ) : (
           <form onSubmit={formik.handleSubmit} className="space-y-6">
             {/* Vehicle Details Card */}
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-5">
@@ -252,7 +268,7 @@ export default function NewVehiclePage() {
               </Button>
             </div>
           </form>
-        </div>
+        )}
       </div>
     </div>
   );

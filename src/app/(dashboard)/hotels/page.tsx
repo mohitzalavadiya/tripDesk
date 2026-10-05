@@ -29,6 +29,8 @@ import { ErrorState } from "@/components/shared/error-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { useSubscription } from "@/context/subscription-context";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +65,7 @@ import { ExcelImportModal } from "@/components/excel/excel-import-modal";
 
 export default function HotelsPage() {
   const router = useRouter();
+  const { isReadOnly: subReadOnly, readOnlyReason } = useSubscription();
 
   // Data states
   const [hotels, setHotels] = React.useState<HotelWithRelations[]>([]);
@@ -74,6 +77,17 @@ export default function HotelsPage() {
   const [archiveTarget, setArchiveTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [importModalOpen, setImportModalOpen] = React.useState(false);
   const [downloadingSample, setDownloadingSample] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+
+  const effectiveReadOnly = isReadOnly || subReadOnly;
+
+  const handleAddHotel = () => {
+    if (effectiveReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    router.push("/hotels/new");
+  };
 
   // Filter & Search states
   const [search, setSearch] = React.useState("");
@@ -262,8 +276,14 @@ export default function HotelsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setImportModalOpen(true)}
-              disabled={isReadOnly}
+              onClick={() => {
+                if (effectiveReadOnly) {
+                  setShowReadOnlyDialog(true);
+                  return;
+                }
+                setImportModalOpen(true);
+              }}
+              disabled={effectiveReadOnly}
               className="bg-white border-indigo-200 hover:bg-indigo-50 text-indigo-700 font-semibold text-xs h-9 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
               <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
@@ -271,9 +291,8 @@ export default function HotelsPage() {
             </Button>
 
             <Button
-              onClick={() => router.push("/hotels/new")}
-              disabled={isReadOnly}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              onClick={handleAddHotel}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all"
             >
               <Plus className="h-4 w-4" />
               Add Hotel

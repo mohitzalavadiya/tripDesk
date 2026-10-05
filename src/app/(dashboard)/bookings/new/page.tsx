@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { QuotaExceededCard } from "@/components/shared/quota-exceeded-card";
+import { ReadOnlyModeCard } from "@/components/shared/read-only-mode-card";
 import { useSubscription } from "@/context/subscription-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,8 +63,18 @@ function NewBookingForm() {
   const searchParams = useSearchParams();
   const initialQuotationId = searchParams.get("quotationId");
   const initialTripId = searchParams.get("tripId");
-  const { canCreate, incrementUsage, refreshSubscription, loading: subscriptionLoading, overview } = useSubscription();
+  const {
+    canCreate,
+    incrementUsage,
+    refreshSubscription,
+    loading: subscriptionLoading,
+    overview,
+    isReadOnly: subReadOnly,
+    readOnlyReason,
+  } = useSubscription();
 
+  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const effectiveReadOnly = isReadOnly || subReadOnly;
   const decision = canCreate("BOOKINGS");
 
   // Mode: "quotation" | "trip"
@@ -76,7 +87,6 @@ function NewBookingForm() {
   const [trips, setTrips] = React.useState<TripWithRelations[]>([]);
   const [customers, setCustomers] = React.useState<Customer[]>([]);
   const [loadingData, setLoadingData] = React.useState(true);
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
 
   // Form State
@@ -234,8 +244,15 @@ function NewBookingForm() {
           ]}
         />
 
-        {/* Direct URL Quota Exceeded Guard */}
-        {!subscriptionLoading && !decision.allowed && decision.reason === "QUOTA_EXCEEDED" ? (
+        {/* Direct URL Guards (Read-Only Mode takes precedence over Quota) */}
+        {!subscriptionLoading && effectiveReadOnly ? (
+          <ReadOnlyModeCard
+            resourceName="Booking"
+            reason={readOnlyReason}
+            backHref="/bookings"
+            backLabel="Back to Bookings"
+          />
+        ) : !subscriptionLoading && !decision.allowed && decision.reason === "QUOTA_EXCEEDED" ? (
           <QuotaExceededCard
             resourceName="Booking"
             currentUsage={decision.currentUsage}
