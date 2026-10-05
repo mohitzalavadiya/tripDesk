@@ -74,14 +74,14 @@ add subscription flow
 
 add agency logo
 
+quatation pdf we got more page 
+
+manage read only from frontend also
 
 
 **TODO**
 
 
-quatation pdf we got more page 
-
-manage read only from frontend also
 
 itinerary builder
 https://pickyourtrail.com/itineraries/6-night-bali-thrills-serenity-at-40k-per-person

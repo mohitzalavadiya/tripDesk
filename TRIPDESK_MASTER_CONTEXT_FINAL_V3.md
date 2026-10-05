@@ -14077,6 +14077,71 @@ The entitlement backend, transactional quota enforcement, and database-driven fe
 
 ---
 
+# 222. NOTIFICATION POPUP + COMMUNICATIONS NOTIFICATION CENTER
+
+## 222.1 Overview & Scope
+- **Objective:** Enhance internal operator notification interactions across the dashboard by:
+  1. Truncating the Topbar notification popover to the **latest 10 notifications** (`limit: 10`) while preserving global unread count badge accuracy.
+  2. Introducing an accessible **hover mark-as-read check button** on every unread notification row in the popover that marks only that item read without navigating away.
+  3. Updating the popover footer action to **"Show All Notifications →"** navigating to `/communications?tab=notifications` (while preserving Platform Owner audit logs navigation).
+  4. Expanding the `/communications` page with a tabbed interface providing a full **System Notifications** history view (`UserNotification`) with pagination, All/Unread filtering, and bulk mark-all-read while keeping the outbound customer communications ledger (`CommunicationLog`) 100% intact.
+- **Strict Guardrails:**
+  - Zero database schema changes, zero migrations, zero database mutations during deployment.
+  - Reused existing `UserNotification` models, `InternalNotificationService`, and `/api/notifications` endpoints.
+  - Strict preservation of tenant and user authorization boundaries (user can only see and mark their own notifications read).
+  - Segregation between `UserNotification` (internal) and `CommunicationLog` (outbound traveler dispatch) preserved.
+
+## 222.2 Implementation
+- **Files Modified:**
+  1. [`src/components/shared/notifications-popover.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/shared/notifications-popover.tsx):
+     - Updated fetch request to `limit: 10`.
+     - Added `handleMarkSingleRead` with `e.stopPropagation()` and optimistic count/state updates.
+     - Added hover `Check` button on unread rows.
+     - Updated footer button to `"Show All Notifications →"` redirecting to `/communications?tab=notifications`.
+  2. [`src/app/(dashboard)/communications/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/(dashboard)/communications/page.tsx):
+     - Added tab switcher: **System Notifications** (`"notifications"`) vs. **Outbound Communications** (`"outbound"`).
+     - Bound active tab to `?tab=notifications` query parameter.
+     - Built System Notifications view with server-side pagination (`notifPage`, `notifTotalPages`), All/Unread filter pills, Mark All Read action, and card rows with category icons and hover mark-as-read.
+     - Preserved 100% of existing Outbound Communications KPI scorecards, filters, search, table, detail modal, and manual message composer.
+
+## 222.3 Verification & Quality Assurance
+- **Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Turbopack compiled all static and dynamic routes successfully)**.
+- **Data Safety:**
+  - Schema changed: **NO**
+  - Migrations created: **NO**
+  - Database altered: **NO**
+  - API / Calculation changed: **NO**
+
+## 222.4 Closure
+**Phase 222 — Notification Popup + Communications Notification Center: CLOSED / PASS**
+
+---
+
+# 223. COMMUNICATIONS SYSTEM NOTIFICATIONS SCROLL CONTAINER
+
+## 223.1 Overview & Scope
+- **Objective:** Prevent extensive notification history from inflating the vertical height of the `/communications` page when the System Notifications tab is active.
+- **Implementation:**
+  - Added `max-h-[620px] overflow-y-auto` to the notification items list container in [`src/app/(dashboard)/communications/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/(dashboard)/communications/page.tsx).
+  - Keeps top filter controls, Mark All Read header action, and bottom pagination bar visible and fixed outside the scrolling content area.
+  - Conforms to the standard TripDesk dashboard table/list scroll pattern (`max-h-[620px] overflow-y-auto`).
+- **Functionality Preserved:**
+  - 100% of Phase 222 features preserved (server-side pagination, hover check mark-as-read, row click navigation, All/Unread filters, true unread counts, loading/empty states, and Outbound Communications ledger).
+
+## 223.2 Verification & Quality Assurance
+- **Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Turbopack compiled all static and dynamic routes successfully)**.
+- **Data Safety:**
+  - Schema changed: **NO**
+  - Migrations created: **NO**
+  - Database altered: **NO**
+
+## 223.3 Closure
+**Phase 223 — Communications System Notifications Scroll Container: CLOSED / PASS**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
