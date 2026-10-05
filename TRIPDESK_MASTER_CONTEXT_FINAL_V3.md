@@ -13990,6 +13990,93 @@ The entitlement backend, transactional quota enforcement, and database-driven fe
 
 ---
 
+# 80. PHASE 220 — PDF TRAILING BLANK PAGES / FOOTER PAGINATION FIX
+
+## 220.1 Objective & Background
+- **Problem:** Quotation, Invoice, and Operations PDFs generated extra trailing blank pages after the actual content finished (e.g. 1 content page generated 3 total pages, 2 content pages generated 6 total pages, 3 content pages generated 9 total pages).
+- **Audit Findings:** The issue was not related to the agency logo implementation. The root cause was located in the second-pass footer rendering loop over `doc.bufferedPageRange()`.
+- **Root Cause:** When `doc.switchToPage(i)` was called to draw footer text and page numbers, `doc.text()` was invoked at `footerY` coordinates ($y \approx 815.89\text{--}820.89\text{ pt}$) that exceeded PDFKit's configured printable bottom text boundary ($\text{pageHeight} - \text{bottomMargin} = 841.89 - 32 = 809.89\text{ pt}$). PDFKit's text layout engine interpreted this position as page overflow and automatically generated a new trailing page for each `doc.text()` invocation in the footer pass.
+
+## 220.2 Implementation
+- **Surgical Targeted Correction:** In the second-pass footer rendering loops across all affected services, `doc.page.margins.bottom = 0` is temporarily set inside a `try/finally` block:
+  ```ts
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    const origBottomMargin = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    try {
+      // Render footer border line, agency contact info, and "Page X of Y"
+    } finally {
+      doc.page.margins.bottom = origBottomMargin;
+    }
+  }
+  ```
+- **Files Modified:**
+  1. `src/lib/services/quotation-pdf-service.ts`: Global footer loop (lines 1037–1078).
+  2. `src/lib/services/invoice-pdf-service.ts`: Watermark & global footer loop (lines 630–675).
+  3. `src/lib/services/operations-document-service.ts`: All 6 document footer loops (Hotel Voucher, Transport Voucher, Activity Pass, Booking Confirmation, Travel Kit, Closure Report).
+- **Clean Service Preserved:** `src/lib/services/document-pdf-service.ts` remained completely untouched (already clean with footer positioned inside margin bounds at $y = 780\text{ pt}$).
+
+## 220.3 Verification & QA Results
+- **Automated QA Suite (`prisma/test-phase-220-pagination-fix.ts`):**
+  - Test 1: Quotation (Minimal without logo) $\to$ exactly 1 page (0 trailing pages) $\to$ PASS
+  - Test 2: Quotation (Minimal with logo) $\to$ exactly 1 page (0 trailing pages) $\to$ PASS
+  - Test 3: Quotation (Medium) $\to$ exactly 2 pages (0 trailing pages) $\to$ PASS
+  - Test 4: Tax Invoice (Standard without logo) $\to$ exactly 1 page (0 trailing pages) $\to$ PASS
+  - Test 5: Tax Invoice (Standard with logo) $\to$ exactly 1 page (0 trailing pages) $\to$ PASS
+  - Tests 6–10: Document Suite regressions (Hotel Voucher, Vehicle Voucher, Activity Pass, Booking Confirmation, Payment Receipt strict 1-page) $\to$ PASS
+  - Total: **10/10 Tests PASSED**
+- **Regression Suites:**
+  - `prisma/test-phase-219-pdf-logo-branding.ts` $\to$ **22/22 Tests PASSED**
+  - `prisma/test-phase-218-logo-upload.ts` $\to$ **22/22 Tests PASSED**
+  - `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 Tests PASSED**
+- **Typecheck & Production Build:**
+  - `npx tsc --noEmit` $\to$ **PASS (0 errors)**
+  - `npm run build` $\to$ **PASS (Turbopack production build compiled successfully)**
+- **Data & Security Safety:**
+  - Schema Changed: **NO**
+  - Migrations Created: **NO**
+  - Database Mutated: **NO**
+  - Tenant Isolation & Entitlement Rules: **100% Preserved**
+
+## 220.4 Closure
+**Phase 220 — PDF Trailing Blank Pages / Footer Pagination Fix: CLOSED / PASS**
+
+---
+
+# 221. DEFAULT TAX RATE DROPDOWN — COMMON DROPDOWN UI CONSISTENCY
+
+## 221.1 Overview & Scope
+- **Objective:** Standardize the **Default Tax Rate (Catalog Presets)** dropdown in the agency settings page to use the common TripDesk dropdown UI (`@/components/ui/select`) instead of an unstyled native HTML `<select>` tag.
+- **Strict Guardrails:**
+  - Frontend UI presentation consistency fix only.
+  - Zero modifications to backend tax calculation services, APIs, Prisma schema, migrations, or database tables.
+  - 100% preservation of TripDesk's locked tax business rules (0/5/12/18/28% rates, EXCLUSIVE/INCLUSIVE modes, Intra/Inter-state treatment).
+
+## 221.2 Implementation
+- **File Updated:** [`src/app/(dashboard)/settings/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/(dashboard)/settings/page.tsx)
+- **Component Reused:** Shared `@/components/ui/select` (`Select`, `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectItem`).
+- **State & Data Flow:**
+  - Value bound to `String(defaultGstRate)`.
+  - Selection handler safely casts to numeric state `setDefaultGstRate(Number(val))`.
+  - Rate list continues mapping from dynamic `taxRates` API array.
+  - Preserved disabled state binding `disabled={savingTax}`.
+
+## 221.3 Verification & Quality Assurance
+- **Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Turbopack compiled successfully)**.
+- **Data Safety:**
+  - Schema changed: **NO**
+  - Migrations created: **NO**
+  - Database altered: **NO**
+  - API / Calculation changed: **NO**
+
+## 221.4 Closure
+**Default Tax Rate Dropdown UI Consistency: CLOSED / PASS**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

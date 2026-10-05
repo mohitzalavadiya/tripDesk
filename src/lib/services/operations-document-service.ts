@@ -494,53 +494,59 @@ export class OperationsDocumentService {
         const range = doc.bufferedPageRange();
         for (let i = 0; i < range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          // Top running header on multi-page documents
-          if (i > 0) {
+          try {
+            // Top running header on multi-page documents
+            if (i > 0) {
+              doc
+                .fontSize(7)
+                .font("Helvetica")
+                .fillColor(textLight)
+                .text(`Hotel Voucher • ${documentNumber} • ${hotelNameStr}`, margin, margin - 14, {
+                  width: contentWidth,
+                  align: "left",
+                });
+              doc
+                .moveTo(margin, margin - 6)
+                .lineTo(margin + contentWidth, margin - 6)
+                .strokeColor(borderLight)
+                .lineWidth(0.5)
+                .stroke();
+            }
+
+            // Bottom Running Footer
+            const footerY = pageHeight - 34;
             doc
-              .fontSize(7)
+              .moveTo(margin, footerY)
+              .lineTo(margin + contentWidth, footerY)
+              .strokeColor(borderLight)
+              .lineWidth(0.75)
+              .stroke();
+
+            doc
+              .fontSize(7.5)
               .font("Helvetica")
               .fillColor(textLight)
-              .text(`Hotel Voucher • ${documentNumber} • ${hotelNameStr}`, margin, margin - 14, {
-                width: contentWidth,
-                align: "left",
-              });
+              .text(
+                `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
+                margin,
+                footerY + 8,
+                { width: contentWidth - 80, align: "left" }
+              );
+
             doc
-              .moveTo(margin, margin - 6)
-              .lineTo(margin + contentWidth, margin - 6)
-              .strokeColor(borderLight)
-              .lineWidth(0.5)
-              .stroke();
+              .fontSize(7.5)
+              .font("Helvetica-Bold")
+              .fillColor(textLight)
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+                width: 75,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
           }
-
-          // Bottom Running Footer
-          const footerY = pageHeight - 34;
-          doc
-            .moveTo(margin, footerY)
-            .lineTo(margin + contentWidth, footerY)
-            .strokeColor(borderLight)
-            .lineWidth(0.75)
-            .stroke();
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica")
-            .fillColor(textLight)
-            .text(
-              `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
-              margin,
-              footerY + 8,
-              { width: contentWidth - 80, align: "left" }
-            );
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica-Bold")
-            .fillColor(textLight)
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
-              width: 75,
-              align: "right",
-            });
         }
 
         doc.end();
@@ -967,51 +973,57 @@ export class OperationsDocumentService {
         const range = doc.bufferedPageRange();
         for (let i = 0; i < range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          if (i > 0) {
+          try {
+            if (i > 0) {
+              doc
+                .fontSize(7)
+                .font("Helvetica")
+                .fillColor(textLight)
+                .text(`Transport Voucher • ${documentNumber} • ${vehicleNameStr}`, margin, margin - 14, {
+                  width: contentWidth,
+                  align: "left",
+                });
+              doc
+                .moveTo(margin, margin - 6)
+                .lineTo(margin + contentWidth, margin - 6)
+                .strokeColor(borderLight)
+                .lineWidth(0.5)
+                .stroke();
+            }
+
+            const footerY = pageHeight - 34;
             doc
-              .fontSize(7)
+              .moveTo(margin, footerY)
+              .lineTo(margin + contentWidth, footerY)
+              .strokeColor(borderLight)
+              .lineWidth(0.75)
+              .stroke();
+
+            doc
+              .fontSize(7.5)
               .font("Helvetica")
               .fillColor(textLight)
-              .text(`Transport Voucher • ${documentNumber} • ${vehicleNameStr}`, margin, margin - 14, {
-                width: contentWidth,
-                align: "left",
-              });
+              .text(
+                `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
+                margin,
+                footerY + 8,
+                { width: contentWidth - 80, align: "left" }
+              );
+
             doc
-              .moveTo(margin, margin - 6)
-              .lineTo(margin + contentWidth, margin - 6)
-              .strokeColor(borderLight)
-              .lineWidth(0.5)
-              .stroke();
+              .fontSize(7.5)
+              .font("Helvetica-Bold")
+              .fillColor(textLight)
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+                width: 75,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
           }
-
-          const footerY = pageHeight - 34;
-          doc
-            .moveTo(margin, footerY)
-            .lineTo(margin + contentWidth, footerY)
-            .strokeColor(borderLight)
-            .lineWidth(0.75)
-            .stroke();
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica")
-            .fillColor(textLight)
-            .text(
-              `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
-              margin,
-              footerY + 8,
-              { width: contentWidth - 80, align: "left" }
-            );
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica-Bold")
-            .fillColor(textLight)
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
-              width: 75,
-              align: "right",
-            });
         }
 
         doc.end();
@@ -1439,51 +1451,57 @@ export class OperationsDocumentService {
         const range = doc.bufferedPageRange();
         for (let i = 0; i < range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          if (i > 0) {
+          try {
+            if (i > 0) {
+              doc
+                .fontSize(7)
+                .font("Helvetica")
+                .fillColor(textLight)
+                .text(`Activity Pass • ${documentNumber} • ${activityTitleStr}`, margin, margin - 14, {
+                  width: contentWidth,
+                  align: "left",
+                });
+              doc
+                .moveTo(margin, margin - 6)
+                .lineTo(margin + contentWidth, margin - 6)
+                .strokeColor(borderLight)
+                .lineWidth(0.5)
+                .stroke();
+            }
+
+            const footerY = pageHeight - 34;
             doc
-              .fontSize(7)
+              .moveTo(margin, footerY)
+              .lineTo(margin + contentWidth, footerY)
+              .strokeColor(borderLight)
+              .lineWidth(0.75)
+              .stroke();
+
+            doc
+              .fontSize(7.5)
               .font("Helvetica")
               .fillColor(textLight)
-              .text(`Activity Pass • ${documentNumber} • ${activityTitleStr}`, margin, margin - 14, {
-                width: contentWidth,
-                align: "left",
-              });
+              .text(
+                `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
+                margin,
+                footerY + 8,
+                { width: contentWidth - 80, align: "left" }
+              );
+
             doc
-              .moveTo(margin, margin - 6)
-              .lineTo(margin + contentWidth, margin - 6)
-              .strokeColor(borderLight)
-              .lineWidth(0.5)
-              .stroke();
+              .fontSize(7.5)
+              .font("Helvetica-Bold")
+              .fillColor(textLight)
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+                width: 75,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
           }
-
-          const footerY = pageHeight - 34;
-          doc
-            .moveTo(margin, footerY)
-            .lineTo(margin + contentWidth, footerY)
-            .strokeColor(borderLight)
-            .lineWidth(0.75)
-            .stroke();
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica")
-            .fillColor(textLight)
-            .text(
-              `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
-              margin,
-              footerY + 8,
-              { width: contentWidth - 80, align: "left" }
-            );
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica-Bold")
-            .fillColor(textLight)
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
-              width: 75,
-              align: "right",
-            });
         }
 
         doc.end();
@@ -1934,51 +1952,57 @@ export class OperationsDocumentService {
         const range = doc.bufferedPageRange();
         for (let i = 0; i < range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          if (i > 0) {
+          try {
+            if (i > 0) {
+              doc
+                .fontSize(7)
+                .font("Helvetica")
+                .fillColor(textLight)
+                .text(`Booking Confirmation • ${documentNumber} • ${operation.trip.title}`, margin, margin - 14, {
+                  width: contentWidth,
+                  align: "left",
+                });
+              doc
+                .moveTo(margin, margin - 6)
+                .lineTo(margin + contentWidth, margin - 6)
+                .strokeColor(borderLight)
+                .lineWidth(0.5)
+                .stroke();
+            }
+
+            const footerY = pageHeight - 34;
             doc
-              .fontSize(7)
+              .moveTo(margin, footerY)
+              .lineTo(margin + contentWidth, footerY)
+              .strokeColor(borderLight)
+              .lineWidth(0.75)
+              .stroke();
+
+            doc
+              .fontSize(7.5)
               .font("Helvetica")
               .fillColor(textLight)
-              .text(`Booking Confirmation • ${documentNumber} • ${operation.trip.title}`, margin, margin - 14, {
-                width: contentWidth,
-                align: "left",
-              });
+              .text(
+                `Generated securely via TripDesk • Official Booking Confirmation • ${operation.agency.name}`,
+                margin,
+                footerY + 8,
+                { width: contentWidth - 80, align: "left" }
+              );
+
             doc
-              .moveTo(margin, margin - 6)
-              .lineTo(margin + contentWidth, margin - 6)
-              .strokeColor(borderLight)
-              .lineWidth(0.5)
-              .stroke();
+              .fontSize(7.5)
+              .font("Helvetica-Bold")
+              .fillColor(textLight)
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+                width: 75,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
           }
-
-          const footerY = pageHeight - 34;
-          doc
-            .moveTo(margin, footerY)
-            .lineTo(margin + contentWidth, footerY)
-            .strokeColor(borderLight)
-            .lineWidth(0.75)
-            .stroke();
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica")
-            .fillColor(textLight)
-            .text(
-              `Generated securely via TripDesk • Official Booking Confirmation • ${operation.agency.name}`,
-              margin,
-              footerY + 8,
-              { width: contentWidth - 80, align: "left" }
-            );
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica-Bold")
-            .fillColor(textLight)
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
-              width: 75,
-              align: "right",
-            });
         }
 
         doc.end();
@@ -2456,51 +2480,57 @@ export class OperationsDocumentService {
         const range = doc.bufferedPageRange();
         for (let i = 0; i < range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          if (i > 0) {
+          try {
+            if (i > 0) {
+              doc
+                .fontSize(7)
+                .font("Helvetica")
+                .fillColor(textLight)
+                .text(`Final Travel Kit • ${documentNumber} • ${operation.trip.title}`, margin, margin - 14, {
+                  width: contentWidth,
+                  align: "left",
+                });
+              doc
+                .moveTo(margin, margin - 6)
+                .lineTo(margin + contentWidth, margin - 6)
+                .strokeColor(borderLight)
+                .lineWidth(0.5)
+                .stroke();
+            }
+
+            const footerY = pageHeight - 34;
             doc
-              .fontSize(7)
+              .moveTo(margin, footerY)
+              .lineTo(margin + contentWidth, footerY)
+              .strokeColor(borderLight)
+              .lineWidth(0.75)
+              .stroke();
+
+            doc
+              .fontSize(7.5)
               .font("Helvetica")
               .fillColor(textLight)
-              .text(`Final Travel Kit • ${documentNumber} • ${operation.trip.title}`, margin, margin - 14, {
-                width: contentWidth,
-                align: "left",
-              });
+              .text(
+                `Generated securely via TripDesk • Final Travel Kit & Itinerary • ${operation.agency.name}`,
+                margin,
+                footerY + 8,
+                { width: contentWidth - 80, align: "left" }
+              );
+
             doc
-              .moveTo(margin, margin - 6)
-              .lineTo(margin + contentWidth, margin - 6)
-              .strokeColor(borderLight)
-              .lineWidth(0.5)
-              .stroke();
+              .fontSize(7.5)
+              .font("Helvetica-Bold")
+              .fillColor(textLight)
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+                width: 75,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
           }
-
-          const footerY = pageHeight - 34;
-          doc
-            .moveTo(margin, footerY)
-            .lineTo(margin + contentWidth, footerY)
-            .strokeColor(borderLight)
-            .lineWidth(0.75)
-            .stroke();
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica")
-            .fillColor(textLight)
-            .text(
-              `Generated securely via TripDesk • Final Travel Kit & Itinerary • ${operation.agency.name}`,
-              margin,
-              footerY + 8,
-              { width: contentWidth - 80, align: "left" }
-            );
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica-Bold")
-            .fillColor(textLight)
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
-              width: 75,
-              align: "right",
-            });
         }
 
         doc.end();
@@ -3120,16 +3150,23 @@ export class OperationsDocumentService {
         const pages = doc.bufferedPageRange();
         for (let i = 0; i < pages.count; i++) {
           doc.switchToPage(i);
-          doc
-            .fillColor(textMuted)
-            .fontSize(7.5)
-            .font("Helvetica")
-            .text(
-              `${operation.agency.name} • Internal Operations Document • Page ${i + 1} of ${pages.count}`,
-              margin,
-              pageHeight - 30,
-              { align: "center", width: contentWidth }
-            );
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
+
+          try {
+            doc
+              .fillColor(textMuted)
+              .fontSize(7.5)
+              .font("Helvetica")
+              .text(
+                `${operation.agency.name} • Internal Operations Document • Page ${i + 1} of ${pages.count}`,
+                margin,
+                pageHeight - 30,
+                { align: "center", width: contentWidth }
+              );
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
+          }
         }
 
         doc.end();

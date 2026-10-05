@@ -1037,44 +1037,50 @@ export class QuotationPdfService {
         const range = doc.bufferedPageRange();
         for (let i = range.start; i < range.start + range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          const footerY = pageHeight - 26;
+          try {
+            const footerY = pageHeight - 26;
 
-          // Top footer border
-          doc
-            .strokeColor(borderLight)
-            .lineWidth(0.75)
-            .moveTo(margin, footerY)
-            .lineTo(margin + contentWidth, footerY)
-            .stroke();
+            // Top footer border
+            doc
+              .strokeColor(borderLight)
+              .lineWidth(0.75)
+              .moveTo(margin, footerY)
+              .lineTo(margin + contentWidth, footerY)
+              .stroke();
 
-          // Left: Agency details
-          const agencyContact = [
-            agencyName,
-            data.agency?.phone,
-            data.agency?.email,
-          ]
-            .filter(Boolean)
-            .join("   |   ");
+            // Left: Agency details
+            const agencyContact = [
+              agencyName,
+              data.agency?.phone,
+              data.agency?.email,
+            ]
+              .filter(Boolean)
+              .join("   |   ");
 
-          doc
-            .fillColor(textLight)
-            .fontSize(7)
-            .font("Helvetica")
-            .text(agencyContact, margin, footerY + 5, {
-              width: contentWidth - 90,
-              ellipsis: true,
-            });
+            doc
+              .fillColor(textLight)
+              .fontSize(7)
+              .font("Helvetica")
+              .text(agencyContact, margin, footerY + 5, {
+                width: contentWidth - 90,
+                ellipsis: true,
+              });
 
-          // Right: Page number
-          doc
-            .fillColor(textLight)
-            .fontSize(7)
-            .font("Helvetica")
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 80, footerY + 5, {
-              width: 80,
-              align: "right",
-            });
+            // Right: Page number
+            doc
+              .fillColor(textLight)
+              .fontSize(7)
+              .font("Helvetica")
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 80, footerY + 5, {
+                width: 80,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
+          }
         }
 
         doc.end();

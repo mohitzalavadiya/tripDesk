@@ -72,12 +72,12 @@ test Feedback &  Reviews page
 
 add subscription flow
 
+add agency logo
 
 
 
 **TODO**
 
-add agency logo
 
 quatation pdf we got more page 
 

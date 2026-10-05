@@ -630,48 +630,54 @@ export const invoicePdfService = {
         const range = doc.bufferedPageRange();
         for (let i = range.start; i < range.start + range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          // Watermark for Cancelled / Draft
-          if (isDraft || isCancelled) {
-            doc.save();
-            doc.rotate(-45, { origin: [pageWidth / 2, pageHeight / 2] });
-            doc.fontSize(isDraft ? 36 : 46).font("Helvetica-Bold");
-            doc.fillColor(isCancelled ? "#EF4444" : "#94A3B8", 0.08);
-            doc.text(
-              isDraft ? "DRAFT — NOT AN ISSUED INVOICE" : "CANCELLED",
-              margin,
-              pageHeight / 2 - 20,
-              { align: "center", width: contentWidth }
-            );
-            doc.restore();
+          try {
+            // Watermark for Cancelled / Draft
+            if (isDraft || isCancelled) {
+              doc.save();
+              doc.rotate(-45, { origin: [pageWidth / 2, pageHeight / 2] });
+              doc.fontSize(isDraft ? 36 : 46).font("Helvetica-Bold");
+              doc.fillColor(isCancelled ? "#EF4444" : "#94A3B8", 0.08);
+              doc.text(
+                isDraft ? "DRAFT — NOT AN ISSUED INVOICE" : "CANCELLED",
+                margin,
+                pageHeight / 2 - 20,
+                { align: "center", width: contentWidth }
+              );
+              doc.restore();
+            }
+
+            // Global Footer
+            const footerY = pageHeight - 32;
+
+            doc.strokeColor(borderLight).lineWidth(0.5).moveTo(margin, footerY).lineTo(margin + contentWidth, footerY).stroke();
+
+            // Left: Computer-generated notice
+            doc
+              .fillColor(textLight)
+              .fontSize(7)
+              .font("Helvetica")
+              .text(
+                `This is a computer-generated invoice from ${agencyName} • Powered by TripDesk`,
+                margin,
+                footerY + 6,
+                { width: contentWidth - 85, ellipsis: true }
+              );
+
+            // Right: Page number
+            doc
+              .fillColor(textLight)
+              .fontSize(7)
+              .font("Helvetica")
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 80, footerY + 6, {
+                width: 80,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
           }
-
-          // Global Footer
-          const footerY = pageHeight - 32;
-
-          doc.strokeColor(borderLight).lineWidth(0.5).moveTo(margin, footerY).lineTo(margin + contentWidth, footerY).stroke();
-
-          // Left: Computer-generated notice
-          doc
-            .fillColor(textLight)
-            .fontSize(7)
-            .font("Helvetica")
-            .text(
-              `This is a computer-generated invoice from ${agencyName} • Powered by TripDesk`,
-              margin,
-              footerY + 6,
-              { width: contentWidth - 85, ellipsis: true }
-            );
-
-          // Right: Page number
-          doc
-            .fillColor(textLight)
-            .fontSize(7)
-            .font("Helvetica")
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 80, footerY + 6, {
-              width: 80,
-              align: "right",
-            });
         }
 
         doc.end();

@@ -6,6 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   communicationClient,
   CommunicationSettings,
   CommunicationLogItem,
@@ -963,17 +970,26 @@ export default function SettingsPage() {
                         Selected: {defaultGstRate}%
                       </span>
                     </label>
-                    <select
-                      value={defaultGstRate}
-                      onChange={(e) => setDefaultGstRate(Number(e.target.value))}
-                      className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-medium cursor-pointer"
+                    <Select
+                      value={String(defaultGstRate)}
+                      onValueChange={(val) => {
+                        if (val !== undefined && val !== null) {
+                          setDefaultGstRate(Number(val));
+                        }
+                      }}
+                      disabled={savingTax}
                     >
-                      {taxRates.map((rateItem) => (
-                        <option key={rateItem.id} value={rateItem.rate}>
-                          {rateItem.name} — ({rateItem.rate === 0 ? "0% No Tax / Exempt" : `${rateItem.rate}% Standard Rate`})
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full h-9 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {taxRates.map((rateItem) => (
+                          <SelectItem key={rateItem.id} value={String(rateItem.rate)} className="text-xs">
+                            {rateItem.name} — ({rateItem.rate === 0 ? "0% No Tax / Exempt" : `${rateItem.rate}% Standard Rate`})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <p className="text-[10px] text-slate-400">
                       Applied at the quotation/package total level (no item-level rate splits).
                     </p>
