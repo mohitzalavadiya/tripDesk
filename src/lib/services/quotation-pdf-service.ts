@@ -1,6 +1,7 @@
 import "server-only";
 
 import PDFDocument from "pdfkit";
+import { pdfBrandingHelper } from "@/lib/services/pdf-branding-helper";
 
 export interface QuotationPdfData {
   quotationNumber: string;
@@ -30,6 +31,7 @@ export interface QuotationPdfData {
   createdAt?: Date | string;
 
   agency?: {
+    id?: string;
     name: string;
     email?: string | null;
     phone?: string | null;
@@ -131,6 +133,11 @@ export class QuotationPdfService {
    * All line item rates, subtotals, markups, discounts, taxes, and milestone amounts are redacted.
    */
   async generateQuotationPdf(data: QuotationPdfData): Promise<Buffer> {
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: data.agency?.id,
+      logoUrl: data.agency?.logo,
+    });
+
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -252,54 +259,30 @@ export class QuotationPdfService {
         // ═════════════════════════════════════════════════════════════════════
         const tripTitle = data.title || "Customized Holiday Itinerary";
         
-        doc.fontSize(14).font("Helvetica-Bold");
-        const titleHeight = doc.heightOfString(tripTitle, { width: contentWidth - 28 });
+        doc.fontSize(17).font("Helvetica-Bold");
+        const titleHeight = doc.heightOfString(tripTitle, { width: contentWidth - 32 });
         
         let subtitleHeight = 0;
         if (data.proposalSubtitle) {
           doc.fontSize(8).font("Helvetica");
-          subtitleHeight = doc.heightOfString(data.proposalSubtitle, { width: contentWidth - 28 }) + 3;
+          subtitleHeight = doc.heightOfString(data.proposalSubtitle, { width: contentWidth - 32 }) + 3;
         }
 
         const heroHeaderTopY = margin;
-        const heroTopSectionH = 48 + titleHeight + subtitleHeight;
-        const heroMetaSectionH = 40;
+        const logoH = logoBuffer ? 46 : 0;
+        const heroTopSectionH = 48 + titleHeight + subtitleHeight + logoH;
+        const heroMetaSectionH = 42;
         const totalHeroH = heroTopSectionH + heroMetaSectionH + 16;
 
         doc
           .roundedRect(margin, heroHeaderTopY, contentWidth, totalHeroH, 8)
           .fill(brandDark);
 
-        // Top Brand Row
-        doc
-          .fillColor("#A5B4FC")
-          .fontSize(11)
-          .font("Helvetica-Bold")
-          .text(agencyName.toUpperCase(), margin + 14, heroHeaderTopY + 12, {
-            width: contentWidth - 170,
-            ellipsis: true,
-          });
-
-        // Dynamic Agency Subtitle / Tagline / Contact
-        const agencyContactParts = [data.agency?.phone, data.agency?.email].filter(Boolean);
-        const dynamicAgencySubtext = agencyContactParts.length > 0
-          ? agencyContactParts.join("   |   ")
-          : "TRIP PROPOSAL";
-
-        doc
-          .fillColor("#CBD5E1")
-          .fontSize(7.5)
-          .font("Helvetica")
-          .text(dynamicAgencySubtext, margin + 14, heroHeaderTopY + 26, {
-            width: contentWidth - 170,
-            ellipsis: true,
-          });
-
         // Top-Right Reference Pill
         const pillW = 125;
         const pillH = 20;
-        const pillX = margin + contentWidth - pillW - 14;
-        const pillY = heroHeaderTopY + 12;
+        const pillX = margin + contentWidth - pillW - 16;
+        const pillY = heroHeaderTopY + 14;
 
         doc
           .roundedRect(pillX, pillY, pillW, pillH, 10)
@@ -314,43 +297,60 @@ export class QuotationPdfService {
             align: "center",
           });
 
-        // Proposal Tier Badge Pill
-        const catPillY = heroHeaderTopY + 40;
-        // const tierName = data.tier || "Deluxe";
-        // const proposalBadgeText = `TIER: ${tierName.toUpperCase()}`;
-        // const badgeW = Math.min(200, Math.max(90, proposalBadgeText.length * 6.5 + 18));
+        let curHeroY = heroHeaderTopY + 14;
 
-        // doc
-        //   .roundedRect(margin + 14, catPillY, badgeW, 14, 4)
-        //   .fill("#1E1B4B");
+        // Top-Left Branding: Logo & Agency Name
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 16, curHeroY, { fit: [135, 40] });
+            curHeroY += 46;
+          } catch {
+            // fallback gracefully
+          }
+        }
 
-        // doc
-        //   .fillColor("#818CF8")
-        //   .fontSize(7)
-        //   .font("Helvetica-Bold")
-        //   .text(proposalBadgeText, margin + 14, catPillY + 3.5, {
-        //     width: badgeW,
-        //     align: "center",
-        //   });
+        const agencyContactParts = [data.agency?.phone, data.agency?.email].filter(Boolean);
+        const dynamicAgencySubtext = agencyContactParts.length > 0
+          ? agencyContactParts.join("   |   ")
+          : "OFFICIAL TRIP PROPOSAL";
 
-        // Main Trip Title
-        const titleY = catPillY + 5;
         doc
-          .fillColor("#FFFFFF")
-          .fontSize(18)
+          .fillColor("#A5B4FC")
+          .fontSize(10.5)
           .font("Helvetica-Bold")
-          .text(tripTitle, margin + 14, titleY, {
-            width: contentWidth - 28,
+          .text(agencyName.toUpperCase(), margin + 16, curHeroY, {
+            width: contentWidth - 160,
+            ellipsis: true,
           });
 
-        let nextHeroY = titleY + titleHeight + 3;
+        doc
+          .fillColor("#CBD5E1")
+          .fontSize(7.5)
+          .font("Helvetica")
+          .text(dynamicAgencySubtext, margin + 16, curHeroY + 13, {
+            width: contentWidth - 160,
+            ellipsis: true,
+          });
+
+        curHeroY += 27;
+
+        // Main Trip Title
+        doc
+          .fillColor("#FFFFFF")
+          .fontSize(17)
+          .font("Helvetica-Bold")
+          .text(tripTitle, margin + 16, curHeroY, {
+            width: contentWidth - 32,
+          });
+
+        let nextHeroY = curHeroY + titleHeight + 3;
         if (data.proposalSubtitle) {
           doc
             .fillColor("#E2E8F0")
             .fontSize(8)
             .font("Helvetica")
-            .text(data.proposalSubtitle, margin + 14, nextHeroY, {
-              width: contentWidth - 28,
+            .text(data.proposalSubtitle, margin + 16, nextHeroY, {
+              width: contentWidth - 32,
             });
           nextHeroY += subtitleHeight;
         }
@@ -359,32 +359,32 @@ export class QuotationPdfService {
         doc
           .strokeColor("#334155")
           .lineWidth(0.75)
-          .moveTo(margin + 14, nextHeroY + 4)
-          .lineTo(margin + contentWidth - 14, nextHeroY + 4)
+          .moveTo(margin + 16, nextHeroY + 4)
+          .lineTo(margin + contentWidth - 16, nextHeroY + 4)
           .stroke();
 
-        // 4-Column Structured Metadata Bar (Inside Hero)
+        // 3-Column Structured Metadata Bar (Inside Hero)
         const metaY = nextHeroY + 9;
-        const colW = (contentWidth - 28) / 3;
+        const colW = (contentWidth - 32) / 3;
 
         // Col 1: Prepared For
         doc
           .fillColor("#94A3B8")
           .fontSize(6.5)
           .font("Helvetica-Bold")
-          .text("PREPARED FOR", margin + 14, metaY);
+          .text("PREPARED FOR", margin + 16, metaY);
         doc
           .fillColor("#FFFFFF")
           .fontSize(8.5)
           .font("Helvetica-Bold")
-          .text(customerName, margin + 14, metaY + 9, { width: colW - 8, ellipsis: true });
+          .text(customerName, margin + 16, metaY + 9, { width: colW - 8, ellipsis: true });
 
         // Col 2: Travel Dates & Duration
         doc
           .fillColor("#94A3B8")
           .fontSize(6.5)
           .font("Helvetica-Bold")
-          .text("TRAVEL DATES", margin + 14 + colW, metaY);
+          .text("TRAVEL DATES", margin + 16 + colW, metaY);
         let dateRangeStr = "Custom / Flexible";
         if (data.trip?.startDate && data.trip?.endDate) {
           const startDateStr = new Date(data.trip.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -395,13 +395,13 @@ export class QuotationPdfService {
           .fillColor("#FFFFFF")
           .fontSize(8.5)
           .font("Helvetica-Bold")
-          .text(dateRangeStr, margin + 14 + colW, metaY + 9, { width: colW - 8, ellipsis: true });
+          .text(dateRangeStr, margin + 16 + colW, metaY + 9, { width: colW - 8, ellipsis: true });
         if (durationText) {
           doc
             .fillColor("#A5B4FC")
             .fontSize(7)
             .font("Helvetica-Bold")
-            .text(durationText, margin + 14 + colW, metaY + 20, { width: colW - 8 });
+            .text(durationText, margin + 16 + colW, metaY + 20, { width: colW - 8 });
         }
 
         // Col 3: Group Size
@@ -409,28 +409,13 @@ export class QuotationPdfService {
           .fillColor("#94A3B8")
           .fontSize(6.5)
           .font("Helvetica-Bold")
-          .text("GROUP SIZE", margin + 14 + colW * 2, metaY);
+          .text("GROUP SIZE", margin + 16 + colW * 2, metaY);
         const travelerCount = data.trip?.travelers?.length || 1;
         doc
           .fillColor("#FFFFFF")
           .fontSize(8.5)
           .font("Helvetica-Bold")
-          .text(`${travelerCount} Traveler(s)`, margin + 14 + colW * 2, metaY + 9);
-
-        // // Col 4: Validity
-        // doc
-        //   .fillColor("#94A3B8")
-        //   .fontSize(6.5)
-        //   .font("Helvetica-Bold")
-        //   .text("VALIDITY", margin + 14 + colW * 3, metaY);
-        // const validStr = data.validUntil
-        //   ? new Date(data.validUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-        //   : "Upon Confirmation";
-        // doc
-        //   .fillColor("#A5B4FC")
-        //   .fontSize(8.5)
-        //   .font("Helvetica-Bold")
-        //   .text(validStr, margin + 14 + colW * 3, metaY + 9, { width: colW - 8 });
+          .text(`${travelerCount} Traveler(s)`, margin + 16 + colW * 2, metaY + 9);
 
         doc.y = heroHeaderTopY + totalHeroH + 12;
         doc.x = margin;

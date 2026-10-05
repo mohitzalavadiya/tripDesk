@@ -13914,11 +13914,79 @@ The entitlement backend, transactional quota enforcement, and database-driven fe
 - `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` (Updated with Section 218)
 
 ## 218.6 Known Limitations & Deferred Work
-- **Logo Display**: Logo rendering in quotations, proposal PDFs, customer portals, invoices, booking documents, and email templates remains deferred to future dedicated branding display phases.
+- **Logo Display**: Logo rendering in customer-facing PDFs implemented in Phase 219. Customer portal UI and email templates remain deferred.
 - **SVG Format**: SVG remains unsupported in this phase to prevent script injection / XSS risks until an SVG sanitization library is introduced.
 
 ## 218.7 Closure
 **Phase 218 — CLOSED / PASS**
+
+---
+
+# 219. PROFESSIONAL AGENCY LOGO IN CUSTOMER-FACING PDFs
+
+## 219.1 Purpose & Scope
+- **Objective:** Render the custom agency logo uploaded in Phase 218 onto all customer-facing PDF documents generated across TripDesk SaaS for agencies with the `CUSTOM_AGENCY_LOGO` entitlement (Professional plan, active Trials, or dynamically entitled).
+- **Core Principle:** Presentation-only branding enhancement. Zero redesign of PDF layouts, zero changes to financial formulas, pricing, taxes, line items, booking states, or operational workflows.
+- **Fail-Open Resilience:** PDF generation must never crash if a logo URL is null, corrupt, unreachable, timed out, or unentitled; the document cleanly falls back to the existing text-based header layout.
+
+## 219.2 Architecture & Shared Helper
+- **Shared Helper (`src/lib/services/pdf-branding-helper.ts`):**
+  - Resolves `Agency.logo` into an in-memory `Buffer` compatible with PDFKit.
+  - Verifies `CUSTOM_AGENCY_LOGO` entitlement via `entitlementService.isFeatureAllowed()`.
+  - Supports base64 Data URLs and remote HTTPS Supabase Storage URLs.
+  - Bounded 3000ms network timeout via `AbortSignal.timeout(3000)`.
+  - Enforces magic-byte signature validation (PNG `\x89PNG...`, JPEG `\xff\xd8\xff`, WEBP `RIFF...WEBP`). Disallows SVG and non-image streams.
+  - Fail-open exception handling returning `null` on errors or timeouts.
+
+## 219.3 Customer-Facing PDF Integrations & Approved Visual Placements
+1. **Quotation / Proposal PDF (`quotation-pdf-service.ts`):**
+   - Page 1 Hero Banner (top-left). Refined `fit: [135, 40]`, positioned at `(margin + 16, heroHeaderTopY + 14)`.
+   - Vertical branding flow: Agency logo $\to$ Agency name (`10.5pt bold #A5B4FC`) + contact text $\to$ Trip Title (`17pt bold white`) $\to$ Subtitle $\to$ Metadata pill.
+   - Dynamic hero height computation: `heroTopSectionH = 48 + titleHeight + subtitleHeight + (logoBuffer ? 46 : 0)`.
+   - Preserves proposal metadata, trip title, package comparison, pricing breakdown, milestones, and terms.
+2. **Tax Invoice PDF (`invoice-pdf-service.ts`):**
+   - Page 1 Agency Header Column (top-left). Refined `fit: [140, 44]`, positioned at `(margin, margin)`.
+   - Commercial layout: Renders logo at `[140, 44]`, then drops `+48pt` to render Agency Name (`12pt bold brandPrimary`), Address, Contact, and GSTIN with clean vertical spacing.
+   - Preserves GSTIN, state code, tax tables (CGST/SGST/IGST), totals, and payment status.
+3. **Hotel Voucher PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Hero Container (top-left). Refined `fit: [130, 40]` (operations) / `[130, 36]` (document suite), positioned at `(margin + 16, margin + 12)`.
+   - Banner height dynamically adapts to `Math.max(90, leftContentH, minRightBoxH + 28)` / `94pt`.
+   - Preserves guest details, check-in/out dates, room configurations, and guidelines.
+4. **Transport / Vehicle Voucher PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Hero Container (top-left). Refined `fit: [130, 40]` (operations) / `[130, 36]` (document suite).
+   - Preserves Phase 185 dynamic header height and multi-line title wrapping logic (`bannerHeight = Math.max(90, leftContentH, minRightBoxH + 28)`).
+5. **Activity Pass / Voucher PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Hero Container (top-left). Refined `fit: [130, 40]` (operations) / `[130, 36]` (document suite).
+   - Preserves pass holder details, activity timings, and meeting point instructions.
+6. **Booking Confirmation PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Hero Container (top-left). Refined `fit: [130, 40]` (operations) / `[130, 36]` (document suite).
+   - Preserves traveler overview, financial balance ledger, and confirmation status.
+7. **Final Travel Kit / Customer Itinerary PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Cover Hero Banner ONLY. Refined `fit: [140, 44]` (operations) / `[135, 36]` (document suite).
+   - Preserves subsequent day-by-day itinerary page layout and global text footers without repeating hero logo.
+8. **Official Payment Receipt PDF (`document-pdf-service.ts`):**
+   - Page 1 Header Banner (top-left). Refined `fit: [130, 34]`, positioned at `(margin + 16, margin + 12)`.
+   - Strict 1-page financial layout constraint fully preserved.
+
+## 219.4 Internal Documents Unchanged
+- **Operations Closure Report** (`operations-document-service.ts`) & **Executive/BI Report** (`reporting-service.ts`): Remain internal-only documents without agency logo branding.
+
+## 219.5 Verification & QA Results
+- **Automated QA Suite (`prisma/test-phase-219-pdf-logo-branding.ts`):**
+  - Section 1: Magic byte validation (PNG, JPEG, WEBP pass; SVG, corrupt data URL, null, unreachable URL fail open) $\to$ PASS (6/6)
+  - Section 2: Entitlement checks (Starter unentitled returns null; Professional and Active Trial return Buffer) $\to$ PASS (3/3)
+  - Section 3: End-to-end PDF generation for all 8 customer-facing documents (with and without logo) $\to$ PASS (11/11)
+  - Section 4: Tenant isolation & fail-open security $\to$ PASS (2/2)
+  - Total: **22/22 Tests PASSED**
+- **Regression Suites:**
+  - `prisma/test-phase-218-logo-upload.ts` $\to$ **22/22 Tests PASSED**
+  - `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 Tests PASSED**
+- **Typecheck & Production Build:**
+  - `npx tsc --noEmit` $\to$ **PASS (0 errors)**
+  - `npm run build` $\to$ **PASS (Turbopack production build compiled successfully)**
+
+## 219.6 Closure
+**Phase 219 — Visual Refinement & PDF Branding: CLOSED / PASS**
 
 ---
 

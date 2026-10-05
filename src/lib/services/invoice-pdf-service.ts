@@ -1,6 +1,7 @@
 import "server-only";
 import PDFDocument from "pdfkit";
 import { InvoiceWithDetails } from "./invoice-service";
+import { pdfBrandingHelper } from "@/lib/services/pdf-branding-helper";
 
 /**
  * Helper to format currency in Indian numbering format (INR Rs.)
@@ -36,6 +37,15 @@ export const invoicePdfService = {
    * adhering strictly to Decision #18 (Booking as financial source of truth).
    */
   async generateInvoicePdf(invoice: InvoiceWithDetails): Promise<Buffer> {
+    const agencySnap = (invoice.agencySnapshot as any) || invoice.agency || {};
+    const agencyId = invoice.agencyId || invoice.agency?.id || (invoice.agencySnapshot as any)?.id;
+    const agencyLogo = agencySnap.logo || invoice.agency?.logo || null;
+
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId,
+      logoUrl: agencyLogo,
+    });
+
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -93,39 +103,32 @@ export const invoicePdfService = {
         // ═════════════════════════════════════════════════════════════════════
         // 1. HEADER & AGENCY BRANDING
         // ═════════════════════════════════════════════════════════════════════
-        const agencySnap = (invoice.agencySnapshot as any) || invoice.agency || {};
         const agencyName = agencySnap.name || "TripDesk Partner Agency";
         const agencyEmail = agencySnap.email || "";
         const agencyPhone = agencySnap.phone || "";
         const agencyAddress = agencySnap.address || "";
-        const agencyLogo = agencySnap.logo || invoice.agency?.logo || null;
 
-        // Header Left: Logo or Agency Name
-        let logoDrawn = false;
-        if (agencyLogo && typeof agencyLogo === "string") {
+        // Header Left: Logo and Agency Branding
+        if (logoBuffer) {
           try {
-            if (agencyLogo.startsWith("data:image/") || agencyLogo.startsWith("/")) {
-              doc.image(agencyLogo, margin, currentY, { fit: [140, 45] });
-              logoDrawn = true;
-              currentY += 50;
-            }
+            doc.image(logoBuffer, margin, currentY, { fit: [140, 44] });
+            currentY += 48;
           } catch {
-            logoDrawn = false;
+            // fallback gracefully
           }
         }
 
-        if (!logoDrawn) {
-          doc.fillColor(brandPrimary).fontSize(17).font("Helvetica-Bold").text(agencyName, margin, currentY, {
-            width: 280,
-            ellipsis: true,
-          });
-          currentY += 22;
-        }
+        const agencyTitleSize = logoBuffer ? 12 : 16;
+        doc.fillColor(brandPrimary).fontSize(agencyTitleSize).font("Helvetica-Bold").text(agencyName, margin, currentY, {
+          width: 280,
+          ellipsis: true,
+        });
+        currentY += logoBuffer ? 16 : 20;
 
         doc.fillColor(textMuted).fontSize(8.5).font("Helvetica");
         if (agencyAddress) {
           doc.text(agencyAddress, margin, currentY, { width: 280 });
-          currentY += doc.heightOfString(agencyAddress, { width: 280 }) + 2;
+          currentY += doc.heightOfString(agencyAddress, { width: 280 }) + 3;
         }
 
         const agencyContactLine = [agencyPhone, agencyEmail].filter(Boolean).join("  •  ");

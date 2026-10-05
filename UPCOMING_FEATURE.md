@@ -79,6 +79,8 @@ add subscription flow
 
 add agency logo
 
+quatation pdf we got more page 
+
 manage read only from frontend also
 
 itinerary builder

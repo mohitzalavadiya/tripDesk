@@ -56,6 +56,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       privacyPolicy: quotation.privacyPolicy,
       agency: quotation.agency
         ? {
+            id: quotation.agency.id,
             name: quotation.agency.name,
             email: quotation.agency.email,
             phone: quotation.agency.phone,
