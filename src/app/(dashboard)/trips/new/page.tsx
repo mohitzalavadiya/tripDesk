@@ -7,6 +7,8 @@ import * as Yup from "yup";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { DestinationMultiSelect } from "@/components/shared/destination-multi-select";
+import { QuotaExceededCard } from "@/components/shared/quota-exceeded-card";
+import { useSubscription } from "@/context/subscription-context";
 import { customerClient, tripClient, destinationClient } from "@/lib/api-client";
 import { Customer, Destination, TripStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -20,6 +22,7 @@ import {
   Info,
   Loader2,
   AlertCircle,
+  AlertTriangle,
   Plus,
 } from "lucide-react";
 
@@ -75,6 +78,7 @@ function NewTripForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerIdParam = searchParams.get("customerId");
+  const { canCreate, incrementUsage, refreshSubscription, loading: subscriptionLoading, overview } = useSubscription();
 
   // State
   const [customers, setCustomers] = React.useState<Customer[]>([]);
@@ -83,6 +87,8 @@ function NewTripForm() {
   const [loadingDestinations, setLoadingDestinations] = React.useState(true);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [apiError, setApiError] = React.useState<string | null>(null);
+
+  const decision = canCreate("TRIPS");
 
   // Fetch real customers and active destinations from API
   React.useEffect(() => {
@@ -145,6 +151,7 @@ function NewTripForm() {
         });
 
         if (res.success && res.data) {
+          incrementUsage("TRIPS");
           toast.success(`Trip "${res.data.title}" created successfully.`);
           router.push(`/trips/${res.data.id}`);
         }
@@ -152,6 +159,10 @@ function NewTripForm() {
         if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
           setIsReadOnly(true);
           toast.error("Subscription expired. Read-only mode is active.");
+        } else if (err?.code === "QUOTA_EXCEEDED" || err?.statusCode === 403) {
+          await refreshSubscription();
+          setApiError("Trip creation quota limit reached for this billing period.");
+          toast.error("Trip quota exceeded. Please upgrade to continue creating trips.");
         } else {
           setApiError(err?.message || "Failed to create trip workspace. Please try again.");
           toast.error(err?.message || "Failed to create trip.");
@@ -201,15 +212,48 @@ function NewTripForm() {
           ]}
         />
 
-        {apiError && (
-          <div className="max-w-4xl mx-auto p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-            <span>{apiError}</span>
-          </div>
-        )}
+        {/* Direct URL Quota Exceeded Guard */}
+        {!subscriptionLoading && !decision.allowed && decision.reason === "QUOTA_EXCEEDED" ? (
+          <QuotaExceededCard
+            resourceName="Trip"
+            currentUsage={decision.currentUsage}
+            limit={decision.limit}
+            planName={overview?.subscription?.plan?.name}
+            backHref="/trips"
+            backLabel="Back to Trips"
+          />
+        ) : (
+          <>
+            {!decision.isExceeded && decision.remaining !== null && decision.remaining <= 2 && decision.remaining > 0 && (
+              <div className="max-w-4xl mx-auto p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+                  <div>
+                    <p className="font-bold">Approaching Quota Limit ({decision.currentUsage} / {decision.limit} Trips Created)</p>
+                    <p className="text-[11px] text-amber-700 font-normal mt-0.5">
+                      Only {decision.remaining} trip{decision.remaining > 1 ? "s" : ""} remaining in your current billing cycle.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => router.push("/subscription")}
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 h-auto rounded-xl shrink-0 cursor-pointer"
+                >
+                  Upgrade
+                </Button>
+              </div>
+            )}
 
-        <div className="max-w-4xl mx-auto w-full">
-          <form onSubmit={formik.handleSubmit} className="space-y-6">
+            {apiError && (
+              <div className="max-w-4xl mx-auto p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                <span>{apiError}</span>
+              </div>
+            )}
+
+            <div className="max-w-4xl mx-auto w-full">
+              <form onSubmit={formik.handleSubmit} className="space-y-6">
             {/* Main Details block */}
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-6">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
@@ -458,7 +502,9 @@ function NewTripForm() {
             </div>
           </form>
         </div>
-      </div>
-    </div>
+      </>
+    )}
+  </div>
+</div>
   );
 }

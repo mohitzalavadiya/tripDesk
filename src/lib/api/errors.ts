@@ -41,6 +41,46 @@ export class ReadOnlyAccessError extends ApiError {
   }
 }
 
+export class NoActiveSubscriptionError extends ApiError {
+  constructor(
+    message = "No active subscription found for this agency. An active subscription or valid trial is required to perform write actions.",
+    details?: any
+  ) {
+    super(403, "NO_ACTIVE_SUBSCRIPTION", message, details);
+  }
+}
+
+export class FeatureNotAllowedError extends ApiError {
+  constructor(
+    featureKey: string,
+    message = `Feature '${featureKey}' is not included in your current subscription plan. Please upgrade your plan to access this feature.`,
+    details?: any
+  ) {
+    super(403, "FEATURE_NOT_ALLOWED", message, { featureKey, ...details });
+  }
+}
+
+export class EntitlementConfigError extends ApiError {
+  constructor(
+    message = "Entitlement configuration is missing or incomplete for the current plan.",
+    details?: any
+  ) {
+    super(500, "ENTITLEMENT_CONFIG_ERROR", message, details);
+  }
+}
+
+export class QuotaExceededError extends ApiError {
+  constructor(
+    resourceKey: string,
+    limit: number,
+    currentUsage: number,
+    message = `Creation quota limit of ${limit} reached for ${resourceKey} in the current billing period. Please upgrade your plan for higher limits or unlimited access.`,
+    details?: any
+  ) {
+    super(403, "QUOTA_EXCEEDED", message, { resourceKey, limit, currentUsage, ...details });
+  }
+}
+
 export class NotFoundError extends ApiError {
   constructor(resource = "Requested resource", details?: any) {
     super(404, "NOT_FOUND", `${resource} not found.`, details);

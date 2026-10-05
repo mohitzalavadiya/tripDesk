@@ -14,10 +14,12 @@ import {
   ShieldCheck,
   Building,
   CreditCard,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { agencyNavigationConfig, adminNavigationConfig } from "@/lib/navigation";
 import { useAuth } from "@/context/auth-context";
+import { useSubscription, EntitlementsState } from "@/context/subscription-context";
 import { usePlatformChatUnreadCount } from "@/hooks/use-platform-chat";
 
 interface MobileNavProps {
@@ -28,10 +30,11 @@ interface MobileNavProps {
 export function MobileNav({ open, setOpen }: MobileNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser, isPlatformOwner } = useAuth();
+  const { isPlatformOwner } = useAuth();
   const isPlatform = isPlatformOwner || pathname.startsWith("/admin");
   const navSections = isPlatform ? adminNavigationConfig : agencyNavigationConfig;
   const { unreadCount: chatUnreadCount } = usePlatformChatUnreadCount();
+  const { isFeatureAllowed } = useSubscription();
 
   interface BottomNavItem {
     label: string;
@@ -123,6 +126,8 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                         (item.href !== "/admin" && item.href !== "/dashboard" && pathname.startsWith(item.href));
                       const isSupportChat = item.href === "/support" || item.href === "/admin/chat";
                       const hasUnread = isSupportChat && chatUnreadCount > 0;
+                      const isFeatureGated = !isPlatform && Boolean(item.featureKey);
+                      const isLocked = isFeatureGated && !isFeatureAllowed(item.featureKey as keyof EntitlementsState);
 
                       return (
                         <Link
@@ -170,6 +175,13 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                               )}
                             >
                               {item.badge}
+                            </span>
+                          ) : isLocked ? (
+                            <span
+                              className="inline-flex items-center text-slate-400 group-hover:text-amber-400 transition-colors shrink-0"
+                              title="Available with Professional Plan"
+                            >
+                              <Lock className="h-3.5 w-3.5" />
                             </span>
                           ) : null}
                         </Link>

@@ -7,6 +7,7 @@ import {
 } from "@prisma/client";
 import { AgencyPaymentRequestInput } from "@/lib/validation/subscription-schema";
 import { internalNotificationService } from "@/lib/services/internal-notification-service";
+import { entitlementService } from "@/lib/services/entitlement-service";
 
 export interface PublicPlatformBillingSettings {
   upiId: string | null;
@@ -19,6 +20,16 @@ export interface PublicPlatformBillingSettings {
   qrCodeUrl: string | null;
 }
 
+export interface EntitlementUsageItem {
+  resourceKey: string;
+  limit: number | null;
+  currentUsage: number;
+  remaining: number | null;
+  periodStart: string;
+  periodEnd: string;
+  isExceeded: boolean;
+}
+
 export interface AgencySubscriptionOverview {
   agency: {
     id: string;
@@ -26,6 +37,7 @@ export interface AgencySubscriptionOverview {
     email: string;
     phone: string;
     status: string;
+    logo?: string | null;
   };
   subscription: {
     id: string;
@@ -44,6 +56,17 @@ export interface AgencySubscriptionOverview {
     daysRemaining: number;
     isTrialExpired: boolean;
     isActive: boolean;
+  };
+  usage?: {
+    TRIPS: EntitlementUsageItem | null;
+    QUOTATIONS: EntitlementUsageItem | null;
+    BOOKINGS: EntitlementUsageItem | null;
+  };
+  entitlements?: {
+    CUSTOM_AGENCY_LOGO: boolean;
+    FEEDBACK_REVIEWS: boolean;
+    CUSTOMER_INSIGHTS: boolean;
+    REPORTS_ANALYTICS: boolean;
   };
   latestPendingPayment: {
     id: string;
@@ -251,6 +274,32 @@ export const subscriptionService = {
       }))
       .sort((a, b) => a.displayOrder - b.displayOrder || a.price - b.price);
 
+    // Fetch real-time usage & entitlement metrics safely for Agency Owner UX
+    const formatUsage = (u: any) =>
+      u
+        ? {
+            resourceKey: u.resourceKey,
+            limit: u.limit,
+            currentUsage: u.currentUsage,
+            remaining: u.remaining,
+            periodStart: u.periodStart.toISOString(),
+            periodEnd: u.periodEnd.toISOString(),
+            isExceeded: u.isExceeded,
+          }
+        : null;
+
+    const [tripsUsage, quotationsUsage, bookingsUsage] = await Promise.all([
+      entitlementService.getResourceUsage(agencyId, "TRIPS").then(formatUsage).catch(() => null),
+      entitlementService.getResourceUsage(agencyId, "QUOTATIONS").then(formatUsage).catch(() => null),
+      entitlementService.getResourceUsage(agencyId, "BOOKINGS").then(formatUsage).catch(() => null),
+    ]);
+
+    const [logoAllowed, feedbackAllowed, insightsAllowed, reportsAllowed] = await Promise.all([
+      entitlementService.isFeatureAllowed(agencyId, "CUSTOM_AGENCY_LOGO").catch(() => false),
+      entitlementService.isFeatureAllowed(agencyId, "FEEDBACK_REVIEWS").catch(() => false),
+      entitlementService.isFeatureAllowed(agencyId, "CUSTOMER_INSIGHTS").catch(() => false),
+      entitlementService.isFeatureAllowed(agencyId, "REPORTS_ANALYTICS").catch(() => false),
+    ]);
 
     return {
       agency: {
@@ -259,6 +308,7 @@ export const subscriptionService = {
         email: agency.email,
         phone: agency.phone,
         status: agency.status,
+        logo: agency.logo,
       },
       subscription: {
         id: sub.id,
@@ -277,6 +327,17 @@ export const subscriptionService = {
         daysRemaining,
         isTrialExpired,
         isActive: sub.status === SubscriptionStatus.ACTIVE,
+      },
+      usage: {
+        TRIPS: tripsUsage,
+        QUOTATIONS: quotationsUsage,
+        BOOKINGS: bookingsUsage,
+      },
+      entitlements: {
+        CUSTOM_AGENCY_LOGO: logoAllowed,
+        FEEDBACK_REVIEWS: feedbackAllowed,
+        CUSTOMER_INSIGHTS: insightsAllowed,
+        REPORTS_ANALYTICS: reportsAllowed,
       },
       latestPendingPayment,
       paymentHistory,

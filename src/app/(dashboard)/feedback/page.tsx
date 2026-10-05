@@ -38,10 +38,14 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { experienceClient } from "@/lib/api-client/experience-client";
+import { useSubscription } from "@/context/subscription-context";
 import { AgencyFeedbackItem, FeedbackStats } from "@/lib/services/feedback-service";
+import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
 
 export default function FeedbackAndReviewsPage() {
   const router = useRouter();
+  const { isFeatureAllowed, loading: subLoading } = useSubscription();
+  const isAllowed = isFeatureAllowed("FEEDBACK_REVIEWS");
 
   const [feedbacks, setFeedbacks] = React.useState<AgencyFeedbackItem[]>([]);
   const [stats, setStats] = React.useState<FeedbackStats>({
@@ -109,16 +113,20 @@ export default function FeedbackAndReviewsPage() {
         }
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to load feedback");
+      if (err?.code !== "FEATURE_NOT_ALLOWED" && err?.statusCode !== 403) {
+        toast.error(err.message || "Failed to load feedback");
+      }
     } finally {
       setLoading(false);
     }
   }, [activeTab, searchQuery]);
 
   React.useEffect(() => {
-    fetchFeedbacks();
-    fetchSettings();
-  }, [fetchFeedbacks, fetchSettings]);
+    if (isAllowed) {
+      fetchFeedbacks();
+      fetchSettings();
+    }
+  }, [isAllowed, fetchFeedbacks, fetchSettings]);
 
   // Compute star distribution from live feedbacks
   const starCounts = React.useMemo(() => {
@@ -177,6 +185,40 @@ export default function FeedbackAndReviewsPage() {
       setSavingSettings(false);
     }
   };
+
+  if (subLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">
+        <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+          <PageHeader
+            title="Feedback & Reviews"
+            description="Collect post-trip guest ratings, manage service recovery for unhappy guests, and generate Google/TripAdvisor reviews."
+            breadcrumbs={[{ label: "Experience & Retention" }, { label: "Feedback & Reviews" }]}
+          />
+          <div className="h-64 bg-slate-100 rounded-3xl border border-slate-200/80 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAllowed) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">
+        <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+          <PageHeader
+            title="Feedback & Reviews"
+            description="Collect post-trip guest ratings, manage service recovery for unhappy guests, and generate Google/TripAdvisor reviews."
+            breadcrumbs={[{ label: "Experience & Retention" }, { label: "Feedback & Reviews" }]}
+          />
+          <LockedFeatureCard
+            featureName="Feedback & Reviews"
+            featureKey="FEEDBACK_REVIEWS"
+            description="Post-trip guest ratings, service recovery workflows, and Google/TripAdvisor review collection are available with the Professional Plan."
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">

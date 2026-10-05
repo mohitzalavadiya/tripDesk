@@ -15,6 +15,7 @@ import {
   TaxRateItem,
   AgencyTaxProfileData,
 } from "@/lib/api-client/tax-client";
+import { useSubscription } from "@/context/subscription-context";
 import { TaxMode, GstTreatment } from "@prisma/client";
 import {
   Mail,
@@ -35,15 +36,41 @@ import {
   Building2,
   Percent,
   HelpCircle,
+  Lock,
+  Image as ImageIcon,
+  Upload,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = React.useState<"communication" | "tax">("communication");
+  const { isFeatureAllowed, overview } = useSubscription();
+  const [activeTab, setActiveTab] = React.useState<"communication" | "tax" | "branding">("communication");
   const [settings, setSettings] = React.useState<CommunicationSettings | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [runningSweep, setRunningSweep] = React.useState(false);
+
+  // Logo & Branding state
+  const [logoAllowed, setLogoAllowed] = React.useState(true);
+  const [agencyLogoUrl, setAgencyLogoUrl] = React.useState<string | null>(null);
+  const [logoInputUrl, setLogoInputUrl] = React.useState("");
+  const [savingLogo, setSavingLogo] = React.useState(false);
+
+  // Sync logo entitlement and URL from central subscription context
+  React.useEffect(() => {
+    const isLogoEntitled = isFeatureAllowed("CUSTOM_AGENCY_LOGO");
+    setLogoAllowed(isLogoEntitled);
+
+    if (overview?.logo?.customLogoUrl) {
+      setAgencyLogoUrl(overview.logo.customLogoUrl);
+      setLogoInputUrl(overview.logo.customLogoUrl);
+    } else if (overview?.agency?.logo) {
+      setAgencyLogoUrl(overview.agency.logo);
+      setLogoInputUrl(overview.agency.logo);
+    }
+  }, [isFeatureAllowed, overview]);
 
   // Tax Profile state
   const [taxRates, setTaxRates] = React.useState<TaxRateItem[]>([]);
@@ -100,6 +127,64 @@ export default function SettingsPage() {
       setLoading(false);
     }
   }, []);
+
+  const handleSaveLogo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!logoAllowed) {
+      toast.error("Custom agency logo is a Professional Feature. Please upgrade your plan.");
+      return;
+    }
+    if (!logoInputUrl.trim()) {
+      toast.error("Please enter a valid image URL for your agency logo.");
+      return;
+    }
+
+    setSavingLogo(true);
+    try {
+      const res = await fetch("/api/agency/logo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logoUrl: logoInputUrl.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to update agency logo.");
+      }
+
+      setAgencyLogoUrl(json.data.logo);
+      toast.success("Custom agency logo updated successfully!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update agency logo.");
+    } finally {
+      setSavingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!logoAllowed) {
+      toast.error("Custom agency logo is a Professional Feature. Please upgrade your plan.");
+      return;
+    }
+
+    setSavingLogo(true);
+    try {
+      const res = await fetch("/api/agency/logo", {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to remove agency logo.");
+      }
+
+      setAgencyLogoUrl(null);
+      setLogoInputUrl("");
+      toast.success("Custom agency logo removed.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove agency logo.");
+    } finally {
+      setSavingLogo(false);
+    }
+  };
 
   const fetchLogs = React.useCallback(async () => {
     try {
@@ -279,6 +364,22 @@ export default function SettingsPage() {
           >
             <Receipt className="h-4 w-4" />
             Agency Tax & GST Profile
+          </button>
+          <button
+            onClick={() => setActiveTab("branding")}
+            className={`px-4 py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+              activeTab === "branding"
+                ? "border-indigo-600 text-indigo-600 bg-indigo-50/30 rounded-t-lg"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <ImageIcon className="h-4 w-4" />
+            Agency Branding & Logo
+            {!logoAllowed && (
+              <span className="text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                <Lock className="h-2.5 w-2.5" /> PRO
+              </span>
+            )}
           </button>
         </div>
 
@@ -641,11 +742,11 @@ export default function SettingsPage() {
                       ))}
                     </div>
                   )}
-                </div>
               </div>
             </div>
-          )
-        ) : (
+          </div>
+        )
+      ) : activeTab === "tax" ? (
           /* ─── AGENCY TAX & GST SETTINGS TAB ─── */
           loadingTax ? (
             <div className="bg-white p-12 rounded-2xl border border-slate-200 flex flex-col items-center justify-center space-y-3">
@@ -938,6 +1039,135 @@ export default function SettingsPage() {
               </div>
             </form>
           )
+        ) : (
+          /* ─── AGENCY BRANDING & LOGO TAB ─── */
+          <div className="space-y-6">
+            {!logoAllowed && (
+              <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-amber-100 text-amber-700 rounded-xl shrink-0 mt-0.5">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-amber-950 flex items-center gap-2">
+                        <span>Custom Agency Logo Management — Professional Feature</span>
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">
+                          Starter Locked
+                        </span>
+                      </h4>
+                      <p className="text-xs text-amber-800 leading-relaxed mt-1">
+                        Uploading a custom agency logo for PDF proposals, vouchers, and customer portals is available with the <strong>Professional Plan</strong>. Upgrade to customize your agency brand identity.
+                      </p>
+                    </div>
+                  </div>
+                  <Link href="/subscription" className="shrink-0">
+                    <Button type="button" className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-9 px-4 rounded-xl cursor-pointer">
+                      Upgrade to Professional
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-2xs space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl">
+                    <ImageIcon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Custom Agency Logo</h3>
+                    <p className="text-xs text-slate-500">
+                      Displayed on quotation PDFs, booking vouchers, and public customer share links.
+                    </p>
+                  </div>
+                </div>
+                {logoAllowed ? (
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full">
+                    Feature Enabled
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-700 px-3 py-1 rounded-full flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> Locked on Starter
+                  </span>
+                )}
+              </div>
+
+              {/* Existing Logo Display */}
+              {agencyLogoUrl ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-6">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={agencyLogoUrl}
+                    alt="Agency Logo"
+                    className="max-h-20 max-w-48 object-contain bg-white p-2 rounded-xl border border-slate-200 shadow-2xs"
+                  />
+                  <div className="space-y-1 text-center sm:text-left flex-1">
+                    <span className="text-xs font-bold text-slate-900 block">Current Active Logo</span>
+                    <p className="text-[11px] font-mono text-slate-500 break-all select-all">
+                      {agencyLogoUrl}
+                    </p>
+                    {logoAllowed && (
+                      <div className="pt-2 flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRemoveLogo}
+                          disabled={savingLogo}
+                          className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 h-8 rounded-xl border-rose-200 cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove Logo
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-2">
+                  <ImageIcon className="h-8 w-8 text-slate-300 mx-auto" />
+                  <p className="text-xs font-semibold text-slate-600">No custom logo configured.</p>
+                  <p className="text-[11px] text-slate-400">
+                    Default TripDesk agency header will be rendered on documents until a custom logo is set.
+                  </p>
+                </div>
+              )}
+
+              {/* Logo URL Upload Form */}
+              <form onSubmit={handleSaveLogo} className="space-y-4 pt-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                    <span>Logo Image URL (HTTPS)</span>
+                    {!logoAllowed && (
+                      <span className="text-[10px] text-amber-700 font-semibold flex items-center gap-1">
+                        <Lock className="h-3 w-3" /> Upgrade to Professional to update
+                      </span>
+                    )}
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={logoInputUrl}
+                      onChange={(e) => setLogoInputUrl(e.target.value)}
+                      disabled={!logoAllowed || savingLogo}
+                      placeholder="https://example.com/logo.png"
+                      className="text-xs font-mono bg-white h-10"
+                    />
+                    <Button
+                      type="submit"
+                      disabled={!logoAllowed || savingLogo}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold h-10 px-5 rounded-xl shrink-0 cursor-pointer disabled:opacity-50"
+                    >
+                      {savingLogo ? "Saving..." : "Save Logo"}
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Provide a direct HTTPS image URL for PNG, JPG, or SVG logos.
+                  </p>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
       </div>
       </div>

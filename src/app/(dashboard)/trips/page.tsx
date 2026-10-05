@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
+import { useSubscription } from "@/context/subscription-context";
 import { tripClient } from "@/lib/api-client";
 import { TripStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -190,6 +192,7 @@ export function TripStatusBadge({ status }: { status: TripStatus | string }) {
 
 export default function TripsPage() {
   const router = useRouter();
+  const { canCreate, overview } = useSubscription();
 
   // Data states
   const [trips, setTrips] = React.useState<TripWithRelations[]>([]);
@@ -197,6 +200,20 @@ export default function TripsPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [archivingId, setArchivingId] = React.useState<string | null>(null);
+  const [showQuotaDialog, setShowQuotaDialog] = React.useState(false);
+
+  const handleNewTrip = () => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Trip modifications are restricted to read-only mode.");
+      return;
+    }
+    const decision = canCreate("TRIPS");
+    if (!decision.allowed && decision.reason === "QUOTA_EXCEEDED") {
+      setShowQuotaDialog(true);
+      return;
+    }
+    router.push("/trips/new");
+  };
 
   // Filter & Search states
   const [search, setSearch] = React.useState("");
@@ -366,7 +383,7 @@ export default function TripsPage() {
           {/* Right Action Controls */}
           <div className="flex items-center gap-3 z-10 self-start lg:self-center">
             <Button
-              onClick={() => router.push("/trips/new")}
+              onClick={handleNewTrip}
               disabled={isReadOnly}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
@@ -469,7 +486,7 @@ export default function TripsPage() {
                     : "Create your first trip workspace to begin building itineraries, travelers, and quotation costing."
                 }
                 actionText={isFilterActive ? "Clear Filters" : "New Trip"}
-                onAction={isFilterActive ? handleClearFilters : () => router.push("/trips/new")}
+                onAction={isFilterActive ? handleClearFilters : handleNewTrip}
               />
             </div>
           ) : !loading && !error && (
@@ -680,6 +697,16 @@ export default function TripsPage() {
           </div>
         </div>
       </div>
+
+      {/* Quota Exceeded Dialog */}
+      <QuotaExceededDialog
+        open={showQuotaDialog}
+        onOpenChange={setShowQuotaDialog}
+        resourceName="Trips"
+        currentUsage={overview?.usage?.TRIPS?.currentUsage}
+        limit={overview?.usage?.TRIPS?.limit}
+        planName={overview?.subscription?.plan?.name}
+      />
     </div>
   );
 }

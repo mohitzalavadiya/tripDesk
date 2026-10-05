@@ -34,6 +34,8 @@ import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
+import { useSubscription } from "@/context/subscription-context";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,6 +81,7 @@ const PAYMENT_FILTER_LABELS: Record<string, string> = {
 
 export default function BookingsDashboardPage() {
   const router = useRouter();
+  const { canCreate, overview } = useSubscription();
 
   // Data states
   const [bookings, setBookings] = React.useState<BookingWithRelations[]>([]);
@@ -86,6 +89,20 @@ export default function BookingsDashboardPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [showQuotaDialog, setShowQuotaDialog] = React.useState(false);
+
+  const handleNewBooking = () => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Booking modifications are restricted to read-only mode.");
+      return;
+    }
+    const decision = canCreate("BOOKINGS");
+    if (!decision.allowed && decision.reason === "QUOTA_EXCEEDED") {
+      setShowQuotaDialog(true);
+      return;
+    }
+    router.push("/bookings/new");
+  };
 
   // Search & Filter states
   const [search, setSearch] = React.useState("");
@@ -263,7 +280,7 @@ export default function BookingsDashboardPage() {
           {/* Right Action Controls */}
           <div className="flex items-center gap-3 z-10 self-start lg:self-center">
             <Button
-              onClick={() => router.push("/bookings/new")}
+              onClick={handleNewBooking}
               disabled={isReadOnly}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
@@ -577,6 +594,15 @@ export default function BookingsDashboardPage() {
             await confirmAction.action();
           }
         }}
+      />
+      {/* Quota Exceeded Dialog */}
+      <QuotaExceededDialog
+        open={showQuotaDialog}
+        onOpenChange={setShowQuotaDialog}
+        resourceName="Bookings"
+        currentUsage={overview?.usage?.BOOKINGS?.currentUsage}
+        limit={overview?.usage?.BOOKINGS?.limit}
+        planName={overview?.subscription?.plan?.name}
       />
     </div>
   );

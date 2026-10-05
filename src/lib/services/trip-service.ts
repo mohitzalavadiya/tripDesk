@@ -6,7 +6,8 @@ import {
   UpdateTripInput,
   TripQueryParams,
 } from "@/lib/validation/trip-schema";
-import { Trip, Customer, Traveler, ItineraryItem, TripDestination, Destination } from "@prisma/client";
+import { Trip, Customer, Traveler, ItineraryItem, TripDestination, Destination, Prisma } from "@prisma/client";
+import { entitlementService } from "./entitlement-service";
 
 export interface TripWithRelations extends Trip {
   customer: Customer;
@@ -49,12 +50,13 @@ export interface PaginatedTripsResult {
 /**
  * Generates a unique trip number for an agency (e.g. TRP-202608-1234).
  */
-async function generateUniqueTripNumber(agencyId: string): Promise<string> {
+async function generateUniqueTripNumber(agencyId: string, tx?: Prisma.TransactionClient): Promise<string> {
+  const db = tx || prisma;
   const dateStr = new Date().toISOString().slice(0, 7).replace("-", ""); // YYYYMM
   for (let attempt = 0; attempt < 5; attempt++) {
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const candidate = `TRP-${dateStr}-${randomSuffix}`;
-    const existing = await prisma.trip.findUnique({
+    const existing = await db.trip.findUnique({
       where: {
         agencyId_tripNumber: {
           agencyId,
@@ -330,70 +332,78 @@ export const tripService = {
    * If destinationIds are provided, verifies all exist under agency and creates TripDestination records.
    */
   async createTrip(agencyId: string, data: CreateTripInput): Promise<Trip> {
-    // 1. Verify customer exists under this agency and is not archived
-    const customer = await prisma.customer.findFirst({
-      where: {
-        id: data.customerId,
-        agencyId,
-        archivedAt: null,
-      },
-    });
+    return prisma.$transaction(async (tx) => {
+      // 1. Lock authoritative agency subscription row FOR UPDATE
+      await entitlementService.lockAgencySubscription(agencyId, tx);
 
-    if (!customer) {
-      throw new NotFoundError("Customer");
-    }
+      // 2. Validate quota for "TRIPS" resource inside transaction
+      await entitlementService.checkQuota(agencyId, "TRIPS", tx);
 
-    // 2. Validate destination IDs if provided
-    if (data.destinationIds && data.destinationIds.length > 0) {
-      const uniqueDestIds = Array.from(new Set(data.destinationIds));
-      const foundDests = await prisma.destination.findMany({
+      // 3. Verify customer exists under this agency and is not archived
+      const customer = await tx.customer.findFirst({
         where: {
-          id: { in: uniqueDestIds },
+          id: data.customerId,
           agencyId,
-          status: "ACTIVE",
+          archivedAt: null,
         },
-        select: { id: true },
       });
 
-      if (foundDests.length !== uniqueDestIds.length) {
-        throw new ValidationError("One or more selected destinations do not exist, are inactive, or belong to another agency.");
+      if (!customer) {
+        throw new NotFoundError("Customer");
       }
-    }
 
-    // 3. Determine or generate unique trip number
-    const tripNumber = data.tripNumber?.trim() || (await generateUniqueTripNumber(agencyId));
-
-    // 4. Create trip with optional nested trip destinations
-    return prisma.trip.create({
-      data: {
-        agencyId,
-        customerId: data.customerId,
-        tripNumber,
-        title: data.title,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        status: data.status || "DRAFT",
-        notes: data.notes || null,
-        ...(data.destinationIds && data.destinationIds.length > 0
-          ? {
-              tripDestinations: {
-                create: data.destinationIds.map((destId, idx) => ({
-                  destinationId: destId,
-                  sequence: idx + 1,
-                })),
-              },
-            }
-          : {}),
-      },
-      include: {
-        customer: true,
-        tripDestinations: {
-          include: {
-            destination: true,
+      // 4. Validate destination IDs if provided
+      if (data.destinationIds && data.destinationIds.length > 0) {
+        const uniqueDestIds = Array.from(new Set(data.destinationIds));
+        const foundDests = await tx.destination.findMany({
+          where: {
+            id: { in: uniqueDestIds },
+            agencyId,
+            status: "ACTIVE",
           },
-          orderBy: { sequence: "asc" },
+          select: { id: true },
+        });
+
+        if (foundDests.length !== uniqueDestIds.length) {
+          throw new ValidationError("One or more selected destinations do not exist, are inactive, or belong to another agency.");
+        }
+      }
+
+      // 5. Determine or generate unique trip number
+      const tripNumber = data.tripNumber?.trim() || (await generateUniqueTripNumber(agencyId, tx));
+
+      // 6. Create trip with optional nested trip destinations inside transaction
+      return tx.trip.create({
+        data: {
+          agencyId,
+          customerId: data.customerId,
+          tripNumber,
+          title: data.title,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          status: data.status || "DRAFT",
+          notes: data.notes || null,
+          ...(data.destinationIds && data.destinationIds.length > 0
+            ? {
+                tripDestinations: {
+                  create: data.destinationIds.map((destId, idx) => ({
+                    destinationId: destId,
+                    sequence: idx + 1,
+                  })),
+                },
+              }
+            : {}),
         },
-      },
+        include: {
+          customer: true,
+          tripDestinations: {
+            include: {
+              destination: true,
+            },
+            orderBy: { sequence: "asc" },
+          },
+        },
+      });
     });
   },
 

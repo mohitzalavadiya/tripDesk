@@ -35,6 +35,7 @@ export interface NavigationItem {
   icon: LucideIcon;
   badge?: string;
   badgeVariant?: "default" | "warning" | "success" | "info" | "travel";
+  featureKey?: string;
 }
 
 export interface NavigationSection {
@@ -150,16 +151,19 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Feedback & Reviews",
         href: "/feedback",
         icon: Star,
+        featureKey: "FEEDBACK_REVIEWS",
       },
       {
         label: "Customer Insights",
         href: "/customer-insights",
         icon: TrendingUp,
+        featureKey: "CUSTOMER_INSIGHTS",
       },
       {
-        label: "Reports",
+        label: "Reports & Analytics",
         href: "/reports",
         icon: BarChart,
+        featureKey: "REPORTS_ANALYTICS",
       },
       {
         label: "Communications",

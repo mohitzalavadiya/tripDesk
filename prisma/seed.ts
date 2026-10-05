@@ -8,6 +8,114 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+export async function seedEntitlements(client: PrismaClient) {
+  const starterPlan = await client.subscriptionPlan.findUnique({
+    where: { name: "Starter" },
+  });
+
+  const proPlan = await client.subscriptionPlan.findUnique({
+    where: { name: "Professional" },
+  });
+
+  if (starterPlan) {
+    const starterFeatureKeys = [
+      { key: "CUSTOM_AGENCY_LOGO", enabled: false },
+      { key: "FEEDBACK_REVIEWS", enabled: false },
+      { key: "CUSTOMER_INSIGHTS", enabled: false },
+      { key: "REPORTS_ANALYTICS", enabled: false },
+    ];
+
+    for (const f of starterFeatureKeys) {
+      await client.planFeatureEntitlement.upsert({
+        where: {
+          planId_featureKey: {
+            planId: starterPlan.id,
+            featureKey: f.key,
+          },
+        },
+        update: { enabled: f.enabled },
+        create: {
+          planId: starterPlan.id,
+          featureKey: f.key,
+          enabled: f.enabled,
+        },
+      });
+    }
+
+    const starterUsageLimits = [
+      { key: "TRIPS", limit: 20 },
+      { key: "QUOTATIONS", limit: 20 },
+      { key: "BOOKINGS", limit: 20 },
+    ];
+
+    for (const u of starterUsageLimits) {
+      await client.planUsageLimit.upsert({
+        where: {
+          planId_resourceKey: {
+            planId: starterPlan.id,
+            resourceKey: u.key,
+          },
+        },
+        update: { limit: u.limit },
+        create: {
+          planId: starterPlan.id,
+          resourceKey: u.key,
+          limit: u.limit,
+        },
+      });
+    }
+  }
+
+  if (proPlan) {
+    const proFeatureKeys = [
+      { key: "CUSTOM_AGENCY_LOGO", enabled: true },
+      { key: "FEEDBACK_REVIEWS", enabled: true },
+      { key: "CUSTOMER_INSIGHTS", enabled: true },
+      { key: "REPORTS_ANALYTICS", enabled: true },
+    ];
+
+    for (const f of proFeatureKeys) {
+      await client.planFeatureEntitlement.upsert({
+        where: {
+          planId_featureKey: {
+            planId: proPlan.id,
+            featureKey: f.key,
+          },
+        },
+        update: { enabled: f.enabled },
+        create: {
+          planId: proPlan.id,
+          featureKey: f.key,
+          enabled: f.enabled,
+        },
+      });
+    }
+
+    const proUsageLimits = [
+      { key: "TRIPS", limit: null },
+      { key: "QUOTATIONS", limit: null },
+      { key: "BOOKINGS", limit: null },
+    ];
+
+    for (const u of proUsageLimits) {
+      await client.planUsageLimit.upsert({
+        where: {
+          planId_resourceKey: {
+            planId: proPlan.id,
+            resourceKey: u.key,
+          },
+        },
+        update: { limit: u.limit },
+        create: {
+          planId: proPlan.id,
+          resourceKey: u.key,
+          limit: u.limit,
+        },
+      });
+    }
+  }
+}
+
 async function main() {
   console.log("🌱 Starting TripDesk initial database seed...");
 
@@ -47,6 +155,10 @@ async function main() {
   });
 
   console.log(`✅ Seeded plans: ${starterPlan.name} (₹${starterPlan.price}) & ${proPlan.name} (₹${proPlan.price})`);
+
+  // 1B. Seed Plan Entitlements & Usage Limits
+  await seedEntitlements(prisma);
+  console.log(`✅ Seeded entitlements & usage limits for Starter & Professional`);
 
   // 2. Seed Tax Rates Catalog (Tax V1 Presets)
   const taxRates = [

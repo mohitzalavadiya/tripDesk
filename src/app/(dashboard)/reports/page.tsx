@@ -37,6 +37,8 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/costing-engine";
 import { reportingClient } from "@/lib/api-client/reporting-client";
+import { useSubscription } from "@/context/subscription-context";
+import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
 import {
   AgencyBIReportResult,
   ReportExecutiveKPIs,
@@ -52,6 +54,9 @@ const EXPORT_CSV_LABELS: Record<string, string> = {
 };
 
 export default function ReportsPage() {
+  const { isFeatureAllowed, loading: subLoading } = useSubscription();
+  const isAllowed = isFeatureAllowed("REPORTS_ANALYTICS");
+
   const [reportData, setReportData] = React.useState<AgencyBIReportResult | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState<
@@ -75,19 +80,24 @@ export default function ReportsPage() {
         startDate: preset === "CUSTOM_RANGE" ? customStart : undefined,
         endDate: preset === "CUSTOM_RANGE" ? customEnd : undefined,
       });
+
       if (res.success && res.data) {
         setReportData(res.data);
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to load report data");
+      if (err?.code !== "FEATURE_NOT_ALLOWED" && err?.statusCode !== 403) {
+        toast.error(err.message || "Failed to load report data");
+      }
     } finally {
       setLoading(false);
     }
   }, [preset, customStart, customEnd]);
 
   React.useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
+    if (isAllowed) {
+      fetchReport();
+    }
+  }, [isAllowed, fetchReport]);
 
   const handlePresetSelect = (val: string | null) => {
     if (!val) return;
@@ -130,6 +140,40 @@ export default function ReportsPage() {
     if (val >= 100000) return `₹${(val / 100000).toFixed(2)}L`;
     return `₹${val.toLocaleString("en-IN")}`;
   };
+
+  if (subLoading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
+        <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+          <PageHeader
+            title="Reports & Analytics"
+            description="Real-time executive telemetry, sales conversion, profit margins, receivables, and vendor liabilities."
+            breadcrumbs={[{ label: "Reports & Analytics" }]}
+          />
+          <div className="h-64 bg-slate-100 rounded-3xl border border-slate-200/80 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAllowed) {
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
+        <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+          <PageHeader
+            title="Reports & Analytics"
+            description="Real-time executive telemetry, sales conversion, profit margins, receivables, and vendor liabilities."
+            breadcrumbs={[{ label: "Reports & Analytics" }]}
+          />
+          <LockedFeatureCard
+            featureName="Reports & Analytics"
+            featureKey="REPORTS_ANALYTICS"
+            description="Periodic sales trajectories, gross profit margins, customer receivables, and supplier liability ledgers are available with the Professional Plan."
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">

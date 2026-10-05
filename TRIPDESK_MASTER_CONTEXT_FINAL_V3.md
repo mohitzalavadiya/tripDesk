@@ -13346,9 +13346,396 @@ During real usage post-Phase 204, three specific defects were identified and res
 
 ---
 
+# 211. SUBSCRIPTION ENTITLEMENT, USAGE QUOTAS & FEATURE GATING (PHASE A, B, C, D COMPLETE)
+
+## 211.1 Overview & Architecture
+- **Normalized Entitlement Models**:
+  - `PlanFeatureEntitlement`: Maps `(planId, featureKey)` to `enabled` boolean flag.
+  - `PlanUsageLimit`: Maps `(planId, resourceKey)` to `limit` (integer or null for unlimited).
+  - Feature keys: `CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, `REPORTS_ANALYTICS`.
+  - Resource keys: `TRIPS`, `QUOTATIONS`, `BOOKINGS`.
+- **Authoritative Resolution & Fail-Closed Logic**:
+  - `entitlementService.resolveAgencySubscription(agencyId)` determines effective plan using authoritative latest subscription row (`createdAt DESC`).
+  - Active `TRIAL` subscriptions receive **Professional** plan entitlements regardless of stored `planId`.
+  - Missing subscriptions throw `NoActiveSubscriptionError` (`NO_ACTIVE_SUBSCRIPTION`, HTTP 403).
+  - Expired / cancelled subscriptions throw `ReadOnlyAccessError` (`READ_ONLY_ACCESS`, HTTP 403).
+  - Disabled or missing feature rows throw `FeatureNotAllowedError` (`FEATURE_NOT_ALLOWED`, HTTP 403).
+  - Creation quotas throw `QuotaExceededError` (`QUOTA_EXCEEDED`, HTTP 403).
+
+## 211.2 Phase C Transactional Quota Enforcement
+- **Transactional Row Locking**: Every creation operation (`createTrip`, `createQuotation`, `generateTripQuotation`, `createBooking`) acquires a row lock at the start of a Prisma `$transaction`:
+  `SELECT "id" FROM "subscriptions" WHERE "agencyId" = :agencyId ORDER BY "createdAt" DESC LIMIT 1 FOR UPDATE;`
+- **Creation-Based Accounting**: Resource creation counts are calculated over the authoritative billing period (`createdAt >= periodStart AND createdAt < periodEnd`) including soft-deleted/archived entities using composite indexes `[agencyId, createdAt]`.
+- **Exact Boundary Concurrency**: Starter plan limits (20/20) fail closed under high concurrency ($19/20 \to 20/20$ exact, 0 overages).
+
+## 211.3 Phase D Feature Entitlement Enforcement
+- **`CUSTOM_AGENCY_LOGO`**: Server-side mutation gate implemented at `POST/DELETE /api/agency/logo`. Upload and deletion of custom logos require active Professional entitlement. Existing logo display behavior and document rendering remain unchanged.
+- **`FEEDBACK_REVIEWS`**: Server-side entry points `GET/POST /api/feedback`, `GET/PATCH /api/feedback/[id]`, and `feedbackService` agency-side methods enforce `FEEDBACK_REVIEWS` entitlement. Public customer feedback submission (`/api/trips/public/[token]/feedback`) and Customer Portal feedback remain open to all plans without gating.
+- **`CUSTOMER_INSIGHTS`**: Server-side entry point `GET /api/customer-insights` and `customerInsightsService.getCustomerInsights` enforce `CUSTOMER_INSIGHTS` entitlement.
+- **`REPORTS_ANALYTICS`**: Server-side entry points `GET /api/reports`, `GET /api/reports/export`, `GET /api/reports/pdf`, and `reportingService.getAgencyBIReport` enforce `REPORTS_ANALYTICS` entitlement.
+
+## 211.4 Verification & Automated Test Matrix Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all routes (PASS)**.
+- **Phase A Test Suite (`prisma/test-phase-a-entitlements.ts`)**: **PASSED**.
+- **Phase B Test Suite (`prisma/test-phase-b-entitlements.ts`)**: **PASSED**.
+- **Phase C Concurrency Suite (`prisma/test-phase-c-concurrency.ts`)**: **7/7 PASSED** (TRIPS, QUOTATIONS, BOOKINGS 19/20 concurrency $\to$ 1 Success, 1 QUOTA_EXCEEDED, 20 final count).
+- **Phase D Feature Suite (`prisma/test-phase-d-entitlements.ts`)**: **8/8 PASSED** (Starter denials, Pro access, Trial Professional access, disabled DB row fail-closed, missing DB row fail-closed, missing/expired sub fail-closed, direct service gates, public feedback safety).
+
+---
+
+# 212. PHASE E — FRONTEND ENTITLEMENT UI, USAGE METERS & UPGRADE GUIDANCE [CLOSED]
+
+## 212.1 Objective & Final Status
+
+- **Phase E Objective**: Frontend Entitlement UI, Usage Meters & Upgrade Guidance.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+- **Independent Final Read-Only Audit**: **PASS**
+- Phase E adds frontend visibility and UX guidance on top of the existing centralized server-side entitlement architecture.
+
+## 212.2 Subscription API Extension
+
+- Reused existing `GET /api/subscription` endpoint via `subscriptionService.getAgencySubscription()`.
+- Extended the existing subscription overview response payload with:
+  - `usage`: Usage counters and limits for `TRIPS`, `QUOTATIONS`, `BOOKINGS`
+  - `features`: Entitlement status for `CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, `REPORTS_ANALYTICS`
+- No duplicate usage endpoint created.
+- Existing subscription response fields (`agency`, `subscription`, `paymentHistory`, `billingSettings`) preserved.
+
+## 212.3 Usage Meters
+
+- `/subscription` page displays authoritative, database-driven usage meters for Trips, Quotations, and Bookings.
+- Displays current count, limit, remaining quota, progress percentage, and unlimited status indicators.
+- **Starter Plan**: Enforces limits of 20 per subscription billing period (`[periodStart, periodEnd)`).
+- **Professional Plan & Valid Trial**: Displays unlimited usage indicators.
+- Usage remains creation-based and tied to the authoritative stored subscription/trial billing period.
+
+## 212.4 Creation Quota UX
+
+- `/trips/new`
+- `/quotations/new`
+- `/bookings/new`
+
+Added client-side pre-submit UX:
+- Approaching-limit warning banner (`remaining <= 2 && remaining > 0`)
+- Exhausted-limit alert banner (`remaining === 0`)
+- Disabled creation submit button when quota is exhausted
+- Upgrade CTA linking directly to `/subscription`
+
+Explicitly documented: Frontend quota controls are UX guidance only. Server-side transactional quota enforcement from Phase C (`trip-service.ts`, `quotation-service.ts`, `booking-service.ts`) remains authoritative.
+
+## 212.5 Professional Feature Locked UX
+
+- Added reusable presentation-only `LockedFeatureCard` (`src/components/shared/locked-feature-card.tsx`).
+- Page-level locked UX added for Starter plan on restricted routes:
+  - `/feedback`
+  - `/customer-insights`
+  - `/reports`
+- Professional plan and valid Trial retain 100% normal access.
+- Navigation entries for these features remain visible and routable across all plans.
+
+## 212.6 Custom Agency Logo UX
+
+- `/settings` Branding & Logo tab locks custom agency logo mutation controls for Starter plan with Professional upgrade guidance.
+- Professional plan and valid Trial retain full logo upload and deletion capabilities.
+- Existing logo retention/display and document rendering remain unchanged.
+- No logo or storage object deletion or automatic hiding was introduced.
+
+## 212.7 Public Feedback & Customer Portal Regression Safety
+
+- Public customer feedback submission (`/api/trips/public/[token]/feedback`) remains unrestricted across all plans.
+- Customer Portal (`/customer/...`) remains available to Starter, Professional, and Trial.
+- No public or customer-facing flow was gated behind Professional.
+
+## 212.8 Security & Architecture
+
+- Centralized `entitlementService` remains the single source of truth.
+- Zero `if (plan === "Professional")` or hardcoded plan-name string authorization introduced.
+- Authenticated server-side agency context is strictly enforced.
+- Cross-agency tenant isolation preserved.
+- Server-side entitlement gates (Phase B/C/D) remain 100% intact.
+
+## 212.9 Billing & Data Safety
+
+- Prisma schema: **UNCHANGED**
+- Database migrations: **NONE**
+- Subscription / Payment records: **UNCHANGED**
+- Historical billing / Invoices: **UNCHANGED**
+- Existing logo storage: **UNCHANGED**
+- QA data: **UNCHANGED**
+
+## 212.10 Verification
+
+- Phase E implementation: **PASS**
+- Independent Phase E read-only audit: **PASS**
+- `npx tsc --noEmit`: **PASS — 0 errors**
+- `npm run build`: **PASS — exit code 0 across all routes**
+- Security / tenant isolation: **PASS**
+- Phase C regression: **PASS**
+- Phase D regression: **PASS**
+- Public feedback regression: **PASS**
+- Customer Portal regression: **PASS**
+- Starter / Professional / Trial regression: **PASS**
+- Unexpected changes: **NONE**
+- Critical findings: **NONE**
+- Non-blocking observations: **NONE**
+
+## 212.11 Files Changed
+
+- `src/lib/services/subscription-service.ts`
+- `src/lib/api-client/index.ts`
+- `src/components/shared/locked-feature-card.tsx`
+- `src/app/(dashboard)/subscription/page.tsx`
+- `src/app/(dashboard)/trips/new/page.tsx`
+- `src/app/(dashboard)/quotations/new/page.tsx`
+- `src/app/(dashboard)/bookings/new/page.tsx`
+- `src/app/(dashboard)/feedback/page.tsx`
+- `src/app/(dashboard)/customer-insights/page.tsx`
+- `src/app/(dashboard)/reports/page.tsx`
+- `src/app/(dashboard)/settings/page.tsx`
+
+## 212.12 Closure
+
+**Phase E — CLOSED / PASS**
+
+The entitlement backend, transactional quota enforcement, and database-driven feature configuration remain authoritative. Phase E completes the frontend entitlement visibility, usage-meter, quota-guidance, and Professional feature lock UX layer without introducing a duplicate authorization architecture or changing historical billing/data.
+
+---
+
+# 213. PHASE 213 — PLATFORM OWNER ENTITLEMENT & USAGE QUOTA MANAGEMENT [CLOSED]
+
+## 213.1 Objective & Final Status
+- **Objective**: Connect the Platform Owner subscription plan management experience (`/admin/plans`) to the machine-enforced normalized entitlement tables (`PlanFeatureEntitlement` and `PlanUsageLimit`), allowing Platform Owner to dynamically configure feature flags and creation usage quotas per plan.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 213.2 Architectural & Implementation Summary
+1. **Admin Validation Schema Extension (`src/lib/validation/admin-schema.ts`)**:
+   - Extended `planCreateSchema` and `planUpdateSchema` with validated `entitlements` (canonical feature booleans) and `usageLimits` (canonical resource non-negative integers or `null` for Unlimited).
+2. **Atomic Service Mutation Layer (`src/lib/services/admin-service.ts`)**:
+   - `adminService.listPlans`: Includes `featureEntitlements` and `usageLimits` relations, returning structured `entitlements` and `usageLimits` records per plan.
+   - `adminService.createPlan` & `adminService.updatePlan`: Wrapped inside interactive Prisma transaction (`prisma.$transaction`). Atomically updates `SubscriptionPlan` scalar attributes alongside `PlanFeatureEntitlement` and `PlanUsageLimit` rows via `upsert`.
+3. **Platform Owner Admin UI Extension (`src/app/admin/plans/page.tsx`)**:
+   - Plan cards render live machine-enforced resource creation quotas (Trips, Quotations, Bookings) and feature access flags (`CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, `REPORTS_ANALYTICS`).
+   - Create/Edit Plan modal provides toggle switches for feature entitlement flags and dual numeric/unlimited controls for usage limits (`null` mapped strictly to Unlimited).
+4. **Authoritative Runtime Consumption (`src/lib/services/entitlement-service.ts`)**:
+   - Existing `entitlementService` dynamically reads the updated `PlanFeatureEntitlement` and `PlanUsageLimit` rows from PostgreSQL, enforcing updated feature rules and creation quotas immediately without code redeployment.
+
+## 213.3 Security, Billing & Data Safety
+- **Platform Owner Authorization**: Admin APIs (`GET/POST /api/admin/plans`, `PATCH /api/admin/plans/[id]`) remain strictly guarded by `requirePlatformOwnerContext()` with `agencyId = null`. Non-admin requests fail closed with HTTP 403.
+- **Historical Billing Preservation**: Updating plan prices or entitlements affects future subscription evaluation only. Historical `SubscriptionPayment` amounts, historical subscription dates, and invoices remain strictly untouched.
+- **Atomicity**: Plan creation and updates execute within a single Prisma transaction, rolling back completely if any element fails.
+- **Database Schema**: Zero schema alterations, zero migrations created (`prisma db push` not used).
+
+## 213.4 Verification & Automated Test Matrix Results
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 PASSED (100%)**
+  - Read normalized configuration: PASS
+  - Dynamic feature entitlement mutation (OFF $\to$ ON): PASS
+  - Dynamic usage quota mutation (20 $\to$ 30 and Unlimited `null`): PASS
+  - Create new plan with entitlements/limits: PASS
+  - Fail-closed security check on missing config: PASS
+  - Historical billing safety check: PASS
+  - Baseline state restoration: PASS
+
+## 213.5 Files Changed
+- `src/lib/validation/admin-schema.ts`
+- `src/lib/services/admin-service.ts`
+- `src/app/admin/plans/page.tsx`
+- `prisma/test-phase-213-entitlements.ts`
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 213.6 Closure
+**Phase 213 — CLOSED / PASS**
+
+---
+
+# 214. PHASE 214 — SUBSCRIPTION QUOTA BYPASS REMEDIATION [CLOSED]
+
+## 214.1 Objective & Final Status
+- **Objective**: Remediate the two server-side subscription creation quota bypasses identified during the subscription audit (Quotation Fork Version and Quotation $\to$ Booking Conversion), ensuring that every billable creation path across Trips, Quotations, and Bookings enforces authoritative quota limits and subscription row locks inside PostgreSQL interactive transactions.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 214.2 Root Causes & Remediation Summary
+1. **Quotation Fork Version Remediation (`src/lib/services/quotation-service.ts`)**:
+   - **Root Cause**: `quotationService.createQuotationVersion` created a new `Quotation` row in the `quotations` table (which is counted toward usage by `entitlementService.getResourceUsage`) inside a Prisma transaction, but omitted `lockAgencySubscription` and `checkQuota("QUOTATIONS")`.
+   - **Remediation**: Added `await entitlementService.lockAgencySubscription(agencyId, tx)` and `await entitlementService.checkQuota(agencyId, "QUOTATIONS", tx)` inside the interactive `$transaction` prior to `tx.quotation.create`.
+2. **Quotation $\to$ Booking Conversion Remediation (`src/lib/services/booking-service.ts`)**:
+   - **Root Cause**: `bookingService.convertQuotationToBooking` created a new `Booking` row in the `bookings` table inside a Prisma transaction, but omitted `lockAgencySubscription` and `checkQuota("BOOKINGS")`.
+   - **Remediation**: Added `await entitlementService.lockAgencySubscription(agencyId, tx)` and `await entitlementService.checkQuota(agencyId, "BOOKINGS", tx)` inside the interactive `$transaction` prior to `tx.booking.create`.
+
+## 214.3 Complete Billable Creation-Path Matrix
+- **Trips**:
+  - New Manual Trip (`createTrip`): **PROTECTED** (`TRIPS` quota check + subscription lock FOR UPDATE)
+  - Enquiry $\to$ Trip (`convertEnquiryToTrip`): **PROTECTED** (delegates to `createTrip`)
+- **Quotations**:
+  - New Manual Quotation (`createQuotation`): **PROTECTED** (`QUOTATIONS` quota check + subscription lock FOR UPDATE)
+  - Generate Trip Quotation (`generateQuotationFromTrip`): **PROTECTED** (`QUOTATIONS` quota check + subscription lock FOR UPDATE)
+  - Fork New Version (`createQuotationVersion`): **REMEDIATED & PROTECTED** (`QUOTATIONS` quota check + subscription lock FOR UPDATE)
+- **Bookings**:
+  - New Manual Booking (`createBooking`): **PROTECTED** (`BOOKINGS` quota check + subscription lock FOR UPDATE)
+  - Convert Quotation $\to$ Booking (`convertQuotationToBooking`): **REMEDIATED & PROTECTED** (`BOOKINGS` quota check + subscription lock FOR UPDATE)
+
+## 214.4 Database, Concurrency & Security Protection
+- **Concurrency & Locking**: All creation paths execute `lockAgencySubscription(agencyId, tx)` (`SELECT FOR UPDATE`) and `checkQuota` inside the same Prisma transaction, preventing race conditions where simultaneous requests exceed the subscription quota.
+- **Database Schema**: Zero schema alterations, zero migrations created (`prisma db push` not used).
+- **Data & Configuration Safety**: QA test data created during automated testing was completely cleaned up, and original `PlanUsageLimit` values were fully restored.
+
+## 214.5 Automated QA Verification Results
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-214-quota-bypass.ts` $\to$ **20/20 PASSED (100%)**
+  - Forking quotation version below limit (1/2 $\to$ 2/2): PASS
+  - Forking quotation version at quota capacity (2/2): REJECTED with `QuotaExceededError` (DB count unchanged): PASS
+  - Converting quotation to booking below limit (0/1 $\to$ 1/1): PASS
+  - Converting quotation to booking at quota capacity (1/1): REJECTED with `QuotaExceededError` (DB count unchanged): PASS
+  - Concurrency protection test (2 simultaneous requests with 1 spot remaining $\to$ 1 succeeded, 1 blocked, usage = capacity): PASS
+  - Dynamic limit integration test (limit = 10): PASS
+  - Professional plan unlimited test (`limit = null`): PASS
+  - Full matrix regression test (Trip creation blocked at 1/1 capacity): PASS
+
+## 214.6 Files Changed
+- `src/lib/services/quotation-service.ts`
+- `src/lib/services/booking-service.ts`
+- `prisma/test-phase-214-quota-bypass.ts`
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 214.7 Closure
+**Phase 214 — CLOSED / PASS**
+
+---
+
+# 215. PHASE 215 — FRONTEND ENTITLEMENT-GATED NAVIGATION & PLAN CAPABILITY UX [CLOSED]
+
+## 215.1 Objective & Final Status
+- **Objective**: Improve the Agency Owner frontend experience for Professional-only features by ensuring features remain discoverable in navigation with clear lock indicators for Starter users, routes render dedicated locked/upgrade experiences (`LockedFeatureCard`) rather than failing after backend calls, feature-specific API requests are suppressed when disabled, and the Subscription page dynamically presents accurate plan capabilities for both Starter and Professional tiers.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 215.2 Architectural & UX Implementation Summary
+1. **Sidebar Navigation & Mobile Drawer Gating (`src/components/layout/sidebar.tsx`, `src/components/layout/mobile-nav.tsx`)**:
+   - Professional-only features (`Feedback & Reviews`, `Customer Insights`, `Reports & Analytics`) remain fully visible in the sidebar to Starter Agency Owners.
+   - For Starter users whose plan does not entitle a feature (`!isFeatureAllowed(item.featureKey)`), a clean Lucide `Lock` icon is displayed alongside the navigation label (and a `(Pro Feature)` lock badge in collapsed tooltip).
+   - For Professional users, navigation items display normally without lock indications.
+2. **Page-Level Entitlement Gating Before Feature Data Loading (`src/app/(dashboard)/feedback/page.tsx`, `src/app/(dashboard)/customer-insights/page.tsx`, `src/app/(dashboard)/reports/page.tsx`)**:
+   - Consumes live database-driven entitlements from `useSubscription()`.
+   - While subscription context resolves, renders a graceful loading skeleton.
+   - When a feature is not entitled (`!isAllowed`), immediately renders `LockedFeatureCard` with the canonical feature title, clear explanation, and "Upgrade to Professional" CTA linking to `/subscription`.
+   - Feature-specific data fetching (`experienceClient.listFeedbacks`, `experienceClient.getCustomerInsights`, `reportingClient.getReport`) is **strictly prevented** from executing when the feature is locked, eliminating unneeded API traffic and avoiding unexpected `FEATURE_NOT_ALLOWED` error toast experiences.
+   - Direct URL navigation (e.g. typing `/feedback`, `/customer-insights`, or `/reports`) is safely gated by the same entitlement check.
+3. **Subscription Page Dynamic Plan Capabilities (`src/app/(dashboard)/subscription/page.tsx`)**:
+   - Connected `data.entitlements` directly to the "Feature Entitlements" scorecard, accurately displaying `Included` vs `Available with Pro` for `CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, and `REPORTS_ANALYTICS`.
+   - "Current Billing Period Usage" meters dynamically display exact numeric limits (`20 per billing period` or updated quota such as `30`) or `UNLIMITED` when `limit === null`.
+4. **Backend Security Boundary Retained**:
+   - Backend `entitlementService.checkFeatureAllowed` and `entitlementService.checkQuota` remain the final authoritative security barrier. Direct API requests from unauthorized plans continue to be rejected with `FeatureNotAllowedError` (HTTP 403).
+
+## 215.3 Database & System Safety
+- **Database Schema**: Zero schema changes, zero migrations, no `prisma db push` or reset.
+- **Tenant Isolation**: Preserved. No client-supplied IDs trusted.
+- **Billing Semantics**: Historical payments, subscriptions, and invoice records remain 100% immutable and intact.
+
+## 215.4 Automated QA & Regression Test Matrix
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all routes**
+- `prisma/test-phase-215-entitlement-ux.ts` $\to$ **23/23 PASSED (100%)**
+  - Starter baseline machine entitlements verification: PASS
+  - Professional baseline machine entitlements verification: PASS
+  - Permanent test agency entitlement overview consumption: PASS
+  - Controlled dynamic entitlement mutation (OFF $\to$ ON $\to$ OFF): PASS
+  - Backend authorization fail-closed enforcement verification: PASS
+- `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 PASSED (100%)**
+- `prisma/test-phase-214-quota-bypass.ts` $\to$ **20/20 PASSED (100%)**
+
+## 215.5 Files Changed
+- `src/components/layout/sidebar.tsx`
+- `src/components/layout/mobile-nav.tsx`
+- `src/app/(dashboard)/feedback/page.tsx`
+- `src/app/(dashboard)/customer-insights/page.tsx`
+- `src/app/(dashboard)/reports/page.tsx`
+- `src/app/(dashboard)/subscription/page.tsx`
+- `src/app/(dashboard)/settings/page.tsx`
+- `src/lib/services/quotation-service.ts`
+- `prisma/test-phase-215-entitlement-ux.ts`
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 215.6 Closure
+**Phase 215 — CLOSED / PASS**
+
+---
+
+# 216. PHASE 216 — SUBSCRIPTION STATE OPTIMIZATION & QUOTA-AWARE CREATION UX [CLOSED]
+
+## 216.1 Objective & Final Status
+- **Objective**:
+  1. Optimize client subscription state management by eliminating duplicate, redundant `GET /api/subscription` network calls across dashboard pages (`/trips/new`, `/quotations/new`, `/bookings/new`, and `/settings`), consolidating data retrieval into the root `<SubscriptionProvider>` with in-memory React Context and throttled focus revalidation.
+  2. Implement proactive, quota-aware creation UX for Trips, Quotations, and Bookings on both listing pages (intercepting "New" actions when finite quota is exhausted with `QuotaExceededDialog` and upgrade guidance) and direct `/new` routes (guarding active form rendering with `QuotaExceededCard`).
+  3. Ensure post-creation local usage synchronization (`incrementUsage`) to keep in-memory quota counts immediately fresh without triggering full API refetches, while preserving the backend as the final authoritative security and concurrency boundary.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 216.2 Architectural & UX Implementation Summary
+1. **Centralized React State & Context Enhancement (`src/context/subscription-context.tsx`)**:
+   - Enhanced `SubscriptionContext` with `canCreate(resourceKey: 'TRIPS' | 'QUOTATIONS' | 'BOOKINGS'): QuotaDecision` providing `{ allowed, reason, currentUsage, limit, remaining, isExceeded, loading }`.
+   - Enhanced `SubscriptionContext` with `incrementUsage(resourceKey)` to optimistically update in-memory counters post-successful backend creation.
+   - Incorporated 5-minute throttled window focus revalidation to gracefully capture multi-tab or dynamic admin configuration updates without polling or network overhead.
+2. **Redundant Subscription API Fetch Elimination**:
+   - `src/app/(dashboard)/trips/new/page.tsx`: Removed redundant `subscriptionClient.getSubscription()` call; consumes `useSubscription()`.
+   - `src/app/(dashboard)/quotations/new/page.tsx`: Removed redundant `subscriptionClient.getSubscription()` call; consumes `useSubscription()`.
+   - `src/app/(dashboard)/bookings/new/page.tsx`: Removed redundant `subscriptionClient.getSubscription()` call; consumes `useSubscription()`.
+   - `src/app/(dashboard)/settings/page.tsx`: Removed redundant `subscriptionClient.getSubscription()` call; consumes `useSubscription().isFeatureAllowed('CUSTOM_AGENCY_LOGO')` and `overview.logo`.
+   - `src/app/(dashboard)/subscription/page.tsx`: Preserved dedicated billing data fetching while synchronizing with `refreshSubscription()` upon payment requests and data reloads.
+3. **Quota-Aware Listing Page Interception (`src/app/(dashboard)/trips/page.tsx`, `src/app/(dashboard)/quotations/page.tsx`, `src/app/(dashboard)/bookings/page.tsx`)**:
+   - Evaluates `canCreate(resource)` before navigation.
+   - When quota is reached on finite tiers (e.g. Starter 20/20), prevents navigation into the `/new` form and opens `QuotaExceededDialog` (`src/components/shared/quota-exceeded-dialog.tsx`) detailing exact usage, limit, current billing period context, and an "Upgrade Plan" CTA to `/subscription`.
+   - Loading-safe: Never blocks legitimate Professional or available-quota users while subscription state is resolving.
+4. **Direct Route Protection (`src/app/(dashboard)/trips/new/page.tsx`, `src/app/(dashboard)/quotations/new/page.tsx`, `src/app/(dashboard)/bookings/new/page.tsx`)**:
+   - When a user directly navigates to a `/new` URL while quota is exhausted, active form rendering is suppressed.
+   - Renders `QuotaExceededCard` (`src/components/shared/quota-exceeded-card.tsx`) with telemetry pills, plan benefit breakdown, "Back to [Resource]" navigation, and "Upgrade to Professional" CTA.
+5. **Backend Authority & Concurrency Integrity Retained**:
+   - Backend `entitlementService.checkQuota`, transaction locks, and Phase 214 `createQuotationVersion` interactive transaction settings `{ timeout: 15000, maxWait: 10000 }` remain 100% authoritative and unchanged.
+   - On backend `QUOTA_EXCEEDED` (HTTP 403) responses, frontend catches the conflict and triggers `refreshSubscription()` to reconcile local state with authoritative server data.
+
+## 216.3 Database & System Safety
+- **Database Schema**: Zero schema modifications, zero migrations, no `prisma db push` or reset.
+- **Tenant Isolation**: Preserved. Session verified `agencyId` strictly enforced on backend.
+- **External Dependencies**: Zero new libraries added.
+
+## 216.4 Automated QA & Regression Test Matrix
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-216-caching-and-quota-ux.ts` $\to$ **22/22 PASSED (100%)**
+  - Overview payload usage and telemetry integrity: PASS
+  - Starter finite limit evaluation (19/20 allows, 20/20 blocks): PASS
+  - Professional unlimited evaluation (`limit === null` allows): PASS
+  - Active Trial receiving Professional capability evaluation: PASS
+  - Read-only/Canceled subscription rejection: PASS
+  - Authoritative backend `checkQuota` execution: PASS
+- `prisma/test-phase-215-entitlement-ux.ts` $\to$ **23/23 PASSED (100%)**
+- `prisma/test-phase-214-quota-bypass.ts` $\to$ **20/20 PASSED (100%)**
+- `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 PASSED (100%)**
+
+## 216.5 Files Changed / Added
+- `src/context/subscription-context.tsx` (Enhanced with `canCreate`, `incrementUsage`, focus revalidation)
+- `src/components/shared/quota-exceeded-dialog.tsx` (New reusable modal for listing pages)
+- `src/components/shared/quota-exceeded-card.tsx` (New reusable guard card for direct routes)
+- `src/app/(dashboard)/trips/page.tsx` (Added quota-aware `handleNewTrip` and `QuotaExceededDialog`)
+- `src/app/(dashboard)/trips/new/page.tsx` (Eliminated duplicate fetch, added `QuotaExceededCard`, synchronized usage on create)
+- `src/app/(dashboard)/quotations/page.tsx` (Added quota-aware `handleGenerateQuotation` and `QuotaExceededDialog`)
+- `src/app/(dashboard)/quotations/new/page.tsx` (Eliminated duplicate fetch, added `QuotaExceededCard`, synchronized usage on create)
+- `src/app/(dashboard)/bookings/page.tsx` (Added quota-aware `handleNewBooking` and `QuotaExceededDialog`)
+- `src/app/(dashboard)/bookings/new/page.tsx` (Eliminated duplicate fetch, added `QuotaExceededCard`, synchronized usage on create)
+- `src/app/(dashboard)/settings/page.tsx` (Eliminated duplicate fetch, synchronized logo entitlement and branding from Context)
+- `src/app/(dashboard)/subscription/page.tsx` (Synchronized context on payment submissions and data reloads)
+- `prisma/test-phase-216-caching-and-quota-ux.ts` (New Phase 216 automated test suite)
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 216.6 Closure
+**Phase 216 — CLOSED / PASS**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
 
 
 

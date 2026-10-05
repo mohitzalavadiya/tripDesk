@@ -4,6 +4,8 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { QuotaExceededCard } from "@/components/shared/quota-exceeded-card";
+import { useSubscription } from "@/context/subscription-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,6 +39,7 @@ import {
   Sparkles,
   Loader2,
   AlertCircle,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function NewBookingPage() {
@@ -59,6 +62,9 @@ function NewBookingForm() {
   const searchParams = useSearchParams();
   const initialQuotationId = searchParams.get("quotationId");
   const initialTripId = searchParams.get("tripId");
+  const { canCreate, incrementUsage, refreshSubscription, loading: subscriptionLoading, overview } = useSubscription();
+
+  const decision = canCreate("BOOKINGS");
 
   // Mode: "quotation" | "trip"
   const [mode, setMode] = React.useState<"quotation" | "trip">(
@@ -82,7 +88,7 @@ function NewBookingForm() {
   const [bookingNotes, setBookingNotes] = React.useState("");
   const [bookingInternalNotes, setBookingInternalNotes] = React.useState("");
 
-  // Load real active quotations, trips, customers
+  // Load real active quotations, trips, and customers
   React.useEffect(() => {
     async function loadResources() {
       try {
@@ -99,7 +105,7 @@ function NewBookingForm() {
             setSelectedQuotationId(quotesRes.data[0].id);
             setBookingTotal(String(quotesRes.data[0].finalAmount));
           } else if (initialQuotationId) {
-            const found = quotesRes.data.find((q) => q.id === initialQuotationId);
+            const found = quotesRes.data.find((q: QuotationWithRelations) => q.id === initialQuotationId);
             if (found) setBookingTotal(String(found.finalAmount));
           }
         }
@@ -170,6 +176,7 @@ function NewBookingForm() {
         });
 
         if (res.success && res.data) {
+          incrementUsage("BOOKINGS");
           toast.success(`Booking ${res.data.bookingNumber} created successfully!`);
           router.push(`/bookings/${res.data.id}`);
         }
@@ -196,12 +203,18 @@ function NewBookingForm() {
         });
 
         if (res.success && res.data) {
+          incrementUsage("BOOKINGS");
           toast.success(`Booking ${res.data.bookingNumber} created successfully!`);
           router.push(`/bookings/${res.data.id}`);
         }
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to create booking.");
+      if (err?.code === "QUOTA_EXCEEDED" || err?.statusCode === 403) {
+        await refreshSubscription();
+        toast.error("Booking creation quota limit reached for this billing period.");
+      } else {
+        toast.error(err?.message || "Failed to create booking.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -221,8 +234,41 @@ function NewBookingForm() {
           ]}
         />
 
-        <div className="max-w-3xl mx-auto w-full">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Direct URL Quota Exceeded Guard */}
+        {!subscriptionLoading && !decision.allowed && decision.reason === "QUOTA_EXCEEDED" ? (
+          <QuotaExceededCard
+            resourceName="Booking"
+            currentUsage={decision.currentUsage}
+            limit={decision.limit}
+            planName={overview?.subscription?.plan?.name}
+            backHref="/bookings"
+            backLabel="Back to Bookings"
+          />
+        ) : (
+          <>
+            {!decision.isExceeded && decision.remaining !== null && decision.remaining <= 2 && decision.remaining > 0 && (
+              <div className="max-w-3xl mx-auto p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+                  <div>
+                    <p className="font-bold">Approaching Quota Limit ({decision.currentUsage} / {decision.limit} Bookings Created)</p>
+                    <p className="text-[11px] text-amber-700 font-normal mt-0.5">
+                      Only {decision.remaining} booking{decision.remaining > 1 ? "s" : ""} remaining in your current billing cycle.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => router.push("/subscription")}
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 h-auto rounded-xl shrink-0 cursor-pointer"
+                >
+                  Upgrade
+                </Button>
+              </div>
+            )}
+
+            <div className="max-w-3xl mx-auto w-full">
+              <form onSubmit={handleSubmit} className="space-y-6">
             {/* Mode Selector */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-2">
@@ -441,7 +487,9 @@ function NewBookingForm() {
             </div>
           </form>
         </div>
-      </div>
-    </div>
+      </>
+    )}
+  </div>
+</div>
   );
 }
