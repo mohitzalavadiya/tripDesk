@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import { X, IndianRupee, CreditCard, Calendar, Hash, FileText } from "lucide-react";
 
 interface AddPaymentModalProps {
@@ -46,6 +47,7 @@ export function AddPaymentModal({
   isOpen,
   onClose,
 }: AddPaymentModalProps) {
+  useModalScrollLock(isOpen);
   const { addCustomerPayment } = useBooking();
 
   const formik = useFormik({

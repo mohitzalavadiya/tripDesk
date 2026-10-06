@@ -4,6 +4,7 @@ import * as React from "react";
 import { X, Loader2, AlertOctagon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 interface CancelInvoiceModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export function CancelInvoiceModal({
   totalAmount,
   onSuccess,
 }: CancelInvoiceModalProps) {
+  useModalScrollLock(isOpen);
   const [reason, setReason] = React.useState<string>("");
   const [loading, setLoading] = React.useState<boolean>(false);
   const [error, setError] = React.useState<string | null>(null);

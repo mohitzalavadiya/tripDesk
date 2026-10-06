@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import { X, AlertOctagon, IndianRupee, RotateCcw } from "lucide-react";
 
 interface CancelBookingModalProps {
@@ -31,6 +32,7 @@ export function CancelBookingModal({
   isOpen,
   onClose,
 }: CancelBookingModalProps) {
+  useModalScrollLock(isOpen);
   const { cancelBooking } = useBooking();
 
   const formik = useFormik({

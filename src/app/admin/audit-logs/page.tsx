@@ -29,6 +29,7 @@ import {
   Code,
 } from "lucide-react";
 import { adminClient } from "@/lib/api-client/admin-client";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 export default function AdminAuditLogsPage() {
   const [logs, setLogs] = React.useState<any[]>([]);
@@ -36,6 +37,8 @@ export default function AdminAuditLogsPage() {
   const [actionFilter, setActionFilter] = React.useState<string>("ALL");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedLog, setSelectedLog] = React.useState<any | null>(null);
+
+  useModalScrollLock(Boolean(selectedLog));
 
   const fetchLogs = React.useCallback(async () => {
     setLoading(true);

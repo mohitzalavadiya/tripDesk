@@ -7,6 +7,7 @@ import { PublicTripPayload } from "@/lib/services/trip-public-service";
 import { PublicBookingPayload } from "@/lib/services/booking-public-service";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import {
   Compass,
   CheckCircle2,
@@ -36,6 +37,8 @@ export default function CustomerTripPortalPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isHelpModalOpen, setIsHelpModalOpen] = React.useState(false);
   const [helpMessage, setHelpMessage] = React.useState("");
+
+  useModalScrollLock(isHelpModalOpen);
 
   // Post-Trip Feedback States
   const [feedbackStatus, setFeedbackStatus] = React.useState<any | null>(null);

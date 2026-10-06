@@ -14142,9 +14142,30 @@ The entitlement backend, transactional quota enforcement, and database-driven fe
 
 ---
 
+# 224. PHASE 224 — PROJECT-WIDE MODAL BACKGROUND SCROLL LOCK
+
+## 224.1 Objective & Architectural Design
+- **Objective:** Ensure that when any modal/dialog is opened across the entire TripDesk application, background page scrolling (wheel, trackpad, arrow keys, touch gestures, scrollbar drag) is locked, while modal content remains scrollable, layout shift is prevented, page position is preserved upon close, and nested modals maintain lock until all modals are dismissed.
+- **Central Primitive Integration:** Implemented reference-counted scroll locker in `@/lib/scroll-lock` (`useModalScrollLock(isOpen)`). Hooked directly into `DialogContent` in `@/components/ui/dialog.tsx` which automatically covers all standard `Dialog`, `ConfirmDialog`, `AlertDialog`, search modals, and operational/financial dialogs built upon the shared primitive.
+- **Custom Modals Coverage:** Audited and applied `useModalScrollLock` across all standalone `fixed inset-0` modal overlays (Operations dialogs, Invoices modals, Booking modals, Excel import, Mobile navigation drawer, Feedback/Referrals/Subscription/Trip-guest pages, and Admin management overlays).
+- **Layout Shift Compensation:** Dynamically measures `window.innerWidth - document.documentElement.clientWidth` and sets compensatory `paddingRight` on `document.body` along with `overflow: hidden` on both `document.body` and `document.documentElement` during active lock.
+- **Nested Modal Safety:** Uses an active lock reference count (`activeLockCount`). Opening modal A (count=1) -> nested modal B (count=2) -> closing modal B (count=1, still locked) -> closing modal A (count=0, scroll unlocked).
+- **Popovers/Dropdowns Untouched:** Normal dropdowns, comboboxes, select menus, and tooltips are not wrapped in modal lock, preserving standard background interactions.
+
+## 224.2 Verification & Build Results
+- **TypeScript:** `npx tsc --noEmit` passed with 0 errors.
+- **Production Build:** `npm run build` passed with 0 errors.
+- **Database/API Safety:** 0 schema changes, 0 migrations, 0 API route modifications.
+
+## 224.3 Closure
+**Phase 224 — Project-Wide Modal Background Scroll Lock: CLOSED / PASS**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
 
 
 

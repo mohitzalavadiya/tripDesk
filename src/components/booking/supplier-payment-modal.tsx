@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import { X, Truck, IndianRupee, Calendar, Hash } from "lucide-react";
 
 interface SupplierPaymentModalProps {
@@ -49,6 +50,7 @@ export function SupplierPaymentModal({
   isOpen,
   onClose,
 }: SupplierPaymentModalProps) {
+  useModalScrollLock(isOpen);
   const { addSupplierPayment } = useBooking();
 
   const suppliersList = React.useMemo(() => {

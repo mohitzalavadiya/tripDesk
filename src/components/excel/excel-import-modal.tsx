@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getErrorMessage } from "@/lib/utils";
 import { toast } from "sonner";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import * as XLSX from "xlsx";
 
 export type ImportType = "hotels" | "rate-sheets";
@@ -45,6 +46,7 @@ export function ExcelImportModal({
   onPreview,
   onExecute,
 }: ExcelImportModalProps) {
+  useModalScrollLock(isOpen);
   const [step, setStep] = React.useState<1 | 2 | 3>(1);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [mode, setMode] = React.useState<ImportMode>("SKIP");

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import {
   FileText,
   CheckCircle2,
@@ -45,6 +46,7 @@ export function TravelKitReadinessModal({
   openCriticalIssues,
   downloadUrl,
 }: TravelKitReadinessModalProps) {
+  useModalScrollLock(isOpen);
   if (!isOpen) return null;
 
   const isFullyReady = readinessScore >= 90;

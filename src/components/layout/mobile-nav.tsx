@@ -21,6 +21,7 @@ import { agencyNavigationConfig, adminNavigationConfig } from "@/lib/navigation"
 import { useAuth } from "@/context/auth-context";
 import { useSubscription, EntitlementsState } from "@/context/subscription-context";
 import { usePlatformChatUnreadCount } from "@/hooks/use-platform-chat";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 interface MobileNavProps {
   open: boolean;
@@ -28,6 +29,7 @@ interface MobileNavProps {
 }
 
 export function MobileNav({ open, setOpen }: MobileNavProps) {
+  useModalScrollLock(open);
   const pathname = usePathname();
   const router = useRouter();
   const { isPlatformOwner } = useAuth();

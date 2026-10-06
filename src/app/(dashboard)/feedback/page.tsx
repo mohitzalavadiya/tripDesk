@@ -41,6 +41,7 @@ import { experienceClient } from "@/lib/api-client/experience-client";
 import { useSubscription } from "@/context/subscription-context";
 import { AgencyFeedbackItem, FeedbackStats } from "@/lib/services/feedback-service";
 import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 export default function FeedbackAndReviewsPage() {
   const router = useRouter();
@@ -80,6 +81,8 @@ export default function FeedbackAndReviewsPage() {
   const [tripAdvisorUrl, setTripAdvisorUrl] = React.useState("");
   const [loadingSettings, setLoadingSettings] = React.useState(false);
   const [savingSettings, setSavingSettings] = React.useState(false);
+
+  useModalScrollLock(Boolean(selectedRecoveryFb || isSettingsOpen));
 
   const fetchSettings = React.useCallback(async () => {
     try {

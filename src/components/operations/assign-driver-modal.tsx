@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import { X, UserCheck, Car, Calendar, Clock, Loader2 } from "lucide-react";
 
 interface AssignDriverModalProps {
@@ -35,6 +36,7 @@ export function AssignDriverModal({
   onClose,
   onSuccess,
 }: AssignDriverModalProps) {
+  useModalScrollLock(isOpen);
   const [loading, setLoading] = React.useState(false);
 
   const formik = useFormik({

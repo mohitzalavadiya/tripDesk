@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import { X, CalendarClock, Loader2 } from "lucide-react";
 
 interface RescheduleActivityModalProps {
@@ -33,6 +34,7 @@ export function RescheduleActivityModal({
   onClose,
   onSuccess,
 }: RescheduleActivityModalProps) {
+  useModalScrollLock(isOpen);
   const [loading, setLoading] = React.useState(false);
 
   const formik = useFormik({

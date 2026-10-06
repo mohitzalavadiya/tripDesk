@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import { X, Clock, Loader2 } from "lucide-react";
 
 interface ReportDelayModalProps {
@@ -32,6 +33,7 @@ export function ReportDelayModal({
   onClose,
   onSuccess,
 }: ReportDelayModalProps) {
+  useModalScrollLock(isOpen);
   const [loading, setLoading] = React.useState(false);
 
   const formik = useFormik({

@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { adminClient } from "@/lib/api-client/admin-client";
 import { Agency360Details } from "@/lib/services/admin-service";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 export default function AgencyDetailsPage() {
   const params = useParams();
@@ -53,6 +54,8 @@ export default function AgencyDetailsPage() {
   const [isSuspendOpen, setIsSuspendOpen] = React.useState(false);
   const [suspendReason, setSuspendReason] = React.useState("");
   const [suspending, setSuspending] = React.useState(false);
+
+  useModalScrollLock(Boolean(isExtendOpen || isSuspendOpen));
 
   const fetchAgency = React.useCallback(async () => {
     setLoading(true);

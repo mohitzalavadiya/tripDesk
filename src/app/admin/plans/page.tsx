@@ -18,6 +18,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { adminClient } from "@/lib/api-client/admin-client";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 export default function AdminPlansPage() {
   const [plans, setPlans] = React.useState<any[]>([]);
@@ -25,6 +26,8 @@ export default function AdminPlansPage() {
 
   // Edit / Create Modal State
   const [modalMode, setModalMode] = React.useState<"CREATE" | "EDIT" | null>(null);
+
+  useModalScrollLock(Boolean(modalMode));
   const [targetPlanId, setTargetPlanId] = React.useState<string | null>(null);
   const [planName, setPlanName] = React.useState("");
   const [planDesc, setPlanDesc] = React.useState("");

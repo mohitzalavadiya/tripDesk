@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { adminClient } from "@/lib/api-client/admin-client";
 import { PlatformOverviewStats, GlobalSearchResult } from "@/lib/services/admin-service";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -45,6 +46,8 @@ export default function AdminDashboardPage() {
   const [extendDays, setExtendDays] = React.useState(7);
   const [extendReason, setExtendReason] = React.useState("Promotional trial extension");
   const [extending, setExtending] = React.useState(false);
+
+  useModalScrollLock(Boolean(extendModalAgency));
 
   const fetchOverview = React.useCallback(async () => {
     setLoading(true);

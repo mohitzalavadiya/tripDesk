@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import { X, AlertCircle, Loader2 } from "lucide-react";
 
 interface CreateIssueModalProps {
@@ -47,6 +48,7 @@ export function CreateIssueModal({
   onClose,
   onSuccess,
 }: CreateIssueModalProps) {
+  useModalScrollLock(isOpen);
   const [loading, setLoading] = React.useState(false);
   const [selectedOpId, setSelectedOpId] = React.useState<string>(
     operationId || operationList[0]?.id || ""

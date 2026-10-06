@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import {
   X,
   Hotel,
@@ -50,6 +51,7 @@ export function HotelConfirmationDialog({
   onClose,
   onSuccess,
 }: HotelConfirmationDialogProps) {
+  useModalScrollLock(isOpen);
   const [loading, setLoading] = React.useState(false);
 
   const hotelName =

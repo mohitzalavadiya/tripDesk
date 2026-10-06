@@ -79,10 +79,10 @@ quatation pdf we got more page
 manage read only from frontend also
 
 subscription model changes
+When any model openthat time main page scroll should not work. 
 
 **TODO**
 
-When any model openthat time main page scroll should not work. 
 
 
 itinerary builder
@@ -97,7 +97,7 @@ check no static data anywhere
 
 SEO
 
-spedd test
+speed test
 
 compalate QA. 
 

@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import {
   X,
   MessageSquare,
@@ -55,6 +56,7 @@ export function CommunicationModal({
   onClose,
   onSuccess,
 }: CommunicationModalProps) {
+  useModalScrollLock(isOpen);
   const [templateType, setTemplateType] =
     React.useState<CommunicationTemplateType>(initialTemplate);
   const [copied, setCopied] = React.useState(false);

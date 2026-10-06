@@ -39,6 +39,7 @@ import {
 import { StatusBadge } from "@/components/shared/status-badge";
 import { subscriptionClient } from "@/lib/api-client/subscription-client";
 import { useSubscription } from "@/context/subscription-context";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   BANK_TRANSFER: "Bank Transfer",
@@ -170,6 +171,8 @@ export default function AgencySubscriptionPage() {
   const [paymentNotes, setPaymentNotes] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [copiedField, setCopiedField] = React.useState<string | null>(null);
+
+  useModalScrollLock(Boolean(selectedPlanForPurchase));
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
