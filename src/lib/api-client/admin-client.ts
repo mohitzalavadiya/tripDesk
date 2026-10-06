@@ -7,7 +7,6 @@ import {
   SubscriptionPaymentFilterInput,
   SubscriptionPaymentCreateInput,
   SubscriptionPaymentVerifyInput,
-  SubscriptionPaymentRejectInput,
   BillingSettingsUpdateInput,
 } from "@/lib/validation/admin-schema";
 

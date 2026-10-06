@@ -10,7 +10,6 @@ import {
 } from "@prisma/client";
 import {
   CommunicationEventPayload,
-  CommunicationRecipient,
   SendResult,
 } from "@/lib/communication/types";
 import { EmailTemplateEngine, EmailTemplateVariables } from "@/lib/communication/email/template-engine";

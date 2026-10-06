@@ -43,8 +43,6 @@ export async function provisionOnboardedAgencyOwner(
   const agencyEmail = metadata.agencyEmail?.trim();
   const address = metadata.address?.trim() || null;
   const city = metadata.city?.trim();
-  const state = metadata.state?.trim() || null;
-  const country = metadata.country?.trim() || "India";
   const ownerName = metadata.ownerName?.trim();
   const phone = metadata.phone?.trim() || null;
 

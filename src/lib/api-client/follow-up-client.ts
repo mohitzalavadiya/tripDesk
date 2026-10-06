@@ -1,8 +1,5 @@
 import {
   EnquiryFollowUp,
-  FollowUpStatus,
-  FollowUpType,
-  EnquiryPriority,
 } from "@prisma/client";
 import {
   GlobalFollowUpQueryInput,

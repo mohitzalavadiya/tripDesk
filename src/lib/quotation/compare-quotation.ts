@@ -23,7 +23,7 @@ export function detectQuotationChanges(
   currentCosting?: TripCosting,
   currentItinerary: ItineraryDay[] = [],
   currentHotels: TripHotel[] = [],
-  currentVehicles: TripVehicle[] = [],
+  _currentVehicles: TripVehicle[] = [],
   currentActivities: TripActivity[] = []
 ): QuotationDifference {
   const messages: string[] = []

@@ -88,7 +88,6 @@ const formatDate = (d: Date) => d.toISOString().split("T")[0];
 const todayStr = formatDate(now);
 const trialStartDate = formatDate(new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000));
 const trialEndDate = formatDate(new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000));
-const trialExpiringTomorrow = formatDate(new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000));
 const oneYearLater = formatDate(new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000));
 const pastDueRenewal = formatDate(new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000));
 

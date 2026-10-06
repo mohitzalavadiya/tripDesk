@@ -2,7 +2,6 @@ import "server-only";
 import prisma from "@/lib/prisma";
 import { NotFoundError, ValidationError } from "@/lib/api";
 import {
-  CreateHotelInput,
   CreateHotelPayload,
   UpdateHotelInput,
   HotelListQueryInput,

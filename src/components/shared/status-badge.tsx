@@ -13,7 +13,6 @@ import {
   ShieldAlert,
   FileText,
   Ban,
-  BadgeAlert,
 } from "lucide-react";
 
 export type UniversalStatus =

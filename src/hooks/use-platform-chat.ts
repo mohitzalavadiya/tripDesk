@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   platformChatClient,
-  ApiResponse,
 } from "@/lib/api-client/platform-chat-client";
 import { ChatMessageView } from "@/lib/services/platform-chat-service";
 import { RealtimeChannel } from "@supabase/supabase-js";
@@ -240,7 +239,7 @@ export function usePlatformChat({
     // Keep auth in sync for Realtime connection
     const {
       data: { subscription: authSubscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.access_token) {
         supabase.realtime.setAuth(session.access_token);
       }

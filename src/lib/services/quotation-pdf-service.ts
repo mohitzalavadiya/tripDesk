@@ -175,9 +175,7 @@ export class QuotationPdfService {
         const textMuted = "#475569"; // Slate 600
         const textLight = "#94A3B8"; // Slate 400
         const bgCard = "#F8FAFC"; // Slate 50
-        const bgWhite = "#FFFFFF"; // Pure White
         const borderLight = "#E2E8F0"; // Slate 200
-        const borderCard = "#E2E8F0"; // Slate 200
         const greenBg = "#ECFDF5"; // Emerald 50
         const greenBorder = "#A7F3D0"; // Emerald 200
         const greenText = "#065F46"; // Emerald 800

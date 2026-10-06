@@ -210,7 +210,7 @@ export class DocumentPdfService {
     }
   }
 
-  private formatAmount(val: number | string | null | undefined, currency = "INR"): string {
+  private formatAmount(val: number | string | null | undefined, _currency = "INR"): string {
     if (val === null || val === undefined) return "₹0";
     const num = typeof val === "string" ? parseFloat(val) : val;
     if (isNaN(num)) return "₹0";

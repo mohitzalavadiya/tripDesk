@@ -1,4 +1,4 @@
-import { Payment, PaymentMethod, PaymentStatus } from "@prisma/client";
+import { Payment } from "@prisma/client";
 import {
   CreatePaymentInput,
   UpdatePaymentInput,

@@ -1,15 +1,9 @@
 import {
   Payment,
-  PaymentMethod,
-  PaymentStatus,
-  PaymentType,
   SupplierPayable,
   SupplierPayableStatus,
   SupplierPayment,
-  SupplierPaymentStatus,
   OperationalExpense,
-  ExpenseCategory,
-  BookingPaymentStatus,
 } from "@prisma/client";
 import {
   FinanceFilterInput,

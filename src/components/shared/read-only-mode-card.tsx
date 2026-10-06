@@ -17,8 +17,8 @@ export interface ReadOnlyModeCardProps {
 
 export function ReadOnlyModeCard({
   resourceName = "Record",
-  title,
-  description,
+  title: _title,
+  description: _description,
   reason = "EXPIRED",
   backHref,
   backLabel,

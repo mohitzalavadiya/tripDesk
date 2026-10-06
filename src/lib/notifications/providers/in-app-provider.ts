@@ -3,7 +3,7 @@ import { NotificationProvider, NotificationPayload, SendNotificationResult, Noti
 export class InAppNotificationProvider implements NotificationProvider {
   channel: NotificationChannel = NotificationChannel.IN_APP;
 
-  async send(payload: NotificationPayload): Promise<SendNotificationResult> {
+  async send(_payload: NotificationPayload): Promise<SendNotificationResult> {
     // In-app notifications are stored directly in DB and displayed in traveler portal
     return {
       success: true,

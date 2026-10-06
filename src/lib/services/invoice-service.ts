@@ -1155,7 +1155,7 @@ export const invoiceService = {
     const discountType = input.discountType !== undefined ? input.discountType : invoice.discountType;
     const discountValue = input.discountValue !== undefined ? input.discountValue : Number(invoice.discountValue || 0);
 
-    const { subtotal, discountAmount, totalAmount, paidAmount, balanceAmount, items } =
+    const { subtotal, discountAmount, totalAmount, balanceAmount, items } =
       this.calculateFinancials(rawItems, discountType, discountValue, Number(invoice.paidAmount));
 
     const invoiceDate = input.invoiceDate ? new Date(input.invoiceDate) : invoice.invoiceDate;
@@ -1234,7 +1234,7 @@ export const invoiceService = {
   async issueInvoice(
     agencyId: string,
     invoiceId: string,
-    userId: string,
+    _userId: string,
     input?: IssueInvoiceInput
   ): Promise<InvoiceWithDetails> {
     const result = await prisma.$transaction(async (tx) => {

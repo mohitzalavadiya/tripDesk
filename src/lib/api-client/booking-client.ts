@@ -1,4 +1,4 @@
-import { Booking, BookingStatus, BookingPaymentStatus, Payment } from "@prisma/client";
+import { Booking, Payment } from "@prisma/client";
 import {
   CreateBookingInput,
   UpdateBookingInput,
