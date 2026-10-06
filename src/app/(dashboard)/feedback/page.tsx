@@ -402,12 +402,12 @@ export default function FeedbackAndReviewsPage() {
 
         {/* ─── TAB FILTER CONTROLS & SEARCH BAR ───────────────────────────── */}
         <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row gap-3 items-center justify-between">
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scrollbar-none flex-nowrap w-full sm:w-auto pb-1 sm:pb-0">
             <Button
               variant={activeTab === "ALL" ? "default" : "ghost"}
               size="sm"
               onClick={() => setActiveTab("ALL")}
-              className={`h-8.5 text-xs font-bold rounded-xl cursor-pointer ${
+              className={`h-8.5 text-xs font-bold rounded-xl cursor-pointer shrink-0 whitespace-nowrap ${
                 activeTab === "ALL" ? "bg-purple-600 text-white" : "text-slate-600"
               }`}
             >
@@ -417,7 +417,7 @@ export default function FeedbackAndReviewsPage() {
               variant={activeTab === "ATTENTION" ? "default" : "ghost"}
               size="sm"
               onClick={() => setActiveTab("ATTENTION")}
-              className={`h-8.5 text-xs font-bold rounded-xl cursor-pointer ${
+              className={`h-8.5 text-xs font-bold rounded-xl cursor-pointer shrink-0 whitespace-nowrap ${
                 activeTab === "ATTENTION"
                   ? "bg-rose-600 text-white"
                   : "text-rose-600 hover:bg-rose-50"
@@ -430,7 +430,7 @@ export default function FeedbackAndReviewsPage() {
               variant={activeTab === "POSITIVE" ? "default" : "ghost"}
               size="sm"
               onClick={() => setActiveTab("POSITIVE")}
-              className={`h-8.5 text-xs font-bold rounded-xl cursor-pointer ${
+              className={`h-8.5 text-xs font-bold rounded-xl cursor-pointer shrink-0 whitespace-nowrap ${
                 activeTab === "POSITIVE"
                   ? "bg-emerald-600 text-white"
                   : "text-emerald-600 hover:bg-emerald-50"
@@ -443,7 +443,7 @@ export default function FeedbackAndReviewsPage() {
               variant={activeTab === "REVIEWS" ? "default" : "ghost"}
               size="sm"
               onClick={() => setActiveTab("REVIEWS")}
-              className={`h-8.5 text-xs font-bold rounded-xl cursor-pointer ${
+              className={`h-8.5 text-xs font-bold rounded-xl cursor-pointer shrink-0 whitespace-nowrap ${
                 activeTab === "REVIEWS"
                   ? "bg-indigo-600 text-white"
                   : "text-indigo-600 hover:bg-indigo-50"
@@ -494,8 +494,8 @@ export default function FeedbackAndReviewsPage() {
             </div>
           ) : activeTab === "REVIEWS" ? (
             /* Public Google & TripAdvisor Review Links */
-            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-2xs space-y-5">
-              <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+            <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 shadow-2xs space-y-5">
+              <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <h3 className="text-sm font-bold text-slate-900">
                   Public Review Hub & Links
                 </h3>
@@ -503,7 +503,7 @@ export default function FeedbackAndReviewsPage() {
                   size="sm"
                   variant="outline"
                   onClick={() => setIsSettingsOpen(true)}
-                  className="h-8 text-xs font-semibold"
+                  className="h-8 text-xs font-semibold self-start sm:self-auto shrink-0 cursor-pointer"
                 >
                   <Settings className="h-3.5 w-3.5 mr-1" />
                   Configure Review Links
@@ -512,18 +512,18 @@ export default function FeedbackAndReviewsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Google Reviews Card */}
-                <div className="border border-slate-200/90 rounded-2xl p-5 bg-gradient-to-br from-white to-slate-50 space-y-3">
-                  <div className="flex items-center justify-between">
+                <div className="border border-slate-200/90 rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-white to-slate-50 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">🌟</span>
-                      <h4 className="font-bold text-slate-900">Google Reviews URL</h4>
+                      <span className="text-xl shrink-0">🌟</span>
+                      <h4 className="font-bold text-slate-900 text-sm">Google Reviews URL</h4>
                     </div>
                     {googleUrl ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                         Configured
                       </span>
                     ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
                         Not Configured
                       </span>
                     )}
@@ -533,7 +533,7 @@ export default function FeedbackAndReviewsPage() {
                       <p className="text-xs text-slate-600 font-mono break-all bg-white p-2.5 rounded-xl border border-slate-200/70">
                         {googleUrl}
                       </p>
-                      <div className="flex items-center gap-3 pt-1">
+                      <div className="flex items-center gap-3 pt-1 flex-wrap">
                         <a
                           href={googleUrl}
                           target="_blank"
@@ -555,15 +555,15 @@ export default function FeedbackAndReviewsPage() {
                       </div>
                     </>
                   ) : (
-                    <div className="space-y-2 py-1">
-                      <p className="text-xs text-slate-400">
+                    <div className="space-y-2.5 py-1">
+                      <p className="text-xs text-slate-500 leading-relaxed">
                         No Google Review link configured. Add your Google Business Profile review link so guests can review you after their tour.
                       </p>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => setIsSettingsOpen(true)}
-                        className="h-7.5 text-xs font-bold rounded-xl"
+                        className="h-8 text-xs font-bold rounded-xl cursor-pointer"
                       >
                         Configure Google Link
                       </Button>
@@ -572,18 +572,18 @@ export default function FeedbackAndReviewsPage() {
                 </div>
 
                 {/* TripAdvisor Card */}
-                <div className="border border-slate-200/90 rounded-2xl p-5 bg-gradient-to-br from-white to-slate-50 space-y-3">
-                  <div className="flex items-center justify-between">
+                <div className="border border-slate-200/90 rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-white to-slate-50 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">🦉</span>
-                      <h4 className="font-bold text-slate-900">TripAdvisor URL</h4>
+                      <span className="text-xl shrink-0">🦉</span>
+                      <h4 className="font-bold text-slate-900 text-sm">TripAdvisor URL</h4>
                     </div>
                     {tripAdvisorUrl ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                         Configured
                       </span>
                     ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 shrink-0">
                         Not Configured
                       </span>
                     )}
@@ -593,7 +593,7 @@ export default function FeedbackAndReviewsPage() {
                       <p className="text-xs text-slate-600 font-mono break-all bg-white p-2.5 rounded-xl border border-slate-200/70">
                         {tripAdvisorUrl}
                       </p>
-                      <div className="flex items-center gap-3 pt-1">
+                      <div className="flex items-center gap-3 pt-1 flex-wrap">
                         <a
                           href={tripAdvisorUrl}
                           target="_blank"
@@ -615,15 +615,15 @@ export default function FeedbackAndReviewsPage() {
                       </div>
                     </>
                   ) : (
-                    <div className="space-y-2 py-1">
-                      <p className="text-xs text-slate-400">
+                    <div className="space-y-2.5 py-1">
+                      <p className="text-xs text-slate-500 leading-relaxed">
                         No TripAdvisor review link configured. Add your listing review link so guests can review you after their tour.
                       </p>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => setIsSettingsOpen(true)}
-                        className="h-7.5 text-xs font-bold rounded-xl"
+                        className="h-8 text-xs font-bold rounded-xl cursor-pointer"
                       >
                         Configure TripAdvisor Link
                       </Button>

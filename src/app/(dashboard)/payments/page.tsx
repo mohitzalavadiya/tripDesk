@@ -417,11 +417,11 @@ export default function PaymentsPage() {
         {isReadOnly && <ReadOnlyBanner moduleName="Payments & Accounts Ledger" />}
 
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="space-y-3 z-10">
             <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
-                <CreditCard className="h-3 w-3 text-indigo-500" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+                <CreditCard className="h-3 w-3 text-indigo-500 shrink-0" />
                 Unified Payments Ledger
               </span>
               <span className="text-slate-300">•</span>
@@ -440,52 +440,53 @@ export default function PaymentsPage() {
             </div>
 
             {/* Quick KPI Cards Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
-              <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl px-3.5 py-2">
+            <div className="grid grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-1">
+              <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl px-3 sm:px-3.5 py-2 min-w-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 truncate">
                     Total Received (Inflow)
                   </span>
-                  <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-600" />
+                  <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-600 shrink-0 ml-1" />
                 </div>
-                <p className="text-base sm:text-lg font-extrabold text-emerald-950 mt-0.5">
+                <p className="text-base sm:text-lg font-extrabold text-emerald-950 mt-0.5 truncate" title={formatCurrency(summaryMetrics.totalReceived)}>
                   {formatCurrency(summaryMetrics.totalReceived)}
                 </p>
-                <span className="text-[10px] font-medium text-emerald-800">
+                <span className="text-[10px] font-medium text-emerald-800 truncate block">
                   {summaryMetrics.customerCount} customer receipts
                 </span>
               </div>
 
-              <div className="bg-purple-50/50 border border-purple-100 rounded-xl px-3.5 py-2">
+              <div className="bg-purple-50/50 border border-purple-100 rounded-xl px-3 sm:px-3.5 py-2 min-w-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-800">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-800 truncate">
                     Total Disbursed (Outflow)
                   </span>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-purple-600" />
+                  <ArrowUpRight className="h-3.5 w-3.5 text-purple-600 shrink-0 ml-1" />
                 </div>
-                <p className="text-base sm:text-lg font-extrabold text-purple-950 mt-0.5">
+                <p className="text-base sm:text-lg font-extrabold text-purple-950 mt-0.5 truncate" title={formatCurrency(summaryMetrics.totalDisbursed)}>
                   {formatCurrency(summaryMetrics.totalDisbursed)}
                 </p>
-                <span className="text-[10px] font-medium text-purple-800">
+                <span className="text-[10px] font-medium text-purple-800 truncate block">
                   {summaryMetrics.supplierCount} supplier disbursements
                 </span>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 col-span-2 sm:col-span-1">
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 sm:px-3.5 py-2 min-w-0 col-span-1 min-[380px]:col-span-2 sm:col-span-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 truncate">
                     Net Cash Balance
                   </span>
-                  <ArrowUpDown className="h-3.5 w-3.5 text-slate-500" />
+                  <ArrowUpDown className="h-3.5 w-3.5 text-slate-500 shrink-0 ml-1" />
                 </div>
                 <p
-                  className={`text-base sm:text-lg font-extrabold mt-0.5 ${
+                  className={`text-base sm:text-lg font-extrabold mt-0.5 truncate ${
                     summaryMetrics.netCashFlow >= 0 ? "text-slate-900" : "text-rose-600"
                   }`}
+                  title={formatCurrency(summaryMetrics.netCashFlow)}
                 >
                   {formatCurrency(summaryMetrics.netCashFlow)}
                 </p>
-                <span className="text-[10px] font-medium text-slate-500">
+                <span className="text-[10px] font-medium text-slate-500 truncate block">
                   Collections minus disbursements
                 </span>
               </div>
@@ -493,11 +494,11 @@ export default function PaymentsPage() {
           </div>
 
           {/* Right Action Controls */}
-          <div className="flex items-center gap-2.5 z-10 self-start lg:self-center flex-wrap">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 z-10 self-stretch sm:self-start lg:self-center w-full lg:w-auto">
             <Button
               onClick={handleOpenAddCustomer}
               disabled={isReadOnly}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              className="w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
               Log Customer Payment
@@ -505,7 +506,7 @@ export default function PaymentsPage() {
             <Button
               onClick={() => setIsDisbursementOpen(true)}
               disabled={isReadOnly}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-9.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              className="w-full sm:w-auto justify-center bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-9.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
               Record Supplier Payment
@@ -516,13 +517,13 @@ export default function PaymentsPage() {
         {/* Master Unified Table Card */}
         <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
           {/* Search & Filter Toolbar */}
-          <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
+          <div className="p-3.5 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
               {/* Search input */}
               <div className="relative flex-1 max-w-xl">
                 <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search by payment #, UTR / ref, customer, vendor payee, booking, receipt..."
+                  placeholder="Search by payment #, UTR / ref, customer, vendor..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all"
@@ -538,16 +539,16 @@ export default function PaymentsPage() {
               </div>
 
               {/* Filters Strip */}
-              <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2.5">
                 {/* Direction Filter Pill Group */}
-                <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs">
+                <div className="inline-flex overflow-x-auto no-scrollbar scrollbar-none flex-nowrap rounded-xl bg-slate-100 p-1 text-xs w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => {
                       setDirectionFilter("ALL");
                       setPage(1);
                     }}
-                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg font-bold text-xs shrink-0 whitespace-nowrap transition-all cursor-pointer flex-1 sm:flex-none text-center ${
                       directionFilter === "ALL"
                         ? "bg-white text-slate-900 shadow-2xs"
                         : "text-slate-600 hover:text-slate-900"
@@ -561,13 +562,13 @@ export default function PaymentsPage() {
                       setDirectionFilter("CUSTOMER");
                       setPage(1);
                     }}
-                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer flex items-center gap-1 ${
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg font-bold text-xs shrink-0 whitespace-nowrap transition-all cursor-pointer flex items-center justify-center gap-1 flex-1 sm:flex-none ${
                       directionFilter === "CUSTOMER"
                         ? "bg-emerald-600 text-white shadow-2xs"
                         : "text-emerald-700 hover:text-emerald-900"
                     }`}
                   >
-                    <ArrowDownLeft className="h-3 w-3" />
+                    <ArrowDownLeft className="h-3 w-3 shrink-0" />
                     Customer ({summaryMetrics.customerCount})
                   </button>
                   <button
@@ -576,19 +577,19 @@ export default function PaymentsPage() {
                       setDirectionFilter("SUPPLIER");
                       setPage(1);
                     }}
-                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer flex items-center gap-1 ${
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg font-bold text-xs shrink-0 whitespace-nowrap transition-all cursor-pointer flex items-center justify-center gap-1 flex-1 sm:flex-none ${
                       directionFilter === "SUPPLIER"
                         ? "bg-purple-600 text-white shadow-2xs"
                         : "text-purple-700 hover:text-purple-900"
                     }`}
                   >
-                    <ArrowUpRight className="h-3 w-3" />
+                    <ArrowUpRight className="h-3 w-3 shrink-0" />
                     Supplier ({summaryMetrics.supplierCount})
                   </button>
                 </div>
 
-                {/* Method Filter */}
-                <div className="flex items-center gap-1.5">
+                {/* Method & Status Filters */}
+                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
                   <Select
                     value={methodFilter}
                     onValueChange={(val) => {
@@ -598,7 +599,7 @@ export default function PaymentsPage() {
                       }
                     }}
                   >
-                    <SelectTrigger className="h-9 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[125px]">
+                    <SelectTrigger className="h-9 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-full sm:w-[130px]">
                       <SelectValue placeholder="Method">
                         {(val) => (val === "all" ? "All Methods" : METHOD_FILTER_LABELS[val] ?? val)}
                       </SelectValue>
@@ -613,10 +614,7 @@ export default function PaymentsPage() {
                       <SelectItem value={PaymentMethod.OTHER}>Other</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
 
-                {/* Status Filter */}
-                <div className="flex items-center gap-1.5">
                   <Select
                     value={statusFilter}
                     onValueChange={(val) => {
@@ -626,7 +624,7 @@ export default function PaymentsPage() {
                       }
                     }}
                   >
-                    <SelectTrigger className="h-9 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[120px]">
+                    <SelectTrigger className="h-9 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-full sm:w-[125px]">
                       <SelectValue placeholder="Status">
                         {(val) => (val === "all" ? "All Statuses" : val)}
                       </SelectValue>

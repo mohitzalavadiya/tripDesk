@@ -48,7 +48,7 @@ export function PageHeader({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 self-stretch sm:self-auto w-full sm:w-auto">
             {secondaryActions?.map((action, index) => {
               const ActionIcon = action.icon
               return (
@@ -57,10 +57,10 @@ export function PageHeader({
                   variant={action.variant || "outline"}
                   size="sm"
                   onClick={action.onClick}
-                  className="bg-white hover:bg-slate-50 border-slate-200 h-8 sm:h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
+                  className="bg-white hover:bg-slate-50 border-slate-200 h-8 sm:h-9 font-semibold text-xs px-2.5 sm:px-3 rounded-xl shadow-2xs cursor-pointer shrink-0"
                 >
-                  {ActionIcon && <ActionIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 stroke-[1.8]" />}
-                  {action.label}
+                  {ActionIcon && <ActionIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 stroke-[1.8] shrink-0" />}
+                  <span>{action.label}</span>
                 </Button>
               )
             })}
@@ -70,12 +70,12 @@ export function PageHeader({
                 variant={primaryAction.variant || "default"}
                 size="sm"
                 onClick={primaryAction.onClick}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 sm:h-9 px-3.5 sm:px-4 rounded-xl shadow-xs cursor-pointer transition-all"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 sm:h-9 px-3 sm:px-4 rounded-xl shadow-xs cursor-pointer transition-all shrink-0"
               >
                 {primaryAction.icon && (
-                  <primaryAction.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 stroke-[1.8]" />
+                  <primaryAction.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 stroke-[1.8] shrink-0" />
                 )}
-                {primaryAction.label}
+                <span>{primaryAction.label}</span>
               </Button>
             )}
           </div>

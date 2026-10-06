@@ -402,41 +402,41 @@ export default function SettingsPage() {
 
         <div className="max-w-6xl w-full mx-auto space-y-6">
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-200">
+        <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto no-scrollbar scrollbar-none flex-nowrap pb-px">
           <button
             onClick={() => setActiveTab("communication")}
-            className={`px-4 py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            className={`px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === "communication"
                 ? "border-indigo-600 text-indigo-600 bg-indigo-50/30 rounded-t-lg"
                 : "border-transparent text-slate-500 hover:text-slate-900"
             }`}
           >
-            <MessageSquare className="h-4 w-4" />
+            <MessageSquare className="h-4 w-4 shrink-0" />
             WhatsApp & Email Automation
           </button>
           <button
             onClick={() => setActiveTab("tax")}
-            className={`px-4 py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            className={`px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === "tax"
                 ? "border-indigo-600 text-indigo-600 bg-indigo-50/30 rounded-t-lg"
                 : "border-transparent text-slate-500 hover:text-slate-900"
             }`}
           >
-            <Receipt className="h-4 w-4" />
+            <Receipt className="h-4 w-4 shrink-0" />
             Agency Tax & GST Profile
           </button>
           <button
             onClick={() => setActiveTab("branding")}
-            className={`px-4 py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            className={`px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === "branding"
                 ? "border-indigo-600 text-indigo-600 bg-indigo-50/30 rounded-t-lg"
                 : "border-transparent text-slate-500 hover:text-slate-900"
             }`}
           >
-            <ImageIcon className="h-4 w-4" />
+            <ImageIcon className="h-4 w-4 shrink-0" />
             Agency Branding & Logo
             {!logoAllowed && (
-              <span className="text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+              <span className="text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
                 <Lock className="h-2.5 w-2.5" /> PRO
               </span>
             )}
@@ -455,10 +455,10 @@ export default function SettingsPage() {
               <div className="lg:col-span-2 space-y-6">
                 <form onSubmit={handleSaveSettings} className="space-y-6">
                   {/* Communication Channels Box */}
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+                  <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                        <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
                           <Sliders className="h-4 w-4" />
                         </div>
                         <div>
@@ -472,31 +472,31 @@ export default function SettingsPage() {
                       {/* Email Toggle */}
                       <div
                         onClick={() => setEmailEnabled(!emailEnabled)}
-                        className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3.5 ${
+                        className={`p-3 sm:p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
                           emailEnabled
                             ? "bg-indigo-50/40 border-indigo-200 shadow-2xs"
                             : "bg-slate-50 border-slate-200 opacity-60"
                         }`}
                       >
                         <div
-                          className={`h-9 w-9 rounded-lg flex items-center justify-center font-bold ${
+                          className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center font-bold shrink-0 mt-0.5 ${
                             emailEnabled ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-500"
                           }`}
                         >
-                          <Mail className="h-4.5 w-4.5" />
+                          <Mail className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1.5 flex-wrap">
                             <span className="text-xs font-bold text-slate-900">Email Delivery</span>
                             <span
-                              className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
+                              className={`text-[9px] sm:text-[10px] font-extrabold uppercase px-1.5 sm:px-2 py-0.5 rounded-md shrink-0 ${
                                 emailEnabled ? "bg-indigo-100 text-indigo-800" : "bg-slate-200 text-slate-600"
                               }`}
                             >
                               {emailEnabled ? "ACTIVE" : "DISABLED"}
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-500 mt-1">
+                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                             Sends responsive HTML proposals, confirmations, and milestone invoices.
                           </p>
                         </div>
@@ -505,31 +505,31 @@ export default function SettingsPage() {
                       {/* WhatsApp Toggle */}
                       <div
                         onClick={() => setWhatsappEnabled(!whatsappEnabled)}
-                        className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3.5 ${
+                        className={`p-3 sm:p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
                           whatsappEnabled
                             ? "bg-emerald-50/40 border-emerald-200 shadow-2xs"
                             : "bg-slate-50 border-slate-200 opacity-60"
                         }`}
                       >
                         <div
-                          className={`h-9 w-9 rounded-lg flex items-center justify-center font-bold ${
+                          className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center font-bold shrink-0 mt-0.5 ${
                             whatsappEnabled ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500"
                           }`}
                         >
-                          <MessageSquare className="h-4.5 w-4.5" />
+                          <MessageSquare className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1.5 flex-wrap">
                             <span className="text-xs font-bold text-slate-900">WhatsApp Delivery</span>
                             <span
-                              className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
+                              className={`text-[9px] sm:text-[10px] font-extrabold uppercase px-1.5 sm:px-2 py-0.5 rounded-md shrink-0 ${
                                 whatsappEnabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"
                               }`}
                             >
                               {whatsappEnabled ? "ACTIVE" : "DISABLED"}
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-500 mt-1">
+                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                             Sends structured WhatsApp template updates and instant itinerary links.
                           </p>
                         </div>
@@ -561,10 +561,10 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Automation Rules Box */}
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+                  <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="h-8 w-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                        <div className="h-8 w-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
                           <Sparkles className="h-4 w-4" />
                         </div>
                         <div>
@@ -589,7 +589,7 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={autoQuotationSent}
                           onChange={(e) => setAutoQuotationSent(e.target.checked)}
-                          className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                          className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0 ml-2"
                         />
                       </label>
 
@@ -605,7 +605,7 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={autoBookingConfirmed}
                           onChange={(e) => setAutoBookingConfirmed(e.target.checked)}
-                          className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                          className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0 ml-2"
                         />
                       </label>
 
@@ -622,11 +622,11 @@ export default function SettingsPage() {
                             type="checkbox"
                             checked={autoPaymentReminders}
                             onChange={(e) => setAutoPaymentReminders(e.target.checked)}
-                            className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                            className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0 ml-2"
                           />
                         </div>
                         {autoPaymentReminders && (
-                          <div className="pt-2 flex items-center gap-2 text-xs text-slate-600">
+                          <div className="pt-2 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-slate-600">
                             <span>Remind customer</span>
                             <Input
                               type="number"
@@ -634,7 +634,7 @@ export default function SettingsPage() {
                               max={30}
                               value={paymentReminderDays}
                               onChange={(e) => setPaymentReminderDays(parseInt(e.target.value, 10) || 1)}
-                              className="w-16 h-7 text-xs bg-white"
+                              className="w-14 sm:w-16 h-7 text-xs bg-white inline-block text-center font-bold"
                             />
                             <span>days before milestone due date.</span>
                           </div>
@@ -654,11 +654,11 @@ export default function SettingsPage() {
                             type="checkbox"
                             checked={autoTravelReminders}
                             onChange={(e) => setAutoTravelReminders(e.target.checked)}
-                            className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                            className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0 ml-2"
                           />
                         </div>
                         {autoTravelReminders && (
-                          <div className="pt-2 flex items-center gap-2 text-xs text-slate-600">
+                          <div className="pt-2 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-slate-600">
                             <span>Send departure alert</span>
                             <Input
                               type="number"
@@ -666,7 +666,7 @@ export default function SettingsPage() {
                               max={30}
                               value={travelReminderDays}
                               onChange={(e) => setTravelReminderDays(parseInt(e.target.value, 10) || 1)}
-                              className="w-16 h-7 text-xs bg-white"
+                              className="w-14 sm:w-16 h-7 text-xs bg-white inline-block text-center font-bold"
                             />
                             <span>days before tour start date.</span>
                           </div>
@@ -685,17 +685,17 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={autoFeedbackRequests}
                           onChange={(e) => setAutoFeedbackRequests(e.target.checked)}
-                          className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                          className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0 ml-2"
                         />
                       </label>
                     </div>
                   </div>
 
-                  <div className="flex justify-end">
+                  <div className="flex justify-end pt-2">
                     <Button
                       type="submit"
                       disabled={saving}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 px-6 rounded-xl cursor-pointer shadow-2xs gap-1.5"
+                      className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 px-6 rounded-xl cursor-pointer shadow-2xs gap-1.5"
                     >
                       <Check className="h-4 w-4" />
                       {saving ? "Saving Changes..." : "Save Communication Settings"}
@@ -816,7 +816,7 @@ export default function SettingsPage() {
           ) : (
             <form onSubmit={handleSaveTaxProfile} className="space-y-6">
               {/* Informational Scope Callout */}
-              <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5">
+              <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-3.5 sm:p-5 flex items-start gap-3 sm:gap-3.5">
                 <div className="h-8 w-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
                   <Receipt className="h-4.5 w-4.5" />
                 </div>
@@ -830,10 +830,10 @@ export default function SettingsPage() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Card 1: GST Registration Profile */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+                <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                      <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
                         <Building2 className="h-4 w-4" />
                       </div>
                       <div>
@@ -846,18 +846,18 @@ export default function SettingsPage() {
                   {/* Registered Toggle Card */}
                   <div
                     onClick={() => setIsGstRegistered(!isGstRegistered)}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                    className={`p-3 sm:p-4 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-3 ${
                       isGstRegistered
                         ? "bg-emerald-50/40 border-emerald-200 shadow-2xs"
                         : "bg-slate-50 border-slate-200"
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <span className="text-xs font-bold text-slate-900">GST Registered Business</span>
                         <Badge
                           variant="outline"
-                          className={`text-[10px] font-extrabold uppercase px-2 py-0.5 ${
+                          className={`text-[9px] sm:text-[10px] font-extrabold uppercase px-1.5 sm:px-2 py-0.5 shrink-0 ${
                             isGstRegistered
                               ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                               : "bg-slate-200 text-slate-600 border-slate-300"
@@ -866,7 +866,7 @@ export default function SettingsPage() {
                           {isGstRegistered ? "REGISTERED" : "UNREGISTERED"}
                         </Badge>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                         Enable if your agency has an active GSTIN to include on commercial proposals and invoices.
                       </p>
                     </div>
@@ -875,7 +875,7 @@ export default function SettingsPage() {
                       checked={isGstRegistered}
                       onChange={(e) => setIsGstRegistered(e.target.checked)}
                       onClick={(e) => e.stopPropagation()}
-                      className="h-5 w-5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                      className="h-5 w-5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer shrink-0 mt-0.5"
                     />
                   </div>
 
@@ -949,10 +949,10 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Card 2: Commercial Quotation Defaults */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+                <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                      <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
                         <Percent className="h-4 w-4" />
                       </div>
                       <div>
@@ -964,9 +964,9 @@ export default function SettingsPage() {
 
                   {/* Default Tax Rate Selector */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-700 flex flex-wrap items-center justify-between gap-1">
                       <span>Default Tax Rate (Catalog Presets)</span>
-                      <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                      <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded shrink-0">
                         Selected: {defaultGstRate}%
                       </span>
                     </label>
@@ -1100,7 +1100,7 @@ export default function SettingsPage() {
                 <Button
                   type="submit"
                   disabled={savingTax}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 px-6 rounded-xl cursor-pointer shadow-2xs gap-1.5"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 px-6 rounded-xl cursor-pointer shadow-2xs gap-1.5"
                 >
                   <Check className="h-4 w-4" />
                   {savingTax ? "Saving Tax Profile..." : "Save Agency Tax Profile"}
@@ -1139,26 +1139,26 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-2xs space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl">
-                    <ImageIcon className="h-5 w-5" />
+            <div className="bg-white p-4 sm:p-6 md:p-8 rounded-3xl border border-slate-200/90 shadow-2xs space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                  <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
+                    <ImageIcon className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-900">Custom Agency Logo</h3>
-                    <p className="text-xs text-slate-500">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900">Custom Agency Logo</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
                       Displayed on quotation PDFs, booking vouchers, and public customer share links.
                     </p>
                   </div>
                 </div>
                 {logoAllowed ? (
-                  <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full">
+                  <span className="self-start sm:self-auto text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full shrink-0">
                     Feature Enabled
                   </span>
                 ) : (
-                  <span className="text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-700 px-3 py-1 rounded-full flex items-center gap-1">
-                    <Lock className="h-3 w-3" /> Locked on Starter
+                  <span className="self-start sm:self-auto text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-700 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full flex items-center gap-1 shrink-0">
+                    <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> Locked on Starter
                   </span>
                 )}
               </div>
@@ -1175,27 +1175,27 @@ export default function SettingsPage() {
 
               {/* Existing Logo Display */}
               {agencyLogoUrl && !selectedLogoFile && (
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-6">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={agencyLogoUrl}
                     alt="Agency Logo"
-                    className="max-h-20 max-w-48 object-contain bg-white p-2 rounded-xl border border-slate-200 shadow-2xs"
+                    className="max-h-16 sm:max-h-20 max-w-44 sm:max-w-48 object-contain bg-white p-2 rounded-xl border border-slate-200 shadow-2xs"
                   />
-                  <div className="space-y-1 text-center sm:text-left flex-1">
+                  <div className="space-y-1.5 text-center sm:text-left flex-1 min-w-0 w-full">
                     <span className="text-xs font-bold text-slate-900 block">Current Active Logo</span>
-                    <p className="text-[11px] font-mono text-slate-500 break-all select-all">
+                    <p className="text-[10px] sm:text-[11px] font-mono text-slate-400 break-all select-all line-clamp-2 max-w-full">
                       {agencyLogoUrl}
                     </p>
                     {logoAllowed && (
-                      <div className="pt-2 flex items-center justify-center sm:justify-start gap-2">
+                      <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => fileInputRef.current?.click()}
                           disabled={savingLogo}
-                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 h-8 rounded-xl border-indigo-200 cursor-pointer"
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 h-8 px-3 rounded-xl border-indigo-200 cursor-pointer"
                         >
                           <Upload className="h-3.5 w-3.5 mr-1" /> Change Logo
                         </Button>
@@ -1205,7 +1205,7 @@ export default function SettingsPage() {
                           size="sm"
                           onClick={() => setConfirmRemoveLogoOpen(true)}
                           disabled={savingLogo}
-                          className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 h-8 rounded-xl border-rose-200 cursor-pointer"
+                          className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 h-8 px-3 rounded-xl border-rose-200 cursor-pointer"
                         >
                           <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove Logo
                         </Button>
@@ -1217,24 +1217,24 @@ export default function SettingsPage() {
 
               {/* Staged File Preview Card */}
               {selectedLogoFile && selectedLogoPreview && (
-                <div className="bg-indigo-50/40 border border-indigo-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-6">
+                <div className="bg-indigo-50/40 border border-indigo-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={selectedLogoPreview}
                     alt="New Logo Preview"
-                    className="max-h-20 max-w-48 object-contain bg-white p-2 rounded-xl border border-indigo-200 shadow-2xs"
+                    className="max-h-16 sm:max-h-20 max-w-44 sm:max-w-48 object-contain bg-white p-2 rounded-xl border border-indigo-200 shadow-2xs"
                   />
-                  <div className="space-y-1 text-center sm:text-left flex-1">
-                    <div className="flex items-center justify-center sm:justify-start gap-2">
+                  <div className="space-y-1.5 text-center sm:text-left flex-1 min-w-0 w-full">
+                    <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                       <span className="text-xs font-bold text-indigo-950 block">Ready to Upload</span>
                       <span className="text-[10px] font-mono bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">
                         {(selectedLogoFile.size / 1024).toFixed(1)} KB
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 font-medium">
+                    <p className="text-[11px] text-slate-600 font-medium truncate">
                       {selectedLogoFile.name}
                     </p>
-                    <div className="pt-2 flex items-center justify-center sm:justify-start gap-2">
+                    <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
                       <Button
                         type="button"
                         size="sm"

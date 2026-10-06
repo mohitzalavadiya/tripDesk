@@ -272,7 +272,7 @@ function NewTripForm() {
             <div className="max-w-4xl mx-auto w-full">
               <form onSubmit={formik.handleSubmit} className="space-y-6">
             {/* Main Details block */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-6">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Compass className="h-5 w-5 text-indigo-600" />
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
@@ -309,7 +309,7 @@ function NewTripForm() {
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200">
                       {customers.map((c) => (
-                        <SelectItem key={c.id} value={c.id} className="text-xs">
+                         <SelectItem key={c.id} value={c.id} className="text-xs">
                           {c.name} ({c.phone})
                         </SelectItem>
                       ))}
@@ -400,7 +400,7 @@ function NewTripForm() {
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-6">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Calendar className="h-5 w-5 text-indigo-600" />
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
@@ -459,7 +459,7 @@ function NewTripForm() {
             </div>
 
             {/* Notes Block */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-4">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
                   Planning Notes / Special Client Requests
@@ -481,27 +481,27 @@ function NewTripForm() {
             </div>
 
             {/* Actions panel */}
-            <div className="flex items-center justify-between gap-4 pt-4 border-t border-slate-100">
-              <div className="flex gap-2 text-slate-400 text-xs leading-normal">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-100">
+              <div className="flex items-start gap-2 text-slate-400 text-xs leading-normal">
                 <Info className="h-4 w-4 shrink-0 text-slate-400 mt-0.5" />
                 <span>
                   After creating the workspace, you can manage day-by-day itineraries and travelers.
                 </span>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => router.push("/trips")}
-                  className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-10 px-5 cursor-pointer"
+                  className="flex-1 sm:flex-initial bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-10 px-4 cursor-pointer justify-center"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={formik.isSubmitting || isReadOnly}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-5 cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                  className="flex-1 sm:flex-initial bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-4 cursor-pointer shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 whitespace-nowrap"
                 >
                   {formik.isSubmitting ? (
                     <>

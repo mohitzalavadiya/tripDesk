@@ -96,13 +96,13 @@ export function OutstandingBalancesCard({
         {/* CUSTOMERS TAB */}
         {activeTab === "customers" && (
           <div className="space-y-3 pt-1">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs">
               <span className="font-semibold text-amber-800 dark:text-amber-300">
                 Total Customer Outstanding: {formatCurrency(customerReceivables.totalOutstanding)}
               </span>
               {customerReceivables.overdueCount > 0 && (
-                <Badge variant="destructive" className="text-[11px] gap-1">
-                  <AlertTriangle className="h-3 w-3" />
+                <Badge variant="destructive" className="text-[10px] sm:text-[11px] gap-1 shrink-0">
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
                   {customerReceivables.overdueCount} Overdue ({formatCurrency(customerReceivables.overdueAmount)})
                 </Badge>
               )}
@@ -117,46 +117,50 @@ export function OutstandingBalancesCard({
                 {customerReceivables.items.map((item) => (
                   <div
                     key={item.bookingId}
-                    className="p-3 flex items-center justify-between hover:bg-muted/30 transition-colors"
+                    className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-muted/30 transition-colors"
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-foreground">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-bold text-foreground shrink-0">
                           {item.bookingNumber}
                         </span>
-                        <Badge variant="outline" className="text-[10px] uppercase">
+                        <Badge variant="outline" className="text-[9px] sm:text-[10px] uppercase px-1.5 py-0 shrink-0">
                           {item.paymentStatus}
                         </Badge>
                         {item.isOverdue && (
-                          <Badge variant="destructive" className="text-[10px]">
+                          <Badge variant="destructive" className="text-[9px] sm:text-[10px] px-1.5 py-0 shrink-0">
                             Travel Started / Overdue
                           </Badge>
                         )}
                       </div>
-                      <div className="text-xs font-medium text-foreground">
+                      <div className="text-xs font-medium text-foreground truncate">
                         {item.customerName}
                       </div>
-                      <div className="text-[11px] text-muted-foreground flex items-center gap-2">
-                        <span className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" /> {item.customerPhone}
-                        </span>
-                        <span>•</span>
-                        <span>{item.tripTitle}</span>
+                      <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-1.5">
+                        {item.customerPhone && (
+                          <span className="flex items-center gap-1 shrink-0">
+                            <Phone className="h-3 w-3 shrink-0" /> {item.customerPhone}
+                          </span>
+                        )}
+                        {item.customerPhone && item.tripTitle && <span>•</span>}
+                        <span className="truncate">{item.tripTitle}</span>
                       </div>
                     </div>
 
-                    <div className="text-right space-y-1.5">
-                      <div className="text-sm font-bold text-amber-600 dark:text-amber-400">
-                        {formatCurrency(item.outstandingAmount)}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        of {formatCurrency(item.totalAmount)}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border/40">
+                      <div className="flex items-center justify-between sm:block">
+                        <div className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                          {formatCurrency(item.outstandingAmount)}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          of {formatCurrency(item.totalAmount)}
+                        </div>
                       </div>
                       {onRecordCustomerPayment && (
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 text-xs gap-1"
+                          className="h-7 text-xs px-3 gap-1 self-end sm:self-auto shrink-0 cursor-pointer"
                           onClick={() => onRecordCustomerPayment(item.bookingId)}
                         >
                           <Plus className="h-3 w-3" />
@@ -174,13 +178,13 @@ export function OutstandingBalancesCard({
         {/* SUPPLIERS TAB */}
         {activeTab === "suppliers" && (
           <div className="space-y-3 pt-1">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs">
               <span className="font-semibold text-purple-800 dark:text-purple-300">
                 Total Supplier Outstanding: {formatCurrency(supplierPayables.totalOutstanding)}
               </span>
               {supplierPayables.overdueCount > 0 && (
-                <Badge variant="destructive" className="text-[11px] gap-1">
-                  <AlertTriangle className="h-3 w-3" />
+                <Badge variant="destructive" className="text-[10px] sm:text-[11px] gap-1 shrink-0">
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
                   {supplierPayables.overdueCount} Past Due Date
                 </Badge>
               )}
@@ -195,49 +199,51 @@ export function OutstandingBalancesCard({
                 {supplierPayables.items.map((item) => (
                   <div
                     key={item.payableId}
-                    className="p-3 flex items-center justify-between hover:bg-muted/30 transition-colors"
+                    className="p-3 flex flex-col justify-between gap-2 hover:bg-muted/30 transition-colors"
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-foreground">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-bold text-foreground shrink-0">
                           {item.payableNumber}
                         </span>
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge variant="secondary" className="text-[9px] sm:text-[10px] px-1.5 py-0 shrink-0">
                           {item.serviceType}
                         </Badge>
                         {item.isOverdue && (
-                          <Badge variant="destructive" className="text-[10px]">
+                          <Badge variant="destructive" className="text-[9px] sm:text-[10px] px-1.5 py-0 shrink-0">
                             Overdue
                           </Badge>
                         )}
                       </div>
-                      <div className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                        <Building2 className="h-3 w-3 text-muted-foreground" />
-                        {item.supplierName}
+                      <div className="text-xs font-medium text-foreground flex items-center gap-1.5 truncate">
+                        <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="truncate">{item.supplierName}</span>
                       </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {item.description}
+                      <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-1.5">
+                        <span className="truncate">{item.description}</span>
                         {item.dueDate && (
-                          <span className="ml-2 inline-flex items-center gap-1 text-muted-foreground">
-                            <Clock className="h-3 w-3" /> Due: {new Date(item.dueDate).toLocaleDateString("en-IN")}
+                          <span className="inline-flex items-center gap-1 text-muted-foreground shrink-0">
+                            <Clock className="h-3 w-3 shrink-0" /> Due: {new Date(item.dueDate).toLocaleDateString("en-IN")}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="text-right space-y-1.5">
-                      <div className="text-sm font-bold text-purple-600 dark:text-purple-400">
-                        {formatCurrency(item.outstandingAmount)}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border/40">
+                      <div className="flex items-center justify-between sm:block">
+                        <div className="text-sm font-bold text-purple-600 dark:text-purple-400">
+                          {formatCurrency(item.outstandingAmount)}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          Paid: {formatCurrency(item.paidAmount)} / {formatCurrency(item.actualAmount)}
+                        </div>
                       </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        Paid: {formatCurrency(item.paidAmount)} / {formatCurrency(item.actualAmount)}
-                      </div>
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
                         {onEditPayable && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-7 text-xs px-2 gap-1"
+                            className="h-7 text-xs px-2 gap-1 cursor-pointer"
                             onClick={() => onEditPayable(item.payableId)}
                             title="Edit Payable"
                           >
@@ -249,7 +255,7 @@ export function OutstandingBalancesCard({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-xs gap-1"
+                            className="h-7 text-xs px-2.5 gap-1 cursor-pointer"
                             onClick={() => onRecordSupplierPayment(item.payableId)}
                           >
                             <Plus className="h-3 w-3" />

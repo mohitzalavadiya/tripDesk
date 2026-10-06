@@ -152,7 +152,7 @@ export function DestinationDialog({
           </div>
 
           {/* State / Region & Country */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2.5 sm:gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="dest-state" className="text-xs font-semibold text-slate-700">
                 State / Province
@@ -247,12 +247,12 @@ export function DestinationDialog({
             </Select>
           </div>
 
-          <DialogFooter className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+          <DialogFooter className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="text-xs h-8 px-3 rounded-lg"
+              className="text-xs h-9 sm:h-8 px-3 rounded-lg w-full sm:w-auto justify-center"
               onClick={() => onOpenChange(false)}
               disabled={formik.isSubmitting}
             >
@@ -261,7 +261,7 @@ export function DestinationDialog({
             <Button
               type="submit"
               size="sm"
-              className="text-xs h-8 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+              className="text-xs h-9 sm:h-8 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold w-full sm:w-auto justify-center"
               disabled={formik.isSubmitting || isReadOnly}
             >
               {formik.isSubmitting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}

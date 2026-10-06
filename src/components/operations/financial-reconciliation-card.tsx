@@ -123,13 +123,13 @@ export function FinancialReconciliationCard({
   };
 
   return (
-    <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-5">
+    <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-5 shadow-2xs space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+      <div className="flex flex-col min-[480px]:flex-row items-start min-[480px]:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
         <div className="flex items-center gap-2">
-          <DollarSign className="h-4 w-4 text-emerald-600" />
+          <DollarSign className="h-4 w-4 text-emerald-600 shrink-0" />
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 leading-tight">
               Internal Operational Cost & Financial Reconciliation
             </h3>
             <p className="text-[11px] text-slate-400">
@@ -138,11 +138,11 @@ export function FinancialReconciliationCard({
           </div>
         </div>
         {existingFin ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-            <CheckCircle2 className="h-3 w-3" /> Reconciled
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full shrink-0 whitespace-nowrap">
+            <CheckCircle2 className="h-3 w-3 shrink-0" /> Reconciled
           </span>
         ) : (
-          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full shrink-0 whitespace-nowrap">
             Pending Financial Audit
           </span>
         )}
@@ -233,8 +233,8 @@ export function FinancialReconciliationCard({
 
       {/* Cost Adjustments Breakdown */}
       <div className="space-y-3 pt-1">
-        <div className="flex items-center justify-between">
-          <h4 className="text-xs font-bold text-slate-800">
+        <div className="flex flex-col min-[380px]:flex-row items-start min-[380px]:items-center justify-between gap-2">
+          <h4 className="text-xs font-bold text-slate-800 leading-tight">
             Supplier Adjustments & Discrepancies ({adjustments.length})
           </h4>
           {!isFinalized && (
@@ -243,7 +243,7 @@ export function FinancialReconciliationCard({
               size="sm"
               variant="outline"
               onClick={handleAddAdjustment}
-              className="text-xs font-bold h-7 px-2.5 border-slate-200 cursor-pointer"
+              className="text-xs font-bold h-7 px-2.5 border-slate-200 cursor-pointer w-full min-[380px]:w-auto justify-center shrink-0"
             >
               <Plus className="h-3 w-3 mr-1" /> Add Adjustment
             </Button>
@@ -308,13 +308,14 @@ export function FinancialReconciliationCard({
                   />
                 </div>
                 {!isFinalized && (
-                  <div className="sm:col-span-1 text-center">
+                  <div className="sm:col-span-1 flex items-center justify-end sm:justify-center pt-1 sm:pt-0">
                     <button
                       type="button"
                       onClick={() => handleRemoveAdjustment(idx)}
-                      className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
+                      className="text-slate-400 hover:text-rose-600 p-1.5 rounded-md hover:bg-rose-50 transition-colors cursor-pointer flex items-center gap-1 text-[11px] text-rose-600 sm:text-slate-400 font-semibold"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                      <span className="sm:hidden">Remove</span>
                     </button>
                   </div>
                 )}
@@ -344,16 +345,16 @@ export function FinancialReconciliationCard({
             type="button"
             onClick={handleSaveFinancial}
             disabled={saving}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-9 px-4 cursor-pointer shadow-xs"
+            className="w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-9 px-4 cursor-pointer shadow-xs"
           >
             {saving ? (
               <>
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin shrink-0" />
                 Saving Financial Audit...
               </>
             ) : (
               <>
-                <Save className="mr-1.5 h-3.5 w-3.5" />
+                <Save className="mr-1.5 h-3.5 w-3.5 shrink-0" />
                 Save Financial Reconciliation
               </>
             )}

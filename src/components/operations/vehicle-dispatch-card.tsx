@@ -97,7 +97,7 @@ export function VehicleDispatchCard({
 
   return (
     <div
-      className={`border rounded-2xl p-5 shadow-2xs transition-all space-y-4 ${
+      className={`border rounded-2xl p-3.5 sm:p-5 shadow-2xs transition-all space-y-3.5 sm:space-y-4 ${
         status === DispatchStatus.COMPLETED
           ? "bg-white border-slate-200/90"
           : status === DispatchStatus.ON_DUTY
@@ -112,10 +112,10 @@ export function VehicleDispatchCard({
       }`}
     >
       {/* ─── CARD HEADER ─────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
-        <div className="flex items-start gap-3">
+      <div className="flex flex-col min-[360px]:flex-row items-start min-[360px]:items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-100 pb-3">
+        <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
           <div
-            className={`h-10 w-10 rounded-xl border flex items-center justify-center font-bold text-sm shrink-0 mt-0.5 ${
+            className={`h-9 w-9 sm:h-10 sm:w-10 rounded-xl border flex items-center justify-center font-bold text-sm shrink-0 mt-0.5 ${
               status === DispatchStatus.COMPLETED
                 ? "bg-emerald-50 border-emerald-200 text-emerald-600"
                 : status === DispatchStatus.ON_DUTY
@@ -129,43 +129,43 @@ export function VehicleDispatchCard({
                 : "bg-slate-50 border-slate-200 text-slate-600"
             }`}
           >
-            <Car className="h-5 w-5" />
+            <Car className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
 
           <div className="space-y-0.5 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="font-bold text-base text-slate-900 truncate">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <h4 className="font-bold text-sm sm:text-base text-slate-900 truncate">
                 {vehicleName}
               </h4>
-              <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+              <span className="text-[10.5px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">
                 {vehicleType}
               </span>
             </div>
 
-            <p className="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">
+            <div className="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap pt-0.5">
               <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
               <span className="font-medium text-slate-700">{pickupLocation}</span>
               <span className="text-slate-400">→</span>
               <span className="font-medium text-slate-700">{dropLocation}</span>
-            </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+        <div className="flex items-center gap-2 shrink-0 self-start min-[360px]:self-center">
           <TransportStatusBadge status={status} />
         </div>
       </div>
 
       {/* ─── OPERATIONAL & SCHEDULE DETAILS GRID ─────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-slate-50/70 border border-slate-100 rounded-xl p-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-slate-50/70 border border-slate-100 rounded-xl p-3 sm:p-3.5">
         {/* Schedule */}
         <div className="space-y-0.5">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
             Pickup Timing
           </span>
-          <div className="font-bold text-slate-800 flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5 text-slate-400" />
-            <span>
+          <div className="font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+            <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            <span className="whitespace-nowrap">
               {pickupDate
                 ? pickupDate.toLocaleDateString("en-IN", {
                     day: "numeric",
@@ -176,7 +176,7 @@ export function VehicleDispatchCard({
             </span>
           </div>
           <div className="font-semibold text-indigo-600 flex items-center gap-1 text-[11px] pt-0.5">
-            <Clock className="h-3 w-3" />
+            <Clock className="h-3 w-3 shrink-0" />
             <span>{dispatch.pickupTime || "09:00 AM (Default)"}</span>
           </div>
         </div>
@@ -197,7 +197,7 @@ export function VehicleDispatchCard({
                     href={`tel:${dispatch.driverPhone}`}
                     className="text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
                   >
-                    <Phone className="h-3 w-3" />
+                    <Phone className="h-3 w-3 shrink-0" />
                     {dispatch.driverPhone}
                   </a>
                 </div>
@@ -250,14 +250,14 @@ export function VehicleDispatchCard({
 
       {/* Vehicle Commercials & Rate Basis */}
       {dispatch.tripVehicle && (
-        <div className="flex items-center justify-between gap-2 p-2.5 bg-slate-50/90 rounded-xl border border-slate-200/80 text-xs flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rate Basis:</span>
-            <span className="font-bold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded text-[11px]">
+        <div className="flex flex-col min-[360px]:flex-row min-[360px]:items-center min-[360px]:justify-between gap-2 p-2.5 bg-slate-50/90 rounded-xl border border-slate-200/80 text-xs">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Rate Basis:</span>
+            <span className="font-bold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded text-[11px] shrink-0">
               {dispatch.tripVehicle.pricingType === "PER_KM" ? "Per KM" : "Fixed Rate"}
             </span>
             {dispatch.tripVehicle.pricingType === "PER_KM" ? (
-              <span className="text-slate-600 text-[11px]">
+              <span className="text-slate-600 text-[11px] leading-tight">
                 ₹{dispatch.tripVehicle.ratePerKm || 0}/km • Est: {dispatch.tripVehicle.estimatedKm || 0} km
                 {dispatch.tripVehicle.actualKm !== null && dispatch.tripVehicle.actualKm !== undefined ? (
                   <span className="font-bold text-indigo-700 ml-1">
@@ -273,7 +273,7 @@ export function VehicleDispatchCard({
               </span>
             )}
           </div>
-          <div className="text-right">
+          <div className="self-start min-[360px]:self-auto min-[360px]:text-right shrink-0">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Trip Vehicle Cost</span>
             <span className="font-bold text-indigo-700 text-xs">
               {dispatch.tripVehicle.pricingType === "PER_KM"
@@ -301,22 +301,22 @@ export function VehicleDispatchCard({
 
       {/* ─── SUPPLIER & COST (UNIFIED PAYABLE) ──────────────────────────── */}
       {payable && (
-        <div className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-3.5 space-y-2.5">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                <CreditCard className="h-3.5 w-3.5 text-slate-500" />
+        <div className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-3 sm:p-3.5 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5 whitespace-nowrap">
+                <CreditCard className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                 Supplier & Cost
               </span>
               {payable.payeeName && (
-                <span className="text-xs font-semibold text-slate-700">
+                <span className="text-xs font-semibold text-slate-700 truncate max-w-[130px] sm:max-w-none">
                   • {payable.payeeName}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
               <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border shrink-0 ${
                   payable.status === "PAID"
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                     : payable.status === "PARTIALLY_PAID"
@@ -335,14 +335,14 @@ export function VehicleDispatchCard({
                   : "Pending"}
               </span>
               {payable.dueDate && (
-                <span className="text-[11px] text-slate-500 font-medium">
+                <span className="text-[10.5px] text-slate-500 font-medium shrink-0">
                   Due: {new Date(payable.dueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
                 </span>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-200/70 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 pt-2 border-t border-slate-200/70 text-xs">
             <div>
               <p className="text-[10px] text-slate-500 font-medium">Calculated Cost</p>
               <p className="font-semibold text-slate-700">{formatCurrency(Number(payable.plannedAmount || 0))}</p>

@@ -344,24 +344,24 @@ export default function TripsPage() {
         {isReadOnly && <ReadOnlyBanner moduleName="Trip Workspaces" />}
 
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
           {/* Left Title & Telemetry */}
-          <div className="space-y-3 z-10">
-            <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
-                <Compass className="h-3 w-3 text-indigo-500" />
+          <div className="space-y-3 z-10 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0 whitespace-nowrap">
+                <Compass className="h-3 w-3 text-indigo-500 shrink-0" />
                 Operations & Itineraries
               </span>
-              <span className="text-slate-300">•</span>
-              <span className="text-xs font-semibold text-slate-500">
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
                 {pagination.total} total trips
               </span>
             </div>
 
             <div className="flex flex-wrap items-baseline gap-3">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900">
                 Trip Workspaces
               </h1>
               <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
@@ -370,34 +370,34 @@ export default function TripsPage() {
             </div>
 
             {/* Micro-Telemetry Stat Badges */}
-            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 text-amber-800 font-medium border border-amber-100/60">
-                <Plane className="h-3 w-3 text-amber-600 animate-pulse" />
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 text-xs">
+              <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-amber-50 text-amber-800 font-medium border border-amber-100/60 text-[11px] sm:text-xs">
+                <Plane className="h-3 w-3 text-amber-600 animate-pulse shrink-0" />
                 <span className="font-bold text-amber-950">{stats.running}</span> Travelling Now
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-medium border border-emerald-100/60">
-                <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-medium border border-emerald-100/60 text-[11px] sm:text-xs">
+                <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
                 <span className="font-bold text-emerald-950">{stats.confirmed}</span> Confirmed Bookings
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 text-blue-800 font-medium border border-blue-100/60">
-                <Clock className="h-3 w-3 text-blue-600" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-blue-50 text-blue-800 font-medium border border-blue-100/60 text-[11px] sm:text-xs">
+                <Clock className="h-3 w-3 text-blue-600 shrink-0" />
                 <span className="font-bold text-blue-950">{stats.planning}</span> In Planning
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100/80 text-slate-700 font-medium">
-                <Luggage className="h-3 w-3 text-slate-500" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-slate-100/80 text-slate-700 font-medium text-[11px] sm:text-xs">
+                <Luggage className="h-3 w-3 text-slate-500 shrink-0" />
                 <span className="font-bold text-slate-900">Page {pagination.page}</span> of {pagination.totalPages}
               </div>
             </div>
           </div>
 
           {/* Right Action Controls */}
-          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
+          <div className="flex items-center gap-3 z-10 w-full sm:w-auto lg:self-center">
             <Button
               onClick={handleNewTrip}
               disabled={isReadOnly}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 shrink-0" />
               New Trip
             </Button>
           </div>
@@ -406,7 +406,7 @@ export default function TripsPage() {
         {/* Master Workspace Card (Unified Filter Bar + Table) */}
         <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
           {/* Master Toolbar Header */}
-          <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
+          <div className="p-3.5 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="relative flex-1 max-w-2xl">
                 <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />

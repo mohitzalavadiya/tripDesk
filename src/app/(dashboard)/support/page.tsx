@@ -124,54 +124,54 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-2 sm:px-4 py-4 space-y-4 flex flex-col h-[calc(100vh-5rem)]">
+    <div className="max-w-5xl mx-auto px-2 sm:px-4 py-2 sm:py-4 space-y-2 sm:space-y-4 flex flex-col h-[calc(100dvh-8.5rem)] md:h-[calc(100vh-5rem)]">
       {/* Header */}
-      <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold shrink-0">
-            <ShieldCheck className="h-5 w-5" />
+      <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 sm:p-4 shadow-xs flex items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold shrink-0">
+            <ShieldCheck className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900">TripDesk Support</h1>
-              <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <h1 className="text-sm sm:text-lg font-bold text-slate-900 truncate">TripDesk Support</h1>
+              <span className="text-[9px] sm:text-[10px] font-semibold tracking-wider uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
                 Official Platform Team
               </span>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 hidden sm:block">
               Direct assistance with onboarding, trial questions, plan changes & technical support.
             </p>
           </div>
         </div>
 
         {/* Realtime status */}
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-1.5 text-xs shrink-0">
           {connectionStatus === "CONNECTED" && (
-            <span className="inline-flex items-center gap-1.5 text-emerald-700 font-medium bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              Live Connected
+            <span className="inline-flex items-center gap-1 sm:gap-1.5 text-emerald-700 font-medium bg-emerald-50 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-emerald-200 text-[10px] sm:text-xs">
+              <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-emerald-500 animate-pulse" />
+              Live
             </span>
           )}
           {connectionStatus === "CONNECTING" && (
-            <span className="inline-flex items-center gap-1.5 text-amber-700 font-medium bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-              <RefreshCw className="h-3 w-3 animate-spin" />
+            <span className="inline-flex items-center gap-1 sm:gap-1.5 text-amber-700 font-medium bg-amber-50 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-amber-200 text-[10px] sm:text-xs">
+              <RefreshCw className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin" />
               Connecting...
             </span>
           )}
           {(connectionStatus === "DISCONNECTED" || connectionStatus === "ERROR") && (
             <button
               onClick={reloadHistory}
-              className="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 font-medium bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-full border border-slate-300 transition-colors"
+              className="inline-flex items-center gap-1 sm:gap-1.5 text-slate-600 hover:text-slate-900 font-medium bg-slate-100 hover:bg-slate-200 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-slate-300 transition-colors text-[10px] sm:text-xs cursor-pointer"
             >
-              <WifiOff className="h-3 w-3 text-rose-500" />
-              Offline (Click to Refresh)
+              <WifiOff className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-rose-500" />
+              Retry
             </button>
           )}
         </div>
       </div>
 
       {/* Chat Messages Container */}
-      <div className="bg-slate-50/70 border border-slate-200 rounded-xl flex-1 p-4 overflow-y-auto flex flex-col space-y-4 shadow-inner">
+      <div className="bg-slate-50/70 border border-slate-200 rounded-xl flex-1 p-2.5 sm:p-4 overflow-y-auto flex flex-col space-y-3 sm:space-y-4 shadow-inner min-h-0">
         {isLoadingHistory && messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-slate-400 text-xs gap-2">
             <RefreshCw className="h-4 w-4 animate-spin text-purple-600" />
@@ -210,7 +210,7 @@ export default function SupportPage() {
                 </div>
 
                 <div
-                  className={`px-4 py-2.5 rounded-2xl max-w-[85%] sm:max-w-[75%] break-words whitespace-pre-wrap text-sm shadow-xs ${
+                  className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl max-w-[88%] sm:max-w-[75%] break-words whitespace-pre-wrap text-xs sm:text-sm shadow-xs ${
                     isMe
                       ? "bg-purple-600 text-white rounded-tr-xs"
                       : "bg-white text-slate-900 border border-slate-200 rounded-tl-xs"
@@ -243,28 +243,28 @@ export default function SupportPage() {
       {/* Chat Composer */}
       <form
         onSubmit={handleSend}
-        className="bg-white border border-slate-200/90 rounded-xl p-2.5 shadow-xs flex items-end gap-2 shrink-0"
+        className="bg-white border border-slate-200/90 rounded-xl p-1.5 sm:p-2.5 shadow-xs flex items-end gap-1.5 sm:gap-2 shrink-0"
       >
         <textarea
           ref={inputRef}
-          rows={2}
+          rows={1}
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type your question or request (Press Enter to send, Shift+Enter for new line)..."
-          className="flex-1 resize-none bg-transparent border-0 focus:outline-hidden text-sm text-slate-900 placeholder:text-slate-400 p-2 min-h-[44px] max-h-[120px]"
+          placeholder="Type a message..."
+          className="flex-1 resize-none bg-transparent border-0 focus:outline-hidden text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 p-1.5 sm:p-2 min-h-[36px] sm:min-h-[44px] max-h-[90px] sm:max-h-[120px]"
         />
         <Button
           type="submit"
           disabled={!inputMessage.trim() || isSending}
-          className="h-10 px-4 bg-purple-600 hover:bg-purple-700 text-white shrink-0 rounded-lg shadow-xs transition-all disabled:opacity-50"
+          className="h-9 sm:h-10 px-3 sm:px-4 bg-purple-600 hover:bg-purple-700 text-white shrink-0 rounded-lg shadow-xs transition-all disabled:opacity-50 cursor-pointer"
         >
           {isSending ? (
-            <RefreshCw className="h-4 w-4 animate-spin" />
+            <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
           ) : (
             <>
               <span className="hidden sm:inline mr-1 text-xs font-semibold">Send</span>
-              <Send className="h-4 w-4" />
+              <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </>
           )}
         </Button>

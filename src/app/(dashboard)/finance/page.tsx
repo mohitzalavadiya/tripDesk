@@ -192,13 +192,13 @@ export default function FinanceDashboardPage() {
         />
 
         {/* Filter Controls Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-700">Financial Period:</span>
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1">
-              <Calendar className="h-3.5 w-3.5 text-slate-500" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex flex-col min-[360px]:flex-row min-[360px]:items-center gap-2 w-full sm:w-auto">
+            <span className="text-xs font-bold text-slate-700 shrink-0">Financial Period:</span>
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 w-full min-[360px]:w-auto">
+              <Calendar className="h-3.5 w-3.5 text-slate-500 shrink-0" />
               <Select value={preset} onValueChange={(val) => setPreset(val as FinancePreset)}>
-                <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none w-36 focus:ring-0 font-medium">
+                <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none w-full min-[360px]:w-40 focus:ring-0 font-medium whitespace-nowrap">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -213,7 +213,7 @@ export default function FinanceDashboardPage() {
               </Select>
             </div>
           </div>
-          <div className="text-xs text-slate-400 font-medium">
+          <div className="text-[11px] text-slate-400 font-medium">
             Server-authoritative enterprise ledger
           </div>
         </div>

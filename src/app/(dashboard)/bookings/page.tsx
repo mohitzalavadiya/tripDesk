@@ -235,24 +235,24 @@ export default function BookingsDashboardPage() {
         {isReadOnly && <ReadOnlyBanner moduleName="Bookings & Reservations" />}
 
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
           {/* Left Title & Telemetry */}
           <div className="space-y-3 z-10">
-            <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0 whitespace-nowrap">
                 <CalendarCheck className="h-3 w-3 text-emerald-500" />
                 Active Operations
               </span>
-              <span className="text-slate-300">•</span>
-              <span className="text-xs font-semibold text-slate-500">
+              <span className="text-slate-300 hidden min-[360px]:inline">•</span>
+              <span className="text-xs font-semibold text-slate-500 shrink-0 whitespace-nowrap">
                 {pagination.total} bookings managed
               </span>
             </div>
 
             <div className="flex flex-wrap items-baseline gap-3">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900">
                 Bookings & Operations
               </h1>
               <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
@@ -288,11 +288,11 @@ export default function BookingsDashboardPage() {
           </div>
 
           {/* Right Action Controls */}
-          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
+          <div className="flex items-center gap-3 z-10 w-full sm:w-auto self-start lg:self-center">
             <Button
               onClick={handleNewBooking}
               disabled={isReadOnly}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
               New Booking

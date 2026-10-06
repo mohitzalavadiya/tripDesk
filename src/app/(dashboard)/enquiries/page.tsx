@@ -271,7 +271,7 @@ export default function EnquiriesPage() {
         {isReadOnly && <ReadOnlyBanner moduleName="Enquiries & Leads CRM" />}
 
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
           {/* Left Title & Status Quick Tabs */}
@@ -297,7 +297,7 @@ export default function EnquiriesPage() {
             </div>
 
             {/* Quick Status Tabs */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scrollbar-none flex-nowrap pt-1 pb-1 -mx-1 px-1 text-xs">
               {[
                 { label: "All", value: "all" },
                 { label: "New", value: EnquiryStatus.NEW },
@@ -316,7 +316,7 @@ export default function EnquiriesPage() {
                     setStatusFilter(tab.value);
                     setPage(1);
                   }}
-                  className={`px-3 py-1 rounded-lg font-semibold text-xs transition-colors cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg font-semibold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
                     statusFilter === tab.value
                       ? "bg-indigo-600 text-white shadow-2xs"
                       : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
@@ -329,12 +329,12 @@ export default function EnquiriesPage() {
           </div>
 
           {/* Right Action Controls (View Switcher + New Enquiry) */}
-          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
+          <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2.5 z-10 w-full lg:w-auto">
             {/* View Mode Toggle */}
             <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
               <button
                 onClick={() => handleViewChange("list")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex-1 xs:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   view === "list"
                     ? "bg-white text-slate-900 shadow-2xs"
                     : "text-slate-500 hover:text-slate-900"
@@ -345,7 +345,7 @@ export default function EnquiriesPage() {
               </button>
               <button
                 onClick={() => handleViewChange("pipeline")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex-1 xs:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   view === "pipeline"
                     ? "bg-white text-slate-900 shadow-2xs"
                     : "text-slate-500 hover:text-slate-900"
@@ -359,7 +359,7 @@ export default function EnquiriesPage() {
             <Button
               onClick={() => router.push("/enquiries/new")}
               disabled={isReadOnly}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50 w-full xs:w-auto justify-center whitespace-nowrap"
             >
               <Plus className="h-4 w-4" />
               New Enquiry
@@ -368,44 +368,44 @@ export default function EnquiriesPage() {
         </div>
 
         {/* KPI Telemetry Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-              <Inbox className="h-5 w-5" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <Inbox className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Total Captured</span>
-              <h4 className="text-lg font-black text-slate-900">{stats.total}</h4>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-              <Clock className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Active Leads</span>
-              <h4 className="text-lg font-black text-slate-900">{stats.active}</h4>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight">Total Captured</span>
+              <h4 className="text-base sm:text-lg font-black text-slate-900 leading-tight truncate">{stats.total}</h4>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-              <CheckCircle2 className="h-5 w-5" />
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Converted Trips</span>
-              <h4 className="text-lg font-black text-slate-900">{stats.converted}</h4>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight">Active Leads</span>
+              <h4 className="text-base sm:text-lg font-black text-slate-900 leading-tight truncate">{stats.active}</h4>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-              <IndianRupee className="h-5 w-5" />
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Quoted Value</span>
-              <h4 className="text-lg font-black text-indigo-600">{formatCurrency(stats.quotedPipelineValue)}</h4>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight">Converted Trips</span>
+              <h4 className="text-base sm:text-lg font-black text-slate-900 leading-tight truncate">{stats.converted}</h4>
+            </div>
+          </div>
+
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+              <IndianRupee className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight">Quoted Value</span>
+              <h4 className="text-base sm:text-lg font-black text-indigo-600 leading-tight truncate">{formatCurrency(stats.quotedPipelineValue)}</h4>
             </div>
           </div>
         </div>
@@ -434,7 +434,7 @@ export default function EnquiriesPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-1 min-w-[125px]">
                   <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Priority:</span>
                   <Select
                     value={priorityFilter}
@@ -445,7 +445,7 @@ export default function EnquiriesPage() {
                       }
                     }}
                   >
-                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[125px] sm:w-[135px]">
+                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-full sm:w-[135px]">
                       <SelectValue placeholder="All">
                         {(val) => PRIORITY_FILTER_LABELS[val] ?? "All"}
                       </SelectValue>
@@ -460,7 +460,7 @@ export default function EnquiriesPage() {
                   </Select>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-1 min-w-[125px]">
                   <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Source:</span>
                   <Select
                     value={sourceFilter}
@@ -471,7 +471,7 @@ export default function EnquiriesPage() {
                       }
                     }}
                   >
-                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[125px] sm:w-[135px]">
+                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-full sm:w-[135px]">
                       <SelectValue placeholder="All">
                         {(val) => SOURCE_FILTER_LABELS[val] ?? "All"}
                       </SelectValue>

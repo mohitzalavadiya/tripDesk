@@ -335,14 +335,14 @@ export default function NewEnquiryPage() {
         <div className="max-w-4xl mx-auto w-full">
           <form onSubmit={formik.handleSubmit} noValidate className="space-y-6">
             {/* 1. Customer Selection Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-3">
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <User className="h-4 w-4 text-indigo-600" />
+                  <User className="h-4 w-4 text-indigo-600 shrink-0" />
                   <span>Customer Information</span>
                 </h3>
 
-                <div className="flex items-center gap-2 text-xs">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
                   <button
                     type="button"
                     onClick={() => {
@@ -351,7 +351,7 @@ export default function NewEnquiryPage() {
                         formik.setFieldValue("selectedCustomerId", customers[0].id);
                       }
                     }}
-                    className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg font-semibold text-xs transition-all cursor-pointer ${
                       formik.values.customerMode === "existing"
                         ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
                         : "text-slate-500 hover:text-slate-900"
@@ -365,7 +365,7 @@ export default function NewEnquiryPage() {
                       formik.setFieldValue("customerMode", "new");
                       setDuplicateEnquiries([]);
                     }}
-                    className={`px-3 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg font-semibold text-xs transition-all cursor-pointer whitespace-nowrap ${
                       formik.values.customerMode === "new"
                         ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
                         : "text-slate-500 hover:text-slate-900"
@@ -525,10 +525,10 @@ export default function NewEnquiryPage() {
             </div>
 
             {/* 2. Destination & Dates Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-emerald-600" />
+                  <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
                   <span>Travel Details & Dates</span>
                 </h3>
                 {durationString && (
@@ -596,15 +596,15 @@ export default function NewEnquiryPage() {
             </div>
 
             {/* 3. Passengers & Budget Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
               <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
-                <Users className="h-4 w-4 text-purple-600" />
+                <Users className="h-4 w-4 text-purple-600 shrink-0" />
                 <span>Passenger Count & Commercial Budget</span>
               </h3>
 
-              <div className="grid grid-cols-3 gap-3 text-xs">
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Adults (12+ yrs) *</label>
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-3 text-xs min-w-0">
+                <div className="space-y-1 min-w-0">
+                  <label className="font-bold text-slate-700 text-[10px] sm:text-xs block truncate" title="Adults (12+ yrs) *">Adults (12+ y)*</label>
                   <Input
                     type="number"
                     min={1}
@@ -612,20 +612,20 @@ export default function NewEnquiryPage() {
                     value={formik.values.adults}
                     onChange={(e) => formik.setFieldValue("adults", parseInt(e.target.value) || 0)}
                     onBlur={formik.handleBlur}
-                    className={`h-9 bg-slate-50/50 border-slate-200 text-xs font-bold ${
+                    className={`h-8.5 sm:h-9 px-2 sm:px-3 bg-slate-50/50 border-slate-200 text-xs font-bold w-full min-w-0 ${
                       getFieldError("adults")
                         ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20"
                         : ""
                     }`}
                   />
                   {getFieldError("adults") && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                    <p className="text-[10px] text-red-500 font-semibold mt-0.5 truncate">
                       {getFieldError("adults")}
                     </p>
                   )}
                 </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Children (2-11 yrs)</label>
+                <div className="space-y-1 min-w-0">
+                  <label className="font-bold text-slate-700 text-[10px] sm:text-xs block truncate" title="Children (2-11 yrs)">Children (2-11y)</label>
                   <Input
                     type="number"
                     min={0}
@@ -633,11 +633,11 @@ export default function NewEnquiryPage() {
                     value={formik.values.children}
                     onChange={(e) => formik.setFieldValue("children", parseInt(e.target.value) || 0)}
                     onBlur={formik.handleBlur}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs font-bold"
+                    className="h-8.5 sm:h-9 px-2 sm:px-3 bg-slate-50/50 border-slate-200 text-xs font-bold w-full min-w-0"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Infants (0-2 yrs)</label>
+                <div className="space-y-1 min-w-0">
+                  <label className="font-bold text-slate-700 text-[10px] sm:text-xs block truncate" title="Infants (0-2 yrs)">Infants (0-2y)</label>
                   <Input
                     type="number"
                     min={0}
@@ -645,7 +645,7 @@ export default function NewEnquiryPage() {
                     value={formik.values.infants}
                     onChange={(e) => formik.setFieldValue("infants", parseInt(e.target.value) || 0)}
                     onBlur={formik.handleBlur}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs font-bold"
+                    className="h-8.5 sm:h-9 px-2 sm:px-3 bg-slate-50/50 border-slate-200 text-xs font-bold w-full min-w-0"
                   />
                 </div>
               </div>
@@ -683,9 +683,9 @@ export default function NewEnquiryPage() {
             </div>
 
             {/* 4. Preferences & Requirements Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
               <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
-                <Settings2 className="h-4 w-4 text-amber-600" />
+                <Settings2 className="h-4 w-4 text-amber-600 shrink-0" />
                 <span>Package Preferences & Lead Source</span>
               </h3>
 
@@ -828,7 +828,7 @@ export default function NewEnquiryPage() {
             </div>
 
             {/* 5. Notes & Special Remarks Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
               <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3">
                 Special Requirements & Notes
               </h3>
@@ -874,19 +874,19 @@ export default function NewEnquiryPage() {
             </div>
 
             {/* Form Actions */}
-            <div className="flex items-center justify-between gap-4 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push("/enquiries")}
-                className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-10 px-5 cursor-pointer"
+                className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-10 px-5 cursor-pointer w-full sm:w-auto justify-center"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={formik.isSubmitting || isReadOnly}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-6 cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-6 cursor-pointer shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 w-full sm:w-auto"
               >
                 {formik.isSubmitting ? (
                   <>

@@ -287,27 +287,27 @@ function NewBookingForm() {
             <div className="max-w-3xl mx-auto w-full">
               <form onSubmit={handleSubmit} className="space-y-6">
             {/* Mode Selector */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-4">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-600" />
+                <Sparkles className="h-4 w-4 text-indigo-600 shrink-0" />
                 <span>Booking Source Type</span>
               </h3>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <button
                   type="button"
                   onClick={() => setMode("quotation")}
-                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                  className={`p-3.5 sm:p-4 rounded-xl border text-left transition-all cursor-pointer ${
                     mode === "quotation"
                       ? "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20"
                       : "border-slate-200 hover:bg-slate-50"
                   }`}
                 >
                   <div className="font-bold text-slate-900 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-indigo-600" />
-                    <span>From Quotation Proposal</span>
+                    <FileText className="h-4 w-4 text-indigo-600 shrink-0" />
+                    <span className="leading-tight">From Quotation Proposal</span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
+                  <p className="text-[11px] text-slate-500 mt-1 leading-normal">
                     Inherits accepted pricing, itinerary, travelers, and quotation snapshots.
                   </p>
                 </button>
@@ -315,17 +315,17 @@ function NewBookingForm() {
                 <button
                   type="button"
                   onClick={() => setMode("trip")}
-                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                  className={`p-3.5 sm:p-4 rounded-xl border text-left transition-all cursor-pointer ${
                     mode === "trip"
                       ? "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20"
                       : "border-slate-200 hover:bg-slate-50"
                   }`}
                 >
                   <div className="font-bold text-slate-900 flex items-center gap-2">
-                    <Compass className="h-4 w-4 text-emerald-600" />
-                    <span>Direct Trip Workspace</span>
+                    <Compass className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="leading-tight">Direct Trip Workspace</span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
+                  <p className="text-[11px] text-slate-500 mt-1 leading-normal">
                     Select a trip workspace and specify custom commercial contract amounts.
                   </p>
                 </button>
@@ -333,7 +333,7 @@ function NewBookingForm() {
             </div>
 
             {/* Source Configuration */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-4">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">
                 {mode === "quotation" ? "Select Client Proposal" : "Select Trip & Customer"}
               </h3>
@@ -377,12 +377,12 @@ function NewBookingForm() {
                   )}
 
                   {selectedQuotation && (
-                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                      <div className="flex justify-between items-center text-xs">
+                    <div className="p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                      <div className="flex flex-col min-[380px]:flex-row justify-between items-start min-[380px]:items-center gap-1 text-xs">
                         <span className="text-slate-500 font-semibold">Customer:</span>
-                        <strong className="text-slate-900">{selectedQuotation.customer?.name} ({selectedQuotation.customer?.phone})</strong>
+                        <strong className="text-slate-900 font-bold">{selectedQuotation.customer?.name} ({selectedQuotation.customer?.phone})</strong>
                       </div>
-                      <div className="flex justify-between items-center text-xs">
+                      <div className="flex flex-col min-[380px]:flex-row justify-between items-start min-[380px]:items-center gap-1 text-xs">
                         <span className="text-slate-500 font-semibold">Proposal Final Amount:</span>
                         <strong className="text-indigo-600 font-extrabold text-sm">{formatCurrency(Number(selectedQuotation.finalAmount))}</strong>
                       </div>
@@ -416,7 +416,7 @@ function NewBookingForm() {
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="font-bold text-slate-700">Total Contract Value (₹) *</label>
                       <Input
@@ -445,7 +445,7 @@ function NewBookingForm() {
             </div>
 
             {/* Notes */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-4">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">
                 Booking Remarks & Internal Notes
               </h3>

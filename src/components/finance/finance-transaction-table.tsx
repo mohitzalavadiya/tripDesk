@@ -103,27 +103,27 @@ export function FinanceTransactionTable({
 
   return (
     <Card className="border-border bg-card shadow-sm">
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              Unified Transaction Ledger
+      <CardHeader className="p-3.5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="space-y-1">
+            <CardTitle className="text-sm sm:text-base font-semibold flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary shrink-0" />
+              <span>Unified Transaction Ledger</span>
             </CardTitle>
-            <CardDescription className="text-xs">
+            <CardDescription className="text-xs leading-relaxed">
               Complete chronological audit trail of all customer collections, refunds, disbursements, and expenses.
             </CardDescription>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
             {/* Search */}
-            <div className="relative w-48 sm:w-64">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
               <Input
                 placeholder="Search number, party, ref..."
                 value={search}
                 onChange={(e) => onSearchChange(e.target.value)}
-                className="pl-9 pr-8 h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white transition-all"
+                className="pl-9 pr-8 h-9 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white transition-all w-full"
               />
               {search && (
                 <button
@@ -141,7 +141,7 @@ export function FinanceTransactionTable({
               value={selectedType}
               onValueChange={(val) => onTypeChange(val as TransactionType)}
             >
-              <SelectTrigger className="h-9.5 text-xs w-44 rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+              <SelectTrigger className="h-9 text-xs w-full sm:w-44 rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
                 <SelectValue placeholder="All">
                   {(val) => TRANSACTION_TYPE_LABELS[val] ?? "All"}
                 </SelectValue>
@@ -158,8 +158,8 @@ export function FinanceTransactionTable({
         </div>
       </CardHeader>
 
-      <CardContent>
-        <div className="border border-border rounded-lg overflow-hidden">
+      <CardContent className="p-3.5 sm:p-6 pt-0">
+        <div className="border border-border rounded-lg overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40">
@@ -254,11 +254,11 @@ export function FinanceTransactionTable({
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between pt-4 text-xs text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-4 text-xs text-muted-foreground text-center sm:text-left">
           <div>
             Showing {transactions.length} of {meta.total} transactions
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             <Button
               variant="outline"
               size="sm"

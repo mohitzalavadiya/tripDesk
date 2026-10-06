@@ -500,18 +500,18 @@ export default function AgencySubscriptionPage() {
         {/* ─── 2.5 SUBSCRIPTION USAGE METERS & FEATURE ENTITLEMENTS ──────── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Usage Meters Card (2 cols on lg) */}
-          <div className="lg:col-span-2 bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="lg:col-span-2 bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
               <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-indigo-600" />
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 shrink-0" />
                   <span>Current Billing Period Usage</span>
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Monthly resource creation counts enforced by your subscription plan.
                 </p>
               </div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-100 px-3 py-1 rounded-full">
+              <span className="self-start sm:self-auto text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-100 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full shrink-0">
                 Authoritative
               </span>
             </div>
@@ -829,15 +829,15 @@ export default function AgencySubscriptionPage() {
         </div>
 
         {/* ─── 4. PAYMENT & SUBSCRIPTION HISTORY ──────────────────────────── */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4 mt-8">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 md:p-8 shadow-xs space-y-4 mt-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
             <div>
-              <h3 className="text-base font-bold text-slate-900">Subscription Payment History</h3>
-              <p className="text-xs text-slate-500">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900">Subscription Payment History</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
                 Log of all manual UPI and Bank Transfer payment submissions for verification.
               </p>
             </div>
-            <span className="text-xs font-semibold text-slate-500 font-mono">
+            <span className="self-start sm:self-auto text-[10px] sm:text-xs font-semibold text-slate-500 font-mono bg-slate-100 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full shrink-0">
               {(data?.paymentHistory || []).length} Records
             </span>
           </div>

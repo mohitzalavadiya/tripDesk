@@ -154,13 +154,13 @@ export function HotelConfirmationDialog({
   if (!isOpen || !hotelConfirmation) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
-      <div className="bg-white border border-slate-200/90 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
+      <div className="bg-white border border-slate-200/90 rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className={`h-9 w-9 rounded-xl border flex items-center justify-center font-bold text-sm ${
+              className={`h-9 w-9 rounded-xl border flex items-center justify-center font-bold text-sm shrink-0 ${
                 mode === "CONFIRM"
                   ? "bg-emerald-50 border-emerald-200/80 text-emerald-600"
                   : mode === "REQUEST"
@@ -175,14 +175,14 @@ export function HotelConfirmationDialog({
               {mode === "AMEND" && <CalendarClock className="h-5 w-5" />}
               {mode === "CANCEL" && <AlertTriangle className="h-5 w-5" />}
             </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900">
+            <div className="min-w-0">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">
                 {mode === "REQUEST" && "Request Supplier Confirmation"}
                 {mode === "CONFIRM" && "Confirm Hotel Booking"}
                 {mode === "AMEND" && "Amend Hotel Details"}
                 {mode === "CANCEL" && "Cancel Hotel Booking"}
               </h3>
-              <p className="text-xs text-slate-500 font-medium truncate max-w-[280px]">
+              <p className="text-xs text-slate-500 font-medium truncate">
                 {hotelName} • {destination}
               </p>
             </div>
@@ -190,16 +190,16 @@ export function HotelConfirmationDialog({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Schedule & Stay Summary */}
-        <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 space-y-1.5 text-xs text-slate-600">
-          <div className="flex justify-between items-center">
-            <span className="font-semibold text-slate-500">Dates:</span>
+        <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 sm:p-3.5 space-y-1.5 text-xs text-slate-600">
+          <div className="flex flex-col min-[360px]:flex-row min-[360px]:justify-between min-[360px]:items-center gap-0.5 min-[360px]:gap-2">
+            <span className="font-semibold text-slate-500 shrink-0">Dates:</span>
             <span className="font-bold text-slate-800">
               {hotelConfirmation.checkIn
                 ? new Date(hotelConfirmation.checkIn).toLocaleDateString("en-IN", {
@@ -219,17 +219,17 @@ export function HotelConfirmationDialog({
             </span>
           </div>
 
-          <div className="flex justify-between items-center">
-            <span className="font-semibold text-slate-500">Planned Room & Meal:</span>
+          <div className="flex flex-col min-[360px]:flex-row min-[360px]:justify-between min-[360px]:items-center gap-0.5 min-[360px]:gap-2">
+            <span className="font-semibold text-slate-500 shrink-0">Planned Room & Meal:</span>
             <span className="font-bold text-slate-800">
               {plannedRoom} ({plannedMeal})
             </span>
           </div>
 
           {hotelConfirmation.supplier && (
-            <div className="flex justify-between items-center pt-1 border-t border-slate-200/60">
-              <span className="font-semibold text-slate-500">Supplier:</span>
-              <span className="font-semibold text-indigo-600">
+            <div className="flex flex-col min-[360px]:flex-row min-[360px]:justify-between min-[360px]:items-center gap-0.5 min-[360px]:gap-2 pt-1 border-t border-slate-200/60">
+              <span className="font-semibold text-slate-500 shrink-0">Supplier:</span>
+              <span className="font-semibold text-indigo-600 truncate">
                 {hotelConfirmation.supplier.name}
               </span>
             </div>
@@ -238,7 +238,7 @@ export function HotelConfirmationDialog({
 
         {/* Cancellation Alert Warning */}
         {mode === "CANCEL" && (
-          <div className="bg-rose-50 border border-rose-200/80 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-rose-800">
+          <div className="bg-rose-50 border border-rose-200/80 rounded-xl p-3 sm:p-3.5 flex items-start gap-2.5 text-xs text-rose-800">
             <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold block">
@@ -252,7 +252,7 @@ export function HotelConfirmationDialog({
         )}
 
         {/* Form */}
-        <form onSubmit={formik.handleSubmit} className="space-y-4">
+        <form onSubmit={formik.handleSubmit} className="space-y-3.5 sm:space-y-4">
           {/* Confirmation Number / Voucher */}
           {(mode === "CONFIRM" || mode === "AMEND") && (
             <div className="space-y-1.5">
@@ -272,7 +272,7 @@ export function HotelConfirmationDialog({
 
           {/* Room Details & Meal Plan in Edit / Amend Modes */}
           {(mode === "CONFIRM" || mode === "AMEND") && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Room Details / Category</label>
                 <Input
@@ -326,13 +326,13 @@ export function HotelConfirmationDialog({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-2.5 pt-3 border-t border-slate-100">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
               disabled={loading}
-              className="text-xs font-semibold h-9 px-4 cursor-pointer"
+              className="text-xs font-semibold h-9 px-4 cursor-pointer w-full sm:w-auto justify-center"
             >
               Back / Cancel
             </Button>
@@ -340,7 +340,7 @@ export function HotelConfirmationDialog({
             <Button
               type="submit"
               disabled={loading}
-              className={`text-white text-xs font-bold h-9 px-5 cursor-pointer shadow-xs ${
+              className={`text-white text-xs font-bold h-9 px-5 cursor-pointer shadow-xs w-full sm:w-auto justify-center ${
                 mode === "CONFIRM"
                   ? "bg-emerald-600 hover:bg-emerald-700"
                   : mode === "REQUEST"

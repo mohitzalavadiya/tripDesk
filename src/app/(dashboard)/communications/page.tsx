@@ -530,32 +530,32 @@ export default function CommunicationsPage() {
         />
 
         {/* ─── NAVIGATION TABS ────────────────────────────────────────────── */}
-        <div className="flex items-center gap-2 border-b border-slate-200">
+        <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto no-scrollbar scrollbar-none flex-nowrap pb-px">
           <button
             onClick={() => setActiveTab("notifications")}
-            className={`px-4 py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            className={`px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === "notifications"
                 ? "border-indigo-600 text-indigo-600 bg-indigo-50/30 rounded-t-lg"
                 : "border-transparent text-slate-500 hover:text-slate-900"
             }`}
           >
-            <Bell className="h-4 w-4" />
+            <Bell className="h-4 w-4 shrink-0" />
             System Notifications
             {notifUnreadCount > 0 && (
-              <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full ml-1">
+              <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full ml-1 shrink-0">
                 {notifUnreadCount} new
               </span>
             )}
           </button>
           <button
             onClick={() => setActiveTab("outbound")}
-            className={`px-4 py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            className={`px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === "outbound"
                 ? "border-indigo-600 text-indigo-600 bg-indigo-50/30 rounded-t-lg"
                 : "border-transparent text-slate-500 hover:text-slate-900"
             }`}
           >
-            <MessageSquare className="h-4 w-4" />
+            <MessageSquare className="h-4 w-4 shrink-0" />
             Outbound Communications
           </button>
         </div>
@@ -721,22 +721,22 @@ export default function CommunicationsPage() {
 
               {/* Notification Pagination Bar */}
               {notifTotalPages > 1 && (
-                <div className="p-4 border-t border-slate-100 flex items-center justify-between">
+                <div className="p-3 sm:p-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <span className="text-xs text-slate-500 font-medium">
                     Showing {(notifPage - 1) * notifLimit + 1} to{" "}
                     {Math.min(notifPage * notifLimit, notifTotal)} of {notifTotal} notifications
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 self-end sm:self-auto shrink-0 whitespace-nowrap">
                     <Button
                       variant="outline"
                       size="sm"
                       disabled={notifPage <= 1 || notifLoading}
                       onClick={() => setNotifPage((prev) => Math.max(1, prev - 1))}
-                      className="h-8 px-2.5 rounded-xl text-xs"
+                      className="h-8 px-2.5 rounded-xl text-xs shrink-0 cursor-pointer"
                     >
                       <ChevronLeft className="h-3.5 w-3.5" />
                     </Button>
-                    <span className="text-xs font-bold text-slate-700 px-2">
+                    <span className="text-xs font-bold text-slate-700 px-2 shrink-0 whitespace-nowrap">
                       {notifPage} / {notifTotalPages}
                     </span>
                     <Button
@@ -744,7 +744,7 @@ export default function CommunicationsPage() {
                       size="sm"
                       disabled={notifPage >= notifTotalPages || notifLoading}
                       onClick={() => setNotifPage((prev) => Math.min(notifTotalPages, prev + 1))}
-                      className="h-8 px-2.5 rounded-xl text-xs"
+                      className="h-8 px-2.5 rounded-xl text-xs shrink-0 cursor-pointer"
                     >
                       <ChevronRight className="h-3.5 w-3.5" />
                     </Button>
@@ -931,10 +931,10 @@ export default function CommunicationsPage() {
 
             {/* COMMUNICATION HISTORY LEDGER TABLE */}
             <div className="bg-white border border-slate-200/90 rounded-2xl shadow-2xs overflow-hidden">
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="p-3 sm:p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-sm font-extrabold text-slate-900">Communication Ledger</h2>
-                  <Badge variant="outline" className="text-[10px] font-bold">
+                  <Badge variant="outline" className="text-[10px] font-bold shrink-0">
                     {totalLogs} Record{totalLogs !== 1 ? "s" : ""}
                   </Badge>
                 </div>
@@ -943,7 +943,7 @@ export default function CommunicationsPage() {
                   variant="ghost"
                   size="sm"
                   onClick={fetchCommunications}
-                  className="h-8 text-xs text-slate-500 hover:text-slate-900"
+                  className="h-8 text-xs text-slate-500 hover:text-slate-900 px-2.5 shrink-0 cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? "animate-spin text-indigo-600" : ""}`} />
                   Refresh
@@ -1075,22 +1075,22 @@ export default function CommunicationsPage() {
 
               {/* Outbound Pagination Bar */}
               {totalPages > 1 && (
-                <div className="p-4 border-t border-slate-100 flex items-center justify-between">
+                <div className="p-3 sm:p-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <span className="text-xs text-slate-500 font-medium">
                     Showing {(page - 1) * limit + 1} to{" "}
                     {Math.min(page * limit, totalLogs)} of {totalLogs} dispatches
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 self-end sm:self-auto shrink-0 whitespace-nowrap">
                     <Button
                       variant="outline"
                       size="sm"
                       disabled={page <= 1 || loading}
                       onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                      className="h-8 px-2.5 rounded-xl text-xs"
+                      className="h-8 px-2.5 rounded-xl text-xs shrink-0 cursor-pointer"
                     >
                       <ChevronLeft className="h-3.5 w-3.5" />
                     </Button>
-                    <span className="text-xs font-bold text-slate-700 px-2">
+                    <span className="text-xs font-bold text-slate-700 px-2 shrink-0 whitespace-nowrap">
                       {page} / {totalPages}
                     </span>
                     <Button
@@ -1098,7 +1098,7 @@ export default function CommunicationsPage() {
                       size="sm"
                       disabled={page >= totalPages || loading}
                       onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                      className="h-8 px-2.5 rounded-xl text-xs"
+                      className="h-8 px-2.5 rounded-xl text-xs shrink-0 cursor-pointer"
                     >
                       <ChevronRight className="h-3.5 w-3.5" />
                     </Button>

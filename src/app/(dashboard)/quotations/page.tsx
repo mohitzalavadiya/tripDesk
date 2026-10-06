@@ -277,24 +277,24 @@ export default function QuotationsPage() {
         {isReadOnly && <ReadOnlyBanner moduleName="Quotations & Proposals" />}
 
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
           {/* Left Title & Telemetry */}
-          <div className="space-y-3 z-10">
-            <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
-                <FileText className="h-3 w-3 text-indigo-500" />
+          <div className="space-y-3 z-10 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0 whitespace-nowrap">
+                <FileText className="h-3 w-3 text-indigo-500 shrink-0" />
                 Commercial Proposals
               </span>
-              <span className="text-slate-300">•</span>
-              <span className="text-xs font-semibold text-slate-500">
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
                 {pagination.total} proposals generated
               </span>
             </div>
 
             <div className="flex flex-wrap items-baseline gap-3">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900">
                 Quotations & Proposals
               </h1>
               <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
@@ -331,13 +331,13 @@ export default function QuotationsPage() {
           </div>
 
           {/* Right Action Controls */}
-          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
+          <div className="flex items-center gap-3 z-10 w-full sm:w-auto lg:self-center">
             <Button
               onClick={handleGenerateQuotation}
               disabled={isReadOnly}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 shrink-0" />
               Generate from Trip
             </Button>
           </div>
@@ -346,7 +346,7 @@ export default function QuotationsPage() {
         {/* Master Card (Filter Bar + Table) */}
         <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
           {/* Search Toolbar */}
-          <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
+          <div className="p-3.5 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="relative flex-1 max-w-2xl">
                 <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />

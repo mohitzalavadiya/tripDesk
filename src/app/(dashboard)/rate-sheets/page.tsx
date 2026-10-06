@@ -243,17 +243,15 @@ export default function RateSheetsPage() {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
         {/* Read-Only Banner */}
-        {isReadOnly && <ReadOnlyBanner moduleName="Rate Sheets" />}
-
-        {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        {isReadOnly && <ReadOnlyBanner moduleName="Rate Sheets" />}        {/* Top Hero Command Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-purple-50/70 via-purple-50/20 to-transparent pointer-events-none" />
 
           {/* Title & Info */}
           <div className="space-y-2 z-10">
-            <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-purple-50 text-purple-700 border border-purple-100">
-                <Sparkles className="h-3 w-3 text-purple-500" />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-purple-50 text-purple-700 border border-purple-100 shrink-0 whitespace-nowrap">
+                <Sparkles className="h-3 w-3 text-purple-500 shrink-0" />
                 Commercial Tariffs
               </span>
               <span className="text-slate-300">•</span>
@@ -273,7 +271,7 @@ export default function RateSheetsPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2.5 z-10 self-start lg:self-center">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 z-10 self-stretch sm:self-start lg:self-center w-full lg:w-auto">
             <Button
               variant="outline"
               size="sm"
@@ -289,65 +287,71 @@ export default function RateSheetsPage() {
                 }
               }}
               disabled={downloadingSample}
-              className="bg-white border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs h-9.5 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all"
+              className="w-full sm:w-auto justify-center bg-white border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs h-9 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all shrink-0"
             >
               {downloadingSample ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Download className="h-3.5 w-3.5 text-slate-500" />
               )}
-              Download Sample
+              <span>Download Sample</span>
             </Button>
 
             <Button
               variant="outline"
               size="sm"
               onClick={handleImportExcel}
-              className="bg-white border-indigo-200 hover:bg-indigo-50 text-indigo-700 font-semibold text-xs h-9.5 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              className="w-full sm:w-auto justify-center bg-white border-indigo-200 hover:bg-indigo-50 text-indigo-700 font-semibold text-xs h-9 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all disabled:opacity-50 shrink-0"
             >
               <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
-              Import Excel
+              <span>Import Excel</span>
             </Button>
 
             <Button
               onClick={handleAddRateSheet}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50 shrink-0"
             >
               <Plus className="h-4 w-4" />
-              Add Rate Sheet
+              <span>Add Rate Sheet</span>
             </Button>
           </div>
         </div>
 
         {/* KPI Telemetry Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-              <Sparkles className="h-5 w-5" />
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold shrink-0">
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Total Tariffs</span>
-              <h4 className="text-lg font-black text-slate-900">{totalRates}</h4>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Active Status</span>
-              <h4 className="text-lg font-black text-emerald-700">{activeRates}</h4>
+            <div className="min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate block">
+                Total Tariffs
+              </span>
+              <h4 className="text-base sm:text-lg font-black text-slate-900 truncate">{totalRates}</h4>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-              <Hotel className="h-5 w-5" />
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Hotel Rates</span>
-              <h4 className="text-lg font-black text-slate-900">{hotelTariffs}</h4>
+            <div className="min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate block">
+                Active Status
+              </span>
+              <h4 className="text-base sm:text-lg font-black text-emerald-700 truncate">{activeRates}</h4>
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3 min-w-0 col-span-1 min-[380px]:col-span-2 lg:col-span-1">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
+              <Hotel className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate block">
+                Hotel Rates
+              </span>
+              <h4 className="text-base sm:text-lg font-black text-slate-900 truncate">{hotelTariffs}</h4>
             </div>
           </div>
         </div>
@@ -355,12 +359,12 @@ export default function RateSheetsPage() {
         {/* Master Card (Search & Table) */}
         <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
           {/* Search Toolbar */}
-          <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
+          <div className="p-3.5 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="relative flex-1 max-w-xl">
                 <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search by rate #, tariff name, inventory item, room type, season, supplier..."
+                  placeholder="Search by rate #, tariff name, inventory item..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all"
@@ -374,8 +378,6 @@ export default function RateSheetsPage() {
                   </button>
                 )}
               </div>
-
-
 
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold cursor-pointer">

@@ -162,17 +162,17 @@ export function ExcelImportModal({
   const rows = previewResult?.rows || [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 w-full max-w-4xl max-h-[94vh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-indigo-600 shrink-0 shadow-2xs">
-              <FileSpreadsheet className="h-5 w-5" />
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-indigo-600 shrink-0 shadow-2xs">
+              <FileSpreadsheet className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-900 leading-snug">{title}</h2>
-              <p className="text-xs text-slate-500">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 leading-snug truncate">{title}</h2>
+              <p className="text-[11px] sm:text-xs text-slate-500 truncate">
                 Step {step} of 3:{" "}
                 {step === 1 ? "Upload & Options" : step === 2 ? "Preview & Validation" : "Import Results"}
               </p>
@@ -180,25 +180,25 @@ export function ExcelImportModal({
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer shrink-0 ml-1"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+        <div className="p-3.5 sm:p-6 overflow-y-auto flex-1 space-y-4 sm:space-y-6">
           {/* STEP 1: Upload & Mode Selection */}
           {step === 1 && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Sample Download Banner */}
-              <div className="p-4.5 rounded-xl bg-indigo-50/60 border border-indigo-100/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
-                <div className="space-y-1">
+              <div className="p-3.5 sm:p-4.5 rounded-xl bg-indigo-50/60 border border-indigo-100/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1 min-w-0">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-900">
                     <Info className="h-4 w-4 text-indigo-600 shrink-0" />
                     Need the formatted Excel template?
                   </div>
-                  <p className="text-xs text-indigo-700/90">
+                  <p className="text-[11px] sm:text-xs text-indigo-700/90 leading-relaxed">
                     Download the pre-structured sample file with instructions and required column formats.
                   </p>
                 </div>
@@ -208,7 +208,7 @@ export function ExcelImportModal({
                   size="sm"
                   onClick={handleDownloadSample}
                   disabled={downloadingSample}
-                  className="bg-white border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold text-xs shrink-0 cursor-pointer shadow-2xs"
+                  className="w-full sm:w-auto justify-center bg-white border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold text-xs shrink-0 cursor-pointer shadow-2xs h-8 sm:h-9"
                 >
                   {downloadingSample ? (
                     <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -220,34 +220,34 @@ export function ExcelImportModal({
               </div>
 
               {/* Drag & Drop File Picker */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              <div className="space-y-1.5 sm:space-y-2">
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                   Select Excel File (.xlsx)
                 </label>
-                <div className="relative border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl p-8 text-center bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer group">
+                <div className="relative border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl p-4 sm:p-8 text-center bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer group">
                   <input
                     type="file"
                     accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     onChange={handleFileChange}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
-                  <div className="flex flex-col items-center justify-center space-y-3">
-                    <div className="h-12 w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:border-indigo-200 shadow-2xs transition-colors">
-                      <UploadCloud className="h-6 w-6" />
+                  <div className="flex flex-col items-center justify-center space-y-2.5 sm:space-y-3">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:border-indigo-200 shadow-2xs transition-colors">
+                      <UploadCloud className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
                     {selectedFile ? (
-                      <div className="space-y-1">
-                        <p className="text-sm font-bold text-slate-900">{selectedFile.name}</p>
-                        <p className="text-xs text-slate-500">
+                      <div className="space-y-1 max-w-full px-2">
+                        <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">{selectedFile.name}</p>
+                        <p className="text-[11px] sm:text-xs text-slate-500">
                           {(selectedFile.size / 1024).toFixed(1)} KB • Click to choose a different file
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-1">
+                      <div className="space-y-0.5 sm:space-y-1 max-w-full px-2">
                         <p className="text-xs font-bold text-slate-800">
                           Click to browse or drag & drop your Excel file
                         </p>
-                        <p className="text-[11px] text-slate-500">
+                        <p className="text-[10px] sm:text-[11px] text-slate-500">
                           Microsoft Excel (.xlsx) up to 5 MB (Max 1,000 rows)
                         </p>
                       </div>
@@ -257,11 +257,11 @@ export function ExcelImportModal({
               </div>
 
               {/* Duplicate Handling Mode */}
-              <div className="space-y-2.5">
-                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                   Duplicate Matching Action
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                   {[
                     {
                       id: "SKIP",
@@ -282,7 +282,7 @@ export function ExcelImportModal({
                     <div
                       key={opt.id}
                       onClick={() => setMode(opt.id as ImportMode)}
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                      className={`p-3 rounded-xl border cursor-pointer transition-all ${
                         mode === opt.id
                           ? "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20"
                           : "border-slate-200 bg-white hover:border-slate-300"
@@ -298,7 +298,7 @@ export function ExcelImportModal({
                         />
                         <span className="text-xs font-bold text-slate-900">{opt.title}</span>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-1 pl-5.5 leading-relaxed">
+                      <p className="text-[10px] sm:text-[11px] text-slate-500 mt-1 pl-5.5 leading-relaxed">
                         {opt.desc}
                       </p>
                     </div>

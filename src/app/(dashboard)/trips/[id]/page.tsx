@@ -1255,93 +1255,93 @@ export default function TripDetailPage() {
         {isReadOnly && <ReadOnlyBanner moduleName="Trip Workspace" />}
 
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
           {/* Left Title & Telemetry */}
-          <div className="space-y-3 z-10">
-            <div className="flex items-center gap-2.5">
+          <div className="space-y-3 z-10 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/trips"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shrink-0"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
               </Link>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
-                <Compass className="h-3 w-3 text-indigo-500" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0 whitespace-nowrap">
+                <Compass className="h-3 w-3 text-indigo-500 shrink-0" />
                 Trip Workspace
               </span>
-              <span className="text-slate-300">•</span>
+              <span className="text-slate-300 hidden xs:inline">•</span>
               <TripStatusBadge status={trip.status} />
             </div>
 
-            <div className="flex flex-wrap items-baseline gap-3">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            <div className="flex flex-wrap items-baseline gap-2.5">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900 leading-tight">
                 {trip.title}
               </h1>
-              <span className="text-xs font-semibold text-slate-500">
+              <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
                 {duration} Days Trip
               </span>
             </div>
 
             {/* Micro details */}
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-              <span className="flex items-center gap-1 font-medium">
-                <Calendar className="h-3.5 w-3.5 text-slate-400" />
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-600">
+              <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+                <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 {formatDateDisplay(trip.startDate)} – {formatDateDisplay(trip.endDate)}
               </span>
-              <span className="text-slate-300">•</span>
-              <span className="flex items-center gap-1 font-medium">
-                <MapPin className="h-3.5 w-3.5 text-slate-400" />
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+                <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 {tripDestinations.length} {tripDestinations.length === 1 ? "Destination" : "Destinations"}
               </span>
-              <span className="text-slate-300">•</span>
-              <span className="flex items-center gap-1 font-medium">
-                <Users className="h-3.5 w-3.5 text-slate-400" />
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+                <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 {travelers.length} Travelers
               </span>
-              <span className="text-slate-300">•</span>
-              <span className="flex items-center gap-1 font-medium">
-                <Building2 className="h-3.5 w-3.5 text-slate-400" />
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+                <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 {tripHotels.length} Hotels
               </span>
-              <span className="text-slate-300">•</span>
-              <span className="flex items-center gap-1 font-medium">
-                <Car className="h-3.5 w-3.5 text-slate-400" />
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+                <Car className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 {tripVehicles.length} Vehicles
               </span>
-              <span className="text-slate-300">•</span>
-              <span className="flex items-center gap-1 font-medium">
-                <Ticket className="h-3.5 w-3.5 text-slate-400" />
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+                <Ticket className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 {tripActivities.length} Activities
               </span>
             </div>
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2.5 z-10">
+          <div className="flex items-center gap-2 flex-wrap z-10 w-full sm:w-auto">
             {trip.status === TripStatus.COMPLETED && (
               <Button
                 variant="outline"
                 size="sm"
                 disabled={isGeneratingFeedbackLink}
                 onClick={handleCopyFeedbackLink}
-                className="bg-amber-50 hover:bg-amber-100/80 border-amber-200 text-amber-900 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
+                className="flex-1 xs:flex-initial bg-amber-50 hover:bg-amber-100/80 border-amber-200 text-amber-900 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer justify-center whitespace-nowrap"
                 title="Copy Customer Feedback Link"
               >
                 {isGeneratingFeedbackLink ? (
                   <>
-                    <Loader2 className="h-3.5 w-3.5 mr-1 text-amber-600 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 mr-1 text-amber-600 animate-spin shrink-0" />
                     Generating...
                   </>
                 ) : copiedFeedbackLink ? (
                   <>
-                    <Check className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                    <Check className="h-3.5 w-3.5 mr-1 text-emerald-600 shrink-0" />
                     Copied!
                   </>
                 ) : (
                   <>
-                    <MessageSquare className="h-3.5 w-3.5 mr-1 text-amber-600" />
+                    <MessageSquare className="h-3.5 w-3.5 mr-1 text-amber-600 shrink-0" />
                     {activeShareLink ? "Feedback Link" : "Get Feedback Link"}
                   </>
                 )}
@@ -1352,18 +1352,18 @@ export default function TripDetailPage() {
               size="sm"
               disabled={isReadOnly}
               onClick={() => setIsEditOpen(true)}
-              className="bg-white hover:bg-slate-50 border-slate-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer disabled:opacity-50"
+              className="flex-1 xs:flex-initial bg-white hover:bg-slate-50 border-slate-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer disabled:opacity-50 justify-center whitespace-nowrap"
             >
-              <Edit2 className="h-3.5 w-3.5 mr-1 text-slate-400" /> Edit Trip
+              <Edit2 className="h-3.5 w-3.5 mr-1 text-slate-400 shrink-0" /> Edit Trip
             </Button>
             <Button
               variant="outline"
               size="sm"
               disabled={isReadOnly || isArchiving}
               onClick={handleArchiveTrip}
-              className="bg-white hover:bg-rose-50 border-slate-200 text-rose-600 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer disabled:opacity-50"
+              className="flex-1 xs:flex-initial bg-white hover:bg-rose-50 border-slate-200 text-rose-600 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer disabled:opacity-50 justify-center whitespace-nowrap"
             >
-              <Archive className="h-3.5 w-3.5 mr-1 text-rose-500" />
+              <Archive className="h-3.5 w-3.5 mr-1 text-rose-500 shrink-0" />
               {isArchiving ? "Archiving..." : "Archive"}
             </Button>
           </div>
@@ -1415,7 +1415,7 @@ export default function TripDetailPage() {
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-150">
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-4">
+              <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-4">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3">
                   Trip Profile Details
                 </h3>
@@ -1428,7 +1428,7 @@ export default function TripDetailPage() {
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[11px]">Customer Email</span>
-                    <span className="font-semibold text-slate-800">{trip.customer?.email || "No email registered"}</span>
+                    <span className="font-semibold text-slate-800 break-all">{trip.customer?.email || "No email registered"}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[11px]">Destinations</span>
@@ -1461,13 +1461,13 @@ export default function TripDetailPage() {
               </div>
 
               {/* Customer Feedback & Review Link (Phase 209) */}
-              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4">
+              <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-lg bg-amber-50 text-amber-600 border border-amber-100">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="p-2 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 shrink-0">
                       <MessageSquare className="h-4 w-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                         Customer Feedback & Review Link
                       </h3>
@@ -1481,13 +1481,13 @@ export default function TripDetailPage() {
 
                   {/* Submission Status Badge */}
                   {trip.status === TripStatus.COMPLETED && (
-                    <div>
+                    <div className="shrink-0">
                       {trip.feedbacks && trip.feedbacks.length > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 whitespace-nowrap">
                           <Check className="h-3 w-3" /> Feedback Received ({trip.feedbacks[0].rating}/5 ★)
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0 whitespace-nowrap">
                           Pending Response
                         </span>
                       )}
@@ -1497,37 +1497,37 @@ export default function TripDetailPage() {
 
                 {trip.status === TripStatus.COMPLETED ? (
                   <div className="space-y-3">
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                      <div className="flex-1 flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-600 truncate">
-                        <span className="truncate">
+                    <div className="flex flex-col gap-2.5">
+                      <div className="w-full flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-600 min-w-0 overflow-hidden">
+                        <span className="truncate block">
                           {getTripFeedbackUrl() ||
                             (isGeneratingFeedbackLink
                               ? "Generating secure link..."
                               : "Click 'Get Feedback Link' to generate customer feedback link.")}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-col xs:flex-row sm:flex-row items-stretch sm:items-center gap-2 w-full">
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           disabled={isGeneratingFeedbackLink}
                           onClick={handleCopyFeedbackLink}
-                          className="flex-1 sm:flex-initial h-9 text-xs font-semibold bg-white hover:bg-slate-50 border-slate-200 cursor-pointer"
+                          className="w-full xs:flex-1 sm:w-auto h-9 text-xs font-semibold bg-white hover:bg-slate-50 border-slate-200 cursor-pointer justify-center whitespace-nowrap"
                         >
                           {isGeneratingFeedbackLink ? (
                             <>
-                              <Loader2 className="h-3.5 w-3.5 mr-1.5 text-slate-500 animate-spin" />
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 text-slate-500 animate-spin shrink-0" />
                               Generating...
                             </>
                           ) : copiedFeedbackLink ? (
                             <>
-                              <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-600" />
+                              <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-600 shrink-0" />
                               Copied!
                             </>
                           ) : (
                             <>
-                              <Copy className="h-3.5 w-3.5 mr-1.5 text-slate-500" />
+                              <Copy className="h-3.5 w-3.5 mr-1.5 text-slate-500 shrink-0" />
                               {activeShareLink ? "Copy Feedback Link" : "Get Feedback Link"}
                             </>
                           )}
@@ -1537,9 +1537,9 @@ export default function TripDetailPage() {
                             href={getTripFeedbackUrl()}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center flex-1 sm:flex-initial h-9 px-3 text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-slate-700 shadow-2xs transition-colors cursor-pointer"
+                            className="inline-flex items-center justify-center w-full xs:flex-1 sm:w-auto h-9 px-3 text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-slate-700 shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
                           >
-                            <ExternalLink className="h-3.5 w-3.5 mr-1.5 text-slate-500" />
+                            <ExternalLink className="h-3.5 w-3.5 mr-1.5 text-slate-500 shrink-0" />
                             Open Link
                           </a>
                         )}
@@ -1652,8 +1652,8 @@ export default function TripDetailPage() {
         {/* TAB 2: TRAVELERS */}
         {activeTab === "travelers" && (
           <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
-            <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
                 <h3 className="font-bold text-slate-900 text-sm">Travelers & Passenger Manifest</h3>
                 <p className="text-xs text-slate-500">
                   Manage passenger profiles, contact information, and travel demographics.
@@ -1663,9 +1663,9 @@ export default function TripDetailPage() {
               <Button
                 onClick={handleOpenAddTraveler}
                 disabled={isReadOnly}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50"
+                className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
               >
-                <UserPlus className="h-3.5 w-3.5 mr-1" /> Add Traveler
+                <UserPlus className="h-3.5 w-3.5 mr-1 shrink-0" /> Add Traveler
               </Button>
             </div>
 
@@ -1680,28 +1680,28 @@ export default function TripDetailPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {travelers.map((t) => (
-                  <div key={t.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3 hover:shadow-xs transition-all">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className="h-9 w-9 rounded-full bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center border border-indigo-100">
+                  <div key={t.id} className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3 hover:shadow-xs transition-all">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="h-9 w-9 rounded-full bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center border border-indigo-100 shrink-0">
                           {t.name.slice(0, 2).toUpperCase()}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <h4 className="font-bold text-slate-900 text-xs">{t.name}</h4>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="font-bold text-slate-900 text-xs leading-snug break-words">{t.name}</h4>
                             {t.isPrimary && (
-                              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 shrink-0 whitespace-nowrap">
                                 Primary
                               </span>
                             )}
                           </div>
-                          <span className="text-[11px] text-slate-500 capitalize">
+                          <span className="text-[11px] text-slate-500 capitalize block truncate">
                             {t.type.toLowerCase()} {t.gender ? `• ${formatEnumLabel(t.gender)}` : ""} {t.nationality ? `• ${t.nationality}` : ""}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => handleOpenEditTraveler(t)}
                           disabled={isReadOnly}
@@ -1723,15 +1723,15 @@ export default function TripDetailPage() {
 
                     <div className="space-y-1 text-xs text-slate-600 border-t border-slate-100 pt-2.5">
                       {t.phone && (
-                        <div className="flex items-center gap-1.5">
-                          <Phone className="h-3 w-3 text-slate-400" />
-                          <span>{t.phone}</span>
+                        <div className="flex items-center gap-1.5 truncate">
+                          <Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{t.phone}</span>
                         </div>
                       )}
                       {t.email && (
-                        <div className="flex items-center gap-1.5">
-                          <Mail className="h-3 w-3 text-slate-400" />
-                          <span>{t.email}</span>
+                        <div className="flex items-center gap-1.5 truncate">
+                          <Mail className="h-3 w-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{t.email}</span>
                         </div>
                       )}
                     </div>
@@ -1745,8 +1745,8 @@ export default function TripDetailPage() {
         {/* TAB 3: ITINERARY */}
         {activeTab === "itinerary" && (
           <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
-            <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
                 <h3 className="font-bold text-slate-900 text-sm">Day-by-Day Itinerary Builder</h3>
                 <p className="text-xs text-slate-500">
                   Dates: {formatDateDisplay(trip.startDate)} to {formatDateDisplay(trip.endDate)} ({duration} Days)
@@ -1756,9 +1756,9 @@ export default function TripDetailPage() {
               <Button
                 onClick={handleOpenAddItem}
                 disabled={isReadOnly}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50"
+                className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Day
+                <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> Add Day
               </Button>
             </div>
 
@@ -1775,25 +1775,25 @@ export default function TripDetailPage() {
                 {itineraryItems.map((item) => (
                   <div
                     key={item.id}
-                    className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-3 hover:shadow-xs transition-all"
+                    className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3 hover:shadow-xs transition-all"
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md uppercase">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2.5">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md uppercase shrink-0 whitespace-nowrap">
                             Day {item.dayNumber}
                           </span>
-                          <h4 className="font-bold text-slate-900 text-sm">{item.title}</h4>
+                          <h4 className="font-bold text-slate-900 text-sm leading-snug break-words">{item.title}</h4>
                         </div>
                         {item.date && (
                           <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
-                            <Calendar className="h-3 w-3 text-slate-400" />
+                            <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
                             {formatDateDisplay(item.date)}
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => handleOpenEditItem(item)}
                           disabled={isReadOnly}
@@ -1812,13 +1812,13 @@ export default function TripDetailPage() {
                     </div>
 
                     {item.description && (
-                      <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                      <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-words">
                         {item.description}
                       </p>
                     )}
 
                     {(item.location || item.startTime || item.endTime) && (
-                      <div className="flex flex-wrap gap-3 text-xs text-slate-500 pt-1">
+                      <div className="flex flex-wrap gap-2 sm:gap-3 text-xs text-slate-500 pt-1">
                         {item.location && (
                           <span>Location: <strong className="text-slate-800">{item.location}</strong></span>
                         )}
@@ -1837,8 +1837,8 @@ export default function TripDetailPage() {
         {/* TAB 4: HOTELS (Real PostgreSQL Trip-Hotel Integration) */}
         {activeTab === "hotels" && (
           <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
-            <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
                 <h3 className="font-bold text-slate-900 text-sm">Accommodation & Hotel Reservations</h3>
                 <p className="text-xs text-slate-500">
                   Assign contracted agency hotels, room categories, check-in dates, and meal plans.
@@ -1848,9 +1848,9 @@ export default function TripDetailPage() {
               <Button
                 onClick={handleOpenAddHotel}
                 disabled={isReadOnly}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50"
+                className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Hotel
+                <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> Add Hotel
               </Button>
             </div>
 
@@ -1867,28 +1867,28 @@ export default function TripDetailPage() {
                 {tripHotels.map((th) => (
                   <div
                     key={th.id}
-                    className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-3 hover:shadow-xs transition-all"
+                    className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3 hover:shadow-xs transition-all"
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2">
-                      <div className="space-y-0.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2.5">
+                      <div className="space-y-0.5 min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md uppercase">
+                          <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md uppercase shrink-0 whitespace-nowrap">
                             {th.roomType}
                           </span>
-                          <h4 className="font-bold text-slate-900 text-sm">{th.hotel?.name || "Contracted Hotel"}</h4>
+                          <h4 className="font-bold text-slate-900 text-sm leading-snug break-words">{th.hotel?.name || "Contracted Hotel"}</h4>
                           {th.tripDestination && (
-                            <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
-                              <MapPin className="h-2.5 w-2.5" /> Leg {th.tripDestination.sequence}: {th.tripDestination.destination?.name}
+                            <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0 whitespace-nowrap">
+                              <MapPin className="h-2.5 w-2.5 shrink-0" /> Leg {th.tripDestination.sequence}: {th.tripDestination.destination?.name}
                             </span>
                           )}
                         </div>
                         <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
-                          <Calendar className="h-3 w-3 text-slate-400" />
+                          <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
                           Check-in: {formatDateDisplay(th.checkIn)} → Check-out: {formatDateDisplay(th.checkOut)}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => handleOpenEditHotel(th)}
                           disabled={isReadOnly}
@@ -1932,7 +1932,7 @@ export default function TripDetailPage() {
                     </div>
 
                     {th.notes && (
-                      <p className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <p className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100 break-words">
                         {th.notes}
                       </p>
                     )}
@@ -1946,8 +1946,8 @@ export default function TripDetailPage() {
         {/* TAB 5: VEHICLES (Real PostgreSQL Trip-Vehicle Integration) */}
         {activeTab === "vehicles" && (
           <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
-            <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
                 <h3 className="font-bold text-slate-900 text-sm">Transportation & Vehicle Assignments</h3>
                 <p className="text-xs text-slate-500">
                   Assign fleet units, sedans, SUVs, and tempo travellers with driver arrangements.
@@ -1957,9 +1957,9 @@ export default function TripDetailPage() {
               <Button
                 onClick={handleOpenAddVehicle}
                 disabled={isReadOnly}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50"
+                className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Vehicle
+                <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> Add Vehicle
               </Button>
             </div>
 
@@ -1976,28 +1976,28 @@ export default function TripDetailPage() {
                 {tripVehicles.map((tv) => (
                   <div
                     key={tv.id}
-                    className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-3 hover:shadow-xs transition-all"
+                    className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3 hover:shadow-xs transition-all"
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md uppercase">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2.5">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md uppercase shrink-0 whitespace-nowrap">
                             {tv.vehicleType}
                           </span>
-                          <h4 className="font-bold text-slate-900 text-sm">{tv.vehicleName}</h4>
+                          <h4 className="font-bold text-slate-900 text-sm leading-snug break-words">{tv.vehicleName}</h4>
                           {tv.capacity && (
-                            <span className="text-[11px] text-slate-500">({tv.capacity} Seats)</span>
+                            <span className="text-[11px] text-slate-500 shrink-0 whitespace-nowrap">({tv.capacity} Seats)</span>
                           )}
                         </div>
                         {(tv.startDate || tv.endDate) && (
                           <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
-                            <Calendar className="h-3 w-3 text-slate-400" />
+                            <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
                             {formatDateDisplay(tv.startDate)} → {formatDateDisplay(tv.endDate)}
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => handleOpenEditVehicle(tv)}
                           disabled={isReadOnly}
@@ -2051,17 +2051,17 @@ export default function TripDetailPage() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs text-slate-600 pt-1 border-t border-slate-100">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 text-xs text-slate-600 pt-1 border-t border-slate-100">
                       {tv.pickupLocation && (
                         <div>
                           <span className="text-slate-400 block text-[10px] uppercase font-bold">Pickup</span>
-                          <span className="text-slate-800 font-medium">{tv.pickupLocation}</span>
+                          <span className="text-slate-800 font-medium break-words">{tv.pickupLocation}</span>
                         </div>
                       )}
                       {tv.dropLocation && (
                         <div>
                           <span className="text-slate-400 block text-[10px] uppercase font-bold">Drop</span>
-                          <span className="text-slate-800 font-medium">{tv.dropLocation}</span>
+                          <span className="text-slate-800 font-medium break-words">{tv.dropLocation}</span>
                         </div>
                       )}
                       {tv.driverName && (
@@ -2073,7 +2073,7 @@ export default function TripDetailPage() {
                     </div>
 
                     {tv.notes && (
-                      <p className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <p className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100 break-words">
                         {tv.notes}
                       </p>
                     )}
@@ -2087,8 +2087,8 @@ export default function TripDetailPage() {
         {/* TAB 6: ACTIVITIES (Real PostgreSQL Trip-Activity Integration) */}
         {activeTab === "activities" && (
           <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
-            <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
                 <h3 className="font-bold text-slate-900 text-sm">Sightseeing & Activity Passes</h3>
                 <p className="text-xs text-slate-500">
                   Attach guided excursions, boat tickets, entrance passes, and adventure experiences.
@@ -2098,9 +2098,9 @@ export default function TripDetailPage() {
               <Button
                 onClick={handleOpenAddActivity}
                 disabled={isReadOnly}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50"
+                className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Activity
+                <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> Add Activity
               </Button>
             </div>
 
@@ -2119,27 +2119,27 @@ export default function TripDetailPage() {
                   return (
                     <div
                       key={ta.id}
-                      className="bg-white rounded-xl border border-slate-200 p-4.5 shadow-2xs space-y-2 hover:shadow-xs transition-all"
+                      className="bg-white rounded-xl border border-slate-200 p-4 sm:p-4.5 shadow-2xs space-y-2 hover:shadow-xs transition-all"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2">
-                        <div className="space-y-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2.5">
+                        <div className="space-y-1 min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             {isIncluded ? (
-                              <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600" />
+                              <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
                                 Included in Package
                               </span>
                             ) : (
-                              <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <Info className="h-2.5 w-2.5 text-amber-600" />
+                              <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                <Info className="h-2.5 w-2.5 text-amber-600 shrink-0" />
                                 Not Included (Pay on Site)
                               </span>
                             )}
-                            <h4 className="font-bold text-slate-900 text-sm">{ta.name}</h4>
+                            <h4 className="font-bold text-slate-900 text-sm leading-snug break-words">{ta.name}</h4>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             onClick={() => handleOpenEditActivity(ta)}
                             disabled={isReadOnly}
@@ -2259,20 +2259,20 @@ export default function TripDetailPage() {
         {/* TAB 8: QUOTATIONS */}
         {activeTab === "quotation" && (
           <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
-            <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
                 <h3 className="font-bold text-slate-900 text-sm">
                   Quotations & Proposals ({tripQuotations.length})
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Manage quotation snapshots, customer proposals, and package options generated for this trip.
                 </p>
               </div>
 
-              <Link href={`/trips/${trip.id}/quotation`}>
+              <Link href={`/trips/${trip.id}/quotation`} className="w-full sm:w-auto shrink-0">
                 <Button
                   disabled={isReadOnly}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl cursor-pointer shadow-xs inline-flex items-center gap-1.5 disabled:opacity-50"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl cursor-pointer shadow-xs inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Open Quotation Studio
@@ -2403,7 +2403,7 @@ export default function TripDetailPage() {
 
         {/* ─── TRAVELER DIALOGS ─── */}
         <Dialog open={isAddTravelerOpen} onOpenChange={setIsAddTravelerOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-6 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-md p-4 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleSaveAddTraveler}>
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base">Add Traveler</DialogTitle>
@@ -2424,7 +2424,7 @@ export default function TripDetailPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Type</label>
                     <Select value={travelerType} onValueChange={(val) => val && setTravelerType(val as TravelerType)}>
@@ -2454,7 +2454,7 @@ export default function TripDetailPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Phone</label>
                     <Input
@@ -2477,10 +2477,10 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
                       Cancel
                     </Button>
                   }
@@ -2489,7 +2489,7 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={travelerSaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
                 >
                   {travelerSaving ? "Saving..." : "Add Traveler"}
                 </Button>
@@ -2499,7 +2499,7 @@ export default function TripDetailPage() {
         </Dialog>
 
         <Dialog open={isEditTravelerOpen} onOpenChange={setIsEditTravelerOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-6 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-md p-4 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleSaveEditTraveler}>
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base">Edit Traveler</DialogTitle>
@@ -2516,7 +2516,7 @@ export default function TripDetailPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Type</label>
                     <Select value={travelerType} onValueChange={(val) => val && setTravelerType(val as TravelerType)}>
@@ -2546,7 +2546,7 @@ export default function TripDetailPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Phone</label>
                     <Input
@@ -2567,10 +2567,10 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
                       Cancel
                     </Button>
                   }
@@ -2579,7 +2579,7 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={travelerSaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
                 >
                   {travelerSaving ? "Saving..." : "Save"}
                 </Button>
@@ -2590,14 +2590,14 @@ export default function TripDetailPage() {
 
         {/* ─── ITINERARY DIALOGS ─── */}
         <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-lg p-4 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleSaveAddItem}>
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base">Add Itinerary Day Item</DialogTitle>
               </DialogHeader>
 
               <div className="space-y-3.5 mt-4 text-xs">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Day Number *</label>
                     <Input
@@ -2642,7 +2642,7 @@ export default function TripDetailPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 xs:grid-cols-3 sm:grid-cols-3 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Location</label>
                     <Input
@@ -2670,10 +2670,10 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
                       Cancel
                     </Button>
                   }
@@ -2682,7 +2682,7 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={itemSaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
                 >
                   {itemSaving ? "Saving..." : "Add Itinerary Item"}
                 </Button>
@@ -2692,14 +2692,14 @@ export default function TripDetailPage() {
         </Dialog>
 
         <Dialog open={isEditItemOpen} onOpenChange={setIsEditItemOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-lg p-4 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleSaveEditItem}>
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base">Edit Itinerary Day Item</DialogTitle>
               </DialogHeader>
 
               <div className="space-y-3.5 mt-4 text-xs">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Day Number *</label>
                     <Input
@@ -2742,7 +2742,7 @@ export default function TripDetailPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 xs:grid-cols-3 sm:grid-cols-3 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Location</label>
                     <Input
@@ -2770,10 +2770,10 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
                       Cancel
                     </Button>
                   }
@@ -2782,7 +2782,7 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={itemSaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
                 >
                   {itemSaving ? "Saving..." : "Save"}
                 </Button>
@@ -2793,25 +2793,25 @@ export default function TripDetailPage() {
 
         {/* ─── TRIP HOTEL DIALOGS ─── */}
         <Dialog open={isAddHotelOpen} onOpenChange={setIsAddHotelOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
-            <form onSubmit={handleSaveAddHotel}>
-              <DialogHeader>
-                <DialogTitle className="text-slate-900 font-bold text-base">Attach Hotel to Trip</DialogTitle>
-                <DialogDescription className="text-slate-500 text-xs mt-1">
-                  Select a property from your agency inventory and configure reservation dates.
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[calc(100vw-20px)] max-w-sm p-3.5 sm:p-5 shadow-xl min-w-0 overflow-hidden box-border">
+            <form onSubmit={handleSaveAddHotel} className="w-full min-w-0">
+              <DialogHeader className="pb-0.5 min-w-0">
+                <DialogTitle className="text-slate-900 font-bold text-sm sm:text-base truncate pr-6">Attach Hotel to Trip</DialogTitle>
+                <DialogDescription className="text-slate-500 text-[11px] mt-0.5 leading-tight truncate">
+                  Select inventory property and reservation dates.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-3.5 mt-4 text-xs">
+              <div className="space-y-2 mt-2 text-xs min-w-0">
                 {/* Hotel Property Selection (Filtered automatically by Trip destinations) */}
                 {(() => {
                   const filtered = getFilteredHotels();
                   return (
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Select Hotel Property *</label>
+                    <div className="space-y-0.5 min-w-0">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase block truncate">Select Hotel Property *</label>
                       {tripDestinations.length === 0 ? (
-                        <div className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
-                          Add destinations to this Trip to see destination-specific Hotels.
+                        <div className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200">
+                          Add destinations to this Trip to see destination Hotels.
                         </div>
                       ) : (
                         <>
@@ -2823,8 +2823,8 @@ export default function TripDetailPage() {
                               fetchApplicableHotelRates(val, hotelFormCheckIn, hotelFormRoomType, hotelFormMealPlan);
                             }}
                           >
-                            <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
-                              <SelectValue placeholder={filtered.length === 0 ? "No matching hotels for trip destinations..." : "Choose hotel..."}>
+                            <SelectTrigger className="h-8 bg-slate-50/50 border-slate-200 text-xs min-w-0 w-full overflow-hidden">
+                              <SelectValue placeholder={filtered.length === 0 ? "No matching hotels..." : "Choose hotel..."}>
                                 {(val: string | null) => {
                                   if (!val) return undefined;
                                   const h = masterHotels.find((item) => item.id === val);
@@ -2832,7 +2832,7 @@ export default function TripDetailPage() {
                                 }}
                               </SelectValue>
                             </SelectTrigger>
-                            <SelectContent className="bg-white border-slate-200">
+                            <SelectContent className="bg-white border-slate-200 max-w-[calc(100vw-30px)] sm:max-w-md">
                               {filtered.map((h) => (
                                 <SelectItem key={h.id} value={h.id} className="text-xs">
                                   {h.name} <span className="text-slate-400 font-normal">({h.destination?.name || h.city || "Destination"})</span>
@@ -2841,8 +2841,8 @@ export default function TripDetailPage() {
                             </SelectContent>
                           </Select>
                           {filtered.length === 0 && (
-                            <p className="text-[11px] text-amber-600 mt-1">
-                              No hotels associated with the destinations in this trip route. You can assign destinations under Inventory &gt; Hotels.
+                            <p className="text-[10px] text-amber-600 mt-0.5">
+                              No hotels associated with trip destinations.
                             </p>
                           )}
                         </>
@@ -2853,16 +2853,19 @@ export default function TripDetailPage() {
 
                 {/* 3. RateSheet Resolution State */}
                 {hotelRateLoading ? (
-                  <div className="flex items-center gap-2 text-xs text-indigo-600 bg-indigo-50/60 p-2.5 rounded-lg border border-indigo-100">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" /> Fetching applicable master rate sheets...
+                  <div className="flex items-center gap-1.5 text-xs text-indigo-600 bg-indigo-50/60 p-1.5 rounded-lg border border-indigo-100 min-w-0">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600 shrink-0" />
+                    <span className="truncate text-[11px]">Fetching master rate sheets...</span>
                   </div>
                 ) : hotelRateMessage ? (
-                  <div className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                  <div className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200 truncate">
                     {hotelRateMessage}
                   </div>
                 ) : hotelAvailableRates.length > 1 ? (
-                  <div className="space-y-1 bg-indigo-50/40 p-3 rounded-xl border border-indigo-100">
-                    <label className="text-[10px] font-bold text-indigo-700 uppercase">Applicable Master Rate Sheet ({hotelAvailableRates.length} available)</label>
+                  <div className="space-y-0.5 bg-indigo-50/40 p-1.5 rounded-lg border border-indigo-100 min-w-0">
+                    <label className="text-[9px] font-bold text-indigo-700 uppercase tracking-wider block truncate">
+                      Rate Sheet ({hotelAvailableRates.length} available)
+                    </label>
                     <Select
                       value={hotelFormRateSheetId || ""}
                       onValueChange={(val) => {
@@ -2879,128 +2882,144 @@ export default function TripDetailPage() {
                         }
                       }}
                     >
-                      <SelectTrigger className="h-9 bg-white border-indigo-200 text-xs">
-                        <SelectValue placeholder="Choose rate plan...">
+                      <SelectTrigger className="h-7.5 bg-white border-indigo-200 text-xs min-w-0 w-full overflow-hidden">
+                        <SelectValue placeholder="Choose rate plan..." className="truncate min-w-0 block text-[11px]">
                           {(val: string | null) => {
                             if (!val) return undefined;
                             const r = hotelAvailableRates.find((item) => item.id === val);
-                            return r ? `${r.name} - ${r.roomType || "Room"} (${r.mealPlan || "No Meal"}) - ₹${Number(r.costPrice)}/night` : val;
+                            if (!r) return val;
+                            const mealText = r.mealPlan ? `(${r.mealPlan})` : "";
+                            const hasDetails = r.roomType && r.name.toLowerCase().includes(r.roomType.toLowerCase());
+                            return hasDetails
+                              ? `${r.name} ${mealText ? `• ${mealText}` : ""} - ₹${Number(r.costPrice)}/night`
+                              : `${r.name} - ${r.roomType || "Standard"} ${mealText} - ₹${Number(r.costPrice)}/night`;
                           }}
                         </SelectValue>
                       </SelectTrigger>
-                      <SelectContent className="bg-white border-slate-200">
-                        {hotelAvailableRates.map((r) => (
-                          <SelectItem key={r.id} value={r.id} className="text-xs">
-                            {r.name} - {r.roomType || "Room"} ({r.mealPlan || "No Meal"}) - ₹{Number(r.costPrice)}/night
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="bg-white border-slate-200 max-w-[calc(100vw-30px)] sm:max-w-md">
+                        {hotelAvailableRates.map((r) => {
+                          const mealText = r.mealPlan ? `(${r.mealPlan})` : "";
+                          const hasDetails = r.roomType && r.name.toLowerCase().includes(r.roomType.toLowerCase());
+                          const text = hasDetails
+                            ? `${r.name} ${mealText ? `• ${mealText}` : ""} - ₹${Number(r.costPrice)}/night`
+                            : `${r.name} - ${r.roomType || "Standard"} ${mealText} - ₹${Number(r.costPrice)}/night`;
+                          return (
+                            <SelectItem key={r.id} value={r.id} className="text-xs">
+                              {text}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
                 ) : hotelAvailableRates.length === 1 ? (
-                  <div className="flex items-center justify-between text-xs bg-emerald-50/80 text-emerald-800 p-2.5 rounded-lg border border-emerald-200">
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                      <span>Master Rate: <strong>{hotelAvailableRates[0].name}</strong> (₹{Number(hotelAvailableRates[0].costPrice)}/night)</span>
+                  <div className="flex items-center justify-between text-[11px] bg-emerald-50/80 text-emerald-800 p-1.5 rounded-lg border border-emerald-200 min-w-0">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                      <span className="truncate">Rate: <strong>{hotelAvailableRates[0].name}</strong> (₹{Number(hotelAvailableRates[0].costPrice)})</span>
                     </div>
-                    <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Auto-selected</span>
+                    <span className="text-[8px] font-bold uppercase bg-emerald-100 text-emerald-700 px-1 py-0.2 rounded shrink-0">Auto</span>
                   </div>
                 ) : null}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Check-in Date *</label>
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Check-in *</label>
                     <Input
                       type="date"
                       value={hotelFormCheckIn}
                       onChange={(e) => handleHotelCheckInChange(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-[11px] px-1 w-full min-w-0"
                       required
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Check-out Date *</label>
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Check-out *</label>
                     <Input
                       type="date"
                       value={hotelFormCheckOut}
                       onChange={(e) => handleHotelCheckOutChange(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-[11px] px-1 w-full min-w-0"
                       required
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Room Category</label>
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Room Category</label>
                     <Input
                       value={hotelFormRoomType}
                       onChange={(e) => setHotelFormRoomType(e.target.value)}
                       placeholder="Deluxe Room"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Number of Rooms</label>
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Rooms Count</label>
                     <Input
                       type="number"
                       min={1}
                       value={hotelFormRooms}
                       onChange={(e) => handleHotelRoomsChange(parseInt(e.target.value) || 1)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
                       required
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Meal Plan</label>
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Meal Plan</label>
                     <Input
                       value={hotelFormMealPlan}
                       onChange={(e) => setHotelFormMealPlan(e.target.value)}
                       placeholder="CP / MAP / AP"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Nightly Rate (₹)</label>
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Nightly Rate (₹)</label>
                     <Input
                       type="number"
                       value={hotelFormNightlyRate}
                       onChange={(e) => handleHotelNightlyRateChange(e.target.value)}
-                      placeholder="Enter rate"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      placeholder="Rate"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Total Tariff (₹)</label>
+                </div>
+
+                <div className="flex items-center justify-between bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200 min-w-0">
+                  <span className="text-[11px] font-semibold text-slate-700 truncate">Total Tariff:</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs font-bold text-slate-500">₹</span>
                     <Input
                       type="number"
                       value={hotelFormTotalAmount}
                       onChange={(e) => setHotelFormTotalAmount(e.target.value)}
                       placeholder="0"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-6.5 w-24 bg-white border-slate-200 text-xs font-bold text-right text-indigo-700 px-1.5 min-w-0"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Special Inclusions / Notes</label>
+                <div className="space-y-0.5 min-w-0">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Special Inclusions / Notes</label>
                   <Textarea
                     value={hotelFormNotes}
                     onChange={(e) => setHotelFormNotes(e.target.value)}
-                    placeholder="Extra bed, honeymoon inclusions, breakfast timings..."
-                    rows={2}
-                    className="bg-slate-50/50 border-slate-200 text-xs"
+                    placeholder="Extra bed, honeymoon inclusions..."
+                    rows={1}
+                    className="bg-slate-50/50 border-slate-200 text-xs min-h-[28px] max-h-[40px] py-1 px-2 resize-none w-full min-w-0"
                   />
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogFooter className="mt-3 flex flex-row items-center gap-2 min-w-0">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="flex-1 h-8 bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
                       Cancel
                     </Button>
                   }
@@ -3009,7 +3028,7 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={hotelSaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  className="flex-1 h-8 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-3 rounded-xl justify-center shadow-xs truncate"
                 >
                   {hotelSaving ? "Attaching..." : "Attach Hotel"}
                 </Button>
@@ -3019,22 +3038,22 @@ export default function TripDetailPage() {
         </Dialog>
 
         <Dialog open={isEditHotelOpen} onOpenChange={setIsEditHotelOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
-            <form onSubmit={handleSaveEditHotel}>
-              <DialogHeader>
-                <DialogTitle className="text-slate-900 font-bold text-base">Edit Hotel Reservation</DialogTitle>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[calc(100vw-20px)] max-w-sm p-3.5 sm:p-5 shadow-xl min-w-0 overflow-hidden box-border">
+            <form onSubmit={handleSaveEditHotel} className="w-full min-w-0">
+              <DialogHeader className="pb-0.5 min-w-0">
+                <DialogTitle className="text-slate-900 font-bold text-sm sm:text-base truncate pr-6">Edit Hotel Reservation</DialogTitle>
               </DialogHeader>
 
-              <div className="space-y-3.5 mt-4 text-xs">
+              <div className="space-y-2 mt-2 text-xs min-w-0">
                 {/* Hotel Property Selection (Filtered automatically by Trip destinations) */}
                 {(() => {
                   const filtered = getFilteredHotels();
                   return (
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Select Hotel Property *</label>
+                    <div className="space-y-0.5 min-w-0">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase block truncate">Select Hotel Property *</label>
                       {tripDestinations.length === 0 ? (
-                        <div className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
-                          Add destinations to this Trip to see destination-specific Hotels.
+                        <div className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200">
+                          Add destinations to this Trip to see destination Hotels.
                         </div>
                       ) : (
                         <>
@@ -3046,8 +3065,8 @@ export default function TripDetailPage() {
                               fetchApplicableHotelRates(val, hotelFormCheckIn, hotelFormRoomType, hotelFormMealPlan);
                             }}
                           >
-                            <SelectTrigger className="h-9 bg-slate-50/50 border-slate-200 text-xs">
-                              <SelectValue placeholder={filtered.length === 0 ? "No matching hotels for trip destinations..." : "Choose hotel..."}>
+                            <SelectTrigger className="h-8 bg-slate-50/50 border-slate-200 text-xs min-w-0 w-full overflow-hidden">
+                              <SelectValue placeholder={filtered.length === 0 ? "No matching hotels..." : "Choose hotel..."}>
                                 {(val: string | null) => {
                                   if (!val) return undefined;
                                   const h = masterHotels.find((item) => item.id === val);
@@ -3055,7 +3074,7 @@ export default function TripDetailPage() {
                                 }}
                               </SelectValue>
                             </SelectTrigger>
-                            <SelectContent className="bg-white border-slate-200">
+                            <SelectContent className="bg-white border-slate-200 max-w-[calc(100vw-30px)] sm:max-w-md">
                               {filtered.map((h) => (
                                 <SelectItem key={h.id} value={h.id} className="text-xs">
                                   {h.name} <span className="text-slate-400 font-normal">({h.destination?.name || h.city || "Destination"})</span>
@@ -3064,8 +3083,8 @@ export default function TripDetailPage() {
                             </SelectContent>
                           </Select>
                           {filtered.length === 0 && (
-                            <p className="text-[11px] text-amber-600 mt-1">
-                              No hotels associated with the destinations in this trip route.
+                            <p className="text-[10px] text-amber-600 mt-0.5">
+                              No hotels associated with trip destinations.
                             </p>
                           )}
                         </>
@@ -3076,16 +3095,19 @@ export default function TripDetailPage() {
 
                 {/* 3. RateSheet Resolution State */}
                 {hotelRateLoading ? (
-                  <div className="flex items-center gap-2 text-xs text-indigo-600 bg-indigo-50/60 p-2.5 rounded-lg border border-indigo-100">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" /> Fetching applicable master rate sheets...
+                  <div className="flex items-center gap-1.5 text-xs text-indigo-600 bg-indigo-50/60 p-1.5 rounded-lg border border-indigo-100 min-w-0">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600 shrink-0" />
+                    <span className="truncate text-[11px]">Fetching master rate sheets...</span>
                   </div>
                 ) : hotelRateMessage ? (
-                  <div className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                  <div className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200 truncate">
                     {hotelRateMessage}
                   </div>
                 ) : hotelAvailableRates.length > 1 ? (
-                  <div className="space-y-1 bg-indigo-50/40 p-3 rounded-xl border border-indigo-100">
-                    <label className="text-[10px] font-bold text-indigo-700 uppercase">Applicable Master Rate Sheet ({hotelAvailableRates.length} available)</label>
+                  <div className="space-y-0.5 bg-indigo-50/40 p-1.5 rounded-lg border border-indigo-100 min-w-0">
+                    <label className="text-[9px] font-bold text-indigo-700 uppercase tracking-wider block truncate">
+                      Rate Sheet ({hotelAvailableRates.length} available)
+                    </label>
                     <Select
                       value={hotelFormRateSheetId || ""}
                       onValueChange={(val) => {
@@ -3102,123 +3124,140 @@ export default function TripDetailPage() {
                         }
                       }}
                     >
-                      <SelectTrigger className="h-9 bg-white border-indigo-200 text-xs">
-                        <SelectValue placeholder="Choose rate plan...">
+                      <SelectTrigger className="h-7.5 bg-white border-indigo-200 text-xs min-w-0 w-full overflow-hidden">
+                        <SelectValue placeholder="Choose rate plan..." className="truncate min-w-0 block text-[11px]">
                           {(val: string | null) => {
                             if (!val) return undefined;
                             const r = hotelAvailableRates.find((item) => item.id === val);
-                            return r ? `${r.name} - ${r.roomType || "Room"} (${r.mealPlan || "No Meal"}) - ₹${Number(r.costPrice)}/night` : val;
+                            if (!r) return val;
+                            const mealText = r.mealPlan ? `(${r.mealPlan})` : "";
+                            const hasDetails = r.roomType && r.name.toLowerCase().includes(r.roomType.toLowerCase());
+                            return hasDetails
+                              ? `${r.name} ${mealText ? `• ${mealText}` : ""} - ₹${Number(r.costPrice)}/night`
+                              : `${r.name} - ${r.roomType || "Standard"} ${mealText} - ₹${Number(r.costPrice)}/night`;
                           }}
                         </SelectValue>
                       </SelectTrigger>
-                      <SelectContent className="bg-white border-slate-200">
-                        {hotelAvailableRates.map((r) => (
-                          <SelectItem key={r.id} value={r.id} className="text-xs">
-                            {r.name} - {r.roomType || "Room"} ({r.mealPlan || "No Meal"}) - ₹{Number(r.costPrice)}/night
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="bg-white border-slate-200 max-w-[calc(100vw-30px)] sm:max-w-md">
+                        {hotelAvailableRates.map((r) => {
+                          const mealText = r.mealPlan ? `(${r.mealPlan})` : "";
+                          const hasDetails = r.roomType && r.name.toLowerCase().includes(r.roomType.toLowerCase());
+                          const text = hasDetails
+                            ? `${r.name} ${mealText ? `• ${mealText}` : ""} - ₹${Number(r.costPrice)}/night`
+                            : `${r.name} - ${r.roomType || "Standard"} ${mealText} - ₹${Number(r.costPrice)}/night`;
+                          return (
+                            <SelectItem key={r.id} value={r.id} className="text-xs">
+                              {text}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
                 ) : hotelAvailableRates.length === 1 ? (
-                  <div className="flex items-center justify-between text-xs bg-emerald-50/80 text-emerald-800 p-2.5 rounded-lg border border-emerald-200">
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                      <span>Master Rate: <strong>{hotelAvailableRates[0].name}</strong> (₹{Number(hotelAvailableRates[0].costPrice)}/night)</span>
+                  <div className="flex items-center justify-between text-[11px] bg-emerald-50/80 text-emerald-800 p-1.5 rounded-lg border border-emerald-200 min-w-0">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                      <span className="truncate">Rate: <strong>{hotelAvailableRates[0].name}</strong> (₹{Number(hotelAvailableRates[0].costPrice)})</span>
                     </div>
-                    <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Auto-selected</span>
+                    <span className="text-[8px] font-bold uppercase bg-emerald-100 text-emerald-700 px-1 py-0.2 rounded shrink-0">Auto</span>
                   </div>
                 ) : null}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Check-in Date *</label>
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Check-in *</label>
                     <Input
                       type="date"
                       value={hotelFormCheckIn}
                       onChange={(e) => handleHotelCheckInChange(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-[11px] px-1 w-full min-w-0"
                       required
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Check-out Date *</label>
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Check-out *</label>
                     <Input
                       type="date"
                       value={hotelFormCheckOut}
                       onChange={(e) => handleHotelCheckOutChange(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-[11px] px-1 w-full min-w-0"
                       required
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Room Category</label>
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Room Category</label>
                     <Input
                       value={hotelFormRoomType}
                       onChange={(e) => setHotelFormRoomType(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Number of Rooms</label>
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Rooms Count</label>
                     <Input
                       type="number"
                       min={1}
                       value={hotelFormRooms}
                       onChange={(e) => handleHotelRoomsChange(parseInt(e.target.value) || 1)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
                       required
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Meal Plan</label>
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Meal Plan</label>
                     <Input
                       value={hotelFormMealPlan}
                       onChange={(e) => setHotelFormMealPlan(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Nightly Rate (₹)</label>
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Nightly Rate (₹)</label>
                     <Input
                       type="number"
                       value={hotelFormNightlyRate}
                       onChange={(e) => handleHotelNightlyRateChange(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Total Tariff (₹)</label>
+                </div>
+
+                <div className="flex items-center justify-between bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200 min-w-0">
+                  <span className="text-[11px] font-semibold text-slate-700 truncate">Total Tariff:</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs font-bold text-slate-500">₹</span>
                     <Input
                       type="number"
                       value={hotelFormTotalAmount}
                       onChange={(e) => setHotelFormTotalAmount(e.target.value)}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      placeholder="0"
+                      className="h-6.5 w-24 bg-white border-slate-200 text-xs font-bold text-right text-indigo-700 px-1.5 min-w-0"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Notes</label>
+                <div className="space-y-0.5 min-w-0">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Notes</label>
                   <Textarea
                     value={hotelFormNotes}
                     onChange={(e) => setHotelFormNotes(e.target.value)}
-                    rows={2}
-                    className="bg-slate-50/50 border-slate-200 text-xs"
+                    rows={1}
+                    className="bg-slate-50/50 border-slate-200 text-xs min-h-[28px] max-h-[40px] py-1 px-2 resize-none w-full min-w-0"
                   />
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogFooter className="mt-3 flex flex-row items-center gap-2 min-w-0">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="flex-1 h-8 bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
                       Cancel
                     </Button>
                   }
@@ -3227,7 +3266,7 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={hotelSaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  className="flex-1 h-8 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-3 rounded-xl justify-center shadow-xs truncate"
                 >
                   {hotelSaving ? "Saving..." : "Save"}
                 </Button>
@@ -3238,7 +3277,7 @@ export default function TripDetailPage() {
 
         {/* ─── TRIP VEHICLE DIALOGS ─── */}
         <Dialog open={isAddVehicleOpen} onOpenChange={setIsAddVehicleOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-5 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-md p-4 sm:p-5 shadow-xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleSaveAddVehicle}>
               <DialogHeader className="pb-1">
                 <DialogTitle className="text-slate-900 font-bold text-base">Assign Vehicle to Trip</DialogTitle>
@@ -3258,7 +3297,7 @@ export default function TripDetailPage() {
                       value={vehicleFormVehicleId || "manual"}
                       onValueChange={(val) => {
                         if (val === "manual") {
-                          setVehicleFormVehicleId("");
+                           setVehicleFormVehicleId("");
                         } else {
                           handleSelectMasterVehicle(val);
                         }
@@ -3300,7 +3339,7 @@ export default function TripDetailPage() {
                 </div>
 
                 {/* Type + Capacity */}
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vehicle Type *</label>
                     <Input
@@ -3365,7 +3404,7 @@ export default function TripDetailPage() {
                       />
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rate / KM (₹) *</label>
                         <Input
@@ -3403,7 +3442,7 @@ export default function TripDetailPage() {
                 </div>
 
                 {/* 5. Driver Name + Phone */}
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Driver Name</label>
                     <Input
@@ -3426,10 +3465,10 @@ export default function TripDetailPage() {
               </div>
 
               {/* 7. Footer: Cancel / Add Vehicle */}
-              <DialogFooter className="mt-5 flex justify-end gap-2">
+              <DialogFooter className="mt-5 flex flex-col-reverse sm:flex-row justify-end gap-2">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
                       Cancel
                     </Button>
                   }
@@ -3438,7 +3477,7 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={vehicleSaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
                 >
                   {vehicleSaving ? "Assigning..." : "Add Vehicle"}
                 </Button>
@@ -3448,7 +3487,7 @@ export default function TripDetailPage() {
         </Dialog>
 
         <Dialog open={isEditVehicleOpen} onOpenChange={setIsEditVehicleOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-5 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-md p-4 sm:p-5 shadow-xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleSaveEditVehicle}>
               <DialogHeader className="pb-1">
                 <DialogTitle className="text-slate-900 font-bold text-base">Edit Vehicle Assignment</DialogTitle>
@@ -3471,7 +3510,7 @@ export default function TripDetailPage() {
                 </div>
 
                 {/* Type + Capacity */}
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vehicle Type *</label>
                     <Input
@@ -3535,7 +3574,7 @@ export default function TripDetailPage() {
                       />
                     </div>
                   ) : (
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 xs:grid-cols-3 sm:grid-cols-3 gap-2">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rate / KM (₹) *</label>
                         <Input
@@ -3589,7 +3628,7 @@ export default function TripDetailPage() {
                 </div>
 
                 {/* Driver Name + Phone */}
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Driver Name</label>
                     <Input
@@ -3611,10 +3650,10 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              <DialogFooter className="mt-5 flex justify-end gap-2">
+              <DialogFooter className="mt-5 flex flex-col-reverse sm:flex-row justify-end gap-2">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
                       Cancel
                     </Button>
                   }
@@ -3623,7 +3662,7 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={vehicleSaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
                 >
                   {vehicleSaving ? "Saving..." : "Save Changes"}
                 </Button>
@@ -3634,7 +3673,7 @@ export default function TripDetailPage() {
 
         {/* ─── TRIP ACTIVITY DIALOGS ─── */}
         <Dialog open={isAddActivityOpen} onOpenChange={setIsAddActivityOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-5 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-md p-4 sm:p-5 shadow-xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleSaveAddActivity}>
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base">Add Activity</DialogTitle>
@@ -3699,7 +3738,7 @@ export default function TripDetailPage() {
                 {/* Inclusion Status Selector */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">Inclusion <span className="text-red-500">*</span></label>
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={() => setActivityFormType(ActivityType.INCLUDED)}
@@ -3751,10 +3790,10 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              <DialogFooter className="mt-5 flex justify-end gap-2">
+              <DialogFooter className="mt-5 flex flex-col-reverse sm:flex-row justify-end gap-2">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
                       Cancel
                     </Button>
                   }
@@ -3763,7 +3802,7 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={activitySaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl shadow-xs"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl shadow-xs justify-center"
                 >
                   {activitySaving ? "Adding..." : "Add Activity"}
                 </Button>
@@ -3773,7 +3812,7 @@ export default function TripDetailPage() {
         </Dialog>
 
         <Dialog open={isEditActivityOpen} onOpenChange={setIsEditActivityOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-5 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-md p-4 sm:p-5 shadow-xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleSaveEditActivity}>
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base">Edit Activity</DialogTitle>
@@ -3798,7 +3837,7 @@ export default function TripDetailPage() {
                 {/* Inclusion Status Selector */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">Inclusion <span className="text-red-500">*</span></label>
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={() => setActivityFormType(ActivityType.INCLUDED)}
@@ -3848,10 +3887,10 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              <DialogFooter className="mt-5 flex justify-end gap-2">
+              <DialogFooter className="mt-5 flex flex-col-reverse sm:flex-row justify-end gap-2">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
                       Cancel
                     </Button>
                   }
@@ -3860,7 +3899,7 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={activitySaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl shadow-xs"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl shadow-xs justify-center"
                 >
                   {activitySaving ? "Saving..." : "Save Changes"}
                 </Button>
@@ -3871,7 +3910,7 @@ export default function TripDetailPage() {
 
         {/* ─── EDIT TRIP MODAL ─── */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-lg p-4 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={editTripFormik.handleSubmit}>
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base">Edit Trip Workspace</DialogTitle>
@@ -3899,7 +3938,7 @@ export default function TripDetailPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Start Date</label>
                     <Input
@@ -3949,10 +3988,10 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
                       Cancel
                     </Button>
                   }
@@ -3961,7 +4000,7 @@ export default function TripDetailPage() {
                   type="submit"
                   disabled={editSaving}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
                 >
                   {editSaving ? "Saving..." : "Save Changes"}
                 </Button>

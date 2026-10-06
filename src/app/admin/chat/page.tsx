@@ -173,7 +173,7 @@ export default function AdminChatPage() {
   };
 
   return (
-    <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-4 h-[calc(100vh-4.5rem)] flex flex-col">
+    <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-2 sm:py-4 h-[calc(100dvh-8.5rem)] md:h-[calc(100vh-4.5rem)] flex flex-col">
       {/* Page Title */}
       <div className="mb-3 flex items-center justify-between shrink-0">
         <div>
