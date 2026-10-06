@@ -445,15 +445,15 @@ export default function OperationsDashboardPage() {
               )}
 
               {/* ─── OPERATIONS MASTER LIST ─────────────────────────────────── */}
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-indigo-600" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Activity className="h-4 w-4 text-indigo-600 shrink-0" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 whitespace-nowrap">
                       Operations Directory ({pagination.total})
                     </h3>
                   </div>
-                  <span className="text-[11px] text-slate-400 font-semibold">
+                  <span className="text-[11px] text-slate-400 font-semibold shrink-0 whitespace-nowrap">
                     Page {pagination.page} of {pagination.totalPages}
                   </span>
                 </div>
@@ -472,63 +472,51 @@ export default function OperationsDashboardPage() {
                       <div
                         key={op.id}
                         onClick={() => router.push(`/operations/${op.trip.id}`)}
-                        className="border border-slate-200 rounded-xl p-4 bg-slate-50/40 hover:bg-slate-100/60 hover:border-slate-300 transition-all cursor-pointer space-y-3 group"
+                        className="border border-slate-200 rounded-xl p-3.5 sm:p-4 bg-slate-50/40 hover:bg-slate-100/60 hover:border-slate-300 transition-all cursor-pointer space-y-2.5 group"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <span className="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition-colors block">
+                        <div className="flex flex-col min-[360px]:flex-row min-[360px]:items-start justify-between gap-2">
+                          <div className="min-w-0 space-y-1">
+                            <span className="font-bold text-xs sm:text-sm text-slate-900 group-hover:text-indigo-600 transition-colors block">
                               {op.trip.title}
                             </span>
-                            <div className="flex items-center gap-2 text-xs text-slate-500 pt-0.5 flex-wrap">
-                              <span className="font-mono font-semibold text-slate-700">
+                            <div className="flex items-center gap-x-2 gap-y-1 text-xs text-slate-500 pt-0.5 flex-wrap">
+                              <span className="font-mono font-semibold text-slate-700 whitespace-nowrap">
                                 {op.booking?.bookingNumber || op.trip.tripNumber}
                               </span>
-                              <span>•</span>
-                              <span>{op.trip.customer.name}</span>
-                              <span>•</span>
-                              <span className="flex items-center gap-1 text-slate-600">
-                                <Calendar className="h-3 w-3 text-slate-400" />
+                              <span className="text-slate-300 hidden min-[320px]:inline">•</span>
+                              <span className="truncate max-w-[140px] sm:max-w-none">{op.trip.customer.name}</span>
+                              <span className="text-slate-300 hidden min-[320px]:inline">•</span>
+                              <span className="flex items-center gap-1 text-slate-600 whitespace-nowrap">
+                                <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
                                 {new Date(op.trip.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} → {new Date(op.trip.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                               </span>
                             </div>
                           </div>
 
-                          <div className="text-right shrink-0 space-y-1">
+                          <div className="self-start shrink-0">
                             <TripOperationsStatusBadge status={op.status} />
                           </div>
                         </div>
 
                         {/* Status Check Chips */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-[11px]">
+                        <div className="grid grid-cols-2 min-[380px]:grid-cols-3 gap-1.5 min-[380px]:gap-2 pt-2 border-t border-slate-100 text-[11px]">
                           <div className="bg-white border border-slate-100 rounded-lg px-2.5 py-1 text-slate-600">
-                            <span className="text-[10px] text-slate-400 block font-semibold uppercase">Hotels</span>
-                            <span className={`font-bold ${totalHotels > 0 && confirmedHotels === totalHotels ? "text-emerald-700" : "text-amber-700"}`}>
+                            <span className="text-[10px] text-slate-400 block font-semibold uppercase whitespace-nowrap">Hotels</span>
+                            <span className={`font-bold whitespace-nowrap ${totalHotels > 0 && confirmedHotels === totalHotels ? "text-emerald-700" : "text-amber-700"}`}>
                               {confirmedHotels}/{totalHotels} Confirmed
                             </span>
                           </div>
 
                           <div className="bg-white border border-slate-100 rounded-lg px-2.5 py-1 text-slate-600">
-                            <span className="text-[10px] text-slate-400 block font-semibold uppercase">Fleet</span>
-                            <span className={`font-bold ${totalVehicles > 0 && assignedVehicles === totalVehicles ? "text-emerald-700" : "text-amber-700"}`}>
+                            <span className="text-[10px] text-slate-400 block font-semibold uppercase whitespace-nowrap">Fleet</span>
+                            <span className={`font-bold whitespace-nowrap ${totalVehicles > 0 && assignedVehicles === totalVehicles ? "text-emerald-700" : "text-amber-700"}`}>
                               {assignedVehicles}/{totalVehicles} Assigned
                             </span>
                           </div>
 
-                          {/* Activity Operations UI intentionally hidden.
-                              Activity is currently a trip inclusion/catalogue feature and is not
-                              surfaced as an operational service. Existing implementation is preserved
-                              for possible future use.
-                          <div className="bg-white border border-slate-100 rounded-lg px-2.5 py-1 text-slate-600">
-                            <span className="text-[10px] text-slate-400 block font-semibold uppercase">Activities</span>
-                            <span className={`font-bold ${totalActivities > 0 && confirmedActivities === totalActivities ? "text-emerald-700" : "text-amber-700"}`}>
-                              {confirmedActivities}/{totalActivities} Confirmed
-                            </span>
-                          </div>
-                          */}
-
-                          <div className="bg-white border border-slate-100 rounded-lg px-2.5 py-1 text-slate-600">
-                            <span className="text-[10px] text-slate-400 block font-semibold uppercase">Tickets</span>
-                            <span className={`font-bold ${openIssues > 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                          <div className="bg-white border border-slate-100 rounded-lg px-2.5 py-1 text-slate-600 col-span-2 min-[380px]:col-span-1">
+                            <span className="text-[10px] text-slate-400 block font-semibold uppercase whitespace-nowrap">Tickets</span>
+                            <span className={`font-bold whitespace-nowrap ${openIssues > 0 ? "text-rose-700" : "text-emerald-700"}`}>
                               {openIssues} Open Issue(s)
                             </span>
                           </div>
@@ -540,8 +528,8 @@ export default function OperationsDashboardPage() {
 
                 {/* Pagination Controls */}
                 {pagination.totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-xs">
-                    <span className="text-slate-500">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-4 border-t border-slate-100 text-xs">
+                    <span className="text-slate-500 text-center sm:text-left">
                       Showing {(pagination.page - 1) * pagination.limit + 1}–
                       {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} operations
                     </span>
@@ -575,15 +563,15 @@ export default function OperationsDashboardPage() {
             {/* ─── RIGHT 5 COLS: ACTIVE & UPCOMING DEPARTURES ─────────────────── */}
             <div className="lg:col-span-5 space-y-5">
               {/* Active Trips Card */}
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-emerald-600" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Activity className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 whitespace-nowrap">
                       Active Trips On Tour
                     </h3>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 shrink-0 whitespace-nowrap">
                     {activeTrips.length} Live
                   </span>
                 </div>
@@ -598,26 +586,28 @@ export default function OperationsDashboardPage() {
                       <div
                         key={trip.id}
                         onClick={() => router.push(`/operations/${trip.trip.id}`)}
-                        className="border border-slate-200 rounded-xl p-4 bg-slate-50/40 hover:bg-slate-100/60 transition-all cursor-pointer space-y-2 group"
+                        className="border border-slate-200 rounded-xl p-3.5 sm:p-4 bg-slate-50/40 hover:bg-slate-100/60 transition-all cursor-pointer space-y-2 group"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <span className="font-bold text-xs text-slate-900 group-hover:text-indigo-600 transition-colors block">
+                          <div className="min-w-0">
+                            <span className="font-bold text-xs text-slate-900 group-hover:text-indigo-600 transition-colors block truncate">
                               {trip.trip.title}
                             </span>
-                            <span className="text-[11px] text-slate-500 font-mono">
+                            <span className="text-[11px] text-slate-500 font-mono block truncate">
                               {trip.booking?.bookingNumber || trip.trip.tripNumber} • {trip.trip.customer.name}
                             </span>
                           </div>
-                          <TripOperationsStatusBadge status={trip.status} />
+                          <div className="shrink-0">
+                            <TripOperationsStatusBadge status={trip.status} />
+                          </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3 text-slate-400" />
+                        <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                          <span className="flex items-center gap-1 whitespace-nowrap">
+                            <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
                             {new Date(trip.trip.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} → {new Date(trip.trip.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                           </span>
-                          <span className="text-indigo-600 font-semibold flex items-center gap-0.5">
+                          <span className="text-indigo-600 font-semibold flex items-center gap-0.5 whitespace-nowrap">
                             View File →
                           </span>
                         </div>
@@ -628,15 +618,15 @@ export default function OperationsDashboardPage() {
               </div>
 
               {/* Upcoming Departures Watch */}
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <Compass className="h-4 w-4 text-blue-600" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Compass className="h-4 w-4 text-blue-600 shrink-0" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 whitespace-nowrap">
                       Upcoming Departures Watch
                     </h3>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-semibold">{upcomingTrips.length} Upcoming</span>
+                  <span className="text-[10px] text-slate-400 font-semibold shrink-0 whitespace-nowrap">{upcomingTrips.length} Upcoming</span>
                 </div>
 
                 {upcomingTrips.length === 0 ? (
@@ -649,7 +639,7 @@ export default function OperationsDashboardPage() {
                       <div
                         key={uTrip.id}
                         onClick={() => router.push(`/operations/${uTrip.trip.id}`)}
-                        className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/40 hover:bg-slate-100/60 transition-all cursor-pointer flex items-center justify-between gap-3 group"
+                        className="border border-slate-200 rounded-xl p-3 sm:p-3.5 bg-slate-50/40 hover:bg-slate-100/60 transition-all cursor-pointer flex items-center justify-between gap-2.5 group"
                       >
                         <div className="min-w-0 space-y-0.5">
                           <span className="font-bold text-xs text-slate-900 group-hover:text-indigo-600 transition-colors block truncate">

@@ -37,6 +37,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { experienceClient } from "@/lib/api-client/experience-client";
 import { customerClient } from "@/lib/api-client/customer-client";
 import { AgencyReferralItem, ReferralSummaryStats } from "@/lib/services/referral-service";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 const REFERRAL_STATUS_FILTER_LABELS: Record<string, string> = {
   ALL: "All",
@@ -79,6 +80,8 @@ export default function ReferralsAndRewardsPage() {
   const [rewardAmount, setRewardAmount] = React.useState("500");
   const [friendDiscount, setFriendDiscount] = React.useState("500");
   const [minBookingAmount, setMinBookingAmount] = React.useState("10000");
+
+  useModalScrollLock(Boolean(isCreateOpen || isSettingsOpen));
 
   const fetchReferrals = React.useCallback(async () => {
     setLoading(true);

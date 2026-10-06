@@ -24,10 +24,14 @@ import {
   Ticket,
 } from "lucide-react";
 import { experienceClient } from "@/lib/api-client/experience-client";
+import { useSubscription } from "@/context/subscription-context";
 import { CustomerInsightsData } from "@/lib/services/customer-insights-service";
+import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
 
 export default function CustomerInsightsPage() {
   const router = useRouter();
+  const { isFeatureAllowed, loading: subLoading } = useSubscription();
+  const isAllowed = isFeatureAllowed("CUSTOMER_INSIGHTS");
 
   const [data, setData] = React.useState<CustomerInsightsData | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -36,19 +40,24 @@ export default function CustomerInsightsPage() {
     setLoading(true);
     try {
       const res = await experienceClient.getCustomerInsights();
+
       if (res.success && res.data) {
         setData(res.data);
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to load customer insights");
+      if (err?.code !== "FEATURE_NOT_ALLOWED" && err?.statusCode !== 403) {
+        toast.error(err.message || "Failed to load customer insights");
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
   React.useEffect(() => {
-    fetchInsights();
-  }, [fetchInsights]);
+    if (isAllowed) {
+      fetchInsights();
+    }
+  }, [isAllowed, fetchInsights]);
 
   const overview = data?.overview || {
     totalCustomers: 0,
@@ -82,6 +91,40 @@ export default function CustomerInsightsPage() {
 
   const topDestinations = data?.topDestinations || [];
   const topCustomers = data?.topCustomers || [];
+
+  if (subLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">
+        <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+          <PageHeader
+            title="Customer Insights"
+            description="Track repeat customer rate, lifetime value (LTV), destination revenue, and quality performance."
+            breadcrumbs={[{ label: "Experience & Retention" }, { label: "Customer Insights" }]}
+          />
+          <div className="h-64 bg-slate-100 rounded-3xl border border-slate-200/80 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAllowed) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">
+        <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+          <PageHeader
+            title="Customer Insights"
+            description="Track repeat customer rate, lifetime value (LTV), destination revenue, and quality performance."
+            breadcrumbs={[{ label: "Experience & Retention" }, { label: "Customer Insights" }]}
+          />
+          <LockedFeatureCard
+            featureName="Customer Insights"
+            featureKey="CUSTOMER_INSIGHTS"
+            description="Analyzing guest lifetime value (LTV), repeat traveler retention rates, and top-revenue destinations is available with the Professional Plan."
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">

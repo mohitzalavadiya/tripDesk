@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import {
   X,
   CheckCircle2,
@@ -32,6 +33,7 @@ export function CompleteTripModal({
   onClose,
   onSuccess,
 }: CompleteTripModalProps) {
+  useModalScrollLock(isOpen);
   const [loading, setLoading] = React.useState(false);
   const [rating, setRating] = React.useState<number>(5);
   const [closingNotes, setClosingNotes] = React.useState(

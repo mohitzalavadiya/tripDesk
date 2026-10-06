@@ -44,6 +44,7 @@ import {
 import { StatusBadge } from "@/components/shared/status-badge";
 import { adminClient } from "@/lib/api-client/admin-client";
 import { AdminAgencyListItem } from "@/lib/services/admin-service";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 export default function AdminAgenciesPage() {
   const router = useRouter();
@@ -66,6 +67,8 @@ export default function AdminAgenciesPage() {
   const [suspendAgencyTarget, setSuspendAgencyTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [suspendReason, setSuspendReason] = React.useState("");
   const [suspending, setSuspending] = React.useState(false);
+
+  useModalScrollLock(Boolean(extendAgency || suspendAgencyTarget));
 
   const fetchAgencies = React.useCallback(async () => {
     setLoading(true);

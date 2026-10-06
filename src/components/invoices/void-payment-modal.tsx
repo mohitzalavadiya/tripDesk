@@ -4,6 +4,7 @@ import * as React from "react";
 import { X, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 interface VoidPaymentModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export function VoidPaymentModal({
   payment,
   onSuccess,
 }: VoidPaymentModalProps) {
+  useModalScrollLock(isOpen);
   const [reason, setReason] = React.useState<string>("");
   const [loading, setLoading] = React.useState<boolean>(false);
   const [error, setError] = React.useState<string | null>(null);

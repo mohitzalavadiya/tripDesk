@@ -772,6 +772,7 @@ export class TravelDocumentService {
     const document = await this.getDocumentDetails(agencyId, documentId);
 
     const agency = {
+      id: document.agency.id,
       name: document.agency.name,
       phone: document.agency.phone,
       email: document.agency.email,

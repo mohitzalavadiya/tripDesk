@@ -745,82 +745,287 @@ export const adminService = {
         _count: {
           select: { subscriptions: true },
         },
+        featureEntitlements: true,
+        usageLimits: true,
       },
     });
 
-    return plans.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      price: Number(p.price),
-      yearlyPrice: p.yearlyPrice ? Number(p.yearlyPrice) : null,
-      durationDays: p.durationDays,
-      features: p.features ? (Array.isArray(p.features) ? p.features : (p.features as any)) : [],
-      isPopular: p.isPopular,
-      displayOrder: p.displayOrder,
-      isActive: p.isActive,
-      subscriptionsCount: p._count.subscriptions,
-      createdAt: p.createdAt.toISOString(),
-      updatedAt: p.updatedAt.toISOString(),
-    }));
+    return plans.map((p) => {
+      const entitlementsRecord: Record<string, boolean> = {
+        CUSTOM_AGENCY_LOGO: false,
+        FEEDBACK_REVIEWS: false,
+        CUSTOMER_INSIGHTS: false,
+        REPORTS_ANALYTICS: false,
+      };
+
+      p.featureEntitlements.forEach((fe) => {
+        entitlementsRecord[fe.featureKey] = fe.enabled;
+      });
+
+      const usageLimitsRecord: Record<string, number | null> = {
+        TRIPS: 20,
+        QUOTATIONS: 20,
+        BOOKINGS: 20,
+      };
+
+      p.usageLimits.forEach((ul) => {
+        usageLimitsRecord[ul.resourceKey] = ul.limit;
+      });
+
+      return {
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        price: Number(p.price),
+        yearlyPrice: p.yearlyPrice ? Number(p.yearlyPrice) : null,
+        durationDays: p.durationDays,
+        features: p.features ? (Array.isArray(p.features) ? p.features : (p.features as any)) : [],
+        isPopular: p.isPopular,
+        displayOrder: p.displayOrder,
+        isActive: p.isActive,
+        subscriptionsCount: p._count.subscriptions,
+        entitlements: entitlementsRecord,
+        usageLimits: usageLimitsRecord,
+        createdAt: p.createdAt.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
+      };
+    });
   },
 
   async createPlan(input: PlanCreateInput, actorUserId: string) {
-    const plan = await prisma.subscriptionPlan.create({
-      data: {
-        name: input.name,
-        description: input.description,
-        price: new Prisma.Decimal(input.price),
-        yearlyPrice: input.yearlyPrice !== undefined && input.yearlyPrice !== null ? new Prisma.Decimal(input.yearlyPrice) : null,
-        durationDays: input.durationDays ?? 30,
-        features: input.features ?? [],
-        isPopular: input.isPopular ?? false,
-        displayOrder: input.displayOrder ?? 0,
-        isActive: input.isActive ?? true,
-      },
-    });
+    return prisma.$transaction(async (tx) => {
+      const plan = await tx.subscriptionPlan.create({
+        data: {
+          name: input.name,
+          description: input.description,
+          price: new Prisma.Decimal(input.price),
+          yearlyPrice: input.yearlyPrice !== undefined && input.yearlyPrice !== null ? new Prisma.Decimal(input.yearlyPrice) : null,
+          durationDays: input.durationDays ?? 30,
+          features: input.features ?? [],
+          isPopular: input.isPopular ?? false,
+          displayOrder: input.displayOrder ?? 0,
+          isActive: input.isActive ?? true,
+        },
+      });
 
-    await prisma.platformAuditLog.create({
-      data: {
-        actorUserId,
-        action: "PLAN_CREATED",
-        entityType: "SUBSCRIPTION_PLAN",
-        entityId: plan.id,
-        metadata: { name: plan.name, price: input.price, yearlyPrice: input.yearlyPrice },
-      },
-    });
+      const canonicalFeatures = [
+        "CUSTOM_AGENCY_LOGO",
+        "FEEDBACK_REVIEWS",
+        "CUSTOMER_INSIGHTS",
+        "REPORTS_ANALYTICS",
+      ];
 
-    return plan;
+      for (const featureKey of canonicalFeatures) {
+        const enabled = input.entitlements && featureKey in input.entitlements
+          ? Boolean(input.entitlements[featureKey as keyof typeof input.entitlements])
+          : false;
+
+        await tx.planFeatureEntitlement.upsert({
+          where: {
+            planId_featureKey: {
+              planId: plan.id,
+              featureKey,
+            },
+          },
+          create: {
+            planId: plan.id,
+            featureKey,
+            enabled,
+          },
+          update: {
+            enabled,
+          },
+        });
+      }
+
+      const canonicalResources = ["TRIPS", "QUOTATIONS", "BOOKINGS"];
+      for (const resourceKey of canonicalResources) {
+        let limitVal: number | null = 20;
+        if (input.usageLimits && resourceKey in input.usageLimits) {
+          const rawLimit = input.usageLimits[resourceKey as keyof typeof input.usageLimits];
+          limitVal = (rawLimit === null || rawLimit === undefined) ? null : Math.max(0, Math.floor(rawLimit));
+        }
+
+        await tx.planUsageLimit.upsert({
+          where: {
+            planId_resourceKey: {
+              planId: plan.id,
+              resourceKey,
+            },
+          },
+          create: {
+            planId: plan.id,
+            resourceKey,
+            limit: limitVal,
+          },
+          update: {
+            limit: limitVal,
+          },
+        });
+      }
+
+      await tx.platformAuditLog.create({
+        data: {
+          actorUserId,
+          action: "PLAN_CREATED",
+          entityType: "SUBSCRIPTION_PLAN",
+          entityId: plan.id,
+          metadata: {
+            name: plan.name,
+            price: input.price,
+            yearlyPrice: input.yearlyPrice,
+            entitlements: input.entitlements,
+            usageLimits: input.usageLimits,
+          },
+        },
+      });
+
+      const freshPlan = await tx.subscriptionPlan.findUnique({
+        where: { id: plan.id },
+        include: {
+          featureEntitlements: true,
+          usageLimits: true,
+          _count: { select: { subscriptions: true } },
+        },
+      });
+
+      if (!freshPlan) throw new Error("Failed to retrieve created plan.");
+
+      const entitlementsRecord: Record<string, boolean> = {};
+      freshPlan.featureEntitlements.forEach((fe) => {
+        entitlementsRecord[fe.featureKey] = fe.enabled;
+      });
+
+      const usageLimitsRecord: Record<string, number | null> = {};
+      freshPlan.usageLimits.forEach((ul) => {
+        usageLimitsRecord[ul.resourceKey] = ul.limit;
+      });
+
+      return {
+        ...freshPlan,
+        price: Number(freshPlan.price),
+        yearlyPrice: freshPlan.yearlyPrice ? Number(freshPlan.yearlyPrice) : null,
+        subscriptionsCount: freshPlan._count.subscriptions,
+        entitlements: entitlementsRecord,
+        usageLimits: usageLimitsRecord,
+      };
+    });
   },
 
   async updatePlan(planId: string, input: PlanUpdateInput, actorUserId: string) {
-    const plan = await prisma.subscriptionPlan.update({
-      where: { id: planId },
-      data: {
-        name: input.name,
-        description: input.description,
-        price: input.price !== undefined ? new Prisma.Decimal(input.price) : undefined,
-        yearlyPrice: input.yearlyPrice !== undefined ? (input.yearlyPrice !== null ? new Prisma.Decimal(input.yearlyPrice) : null) : undefined,
-        durationDays: input.durationDays,
-        features: input.features !== undefined ? (input.features ?? Prisma.JsonNull) : undefined,
-        isPopular: input.isPopular,
-        displayOrder: input.displayOrder,
-        isActive: input.isActive,
-      },
+    return prisma.$transaction(async (tx) => {
+      const plan = await tx.subscriptionPlan.update({
+        where: { id: planId },
+        data: {
+          name: input.name,
+          description: input.description,
+          price: input.price !== undefined ? new Prisma.Decimal(input.price) : undefined,
+          yearlyPrice: input.yearlyPrice !== undefined ? (input.yearlyPrice !== null ? new Prisma.Decimal(input.yearlyPrice) : null) : undefined,
+          durationDays: input.durationDays,
+          features: input.features !== undefined ? (input.features ?? Prisma.JsonNull) : undefined,
+          isPopular: input.isPopular,
+          displayOrder: input.displayOrder,
+          isActive: input.isActive,
+        },
+      });
+
+      if (input.entitlements) {
+        const canonicalFeatures = [
+          "CUSTOM_AGENCY_LOGO",
+          "FEEDBACK_REVIEWS",
+          "CUSTOMER_INSIGHTS",
+          "REPORTS_ANALYTICS",
+        ];
+
+        for (const featureKey of canonicalFeatures) {
+          if (featureKey in input.entitlements) {
+            const enabled = Boolean(input.entitlements[featureKey as keyof typeof input.entitlements]);
+            await tx.planFeatureEntitlement.upsert({
+              where: {
+                planId_featureKey: {
+                  planId: plan.id,
+                  featureKey,
+                },
+              },
+              create: {
+                planId: plan.id,
+                featureKey,
+                enabled,
+              },
+              update: {
+                enabled,
+              },
+            });
+          }
+        }
+      }
+
+      if (input.usageLimits) {
+        const canonicalResources = ["TRIPS", "QUOTATIONS", "BOOKINGS"];
+        for (const resourceKey of canonicalResources) {
+          if (resourceKey in input.usageLimits) {
+            const rawLimit = input.usageLimits[resourceKey as keyof typeof input.usageLimits];
+            const limitVal = (rawLimit === null || rawLimit === undefined) ? null : Math.max(0, Math.floor(rawLimit));
+            await tx.planUsageLimit.upsert({
+              where: {
+                planId_resourceKey: {
+                  planId: plan.id,
+                  resourceKey,
+                },
+              },
+              create: {
+                planId: plan.id,
+                resourceKey,
+                limit: limitVal,
+              },
+              update: {
+                limit: limitVal,
+              },
+            });
+          }
+        }
+      }
+
+      await tx.platformAuditLog.create({
+        data: {
+          actorUserId,
+          action: "PLAN_UPDATED",
+          entityType: "SUBSCRIPTION_PLAN",
+          entityId: plan.id,
+          metadata: input,
+        },
+      });
+
+      const freshPlan = await tx.subscriptionPlan.findUnique({
+        where: { id: plan.id },
+        include: {
+          featureEntitlements: true,
+          usageLimits: true,
+          _count: { select: { subscriptions: true } },
+        },
+      });
+
+      if (!freshPlan) throw new Error("Failed to retrieve updated plan.");
+
+      const entitlementsRecord: Record<string, boolean> = {};
+      freshPlan.featureEntitlements.forEach((fe) => {
+        entitlementsRecord[fe.featureKey] = fe.enabled;
+      });
+
+      const usageLimitsRecord: Record<string, number | null> = {};
+      freshPlan.usageLimits.forEach((ul) => {
+        usageLimitsRecord[ul.resourceKey] = ul.limit;
+      });
+
+      return {
+        ...freshPlan,
+        price: Number(freshPlan.price),
+        yearlyPrice: freshPlan.yearlyPrice ? Number(freshPlan.yearlyPrice) : null,
+        subscriptionsCount: freshPlan._count.subscriptions,
+        entitlements: entitlementsRecord,
+        usageLimits: usageLimitsRecord,
+      };
     });
-
-
-    await prisma.platformAuditLog.create({
-      data: {
-        actorUserId,
-        action: "PLAN_UPDATED",
-        entityType: "SUBSCRIPTION_PLAN",
-        entityId: plan.id,
-        metadata: input,
-      },
-    });
-
-    return plan;
   },
 
 

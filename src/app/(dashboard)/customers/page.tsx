@@ -8,6 +8,8 @@ import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { useSubscription } from "@/context/subscription-context";
 import {
   customerClient,
   CustomerWithCounts,
@@ -82,12 +84,24 @@ function getGradient(name: string) {
 
 export default function CustomersPage() {
   const router = useRouter();
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
 
   // Data states
   const [customers, setCustomers] = React.useState<CustomerWithCounts[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+
+  const isReadOnly = isCentralReadOnly || localReadOnly;
+
+  const handleAddCustomer = () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    router.push("/customers/new");
+  };
 
   // Search & Filter states
   const [search, setSearch] = React.useState("");
@@ -133,7 +147,7 @@ export default function CustomersPage() {
       }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-        setIsReadOnly(true);
+        setLocalReadOnly(true);
       }
       setError(getErrorMessage(err, "Unable to load customer directory. Please try again."));
     } finally {
@@ -166,8 +180,12 @@ export default function CustomersPage() {
 
   // Archive Customer
   const handleArchive = (id: string, name: string, customerNumber?: string | null) => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
     if (isReadOnly) {
-      toast.error("Subscription expired. Read-only mode is active.");
+      toast.error("Modifications are restricted in read-only mode.");
       return;
     }
 
@@ -185,7 +203,13 @@ export default function CustomersPage() {
           setConfirmAction(null);
           await fetchCustomers();
         } catch (err: any) {
-          toast.error(getErrorMessage(err, "We couldn't archive the customer. Please try again."));
+          if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+            setLocalReadOnly(true);
+            refreshSubscription();
+            toast.error("Modifications restricted. Read-only mode is active.");
+          } else {
+            toast.error(getErrorMessage(err, "We couldn't archive the customer. Please try again."));
+          }
         } finally {
           setActionLoading(false);
         }
@@ -215,14 +239,14 @@ export default function CustomersPage() {
         {isReadOnly && <ReadOnlyBanner moduleName="Customer Directory" />}
 
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
           {/* Title & Info */}
           <div className="space-y-2 z-10">
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-blue-50 text-blue-700 border border-blue-100">
-                <Users className="h-3 w-3 text-blue-500" />
+                <Users className="h-3 w-3 text-blue-500 shrink-0" />
                 Customer 360
               </span>
               <span className="text-slate-300">•</span>
@@ -232,7 +256,7 @@ export default function CustomersPage() {
             </div>
 
             <div className="flex flex-wrap items-baseline gap-3">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+              <h1 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900">
                 Customers & Profiles
               </h1>
               <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
@@ -242,57 +266,56 @@ export default function CustomersPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
+          <div className="flex items-center gap-3 z-10 w-full lg:w-auto">
             <Button
-              onClick={() => router.push("/customers/new")}
-              disabled={isReadOnly}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              onClick={handleAddCustomer}
+              className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 shrink-0" />
               Add Customer
             </Button>
           </div>
         </div>
 
         {/* KPI Telemetry Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-              <Users className="h-5 w-5" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Total Customers</span>
-              <h4 className="text-lg font-black text-slate-900">{totalCustomers}</h4>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-              <Inbox className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Enquiries Generated</span>
-              <h4 className="text-lg font-black text-slate-900">{totalEnquiries}</h4>
+            <div className="min-w-0">
+              <span className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight truncate">Total Customers</span>
+              <h4 className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{totalCustomers}</h4>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center font-bold">
-              <Compass className="h-5 w-5" />
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
+              <Inbox className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Trips Planned</span>
-              <h4 className="text-lg font-black text-slate-900">{totalTrips}</h4>
+            <div className="min-w-0">
+              <span className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight truncate">Enquiries Generated</span>
+              <h4 className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{totalEnquiries}</h4>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-              <CheckCircle2 className="h-5 w-5" />
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center font-bold shrink-0">
+              <Compass className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Confirmed Bookings</span>
-              <h4 className="text-lg font-black text-emerald-700">{totalBookings}</h4>
+            <div className="min-w-0">
+              <span className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight truncate">Trips Planned</span>
+              <h4 className="text-base sm:text-lg font-black text-slate-900 mt-0.5">{totalTrips}</h4>
+            </div>
+          </div>
+
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight truncate">Confirmed Bookings</span>
+              <h4 className="text-base sm:text-lg font-black text-emerald-700 mt-0.5">{totalBookings}</h4>
             </div>
           </div>
         </div>
@@ -364,7 +387,7 @@ export default function CustomersPage() {
                     : "Add clients to track their inquiries, trip itineraries, costing proposals, and booking payments."
                 }
                 actionText={isFilterActive ? "Clear Filter" : "Add First Customer"}
-                onAction={isFilterActive ? handleClearFilters : () => router.push("/customers/new")}
+                onAction={isFilterActive ? handleClearFilters : handleAddCustomer}
               />
             </div>
           ) : !loading && !error && (
@@ -578,6 +601,14 @@ export default function CustomersPage() {
           </div>
         </div>
       </div>
+
+      {/* Read-Only Mode Warning Dialog */}
+      <ReadOnlyModeDialog
+        open={showReadOnlyDialog}
+        onOpenChange={setShowReadOnlyDialog}
+        reason={readOnlyReason}
+        actionLabel="Adding or modifying customers"
+      />
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

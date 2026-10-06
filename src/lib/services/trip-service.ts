@@ -6,7 +6,8 @@ import {
   UpdateTripInput,
   TripQueryParams,
 } from "@/lib/validation/trip-schema";
-import { Trip, Customer, Traveler, ItineraryItem, TripDestination, Destination } from "@prisma/client";
+import { Trip, Customer, Traveler, ItineraryItem, TripDestination, Destination, Prisma } from "@prisma/client";
+import { entitlementService } from "./entitlement-service";
 
 export interface TripWithRelations extends Trip {
   customer: Customer;
@@ -17,6 +18,19 @@ export interface TripWithRelations extends Trip {
   tripHotels?: any[];
   tripVehicles?: any[];
   tripActivities?: any[];
+  publicShareLinks?: {
+    id: string;
+    tokenHash: string;
+    status: string;
+    createdAt: Date;
+  }[];
+  feedbacks?: {
+    id: string;
+    rating: number;
+    comments?: string | null;
+    serviceRecoveryStatus: string | null;
+    createdAt: Date;
+  }[];
   _count?: {
     travelers: number;
     itineraryItems: number;
@@ -36,12 +50,13 @@ export interface PaginatedTripsResult {
 /**
  * Generates a unique trip number for an agency (e.g. TRP-202608-1234).
  */
-async function generateUniqueTripNumber(agencyId: string): Promise<string> {
+async function generateUniqueTripNumber(agencyId: string, tx?: Prisma.TransactionClient): Promise<string> {
+  const db = tx || prisma;
   const dateStr = new Date().toISOString().slice(0, 7).replace("-", ""); // YYYYMM
   for (let attempt = 0; attempt < 5; attempt++) {
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const candidate = `TRP-${dateStr}-${randomSuffix}`;
-    const existing = await prisma.trip.findUnique({
+    const existing = await db.trip.findUnique({
       where: {
         agencyId_tripNumber: {
           agencyId,
@@ -145,7 +160,7 @@ export const tripService = {
    * Returns null if not found or if the record belongs to another agency.
    */
   async getTripById(agencyId: string, tripId: string): Promise<TripWithRelations | null> {
-    return prisma.trip.findFirst({
+    const trip = await prisma.trip.findFirst({
       where: {
         id: tripId,
         agencyId,
@@ -186,6 +201,28 @@ export const tripService = {
             updatedAt: true,
           },
         },
+        publicShareLinks: {
+          where: { status: "ACTIVE", revokedAt: null },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            tokenHash: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+        feedbacks: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            rating: true,
+            comments: true,
+            serviceRecoveryStatus: true,
+            createdAt: true,
+          },
+        },
         _count: {
           select: {
             travelers: true,
@@ -196,6 +233,97 @@ export const tripService = {
         },
       },
     });
+
+    if (!trip) {
+      return null;
+    }
+
+    return trip as TripWithRelations;
+  },
+
+  /**
+   * Explicitly retrieves or creates an active PublicShareLink for customer feedback link sharing.
+   * Strictly enforces:
+   * - Authenticated agency tenancy
+   * - Trip status must be COMPLETED
+   * - Reuses existing active link (status: ACTIVE, revokedAt: null)
+   * - Rejects if an existing link was REVOKED (does not silently recreate)
+   * - Race condition & duplicate prevention via transactional check and creation
+   */
+  async getOrCreateFeedbackLink(
+    agencyId: string,
+    tripId: string
+  ): Promise<{ id: string; tokenHash: string; status: string; createdAt: Date }> {
+    return await prisma.$transaction(async (tx) => {
+      // 1. Acquire trip-level row lock inside transaction to serialize concurrent requests for this trip
+      const lockedTrips = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+        SELECT "id", "status" FROM "trips" WHERE "id" = ${tripId} AND "agencyId" = ${agencyId} FOR UPDATE
+      `;
+
+      const lockedTrip = lockedTrips[0];
+
+      if (!lockedTrip) {
+        throw new NotFoundError("Trip");
+      }
+
+      if (lockedTrip.status !== "COMPLETED") {
+        throw new ValidationError("Feedback links can only be generated for completed trips.");
+      }
+
+      // 2. Re-check for existing active share link AFTER lock acquisition
+      const activeLink = await tx.publicShareLink.findFirst({
+        where: {
+          agencyId,
+          tripId,
+          status: "ACTIVE",
+          revokedAt: null,
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          tokenHash: true,
+          status: true,
+          createdAt: true,
+        },
+      });
+
+      if (activeLink) {
+        return activeLink;
+      }
+
+      // 3. Check if a revoked share link exists for this trip
+      const revokedLink = await tx.publicShareLink.findFirst({
+        where: {
+          agencyId,
+          tripId,
+          OR: [{ status: "REVOKED" }, { revokedAt: { not: null } }],
+        },
+        select: { id: true },
+      });
+
+      if (revokedLink) {
+        throw new ValidationError("Customer feedback link for this trip was explicitly revoked.");
+      }
+
+      // 4. Create new active share link safely
+      const tokenHash = `psl_${crypto.randomUUID().replace(/-/g, "")}`;
+      const newShareLink = await tx.publicShareLink.create({
+        data: {
+          agencyId,
+          tripId,
+          tokenHash,
+          status: "ACTIVE",
+        },
+        select: {
+          id: true,
+          tokenHash: true,
+          status: true,
+          createdAt: true,
+        },
+      });
+
+      return newShareLink;
+    });
   },
 
   /**
@@ -204,70 +332,78 @@ export const tripService = {
    * If destinationIds are provided, verifies all exist under agency and creates TripDestination records.
    */
   async createTrip(agencyId: string, data: CreateTripInput): Promise<Trip> {
-    // 1. Verify customer exists under this agency and is not archived
-    const customer = await prisma.customer.findFirst({
-      where: {
-        id: data.customerId,
-        agencyId,
-        archivedAt: null,
-      },
-    });
+    return prisma.$transaction(async (tx) => {
+      // 1. Lock authoritative agency subscription row FOR UPDATE
+      await entitlementService.lockAgencySubscription(agencyId, tx);
 
-    if (!customer) {
-      throw new NotFoundError("Customer");
-    }
+      // 2. Validate quota for "TRIPS" resource inside transaction
+      await entitlementService.checkQuota(agencyId, "TRIPS", tx);
 
-    // 2. Validate destination IDs if provided
-    if (data.destinationIds && data.destinationIds.length > 0) {
-      const uniqueDestIds = Array.from(new Set(data.destinationIds));
-      const foundDests = await prisma.destination.findMany({
+      // 3. Verify customer exists under this agency and is not archived
+      const customer = await tx.customer.findFirst({
         where: {
-          id: { in: uniqueDestIds },
+          id: data.customerId,
           agencyId,
-          status: "ACTIVE",
+          archivedAt: null,
         },
-        select: { id: true },
       });
 
-      if (foundDests.length !== uniqueDestIds.length) {
-        throw new ValidationError("One or more selected destinations do not exist, are inactive, or belong to another agency.");
+      if (!customer) {
+        throw new NotFoundError("Customer");
       }
-    }
 
-    // 3. Determine or generate unique trip number
-    const tripNumber = data.tripNumber?.trim() || (await generateUniqueTripNumber(agencyId));
-
-    // 4. Create trip with optional nested trip destinations
-    return prisma.trip.create({
-      data: {
-        agencyId,
-        customerId: data.customerId,
-        tripNumber,
-        title: data.title,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        status: data.status || "DRAFT",
-        notes: data.notes || null,
-        ...(data.destinationIds && data.destinationIds.length > 0
-          ? {
-              tripDestinations: {
-                create: data.destinationIds.map((destId, idx) => ({
-                  destinationId: destId,
-                  sequence: idx + 1,
-                })),
-              },
-            }
-          : {}),
-      },
-      include: {
-        customer: true,
-        tripDestinations: {
-          include: {
-            destination: true,
+      // 4. Validate destination IDs if provided
+      if (data.destinationIds && data.destinationIds.length > 0) {
+        const uniqueDestIds = Array.from(new Set(data.destinationIds));
+        const foundDests = await tx.destination.findMany({
+          where: {
+            id: { in: uniqueDestIds },
+            agencyId,
+            status: "ACTIVE",
           },
-          orderBy: { sequence: "asc" },
+          select: { id: true },
+        });
+
+        if (foundDests.length !== uniqueDestIds.length) {
+          throw new ValidationError("One or more selected destinations do not exist, are inactive, or belong to another agency.");
+        }
+      }
+
+      // 5. Determine or generate unique trip number
+      const tripNumber = data.tripNumber?.trim() || (await generateUniqueTripNumber(agencyId, tx));
+
+      // 6. Create trip with optional nested trip destinations inside transaction
+      return tx.trip.create({
+        data: {
+          agencyId,
+          customerId: data.customerId,
+          tripNumber,
+          title: data.title,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          status: data.status || "DRAFT",
+          notes: data.notes || null,
+          ...(data.destinationIds && data.destinationIds.length > 0
+            ? {
+                tripDestinations: {
+                  create: data.destinationIds.map((destId, idx) => ({
+                    destinationId: destId,
+                    sequence: idx + 1,
+                  })),
+                },
+              }
+            : {}),
         },
-      },
+        include: {
+          customer: true,
+          tripDestinations: {
+            include: {
+              destination: true,
+            },
+            orderBy: { sequence: "asc" },
+          },
+        },
+      });
     });
   },
 

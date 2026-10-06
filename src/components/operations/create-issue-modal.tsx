@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import { X, AlertCircle, Loader2 } from "lucide-react";
 
 interface CreateIssueModalProps {
@@ -47,6 +48,7 @@ export function CreateIssueModal({
   onClose,
   onSuccess,
 }: CreateIssueModalProps) {
+  useModalScrollLock(isOpen);
   const [loading, setLoading] = React.useState(false);
   const [selectedOpId, setSelectedOpId] = React.useState<string>(
     operationId || operationList[0]?.id || ""
@@ -113,17 +115,17 @@ export function CreateIssueModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
-      <div className="bg-white border border-slate-200/90 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
+      <div className="bg-white border border-slate-200/90 rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-600 flex items-center justify-center font-bold text-sm">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-9 w-9 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-600 flex items-center justify-center font-bold text-sm shrink-0">
               <AlertCircle className="h-5 w-5" />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900">Log Operational Issue</h3>
-              <p className="text-xs text-slate-500 font-medium">
+            <div className="min-w-0">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">Log Operational Issue</h3>
+              <p className="text-xs text-slate-500 font-medium truncate">
                 Record blockers, guest complaints, or delays
               </p>
             </div>
@@ -131,7 +133,7 @@ export function CreateIssueModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
           >
             <X className="h-4 w-4" />
           </button>
@@ -163,8 +165,8 @@ export function CreateIssueModal({
         )}
 
         {/* Form */}
-        <form onSubmit={formik.handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <form onSubmit={formik.handleSubmit} className="space-y-3.5 sm:space-y-4">
+          <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-3 sm:gap-3.5">
             {/* Priority */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">
@@ -265,20 +267,20 @@ export function CreateIssueModal({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-2.5 pt-3 border-t border-slate-100">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
               disabled={loading}
-              className="text-xs font-semibold h-9 px-4 cursor-pointer"
+              className="text-xs font-semibold h-9 px-4 cursor-pointer w-full sm:w-auto justify-center"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold h-9 px-5 cursor-pointer shadow-xs"
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold h-9 px-5 cursor-pointer shadow-xs w-full sm:w-auto justify-center"
             >
               {loading ? (
                 <>

@@ -457,6 +457,45 @@ export const financeService = {
       : input.notes;
 
     const payment = await prisma.$transaction(async (tx) => {
+      // 1. Acquire row lock on the Booking record to serialize concurrent payment submissions
+      await tx.$queryRaw`
+        SELECT "id" FROM "bookings" WHERE "id" = ${booking.id} AND "agencyId" = ${agencyId} FOR UPDATE
+      `;
+
+      // 2. Fetch fresh active completed payments inside transaction to calculate real-time authoritative balance
+      const freshBooking = await tx.booking.findUnique({
+        where: { id: booking.id },
+        select: { totalAmount: true },
+      });
+
+      const activePayments = await tx.payment.findMany({
+        where: { bookingId: booking.id, archivedAt: null, status: PaymentStatus.COMPLETED },
+        select: { amount: true, refundedAmount: true },
+      });
+
+      let totalPaid = 0;
+      let totalRefunded = 0;
+      for (const p of activePayments) {
+        totalPaid += Number(p.amount);
+        totalRefunded += Number(p.refundedAmount || 0);
+      }
+      const netPaid = Math.max(0, totalPaid - totalRefunded);
+      const totalAmount = freshBooking ? Number(freshBooking.totalAmount) : Number(booking.totalAmount);
+      const currentOutstanding = Math.max(0, Math.round((totalAmount - netPaid) * 100) / 100);
+      const requestedAmount = Math.round(input.amount * 100) / 100;
+
+      if (currentOutstanding <= 0) {
+        throw new Error("Cannot record payment. The booking is already fully paid with ₹0.00 outstanding due.");
+      }
+
+      if (requestedAmount > currentOutstanding) {
+        const formattedReq = requestedAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+        const formattedOut = currentOutstanding.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+        throw new Error(
+          `Payment amount cannot exceed the current outstanding due of ₹${formattedOut}. (Requested: ₹${formattedReq})`
+        );
+      }
+
       const p = await tx.payment.create({
         data: {
           agencyId,
@@ -713,78 +752,105 @@ export const financeService = {
     input: UpdateSupplierPayableInput,
     userId?: string
   ): Promise<SupplierPayable> {
-    const payable = await prisma.supplierPayable.findFirst({
-      where: { id, agencyId, archivedAt: null },
-    });
-    if (!payable) throw new Error("Payable record not found.");
+    return prisma.$transaction(async (tx) => {
+      // 1. Acquire row lock on SupplierPayable record to serialize concurrent edits/disbursements
+      await tx.$queryRaw`
+        SELECT "id" FROM "supplier_payables" WHERE "id" = ${id} AND "agencyId" = ${agencyId} FOR UPDATE
+      `;
 
-    if (payable.tripOperationId) {
-      await this.verifyOperationNotFinalized(agencyId, payable.tripOperationId);
-    }
+      const payable = await tx.supplierPayable.findFirst({
+        where: { id, agencyId, archivedAt: null },
+      });
+      if (!payable) throw new Error("Payable record not found.");
 
-    const currentActual = Number(payable.actualAmount);
-    const currentPaid = Number(payable.paidAmount);
-    const newActual = input.actualAmount !== undefined ? input.actualAmount : currentActual;
-    const newPlanned = input.plannedAmount !== undefined ? input.plannedAmount : Number(payable.plannedAmount);
-    const newOutstanding = Math.max(0, newActual - currentPaid);
-
-    let newStatus = input.status || payable.status;
-    if (!input.status) {
-      if (currentPaid >= newActual && newActual > 0) {
-        newStatus = SupplierPayableStatus.PAID;
-      } else if (currentPaid > 0) {
-        newStatus = SupplierPayableStatus.PARTIALLY_PAID;
-      } else if (payable.status !== SupplierPayableStatus.CANCELLED) {
-        newStatus = SupplierPayableStatus.PENDING;
+      if (payable.tripOperationId) {
+        await this.verifyOperationNotFinalized(agencyId, payable.tripOperationId);
       }
-    }
 
-    let updatedNotes = input.notes !== undefined ? input.notes : payable.notes;
-    if (input.actualAmount !== undefined && input.actualAmount !== currentActual) {
-      const nowStr = new Date().toISOString().split("T")[0];
-      const editLog = `[Edited ${nowStr}: Amount changed from ₹${currentActual.toLocaleString("en-IN")} to ₹${newActual.toLocaleString("en-IN")}${input.reason ? ` (${input.reason})` : ""}${userId ? ` by ${userId}` : ""}]`;
-      updatedNotes = updatedNotes ? `${updatedNotes} | ${editLog}` : editLog;
-    }
+      // Fetch fresh active completed disbursements to calculate authoritative paid amount
+      const activePayments = await tx.supplierPayment.findMany({
+        where: { payableId: payable.id, archivedAt: null, status: SupplierPaymentStatus.COMPLETED },
+        select: { amount: true },
+      });
+      let freshPaid = 0;
+      for (const p of activePayments) {
+        freshPaid += Number(p.amount);
+      }
 
-    const updated = await prisma.supplierPayable.update({
-      where: { id: payable.id },
-      data: {
-        payeeName: input.payeeName !== undefined ? input.payeeName : payable.payeeName,
-        description: input.description !== undefined ? input.description : payable.description,
-        plannedAmount: new Prisma.Decimal(newPlanned),
-        actualAmount: new Prisma.Decimal(newActual),
-        outstandingAmount: new Prisma.Decimal(newOutstanding),
-        dueDate: input.dueDate !== undefined ? (input.dueDate ? new Date(input.dueDate) : null) : payable.dueDate,
-        status: newStatus,
-        notes: updatedNotes,
-      },
-    });
+      const currentActual = Number(payable.actualAmount);
+      const currentPaid = Math.round(freshPaid * 100) / 100;
+      const newActual = input.actualAmount !== undefined ? Math.round(input.actualAmount * 100) / 100 : currentActual;
+      const newPlanned = input.plannedAmount !== undefined ? input.plannedAmount : Number(payable.plannedAmount);
 
-    if (payable.tripOperationId && input.actualAmount !== undefined && input.actualAmount !== currentActual) {
-      try {
-        await prisma.operationEvent.create({
-          data: {
-            agencyId,
-            tripOperationId: payable.tripOperationId,
-            eventType: "SUPPLIER_PAYABLE_UPDATED",
-            description: `Updated payable ${payable.payableNumber} (${payable.description}) amount from ₹${currentActual.toLocaleString("en-IN")} to ₹${newActual.toLocaleString("en-IN")}.${input.reason ? ` Reason: ${input.reason}` : ""}`,
-            metadata: {
-              payableId: payable.id,
-              previousActualAmount: currentActual,
-              newActualAmount: newActual,
-              plannedAmount: Number(payable.plannedAmount),
-              reason: input.reason,
-              userId,
+      if (newActual < currentPaid - 0.001) {
+        const formattedNew = newActual.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+        const formattedPaid = currentPaid.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+        throw new Error(
+          `Payable amount (₹${formattedNew}) cannot be less than the amount already paid of ₹${formattedPaid}.`
+        );
+      }
+
+      const newOutstanding = Math.max(0, Math.round((newActual - currentPaid) * 100) / 100);
+
+      let newStatus = input.status || payable.status;
+      if (!input.status) {
+        if (currentPaid >= newActual && newActual > 0) {
+          newStatus = SupplierPayableStatus.PAID;
+        } else if (currentPaid > 0) {
+          newStatus = SupplierPayableStatus.PARTIALLY_PAID;
+        } else if (payable.status !== SupplierPayableStatus.CANCELLED) {
+          newStatus = SupplierPayableStatus.PENDING;
+        }
+      }
+
+      let updatedNotes = input.notes !== undefined ? input.notes : payable.notes;
+      if (input.actualAmount !== undefined && Math.abs(input.actualAmount - currentActual) > 0.001) {
+        const nowStr = new Date().toISOString().split("T")[0];
+        const editLog = `[Edited ${nowStr}: Amount changed from ₹${currentActual.toLocaleString("en-IN")} to ₹${newActual.toLocaleString("en-IN")}${input.reason ? ` (${input.reason})` : ""}${userId ? ` by ${userId}` : ""}]`;
+        updatedNotes = updatedNotes ? `${updatedNotes} | ${editLog}` : editLog;
+      }
+
+      const updated = await tx.supplierPayable.update({
+        where: { id: payable.id },
+        data: {
+          payeeName: input.payeeName !== undefined ? input.payeeName : payable.payeeName,
+          description: input.description !== undefined ? input.description : payable.description,
+          plannedAmount: new Prisma.Decimal(newPlanned),
+          actualAmount: new Prisma.Decimal(newActual),
+          paidAmount: new Prisma.Decimal(currentPaid),
+          outstandingAmount: new Prisma.Decimal(newOutstanding),
+          dueDate: input.dueDate !== undefined ? (input.dueDate ? new Date(input.dueDate) : null) : payable.dueDate,
+          status: newStatus,
+          notes: updatedNotes,
+        },
+      });
+
+      if (payable.tripOperationId && input.actualAmount !== undefined && Math.abs(input.actualAmount - currentActual) > 0.001) {
+        try {
+          await tx.operationEvent.create({
+            data: {
+              agencyId,
+              tripOperationId: payable.tripOperationId,
+              eventType: "SUPPLIER_PAYABLE_UPDATED",
+              description: `Updated payable ${payable.payableNumber} (${payable.description}) amount from ₹${currentActual.toLocaleString("en-IN")} to ₹${newActual.toLocaleString("en-IN")}.${input.reason ? ` Reason: ${input.reason}` : ""}`,
+              metadata: {
+                payableId: payable.id,
+                previousActualAmount: currentActual,
+                newActualAmount: newActual,
+                plannedAmount: Number(payable.plannedAmount),
+                reason: input.reason,
+                userId,
+              },
+              createdBy: userId,
             },
-            createdBy: userId,
-          },
-        });
-      } catch {
-        // Non-blocking
+          });
+        } catch {
+          // Non-blocking
+        }
       }
-    }
 
-    return updated;
+      return updated;
+    });
   },
 
   /**
@@ -896,13 +962,49 @@ export const financeService = {
       : input.notes;
 
     return prisma.$transaction(async (tx) => {
+      let activePayable = payable;
+
+      if (input.payableId) {
+        // 1. Acquire row lock on SupplierPayable record to serialize concurrent disbursements
+        await tx.$queryRaw`
+          SELECT "id" FROM "supplier_payables" WHERE "id" = ${input.payableId} AND "agencyId" = ${agencyId} FOR UPDATE
+        `;
+
+        // 2. Fetch fresh supplier payable inside transaction to calculate real-time authoritative balance
+        const freshPayable = await tx.supplierPayable.findFirst({
+          where: { id: input.payableId, agencyId, archivedAt: null },
+        });
+
+        if (!freshPayable) {
+          throw new Error("Payable record not found.");
+        }
+        activePayable = freshPayable;
+
+        const actualAmt = Number(activePayable.actualAmount);
+        const paidAmt = Number(activePayable.paidAmount);
+        const currentOutstanding = Math.max(0, Math.round((actualAmt - paidAmt) * 100) / 100);
+        const requestedAmount = Math.round(input.amount * 100) / 100;
+
+        if (currentOutstanding <= 0) {
+          throw new Error("Cannot record disbursement. The payable is already fully settled with ₹0.00 outstanding.");
+        }
+
+        if (requestedAmount > currentOutstanding) {
+          const formattedReq = requestedAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+          const formattedOut = currentOutstanding.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+          throw new Error(
+            `Payment amount cannot exceed the current outstanding payable of ₹${formattedOut}. (Requested: ₹${formattedReq})`
+          );
+        }
+      }
+
       const payment = await tx.supplierPayment.create({
         data: {
           agencyId,
-          supplierId: input.supplierId || payable?.supplierId || null,
+          supplierId: input.supplierId || activePayable?.supplierId || null,
           payeeName: resolvedPayee,
           payableId: input.payableId || null,
-          bookingId: input.bookingId || payable?.bookingId || null,
+          bookingId: input.bookingId || activePayable?.bookingId || null,
           paymentNumber,
           amount: new Prisma.Decimal(input.amount),
           currency: input.currency || "INR",
@@ -916,12 +1018,12 @@ export const financeService = {
       });
 
       // If tied to payable, update payable balances and status
-      if (payable) {
-        const newPaid = Number(payable.paidAmount) + input.amount;
-        const actualAmt = Number(payable.actualAmount);
-        const newOutstanding = Math.max(0, actualAmt - newPaid);
+      if (activePayable) {
+        const newPaid = Number(activePayable.paidAmount) + input.amount;
+        const actualAmt = Number(activePayable.actualAmount);
+        const newOutstanding = Math.max(0, Math.round((actualAmt - newPaid) * 100) / 100);
 
-        let newStatus: SupplierPayableStatus = payable.status;
+        let newStatus: SupplierPayableStatus = activePayable.status;
         if (newPaid >= actualAmt && actualAmt > 0) {
           newStatus = SupplierPayableStatus.PAID;
         } else if (newPaid > 0) {
@@ -929,7 +1031,7 @@ export const financeService = {
         }
 
         await tx.supplierPayable.update({
-          where: { id: payable.id },
+          where: { id: activePayable.id },
           data: {
             paidAmount: new Prisma.Decimal(newPaid),
             outstandingAmount: new Prisma.Decimal(newOutstanding),

@@ -43,6 +43,7 @@ import {
   AdminSubscriptionPaymentItem,
   SubscriptionPaymentSummaryStats,
 } from "@/lib/services/admin-service";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   BANK_TRANSFER: "Bank Transfer",
@@ -98,6 +99,8 @@ export default function AdminPaymentsPage() {
   const [createDate, setCreateDate] = React.useState(new Date().toISOString().split("T")[0]);
   const [createNotes, setCreateNotes] = React.useState("");
   const [createLoading, setCreateLoading] = React.useState(false);
+
+  useModalScrollLock(Boolean(selectedPayment || isCreateOpen));
 
   // Fetch live payments from API
   const fetchPayments = React.useCallback(async () => {

@@ -1,6 +1,7 @@
 import "server-only";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import { entitlementService } from "./entitlement-service";
 import {
   Quotation,
   QuotationItem,
@@ -684,41 +685,48 @@ export const quotationService = {
    * Create a manual Quotation with calculated amounts
    */
   async createQuotation(agencyId: string, data: CreateQuotationInput): Promise<QuotationWithRelations> {
-    const quotationNumber = await this.generateNextQuotationNumber(agencyId);
-    const shareToken = crypto.randomBytes(16).toString("hex");
+    return prisma.$transaction(async (tx) => {
+      // 1. Lock authoritative agency subscription FOR UPDATE
+      await entitlementService.lockAgencySubscription(agencyId, tx);
 
-    const taxConfig = await this.resolveQuotationTaxConfig(agencyId, {
-      taxRate: data.taxRate,
-      taxPercentage: data.taxPercentage,
-      taxMode: data.taxMode,
-      gstTreatment: data.gstTreatment,
-    });
+      // 2. Validate quota for "QUOTATIONS" resource inside transaction
+      await entitlementService.checkQuota(agencyId, "QUOTATIONS", tx);
 
-    const subtotal = Number(data.subtotal || 0);
-    const markupPct = Number(data.markupPercentage || 0);
-    const markupAmount = data.markupAmount !== undefined ? Number(data.markupAmount) : Math.round((subtotal * markupPct) / 100);
-    const baseWithMarkup = subtotal + markupAmount;
+      const quotationNumber = await this.generateNextQuotationNumber(agencyId, tx);
+      const shareToken = crypto.randomBytes(16).toString("hex");
 
-    const discountPct = Number(data.discountPercentage || 0);
-    const discountAmount = data.discountAmount !== undefined ? Number(data.discountAmount) : Math.round((baseWithMarkup * discountPct) / 100);
-    const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
+      const taxConfig = await this.resolveQuotationTaxConfig(agencyId, {
+        taxRate: data.taxRate,
+        taxPercentage: data.taxPercentage,
+        taxMode: data.taxMode,
+        gstTreatment: data.gstTreatment,
+      });
 
-    const taxResult = taxService.calculate({
-      amount: afterDiscount,
-      taxRate: taxConfig.taxRate,
-      taxMode: taxConfig.taxMode,
-      gstTreatment: taxConfig.gstTreatment,
-    });
+      const subtotal = Number(data.subtotal || 0);
+      const markupPct = Number(data.markupPercentage || 0);
+      const markupAmount = data.markupAmount !== undefined ? Number(data.markupAmount) : Math.round((subtotal * markupPct) / 100);
+      const baseWithMarkup = subtotal + markupAmount;
 
-    const selectedTier = data.tier || "Deluxe";
-    let quotationTitle = data.title;
-    if (!quotationTitle) {
-      quotationTitle = `Proposal for Trip - ${selectedTier}`;
-    } else if (!quotationTitle.includes(selectedTier)) {
-      quotationTitle = `${quotationTitle} - ${selectedTier}`;
-    }
+      const discountPct = Number(data.discountPercentage || 0);
+      const discountAmount = data.discountAmount !== undefined ? Number(data.discountAmount) : Math.round((baseWithMarkup * discountPct) / 100);
+      const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
 
-    const quote = await prisma.quotation.create({
+      const taxResult = taxService.calculate({
+        amount: afterDiscount,
+        taxRate: taxConfig.taxRate,
+        taxMode: taxConfig.taxMode,
+        gstTreatment: taxConfig.gstTreatment,
+      });
+
+      const selectedTier = data.tier || "Deluxe";
+      let quotationTitle = data.title;
+      if (!quotationTitle) {
+        quotationTitle = `Proposal for Trip - ${selectedTier}`;
+      } else if (!quotationTitle.includes(selectedTier)) {
+        quotationTitle = `${quotationTitle} - ${selectedTier}`;
+      }
+
+      const quote = await tx.quotation.create({
       data: {
         agencyId,
         tripId: data.tripId,
@@ -866,7 +874,8 @@ export const quotationService = {
       },
     });
 
-    return quote as QuotationWithRelations;
+      return quote as QuotationWithRelations;
+    });
   },
 
   /**
@@ -1415,6 +1424,12 @@ export const quotationService = {
     const quotationTitle = options?.title || `Proposal for ${costing.tripTitle} - ${selectedTier}`;
 
     const quotation = await prisma.$transaction(async (tx) => {
+      // 1. Lock authoritative agency subscription FOR UPDATE
+      await entitlementService.lockAgencySubscription(agencyId, tx);
+
+      // 2. Validate quota for "QUOTATIONS" resource inside transaction
+      await entitlementService.checkQuota(agencyId, "QUOTATIONS", tx);
+
       const q = await tx.quotation.create({
         data: {
           agencyId,
@@ -1605,6 +1620,12 @@ export const quotationService = {
     const newShareToken = crypto.randomBytes(16).toString("hex");
 
     const newQuotation = await prisma.$transaction(async (tx) => {
+      // 1. Lock authoritative agency subscription FOR UPDATE
+      await entitlementService.lockAgencySubscription(agencyId, tx);
+
+      // 2. Validate quota for "QUOTATIONS" resource inside transaction
+      await entitlementService.checkQuota(agencyId, "QUOTATIONS", tx);
+
       const q = await tx.quotation.create({
         data: {
           agencyId,
@@ -1794,7 +1815,7 @@ export const quotationService = {
       });
 
       return q;
-    });
+    }, { timeout: 15000, maxWait: 10000 });
 
     return newQuotation as QuotationWithRelations;
   },

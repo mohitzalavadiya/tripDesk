@@ -97,6 +97,13 @@ export function RecordPaymentDialog({
       toast.error("Please enter a valid positive payment amount.");
       return;
     }
+    if (selectedBooking) {
+      const currentBalance = Number(selectedBooking.balanceAmount);
+      if (numAmount > currentBalance + 0.001) {
+        toast.error(`Payment amount cannot exceed the outstanding due of ${formatCurrency(currentBalance)}.`);
+        return;
+      }
+    }
 
     setLoading(true);
     try {

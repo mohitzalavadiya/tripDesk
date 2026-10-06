@@ -404,19 +404,19 @@ export default function CustomerDetailPage() {
         {isReadOnly && <ReadOnlyBanner moduleName="Customer Profile" />}
 
         {/* Top Hero Command Header */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden space-y-5">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden space-y-4 sm:space-y-5">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
           {/* Breadcrumb & Badges */}
-          <div className="flex items-center gap-2.5 z-10">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 z-10">
             <Link
               href="/customers"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shrink-0"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
             </Link>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-blue-50 text-blue-700 border border-blue-100">
-              <Users className="h-3 w-3 text-blue-500" />
+              <Users className="h-3 w-3 text-blue-500 shrink-0" />
               Customer 360 Profile
             </span>
             <span className="text-slate-300">•</span>
@@ -432,35 +432,35 @@ export default function CustomerDetailPage() {
 
           {/* Main Info Row */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 z-10">
-            <div className="flex items-start gap-4">
+            <div className="flex items-start gap-3 sm:gap-4 min-w-0">
               <div
-                className={`h-16 w-16 rounded-2xl bg-gradient-to-tr ${getGradient(
+                className={`h-12 w-12 sm:h-16 sm:w-16 rounded-2xl bg-gradient-to-tr ${getGradient(
                   customer.name
-                )} text-white flex items-center justify-center font-black text-xl shadow-xs shrink-0`}
+                )} text-white flex items-center justify-center font-black text-lg sm:text-xl shadow-xs shrink-0`}
               >
                 {getInitials(customer.name)}
               </div>
 
-              <div className="space-y-1">
-                <div className="flex items-center gap-2.5">
-                  <h1 className="text-2xl font-black text-slate-900 tracking-tight">{customer.name}</h1>
+              <div className="space-y-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight truncate">{customer.name}</h1>
                   {customer.isRepeatCustomer ? (
-                    <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-[11px] font-bold">
+                    <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-[10px] sm:text-[11px] font-bold">
                       Repeat Client
                     </Badge>
                   ) : (
-                    <Badge className="bg-slate-100 text-slate-700 border-slate-200 text-[11px] font-medium">
+                    <Badge className="bg-slate-100 text-slate-700 border-slate-200 text-[10px] sm:text-[11px] font-medium">
                       New Client
                     </Badge>
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-600">
                   <a
                     href={`tel:${customer.phone}`}
                     className="flex items-center gap-1 hover:text-indigo-600 font-semibold transition-colors"
                   >
-                    <Phone className="h-3.5 w-3.5 text-slate-400" />
+                    <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                     <span>{customer.phone}</span>
                   </a>
 
@@ -470,23 +470,23 @@ export default function CustomerDetailPage() {
 
                   {customer.email && (
                     <>
-                      <span>•</span>
+                      <span className="text-slate-300">•</span>
                       <a
                         href={`mailto:${customer.email}`}
-                        className="flex items-center gap-1 hover:text-indigo-600 transition-colors"
+                        className="flex items-center gap-1 hover:text-indigo-600 transition-colors truncate max-w-[180px] sm:max-w-none"
                       >
-                        <Mail className="h-3.5 w-3.5 text-slate-400" />
-                        <span>{customer.email}</span>
+                        <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">{customer.email}</span>
                       </a>
                     </>
                   )}
 
                   {(customer.city || customer.address) && (
                     <>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                        <span>{customer.city || customer.address}</span>
+                      <span className="text-slate-300">•</span>
+                      <span className="flex items-center gap-1 truncate max-w-[140px] sm:max-w-none">
+                        <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">{customer.city || customer.address}</span>
                       </span>
                     </>
                   )}
@@ -495,24 +495,24 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2 w-full lg:w-auto">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setIsEditOpen(true)}
                 disabled={isReadOnly}
-                className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-9 rounded-xl shadow-2xs cursor-pointer gap-1.5"
+                className="flex-1 sm:flex-initial justify-center bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8.5 px-3 rounded-xl shadow-2xs cursor-pointer gap-1.5 whitespace-nowrap"
               >
-                <Edit2 className="h-3.5 w-3.5 text-slate-500" />
+                <Edit2 className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                 Edit Profile
               </Button>
 
               <Button
                 onClick={() => router.push(`/trips/new?customerId=${customer.id}`)}
                 disabled={isReadOnly}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 rounded-xl shadow-xs cursor-pointer gap-1.5"
+                className="flex-1 sm:flex-initial justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8.5 px-3 rounded-xl shadow-xs cursor-pointer gap-1.5 whitespace-nowrap"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-4 w-4 shrink-0" />
                 New Trip
               </Button>
 
@@ -522,7 +522,7 @@ export default function CustomerDetailPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="bg-white hover:bg-slate-50 border-slate-200 h-9 w-9 p-0 rounded-xl shadow-2xs cursor-pointer"
+                      className="bg-white hover:bg-slate-50 border-slate-200 h-8.5 w-8.5 p-0 rounded-xl shadow-2xs cursor-pointer shrink-0"
                     >
                       <MoreVertical className="h-4 w-4 text-slate-500" />
                     </Button>
@@ -553,50 +553,50 @@ export default function CustomerDetailPage() {
         </div>
 
         {/* Financial & Metric KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-              <IndianRupee className="h-5 w-5" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+              <IndianRupee className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Lifetime Spend</span>
-              <h4 className="text-lg font-black text-slate-900">
+            <div className="min-w-0">
+              <span className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight truncate">Lifetime Spend</span>
+              <h4 className="text-xs xs:text-sm sm:text-lg font-black text-slate-900 mt-0.5 truncate">
                 {formatCurrency(customer.financials.totalSpent)}
               </h4>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-              <CreditCard className="h-5 w-5" />
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
+              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Total Paid</span>
-              <h4 className="text-lg font-black text-emerald-700">
+            <div className="min-w-0">
+              <span className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight truncate">Total Paid</span>
+              <h4 className="text-xs xs:text-sm sm:text-lg font-black text-emerald-700 mt-0.5 truncate">
                 {formatCurrency(customer.financials.totalPaid)}
               </h4>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-              <Clock className="h-5 w-5" />
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Outstanding Balance</span>
-              <h4 className="text-lg font-black text-amber-700">
+            <div className="min-w-0">
+              <span className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight truncate">Outstanding</span>
+              <h4 className="text-xs xs:text-sm sm:text-lg font-black text-amber-700 mt-0.5 truncate">
                 {formatCurrency(customer.financials.totalOutstandingBalance)}
               </h4>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-              <CheckCircle2 className="h-5 w-5" />
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold shrink-0">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Bookings / Conversion</span>
-              <h4 className="text-lg font-black text-purple-700">
+            <div className="min-w-0">
+              <span className="text-[9px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight truncate">Bookings</span>
+              <h4 className="text-xs xs:text-sm sm:text-lg font-black text-purple-700 mt-0.5 truncate">
                 {customer.financials.totalBookings} Bookings
               </h4>
             </div>
@@ -738,17 +738,17 @@ export default function CustomerDetailPage() {
         {/* Tab 2: Enquiries */}
         {activeTab === "enquiries" && (
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+            <div className="p-3.5 sm:p-5 border-b border-slate-100 flex flex-col xs:flex-row xs:items-center justify-between gap-2.5">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <Inbox className="h-4 w-4 text-blue-600" />
+                <Inbox className="h-4 w-4 text-blue-600 shrink-0" />
                 <span>Captured Inquiries ({customer.enquiries.length})</span>
               </h3>
               <Button
                 size="sm"
                 onClick={() => router.push(`/enquiries/new?customerId=${customer.id}`)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                className="w-full xs:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" /> New Enquiry
+                <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> New Enquiry
               </Button>
             </div>
 
@@ -806,17 +806,17 @@ export default function CustomerDetailPage() {
         {/* Tab 3: Trips */}
         {activeTab === "trips" && (
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+            <div className="p-3.5 sm:p-5 border-b border-slate-100 flex flex-col xs:flex-row xs:items-center justify-between gap-2.5">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <Compass className="h-4 w-4 text-teal-600" />
+                <Compass className="h-4 w-4 text-teal-600 shrink-0" />
                 <span>Trip Workspaces ({customer.trips.length})</span>
               </h3>
               <Button
                 size="sm"
                 onClick={() => router.push(`/trips/new?customerId=${customer.id}`)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                className="w-full xs:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" /> New Trip
+                <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> New Trip
               </Button>
             </div>
 
@@ -1045,19 +1045,19 @@ export default function CustomerDetailPage() {
         {/* Tab 7: Communications & Outbound History */}
         {activeTab === "communications" && (
           <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Communication History</h3>
                 <p className="text-xs text-slate-500">
                   Automated proposals, reminders, and manual messages sent to {customer.name}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <Button
                   onClick={loadCommunications}
                   variant="outline"
                   size="sm"
-                  className="text-xs h-8 px-2.5 text-slate-600 gap-1.5 cursor-pointer"
+                  className="flex-1 sm:flex-initial justify-center text-xs h-8 px-2.5 text-slate-600 gap-1.5 cursor-pointer"
                 >
                   <RotateCw className={`h-3 w-3 ${loadingComms ? "animate-spin" : ""}`} />
                   Refresh
@@ -1066,7 +1066,7 @@ export default function CustomerDetailPage() {
                   onClick={() => setIsMsgModalOpen(true)}
                   disabled={isReadOnly}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 px-3 rounded-lg gap-1.5 cursor-pointer shadow-2xs"
+                  className="flex-1 sm:flex-initial justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 px-3 rounded-lg gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <Send className="h-3 w-3" />
                   Send Direct Message
@@ -1257,25 +1257,25 @@ export default function CustomerDetailPage() {
 
         {/* ─── EDIT CUSTOMER MODAL ─── */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
-            <form onSubmit={editFormik.handleSubmit} noValidate>
-              <DialogHeader>
-                <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
-                  <Edit2 className="h-4 w-4 text-indigo-600" />
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[calc(100vw-20px)] max-w-lg p-4 sm:p-6 shadow-xl min-w-0 overflow-hidden box-border">
+            <form onSubmit={editFormik.handleSubmit} noValidate className="w-full min-w-0">
+              <DialogHeader className="min-w-0 pr-6">
+                <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2 truncate">
+                  <Edit2 className="h-4 w-4 text-indigo-600 shrink-0" />
                   <span>Edit Customer Details</span>
                 </DialogTitle>
-                <DialogDescription className="text-slate-500 text-xs mt-1">
-                  Update primary contact details, address, and client preferences for {customer.name}.
+                <DialogDescription className="text-slate-500 text-xs mt-1 truncate">
+                  Update primary contact details, address, and client preferences.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-3.5 mt-4 text-xs max-h-[60vh] overflow-y-auto pr-1">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
+              <div className="space-y-3 mt-3 text-xs max-h-[60vh] overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1 min-w-0">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Full Name *</label>
                     <Input
                       {...editFormik.getFieldProps("name")}
-                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold ${getEditFieldError("name") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+                      className={`h-8.5 bg-slate-50/50 border-slate-200 text-xs font-semibold w-full min-w-0 ${getEditFieldError("name") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                     />
                     {getEditFieldError("name") && (
                       <p className="text-[11px] text-red-500 font-semibold mt-0.5">
@@ -1283,11 +1283,11 @@ export default function CustomerDetailPage() {
                       </p>
                     )}
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Primary Phone *</label>
                     <Input
                       {...editFormik.getFieldProps("phone")}
-                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold ${getEditFieldError("phone") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+                      className={`h-8.5 bg-slate-50/50 border-slate-200 text-xs font-semibold w-full min-w-0 ${getEditFieldError("phone") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                     />
                     {getEditFieldError("phone") && (
                       <p className="text-[11px] text-red-500 font-semibold mt-0.5">
@@ -1297,12 +1297,12 @@ export default function CustomerDetailPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1 min-w-0">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Alternate Phone</label>
                     <Input
                       {...editFormik.getFieldProps("alternatePhone")}
-                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${getEditFieldError("alternatePhone") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+                      className={`h-8.5 bg-slate-50/50 border-slate-200 text-xs w-full min-w-0 ${getEditFieldError("alternatePhone") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                     />
                     {getEditFieldError("alternatePhone") && (
                       <p className="text-[11px] text-red-500 font-semibold mt-0.5">
@@ -1310,12 +1310,12 @@ export default function CustomerDetailPage() {
                       </p>
                     )}
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Email Address</label>
                     <Input
                       type="email"
                       {...editFormik.getFieldProps("email")}
-                      className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${getEditFieldError("email") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+                      className={`h-8.5 bg-slate-50/50 border-slate-200 text-xs w-full min-w-0 ${getEditFieldError("email") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                     />
                     {getEditFieldError("email") && (
                       <p className="text-[11px] text-red-500 font-semibold mt-0.5">
@@ -1325,16 +1325,16 @@ export default function CustomerDetailPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1 min-w-0">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Date of Birth</label>
                     <Input
                       type="date"
                       {...editFormik.getFieldProps("dateOfBirth")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs w-full min-w-0"
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Gender</label>
                     <Select
                       value={editFormik.values.gender || ""}
@@ -1343,7 +1343,7 @@ export default function CustomerDetailPage() {
                         editFormik.setFieldTouched("gender", true);
                       }}
                     >
-                      <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                      <SelectTrigger className="h-8.5 text-xs bg-slate-50/50 border-slate-200 w-full min-w-0">
                         <SelectValue placeholder="Select gender" />
                       </SelectTrigger>
                       <SelectContent className="bg-white border-slate-200">
@@ -1357,29 +1357,29 @@ export default function CustomerDetailPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1 min-w-0">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Nationality</label>
                     <Input
                       {...editFormik.getFieldProps("nationality")}
                       placeholder="Indian"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs w-full min-w-0"
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">City</label>
                     <Input
                       {...editFormik.getFieldProps("city")}
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs w-full min-w-0"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Street Address</label>
                   <Input
                     {...editFormik.getFieldProps("address")}
-                    className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${getEditFieldError("address") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+                    className={`h-8.5 bg-slate-50/50 border-slate-200 text-xs w-full min-w-0 ${getEditFieldError("address") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
                   {getEditFieldError("address") && (
                     <p className="text-[11px] text-red-500 font-semibold mt-0.5">
@@ -1388,12 +1388,12 @@ export default function CustomerDetailPage() {
                   )}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Client Notes / Preferences</label>
                   <Textarea
                     {...editFormik.getFieldProps("notes")}
-                    rows={3}
-                    className={`bg-slate-50/50 border-slate-200 text-xs ${getEditFieldError("notes") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+                    rows={2}
+                    className={`bg-slate-50/50 border-slate-200 text-xs w-full min-w-0 ${getEditFieldError("notes") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
                   {getEditFieldError("notes") && (
                     <p className="text-[11px] text-red-500 font-semibold mt-0.5">
@@ -1402,12 +1402,12 @@ export default function CustomerDetailPage() {
                   )}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Internal Agency Remarks</label>
                   <Textarea
                     {...editFormik.getFieldProps("internalNotes")}
-                    rows={3}
-                    className={`bg-slate-50/50 border-slate-200 text-xs ${getEditFieldError("internalNotes") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+                    rows={2}
+                    className={`bg-slate-50/50 border-slate-200 text-xs w-full min-w-0 ${getEditFieldError("internalNotes") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
                   {getEditFieldError("internalNotes") && (
                     <p className="text-[11px] text-red-500 font-semibold mt-0.5">
@@ -1417,10 +1417,10 @@ export default function CustomerDetailPage() {
                 </div>
               </div>
 
-              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+              <DialogFooter className="mt-4 flex flex-row items-center justify-end gap-2">
                 <DialogClose
                   render={
-                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                    <Button type="button" variant="outline" size="sm" className="flex-1 sm:flex-initial justify-center bg-white border-slate-200 text-xs font-semibold rounded-xl h-8.5">
                       Cancel
                     </Button>
                   }
@@ -1429,7 +1429,7 @@ export default function CustomerDetailPage() {
                   type="submit"
                   disabled={editFormik.isSubmitting}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                  className="flex-1 sm:flex-initial justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl h-8.5 shadow-xs"
                 >
                   {editFormik.isSubmitting ? "Saving..." : "Save Changes"}
                 </Button>

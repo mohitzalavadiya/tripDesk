@@ -24,6 +24,8 @@ import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { useSubscription } from "@/context/subscription-context";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,13 +52,25 @@ import { Compass } from "lucide-react";
 
 export default function ActivitiesPage() {
   const router = useRouter();
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
 
   // Data states
   const [activities, setActivities] = React.useState<ActivityWithRelations[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
   const [archivingId, setArchivingId] = React.useState<string | null>(null);
+
+  const isReadOnly = isCentralReadOnly || localReadOnly;
+
+  const handleAddActivity = () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    router.push("/activities/new");
+  };
 
   // Filter & Search states
   const [search, setSearch] = React.useState("");
@@ -96,7 +110,7 @@ export default function ActivitiesPage() {
       }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-        setIsReadOnly(true);
+        setLocalReadOnly(true);
       }
       setError(getErrorMessage(err, "Unable to load activity catalog. Please try again."));
     } finally {
@@ -127,8 +141,12 @@ export default function ActivitiesPage() {
 
   // Archive Activity
   const handleArchive = (id: string, name: string) => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
     if (isReadOnly) {
-      toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+      toast.error("Modifications are restricted in read-only mode.");
       return;
     }
 
@@ -147,8 +165,9 @@ export default function ActivitiesPage() {
           await fetchActivities();
         } catch (err: any) {
           if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-            setIsReadOnly(true);
-            toast.error("Subscription expired. Read-only mode is active.");
+            setLocalReadOnly(true);
+            refreshSubscription();
+            toast.error("Modifications restricted. Read-only mode is active.");
           } else {
             toast.error(getErrorMessage(err, "We couldn't archive the activity. Please try again."));
           }
@@ -167,14 +186,14 @@ export default function ActivitiesPage() {
         {isReadOnly && <ReadOnlyBanner moduleName="Activities & Excursions" />}
 
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
           {/* Left Title & Telemetry */}
           <div className="space-y-3 z-10">
-            <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
-                <Ticket className="h-3 w-3 text-indigo-500" />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0 whitespace-nowrap">
+                <Ticket className="h-3 w-3 text-indigo-500 shrink-0" />
                 Experiences & Sightseeing
               </span>
               <span className="text-slate-300">•</span>
@@ -194,11 +213,11 @@ export default function ActivitiesPage() {
 
             {/* Micro-Telemetry Stat Badges */}
             <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-medium border border-emerald-100/60">
-                <Sparkles className="h-3 w-3 text-emerald-600" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-medium border border-emerald-100/60 shrink-0">
+                <Sparkles className="h-3 w-3 text-emerald-600 shrink-0" />
                 <span className="font-bold text-emerald-950">{pagination.total}</span> Activities Available
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100/80 text-slate-700 font-medium">
+              <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-slate-100/80 text-slate-700 font-medium shrink-0">
                 <span>Page</span>
                 <strong className="text-slate-900">{pagination.page}</strong>
                 <span>of</span>
@@ -208,11 +227,10 @@ export default function ActivitiesPage() {
           </div>
 
           {/* Right Action Controls */}
-          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
+          <div className="flex items-center gap-3 z-10 self-stretch sm:self-start lg:self-center w-full sm:w-auto">
             <Button
-              onClick={() => router.push("/activities/new")}
-              disabled={isReadOnly}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              onClick={handleAddActivity}
+              className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
               Add Activity
@@ -223,12 +241,12 @@ export default function ActivitiesPage() {
         {/* Master Card (Filter Bar + Table) */}
         <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
           {/* Search Toolbar */}
-          <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
+          <div className="p-3.5 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="relative flex-1 max-w-2xl">
                 <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search activities by title, location, category, or duration..."
+                  placeholder="Search activities by title, location..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all"
@@ -275,7 +293,7 @@ export default function ActivitiesPage() {
                     : "Add your first sightseeing tour or adventure activity to assign it to itineraries."
                 }
                 actionText={isFilterActive ? "Clear Filter" : "Add Activity"}
-                onAction={isFilterActive ? handleClearFilters : () => router.push("/activities/new")}
+                onAction={isFilterActive ? handleClearFilters : handleAddActivity}
               />
             </div>
           ) : !loading && !error && (
@@ -432,6 +450,14 @@ export default function ActivitiesPage() {
           </div>
         </div>
       </div>
+
+      {/* Read-Only Mode Warning Dialog */}
+      <ReadOnlyModeDialog
+        open={showReadOnlyDialog}
+        onOpenChange={setShowReadOnlyDialog}
+        reason={readOnlyReason}
+        actionLabel="Adding or modifying activities"
+      />
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

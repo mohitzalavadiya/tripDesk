@@ -64,36 +64,40 @@ add scroll in Booking & Operations Audit Timeline table.
 Activity also not need to show in invoice
 
 Re-generate Invoice
-**TODO**
-
-
-
-
-
-
-
-
-
-
-
 quatation preview mobile screen is need to fix
+
 quatation pdf UI changes
 
 test Feedback &  Reviews page
 
+add subscription flow
+
+add agency logo
+
+quatation pdf we got more page 
+
 manage read only from frontend also
+
+subscription model changes
+When any model openthat time main page scroll should not work. 
+
+**TODO**
+
+
 
 itinerary builder
 https://pickyourtrail.com/itineraries/6-night-bali-thrills-serenity-at-40k-per-person
 
 if we not add any tax then GST (0% Exempt): should not show in invoice
 
-subscription model changes
 
 remove usused code, imports and files
 remove all type script error
 check no static data anywhere
 
+SEO
+
+speed test
 
 compalate QA. 
 

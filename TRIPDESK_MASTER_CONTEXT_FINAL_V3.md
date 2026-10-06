@@ -13093,9 +13093,1080 @@ During real usage post-Phase 204, three specific defects were identified and res
 
 ---
 
+# 206. QUOTATION PDF FULL UI & VISUAL REDESIGN (2026-09-30)
+
+## 206.1 Purpose & Scope
+- **Objective**: Complete presentation-only redesign of the generated Quotation PDF (`quotation-pdf-service.ts`) into a high-end, editorial-grade travel agency proposal document.
+- **Strict Scope Isolation**:
+  - **Quotation PDF Presentation Only**: Transformed from plain tabular layout to an editorial, structured travel proposal.
+  - **Zero Database Schema Changes**: No Prisma migrations, no schema mutations.
+  - **Zero Calculation Mutations**: Quotation totals, subtotal, discount, taxable base, GST split, markup, pricing engine, and invoice calculations remain strictly untouched.
+  - **Security & Non-Exposure**: Provider costs, buying rates, supplier payables, gross margins, and agency markups remain strictly non-exposed.
+  - **Activity Phase 200 Invariant**: Activities have zero financial impact and render with clean `Included` / `Not Included` badges without rates or voucher IDs.
+  - **Version Normalization**: Formatted strictly as uppercase `V1`, `V2`, `V3` (never lowercase `v1`).
+
+## 206.2 Architectural & Design Implementation
+1. **Dedicated Page 1 — Cover Page**:
+   - Agency branding banner with logo (or elegant vector monogram badge fallback).
+   - Prominent Proposal Title with dynamic Tier suffix (`Deluxe`, `Ultra Deluxe`, `Premium`).
+   - Customer details card (`Prepared for: Customer Name`, Contact details).
+   - Structured Trip Overview card (Destination route, Travel Dates, Duration in Days/Nights, Travelers/Pax count).
+   - Reference & validity bar (`Quotation Ref`, `Version V1/V2`, `Valid Until`).
+2. **Page 2+ Running Header & Footer System**:
+   - Running header on content pages: Agency Name, Quotation Number, and Version badge (`V1`).
+   - Running footer on all pages: Quotation Title, Version, and dynamic page numbering (`Page X of Y` via `doc.bufferedPageRange()`).
+3. **Trip At A Glance & Consultant Welcome**:
+   - Renders personalized `proposalSubtitle` and `customerMessage` welcome note snapshots.
+   - Clean summary grid for quick scanning.
+4. **Day-by-Day Itinerary Presentation**:
+   - Structured day cards with day badges (`Day 01`, `Day 02`), location tags, and itinerary descriptions.
+5. **Accommodation & Transport Cards**:
+   - Hotel cards with destination, room category, meal plan, stay dates, nights, and room counts.
+   - Transport cards with vehicle type, passenger capacity, and chauffeured service details.
+6. **Sightseeing & Excursions**:
+   - Editorial cards clearly displaying `Included` or `Not Included` status without financial clutter.
+7. **Inclusions & Exclusions Grid**:
+   - Two-column card layout cleanly separating what is included versus excluded.
+8. **Transparent Package Investment Breakdown**:
+   - Services / Package Amount, Special Discount, Taxable Base, GST Breakdown (CGST + SGST or IGST), and prominent Total Package Price.
+9. **Terms, Policies & Agency Closing**:
+   - Structured cards for Cancellation Policy, Important Traveler Notes, Privacy Policy, and Terms & Conditions.
+   - Professional closing card with agency contact details.
+
+## 206.3 Quality Assurance & Verification
+- **Test Suite**: Automated PDF generation QA suite (`scratch/test-quotation-pdf-qa.ts`) verified:
+  - Short Quotation (5-day tour): PASS (58,631 bytes).
+  - Long Multi-Day Expedition (14 days, multiple properties & vehicles): PASS (92,493 bytes).
+  - Inclusions & Exclusions formatting: PASS.
+  - Currency Formatting (`INR` without encoding glitches): PASS.
+  - Non-exposure of internal financials/markup: PASS.
+- **TypeScript Check**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASS)**.
+
+---
+
+# 207. QUOTATION PREVIEW & PUBLIC SHAREABLE RESPONSIVE UI AUDIT + FIX (2026-09-30)
+
+## 207.1 Purpose & Scope
+- **Objective**: Audit and enhance the responsive presentation of the **Internal Quotation Preview** (`/trips/[id]/quotation/preview`) and **Public Shareable Quotation** (`/q/[shareToken]`) across small/mobile viewports (320px, 360px, 375px, 390px, 430px) through tablet (768px) and desktop (1024px+).
+- **Desktop Parity**: Preserved existing rich desktop card designs, spacing, typography hierarchy, and branding intact.
+- **Strict Scope Isolation**: Zero database changes, zero calculation modifications, zero API contract changes, zero security/data exposure changes.
+
+## 207.2 Key Responsive Improvements Implemented
+1. **Top Floating Header Action Bar**:
+   - Replaced rigid horizontal action button row with responsive layout (`px-3 sm:px-8 py-2.5 sm:py-3`).
+   - Action buttons wrap gracefully and adapt labels cleanly (`Back to Editor` / `Back`, `Download PDF` / `PDF`, `Live Link`).
+   - Viewport switcher (`desktop`/`tablet`/`mobile`) elegantly adapts and remains hidden on physical mobile viewports.
+2. **Hero Header & Proposal Title**:
+   - Handled long quotation titles and agency names with `break-words` and responsive scale (`text-xl sm:text-3xl lg:text-5xl`).
+   - Agency contact and quotation reference badges wrap safely without colliding on 320px screens.
+3. **Trip Overview Metadata Bar**:
+   - Enhanced 2-column mobile to 4-column desktop grid with `min-w-0` and `gap-3 sm:gap-4` to prevent long travel date strings from clipping.
+4. **Highlights & Tour Badges**:
+   - Switched from rigid single flex-row to a clean 2-column mobile grid / centered desktop flex row with `min-w-0` and `truncate`.
+5. **Day-Wise Itinerary Cards**:
+   - Day badge + location tags wrap into a responsive header column on small mobile screens, preventing title/tag truncation.
+   - Long itinerary descriptions wrap cleanly with `whitespace-pre-wrap break-words`.
+6. **Hotel Accommodation & Transport Cards**:
+   - Check-in/check-out lines, meal plans, room types, and vehicle notes wrap safely into fluid multi-line spans on narrow screens.
+7. **Sightseeing / Activities Cards**:
+   - Activity titles and `Included` / `Not Included` status badges use `min-w-0 flex-1` and `shrink-0` to prevent badge compression.
+8. **Inclusions & Exclusions / Policies**:
+   - Responsive card padding (`p-4 sm:p-6`) and list items with `min-w-0 break-words`.
+9. **Total Package Price & Interactive Bottom Decision Bar**:
+   - Action buttons in public quotation (`PDF`, `WhatsApp`, `Request Changes`, `Accept Proposal`) use a responsive `grid grid-cols-2 sm:flex sm:flex-wrap` layout to completely prevent mobile horizontal overflow.
+10. **Accept & Revision Modals**:
+    - Dialog modals use `max-w-[94vw] sm:max-w-md` with responsive padding and touch-friendly controls.
+
+## 207.3 Validation & Quality Assurance
+- **Desktop Regression**: PASS (full layout, grid columns, and hierarchy preserved).
+- **Mobile QA (320px, 360px, 390px, 430px)**: PASS (0 horizontal overflow, 0 text clipping, 0 button collisions).
+- **Tablet QA (768px)**: PASS.
+- **Public Shareable Link (`/q/[shareToken]`)**: PASS.
+- **Internal Preview (`/trips/[id]/quotation/preview`)**: PASS.
+- **Security & Data Exposure**: PASS (zero provider costs, payables, or markups exposed).
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASS)**.
+- **Database / Schema**: No schema changes, no migrations.
+
+---
+
+# 208. CUSTOMER FEEDBACK & EXTERNAL REVIEW FLOW IMPLEMENTATION (2026-09-30)
+
+## 208.1 Purpose & Architecture Overview
+- **Objective**: Implement the completed, non-manipulative **Customer Feedback + External Review Flow** allowing customers to submit post-trip feedback and optionally click through to public review platforms (Google Review and TripAdvisor).
+- **Core Principles Maintained**:
+  - **Surgical Extension**: Reused existing `CustomerFeedback` and `AgencyCommunicationSetting` tables without introducing redundant models (`Review`, `CustomerReview`, `ReviewSubmission`, etc.).
+  - **Zero Review Manipulation**: External review links appear for **all** rating tiers (1 to 5 stars) equally if configured by the agency. No review gating, rating suppression, or conditional redirects.
+  - **Feedback Idempotency**: Both public token (`/trip/[secureToken]`) and authenticated customer portal (`/customer/trips/[tripId]/feedback`) paths update existing records on repeated submissions without duplicate row creation.
+  - **Staged Communication Isolation**: Real external delivery (Email/WhatsApp/SMS) remains strictly ON HOLD; provider stubs/staged notification architecture preserved.
+
+## 208.2 Database & Migration Changes
+- **Model Extended**: `AgencyCommunicationSetting` in `prisma/schema.prisma`
+  - Added optional fields: `googleReviewUrl String?` and `tripAdvisorReviewUrl String?`.
+- **Migration**: `20260930161500_add_agency_review_urls`
+  - SQL: `ALTER TABLE "AgencyCommunicationSetting" ADD COLUMN "googleReviewUrl" TEXT, ADD COLUMN "tripAdvisorReviewUrl" TEXT;`
+  - Zero disruption to existing records; backwards-compatible with `NULL` defaults.
+
+## 208.3 Validation & Security
+- **Schema**: `src/lib/validation/communication-schema.ts`
+  - Added strict HTTPS URL validation for `googleReviewUrl` and `tripAdvisorReviewUrl`, supporting empty string / null clearing.
+- **Tenant Isolation**: Settings updates and fetches strictly scoped to authenticated `agencyId` derived server-side via session.
+- **Public Payload Safety**: Public and customer portal feedback payloads expose only safe `{ googleReviewUrl, tripAdvisorReviewUrl }` objects. Zero internal costs, margins, supplier payables, email/WhatsApp configurations, or provider API keys are leaked.
+
+## 208.4 Implementation Details
+1. **Idempotent Customer Portal Feedback** (`src/lib/services/customer-portal-service.ts`):
+   - `submitCustomerTripFeedback`: Validates customer authentication, trip completion, and agency scoping. Checks for an existing `CustomerFeedback` record; updates if present, creates if absent. Automatically sets `serviceRecoveryStatus: FOLLOW_UP_REQUIRED` for ratings <= 3.
+2. **Public Feedback Flow** (`src/lib/services/feedback-service.ts`):
+   - `getPublicFeedbackStatus` & `submitPublicFeedback`: Returns `reviewLinks: { googleReviewUrl, tripAdvisorReviewUrl }` from the trip's agency settings.
+3. **Agency Dashboard Settings UI** (`src/app/(dashboard)/feedback/page.tsx`):
+   - Removed fake hardcoded placeholder URLs.
+   - Connected the Review Settings modal directly to `GET /api/communication/settings` and `PATCH /api/communication/settings`.
+   - Dynamic status badges: "Configured" with copy/link actions or "Not Configured" with direct configuration CTA.
+4. **Customer Post-Submission UI** (`/trip/[secureToken]` and `/customer/trips/[tripId]/feedback`):
+   - Upon feedback submission, customer is greeted with the thank-you state and dynamic "Share your experience publicly" section with "Review us on Google" and/or "Review us on TripAdvisor" buttons matching agency configuration.
+
+## 208.5 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all routes (PASS)**.
+- **Idempotency QA**: Repeated submissions in both public and portal flows update in place with 0 duplicate rows created (PASS).
+- **Tenant Isolation QA**: Agency A links never bleed into Agency B (PASS).
+- **Low-Rating Service Recovery**: Ratings $\le 3$ correctly trigger `FOLLOW_UP_REQUIRED` while still presenting configured public review links fairly (PASS).
+- **Responsive QA**: Verified across 320px, 360px, 390px, 430px, 768px, and 1024px+ viewports with zero horizontal overflow or clipping (PASS).
+
+---
+
+# 209. CUSTOMER FEEDBACK LINK SHARING IMPLEMENTATION (2026-09-30)
+
+## 209.1 Purpose & Architecture Overview
+- **Objective**: Give the Agency Owner a direct, contextual way to obtain, copy, and open the existing secure customer Trip feedback link directly from the Trip Details workspace (`/trips/[id]`).
+- **Core Principles Maintained**:
+  - **Surgical Extension**: Reused the existing `PublicShareLink` / secure token and `/trip/[secureToken]` public route.
+  - **Zero New Models / Zero Schema Migrations**: Zero new tables (`FeedbackLink`, `FeedbackToken`, etc.), zero new columns, zero schema migrations.
+  - **Single Source of Truth**: Uses `PublicShareLink` (`status: "ACTIVE"`, `revokedAt: null`) as the single source of truth for public customer trip URLs.
+  - **Explicit Link Generation & Strict Read-Only GET**: `getTripById(agencyId, tripId)` is strictly 100% read-only. Zero write operations, zero lazy creation on GET. Feedback link generation is strictly explicit via `POST /api/trips/[id]/share-link`.
+  - **Zero Review Manipulation**: Preserved Phase 208 behavior (Google and TripAdvisor external review CTAs are shown equally to all rating tiers post-submission).
+  - **Communication Scope Maintained**: Real external Email/WhatsApp/SMS delivery remains ON HOLD (manual copy and direct link access only).
+  - **Tenant Isolation & Public Safety**: Agency tenant scoping strictly enforced server-side; non-exposure of internal financials, margins, costs, and payables intact.
+
+## 209.2 Authoritative Corrected Architecture Implementation
+1. **Strict Read/Write Separation in Service Layer (`src/lib/services/trip-service.ts`)**:
+   - `tripService.getTripById`: **100% READ-ONLY**. All database write/INSERT side effects were completely removed. Querying a trip executes only `SELECT` operations regardless of status.
+   - `tripService.getOrCreateFeedbackLink`: Dedicated server mutation for generating/retrieving customer feedback links.
+2. **Dedicated Server Mutation API (`src/app/api/trips/[id]/share-link/route.ts`)**:
+   - `POST /api/trips/[id]/share-link`: Enforces authenticated agency tenancy (`requireWriteAccess()`).
+   - **Completed Status Guard**: Server-side validation strictly enforces `trip.status === TripStatus.COMPLETED`. Rejects `PLANNING`, `CONFIRMED`, `IN_PROGRESS`, `CANCELLED`, `DRAFT` with HTTP 400 (`ValidationError`).
+   - **Active Link Reuse**: Reuses existing `PublicShareLink` where `status: "ACTIVE"` and `revokedAt: null`.
+   - **Revoked Link Protection**: Prevents silent replacement of explicitly revoked links (`status: "REVOKED"` or `revokedAt !== null`), returning `ValidationError("Customer feedback link for this trip was explicitly revoked.")`.
+   - **Concurrency Serialization & Race Protection**: Uses parameterized `tx.$queryRaw` (`SELECT "id", "status" FROM "trips" WHERE "id" = ${tripId} AND "agencyId" = ${agencyId} FOR UPDATE`) inside `prisma.$transaction` to serialize concurrent requests for the same Trip. The active/revoked link lookup and creation occur AFTER acquiring the trip row lock, ensuring no duplicate `ACTIVE` links can be created concurrently for the same Trip.
+3. **Trip Details UI & Workspace Integration (`src/app/(dashboard)/trips/[id]/page.tsx`)**:
+   - Opening Trip Details performs zero database mutations.
+   - For `COMPLETED` trips with an active link: Copy and Open actions work immediately with full URL preview (`/trip/[secureToken]`).
+   - For `COMPLETED` trips without an active link: Clicking **[ Get Feedback Link ]** or **[ Copy Feedback Link ]** triggers the explicit server mutation, displaying a loading spinner (`isGeneratingFeedbackLink`) and updating local state upon success.
+   - For non-completed trips: Creation actions are disabled with explanatory guidance.
+
+## 209.3 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASS)**.
+- **Concurrency QA Suite (`prisma/test-phase209-concurrency-qa.ts`)**:
+  - **Case A (Concurrent requests, no link)**: Concurrent requests acquire row lock, exactly 1 active `PublicShareLink` created, both requests return exact same `tokenHash` and ID (PASS).
+  - **Case B (Concurrent requests, active link exists)**: Both concurrent requests re-check after lock, reuse existing link, 0 new links created (PASS).
+  - **Case C (Concurrent requests, revoked link exists)**: Both requests rejected with `ValidationError`, 0 replacement active links created (PASS).
+  - **Case D (Concurrent requests, non-completed trip)**: Both requests rejected with `ValidationError`, 0 links created (PASS).
+  - **Case E (Cross-Tenant Isolation)**: Request for another agency's trip rejected with `NotFoundError`, 0 links created (PASS).
+- **Public Feedback Link UI Cleanup (`src/app/trip/[secureToken]/page.tsx`)**: Removed unnecessary customer dashboard sections (notifications tray, notifications card, payment statement, day schedule, hotels, vehicles, activities, print button) from the public `/trip/[secureToken]` route. Page is now 100% focused on trip context, feedback submission, thank-you state, external review CTAs, and WhatsApp consultant contact (PASS).
+- **Read/Write Separation**: Verified `getTripById` executes zero INSERTs across all trip statuses (PASS).
+- **Completed Trip Guard**: Server rejects creation requests for non-completed trip statuses (PASS).
+- **Revocation Integrity**: Revoked links remain respected without silent bypass (PASS).
+- **Public URL Consistency**: Canonical `/trip/[secureToken]` route resolves directly (PASS).
+- **Phase 208 Integration**: Customer feedback submission, idempotency, and external review links remain intact (PASS).
+- **Communication Scope**: Real external Email/WhatsApp/SMS delivery remains strictly ON HOLD (PASS).
+
+---
+
+# 210. PHASE 210 — CUSTOMER PAYMENT & PAYABLE DISBURSEMENT OVERPAYMENT VALIDATION & HARDENING (COMPLETED)
+
+## 210.1 Purpose & Architecture Overview
+- **Objective**: Prevent payment and disbursement entries exceeding current outstanding balances across both Customer Payments and Supplier Payable Disbursements, and simplify Payable Obligation editing rules.
+- **Locked Business Rules Enforced**:
+  - **Customer Payment**: `amount > 0 AND amount <= current customer outstanding balance`.
+  - **Payable Disbursement**: `amount > 0 AND amount <= current outstanding payable balance`.
+  - **Payable Obligation Edit**: `new actualAmount >= current paidAmount`. (User-facing "Reason for Adjustment" option completely removed from UI).
+  - **Exact Amounts**: Equal amounts (`amount == currentOutstanding`) are allowed.
+  - **Overpayments**: Rejection enforced (`amount > currentOutstanding` rejected).
+  - **Zero / Negative**: Rejection enforced (`amount <= 0` rejected).
+- **Core Principles Maintained**:
+  - **Zero Database Schema Changes**: Zero new models, zero new columns, zero Prisma migrations (`prisma db push` not required).
+  - **Architecture Preserved**: Existing distinction between Customer Payments (`Quotation -> Booking -> Invoice -> Customer Payment -> Receivable`) and Supplier Payables (`Trip / Booking -> Payable -> Supplier Payment -> Outstanding`) remains intact.
+  - **Two-Tier Validation**: Client-side immediate feedback (Formik/Yup, React dialog validation, page-level validation) combined with server-side authoritative protection inside PostgreSQL transaction.
+  - **Concurrency & Stale Dialog Protection**: PostgreSQL `SELECT ... FOR UPDATE` row-locking prevents concurrent overpayments, stale dialog submissions, and race conditions between payable edits and disbursements.
+  - **Paise / Decimal Precision**: Integer-cent/paise precision math prevents floating point rounding errors.
+
+## 210.2 Entry Points Updated
+1. **Customer Payment Client UI**:
+   - `src/components/booking/add-payment-modal.tsx`: Dynamic Formik / Yup schema validating `amount <= booking.pendingAmount`.
+   - `src/components/finance/record-payment-dialog.tsx`: Manual validation enforcing `numAmount <= selectedBooking.balanceAmount`.
+   - `src/app/(dashboard)/bookings/[id]/page.tsx` (**Booking Details -> Payment Transactions -> Log Payment**): Added client-side balance validation (`amt > currentBalance` check).
+2. **Payable Disbursement Client UI**:
+   - `src/components/booking/supplier-payment-modal.tsx`: Dynamic Formik / Yup schema validating `amount <= maxAmount`.
+   - `src/components/finance/record-supplier-payment-dialog.tsx`: Manual validation enforcing `numAmount <= selectedPayable.outstandingAmount`.
+3. **Payable Obligation Edit UI**:
+   - `src/components/finance/edit-payable-dialog.tsx` (**Operations -> Edit Payable Obligation**): Removed "Reason for Adjustment" option completely. Added client-side validation enforcing `numAmount >= paidAmount`.
+4. **Server Service Layer (`src/lib/services/finance-service.ts` & `src/lib/services/payment-service.ts`)**:
+   - `financeService.recordCustomerPayment`: Acquires row lock `SELECT "id" FROM "bookings" ... FOR UPDATE`, recalculates real-time active completed payment balance, and throws explicit error if requested amount exceeds current outstanding due.
+   - `financeService.recordSupplierPayment`: Acquires row lock `SELECT "id" FROM "supplier_payables" ... FOR UPDATE`, recalculates real-time payable balance, and throws explicit error if requested amount exceeds current outstanding payable.
+   - `paymentService.createPayment`: Acquires row lock `SELECT "id" FROM "bookings" ... FOR UPDATE`, recalculates real-time active completed payment balance, and throws explicit error if requested amount exceeds current outstanding due.
+   - `financeService.updateSupplierPayable`: Acquires row lock `SELECT "id" FROM "supplier_payables" ... FOR UPDATE` inside Prisma `$transaction`, recalculates fresh paid amount, and throws explicit error if `newActual < currentPaid`.
+
+## 210.3 Verification & Automated QA Matrix Results (`prisma/test-phase210-overpayment-qa.ts`)
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all routes (PASS)**.
+- **QA Suite Results (21/21 PASSED, 0 FAILED)**:
+  - **A1**: Customer Outstanding ₹15,000 $\to$ Payment ₹10,000 $\to$ **PASS** (New balance: ₹5,000).
+  - **A2**: Customer Outstanding ₹5,000 $\to$ Payment ₹5,000 $\to$ **PASS** (New balance: ₹0).
+  - **A3**: Customer Outstanding ₹15,000 $\to$ Payment ₹15,000.01 $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **A4**: Customer Outstanding ₹15,000 $\to$ Payment ₹20,000 $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **A5**: Customer Outstanding ₹0 $\to$ Payment ₹1 $\to$ **REJECTED** (`The booking is already fully paid...`).
+  - **A8**: Customer Stale Dialog submission $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **A9**: Customer Concurrent ₹10,000 + ₹10,000 against ₹15,000 $\to$ **1 Succeeded, 1 Rejected** (Total paid: ₹10,000).
+  - **B1**: Payable Outstanding ₹11,000 $\to$ Payment ₹8,000 $\to$ **PASS** (Outstanding remaining: ₹3,000).
+  - **B2**: Payable Outstanding ₹3,000 $\to$ Payment ₹3,000 $\to$ **PASS** (Outstanding: ₹0, Status: PAID).
+  - **B3**: Payable Outstanding ₹11,000 $\to$ Payment ₹11,000.01 $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **B4**: Payable Outstanding ₹11,000 $\to$ Payment ₹12,000 $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **B5**: Payable Outstanding ₹0 $\to$ Payment ₹1 $\to$ **REJECTED** (`The payable is already fully settled...`).
+  - **B8**: Payable Stale Dialog submission $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **B9**: Payable Concurrent ₹10,000 + ₹10,000 against ₹15,000 $\to$ **1 Succeeded, 1 Rejected** (Total paid: ₹10,000).
+  - **G**: Payable Edit Actual ₹7,999 (below Paid ₹8,000) $\to$ **REJECTED** (`Payable amount cannot be less than...`).
+  - **H**: Payable Edit Actual ₹8,000 (equal to Paid ₹8,000) $\to$ **PASS** (Outstanding: ₹0, Status: PAID).
+  - **I**: Payable Edit Actual ₹25,000 (above Paid ₹8,000) $\to$ **PASS** (Outstanding: ₹17,000).
+  - **K**: Payable Edit Stale Paid protection $\to$ **REJECTED** (`Payable amount cannot be less than...`).
+  - **R (Tenant Isolation - Payable Edit)**: Cross-agency payable edit attempt $\to$ **REJECTED** (`Payable record not found`).
+  - **Tenant Isolation (Customer Payment)**: Cross-agency payment attempt $\to$ **REJECTED** (`Booking not found...`).
+  - **Tenant Isolation (Supplier Disbursement)**: Cross-agency disbursement attempt $\to$ **REJECTED** (`Payable record not found...`).
+
+---
+
+# 211. SUBSCRIPTION ENTITLEMENT, USAGE QUOTAS & FEATURE GATING (PHASE A, B, C, D COMPLETE)
+
+## 211.1 Overview & Architecture
+- **Normalized Entitlement Models**:
+  - `PlanFeatureEntitlement`: Maps `(planId, featureKey)` to `enabled` boolean flag.
+  - `PlanUsageLimit`: Maps `(planId, resourceKey)` to `limit` (integer or null for unlimited).
+  - Feature keys: `CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, `REPORTS_ANALYTICS`.
+  - Resource keys: `TRIPS`, `QUOTATIONS`, `BOOKINGS`.
+- **Authoritative Resolution & Fail-Closed Logic**:
+  - `entitlementService.resolveAgencySubscription(agencyId)` determines effective plan using authoritative latest subscription row (`createdAt DESC`).
+  - Active `TRIAL` subscriptions receive **Professional** plan entitlements regardless of stored `planId`.
+  - Missing subscriptions throw `NoActiveSubscriptionError` (`NO_ACTIVE_SUBSCRIPTION`, HTTP 403).
+  - Expired / cancelled subscriptions throw `ReadOnlyAccessError` (`READ_ONLY_ACCESS`, HTTP 403).
+  - Disabled or missing feature rows throw `FeatureNotAllowedError` (`FEATURE_NOT_ALLOWED`, HTTP 403).
+  - Creation quotas throw `QuotaExceededError` (`QUOTA_EXCEEDED`, HTTP 403).
+
+## 211.2 Phase C Transactional Quota Enforcement
+- **Transactional Row Locking**: Every creation operation (`createTrip`, `createQuotation`, `generateTripQuotation`, `createBooking`) acquires a row lock at the start of a Prisma `$transaction`:
+  `SELECT "id" FROM "subscriptions" WHERE "agencyId" = :agencyId ORDER BY "createdAt" DESC LIMIT 1 FOR UPDATE;`
+- **Creation-Based Accounting**: Resource creation counts are calculated over the authoritative billing period (`createdAt >= periodStart AND createdAt < periodEnd`) including soft-deleted/archived entities using composite indexes `[agencyId, createdAt]`.
+- **Exact Boundary Concurrency**: Starter plan limits (20/20) fail closed under high concurrency ($19/20 \to 20/20$ exact, 0 overages).
+
+## 211.3 Phase D Feature Entitlement Enforcement
+- **`CUSTOM_AGENCY_LOGO`**: Server-side mutation gate implemented at `POST/DELETE /api/agency/logo`. Upload and deletion of custom logos require active Professional entitlement. Existing logo display behavior and document rendering remain unchanged.
+- **`FEEDBACK_REVIEWS`**: Server-side entry points `GET/POST /api/feedback`, `GET/PATCH /api/feedback/[id]`, and `feedbackService` agency-side methods enforce `FEEDBACK_REVIEWS` entitlement. Public customer feedback submission (`/api/trips/public/[token]/feedback`) and Customer Portal feedback remain open to all plans without gating.
+- **`CUSTOMER_INSIGHTS`**: Server-side entry point `GET /api/customer-insights` and `customerInsightsService.getCustomerInsights` enforce `CUSTOMER_INSIGHTS` entitlement.
+- **`REPORTS_ANALYTICS`**: Server-side entry points `GET /api/reports`, `GET /api/reports/export`, `GET /api/reports/pdf`, and `reportingService.getAgencyBIReport` enforce `REPORTS_ANALYTICS` entitlement.
+
+## 211.4 Verification & Automated Test Matrix Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all routes (PASS)**.
+- **Phase A Test Suite (`prisma/test-phase-a-entitlements.ts`)**: **PASSED**.
+- **Phase B Test Suite (`prisma/test-phase-b-entitlements.ts`)**: **PASSED**.
+- **Phase C Concurrency Suite (`prisma/test-phase-c-concurrency.ts`)**: **7/7 PASSED** (TRIPS, QUOTATIONS, BOOKINGS 19/20 concurrency $\to$ 1 Success, 1 QUOTA_EXCEEDED, 20 final count).
+- **Phase D Feature Suite (`prisma/test-phase-d-entitlements.ts`)**: **8/8 PASSED** (Starter denials, Pro access, Trial Professional access, disabled DB row fail-closed, missing DB row fail-closed, missing/expired sub fail-closed, direct service gates, public feedback safety).
+
+---
+
+# 212. PHASE E — FRONTEND ENTITLEMENT UI, USAGE METERS & UPGRADE GUIDANCE [CLOSED]
+
+## 212.1 Objective & Final Status
+
+- **Phase E Objective**: Frontend Entitlement UI, Usage Meters & Upgrade Guidance.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+- **Independent Final Read-Only Audit**: **PASS**
+- Phase E adds frontend visibility and UX guidance on top of the existing centralized server-side entitlement architecture.
+
+## 212.2 Subscription API Extension
+
+- Reused existing `GET /api/subscription` endpoint via `subscriptionService.getAgencySubscription()`.
+- Extended the existing subscription overview response payload with:
+  - `usage`: Usage counters and limits for `TRIPS`, `QUOTATIONS`, `BOOKINGS`
+  - `features`: Entitlement status for `CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, `REPORTS_ANALYTICS`
+- No duplicate usage endpoint created.
+- Existing subscription response fields (`agency`, `subscription`, `paymentHistory`, `billingSettings`) preserved.
+
+## 212.3 Usage Meters
+
+- `/subscription` page displays authoritative, database-driven usage meters for Trips, Quotations, and Bookings.
+- Displays current count, limit, remaining quota, progress percentage, and unlimited status indicators.
+- **Starter Plan**: Enforces limits of 20 per subscription billing period (`[periodStart, periodEnd)`).
+- **Professional Plan & Valid Trial**: Displays unlimited usage indicators.
+- Usage remains creation-based and tied to the authoritative stored subscription/trial billing period.
+
+## 212.4 Creation Quota UX
+
+- `/trips/new`
+- `/quotations/new`
+- `/bookings/new`
+
+Added client-side pre-submit UX:
+- Approaching-limit warning banner (`remaining <= 2 && remaining > 0`)
+- Exhausted-limit alert banner (`remaining === 0`)
+- Disabled creation submit button when quota is exhausted
+- Upgrade CTA linking directly to `/subscription`
+
+Explicitly documented: Frontend quota controls are UX guidance only. Server-side transactional quota enforcement from Phase C (`trip-service.ts`, `quotation-service.ts`, `booking-service.ts`) remains authoritative.
+
+## 212.5 Professional Feature Locked UX
+
+- Added reusable presentation-only `LockedFeatureCard` (`src/components/shared/locked-feature-card.tsx`).
+- Page-level locked UX added for Starter plan on restricted routes:
+  - `/feedback`
+  - `/customer-insights`
+  - `/reports`
+- Professional plan and valid Trial retain 100% normal access.
+- Navigation entries for these features remain visible and routable across all plans.
+
+## 212.6 Custom Agency Logo UX
+
+- `/settings` Branding & Logo tab locks custom agency logo mutation controls for Starter plan with Professional upgrade guidance.
+- Professional plan and valid Trial retain full logo upload and deletion capabilities.
+- Existing logo retention/display and document rendering remain unchanged.
+- No logo or storage object deletion or automatic hiding was introduced.
+
+## 212.7 Public Feedback & Customer Portal Regression Safety
+
+- Public customer feedback submission (`/api/trips/public/[token]/feedback`) remains unrestricted across all plans.
+- Customer Portal (`/customer/...`) remains available to Starter, Professional, and Trial.
+- No public or customer-facing flow was gated behind Professional.
+
+## 212.8 Security & Architecture
+
+- Centralized `entitlementService` remains the single source of truth.
+- Zero `if (plan === "Professional")` or hardcoded plan-name string authorization introduced.
+- Authenticated server-side agency context is strictly enforced.
+- Cross-agency tenant isolation preserved.
+- Server-side entitlement gates (Phase B/C/D) remain 100% intact.
+
+## 212.9 Billing & Data Safety
+
+- Prisma schema: **UNCHANGED**
+- Database migrations: **NONE**
+- Subscription / Payment records: **UNCHANGED**
+- Historical billing / Invoices: **UNCHANGED**
+- Existing logo storage: **UNCHANGED**
+- QA data: **UNCHANGED**
+
+## 212.10 Verification
+
+- Phase E implementation: **PASS**
+- Independent Phase E read-only audit: **PASS**
+- `npx tsc --noEmit`: **PASS — 0 errors**
+- `npm run build`: **PASS — exit code 0 across all routes**
+- Security / tenant isolation: **PASS**
+- Phase C regression: **PASS**
+- Phase D regression: **PASS**
+- Public feedback regression: **PASS**
+- Customer Portal regression: **PASS**
+- Starter / Professional / Trial regression: **PASS**
+- Unexpected changes: **NONE**
+- Critical findings: **NONE**
+- Non-blocking observations: **NONE**
+
+## 212.11 Files Changed
+
+- `src/lib/services/subscription-service.ts`
+- `src/lib/api-client/index.ts`
+- `src/components/shared/locked-feature-card.tsx`
+- `src/app/(dashboard)/subscription/page.tsx`
+- `src/app/(dashboard)/trips/new/page.tsx`
+- `src/app/(dashboard)/quotations/new/page.tsx`
+- `src/app/(dashboard)/bookings/new/page.tsx`
+- `src/app/(dashboard)/feedback/page.tsx`
+- `src/app/(dashboard)/customer-insights/page.tsx`
+- `src/app/(dashboard)/reports/page.tsx`
+- `src/app/(dashboard)/settings/page.tsx`
+
+## 212.12 Closure
+
+**Phase E — CLOSED / PASS**
+
+The entitlement backend, transactional quota enforcement, and database-driven feature configuration remain authoritative. Phase E completes the frontend entitlement visibility, usage-meter, quota-guidance, and Professional feature lock UX layer without introducing a duplicate authorization architecture or changing historical billing/data.
+
+---
+
+# 213. PHASE 213 — PLATFORM OWNER ENTITLEMENT & USAGE QUOTA MANAGEMENT [CLOSED]
+
+## 213.1 Objective & Final Status
+- **Objective**: Connect the Platform Owner subscription plan management experience (`/admin/plans`) to the machine-enforced normalized entitlement tables (`PlanFeatureEntitlement` and `PlanUsageLimit`), allowing Platform Owner to dynamically configure feature flags and creation usage quotas per plan.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 213.2 Architectural & Implementation Summary
+1. **Admin Validation Schema Extension (`src/lib/validation/admin-schema.ts`)**:
+   - Extended `planCreateSchema` and `planUpdateSchema` with validated `entitlements` (canonical feature booleans) and `usageLimits` (canonical resource non-negative integers or `null` for Unlimited).
+2. **Atomic Service Mutation Layer (`src/lib/services/admin-service.ts`)**:
+   - `adminService.listPlans`: Includes `featureEntitlements` and `usageLimits` relations, returning structured `entitlements` and `usageLimits` records per plan.
+   - `adminService.createPlan` & `adminService.updatePlan`: Wrapped inside interactive Prisma transaction (`prisma.$transaction`). Atomically updates `SubscriptionPlan` scalar attributes alongside `PlanFeatureEntitlement` and `PlanUsageLimit` rows via `upsert`.
+3. **Platform Owner Admin UI Extension (`src/app/admin/plans/page.tsx`)**:
+   - Plan cards render live machine-enforced resource creation quotas (Trips, Quotations, Bookings) and feature access flags (`CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, `REPORTS_ANALYTICS`).
+   - Create/Edit Plan modal provides toggle switches for feature entitlement flags and dual numeric/unlimited controls for usage limits (`null` mapped strictly to Unlimited).
+4. **Authoritative Runtime Consumption (`src/lib/services/entitlement-service.ts`)**:
+   - Existing `entitlementService` dynamically reads the updated `PlanFeatureEntitlement` and `PlanUsageLimit` rows from PostgreSQL, enforcing updated feature rules and creation quotas immediately without code redeployment.
+
+## 213.3 Security, Billing & Data Safety
+- **Platform Owner Authorization**: Admin APIs (`GET/POST /api/admin/plans`, `PATCH /api/admin/plans/[id]`) remain strictly guarded by `requirePlatformOwnerContext()` with `agencyId = null`. Non-admin requests fail closed with HTTP 403.
+- **Historical Billing Preservation**: Updating plan prices or entitlements affects future subscription evaluation only. Historical `SubscriptionPayment` amounts, historical subscription dates, and invoices remain strictly untouched.
+- **Atomicity**: Plan creation and updates execute within a single Prisma transaction, rolling back completely if any element fails.
+- **Database Schema**: Zero schema alterations, zero migrations created (`prisma db push` not used).
+
+## 213.4 Verification & Automated Test Matrix Results
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 PASSED (100%)**
+  - Read normalized configuration: PASS
+  - Dynamic feature entitlement mutation (OFF $\to$ ON): PASS
+  - Dynamic usage quota mutation (20 $\to$ 30 and Unlimited `null`): PASS
+  - Create new plan with entitlements/limits: PASS
+  - Fail-closed security check on missing config: PASS
+  - Historical billing safety check: PASS
+  - Baseline state restoration: PASS
+
+## 213.5 Files Changed
+- `src/lib/validation/admin-schema.ts`
+- `src/lib/services/admin-service.ts`
+- `src/app/admin/plans/page.tsx`
+- `prisma/test-phase-213-entitlements.ts`
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 213.6 Closure
+**Phase 213 — CLOSED / PASS**
+
+---
+
+# 214. PHASE 214 — SUBSCRIPTION QUOTA BYPASS REMEDIATION [CLOSED]
+
+## 214.1 Objective & Final Status
+- **Objective**: Remediate the two server-side subscription creation quota bypasses identified during the subscription audit (Quotation Fork Version and Quotation $\to$ Booking Conversion), ensuring that every billable creation path across Trips, Quotations, and Bookings enforces authoritative quota limits and subscription row locks inside PostgreSQL interactive transactions.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 214.2 Root Causes & Remediation Summary
+1. **Quotation Fork Version Remediation (`src/lib/services/quotation-service.ts`)**:
+   - **Root Cause**: `quotationService.createQuotationVersion` created a new `Quotation` row in the `quotations` table (which is counted toward usage by `entitlementService.getResourceUsage`) inside a Prisma transaction, but omitted `lockAgencySubscription` and `checkQuota("QUOTATIONS")`.
+   - **Remediation**: Added `await entitlementService.lockAgencySubscription(agencyId, tx)` and `await entitlementService.checkQuota(agencyId, "QUOTATIONS", tx)` inside the interactive `$transaction` prior to `tx.quotation.create`.
+2. **Quotation $\to$ Booking Conversion Remediation (`src/lib/services/booking-service.ts`)**:
+   - **Root Cause**: `bookingService.convertQuotationToBooking` created a new `Booking` row in the `bookings` table inside a Prisma transaction, but omitted `lockAgencySubscription` and `checkQuota("BOOKINGS")`.
+   - **Remediation**: Added `await entitlementService.lockAgencySubscription(agencyId, tx)` and `await entitlementService.checkQuota(agencyId, "BOOKINGS", tx)` inside the interactive `$transaction` prior to `tx.booking.create`.
+
+## 214.3 Complete Billable Creation-Path Matrix
+- **Trips**:
+  - New Manual Trip (`createTrip`): **PROTECTED** (`TRIPS` quota check + subscription lock FOR UPDATE)
+  - Enquiry $\to$ Trip (`convertEnquiryToTrip`): **PROTECTED** (delegates to `createTrip`)
+- **Quotations**:
+  - New Manual Quotation (`createQuotation`): **PROTECTED** (`QUOTATIONS` quota check + subscription lock FOR UPDATE)
+  - Generate Trip Quotation (`generateQuotationFromTrip`): **PROTECTED** (`QUOTATIONS` quota check + subscription lock FOR UPDATE)
+  - Fork New Version (`createQuotationVersion`): **REMEDIATED & PROTECTED** (`QUOTATIONS` quota check + subscription lock FOR UPDATE)
+- **Bookings**:
+  - New Manual Booking (`createBooking`): **PROTECTED** (`BOOKINGS` quota check + subscription lock FOR UPDATE)
+  - Convert Quotation $\to$ Booking (`convertQuotationToBooking`): **REMEDIATED & PROTECTED** (`BOOKINGS` quota check + subscription lock FOR UPDATE)
+
+## 214.4 Database, Concurrency & Security Protection
+- **Concurrency & Locking**: All creation paths execute `lockAgencySubscription(agencyId, tx)` (`SELECT FOR UPDATE`) and `checkQuota` inside the same Prisma transaction, preventing race conditions where simultaneous requests exceed the subscription quota.
+- **Database Schema**: Zero schema alterations, zero migrations created (`prisma db push` not used).
+- **Data & Configuration Safety**: QA test data created during automated testing was completely cleaned up, and original `PlanUsageLimit` values were fully restored.
+
+## 214.5 Automated QA Verification Results
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-214-quota-bypass.ts` $\to$ **20/20 PASSED (100%)**
+  - Forking quotation version below limit (1/2 $\to$ 2/2): PASS
+  - Forking quotation version at quota capacity (2/2): REJECTED with `QuotaExceededError` (DB count unchanged): PASS
+  - Converting quotation to booking below limit (0/1 $\to$ 1/1): PASS
+  - Converting quotation to booking at quota capacity (1/1): REJECTED with `QuotaExceededError` (DB count unchanged): PASS
+  - Concurrency protection test (2 simultaneous requests with 1 spot remaining $\to$ 1 succeeded, 1 blocked, usage = capacity): PASS
+  - Dynamic limit integration test (limit = 10): PASS
+  - Professional plan unlimited test (`limit = null`): PASS
+  - Full matrix regression test (Trip creation blocked at 1/1 capacity): PASS
+
+## 214.6 Files Changed
+- `src/lib/services/quotation-service.ts`
+- `src/lib/services/booking-service.ts`
+- `prisma/test-phase-214-quota-bypass.ts`
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 214.7 Closure
+**Phase 214 — CLOSED / PASS**
+
+---
+
+# 215. PHASE 215 — FRONTEND ENTITLEMENT-GATED NAVIGATION & PLAN CAPABILITY UX [CLOSED]
+
+## 215.1 Objective & Final Status
+- **Objective**: Improve the Agency Owner frontend experience for Professional-only features by ensuring features remain discoverable in navigation with clear lock indicators for Starter users, routes render dedicated locked/upgrade experiences (`LockedFeatureCard`) rather than failing after backend calls, feature-specific API requests are suppressed when disabled, and the Subscription page dynamically presents accurate plan capabilities for both Starter and Professional tiers.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 215.2 Architectural & UX Implementation Summary
+1. **Sidebar Navigation & Mobile Drawer Gating (`src/components/layout/sidebar.tsx`, `src/components/layout/mobile-nav.tsx`)**:
+   - Professional-only features (`Feedback & Reviews`, `Customer Insights`, `Reports & Analytics`) remain fully visible in the sidebar to Starter Agency Owners.
+   - For Starter users whose plan does not entitle a feature (`!isFeatureAllowed(item.featureKey)`), a clean Lucide `Lock` icon is displayed alongside the navigation label (and a `(Pro Feature)` lock badge in collapsed tooltip).
+   - For Professional users, navigation items display normally without lock indications.
+2. **Page-Level Entitlement Gating Before Feature Data Loading (`src/app/(dashboard)/feedback/page.tsx`, `src/app/(dashboard)/customer-insights/page.tsx`, `src/app/(dashboard)/reports/page.tsx`)**:
+   - Consumes live database-driven entitlements from `useSubscription()`.
+   - While subscription context resolves, renders a graceful loading skeleton.
+   - When a feature is not entitled (`!isAllowed`), immediately renders `LockedFeatureCard` with the canonical feature title, clear explanation, and "Upgrade to Professional" CTA linking to `/subscription`.
+   - Feature-specific data fetching (`experienceClient.listFeedbacks`, `experienceClient.getCustomerInsights`, `reportingClient.getReport`) is **strictly prevented** from executing when the feature is locked, eliminating unneeded API traffic and avoiding unexpected `FEATURE_NOT_ALLOWED` error toast experiences.
+   - Direct URL navigation (e.g. typing `/feedback`, `/customer-insights`, or `/reports`) is safely gated by the same entitlement check.
+3. **Subscription Page Dynamic Plan Capabilities (`src/app/(dashboard)/subscription/page.tsx`)**:
+   - Connected `data.entitlements` directly to the "Feature Entitlements" scorecard, accurately displaying `Included` vs `Available with Pro` for `CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, and `REPORTS_ANALYTICS`.
+   - "Current Billing Period Usage" meters dynamically display exact numeric limits (`20 per billing period` or updated quota such as `30`) or `UNLIMITED` when `limit === null`.
+4. **Backend Security Boundary Retained**:
+   - Backend `entitlementService.checkFeatureAllowed` and `entitlementService.checkQuota` remain the final authoritative security barrier. Direct API requests from unauthorized plans continue to be rejected with `FeatureNotAllowedError` (HTTP 403).
+
+## 215.3 Database & System Safety
+- **Database Schema**: Zero schema changes, zero migrations, no `prisma db push` or reset.
+- **Tenant Isolation**: Preserved. No client-supplied IDs trusted.
+- **Billing Semantics**: Historical payments, subscriptions, and invoice records remain 100% immutable and intact.
+
+## 215.4 Automated QA & Regression Test Matrix
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all routes**
+- `prisma/test-phase-215-entitlement-ux.ts` $\to$ **23/23 PASSED (100%)**
+  - Starter baseline machine entitlements verification: PASS
+  - Professional baseline machine entitlements verification: PASS
+  - Permanent test agency entitlement overview consumption: PASS
+  - Controlled dynamic entitlement mutation (OFF $\to$ ON $\to$ OFF): PASS
+  - Backend authorization fail-closed enforcement verification: PASS
+- `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 PASSED (100%)**
+- `prisma/test-phase-214-quota-bypass.ts` $\to$ **20/20 PASSED (100%)**
+
+## 215.5 Files Changed
+- `src/components/layout/sidebar.tsx`
+- `src/components/layout/mobile-nav.tsx`
+- `src/app/(dashboard)/feedback/page.tsx`
+- `src/app/(dashboard)/customer-insights/page.tsx`
+- `src/app/(dashboard)/reports/page.tsx`
+- `src/app/(dashboard)/subscription/page.tsx`
+- `src/app/(dashboard)/settings/page.tsx`
+- `src/lib/services/quotation-service.ts`
+- `prisma/test-phase-215-entitlement-ux.ts`
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 215.6 Closure
+**Phase 215 — CLOSED / PASS**
+
+---
+
+# 216. PHASE 216 — SUBSCRIPTION STATE OPTIMIZATION & QUOTA-AWARE CREATION UX [CLOSED]
+
+## 216.1 Objective & Final Status
+- **Objective**:
+  1. Optimize client subscription state management by eliminating duplicate, redundant `GET /api/subscription` network calls across dashboard pages (`/trips/new`, `/quotations/new`, `/bookings/new`, and `/settings`), consolidating data retrieval into the root `<SubscriptionProvider>` with in-memory React Context and throttled focus revalidation.
+  2. Implement proactive, quota-aware creation UX for Trips, Quotations, and Bookings on both listing pages (intercepting "New" actions when finite quota is exhausted with `QuotaExceededDialog` and upgrade guidance) and direct `/new` routes (guarding active form rendering with `QuotaExceededCard`).
+  3. Ensure post-creation local usage synchronization (`incrementUsage`) to keep in-memory quota counts immediately fresh without triggering full API refetches, while preserving the backend as the final authoritative security and concurrency boundary.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 216.2 Architectural & UX Implementation Summary
+1. **Centralized React State & Context Enhancement (`src/context/subscription-context.tsx`)**:
+   - Enhanced `SubscriptionContext` with `canCreate(resourceKey: 'TRIPS' | 'QUOTATIONS' | 'BOOKINGS'): QuotaDecision` providing `{ allowed, reason, currentUsage, limit, remaining, isExceeded, loading }`.
+   - Enhanced `SubscriptionContext` with `incrementUsage(resourceKey)` to optimistically update in-memory counters post-successful backend creation.
+   - Incorporated 5-minute throttled window focus revalidation to gracefully capture multi-tab or dynamic admin configuration updates without polling or network overhead.
+2. **Redundant Subscription API Fetch Elimination**:
+   - `src/app/(dashboard)/trips/new/page.tsx`: Removed redundant `subscriptionClient.getSubscription()` call; consumes `useSubscription()`.
+   - `src/app/(dashboard)/quotations/new/page.tsx`: Removed redundant `subscriptionClient.getSubscription()` call; consumes `useSubscription()`.
+   - `src/app/(dashboard)/bookings/new/page.tsx`: Removed redundant `subscriptionClient.getSubscription()` call; consumes `useSubscription()`.
+   - `src/app/(dashboard)/settings/page.tsx`: Removed redundant `subscriptionClient.getSubscription()` call; consumes `useSubscription().isFeatureAllowed('CUSTOM_AGENCY_LOGO')` and `overview.logo`.
+   - `src/app/(dashboard)/subscription/page.tsx`: Preserved dedicated billing data fetching while synchronizing with `refreshSubscription()` upon payment requests and data reloads.
+3. **Quota-Aware Listing Page Interception (`src/app/(dashboard)/trips/page.tsx`, `src/app/(dashboard)/quotations/page.tsx`, `src/app/(dashboard)/bookings/page.tsx`)**:
+   - Evaluates `canCreate(resource)` before navigation.
+   - When quota is reached on finite tiers (e.g. Starter 20/20), prevents navigation into the `/new` form and opens `QuotaExceededDialog` (`src/components/shared/quota-exceeded-dialog.tsx`) detailing exact usage, limit, current billing period context, and an "Upgrade Plan" CTA to `/subscription`.
+   - Loading-safe: Never blocks legitimate Professional or available-quota users while subscription state is resolving.
+4. **Direct Route Protection (`src/app/(dashboard)/trips/new/page.tsx`, `src/app/(dashboard)/quotations/new/page.tsx`, `src/app/(dashboard)/bookings/new/page.tsx`)**:
+   - When a user directly navigates to a `/new` URL while quota is exhausted, active form rendering is suppressed.
+   - Renders `QuotaExceededCard` (`src/components/shared/quota-exceeded-card.tsx`) with telemetry pills, plan benefit breakdown, "Back to [Resource]" navigation, and "Upgrade to Professional" CTA.
+5. **Backend Authority & Concurrency Integrity Retained**:
+   - Backend `entitlementService.checkQuota`, transaction locks, and Phase 214 `createQuotationVersion` interactive transaction settings `{ timeout: 15000, maxWait: 10000 }` remain 100% authoritative and unchanged.
+   - On backend `QUOTA_EXCEEDED` (HTTP 403) responses, frontend catches the conflict and triggers `refreshSubscription()` to reconcile local state with authoritative server data.
+
+## 216.3 Database & System Safety
+- **Database Schema**: Zero schema modifications, zero migrations, no `prisma db push` or reset.
+- **Tenant Isolation**: Preserved. Session verified `agencyId` strictly enforced on backend.
+- **External Dependencies**: Zero new libraries added.
+
+## 216.4 Automated QA & Regression Test Matrix
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-216-caching-and-quota-ux.ts` $\to$ **22/22 PASSED (100%)**
+  - Overview payload usage and telemetry integrity: PASS
+  - Starter finite limit evaluation (19/20 allows, 20/20 blocks): PASS
+  - Professional unlimited evaluation (`limit === null` allows): PASS
+  - Active Trial receiving Professional capability evaluation: PASS
+  - Read-only/Canceled subscription rejection: PASS
+  - Authoritative backend `checkQuota` execution: PASS
+- `prisma/test-phase-215-entitlement-ux.ts` $\to$ **23/23 PASSED (100%)**
+- `prisma/test-phase-214-quota-bypass.ts` $\to$ **20/20 PASSED (100%)**
+- `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 PASSED (100%)**
+
+## 216.5 Files Changed / Added
+- `src/context/subscription-context.tsx` (Enhanced with `canCreate`, `incrementUsage`, focus revalidation)
+- `src/components/shared/quota-exceeded-dialog.tsx` (New reusable modal for listing pages)
+- `src/components/shared/quota-exceeded-card.tsx` (New reusable guard card for direct routes)
+- `src/app/(dashboard)/trips/page.tsx` (Added quota-aware `handleNewTrip` and `QuotaExceededDialog`)
+- `src/app/(dashboard)/trips/new/page.tsx` (Eliminated duplicate fetch, added `QuotaExceededCard`, synchronized usage on create)
+- `src/app/(dashboard)/quotations/page.tsx` (Added quota-aware `handleGenerateQuotation` and `QuotaExceededDialog`)
+- `src/app/(dashboard)/quotations/new/page.tsx` (Eliminated duplicate fetch, added `QuotaExceededCard`, synchronized usage on create)
+- `src/app/(dashboard)/bookings/page.tsx` (Added quota-aware `handleNewBooking` and `QuotaExceededDialog`)
+- `src/app/(dashboard)/bookings/new/page.tsx` (Eliminated duplicate fetch, added `QuotaExceededCard`, synchronized usage on create)
+- `src/app/(dashboard)/settings/page.tsx` (Eliminated duplicate fetch, synchronized logo entitlement and branding from Context)
+- `src/app/(dashboard)/subscription/page.tsx` (Synchronized context on payment submissions and data reloads)
+- `prisma/test-phase-216-caching-and-quota-ux.ts` (New Phase 216 automated test suite)
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 216.6 Closure
+**Phase 216 — CLOSED / PASS**
+
+---
+
+# 217. PHASE 217 — READ-ONLY MODE & AGENCY SUSPENSION HARDENING [CLOSED]
+
+## 217.1 Objective & Final Status
+- **Objective**:
+  1. Fix the backend security gap where a suspended agency owner with an active subscription could perform write/mutation actions, ensuring that `requireWriteAccess()` and server request context strictly enforce read-only status (`403 Forbidden` / `READ_ONLY_ACCESS`) when `Agency.status === 'SUSPENDED'`.
+  2. Protect custom agency logo upload and deletion mutation routes (`POST /api/agency/logo`, `DELETE /api/agency/logo`) with `requireWriteAccess()`.
+  3. Centralize frontend read-only state in `src/context/subscription-context.tsx` (`isReadOnly`, `readOnlyReason`, `canWrite`), establishing a clean precedence hierarchy where Read-Only Mode strictly supersedes Quota Exceeded states.
+  4. Create reusable `ReadOnlyModeDialog` and `ReadOnlyModeCard` components with differentiated UX messaging and action paths for Suspended accounts (WhatsApp Support CTA) vs Expired/Cancelled accounts (Renew Subscription CTA).
+  5. Proactively guard all listing pages (Trips, Quotations, Bookings, Hotels, Vehicles, Activities, Destinations, Rate Sheets, Customers) to intercept creation attempts before navigation or form rendering, and guard direct `/new` creation routes with `ReadOnlyModeCard`.
+  6. Guard quotation editor proposal generation, forking, and booking conversion flows against read-only state.
+  7. Preserve legitimate exceptions: Subscription renewal/payment requests (`POST /api/subscription/payment-request`), notification read statuses, and platform support communications.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 217.2 Architectural & UX Implementation Summary
+1. **Authoritative Server Guard Hardening (`src/lib/api/context.ts` & `src/app/api/agency/logo/route.ts`)**:
+   - `getRequestContext()`: Computes `isSuspendedAgency = isAgencyOwner && agency?.status === AgencyStatus.SUSPENDED` and forces `canWrite = false` and `hasFullAccess = false` whenever the agency is suspended, regardless of whether the subscription plan is Professional, Starter, or active Trial.
+   - `requireWriteAccess()`: Explicit check `if (context.agency.status === AgencyStatus.SUSPENDED)` throws `ReadOnlyAccessError("Your agency workspace is currently suspended. Creating or modifying business records is restricted. Please contact TripDesk support to reactivate your workspace.")`.
+   - `src/app/api/agency/logo/route.ts`: Updated `POST` and `DELETE` handlers to execute `await requireWriteAccess()` before performing logo modifications.
+2. **Centralized Frontend State & Hierarchy (`src/context/subscription-context.tsx`)**:
+   - Exposed `isReadOnly: boolean`, `readOnlyReason: ReadOnlyReason` (`"SUSPENDED" | "EXPIRED" | "CANCELLED" | "PAST_DUE" | "UNPAID" | null`), and `canWrite: boolean`.
+   - `canCreate(resourceKey)` returns `{ allowed: false, reason: "READ_ONLY_SUBSCRIPTION" }` when `isReadOnly` is true, ensuring read-only restrictions always take precedence over quota limit evaluations.
+3. **Reusable Read-Only UI Components**:
+   - `src/components/shared/read-only-mode-dialog.tsx`: Reusable modal dialog for listing pages and action triggers. Differentiates copy and CTA (Suspended $\to$ Contact Support via WhatsApp vs Expired $\to$ Upgrade / Renew Plan via `/subscription`).
+   - `src/components/shared/read-only-mode-card.tsx`: Reusable full-card view for direct `/new` routes, suppressing input forms when workspace is suspended or read-only.
+4. **Proactive Page & Workflow Interception**:
+   - `src/app/(dashboard)/trips/page.tsx` & `trips/new/page.tsx`: Intercepts "New Trip" button; displays `ReadOnlyModeDialog` or `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/quotations/page.tsx` & `quotations/new/page.tsx`: Intercepts "Generate Quotation"; displays `ReadOnlyModeDialog` or `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/bookings/page.tsx` & `bookings/new/page.tsx`: Intercepts "New Booking"; displays `ReadOnlyModeDialog` or `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/hotels/page.tsx` & `hotels/new/page.tsx`: Guarded with `ReadOnlyModeDialog` and `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/vehicles/page.tsx` & `vehicles/new/page.tsx`: Guarded with `ReadOnlyModeDialog` and `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/activities/page.tsx` & `activities/new/page.tsx`: Guarded with `ReadOnlyModeDialog` and `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/destinations/page.tsx`: Guarded with `ReadOnlyModeDialog`.
+   - `src/app/(dashboard)/rate-sheets/page.tsx` & `rate-sheets/new/page.tsx`: Guarded with `ReadOnlyModeDialog` and `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/customers/page.tsx`: Guarded with `ReadOnlyModeDialog`.
+   - `src/app/(dashboard)/trips/[id]/quotation/page.tsx`: Guarded "Generate Proposal", "Fork New Version", and "Convert to Booking" flows.
+5. **Legitimate Exceptions Preserved**:
+   - `POST /api/subscription/payment-request` remains available for suspended/expired agencies to submit offline payment proofs for reactivation.
+   - `PATCH /api/notifications` remains accessible for in-app alert status updates.
+   - Support communication channels remain open for account resolution.
+
+## 217.3 Database & System Safety
+- **Database Schema**: Zero schema modifications, zero migrations, no `prisma db push` or reset.
+- **Tenant Isolation**: Preserved. Session verified `agencyId` strictly enforced across all server handlers.
+- **External Dependencies**: Zero new libraries added.
+
+## 217.4 Automated QA & Regression Test Matrix
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-217-read-only-hardening.ts` $\to$ **43/43 PASSED (100%)**
+  - Section 1 (Server-Side Backend Guards):
+    - Active Agency + Active Subscription: PASS (write allowed)
+    - Active Agency + Active Trial: PASS (write allowed)
+    - Suspended Agency + Active Starter Subscription: PASS (write blocked, 403 ReadOnlyAccessError)
+    - Suspended Agency + Professional Subscription: PASS (write blocked, 403 ReadOnlyAccessError)
+    - Expired Subscription: PASS (write blocked, 403 ReadOnlyAccessError)
+    - Cancelled Subscription: PASS (write blocked, 403 ReadOnlyAccessError)
+  - Section 2 (Frontend Context State & Precedence Logic):
+    - Suspended Agency produces `isReadOnly=true` & `readOnlyReason='SUSPENDED'`: PASS
+    - Suspended Agency creation returns `READ_ONLY_SUBSCRIPTION` despite remaining quota: PASS
+    - Read-Only takes strict precedence over `QUOTA_EXCEEDED`: PASS
+    - Expired subscription prevents creation with `READ_ONLY_SUBSCRIPTION`: PASS
+    - Active subscription with quota space allows creation: PASS
+    - Active Starter at 20/20 returns `QUOTA_EXCEEDED`: PASS
+  - Section 3 (UI Presentation & CTAs):
+    - Suspended dialog styling, WhatsApp CTA, and external routing: PASS
+    - Expired dialog styling, `/subscription` CTA, and internal routing: PASS
+
+## 217.5 Files Changed / Added
+- `src/lib/api/context.ts` (Hardened `getRequestContext` and `requireWriteAccess` against `AgencyStatus.SUSPENDED`)
+- `src/app/api/agency/logo/route.ts` (Guarded POST/DELETE endpoints with `requireWriteAccess`)
+- `src/context/subscription-context.tsx` (Centralized `isReadOnly`, `readOnlyReason`, `canWrite`, precedence in `canCreate`)
+- `src/components/shared/read-only-mode-dialog.tsx` (New reusable dialog component)
+- `src/components/shared/read-only-mode-card.tsx` (New reusable guard card component)
+- `src/app/(dashboard)/trips/page.tsx` & `trips/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/quotations/page.tsx` & `quotations/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/bookings/page.tsx` & `bookings/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/hotels/page.tsx` & `hotels/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/vehicles/page.tsx` & `vehicles/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/activities/page.tsx` & `activities/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/destinations/page.tsx` (Read-only guards & modal UX)
+- `src/app/(dashboard)/rate-sheets/page.tsx` & `rate-sheets/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/customers/page.tsx` (Read-only guards & modal UX)
+- `src/app/(dashboard)/trips/[id]/quotation/page.tsx` (Proposal generation, version forking, and booking conversion guards)
+- `prisma/test-phase-217-read-only-hardening.ts` (Phase 217 automated QA test suite)
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 217.6 Closure
+**Phase 217 — CLOSED / PASS**
+
+---
+
+# 218. PHASE 218 — CUSTOM AGENCY LOGO REAL FILE UPLOAD & REPLACEMENT FLOW [CLOSED]
+
+## 218.1 Objective & Final Status
+- **Objective**:
+  1. Convert the legacy Custom Agency Logo URL-input mechanism into a real binary file upload, replacement, and removal flow.
+  2. Implement robust server-side binary validation: Enforce magic byte signatures for PNG, JPEG, and WEBP, strict 2MB file size limits, and explicitly disallow SVG files to prevent script injection / XSS vulnerabilities.
+  3. Integrate agency-scoped object storage via Supabase Storage (`agency-assets` bucket) under path convention `agencies/${agencyId}/logo/logo-${timestamp}-${random}.${ext}`.
+  4. Ensure safe replacement ordering: Validate new file $\to$ Upload new storage object $\to$ Update PostgreSQL `Agency.logo` $\to$ Safely delete old storage object (non-fatal cleanup).
+  5. Ensure safe removal flow: Set `Agency.logo` to `null` in PostgreSQL and clean up existing storage object idempotently.
+  6. Enforce strict server-side authorization via `requireWriteAccess()` (Phase 217 read-only and suspension protection) and `entitlementService.checkFeatureAllowed(agencyId, "CUSTOM_AGENCY_LOGO")`.
+  7. Update Agency Owner Settings UI (`src/app/(dashboard)/settings/page.tsx`) with a real file picker, local staged preview, file size pill, upload confirmation, active logo display, change logo trigger, removal with `ConfirmDialog`, and read-only blocking with `ReadOnlyModeDialog`.
+  8. Execute automated QA suite and ensure clean typecheck and production build.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 218.2 Architectural & Security Implementation Summary
+1. **Server-Side File Validation (`src/lib/services/agency-logo-service.ts`)**:
+   - `validateLogoFile()`: Validates file buffer length (1B to 2MB limit), whitelisted MIME types (`image/png`, `image/jpeg`, `image/webp`), and magic byte headers:
+     - PNG: `0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a`
+     - JPEG: `0xff, 0xd8, 0xff`
+     - WEBP: `RIFF....WEBP`
+   - Disallows SVG explicitly to prevent stored XSS / malicious active content.
+   - Throws structured `ApiError` codes (`EMPTY_FILE`, `FILE_TOO_LARGE`, `INVALID_FILE_TYPE`, `CORRUPTED_IMAGE`).
+2. **Agency-Scoped Storage & Tenant Isolation**:
+   - Bucket: `agency-assets` (public read).
+   - Storage Path: `agencies/${agencyId}/logo/logo-${Date.now()}-${random}.${ext}`.
+   - `extractAgencyLogoStoragePath()`: Validates that storage operations only resolve paths prefixed with `agencies/${agencyId}/logo/`, strictly preventing cross-tenant file deletion attempts.
+   - Never trusts client-supplied storage paths, file names, or agency IDs.
+3. **Safe Replacement Order & Failure Invariants**:
+   - Step 1: Validate new file buffer and magic bytes.
+   - Step 2: Upload new object into `agency-assets` bucket.
+   - Step 3: Update `Agency.logo` in PostgreSQL database.
+   - Step 4: If update succeeds and old logo resided in storage, delete old storage object.
+   - If upload fails: Existing DB record and old logo are untouched.
+   - If DB update fails: Newly uploaded orphan object is cleaned up, and old logo remains valid.
+   - If old storage deletion fails: DB update remains committed and new logo is preserved (non-fatal cleanup).
+4. **Safe Removal Flow (`DELETE /api/agency/logo`)**:
+   - Updates `Agency.logo` to `null` in PostgreSQL.
+   - Cleans up storage object if present; idempotent on repeat deletion.
+5. **Entitlement & Read-Only Hardening**:
+   - Gated server-side by `requireWriteAccess()` (Phase 217 suspension & expired subscription blocking).
+   - Gated server-side by `entitlementService.checkFeatureAllowed(agencyId, "CUSTOM_AGENCY_LOGO")`. Starter plan blocked (`403 FORBIDDEN`), Professional plan and active Trial allowed.
+6. **Settings Page UI Integration (`src/app/(dashboard)/settings/page.tsx`)**:
+   - Replaced URL text input with hidden `<input type="file" accept="image/png,image/jpeg,image/webp" />`.
+   - Staged preview card displays image preview, file name, and formatted file size in KB before upload.
+   - "Confirm & Save Logo" and "Cancel" actions for staged selection.
+   - Active logo card displays current logo image with "Change Logo" and "Remove Logo" buttons.
+   - Removal guarded by `ConfirmDialog` modal.
+   - Mutation triggers `refreshSubscription()` upon completion to synchronize context.
+   - Intercepted by `ReadOnlyModeDialog` if workspace is suspended or read-only.
+
+## 218.3 Database & Data Safety
+- **Database Schema**: Zero schema migrations required. Reused existing `Agency.logo String?` column safely.
+- **Backward Compatibility**: Legacy external URLs stored in `Agency.logo` remain viewable and can be safely replaced or deleted without throwing storage path errors.
+- **Baseline Data**: Zero production or QA baseline records altered or destroyed.
+
+## 218.4 Automated QA & Regression Test Matrix
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-218-logo-upload.ts` $\to$ **22/22 PASSED (100%)**
+  - Section 1 (Binary File Validation & Magic Bytes):
+    - Valid PNG magic bytes $\to$ PASS
+    - Valid JPEG magic bytes $\to$ PASS
+    - Valid WEBP magic bytes $\to$ PASS
+    - Corrupted / spoofed HTML $\to$ PASS (rejected with `CORRUPTED_IMAGE`)
+    - SVG format $\to$ PASS (rejected with `INVALID_FILE_TYPE`)
+    - Oversized file (>2MB) $\to$ PASS (rejected with `FILE_TOO_LARGE`)
+    - Empty file (0B) $\to$ PASS (rejected with `EMPTY_FILE`)
+  - Section 2 (Storage Path Resolution & Tenant Isolation):
+    - Scoped path extraction $\to$ PASS
+    - Cross-tenant storage path attempt $\to$ PASS (returns `null`, deletion blocked)
+    - Legacy external URL extraction $\to$ PASS (returns `null`, storage bypassed safely)
+  - Section 3 (Service Lifecycles):
+    - Initial logo upload & DB persistence $\to$ PASS
+    - Logo replacement with safe ordering $\to$ PASS
+    - Logo removal setting `Agency.logo = null` $\to$ PASS
+    - Repeated removal idempotency $\to$ PASS
+  - Section 4 (Entitlement & Read-Only Hardening):
+    - Starter plan blocked with 403 `FeatureNotAllowedError` $\to$ PASS
+    - `isFeatureAllowed` returns false on Starter $\to$ PASS
+    - Professional plan allowed $\to$ PASS
+    - Expired subscription blocked with 403 `ReadOnlyAccessError` $\to$ PASS
+    - Suspended agency status verified $\to$ PASS
+
+## 218.5 Files Changed / Added
+- `src/lib/services/agency-logo-service.ts` (New service for logo file validation, storage upload, safe replacement, and deletion)
+- `src/app/api/agency/logo/route.ts` (Refactored `POST` for `multipart/form-data` file upload and `DELETE` for logo removal)
+- `src/app/(dashboard)/settings/page.tsx` (Updated Agency Branding tab with real file picker, staged preview, change/remove flows, and `ConfirmDialog`)
+- `prisma/test-phase-218-logo-upload.ts` (Phase 218 automated QA test suite)
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` (Updated with Section 218)
+
+## 218.6 Known Limitations & Deferred Work
+- **Logo Display**: Logo rendering in customer-facing PDFs implemented in Phase 219. Customer portal UI and email templates remain deferred.
+- **SVG Format**: SVG remains unsupported in this phase to prevent script injection / XSS risks until an SVG sanitization library is introduced.
+
+## 218.7 Closure
+**Phase 218 — CLOSED / PASS**
+
+---
+
+# 219. PROFESSIONAL AGENCY LOGO IN CUSTOMER-FACING PDFs
+
+## 219.1 Purpose & Scope
+- **Objective:** Render the custom agency logo uploaded in Phase 218 onto all customer-facing PDF documents generated across TripDesk SaaS for agencies with the `CUSTOM_AGENCY_LOGO` entitlement (Professional plan, active Trials, or dynamically entitled).
+- **Core Principle:** Presentation-only branding enhancement. Zero redesign of PDF layouts, zero changes to financial formulas, pricing, taxes, line items, booking states, or operational workflows.
+- **Fail-Open Resilience:** PDF generation must never crash if a logo URL is null, corrupt, unreachable, timed out, or unentitled; the document cleanly falls back to the existing text-based header layout.
+
+## 219.2 Architecture & Shared Helper
+- **Shared Helper (`src/lib/services/pdf-branding-helper.ts`):**
+  - Resolves `Agency.logo` into an in-memory `Buffer` compatible with PDFKit.
+  - Verifies `CUSTOM_AGENCY_LOGO` entitlement via `entitlementService.isFeatureAllowed()`.
+  - Supports base64 Data URLs and remote HTTPS Supabase Storage URLs.
+  - Bounded 3000ms network timeout via `AbortSignal.timeout(3000)`.
+  - Enforces magic-byte signature validation (PNG `\x89PNG...`, JPEG `\xff\xd8\xff`, WEBP `RIFF...WEBP`). Disallows SVG and non-image streams.
+  - Fail-open exception handling returning `null` on errors or timeouts.
+
+## 219.3 Customer-Facing PDF Integrations & Approved Visual Placements
+1. **Quotation / Proposal PDF (`quotation-pdf-service.ts`):**
+   - Page 1 Hero Banner (top-left). Refined `fit: [135, 40]`, positioned at `(margin + 16, heroHeaderTopY + 14)`.
+   - Vertical branding flow: Agency logo $\to$ Agency name (`10.5pt bold #A5B4FC`) + contact text $\to$ Trip Title (`17pt bold white`) $\to$ Subtitle $\to$ Metadata pill.
+   - Dynamic hero height computation: `heroTopSectionH = 48 + titleHeight + subtitleHeight + (logoBuffer ? 46 : 0)`.
+   - Preserves proposal metadata, trip title, package comparison, pricing breakdown, milestones, and terms.
+2. **Tax Invoice PDF (`invoice-pdf-service.ts`):**
+   - Page 1 Agency Header Column (top-left). Refined `fit: [140, 44]`, positioned at `(margin, margin)`.
+   - Commercial layout: Renders logo at `[140, 44]`, then drops `+48pt` to render Agency Name (`12pt bold brandPrimary`), Address, Contact, and GSTIN with clean vertical spacing.
+   - Preserves GSTIN, state code, tax tables (CGST/SGST/IGST), totals, and payment status.
+3. **Hotel Voucher PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Hero Container (top-left). Refined `fit: [130, 40]` (operations) / `[130, 36]` (document suite), positioned at `(margin + 16, margin + 12)`.
+   - Banner height dynamically adapts to `Math.max(90, leftContentH, minRightBoxH + 28)` / `94pt`.
+   - Preserves guest details, check-in/out dates, room configurations, and guidelines.
+4. **Transport / Vehicle Voucher PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Hero Container (top-left). Refined `fit: [130, 40]` (operations) / `[130, 36]` (document suite).
+   - Preserves Phase 185 dynamic header height and multi-line title wrapping logic (`bannerHeight = Math.max(90, leftContentH, minRightBoxH + 28)`).
+5. **Activity Pass / Voucher PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Hero Container (top-left). Refined `fit: [130, 40]` (operations) / `[130, 36]` (document suite).
+   - Preserves pass holder details, activity timings, and meeting point instructions.
+6. **Booking Confirmation PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Hero Container (top-left). Refined `fit: [130, 40]` (operations) / `[130, 36]` (document suite).
+   - Preserves traveler overview, financial balance ledger, and confirmation status.
+7. **Final Travel Kit / Customer Itinerary PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Cover Hero Banner ONLY. Refined `fit: [140, 44]` (operations) / `[135, 36]` (document suite).
+   - Preserves subsequent day-by-day itinerary page layout and global text footers without repeating hero logo.
+8. **Official Payment Receipt PDF (`document-pdf-service.ts`):**
+   - Page 1 Header Banner (top-left). Refined `fit: [130, 34]`, positioned at `(margin + 16, margin + 12)`.
+   - Strict 1-page financial layout constraint fully preserved.
+
+## 219.4 Internal Documents Unchanged
+- **Operations Closure Report** (`operations-document-service.ts`) & **Executive/BI Report** (`reporting-service.ts`): Remain internal-only documents without agency logo branding.
+
+## 219.5 Verification & QA Results
+- **Automated QA Suite (`prisma/test-phase-219-pdf-logo-branding.ts`):**
+  - Section 1: Magic byte validation (PNG, JPEG, WEBP pass; SVG, corrupt data URL, null, unreachable URL fail open) $\to$ PASS (6/6)
+  - Section 2: Entitlement checks (Starter unentitled returns null; Professional and Active Trial return Buffer) $\to$ PASS (3/3)
+  - Section 3: End-to-end PDF generation for all 8 customer-facing documents (with and without logo) $\to$ PASS (11/11)
+  - Section 4: Tenant isolation & fail-open security $\to$ PASS (2/2)
+  - Total: **22/22 Tests PASSED**
+- **Regression Suites:**
+  - `prisma/test-phase-218-logo-upload.ts` $\to$ **22/22 Tests PASSED**
+  - `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 Tests PASSED**
+- **Typecheck & Production Build:**
+  - `npx tsc --noEmit` $\to$ **PASS (0 errors)**
+  - `npm run build` $\to$ **PASS (Turbopack production build compiled successfully)**
+
+## 219.6 Closure
+**Phase 219 — Visual Refinement & PDF Branding: CLOSED / PASS**
+
+---
+
+# 80. PHASE 220 — PDF TRAILING BLANK PAGES / FOOTER PAGINATION FIX
+
+## 220.1 Objective & Background
+- **Problem:** Quotation, Invoice, and Operations PDFs generated extra trailing blank pages after the actual content finished (e.g. 1 content page generated 3 total pages, 2 content pages generated 6 total pages, 3 content pages generated 9 total pages).
+- **Audit Findings:** The issue was not related to the agency logo implementation. The root cause was located in the second-pass footer rendering loop over `doc.bufferedPageRange()`.
+- **Root Cause:** When `doc.switchToPage(i)` was called to draw footer text and page numbers, `doc.text()` was invoked at `footerY` coordinates ($y \approx 815.89\text{--}820.89\text{ pt}$) that exceeded PDFKit's configured printable bottom text boundary ($\text{pageHeight} - \text{bottomMargin} = 841.89 - 32 = 809.89\text{ pt}$). PDFKit's text layout engine interpreted this position as page overflow and automatically generated a new trailing page for each `doc.text()` invocation in the footer pass.
+
+## 220.2 Implementation
+- **Surgical Targeted Correction:** In the second-pass footer rendering loops across all affected services, `doc.page.margins.bottom = 0` is temporarily set inside a `try/finally` block:
+  ```ts
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    const origBottomMargin = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    try {
+      // Render footer border line, agency contact info, and "Page X of Y"
+    } finally {
+      doc.page.margins.bottom = origBottomMargin;
+    }
+  }
+  ```
+- **Files Modified:**
+  1. `src/lib/services/quotation-pdf-service.ts`: Global footer loop (lines 1037–1078).
+  2. `src/lib/services/invoice-pdf-service.ts`: Watermark & global footer loop (lines 630–675).
+  3. `src/lib/services/operations-document-service.ts`: All 6 document footer loops (Hotel Voucher, Transport Voucher, Activity Pass, Booking Confirmation, Travel Kit, Closure Report).
+- **Clean Service Preserved:** `src/lib/services/document-pdf-service.ts` remained completely untouched (already clean with footer positioned inside margin bounds at $y = 780\text{ pt}$).
+
+## 220.3 Verification & QA Results
+- **Automated QA Suite (`prisma/test-phase-220-pagination-fix.ts`):**
+  - Test 1: Quotation (Minimal without logo) $\to$ exactly 1 page (0 trailing pages) $\to$ PASS
+  - Test 2: Quotation (Minimal with logo) $\to$ exactly 1 page (0 trailing pages) $\to$ PASS
+  - Test 3: Quotation (Medium) $\to$ exactly 2 pages (0 trailing pages) $\to$ PASS
+  - Test 4: Tax Invoice (Standard without logo) $\to$ exactly 1 page (0 trailing pages) $\to$ PASS
+  - Test 5: Tax Invoice (Standard with logo) $\to$ exactly 1 page (0 trailing pages) $\to$ PASS
+  - Tests 6–10: Document Suite regressions (Hotel Voucher, Vehicle Voucher, Activity Pass, Booking Confirmation, Payment Receipt strict 1-page) $\to$ PASS
+  - Total: **10/10 Tests PASSED**
+- **Regression Suites:**
+  - `prisma/test-phase-219-pdf-logo-branding.ts` $\to$ **22/22 Tests PASSED**
+  - `prisma/test-phase-218-logo-upload.ts` $\to$ **22/22 Tests PASSED**
+  - `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 Tests PASSED**
+- **Typecheck & Production Build:**
+  - `npx tsc --noEmit` $\to$ **PASS (0 errors)**
+  - `npm run build` $\to$ **PASS (Turbopack production build compiled successfully)**
+- **Data & Security Safety:**
+  - Schema Changed: **NO**
+  - Migrations Created: **NO**
+  - Database Mutated: **NO**
+  - Tenant Isolation & Entitlement Rules: **100% Preserved**
+
+## 220.4 Closure
+**Phase 220 — PDF Trailing Blank Pages / Footer Pagination Fix: CLOSED / PASS**
+
+---
+
+# 221. DEFAULT TAX RATE DROPDOWN — COMMON DROPDOWN UI CONSISTENCY
+
+## 221.1 Overview & Scope
+- **Objective:** Standardize the **Default Tax Rate (Catalog Presets)** dropdown in the agency settings page to use the common TripDesk dropdown UI (`@/components/ui/select`) instead of an unstyled native HTML `<select>` tag.
+- **Strict Guardrails:**
+  - Frontend UI presentation consistency fix only.
+  - Zero modifications to backend tax calculation services, APIs, Prisma schema, migrations, or database tables.
+  - 100% preservation of TripDesk's locked tax business rules (0/5/12/18/28% rates, EXCLUSIVE/INCLUSIVE modes, Intra/Inter-state treatment).
+
+## 221.2 Implementation
+- **File Updated:** [`src/app/(dashboard)/settings/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/(dashboard)/settings/page.tsx)
+- **Component Reused:** Shared `@/components/ui/select` (`Select`, `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectItem`).
+- **State & Data Flow:**
+  - Value bound to `String(defaultGstRate)`.
+  - Selection handler safely casts to numeric state `setDefaultGstRate(Number(val))`.
+  - Rate list continues mapping from dynamic `taxRates` API array.
+  - Preserved disabled state binding `disabled={savingTax}`.
+
+## 221.3 Verification & Quality Assurance
+- **Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Turbopack compiled successfully)**.
+- **Data Safety:**
+  - Schema changed: **NO**
+  - Migrations created: **NO**
+  - Database altered: **NO**
+  - API / Calculation changed: **NO**
+
+## 221.4 Closure
+**Default Tax Rate Dropdown UI Consistency: CLOSED / PASS**
+
+---
+
+# 222. NOTIFICATION POPUP + COMMUNICATIONS NOTIFICATION CENTER
+
+## 222.1 Overview & Scope
+- **Objective:** Enhance internal operator notification interactions across the dashboard by:
+  1. Truncating the Topbar notification popover to the **latest 10 notifications** (`limit: 10`) while preserving global unread count badge accuracy.
+  2. Introducing an accessible **hover mark-as-read check button** on every unread notification row in the popover that marks only that item read without navigating away.
+  3. Updating the popover footer action to **"Show All Notifications →"** navigating to `/communications?tab=notifications` (while preserving Platform Owner audit logs navigation).
+  4. Expanding the `/communications` page with a tabbed interface providing a full **System Notifications** history view (`UserNotification`) with pagination, All/Unread filtering, and bulk mark-all-read while keeping the outbound customer communications ledger (`CommunicationLog`) 100% intact.
+- **Strict Guardrails:**
+  - Zero database schema changes, zero migrations, zero database mutations during deployment.
+  - Reused existing `UserNotification` models, `InternalNotificationService`, and `/api/notifications` endpoints.
+  - Strict preservation of tenant and user authorization boundaries (user can only see and mark their own notifications read).
+  - Segregation between `UserNotification` (internal) and `CommunicationLog` (outbound traveler dispatch) preserved.
+
+## 222.2 Implementation
+- **Files Modified:**
+  1. [`src/components/shared/notifications-popover.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/shared/notifications-popover.tsx):
+     - Updated fetch request to `limit: 10`.
+     - Added `handleMarkSingleRead` with `e.stopPropagation()` and optimistic count/state updates.
+     - Added hover `Check` button on unread rows.
+     - Updated footer button to `"Show All Notifications →"` redirecting to `/communications?tab=notifications`.
+  2. [`src/app/(dashboard)/communications/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/(dashboard)/communications/page.tsx):
+     - Added tab switcher: **System Notifications** (`"notifications"`) vs. **Outbound Communications** (`"outbound"`).
+     - Bound active tab to `?tab=notifications` query parameter.
+     - Built System Notifications view with server-side pagination (`notifPage`, `notifTotalPages`), All/Unread filter pills, Mark All Read action, and card rows with category icons and hover mark-as-read.
+     - Preserved 100% of existing Outbound Communications KPI scorecards, filters, search, table, detail modal, and manual message composer.
+
+## 222.3 Verification & Quality Assurance
+- **Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Turbopack compiled all static and dynamic routes successfully)**.
+- **Data Safety:**
+  - Schema changed: **NO**
+  - Migrations created: **NO**
+  - Database altered: **NO**
+  - API / Calculation changed: **NO**
+
+## 222.4 Closure
+**Phase 222 — Notification Popup + Communications Notification Center: CLOSED / PASS**
+
+---
+
+# 223. COMMUNICATIONS SYSTEM NOTIFICATIONS SCROLL CONTAINER
+
+## 223.1 Overview & Scope
+- **Objective:** Prevent extensive notification history from inflating the vertical height of the `/communications` page when the System Notifications tab is active.
+- **Implementation:**
+  - Added `max-h-[620px] overflow-y-auto` to the notification items list container in [`src/app/(dashboard)/communications/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/(dashboard)/communications/page.tsx).
+  - Keeps top filter controls, Mark All Read header action, and bottom pagination bar visible and fixed outside the scrolling content area.
+  - Conforms to the standard TripDesk dashboard table/list scroll pattern (`max-h-[620px] overflow-y-auto`).
+- **Functionality Preserved:**
+  - 100% of Phase 222 features preserved (server-side pagination, hover check mark-as-read, row click navigation, All/Unread filters, true unread counts, loading/empty states, and Outbound Communications ledger).
+
+## 223.2 Verification & Quality Assurance
+- **Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Turbopack compiled all static and dynamic routes successfully)**.
+- **Data Safety:**
+  - Schema changed: **NO**
+  - Migrations created: **NO**
+  - Database altered: **NO**
+
+## 223.3 Closure
+**Phase 223 — Communications System Notifications Scroll Container: CLOSED / PASS**
+
+---
+
+# 224. PHASE 224 — PROJECT-WIDE MODAL BACKGROUND SCROLL LOCK
+
+## 224.1 Objective & Architectural Design
+- **Objective:** Ensure that when any modal/dialog is opened across the entire TripDesk application, background page scrolling (wheel, trackpad, arrow keys, touch gestures, scrollbar drag) is locked, while modal content remains scrollable, layout shift is prevented, page position is preserved upon close, and nested modals maintain lock until all modals are dismissed.
+- **Central Primitive Integration:** Implemented reference-counted scroll locker in `@/lib/scroll-lock` (`useModalScrollLock(isOpen)`). Hooked directly into `DialogContent` in `@/components/ui/dialog.tsx` which automatically covers all standard `Dialog`, `ConfirmDialog`, `AlertDialog`, search modals, and operational/financial dialogs built upon the shared primitive.
+- **Custom Modals Coverage:** Audited and applied `useModalScrollLock` across all standalone `fixed inset-0` modal overlays (Operations dialogs, Invoices modals, Booking modals, Excel import, Mobile navigation drawer, Feedback/Referrals/Subscription/Trip-guest pages, and Admin management overlays).
+- **Layout Shift Compensation:** Dynamically measures `window.innerWidth - document.documentElement.clientWidth` and sets compensatory `paddingRight` on `document.body` along with `overflow: hidden` on both `document.body` and `document.documentElement` during active lock.
+- **Nested Modal Safety:** Uses an active lock reference count (`activeLockCount`). Opening modal A (count=1) -> nested modal B (count=2) -> closing modal B (count=1, still locked) -> closing modal A (count=0, scroll unlocked).
+- **Popovers/Dropdowns Untouched:** Normal dropdowns, comboboxes, select menus, and tooltips are not wrapped in modal lock, preserving standard background interactions.
+
+## 224.2 Verification & Build Results
+- **TypeScript:** `npx tsc --noEmit` passed with 0 errors.
+- **Production Build:** `npm run build` passed with 0 errors.
+- **Database/API Safety:** 0 schema changes, 0 migrations, 0 API route modifications.
+
+## 224.3 Closure
+**Phase 224 — Project-Wide Modal Background Scroll Lock: CLOSED / PASS**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+
 
 
 

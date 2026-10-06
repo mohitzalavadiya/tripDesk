@@ -308,6 +308,11 @@ export default function BookingDetailPage() {
       toast.error("Please enter a valid positive payment amount.");
       return;
     }
+    const currentBalance = Number(booking.balanceAmount);
+    if (amt > currentBalance + 0.001) {
+      toast.error(`Payment amount cannot exceed the outstanding due of ${formatCurrency(currentBalance)}.`);
+      return;
+    }
 
     try {
       setSavingPayment(true);
@@ -460,25 +465,25 @@ export default function BookingDetailPage() {
         {isReadOnly && <ReadOnlyBanner moduleName="Booking Workspace" />}
 
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="space-y-3 z-10">
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
               <Link
                 href="/bookings"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shrink-0"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
               </Link>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-emerald-50 text-emerald-700 border border-emerald-100">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0 whitespace-nowrap">
                 <CalendarCheck className="h-3 w-3 text-emerald-500" />
                 Booking Record
               </span>
-              <span className="text-slate-300">•</span>
+              <span className="text-slate-300 hidden min-[380px]:inline">•</span>
               <BookingStatusBadge status={booking.status} />
               <PaymentStatusBadge status={booking.paymentStatus} />
               {readiness && (
                 <Badge
-                  className={`text-[10px] font-bold ${
+                  className={`text-[10px] font-bold shrink-0 whitespace-nowrap ${
                     isReady
                       ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                       : readinessScore >= 50
@@ -493,7 +498,7 @@ export default function BookingDetailPage() {
             </div>
 
             <div className="flex flex-wrap items-baseline gap-3">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900">
                 {booking.bookingNumber}
               </h1>
               <span className="text-xs font-semibold text-slate-500">
@@ -501,28 +506,28 @@ export default function BookingDetailPage() {
               </span>
             </div>
 
-            <div className="flex items-center gap-4 text-xs text-slate-500">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
               <span className="flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                Travel: <strong>{formatDateDisplay(booking.travelStartDate || booking.trip?.startDate)} → {formatDateDisplay(booking.travelEndDate || booking.trip?.endDate)}</strong>
+                <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                <span>Travel: <strong>{formatDateDisplay(booking.travelStartDate || booking.trip?.startDate)} → {formatDateDisplay(booking.travelEndDate || booking.trip?.endDate)}</strong></span>
               </span>
-              <span>•</span>
+              <span className="text-slate-300 hidden min-[380px]:inline">•</span>
               <span className="flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5 text-slate-400" />
-                Booked on: {formatDateDisplay(booking.bookingDate)}
+                <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                <span>Booked on: {formatDateDisplay(booking.bookingDate)}</span>
               </span>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2.5 z-10">
+          <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 sm:gap-2.5 z-10 w-full lg:w-auto">
             <Button
               variant="outline"
               size="sm"
               onClick={() => router.push(`/operations/${booking.tripId}`)}
-              className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
+              className="w-full sm:w-auto justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
             >
-              <Compass className="h-3.5 w-3.5 mr-1 text-indigo-600" />
+              <Compass className="h-3.5 w-3.5 mr-1 text-indigo-600 shrink-0" />
               Operations Workspace
             </Button>
 
@@ -530,9 +535,9 @@ export default function BookingDetailPage() {
               variant="outline"
               size="sm"
               onClick={() => router.push(`/trips/${booking.tripId}`)}
-              className="bg-white hover:bg-slate-50 border-slate-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
+              className="w-full sm:w-auto justify-center bg-white hover:bg-slate-50 border-slate-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
             >
-              <Layers className="h-3.5 w-3.5 mr-1 text-slate-400" />
+              <Layers className="h-3.5 w-3.5 mr-1 text-slate-400 shrink-0" />
               Trip Overview
             </Button>
 
@@ -541,36 +546,37 @@ export default function BookingDetailPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => router.push(`/trips/${booking.tripId}/quotation/preview`)}
-                className="bg-white hover:bg-slate-50 border-slate-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
+                className="w-full sm:w-auto justify-center bg-white hover:bg-slate-50 border-slate-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
               >
-                <FileText className="h-3.5 w-3.5 mr-1 text-slate-400" />
+                <FileText className="h-3.5 w-3.5 mr-1 text-slate-400 shrink-0" />
                 Proposal View
               </Button>
             )}
 
-            <Button
-              onClick={handleOpenAddPayment}
-              disabled={isReadOnly}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <CreditCard className="h-4 w-4" />
-              Add Payment
-            </Button>
+            <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
+              <Button
+                onClick={handleOpenAddPayment}
+                disabled={isReadOnly}
+                className="w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <CreditCard className="h-4 w-4 shrink-0" />
+                Add Payment
+              </Button>
 
-            {/* Booking & Invoice Actions Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="bg-white hover:bg-slate-50 border-slate-200 h-9 px-3 font-semibold text-xs rounded-xl shadow-2xs gap-1 cursor-pointer"
-                  >
-                    Actions
-                    <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
-                  </Button>
-                }
-              />
+              {/* Booking & Invoice Actions Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full sm:w-auto justify-center bg-white hover:bg-slate-50 border-slate-200 h-9 px-3 font-semibold text-xs rounded-xl shadow-2xs gap-1 cursor-pointer"
+                    >
+                      Actions
+                      <ChevronDown className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                    </Button>
+                  }
+                />
               <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md rounded-xl p-1 w-52">
                 <DropdownMenuGroup>
                   <DropdownMenuLabel className="text-[10px] font-bold uppercase text-slate-400 px-2 py-1">
@@ -651,6 +657,7 @@ export default function BookingDetailPage() {
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
+            </div>
           </div>
         </div>
 
@@ -722,20 +729,20 @@ export default function BookingDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* 1. Operational Services Section */}
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                    <Hotel className="h-4 w-4 text-indigo-600" />
+                    <Hotel className="h-4 w-4 text-indigo-600 shrink-0" />
                     <span>Operational Services & Allocations</span>
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Real-time status of hotel vouchers, chauffeur dispatches, and activity passes.
                   </p>
                 </div>
 
-                <Link href={`/operations/${booking.tripId}`}>
-                  <Button size="sm" variant="outline" className="text-xs h-8 cursor-pointer">
-                    Operations Desk <ExternalLink className="h-3 w-3 ml-1" />
+                <Link href={`/operations/${booking.tripId}`} className="w-full sm:w-auto shrink-0">
+                  <Button size="sm" variant="outline" className="w-full sm:w-auto justify-center text-xs h-8 cursor-pointer">
+                    Operations Desk <ExternalLink className="h-3 w-3 ml-1 shrink-0" />
                   </Button>
                 </Link>
               </div>
@@ -1028,40 +1035,40 @@ export default function BookingDetailPage() {
 
             {/* 2. Official Travel Documents & Vouchers Section */}
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-indigo-600" />
+                    <FileText className="h-4 w-4 text-indigo-600 shrink-0" />
                     <span>Official Travel Documents & Vouchers ({bookingDocs.length})</span>
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Official booking confirmations, hotel vouchers, transport passes, and itineraries.
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={handleGenerateDocuments}
                     disabled={generatingDocs || isReadOnly || booking.status === "CANCELLED"}
-                    className="text-xs h-8 border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold cursor-pointer gap-1"
+                    className="w-full sm:w-auto justify-center text-xs h-8 border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold cursor-pointer gap-1"
                   >
-                    {generatingDocs ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    {generatingDocs ? <Loader2 className="h-3 w-3 animate-spin shrink-0" /> : <Sparkles className="h-3 w-3 shrink-0" />}
                     {bookingDocs.length === 0 ? "Generate All Documents" : "Re-sync Documents"}
                   </Button>
 
-                  <Link href="/documents">
-                    <Button size="sm" variant="ghost" className="text-xs h-8 text-slate-500 hover:text-slate-900 cursor-pointer">
-                      Document Center <ExternalLink className="h-3 w-3 ml-1" />
+                  <Link href="/documents" className="w-full sm:w-auto">
+                    <Button size="sm" variant="ghost" className="w-full sm:w-auto justify-center text-xs h-8 text-slate-500 hover:text-slate-900 cursor-pointer">
+                      Document Center <ExternalLink className="h-3 w-3 ml-1 shrink-0" />
                     </Button>
                   </Link>
                 </div>
               </div>
 
-              <div className="p-5">
+              <div className="p-4 sm:p-5">
                 {bookingDocs.length === 0 ? (
-                  <div className="p-6 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                  <div className="p-4 sm:p-6 bg-slate-50 border border-slate-100 rounded-xl text-center">
                     <FileText className="h-8 w-8 text-slate-300 mx-auto mb-2" />
                     <p className="text-xs font-bold text-slate-700">No travel documents generated yet</p>
                     <p className="text-[11px] text-slate-500 max-w-sm mx-auto mt-1 mb-3">
@@ -1071,9 +1078,9 @@ export default function BookingDetailPage() {
                       size="sm"
                       onClick={handleGenerateDocuments}
                       disabled={generatingDocs || isReadOnly || booking.status === "CANCELLED"}
-                      className="text-xs h-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer gap-1"
+                      className="w-full sm:w-auto justify-center text-xs h-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer gap-1"
                     >
-                      {generatingDocs ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                      {generatingDocs ? <Loader2 className="h-3 w-3 animate-spin shrink-0" /> : <Sparkles className="h-3 w-3 shrink-0" />}
                       Generate All Documents
                     </Button>
                   </div>
@@ -1162,13 +1169,13 @@ export default function BookingDetailPage() {
             </div>
 
             {/* 3. Financial Status Summary Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <IndianRupee className="h-4 w-4 text-emerald-600" />
+                  <IndianRupee className="h-4 w-4 text-emerald-600 shrink-0" />
                   <span>Commercial Financial Ledger</span>
                 </h3>
-                <span className="text-xs font-bold text-slate-500 font-mono">{paidPercentage}% Collected</span>
+                <span className="text-xs font-bold text-slate-500 font-mono shrink-0 whitespace-nowrap">{paidPercentage}% Collected</span>
               </div>
 
               {/* Progress Bar */}
@@ -1180,20 +1187,20 @@ export default function BookingDetailPage() {
               </div>
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-3 gap-4 pt-1 text-xs">
-                <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-3 pt-1 text-xs">
+                <div className="p-3 sm:p-3.5 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Total Contract</span>
-                  <strong className="text-base text-slate-900 block font-black">{formatCurrency(total)}</strong>
+                  <strong className="text-sm sm:text-base text-slate-900 block font-black">{formatCurrency(total)}</strong>
                 </div>
 
-                <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl space-y-1">
+                <div className="p-3 sm:p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl space-y-1">
                   <span className="text-[10px] uppercase font-bold text-emerald-700">Total Received</span>
-                  <strong className="text-base text-emerald-900 block font-black">{formatCurrency(paid)}</strong>
+                  <strong className="text-sm sm:text-base text-emerald-900 block font-black">{formatCurrency(paid)}</strong>
                 </div>
 
-                <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-xl space-y-1">
+                <div className="p-3 sm:p-3.5 bg-rose-50 border border-rose-100 rounded-xl space-y-1">
                   <span className="text-[10px] uppercase font-bold text-rose-700">Outstanding Due</span>
-                  <strong className="text-base text-rose-900 block font-black">{formatCurrency(balance)}</strong>
+                  <strong className="text-sm sm:text-base text-rose-900 block font-black">{formatCurrency(balance)}</strong>
                 </div>
               </div>
 
@@ -1334,10 +1341,10 @@ export default function BookingDetailPage() {
 
             {/* 3. Payment Transactions Table */}
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm">Payment Transactions ({booking.payments?.length || 0})</h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Real-time payment logs, advance deposits, and settlement entries.
                   </p>
                 </div>
@@ -1346,9 +1353,9 @@ export default function BookingDetailPage() {
                   size="sm"
                   onClick={handleOpenAddPayment}
                   disabled={isReadOnly}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer disabled:opacity-50"
+                  className="w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer disabled:opacity-50 shrink-0"
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Log Payment
+                  <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> Log Payment
                 </Button>
               </div>
 
@@ -1499,15 +1506,15 @@ export default function BookingDetailPage() {
             </div>
 
             {/* Invoice Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <Receipt className="h-4 w-4 text-indigo-600" />
+                  <Receipt className="h-4 w-4 text-indigo-600 shrink-0" />
                   <span>Invoice</span>
                 </h3>
                 {activeInvoice && (
                   <Badge
-                    className={`text-[10px] font-bold ${
+                    className={`text-[10px] font-bold shrink-0 whitespace-nowrap ${
                       activeInvoice.status === "PAID"
                         ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                         : activeInvoice.status === "PARTIALLY_PAID"
@@ -1558,14 +1565,14 @@ export default function BookingDetailPage() {
                   </div>
 
                   <div className="space-y-2 pt-1">
-                    <div className="flex items-center gap-2">
-                      <Link href={`/invoices/${activeInvoice.id}`} className="flex-1">
+                    <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2">
+                      <Link href={`/invoices/${activeInvoice.id}`} className="w-full">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-full bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                          className="w-full justify-center bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer"
                         >
-                          <FileText className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                          <FileText className="h-3.5 w-3.5 mr-1 text-slate-500 shrink-0" />
                           View Invoice
                         </Button>
                       </Link>
@@ -1573,14 +1580,14 @@ export default function BookingDetailPage() {
                         href={`/api/invoices/${activeInvoice.id}/pdf`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1"
+                        className="w-full"
                       >
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-full bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                          className="w-full justify-center bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer"
                         >
-                          <Download className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                          <Download className="h-3.5 w-3.5 mr-1 text-slate-500 shrink-0" />
                           Download PDF
                         </Button>
                       </a>
@@ -1619,10 +1626,10 @@ export default function BookingDetailPage() {
                           });
                         }}
                         disabled={isReadOnly || actionLoading}
-                        className="w-full bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer text-slate-700"
+                        className="w-full justify-center bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer text-slate-700"
                         title="Refresh invoice snapshot from latest booking/quotation state while keeping the same invoice number"
                       >
-                        <RefreshCw className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                        <RefreshCw className="h-3.5 w-3.5 mr-1 text-slate-500 shrink-0" />
                         Regenerate Invoice
                       </Button>
                     )}
@@ -1673,9 +1680,9 @@ export default function BookingDetailPage() {
             </div>
 
             {/* Customer Contact Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-3.5">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-3.5">
               <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2 flex items-center gap-2">
-                <User className="h-4 w-4 text-indigo-600" />
+                <User className="h-4 w-4 text-indigo-600 shrink-0" />
                 <span>Customer Profile</span>
               </h3>
 
@@ -1688,8 +1695,8 @@ export default function BookingDetailPage() {
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400">Phone Contact</span>
                   <p className="text-slate-700 flex items-center gap-1.5 mt-0.5">
-                    <Phone className="h-3.5 w-3.5 text-slate-400" />
-                    <a href={`tel:${booking.customer?.phone}`} className="hover:underline text-indigo-600 font-semibold">
+                    <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <a href={`tel:${booking.customer?.phone}`} className="hover:underline text-indigo-600 font-semibold break-all">
                       {booking.customer?.phone}
                     </a>
                   </p>
@@ -1699,8 +1706,8 @@ export default function BookingDetailPage() {
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-400">Email Address</span>
                     <p className="text-slate-700 flex items-center gap-1.5 mt-0.5">
-                      <Mail className="h-3.5 w-3.5 text-slate-400" />
-                      <a href={`mailto:${booking.customer?.email}`} className="hover:underline text-indigo-600">
+                      <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <a href={`mailto:${booking.customer?.email}`} className="hover:underline text-indigo-600 break-all">
                         {booking.customer?.email}
                       </a>
                     </p>
@@ -1724,7 +1731,7 @@ export default function BookingDetailPage() {
             </div>
 
             {/* Notes & Remarks Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
               <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">
                 Booking Remarks
               </h3>

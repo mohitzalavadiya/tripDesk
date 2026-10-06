@@ -1,6 +1,7 @@
 import "server-only";
 
 import PDFDocument from "pdfkit";
+import { pdfBrandingHelper } from "@/lib/services/pdf-branding-helper";
 
 export interface QuotationPdfData {
   quotationNumber: string;
@@ -30,6 +31,7 @@ export interface QuotationPdfData {
   createdAt?: Date | string;
 
   agency?: {
+    id?: string;
     name: string;
     email?: string | null;
     phone?: string | null;
@@ -131,6 +133,11 @@ export class QuotationPdfService {
    * All line item rates, subtotals, markups, discounts, taxes, and milestone amounts are redacted.
    */
   async generateQuotationPdf(data: QuotationPdfData): Promise<Buffer> {
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: data.agency?.id,
+      logoUrl: data.agency?.logo,
+    });
+
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -252,54 +259,30 @@ export class QuotationPdfService {
         // ═════════════════════════════════════════════════════════════════════
         const tripTitle = data.title || "Customized Holiday Itinerary";
         
-        doc.fontSize(14).font("Helvetica-Bold");
-        const titleHeight = doc.heightOfString(tripTitle, { width: contentWidth - 28 });
+        doc.fontSize(17).font("Helvetica-Bold");
+        const titleHeight = doc.heightOfString(tripTitle, { width: contentWidth - 32 });
         
         let subtitleHeight = 0;
         if (data.proposalSubtitle) {
           doc.fontSize(8).font("Helvetica");
-          subtitleHeight = doc.heightOfString(data.proposalSubtitle, { width: contentWidth - 28 }) + 3;
+          subtitleHeight = doc.heightOfString(data.proposalSubtitle, { width: contentWidth - 32 }) + 3;
         }
 
         const heroHeaderTopY = margin;
-        const heroTopSectionH = 48 + titleHeight + subtitleHeight;
-        const heroMetaSectionH = 40;
+        const logoH = logoBuffer ? 46 : 0;
+        const heroTopSectionH = 48 + titleHeight + subtitleHeight + logoH;
+        const heroMetaSectionH = 42;
         const totalHeroH = heroTopSectionH + heroMetaSectionH + 16;
 
         doc
           .roundedRect(margin, heroHeaderTopY, contentWidth, totalHeroH, 8)
           .fill(brandDark);
 
-        // Top Brand Row
-        doc
-          .fillColor("#A5B4FC")
-          .fontSize(11)
-          .font("Helvetica-Bold")
-          .text(agencyName.toUpperCase(), margin + 14, heroHeaderTopY + 12, {
-            width: contentWidth - 170,
-            ellipsis: true,
-          });
-
-        // Dynamic Agency Subtitle / Tagline / Contact
-        const agencyContactParts = [data.agency?.phone, data.agency?.email].filter(Boolean);
-        const dynamicAgencySubtext = agencyContactParts.length > 0
-          ? agencyContactParts.join("   |   ")
-          : "TRIP PROPOSAL";
-
-        doc
-          .fillColor("#CBD5E1")
-          .fontSize(7.5)
-          .font("Helvetica")
-          .text(dynamicAgencySubtext, margin + 14, heroHeaderTopY + 26, {
-            width: contentWidth - 170,
-            ellipsis: true,
-          });
-
         // Top-Right Reference Pill
         const pillW = 125;
         const pillH = 20;
-        const pillX = margin + contentWidth - pillW - 14;
-        const pillY = heroHeaderTopY + 12;
+        const pillX = margin + contentWidth - pillW - 16;
+        const pillY = heroHeaderTopY + 14;
 
         doc
           .roundedRect(pillX, pillY, pillW, pillH, 10)
@@ -314,43 +297,60 @@ export class QuotationPdfService {
             align: "center",
           });
 
-        // Proposal Tier Badge Pill
-        const catPillY = heroHeaderTopY + 40;
-        const tierName = data.tier || "Deluxe";
-        const proposalBadgeText = `TIER: ${tierName.toUpperCase()}`;
-        const badgeW = Math.min(200, Math.max(90, proposalBadgeText.length * 6.5 + 18));
+        let curHeroY = heroHeaderTopY + 14;
+
+        // Top-Left Branding: Logo & Agency Name
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 16, curHeroY, { fit: [135, 40] });
+            curHeroY += 46;
+          } catch {
+            // fallback gracefully
+          }
+        }
+
+        const agencyContactParts = [data.agency?.phone, data.agency?.email].filter(Boolean);
+        const dynamicAgencySubtext = agencyContactParts.length > 0
+          ? agencyContactParts.join("   |   ")
+          : "OFFICIAL TRIP PROPOSAL";
 
         doc
-          .roundedRect(margin + 14, catPillY, badgeW, 14, 4)
-          .fill("#1E1B4B");
-
-        doc
-          .fillColor("#818CF8")
-          .fontSize(7)
+          .fillColor("#A5B4FC")
+          .fontSize(10.5)
           .font("Helvetica-Bold")
-          .text(proposalBadgeText, margin + 14, catPillY + 3.5, {
-            width: badgeW,
-            align: "center",
+          .text(agencyName.toUpperCase(), margin + 16, curHeroY, {
+            width: contentWidth - 160,
+            ellipsis: true,
           });
+
+        doc
+          .fillColor("#CBD5E1")
+          .fontSize(7.5)
+          .font("Helvetica")
+          .text(dynamicAgencySubtext, margin + 16, curHeroY + 13, {
+            width: contentWidth - 160,
+            ellipsis: true,
+          });
+
+        curHeroY += 27;
 
         // Main Trip Title
-        const titleY = catPillY + 18;
         doc
           .fillColor("#FFFFFF")
-          .fontSize(14)
+          .fontSize(17)
           .font("Helvetica-Bold")
-          .text(tripTitle, margin + 14, titleY, {
-            width: contentWidth - 28,
+          .text(tripTitle, margin + 16, curHeroY, {
+            width: contentWidth - 32,
           });
 
-        let nextHeroY = titleY + titleHeight + 3;
+        let nextHeroY = curHeroY + titleHeight + 3;
         if (data.proposalSubtitle) {
           doc
             .fillColor("#E2E8F0")
             .fontSize(8)
             .font("Helvetica")
-            .text(data.proposalSubtitle, margin + 14, nextHeroY, {
-              width: contentWidth - 28,
+            .text(data.proposalSubtitle, margin + 16, nextHeroY, {
+              width: contentWidth - 32,
             });
           nextHeroY += subtitleHeight;
         }
@@ -359,32 +359,32 @@ export class QuotationPdfService {
         doc
           .strokeColor("#334155")
           .lineWidth(0.75)
-          .moveTo(margin + 14, nextHeroY + 4)
-          .lineTo(margin + contentWidth - 14, nextHeroY + 4)
+          .moveTo(margin + 16, nextHeroY + 4)
+          .lineTo(margin + contentWidth - 16, nextHeroY + 4)
           .stroke();
 
-        // 4-Column Structured Metadata Bar (Inside Hero)
+        // 3-Column Structured Metadata Bar (Inside Hero)
         const metaY = nextHeroY + 9;
-        const colW = (contentWidth - 28) / 4;
+        const colW = (contentWidth - 32) / 3;
 
         // Col 1: Prepared For
         doc
           .fillColor("#94A3B8")
           .fontSize(6.5)
           .font("Helvetica-Bold")
-          .text("PREPARED FOR", margin + 14, metaY);
+          .text("PREPARED FOR", margin + 16, metaY);
         doc
           .fillColor("#FFFFFF")
           .fontSize(8.5)
           .font("Helvetica-Bold")
-          .text(customerName, margin + 14, metaY + 9, { width: colW - 8, ellipsis: true });
+          .text(customerName, margin + 16, metaY + 9, { width: colW - 8, ellipsis: true });
 
         // Col 2: Travel Dates & Duration
         doc
           .fillColor("#94A3B8")
           .fontSize(6.5)
           .font("Helvetica-Bold")
-          .text("TRAVEL DATES", margin + 14 + colW, metaY);
+          .text("TRAVEL DATES", margin + 16 + colW, metaY);
         let dateRangeStr = "Custom / Flexible";
         if (data.trip?.startDate && data.trip?.endDate) {
           const startDateStr = new Date(data.trip.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -395,13 +395,13 @@ export class QuotationPdfService {
           .fillColor("#FFFFFF")
           .fontSize(8.5)
           .font("Helvetica-Bold")
-          .text(dateRangeStr, margin + 14 + colW, metaY + 9, { width: colW - 8, ellipsis: true });
+          .text(dateRangeStr, margin + 16 + colW, metaY + 9, { width: colW - 8, ellipsis: true });
         if (durationText) {
           doc
             .fillColor("#A5B4FC")
             .fontSize(7)
             .font("Helvetica-Bold")
-            .text(durationText, margin + 14 + colW, metaY + 20, { width: colW - 8 });
+            .text(durationText, margin + 16 + colW, metaY + 20, { width: colW - 8 });
         }
 
         // Col 3: Group Size
@@ -409,28 +409,13 @@ export class QuotationPdfService {
           .fillColor("#94A3B8")
           .fontSize(6.5)
           .font("Helvetica-Bold")
-          .text("GROUP SIZE", margin + 14 + colW * 2, metaY);
+          .text("GROUP SIZE", margin + 16 + colW * 2, metaY);
         const travelerCount = data.trip?.travelers?.length || 1;
         doc
           .fillColor("#FFFFFF")
           .fontSize(8.5)
           .font("Helvetica-Bold")
-          .text(`${travelerCount} Traveler(s)`, margin + 14 + colW * 2, metaY + 9);
-
-        // Col 4: Validity
-        doc
-          .fillColor("#94A3B8")
-          .fontSize(6.5)
-          .font("Helvetica-Bold")
-          .text("VALIDITY", margin + 14 + colW * 3, metaY);
-        const validStr = data.validUntil
-          ? new Date(data.validUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-          : "Upon Confirmation";
-        doc
-          .fillColor("#A5B4FC")
-          .fontSize(8.5)
-          .font("Helvetica-Bold")
-          .text(validStr, margin + 14 + colW * 3, metaY + 9, { width: colW - 8 });
+          .text(`${travelerCount} Traveler(s)`, margin + 16 + colW * 2, metaY + 9);
 
         doc.y = heroHeaderTopY + totalHeroH + 12;
         doc.x = margin;
@@ -480,7 +465,7 @@ export class QuotationPdfService {
         if (hotelsList.length > 0) {
           highlightParts.push(`${hotelsList.length} Premium Stay${hotelsList.length > 1 ? "s" : ""}`);
         }
-        highlightParts.push(vehiclesList.length > 0 ? "Private Vehicle & Chauffeur" : "Transfers Included");
+        highlightParts.push(vehiclesList.length > 0 ? "Private Vehicle & Driver" : "Transfers Included");
         if (activitiesList.length > 0) {
           highlightParts.push(`${activitiesList.length} Curated Experience${activitiesList.length > 1 ? "s" : ""}`);
         }
@@ -521,9 +506,9 @@ export class QuotationPdfService {
             const descHeight = item.description
               ? doc.heightOfString(item.description, { width: contentWidth - 24, lineGap: 2 })
               : 0;
-            const itemBoxHeight = Math.max(38, 28 + descHeight);
+            const itemBoxHeight = Math.max(46, 30 + descHeight);
 
-            ensureSpace(itemBoxHeight + 8);
+            ensureSpace(itemBoxHeight + 12);
             const itemY = doc.y;
 
             // Day Container Card
@@ -532,53 +517,43 @@ export class QuotationPdfService {
               .fillAndStroke(bgCard, borderLight);
 
             // Day Pill Badge
-            const dayPillW = 44;
+            const dayPillW = 46;
             doc
-              .roundedRect(margin + 10, itemY + 7, dayPillW, 16, 4)
+              .roundedRect(margin + 12, itemY + 8, dayPillW, 16, 3)
               .fill(brandDark);
 
             doc
               .fillColor("#FFFFFF")
-              .fontSize(7.5)
+              .fontSize(7)
               .font("Helvetica-Bold")
-              .text(`DAY ${item.dayNumber}`, margin + 10, itemY + 11, {
+              .text(`DAY ${item.dayNumber}`, margin + 12, itemY + 12.5, {
                 width: dayPillW,
                 align: "center",
               });
 
-            // Date under Day pill if present
-            if (item.date) {
-              const dateText = new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-              doc
-                .fillColor(textLight)
-                .fontSize(6)
-                .font("Helvetica")
-                .text(dateText, margin + 10, itemY + 25, { width: dayPillW, align: "center" });
-            }
-
-            // Title
+            // Title - Vertically Centered with Badge
             doc
               .fillColor(textDark)
-              .fontSize(9)
+              .fontSize(9.5)
               .font("Helvetica-Bold")
-              .text(item.title, margin + 62, itemY + 9, {
-                width: contentWidth - 190,
+              .text(item.title, margin + 66, itemY + 11, {
+                width: contentWidth - 195,
                 ellipsis: true,
               });
 
             // Location Badge (Right side)
             if (item.location) {
               const locPillW = 110;
-              const locPillX = margin + contentWidth - locPillW - 10;
+              const locPillX = margin + contentWidth - locPillW - 12;
               doc
-                .roundedRect(locPillX, itemY + 7, locPillW, 16, 4)
+                .roundedRect(locPillX, itemY + 8, locPillW, 16, 3)
                 .fillAndStroke(brandLight, "#C7D2FE");
 
               doc
                 .fillColor(brandIndigo)
                 .fontSize(7)
                 .font("Helvetica-Bold")
-                .text(`Location: ${item.location}`, locPillX + 4, itemY + 11, {
+                .text(`Location: ${item.location}`, locPillX + 4, itemY + 12.5, {
                   width: locPillW - 8,
                   align: "center",
                   ellipsis: true,
@@ -589,15 +564,15 @@ export class QuotationPdfService {
             if (item.description) {
               doc
                 .fillColor(textMuted)
-                .fontSize(8)
+                .fontSize(7.5)
                 .font("Helvetica")
-                .text(item.description, margin + 12, itemY + 27, {
+                .text(item.description, margin + 12, itemY + 29, {
                   width: contentWidth - 24,
                   lineGap: 2,
                 });
             }
 
-            doc.y = itemY + itemBoxHeight + 8;
+            doc.y = itemY + itemBoxHeight + 10;
             doc.x = margin;
           });
         }
@@ -613,9 +588,9 @@ export class QuotationPdfService {
             const notesHeight = h.notes
               ? doc.fontSize(7.5).font("Helvetica").heightOfString(h.notes, { width: contentWidth - 24, lineGap: 1.5 }) + 4
               : 0;
-            const boxH = Math.max(52, 44 + notesHeight);
+            const boxH = Math.max(56, (h.city ? 54 : 46) + notesHeight);
 
-            ensureSpace(boxH + 8);
+            ensureSpace(boxH + 12);
             const boxY = doc.y;
 
             doc
@@ -625,21 +600,21 @@ export class QuotationPdfService {
             // Hotel Badge
             const tagW = 46;
             doc
-              .roundedRect(margin + 12, boxY + 8, tagW, 15, 3)
+              .roundedRect(margin + 12, boxY + 8, tagW, 16, 3)
               .fillAndStroke(brandLight, "#C7D2FE");
 
             doc
               .fillColor(brandIndigo)
               .fontSize(7)
               .font("Helvetica-Bold")
-              .text("HOTEL", margin + 12, boxY + 12, { width: tagW, align: "center" });
+              .text("HOTEL", margin + 12, boxY + 12.5, { width: tagW, align: "center" });
 
-            // Hotel Name
+            // Hotel Name - Vertically Centered with Badge
             doc
               .fillColor(textDark)
               .fontSize(9.5)
               .font("Helvetica-Bold")
-              .text(h.name, margin + 64, boxY + 9, { width: contentWidth - 210, ellipsis: true });
+              .text(h.name, margin + 64, boxY + 11, { width: contentWidth - 210, ellipsis: true });
 
             // City Tag
             if (h.city) {
@@ -647,7 +622,7 @@ export class QuotationPdfService {
                 .fillColor(brandIndigo)
                 .fontSize(7.5)
                 .font("Helvetica-Bold")
-                .text(`City: ${h.city}`, margin + 12, boxY + 26, { width: contentWidth - 180, ellipsis: true });
+                .text(`City: ${h.city}`, margin + 12, boxY + 28, { width: contentWidth - 180, ellipsis: true });
             }
 
             // Key-values: Room Type, Meal Plan
@@ -662,7 +637,7 @@ export class QuotationPdfService {
               .fillColor(textMuted)
               .fontSize(7.5)
               .font("Helvetica")
-              .text(detailsLine, margin + 12, boxY + (h.city ? 37 : 27), { width: contentWidth - 180, ellipsis: true });
+              .text(detailsLine, margin + 12, boxY + (h.city ? 40 : 28), { width: contentWidth - 180, ellipsis: true });
 
             // Nights Badge & Dates (Right Side)
             let dateStr = "";
@@ -683,7 +658,7 @@ export class QuotationPdfService {
                 .fillColor("#334155")
                 .fontSize(7)
                 .font("Helvetica-Bold")
-                .text(`${h.nights} Night(s)  •  ${h.rooms || 1} Room(s)`, nPillX + 2, boxY + 12, {
+                .text(`${h.nights} Night(s)  •  ${h.rooms || 1} Room(s)`, nPillX + 2, boxY + 12.5, {
                   width: nPillW - 4,
                   align: "center",
                 });
@@ -702,10 +677,10 @@ export class QuotationPdfService {
                 .fillColor(textMuted)
                 .fontSize(7.5)
                 .font("Helvetica-Oblique")
-                .text(`Note: ${h.notes}`, margin + 12, boxY + 46, { width: contentWidth - 24, lineGap: 1.5 });
+                .text(`Note: ${h.notes}`, margin + 12, boxY + (h.city ? 52 : 40), { width: contentWidth - 24, lineGap: 1.5 });
             }
 
-            doc.y = boxY + boxH + 8;
+            doc.y = boxY + boxH + 10;
             doc.x = margin;
           });
         }
@@ -718,8 +693,8 @@ export class QuotationPdfService {
           drawSectionHeader("Transportation & Logistics", "Dedicated private transport arrangements");
 
           vehicles.forEach((v) => {
-            const vH = 42;
-            ensureSpace(vH + 8);
+            const vH = 44;
+            ensureSpace(vH + 10);
             const vY = doc.y;
 
             doc
@@ -729,20 +704,20 @@ export class QuotationPdfService {
             // Transport Badge
             const tagW = 54;
             doc
-              .roundedRect(margin + 12, vY + 8, tagW, 15, 3)
+              .roundedRect(margin + 12, vY + 8, tagW, 16, 3)
               .fillAndStroke(brandLight, "#C7D2FE");
 
             doc
               .fillColor(brandIndigo)
               .fontSize(7)
               .font("Helvetica-Bold")
-              .text("VEHICLE", margin + 12, vY + 12, { width: tagW, align: "center" });
+              .text("VEHICLE", margin + 12, vY + 12.5, { width: tagW, align: "center" });
 
             doc
               .fillColor(textDark)
               .fontSize(9.5)
               .font("Helvetica-Bold")
-              .text(v.name, margin + 72, vY + 9, { width: contentWidth - 170, ellipsis: true });
+              .text(v.name, margin + 72, vY + 11, { width: contentWidth - 170, ellipsis: true });
 
             if (v.capacity) {
               const capW = 75;
@@ -755,7 +730,7 @@ export class QuotationPdfService {
                 .fillColor(brandIndigo)
                 .fontSize(7)
                 .font("Helvetica-Bold")
-                .text(`${v.capacity} Seater`, capX + 2, vY + 12, { width: capW - 4, align: "center" });
+                .text(`${v.capacity} Seater`, capX + 2, vY + 12.5, { width: capW - 4, align: "center" });
             }
 
             const typeDetails = [
@@ -769,9 +744,9 @@ export class QuotationPdfService {
               .fillColor(textMuted)
               .fontSize(7.5)
               .font("Helvetica")
-              .text(typeDetails, margin + 12, vY + 26, { width: contentWidth - 24, ellipsis: true });
+              .text(typeDetails, margin + 12, vY + 28, { width: contentWidth - 24, ellipsis: true });
 
-            doc.y = vY + vH + 8;
+            doc.y = vY + vH + 10;
             doc.x = margin;
           });
         }
@@ -787,9 +762,9 @@ export class QuotationPdfService {
             const descH = act.description
               ? doc.fontSize(7.5).font("Helvetica").heightOfString(act.description, { width: contentWidth - 24, lineGap: 1.5 })
               : 0;
-            const actH = Math.max(40, 26 + descH);
+            const actH = Math.max(46, 30 + descH);
 
-            ensureSpace(actH + 8);
+            ensureSpace(actH + 12);
             const actY = doc.y;
 
             doc
@@ -797,22 +772,23 @@ export class QuotationPdfService {
               .fillAndStroke(bgCard, borderLight);
 
             // Activity Badge
-            const tagW = 54;
+            const tagW = 56;
             doc
-              .roundedRect(margin + 12, actY + 8, tagW, 15, 3)
+              .roundedRect(margin + 12, actY + 8, tagW, 16, 3)
               .fillAndStroke(brandLight, "#C7D2FE");
 
             doc
               .fillColor(brandIndigo)
               .fontSize(7)
               .font("Helvetica-Bold")
-              .text("ACTIVITY", margin + 12, actY + 12, { width: tagW, align: "center" });
+              .text("ACTIVITY", margin + 12, actY + 12.5, { width: tagW, align: "center" });
 
+            // Activity Name - Vertically Centered with Badge
             doc
               .fillColor(textDark)
-              .fontSize(9)
+              .fontSize(9.5)
               .font("Helvetica-Bold")
-              .text(act.name, margin + 72, actY + 9, { width: contentWidth - 170, ellipsis: true });
+              .text(act.name, margin + 74, actY + 11, { width: contentWidth - 190, ellipsis: true });
 
             if (act.date) {
               doc
@@ -822,7 +798,7 @@ export class QuotationPdfService {
                 .text(
                   new Date(act.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
                   margin + contentWidth - 130,
-                  actY + 9,
+                  actY + 11,
                   { width: 118, align: "right" }
                 );
             }
@@ -832,12 +808,12 @@ export class QuotationPdfService {
               .fillColor(textMuted)
               .fontSize(7.5)
               .font("Helvetica")
-              .text(sub || "Curated sightseeing experience", margin + 12, actY + 25, {
+              .text(sub || "Curated sightseeing experience", margin + 12, actY + 28, {
                 width: contentWidth - 24,
                 lineGap: 1.5,
               });
 
-            doc.y = actY + actH + 8;
+            doc.y = actY + actH + 10;
             doc.x = margin;
           });
         }
@@ -1061,44 +1037,50 @@ export class QuotationPdfService {
         const range = doc.bufferedPageRange();
         for (let i = range.start; i < range.start + range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          const footerY = pageHeight - 26;
+          try {
+            const footerY = pageHeight - 26;
 
-          // Top footer border
-          doc
-            .strokeColor(borderLight)
-            .lineWidth(0.75)
-            .moveTo(margin, footerY)
-            .lineTo(margin + contentWidth, footerY)
-            .stroke();
+            // Top footer border
+            doc
+              .strokeColor(borderLight)
+              .lineWidth(0.75)
+              .moveTo(margin, footerY)
+              .lineTo(margin + contentWidth, footerY)
+              .stroke();
 
-          // Left: Agency details
-          const agencyContact = [
-            agencyName,
-            data.agency?.phone,
-            data.agency?.email,
-          ]
-            .filter(Boolean)
-            .join("   |   ");
+            // Left: Agency details
+            const agencyContact = [
+              agencyName,
+              data.agency?.phone,
+              data.agency?.email,
+            ]
+              .filter(Boolean)
+              .join("   |   ");
 
-          doc
-            .fillColor(textLight)
-            .fontSize(7)
-            .font("Helvetica")
-            .text(agencyContact, margin, footerY + 5, {
-              width: contentWidth - 90,
-              ellipsis: true,
-            });
+            doc
+              .fillColor(textLight)
+              .fontSize(7)
+              .font("Helvetica")
+              .text(agencyContact, margin, footerY + 5, {
+                width: contentWidth - 90,
+                ellipsis: true,
+              });
 
-          // Right: Page number
-          doc
-            .fillColor(textLight)
-            .fontSize(7)
-            .font("Helvetica")
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 80, footerY + 5, {
-              width: 80,
-              align: "right",
-            });
+            // Right: Page number
+            doc
+              .fillColor(textLight)
+              .fontSize(7)
+              .font("Helvetica")
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 80, footerY + 5, {
+                width: 80,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
+          }
         }
 
         doc.end();

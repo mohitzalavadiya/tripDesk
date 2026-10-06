@@ -13,6 +13,7 @@ import {
   SubscriptionPlan,
   UserRole,
   SubscriptionStatus,
+  AgencyStatus,
 } from "@prisma/client";
 
 export interface SubscriptionAccessInfo {
@@ -102,6 +103,7 @@ export async function getRequestContext(): Promise<RequestContext | null> {
 
     const isPlatformOwner = dbUser.role === UserRole.PLATFORM_OWNER;
     const isAgencyOwner = dbUser.role === UserRole.AGENCY_OWNER && !!dbUser.agencyId;
+    const isSuspendedAgency = isAgencyOwner && agency?.status === AgencyStatus.SUSPENDED;
 
     // Calculate subscription access
     let status: SubscriptionStatus = SubscriptionStatus.TRIAL;
@@ -116,14 +118,18 @@ export async function getRequestContext(): Promise<RequestContext | null> {
       if (subscription.status === SubscriptionStatus.TRIAL && subscription.trialEnd) {
         const end = new Date(subscription.trialEnd).getTime();
         trialDaysRemaining = Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)));
-        canWrite = trialDaysRemaining > 0;
+        canWrite = !isSuspendedAgency && trialDaysRemaining > 0;
       } else if (subscription.status === SubscriptionStatus.ACTIVE) {
-        canWrite = true;
+        canWrite = !isSuspendedAgency;
       } else {
         canWrite = false;
       }
     } else if (isAgencyOwner) {
       status = SubscriptionStatus.EXPIRED;
+      canWrite = false;
+    }
+
+    if (isSuspendedAgency) {
       canWrite = false;
     }
 
@@ -220,10 +226,15 @@ export async function requireReadAccess(): Promise<AgencyOwnerRequestContext> {
 
 /**
  * Guard: Enforces write/mutation permissions on an agency workspace.
- * Throws 403 ReadOnlyAccessError if subscription has expired or cancelled.
+ * Throws 403 ReadOnlyAccessError if agency is suspended or subscription has expired/cancelled.
  */
 export async function requireWriteAccess(): Promise<AgencyOwnerRequestContext> {
   const context = await requireAgencyOwnerContext();
+  if (context.agency.status === AgencyStatus.SUSPENDED) {
+    throw new ReadOnlyAccessError(
+      "Your agency workspace is currently suspended. Creating or modifying business records is restricted. Please contact TripDesk support to reactivate your workspace."
+    );
+  }
   if (!context.subscriptionAccess.canWrite) {
     throw new ReadOnlyAccessError(
       "Your subscription or free trial has expired. Existing data is accessible in read-only mode. Renew to resume creating or modifying business records."

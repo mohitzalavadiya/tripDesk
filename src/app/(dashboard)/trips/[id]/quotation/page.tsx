@@ -42,6 +42,9 @@ import {
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
+import { useSubscription } from "@/context/subscription-context";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,17 +102,24 @@ export default function TripQuotationEditorPage() {
   const router = useRouter();
   const tripId = params.id as string;
 
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, canCreate, refreshSubscription } = useSubscription();
+
   // Data states
   const [quotations, setQuotations] = React.useState<QuotationWithRelations[]>([]);
   const [costing, setCosting] = React.useState<TripCostingResult | null>(null);
   const [activeQuoteId, setActiveQuoteId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+  const [showQuotaDialog, setShowQuotaDialog] = React.useState(false);
+  const [quotaEntityType, setQuotaEntityType] = React.useState<"QUOTATION" | "BOOKING">("QUOTATION");
   const [generating, setGenerating] = React.useState(false);
   const [forkingVersion, setForkingVersion] = React.useState(false);
   const [updatingPricing, setUpdatingPricing] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<ActiveTabType>("pricing");
+
+  const isReadOnly = isCentralReadOnly || localReadOnly;
 
   // Tax Rate Catalog states
   const [taxRates, setTaxRates] = React.useState<TaxRateItem[]>([]);
@@ -192,7 +202,7 @@ export default function TripQuotationEditorPage() {
       }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-        setIsReadOnly(true);
+        setLocalReadOnly(true);
       }
       setError(err?.message || "Failed to load trip quotations.");
     } finally {
@@ -244,8 +254,17 @@ export default function TripQuotationEditorPage() {
 
   // Generate Quotation Snapshot
   const handleGenerate = async () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    if (!activeQuote && !canCreate("QUOTATIONS").allowed) {
+      setQuotaEntityType("QUOTATION");
+      setShowQuotaDialog(true);
+      return;
+    }
     if (isReadOnly) {
-      toast.error("Subscription expired. Modifications are restricted to read-only mode.");
+      toast.error("Modifications are restricted in read-only mode.");
       return;
     }
 
@@ -264,11 +283,18 @@ export default function TripQuotationEditorPage() {
 
       if (res.success && res.data) {
         toast.success(`Proposal snapshot ${res.data.quotationNumber} (V${res.data.version}) created!`);
+        refreshSubscription();
         await fetchTripQuotationData();
         setActiveQuoteId(res.data.id);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to generate proposal.");
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setLocalReadOnly(true);
+        refreshSubscription();
+        toast.error("Modifications restricted. Read-only mode is active.");
+      } else {
+        toast.error(err?.message || "Failed to generate proposal.");
+      }
     } finally {
       setGenerating(false);
     }
@@ -276,24 +302,59 @@ export default function TripQuotationEditorPage() {
 
   // Fork New Version
   const handleForkVersion = async () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    if (!canCreate("QUOTATIONS").allowed) {
+      setQuotaEntityType("QUOTATION");
+      setShowQuotaDialog(true);
+      return;
+    }
     if (!activeQuote || isReadOnly) return;
     try {
       setForkingVersion(true);
       const res = await quotationClient.createQuotationVersion(activeQuote.id);
       if (res.success && res.data) {
         toast.success(`Forked new version V${res.data.version} successfully!`);
+        refreshSubscription();
         await fetchTripQuotationData();
         setActiveQuoteId(res.data.id);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to create new quotation version.");
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setLocalReadOnly(true);
+        refreshSubscription();
+        toast.error("Modifications restricted. Read-only mode is active.");
+      } else {
+        toast.error(err?.message || "Failed to create new quotation version.");
+      }
     } finally {
       setForkingVersion(false);
     }
   };
 
+  const handleConvertToBooking = () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    if (!canCreate("BOOKINGS").allowed) {
+      setQuotaEntityType("BOOKING");
+      setShowQuotaDialog(true);
+      return;
+    }
+    if (activeQuote) {
+      router.push(`/bookings/new?quotationId=${activeQuote.id}&tripId=${tripId}`);
+    }
+  };
+
   // Status Change
   const handleStatusChange = async (newStatus: QuotationStatus) => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
     if (!activeQuote || isReadOnly) return;
     try {
       const res = await quotationClient.updateQuotation(activeQuote.id, { status: newStatus });
@@ -302,7 +363,13 @@ export default function TripQuotationEditorPage() {
         setQuotations((prev) => prev.map((q) => (q.id === activeQuote.id ? res.data! : q)));
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to update status.");
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setLocalReadOnly(true);
+        refreshSubscription();
+        toast.error("Modifications restricted. Read-only mode is active.");
+      } else {
+        toast.error(err?.message || "Failed to update status.");
+      }
     }
   };
 
@@ -671,39 +738,41 @@ export default function TripQuotationEditorPage() {
     <div className="min-h-screen bg-slate-50/50 pb-20">
       {isReadOnly && <ReadOnlyBanner moduleName="Quotations" />}
 
-      <div className="max-w-[1360px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+      <div className="max-w-[1360px] mx-auto p-3.5 sm:p-6 lg:p-8 space-y-6">
         {/* Top Navigation Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-start gap-2.5 sm:gap-3">
             <Link
               href={`/trips/${tripId}`}
-              className="inline-flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 text-xs font-semibold h-9 w-9 rounded-xl shadow-2xs transition-colors"
+              className="inline-flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 text-xs font-semibold h-9 w-9 rounded-xl shadow-2xs transition-colors shrink-0 mt-0.5"
             >
               <ArrowLeft className="h-4 w-4 text-slate-600" />
             </Link>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 leading-snug">
                   {costing?.tripTitle || "Trip Quotation Studio"}
                 </h1>
-                {activeQuote && <QuotationStatusBadge status={activeQuote.status} />}
-                {activeQuote && (
-                  <Badge variant="outline" className="text-xs font-mono font-bold bg-indigo-50/50 text-indigo-700 border-indigo-200">
-                    {activeQuote.quotationNumber} • V{activeQuote.version}
-                  </Badge>
-                )}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {activeQuote && <QuotationStatusBadge status={activeQuote.status} />}
+                  {activeQuote && (
+                    <Badge variant="outline" className="text-xs font-mono font-bold bg-indigo-50/50 text-indigo-700 border-indigo-200 shrink-0 whitespace-nowrap">
+                      {activeQuote.quotationNumber} • V{activeQuote.version}
+                    </Badge>
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 mt-1">
                 {costing?.tripNumber} • {costing?.customer.name} ({costing?.customer.phone})
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full lg:w-auto">
             {/* Version Switcher */}
             {quotations.length > 1 && (
               <Select value={activeQuoteId || ""} onValueChange={(val) => val && setActiveQuoteId(val)}>
-                <SelectTrigger className="h-9 text-xs bg-white border-slate-200 w-auto min-w-36 font-semibold">
+                <SelectTrigger className="h-9 text-xs bg-white border-slate-200 w-full sm:w-auto min-w-36 font-semibold">
                   <History className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
                   <SelectValue placeholder="Select Version">
                     {(val) => {
@@ -729,9 +798,9 @@ export default function TripQuotationEditorPage() {
                   size="sm"
                   onClick={handleForkVersion}
                   disabled={forkingVersion || isReadOnly}
-                  className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-9 rounded-xl shadow-2xs gap-1 cursor-pointer disabled:opacity-50"
+                  className="flex-1 xs:flex-initial bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-9 rounded-xl shadow-2xs gap-1 cursor-pointer disabled:opacity-50 justify-center whitespace-nowrap"
                 >
-                  <History className="h-3.5 w-3.5 text-slate-500" />
+                  <History className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                   {forkingVersion ? "Forking..." : "Fork New Version"}
                 </Button>
 
@@ -740,9 +809,9 @@ export default function TripQuotationEditorPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => copyShareLink(activeQuote.shareToken!)}
-                    className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-9 rounded-xl shadow-2xs gap-1 cursor-pointer"
+                    className="flex-1 xs:flex-initial bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-9 rounded-xl shadow-2xs gap-1 cursor-pointer justify-center whitespace-nowrap"
                   >
-                    <Copy className="h-3.5 w-3.5 text-slate-500" />
+                    <Copy className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                     Share Link
                   </Button>
                 )}
@@ -751,9 +820,9 @@ export default function TripQuotationEditorPage() {
                   href={`/api/quotations/${encodeURIComponent(activeQuote.id)}/pdf`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold h-9 px-3 rounded-xl shadow-2xs gap-1 cursor-pointer text-slate-700"
+                  className="flex-1 xs:flex-initial inline-flex items-center justify-center bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold h-9 px-3 rounded-xl shadow-2xs gap-1 cursor-pointer text-slate-700 whitespace-nowrap"
                 >
-                  <Download className="h-3.5 w-3.5 text-indigo-600" />
+                  <Download className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
                   Export PDF
                 </a>
 
@@ -761,18 +830,18 @@ export default function TripQuotationEditorPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => router.push(`/trips/${tripId}/quotation/preview`)}
-                  className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-9 rounded-xl shadow-2xs gap-1 cursor-pointer"
+                  className="flex-1 xs:flex-initial bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-9 rounded-xl shadow-2xs gap-1 cursor-pointer justify-center whitespace-nowrap"
                 >
-                  <Eye className="h-3.5 w-3.5 text-indigo-600" />
+                  <Eye className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
                   Preview
                 </Button>
 
                 <Button
                   size="sm"
-                  onClick={() => router.push(`/bookings/new?quotationId=${activeQuote.id}&tripId=${tripId}`)}
-                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
+                  onClick={handleConvertToBooking}
+                  className="w-full sm:w-auto bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer justify-center whitespace-nowrap"
                 >
-                  <CalendarCheck className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                  <CalendarCheck className="h-3.5 w-3.5 mr-1 text-emerald-600 shrink-0" />
                   Convert to Booking
                 </Button>
               </>
@@ -781,16 +850,16 @@ export default function TripQuotationEditorPage() {
             <Button
               onClick={handleGenerate}
               disabled={generating || isReadOnly}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap"
             >
               {generating ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
                   Generating...
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
                   {activeQuote ? "Re-sync Proposal" : "Generate Proposal"}
                 </>
               )}
@@ -945,7 +1014,7 @@ export default function TripQuotationEditorPage() {
             {/* Left Col (2 cols): Line Items Snapshot */}
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm">Quotation Line Items Snapshot</h3>
                     <p className="text-xs text-slate-500">
@@ -958,7 +1027,7 @@ export default function TripQuotationEditorPage() {
                     variant="outline"
                     disabled={isReadOnly}
                     onClick={handleOpenAddItem}
-                    className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer disabled:opacity-50"
+                    className="w-full sm:w-auto justify-center bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8.5 rounded-lg cursor-pointer disabled:opacity-50"
                   >
                     <Plus className="h-3.5 w-3.5 mr-1" /> Add Custom Item
                   </Button>
@@ -1386,22 +1455,22 @@ export default function TripQuotationEditorPage() {
           return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Inclusions Card */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-7 w-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="h-7 w-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
                     <Check className="h-4 w-4" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="font-bold text-slate-900 text-sm">Package Inclusions</h3>
-                    <p className="text-[11px] text-slate-500">Services and items covered under this proposal</p>
+                    <p className="text-[11px] text-slate-500 truncate">Services and items covered under this proposal</p>
                   </div>
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => handleOpenAddProposalItem(ProposalItemType.INCLUSION)}
-                  className="h-8 text-xs font-semibold"
+                  className="w-full sm:w-auto justify-center h-8 text-xs font-semibold shrink-0"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" /> Add Inclusion
                 </Button>
@@ -1416,12 +1485,12 @@ export default function TripQuotationEditorPage() {
                       key={item.id}
                       className="p-3 bg-emerald-50/40 rounded-xl border border-emerald-100 flex items-start justify-between gap-3"
                     >
-                      <div className="flex items-start gap-2.5">
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
                         <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-xs">{item.title}</h4>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-slate-900 text-xs leading-snug break-words">{item.title}</h4>
                           {item.description && (
-                            <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{item.description}</p>
+                            <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed break-words">{item.description}</p>
                           )}
                         </div>
                       </div>
@@ -1445,12 +1514,12 @@ export default function TripQuotationEditorPage() {
                   {/* Included Activities Section */}
                   {includedActivities.length > 0 && (
                     <div className="pt-3 border-t border-emerald-100 space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5">
                         <h5 className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
-                          <Ticket className="h-3.5 w-3.5 text-emerald-600" />
+                          <Ticket className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                           <span>Included Activities ({includedActivities.length})</span>
                         </h5>
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">
                           Package Inclusion
                         </span>
                       </div>
@@ -1458,13 +1527,13 @@ export default function TripQuotationEditorPage() {
                         {includedActivities.map((act: any) => (
                           <div
                             key={act.id}
-                            className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-200/50 flex items-center justify-between text-xs"
+                            className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-200/50 flex items-center justify-between text-xs gap-2"
                           >
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                              <span className="font-semibold text-slate-900">{act.name || act.activityName || act.activity?.name || "Sightseeing Experience"}</span>
+                              <span className="font-semibold text-slate-900 leading-snug break-words">{act.name || act.activityName || act.activity?.name || "Sightseeing Experience"}</span>
                             </div>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0 whitespace-nowrap">
                               Included
                             </span>
                           </div>
@@ -1477,22 +1546,22 @@ export default function TripQuotationEditorPage() {
             </div>
 
             {/* Exclusions Card */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-7 w-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="h-7 w-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold shrink-0">
                     <X className="h-4 w-4" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="font-bold text-slate-900 text-sm">Package Exclusions</h3>
-                    <p className="text-[11px] text-slate-500">Items not included in this package price</p>
+                    <p className="text-[11px] text-slate-500 truncate">Items not included in this package price</p>
                   </div>
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => handleOpenAddProposalItem(ProposalItemType.EXCLUSION)}
-                  className="h-8 text-xs font-semibold"
+                  className="w-full sm:w-auto justify-center h-8 text-xs font-semibold shrink-0"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" /> Add Exclusion
                 </Button>
@@ -1507,12 +1576,12 @@ export default function TripQuotationEditorPage() {
                       key={item.id}
                       className="p-3 bg-rose-50/40 rounded-xl border border-rose-100 flex items-start justify-between gap-3"
                     >
-                      <div className="flex items-start gap-2.5">
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
                         <X className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-xs">{item.title}</h4>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-slate-900 text-xs leading-snug break-words">{item.title}</h4>
                           {item.description && (
-                            <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{item.description}</p>
+                            <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed break-words">{item.description}</p>
                           )}
                         </div>
                       </div>
@@ -1536,12 +1605,12 @@ export default function TripQuotationEditorPage() {
                   {/* Not Included Activities Section */}
                   {notIncludedActivities.length > 0 && (
                     <div className="pt-3 border-t border-rose-100 space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5">
                         <h5 className="text-[11px] font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
-                          <Ticket className="h-3.5 w-3.5 text-amber-600" />
+                          <Ticket className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                           <span>Not Included Activities ({notIncludedActivities.length})</span>
                         </h5>
-                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">
                           Direct Venue Purchase
                         </span>
                       </div>
@@ -1549,16 +1618,16 @@ export default function TripQuotationEditorPage() {
                         {notIncludedActivities.map((act: any) => (
                           <div
                             key={act.id}
-                            className="p-2.5 bg-amber-50/60 rounded-xl border border-amber-200/50 flex items-center justify-between text-xs"
+                            className="p-2.5 bg-amber-50/60 rounded-xl border border-amber-200/50 flex items-center justify-between text-xs gap-2"
                           >
-                            <div className="flex items-center gap-2">
-                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-                              <div>
-                                <span className="font-semibold text-slate-900">{act.name || act.activityName || act.activity?.name || "Sightseeing Experience"}</span>
+                            <div className="flex items-start gap-2 min-w-0 flex-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0 mt-1" />
+                              <div className="min-w-0">
+                                <span className="font-semibold text-slate-900 leading-snug break-words">{act.name || act.activityName || act.activity?.name || "Sightseeing Experience"}</span>
                                 <p className="text-[10px] text-amber-700">Ticket directly payable at venue</p>
                               </div>
                             </div>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shrink-0 whitespace-nowrap">
                               Not Included
                             </span>
                           </div>
@@ -2019,6 +2088,21 @@ export default function TripQuotationEditorPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Read-Only Mode Warning Dialog */}
+        <ReadOnlyModeDialog
+          open={showReadOnlyDialog}
+          onOpenChange={setShowReadOnlyDialog}
+          reason={readOnlyReason}
+          actionName="Editing or generating quotation proposals"
+        />
+
+        {/* Quota Exceeded Dialog */}
+        <QuotaExceededDialog
+          open={showQuotaDialog}
+          onOpenChange={setShowQuotaDialog}
+          resourceName={quotaEntityType === "QUOTATION" ? "Quotations" : "Bookings"}
+        />
 
         {/* Global Action Confirmation Modal */}
         <ConfirmDialog

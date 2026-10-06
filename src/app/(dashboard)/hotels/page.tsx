@@ -29,6 +29,8 @@ import { ErrorState } from "@/components/shared/error-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { useSubscription } from "@/context/subscription-context";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +65,7 @@ import { ExcelImportModal } from "@/components/excel/excel-import-modal";
 
 export default function HotelsPage() {
   const router = useRouter();
+  const { isReadOnly: subReadOnly, readOnlyReason } = useSubscription();
 
   // Data states
   const [hotels, setHotels] = React.useState<HotelWithRelations[]>([]);
@@ -74,6 +77,17 @@ export default function HotelsPage() {
   const [archiveTarget, setArchiveTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [importModalOpen, setImportModalOpen] = React.useState(false);
   const [downloadingSample, setDownloadingSample] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+
+  const effectiveReadOnly = isReadOnly || subReadOnly;
+
+  const handleAddHotel = () => {
+    if (effectiveReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    router.push("/hotels/new");
+  };
 
   // Filter & Search states
   const [search, setSearch] = React.useState("");
@@ -192,14 +206,14 @@ export default function HotelsPage() {
         {isReadOnly && <ReadOnlyBanner moduleName="Hotel Inventory" />}
 
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
           {/* Left Title & Telemetry */}
           <div className="space-y-3 z-10">
-            <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
-                <HotelIcon className="h-3 w-3 text-indigo-500" />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0 whitespace-nowrap">
+                <HotelIcon className="h-3 w-3 text-indigo-500 shrink-0" />
                 Hotel Inventory
               </span>
               <span className="text-slate-300">•</span>
@@ -219,11 +233,11 @@ export default function HotelsPage() {
 
             {/* Micro-Telemetry Stat Badges */}
             <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-medium border border-emerald-100/60">
-                <Building2 className="h-3 w-3 text-emerald-600" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-medium border border-emerald-100/60 shrink-0">
+                <Building2 className="h-3 w-3 text-emerald-600 shrink-0" />
                 <span className="font-bold text-emerald-950">{pagination.total}</span> Properties Registered
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100/80 text-slate-700 font-medium">
+              <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-slate-100/80 text-slate-700 font-medium shrink-0">
                 <span>Page</span>
                 <strong className="text-slate-900">{pagination.page}</strong>
                 <span>of</span>
@@ -233,7 +247,7 @@ export default function HotelsPage() {
           </div>
 
           {/* Right Action Controls */}
-          <div className="flex flex-wrap items-center gap-2.5 z-10 self-start lg:self-center">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 z-10 self-stretch sm:self-start lg:self-center w-full lg:w-auto">
             <Button
               variant="outline"
               size="sm"
@@ -249,34 +263,39 @@ export default function HotelsPage() {
                 }
               }}
               disabled={downloadingSample}
-              className="bg-white border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs h-9 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all"
+              className="w-full sm:w-auto justify-center bg-white border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs h-9 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all shrink-0"
             >
               {downloadingSample ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Download className="h-3.5 w-3.5 text-slate-500" />
               )}
-              Download Sample
+              <span>Download Sample</span>
             </Button>
 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setImportModalOpen(true)}
-              disabled={isReadOnly}
-              className="bg-white border-indigo-200 hover:bg-indigo-50 text-indigo-700 font-semibold text-xs h-9 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              onClick={() => {
+                if (effectiveReadOnly) {
+                  setShowReadOnlyDialog(true);
+                  return;
+                }
+                setImportModalOpen(true);
+              }}
+              disabled={effectiveReadOnly}
+              className="w-full sm:w-auto justify-center bg-white border-indigo-200 hover:bg-indigo-50 text-indigo-700 font-semibold text-xs h-9 px-3.5 rounded-xl shadow-2xs gap-1.5 cursor-pointer transition-all disabled:opacity-50 shrink-0"
             >
               <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
-              Import Excel
+              <span>Import Excel</span>
             </Button>
 
             <Button
-              onClick={() => router.push("/hotels/new")}
-              disabled={isReadOnly}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+              onClick={handleAddHotel}
+              className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all shrink-0"
             >
               <Plus className="h-4 w-4" />
-              Add Hotel
+              <span>Add Hotel</span>
             </Button>
           </div>
         </div>
@@ -284,14 +303,14 @@ export default function HotelsPage() {
         {/* Master Card (Filter Bar + Table) */}
         <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
           {/* Search & Filter Toolbar */}
-          <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
+          <div className="p-3.5 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 max-w-3xl">
                 {/* Search Input */}
                 <div className="relative flex-1">
                   <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Search hotels by property name, code, city, state, or category..."
+                    placeholder="Search hotels by property name, city..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all"

@@ -1,8 +1,10 @@
 import "server-only";
 
 import PDFDocument from "pdfkit";
+import { pdfBrandingHelper } from "./pdf-branding-helper";
 
 export interface PdfAgencyInfo {
+  id?: string;
   name: string;
   phone?: string | null;
   email?: string | null;
@@ -220,6 +222,12 @@ export class DocumentPdfService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async renderHotelVoucher(data: HotelVoucherPdfData): Promise<Buffer> {
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: data.agency.id,
+      logoUrl: data.agency.logo,
+      checkEntitlement: true,
+    });
+
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -245,24 +253,35 @@ export class DocumentPdfService {
         const darkColor = "#042F2E";
 
         // Header Banner
-        doc.rect(margin, margin, contentWidth, 75).fill(darkColor);
+        const bannerH = logoBuffer ? 94 : 75;
+        doc.rect(margin, margin, contentWidth, bannerH).fill(darkColor);
+
+        let curY = margin + 12;
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 16, curY, { fit: [130, 36] });
+            curY += 40;
+          } catch {
+            // fallback gracefully
+          }
+        }
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(15)
+          .fontSize(logoBuffer ? 12.5 : 15)
           .font("Helvetica-Bold")
-          .text(data.agency.name, margin + 15, margin + 15, { width: 320 });
+          .text(data.agency.name, margin + 16, curY, { width: 320 });
 
         doc
           .fontSize(8.5)
           .font("Helvetica")
           .fillColor("#99F6E4")
-          .text("OFFICIAL HOTEL ACCOMMODATION VOUCHER", margin + 15, margin + 35);
+          .text("OFFICIAL HOTEL ACCOMMODATION VOUCHER", margin + 16, doc.y + 3);
 
         doc
           .fontSize(8)
           .fillColor("#CCFBF1")
-          .text([data.agency.phone, data.agency.email].filter(Boolean).join(" | "), margin + 15, margin + 49);
+          .text([data.agency.phone, data.agency.email].filter(Boolean).join(" | "), margin + 16, doc.y + 3);
 
         doc
           .fillColor("#FFFFFF")
@@ -289,7 +308,7 @@ export class DocumentPdfService {
             align: "right",
           });
 
-        let y = margin + 90;
+        let y = margin + bannerH + 15;
 
         // Guest Card
         doc.rect(margin, y, contentWidth, 50).fillAndStroke("#F8FAFC", "#E2E8F0");
@@ -375,6 +394,12 @@ export class DocumentPdfService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async renderVehicleVoucher(data: VehicleVoucherPdfData): Promise<Buffer> {
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: data.agency.id,
+      logoUrl: data.agency.logo,
+      checkEntitlement: true,
+    });
+
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -400,24 +425,35 @@ export class DocumentPdfService {
         const darkColor = "#1E1B4B"; // Indigo 950
 
         // Header Banner
-        doc.rect(margin, margin, contentWidth, 75).fill(darkColor);
+        const bannerH = logoBuffer ? 94 : 75;
+        doc.rect(margin, margin, contentWidth, bannerH).fill(darkColor);
+
+        let curY = margin + 12;
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 16, curY, { fit: [130, 36] });
+            curY += 40;
+          } catch {
+            // fallback gracefully
+          }
+        }
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(15)
+          .fontSize(logoBuffer ? 12.5 : 15)
           .font("Helvetica-Bold")
-          .text(data.agency.name, margin + 15, margin + 15, { width: 320 });
+          .text(data.agency.name, margin + 16, curY, { width: 320 });
 
         doc
           .fontSize(8.5)
           .font("Helvetica")
           .fillColor("#93C5FD")
-          .text("OFFICIAL TRANSPORT & TRANSFER VOUCHER", margin + 15, margin + 35);
+          .text("OFFICIAL TRANSPORT & TRANSFER VOUCHER", margin + 16, doc.y + 3);
 
         doc
           .fontSize(8)
           .fillColor("#DBEAFE")
-          .text([data.agency.phone, data.agency.email].filter(Boolean).join(" | "), margin + 15, margin + 49);
+          .text([data.agency.phone, data.agency.email].filter(Boolean).join(" | "), margin + 16, doc.y + 3);
 
         doc
           .fillColor("#FFFFFF")
@@ -444,7 +480,7 @@ export class DocumentPdfService {
             align: "right",
           });
 
-        let y = margin + 90;
+        let y = margin + bannerH + 15;
 
         // Guest Card
         doc.rect(margin, y, contentWidth, 50).fillAndStroke("#F8FAFC", "#E2E8F0");
@@ -527,6 +563,12 @@ export class DocumentPdfService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async renderActivityVoucher(data: ActivityVoucherPdfData): Promise<Buffer> {
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: data.agency.id,
+      logoUrl: data.agency.logo,
+      checkEntitlement: true,
+    });
+
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -552,24 +594,35 @@ export class DocumentPdfService {
         const darkColor = "#3B0764"; // Purple 950
 
         // Header Banner
-        doc.rect(margin, margin, contentWidth, 75).fill(darkColor);
+        const bannerH = logoBuffer ? 94 : 75;
+        doc.rect(margin, margin, contentWidth, bannerH).fill(darkColor);
+
+        let curY = margin + 12;
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 16, curY, { fit: [130, 36] });
+            curY += 40;
+          } catch {
+            // fallback gracefully
+          }
+        }
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(15)
+          .fontSize(logoBuffer ? 12.5 : 15)
           .font("Helvetica-Bold")
-          .text(data.agency.name, margin + 15, margin + 15, { width: 320 });
+          .text(data.agency.name, margin + 16, curY, { width: 320 });
 
         doc
           .fontSize(8.5)
           .font("Helvetica")
           .fillColor("#DDD6FE")
-          .text("OFFICIAL ACTIVITY & SIGHTSEEING PASS", margin + 15, margin + 35);
+          .text("OFFICIAL ACTIVITY & SIGHTSEEING PASS", margin + 16, doc.y + 3);
 
         doc
           .fontSize(8)
           .fillColor("#EDE9FE")
-          .text([data.agency.phone, data.agency.email].filter(Boolean).join(" | "), margin + 15, margin + 49);
+          .text([data.agency.phone, data.agency.email].filter(Boolean).join(" | "), margin + 16, doc.y + 3);
 
         doc
           .fillColor("#FFFFFF")
@@ -596,7 +649,7 @@ export class DocumentPdfService {
             align: "right",
           });
 
-        let y = margin + 90;
+        let y = margin + bannerH + 15;
 
         // Guest Card
         doc.rect(margin, y, contentWidth, 50).fillAndStroke("#F8FAFC", "#E2E8F0");
@@ -674,6 +727,12 @@ export class DocumentPdfService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async renderBookingConfirmation(data: BookingConfirmationPdfData): Promise<Buffer> {
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: data.agency.id,
+      logoUrl: data.agency.logo,
+      checkEntitlement: true,
+    });
+
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -699,24 +758,35 @@ export class DocumentPdfService {
         const darkColor = "#064E3B"; // Emerald 900
 
         // Header Banner
-        doc.rect(margin, margin, contentWidth, 75).fill(darkColor);
+        const bannerH = logoBuffer ? 94 : 75;
+        doc.rect(margin, margin, contentWidth, bannerH).fill(darkColor);
+
+        let curY = margin + 12;
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 16, curY, { fit: [130, 36] });
+            curY += 40;
+          } catch {
+            // fallback gracefully
+          }
+        }
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(15)
+          .fontSize(logoBuffer ? 12.5 : 15)
           .font("Helvetica-Bold")
-          .text(data.agency.name, margin + 15, margin + 15, { width: 320 });
+          .text(data.agency.name, margin + 16, curY, { width: 320 });
 
         doc
           .fontSize(8.5)
           .font("Helvetica")
           .fillColor("#A7F3D0")
-          .text("OFFICIAL TRAVEL BOOKING CONFIRMATION", margin + 15, margin + 35);
+          .text("OFFICIAL TRAVEL BOOKING CONFIRMATION", margin + 16, doc.y + 3);
 
         doc
           .fontSize(8)
           .fillColor("#D1FAE5")
-          .text([data.agency.phone, data.agency.email].filter(Boolean).join(" | "), margin + 15, margin + 49);
+          .text([data.agency.phone, data.agency.email].filter(Boolean).join(" | "), margin + 16, doc.y + 3);
 
         doc
           .fillColor("#FFFFFF")
@@ -743,7 +813,7 @@ export class DocumentPdfService {
             align: "right",
           });
 
-        let y = margin + 90;
+        let y = margin + bannerH + 15;
 
         // Trip & Customer Overview Card
         doc.rect(margin, y, contentWidth, 65).fillAndStroke("#F8FAFC", "#E2E8F0");
@@ -864,6 +934,12 @@ export class DocumentPdfService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async renderPaymentReceipt(data: PaymentReceiptPdfData): Promise<Buffer> {
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: data.agency.id,
+      logoUrl: data.agency.logo,
+      checkEntitlement: true,
+    });
+
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -889,24 +965,35 @@ export class DocumentPdfService {
         const darkColor = "#082F49"; // Sky 950
 
         // Header Banner
-        doc.rect(margin, margin, contentWidth, 75).fill(darkColor);
+        const bannerH = logoBuffer ? 94 : 75;
+        doc.rect(margin, margin, contentWidth, bannerH).fill(darkColor);
+
+        let curY = margin + 12;
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 16, curY, { fit: [130, 34] });
+            curY += 38;
+          } catch {
+            // fallback gracefully
+          }
+        }
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(15)
+          .fontSize(logoBuffer ? 12.5 : 15)
           .font("Helvetica-Bold")
-          .text(data.agency.name, margin + 15, margin + 15, { width: 320 });
+          .text(data.agency.name, margin + 16, curY, { width: 320 });
 
         doc
           .fontSize(8.5)
           .font("Helvetica")
           .fillColor("#BAE6FD")
-          .text("OFFICIAL PAYMENT RECEIPT & ACKNOWLEDGEMENT", margin + 15, margin + 35);
+          .text("OFFICIAL PAYMENT RECEIPT & ACKNOWLEDGEMENT", margin + 16, doc.y + 3);
 
         doc
           .fontSize(8)
           .fillColor("#E0F2FE")
-          .text([data.agency.phone, data.agency.email].filter(Boolean).join(" | "), margin + 15, margin + 49);
+          .text([data.agency.phone, data.agency.email].filter(Boolean).join(" | "), margin + 16, doc.y + 3);
 
         doc
           .fillColor("#FFFFFF")
@@ -933,7 +1020,7 @@ export class DocumentPdfService {
             align: "right",
           });
 
-        let y = margin + 90;
+        let y = margin + bannerH + 15;
 
         // Customer Details
         doc.rect(margin, y, contentWidth, 50).fillAndStroke("#F8FAFC", "#E2E8F0");
@@ -1019,6 +1106,12 @@ export class DocumentPdfService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async renderCustomerItinerary(data: CustomerItineraryPdfData): Promise<Buffer> {
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: data.agency.id,
+      logoUrl: data.agency.logo,
+      checkEntitlement: true,
+    });
+
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -1044,24 +1137,35 @@ export class DocumentPdfService {
         const darkColor = "#042F2E";
 
         // Header Banner
-        doc.rect(margin, margin, contentWidth, 75).fill(darkColor);
+        const bannerH = logoBuffer ? 94 : 75;
+        doc.rect(margin, margin, contentWidth, bannerH).fill(darkColor);
+
+        let curY = margin + 12;
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 16, curY, { fit: [135, 36] });
+            curY += 40;
+          } catch {
+            // fallback gracefully
+          }
+        }
 
         doc
           .fillColor("#FFFFFF")
-          .fontSize(15)
+          .fontSize(logoBuffer ? 12.5 : 15)
           .font("Helvetica-Bold")
-          .text(data.agency.name, margin + 15, margin + 15, { width: 320 });
+          .text(data.agency.name, margin + 16, curY, { width: 320 });
 
         doc
           .fontSize(8.5)
           .font("Helvetica")
           .fillColor("#99F6E4")
-          .text("COMPREHENSIVE ITINERARY & TRAVEL KIT", margin + 15, margin + 35);
+          .text("COMPREHENSIVE ITINERARY & TRAVEL KIT", margin + 16, doc.y + 3);
 
         doc
           .fontSize(8)
           .fillColor("#CCFBF1")
-          .text([data.agency.phone, data.agency.email].filter(Boolean).join(" | "), margin + 15, margin + 49);
+          .text([data.agency.phone, data.agency.email].filter(Boolean).join(" | "), margin + 16, doc.y + 3);
 
         doc
           .fillColor("#FFFFFF")
@@ -1088,7 +1192,7 @@ export class DocumentPdfService {
             align: "right",
           });
 
-        let y = margin + 90;
+        let y = margin + bannerH + 15;
 
         // Trip Overview Box
         doc.rect(margin, y, contentWidth, 50).fillAndStroke("#F8FAFC", "#E2E8F0");

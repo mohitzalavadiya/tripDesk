@@ -4,6 +4,8 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ReadOnlyModeCard } from "@/components/shared/read-only-mode-card";
+import { useSubscription } from "@/context/subscription-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,6 +37,9 @@ function NewRateSheetForm() {
   const preselectedSupplier = searchParams.get("supplierId") || "";
   const preselectedHotel = searchParams.get("hotelId") || "";
 
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
+
   // Master options
   const [suppliers, setSuppliers] = React.useState<Supplier[]>([]);
   const [hotels, setHotels] = React.useState<Hotel[]>([]);
@@ -60,7 +65,8 @@ function NewRateSheetForm() {
   const [extraChildRate, setExtraChildRate] = React.useState("800");
 
   const [submitting, setSubmitting] = React.useState(false);
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
+
+  const isReadOnly = isCentralReadOnly || localReadOnly;
 
   // Load masters on mount
   React.useEffect(() => {
@@ -94,7 +100,7 @@ function NewRateSheetForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly) {
-      toast.error("Subscription expired. Read-only mode is active.");
+      toast.error("Modifications are restricted in read-only mode.");
       return;
     }
 
@@ -138,9 +144,12 @@ function NewRateSheetForm() {
       }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
-        setIsReadOnly(true);
+        setLocalReadOnly(true);
+        refreshSubscription();
+        toast.error("Modifications restricted. Read-only mode is active.");
+      } else {
+        toast.error(err?.message || "Failed to create rate sheet.");
       }
-      toast.error(err?.message || "Failed to create rate sheet.");
     } finally {
       setSubmitting(false);
     }
@@ -149,7 +158,7 @@ function NewRateSheetForm() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        {isReadOnly && <ReadOnlyBanner moduleName="Rate Sheets" />}
+        {isReadOnly && !isCentralReadOnly && <ReadOnlyBanner moduleName="Rate Sheets" />}
 
         <PageHeader
           title="Create Hotel Rate Sheet"
@@ -160,7 +169,17 @@ function NewRateSheetForm() {
           ]}
         />
 
-        <div className="max-w-4xl mx-auto w-full">
+        {isCentralReadOnly ? (
+          <div className="max-w-4xl mx-auto">
+            <ReadOnlyModeCard
+              title="Rate Sheet Creation Restricted"
+              description="Your agency workspace is currently in read-only mode. Adding new rate sheets is not permitted."
+              reason={readOnlyReason}
+              backHref="/rate-sheets"
+              backLabel="Back to Rate Sheets"
+            />
+          </div>
+        ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* 1. Hotel Room & Meal Plan Pricing */}
             <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
@@ -396,7 +415,7 @@ function NewRateSheetForm() {
               </Button>
             </div>
           </form>
-        </div>
+        )}
       </div>
     </div>
   );

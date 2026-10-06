@@ -4,6 +4,9 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { QuotaExceededCard } from "@/components/shared/quota-exceeded-card";
+import { ReadOnlyModeCard } from "@/components/shared/read-only-mode-card";
+import { useSubscription } from "@/context/subscription-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,6 +40,7 @@ import {
   Sparkles,
   Loader2,
   AlertCircle,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function NewBookingPage() {
@@ -59,6 +63,19 @@ function NewBookingForm() {
   const searchParams = useSearchParams();
   const initialQuotationId = searchParams.get("quotationId");
   const initialTripId = searchParams.get("tripId");
+  const {
+    canCreate,
+    incrementUsage,
+    refreshSubscription,
+    loading: subscriptionLoading,
+    overview,
+    isReadOnly: subReadOnly,
+    readOnlyReason,
+  } = useSubscription();
+
+  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const effectiveReadOnly = isReadOnly || subReadOnly;
+  const decision = canCreate("BOOKINGS");
 
   // Mode: "quotation" | "trip"
   const [mode, setMode] = React.useState<"quotation" | "trip">(
@@ -70,7 +87,6 @@ function NewBookingForm() {
   const [trips, setTrips] = React.useState<TripWithRelations[]>([]);
   const [customers, setCustomers] = React.useState<Customer[]>([]);
   const [loadingData, setLoadingData] = React.useState(true);
-  const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
 
   // Form State
@@ -82,7 +98,7 @@ function NewBookingForm() {
   const [bookingNotes, setBookingNotes] = React.useState("");
   const [bookingInternalNotes, setBookingInternalNotes] = React.useState("");
 
-  // Load real active quotations, trips, customers
+  // Load real active quotations, trips, and customers
   React.useEffect(() => {
     async function loadResources() {
       try {
@@ -99,7 +115,7 @@ function NewBookingForm() {
             setSelectedQuotationId(quotesRes.data[0].id);
             setBookingTotal(String(quotesRes.data[0].finalAmount));
           } else if (initialQuotationId) {
-            const found = quotesRes.data.find((q) => q.id === initialQuotationId);
+            const found = quotesRes.data.find((q: QuotationWithRelations) => q.id === initialQuotationId);
             if (found) setBookingTotal(String(found.finalAmount));
           }
         }
@@ -170,6 +186,7 @@ function NewBookingForm() {
         });
 
         if (res.success && res.data) {
+          incrementUsage("BOOKINGS");
           toast.success(`Booking ${res.data.bookingNumber} created successfully!`);
           router.push(`/bookings/${res.data.id}`);
         }
@@ -196,12 +213,18 @@ function NewBookingForm() {
         });
 
         if (res.success && res.data) {
+          incrementUsage("BOOKINGS");
           toast.success(`Booking ${res.data.bookingNumber} created successfully!`);
           router.push(`/bookings/${res.data.id}`);
         }
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to create booking.");
+      if (err?.code === "QUOTA_EXCEEDED" || err?.statusCode === 403) {
+        await refreshSubscription();
+        toast.error("Booking creation quota limit reached for this billing period.");
+      } else {
+        toast.error(err?.message || "Failed to create booking.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -221,30 +244,70 @@ function NewBookingForm() {
           ]}
         />
 
-        <div className="max-w-3xl mx-auto w-full">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Direct URL Guards (Read-Only Mode takes precedence over Quota) */}
+        {!subscriptionLoading && effectiveReadOnly ? (
+          <ReadOnlyModeCard
+            resourceName="Booking"
+            reason={readOnlyReason}
+            backHref="/bookings"
+            backLabel="Back to Bookings"
+          />
+        ) : !subscriptionLoading && !decision.allowed && decision.reason === "QUOTA_EXCEEDED" ? (
+          <QuotaExceededCard
+            resourceName="Booking"
+            currentUsage={decision.currentUsage}
+            limit={decision.limit}
+            planName={overview?.subscription?.plan?.name}
+            backHref="/bookings"
+            backLabel="Back to Bookings"
+          />
+        ) : (
+          <>
+            {!decision.isExceeded && decision.remaining !== null && decision.remaining <= 2 && decision.remaining > 0 && (
+              <div className="max-w-3xl mx-auto p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+                  <div>
+                    <p className="font-bold">Approaching Quota Limit ({decision.currentUsage} / {decision.limit} Bookings Created)</p>
+                    <p className="text-[11px] text-amber-700 font-normal mt-0.5">
+                      Only {decision.remaining} booking{decision.remaining > 1 ? "s" : ""} remaining in your current billing cycle.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => router.push("/subscription")}
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 h-auto rounded-xl shrink-0 cursor-pointer"
+                >
+                  Upgrade
+                </Button>
+              </div>
+            )}
+
+            <div className="max-w-3xl mx-auto w-full">
+              <form onSubmit={handleSubmit} className="space-y-6">
             {/* Mode Selector */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-4">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-600" />
+                <Sparkles className="h-4 w-4 text-indigo-600 shrink-0" />
                 <span>Booking Source Type</span>
               </h3>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <button
                   type="button"
                   onClick={() => setMode("quotation")}
-                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                  className={`p-3.5 sm:p-4 rounded-xl border text-left transition-all cursor-pointer ${
                     mode === "quotation"
                       ? "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20"
                       : "border-slate-200 hover:bg-slate-50"
                   }`}
                 >
                   <div className="font-bold text-slate-900 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-indigo-600" />
-                    <span>From Quotation Proposal</span>
+                    <FileText className="h-4 w-4 text-indigo-600 shrink-0" />
+                    <span className="leading-tight">From Quotation Proposal</span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
+                  <p className="text-[11px] text-slate-500 mt-1 leading-normal">
                     Inherits accepted pricing, itinerary, travelers, and quotation snapshots.
                   </p>
                 </button>
@@ -252,17 +315,17 @@ function NewBookingForm() {
                 <button
                   type="button"
                   onClick={() => setMode("trip")}
-                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                  className={`p-3.5 sm:p-4 rounded-xl border text-left transition-all cursor-pointer ${
                     mode === "trip"
                       ? "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20"
                       : "border-slate-200 hover:bg-slate-50"
                   }`}
                 >
                   <div className="font-bold text-slate-900 flex items-center gap-2">
-                    <Compass className="h-4 w-4 text-emerald-600" />
-                    <span>Direct Trip Workspace</span>
+                    <Compass className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="leading-tight">Direct Trip Workspace</span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
+                  <p className="text-[11px] text-slate-500 mt-1 leading-normal">
                     Select a trip workspace and specify custom commercial contract amounts.
                   </p>
                 </button>
@@ -270,7 +333,7 @@ function NewBookingForm() {
             </div>
 
             {/* Source Configuration */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-4">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">
                 {mode === "quotation" ? "Select Client Proposal" : "Select Trip & Customer"}
               </h3>
@@ -314,12 +377,12 @@ function NewBookingForm() {
                   )}
 
                   {selectedQuotation && (
-                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                      <div className="flex justify-between items-center text-xs">
+                    <div className="p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                      <div className="flex flex-col min-[380px]:flex-row justify-between items-start min-[380px]:items-center gap-1 text-xs">
                         <span className="text-slate-500 font-semibold">Customer:</span>
-                        <strong className="text-slate-900">{selectedQuotation.customer?.name} ({selectedQuotation.customer?.phone})</strong>
+                        <strong className="text-slate-900 font-bold">{selectedQuotation.customer?.name} ({selectedQuotation.customer?.phone})</strong>
                       </div>
-                      <div className="flex justify-between items-center text-xs">
+                      <div className="flex flex-col min-[380px]:flex-row justify-between items-start min-[380px]:items-center gap-1 text-xs">
                         <span className="text-slate-500 font-semibold">Proposal Final Amount:</span>
                         <strong className="text-indigo-600 font-extrabold text-sm">{formatCurrency(Number(selectedQuotation.finalAmount))}</strong>
                       </div>
@@ -353,7 +416,7 @@ function NewBookingForm() {
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="font-bold text-slate-700">Total Contract Value (₹) *</label>
                       <Input
@@ -382,7 +445,7 @@ function NewBookingForm() {
             </div>
 
             {/* Notes */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-4">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5">
                 Booking Remarks & Internal Notes
               </h3>
@@ -441,7 +504,9 @@ function NewBookingForm() {
             </div>
           </form>
         </div>
-      </div>
-    </div>
+      </>
+    )}
+  </div>
+</div>
   );
 }

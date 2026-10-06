@@ -60,7 +60,7 @@ export function NotificationsPopover() {
 
   const fetchNotifications = React.useCallback(async () => {
     try {
-      const res = await notificationClient.getNotifications({ limit: 20 });
+      const res = await notificationClient.getNotifications({ limit: 10 });
       if (res.success && res.data) {
         setNotifications(res.data.data || []);
         setUnreadCount(res.data.meta?.unreadCount || 0);
@@ -93,6 +93,25 @@ export function NotificationsPopover() {
       }
     } catch {
       toast.error("Failed to mark all notifications as read");
+    }
+  };
+
+  const handleMarkSingleRead = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    // Optimistic update
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
+    setUnreadCount((prev) => Math.max(0, prev - 1));
+    try {
+      const res = await notificationClient.markAsRead(id);
+      if (!res.success) {
+        toast.error("Failed to mark notification as read");
+        fetchNotifications();
+      }
+    } catch {
+      toast.error("Failed to mark notification as read");
+      fetchNotifications();
     }
   };
 
@@ -202,11 +221,11 @@ export function NotificationsPopover() {
             </div>
           ) : (
             notifications.map((notif) => (
-              <button
+              <div
                 key={notif.id}
                 onClick={() => handleNotificationClick(notif)}
                 className={cn(
-                  "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50/80 cursor-pointer",
+                  "group relative flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50/80 cursor-pointer",
                   !notif.isRead && "bg-indigo-50/20"
                 )}
               >
@@ -231,7 +250,18 @@ export function NotificationsPopover() {
                       {notif.title}
                     </span>
                     {!notif.isRead && (
-                      <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-600" />
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          aria-label="Mark notification as read"
+                          title="Mark as read"
+                          onClick={(e) => handleMarkSingleRead(e, notif.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50/50 shadow-2xs cursor-pointer"
+                        >
+                          <Check className="h-3 w-3" />
+                        </button>
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-600 group-hover:hidden" />
+                      </div>
                     )}
                   </div>
                   <p className="text-[11px] text-slate-600 leading-snug line-clamp-2">
@@ -241,7 +271,7 @@ export function NotificationsPopover() {
                     {formatRelativeTime(notif.createdAt)}
                   </span>
                 </div>
-              </button>
+              </div>
             ))
           )}
         </div>
@@ -250,11 +280,11 @@ export function NotificationsPopover() {
           <button
             onClick={() => {
               setIsOpen(false);
-              router.push(isPlatformOwner ? "/admin/audit-logs" : "/communications");
+              router.push(isPlatformOwner ? "/admin/audit-logs" : "/communications?tab=notifications");
             }}
             className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer transition-colors"
           >
-            {isPlatformOwner ? "View platform audit logs" : "View communication ledger"}
+            {isPlatformOwner ? "View platform audit logs" : "Show All Notifications →"}
           </button>
         </div>
       </PopoverContent>

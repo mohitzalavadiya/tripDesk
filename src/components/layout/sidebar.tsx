@@ -3,9 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PlaneTakeoff, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
+import { PlaneTakeoff, ChevronLeft, ChevronRight, ShieldCheck, Lock } from "lucide-react";
 import { agencyNavigationConfig, adminNavigationConfig, secondaryNavigation } from "@/lib/navigation";
 import { useAuth } from "@/context/auth-context";
+import { useSubscription, EntitlementsState } from "@/context/subscription-context";
 import { usePlatformChatUnreadCount } from "@/hooks/use-platform-chat";
 import { cn } from "@/lib/utils";
 import {
@@ -22,10 +23,11 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
   const pathname = usePathname();
-  const { currentUser, isPlatformOwner } = useAuth();
+  const { isPlatformOwner } = useAuth();
   const isPlatform = isPlatformOwner || pathname.startsWith("/admin");
   const navSections = isPlatform ? adminNavigationConfig : agencyNavigationConfig;
   const { unreadCount: chatUnreadCount } = usePlatformChatUnreadCount();
+  const { isFeatureAllowed } = useSubscription();
 
   return (
     <TooltipProvider delay={0}>
@@ -90,6 +92,8 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                   const isActive = pathname === item.href || (item.href !== "/admin" && item.href !== "/dashboard" && pathname.startsWith(item.href));
                   const isSupportChat = item.href === "/support" || item.href === "/admin/chat";
                   const hasUnread = isSupportChat && chatUnreadCount > 0;
+                  const isFeatureGated = !isPlatform && Boolean(item.featureKey);
+                  const isLocked = isFeatureGated && !isFeatureAllowed(item.featureKey as keyof EntitlementsState);
 
                   return (
                     <Tooltip key={item.label} disabled={!collapsed}>
@@ -129,6 +133,11 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                               {hasUnread && (
                                 <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-purple-500 ring-2 ring-sidebar animate-pulse" />
                               )}
+                              {isLocked && collapsed && (
+                                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-800 border border-slate-700 text-slate-400">
+                                  <Lock className="h-2 w-2 text-slate-300" />
+                                </span>
+                              )}
                             </div>
 
                             {!collapsed && (
@@ -157,6 +166,15 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                                 {item.badge}
                               </span>
                             )}
+
+                            {!collapsed && !hasUnread && !item.badge && isLocked && (
+                              <span
+                                className="inline-flex items-center text-slate-400 group-hover:text-amber-400 transition-colors ml-auto shrink-0"
+                                title="Available with Professional Plan"
+                              >
+                                <Lock className="h-3.5 w-3.5" />
+                              </span>
+                            )}
                           </Link>
                         }
                       />
@@ -165,6 +183,9 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                         className="bg-slate-900 border border-slate-800 text-white px-2 py-1 text-xs rounded-md shadow-md"
                       >
                         {item.label}
+                        {isLocked && (
+                          <span className="ml-1.5 font-bold text-amber-400">(Pro Feature)</span>
+                        )}
                         {item.badge && (
                           <span className="ml-1.5 font-bold text-slate-400">({item.badge})</span>
                         )}

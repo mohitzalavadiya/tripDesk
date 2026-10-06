@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import { CheckCircle2, X, Loader2, AlertTriangle, ShieldCheck } from "lucide-react";
 import {
   IssuePriorityBadge,
@@ -30,6 +31,7 @@ export function ResolveIssueDialog({
   issue,
   targetStatus = IssueStatus.RESOLVED,
 }: ResolveIssueDialogProps) {
+  useModalScrollLock(isOpen);
   const [resolution, setResolution] = React.useState("");
   const [loading, setLoading] = React.useState(false);
 

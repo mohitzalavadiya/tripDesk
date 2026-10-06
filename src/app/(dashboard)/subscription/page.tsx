@@ -30,9 +30,16 @@ import {
   Copy,
   Landmark,
   Smartphone,
+  BarChart3,
+  FileCheck,
+  PackageCheck,
+  Lock,
+  Zap,
 } from "lucide-react";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { subscriptionClient } from "@/lib/api-client/subscription-client";
+import { useSubscription } from "@/context/subscription-context";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   BANK_TRANSFER: "Bank Transfer",
@@ -47,6 +54,22 @@ const BILLING_CYCLE_LABELS: Record<string, string> = {
   MONTHLY: "Monthly",
   YEARLY: "Yearly",
 };
+
+export interface ResourceUsageItem {
+  resource: string;
+  allowed: boolean;
+  limit: number | null;
+  currentUsage: number;
+  remaining: number | null;
+  isExceeded: boolean;
+  unlimited: boolean;
+}
+
+export interface FeatureEntitlementItem {
+  feature: string;
+  allowed: boolean;
+  reason: string;
+}
 
 interface AgencySubscriptionData {
   agency: {
@@ -74,6 +97,9 @@ interface AgencySubscriptionData {
     isTrialExpired: boolean;
     isActive: boolean;
   };
+  usage?: Record<string, ResourceUsageItem>;
+  entitlements?: Record<string, boolean>;
+  features?: Record<string, FeatureEntitlementItem>;
   latestPendingPayment: {
     id: string;
     amount: number;
@@ -131,6 +157,7 @@ interface PlanItem {
 }
 
 export default function AgencySubscriptionPage() {
+  const { refreshSubscription } = useSubscription();
   const [data, setData] = React.useState<AgencySubscriptionData | null>(null);
   const [plans, setPlans] = React.useState<PlanItem[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -145,6 +172,8 @@ export default function AgencySubscriptionPage() {
   const [submitting, setSubmitting] = React.useState(false);
   const [copiedField, setCopiedField] = React.useState<string | null>(null);
 
+  useModalScrollLock(Boolean(selectedPlanForPurchase));
+
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(label);
@@ -158,6 +187,7 @@ export default function AgencySubscriptionPage() {
       const subRes = await subscriptionClient.getSubscription();
       if (subRes.success && subRes.data) {
         setData(subRes.data);
+        refreshSubscription().catch(() => {});
         if (subRes.data.availablePlans && subRes.data.availablePlans.length > 0) {
           setPlans(subRes.data.availablePlans);
         } else {
@@ -172,7 +202,7 @@ export default function AgencySubscriptionPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshSubscription]);
 
 
   React.useEffect(() => {
@@ -240,6 +270,7 @@ export default function AgencySubscriptionPage() {
       toast.success("Payment request submitted successfully! Waiting for verification.");
       setModalStep("SUCCESS");
       fetchData();
+      refreshSubscription().catch(() => {});
     } catch (err: any) {
       toast.error(err.message || "Failed to submit payment request");
     } finally {
@@ -469,6 +500,186 @@ export default function AgencySubscriptionPage() {
           </div>
         </div>
 
+        {/* ─── 2.5 SUBSCRIPTION USAGE METERS & FEATURE ENTITLEMENTS ──────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Usage Meters Card (2 cols on lg) */}
+          <div className="lg:col-span-2 bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 shrink-0" />
+                  <span>Current Billing Period Usage</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Monthly resource creation counts enforced by your subscription plan.
+                </p>
+              </div>
+              <span className="self-start sm:self-auto text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-100 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full shrink-0">
+                Authoritative
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { key: "TRIPS", label: "Trips", icon: Calendar },
+                { key: "QUOTATIONS", label: "Quotations", icon: FileCheck },
+                { key: "BOOKINGS", label: "Bookings", icon: PackageCheck },
+              ].map(({ key, label, icon: Icon }) => {
+                const item = data?.usage?.[key];
+                const isUnlimited = item?.unlimited ?? false;
+                const limit = item?.limit;
+                const currentUsage = item?.currentUsage ?? 0;
+                const remaining = item?.remaining;
+                const isExceeded = item?.isExceeded ?? false;
+                const isApproaching = !isUnlimited && remaining !== null && remaining !== undefined && remaining <= 2 && remaining > 0;
+
+                const percent = isUnlimited || !limit || limit <= 0
+                  ? 100
+                  : Math.min(100, Math.round((currentUsage / limit) * 100));
+
+                return (
+                  <div
+                    key={key}
+                    className={`rounded-2xl p-4 border space-y-3 transition-all ${
+                      isExceeded
+                        ? "bg-rose-50/70 border-rose-200"
+                        : isApproaching
+                        ? "bg-amber-50/70 border-amber-200"
+                        : "bg-slate-50/70 border-slate-200/80"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`p-2 rounded-xl ${
+                          isExceeded
+                            ? "bg-rose-100 text-rose-700"
+                            : isApproaching
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-indigo-100 text-indigo-700"
+                        }`}>
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-900">{label}</span>
+                      </div>
+                      {isUnlimited ? (
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                          UNLIMITED
+                        </span>
+                      ) : isExceeded ? (
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">
+                          Quota Reached
+                        </span>
+                      ) : isApproaching ? (
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">
+                          {remaining} Left
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-slate-500 font-mono">
+                          {remaining !== null ? `${remaining} remaining` : ""}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-baseline text-xs">
+                        <span className="text-xl font-black text-slate-900 font-mono">
+                          {isUnlimited ? currentUsage : `${currentUsage} / ${limit ?? 0}`}
+                        </span>
+                        {!isUnlimited && (
+                          <span className="text-[11px] font-medium text-slate-500">
+                            {percent}% used
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="h-2 w-full bg-slate-200/80 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isUnlimited
+                              ? "bg-emerald-500"
+                              : isExceeded
+                              ? "bg-rose-600"
+                              : isApproaching
+                              ? "bg-amber-500"
+                              : "bg-indigo-600"
+                          }`}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {isExceeded && (
+                      <p className="text-[11px] text-rose-700 font-medium leading-tight">
+                        Creation limit reached for current billing cycle. Upgrade your plan to create more.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Feature Entitlements Card (1 col on lg) */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="border-b border-slate-100 pb-4">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-amber-500" />
+                  <span>Feature Entitlements</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Database-driven capability access for your current plan.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  { key: "CUSTOM_AGENCY_LOGO", label: "Custom Agency Logo" },
+                  { key: "FEEDBACK_REVIEWS", label: "Feedback & Reviews" },
+                  { key: "CUSTOMER_INSIGHTS", label: "Customer Insights" },
+                  { key: "REPORTS_ANALYTICS", label: "Reports & Analytics" },
+                ].map(({ key, label }) => {
+                  const allowed =
+                    (data?.entitlements && data.entitlements[key as keyof typeof data.entitlements]) ??
+                    data?.features?.[key]?.allowed ??
+                    false;
+
+                  return (
+                    <div
+                      key={key}
+                      className={`flex items-center justify-between p-3 rounded-2xl border text-xs ${
+                        allowed
+                          ? "bg-emerald-50/50 border-emerald-200/60 text-slate-900"
+                          : "bg-slate-50 border-slate-200/60 text-slate-500"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {allowed ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        ) : (
+                          <Lock className="h-4 w-4 text-slate-400 shrink-0" />
+                        )}
+                        <span className="font-semibold">{label}</span>
+                      </div>
+
+                      {allowed ? (
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                          Included
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">
+                          Available with Pro
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* ─── 3. PLAN SELECTION SECTION & BILLING TOGGLE ─────────────────── */}
         <div className="space-y-6 pt-4">
           <div className="text-center max-w-2xl mx-auto space-y-3">
@@ -621,15 +832,15 @@ export default function AgencySubscriptionPage() {
         </div>
 
         {/* ─── 4. PAYMENT & SUBSCRIPTION HISTORY ──────────────────────────── */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4 mt-8">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 md:p-8 shadow-xs space-y-4 mt-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
             <div>
-              <h3 className="text-base font-bold text-slate-900">Subscription Payment History</h3>
-              <p className="text-xs text-slate-500">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900">Subscription Payment History</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
                 Log of all manual UPI and Bank Transfer payment submissions for verification.
               </p>
             </div>
-            <span className="text-xs font-semibold text-slate-500 font-mono">
+            <span className="self-start sm:self-auto text-[10px] sm:text-xs font-semibold text-slate-500 font-mono bg-slate-100 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full shrink-0">
               {(data?.paymentHistory || []).length} Records
             </span>
           </div>

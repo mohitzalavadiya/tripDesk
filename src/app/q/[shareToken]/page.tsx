@@ -208,38 +208,38 @@ export default function PublicQuotationPage() {
   return (
     <div className="min-h-screen bg-slate-100/90 text-slate-900 pb-28 sm:pb-20 font-sans">
       {/* Top Floating Brand Navigation Bar */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs px-4 sm:px-8 py-3 transition-all print:hidden">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-9 w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-xs shrink-0">
-              <Compass className="h-5 w-5" />
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs px-3 sm:px-8 py-2.5 sm:py-3 transition-all print:hidden">
+        <div className="max-w-5xl mx-auto flex items-center justify-between gap-2.5 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <div className="h-8 sm:h-9 w-8 sm:w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-xs shrink-0">
+              <Compass className="h-4 sm:h-5 w-4 sm:w-5" />
             </div>
-            <div className="truncate">
+            <div className="min-w-0 truncate">
               <span className="text-xs font-black tracking-tight text-slate-900 block truncate">
                 {quotation.agency.name}
               </span>
-              <span className="text-[10px] text-slate-500 font-mono">
+              <span className="text-[10px] text-slate-500 font-mono block truncate">
                 {quotation.quotationNumber} • V{quotation.version}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <a
               href={`/api/quotations/public/${encodeURIComponent(shareToken)}/pdf`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold h-8.5 px-3 rounded-xl transition-colors text-slate-700 shadow-2xs"
+              className="inline-flex items-center justify-center bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold h-8 sm:h-8.5 px-2.5 sm:px-3 rounded-xl transition-colors text-slate-700 shadow-2xs"
             >
               <Download className="h-3.5 w-3.5 mr-1 text-slate-500" />
-              Download PDF
+              <span className="hidden xs:inline">Download </span>PDF
             </a>
 
             <Button
               variant="outline"
               size="sm"
               onClick={() => window.print()}
-              className="text-xs font-semibold h-8.5 px-3 rounded-xl cursor-pointer bg-white hidden sm:inline-flex"
+              className="text-xs font-semibold h-8 sm:h-8.5 px-3 rounded-xl cursor-pointer bg-white hidden sm:inline-flex"
             >
               <Printer className="h-3.5 w-3.5 mr-1 text-slate-500" />
               Print
@@ -251,7 +251,7 @@ export default function PublicQuotationPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setIsChangeModalOpen(true)}
-                  className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8.5 px-3 rounded-xl cursor-pointer hidden md:inline-flex"
+                  className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 sm:h-8.5 px-3 rounded-xl cursor-pointer hidden md:inline-flex"
                 >
                   <MessageSquare className="h-3.5 w-3.5 mr-1 text-slate-500" />
                   Request Changes
@@ -260,16 +260,16 @@ export default function PublicQuotationPage() {
                 <Button
                   size="sm"
                   onClick={() => setIsAcceptModalOpen(true)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8.5 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8 sm:h-8.5 px-3 sm:px-4 rounded-xl shadow-xs gap-1 cursor-pointer"
                 >
                   <Check className="h-3.5 w-3.5" />
-                  Accept Proposal
+                  <span>Accept<span className="hidden sm:inline"> Proposal</span></span>
                 </Button>
               </>
             )}
 
             {isAccepted && (
-              <Badge className="bg-emerald-500 text-white font-bold text-xs h-8.5 px-3 gap-1 rounded-xl shadow-xs">
+              <Badge className="bg-emerald-500 text-white font-bold text-xs h-8 sm:h-8.5 px-2.5 sm:px-3 gap-1 rounded-xl shadow-xs">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Accepted
               </Badge>
             )}
@@ -278,160 +278,136 @@ export default function PublicQuotationPage() {
       </header>
 
       {/* Main Document Layout */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
-        <div className="bg-white text-slate-900 shadow-sm rounded-3xl border border-slate-200/90 overflow-hidden font-sans">
+      <main className="max-w-5xl mx-auto px-2.5 sm:px-6 lg:px-8 pt-4 sm:pt-6 space-y-6">
+        <div className="bg-white text-slate-900 shadow-sm rounded-2xl sm:rounded-3xl border border-slate-200/90 overflow-hidden font-sans">
           {/* 1. Header Hero */}
-          <div className="relative bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-10 lg:p-12 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-white/10 pb-6 mb-8">
-              <div>
-                <div className="text-sm sm:text-base font-black tracking-wider text-indigo-300 uppercase">
+          <div className="relative bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-5 sm:p-10 lg:p-12 overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 sm:pb-6 mb-6 sm:mb-8 gap-3">
+              <div className="min-w-0">
+                <div className="text-xs sm:text-base font-black tracking-wider text-indigo-300 uppercase truncate">
                   {quotation.agency.name}
                 </div>
-                <div className="text-[11px] text-slate-300 tracking-wide mt-0.5">
+                <div className="text-[10px] sm:text-[11px] text-slate-300 tracking-wide mt-0.5 break-words">
                   {agencySubtext}
                 </div>
               </div>
 
-              <div className="text-right">
+              <div className="self-start sm:self-auto shrink-0">
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 text-[10px] sm:text-xs font-mono font-semibold tracking-wider text-indigo-200 border border-white/15">
                   <span>{quotation.quotationNumber}</span>
                   <span>•</span>
                   <span>V{quotation.version}</span>
                 </div>
                 {isExpired && (
-                  <div className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mt-1">
+                  <div className="text-[9px] sm:text-[10px] font-bold text-rose-400 uppercase tracking-widest mt-1">
                     Expired Proposal
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="space-y-3">
-              <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-400 bg-indigo-500/20 px-3 py-1 rounded-full border border-indigo-400/30">
+            <div className="space-y-2.5 sm:space-y-3">
+              <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest text-indigo-400 bg-indigo-500/20 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border border-indigo-400/30 inline-block">
                 {proposalBadgeText}
               </span>
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
+              <h1 className="text-xl sm:text-3xl lg:text-5xl font-black text-white tracking-tight leading-tight break-words">
                 {quotation.title}
               </h1>
               {quotation.proposalSubtitle && (
-                <p className="text-sm sm:text-base text-slate-300 font-medium">
+                <p className="text-xs sm:text-base text-slate-300 font-medium break-words leading-relaxed">
                   {quotation.proposalSubtitle}
                 </p>
               )}
             </div>
 
             {/* 2. Trip Overview Metadata Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-white/10 text-xs">
-              <div>
-                <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Prepared For</span>
-                <span className="font-bold text-white text-sm">{quotation.customer.name}</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/10 text-xs">
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Prepared For</span>
+                <span className="font-bold text-white text-xs sm:text-sm truncate block">{quotation.customer.name}</span>
               </div>
 
-              <div>
-                <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Travel Dates</span>
-                <span className="font-bold text-white text-sm">
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Travel Dates</span>
+                <span className="font-bold text-white text-xs sm:text-sm block break-words">
                   {new Date(quotation.trip.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} –{" "}
                   {new Date(quotation.trip.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 </span>
-                {durationText && <span className="text-[10px] text-indigo-300 block font-medium mt-0.5">{durationText}</span>}
+                {durationText && <span className="text-[9px] sm:text-[10px] text-indigo-300 block font-medium mt-0.5">{durationText}</span>}
               </div>
 
-              <div>
-                <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Travelers</span>
-                <span className="font-bold text-white text-sm">
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Travelers</span>
+                <span className="font-bold text-white text-xs sm:text-sm block">
                   {quotation.trip.travelers.length || 1} Person(s)
                 </span>
               </div>
 
-              <div>
-                <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Valid Until</span>
-                <span className="font-bold text-indigo-300 text-sm">
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Valid Until</span>
+                <span className="font-bold text-indigo-300 text-xs sm:text-sm block break-words">
                   {quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Upon confirmation"}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="p-6 sm:p-10 lg:p-12 space-y-10">
+          <div className="p-4 sm:p-8 lg:p-12 space-y-8 sm:space-y-10">
             {/* Welcome Message */}
             {quotation.customerMessage && (
-              <div className="p-5 sm:p-6 bg-slate-50 rounded-2xl border border-slate-200/80 leading-relaxed text-slate-700 text-sm">
-                <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
+              <div className="p-4 sm:p-6 bg-slate-50 rounded-2xl border border-slate-200/80 leading-relaxed text-slate-700 text-xs sm:text-sm">
+                <h3 className="font-bold text-slate-900 text-[11px] sm:text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
                   Greeting from your Travel Advisor
                 </h3>
-                <p className="whitespace-pre-wrap">{quotation.customerMessage}</p>
+                <p className="whitespace-pre-wrap break-words">{quotation.customerMessage}</p>
               </div>
             )}
 
-
-
             {/* 3. Tour Highlights Bar */}
-            <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
-              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-xs text-slate-700 font-semibold">
+            <div className="p-3 sm:p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-3 sm:gap-6 text-[11px] sm:text-xs text-slate-700 font-semibold">
                 {hotelsList.length > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <Hotel className="h-4 w-4 text-indigo-600" />
-                    <span>{hotelsList.length} Premium Stay{hotelsList.length > 1 ? "s" : ""}</span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Hotel className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-indigo-600 shrink-0" />
+                    <span className="truncate">{hotelsList.length} Premium Stay{hotelsList.length > 1 ? "s" : ""}</span>
                   </div>
                 )}
-                <div className="flex items-center gap-1.5">
-                  <Car className="h-4 w-4 text-indigo-600" />
-                  <span>{vehiclesList.length > 0 ? "Private Vehicle & Chauffeur" : "Transfers Included"}</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Car className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-indigo-600 shrink-0" />
+                  <span className="truncate">{vehiclesList.length > 0 ? "Private Vehicle" : "Transfers"}</span>
                 </div>
                 {activitiesList.length > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <Ticket className="h-4 w-4 text-indigo-600" />
-                    <span>{activitiesList.length} Curated Experience{activitiesList.length > 1 ? "s" : ""}</span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Ticket className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-indigo-600 shrink-0" />
+                    <span className="truncate">{activitiesList.length} Experience{activitiesList.length > 1 ? "s" : ""}</span>
                   </div>
                 )}
                 {itineraryItems.length > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4 text-indigo-600" />
-                    <span>{itineraryItems.length} Days Itinerary</span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Calendar className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-indigo-600 shrink-0" />
+                    <span className="truncate">{itineraryItems.length} Days Tour</span>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* 4. Destination Route Sequence */}
-            {/* {sortedDestinations.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4 text-indigo-600" />
-                  Tour Route Sequence
-                </h3>
-                <div className="flex flex-wrap items-center gap-2 p-3 bg-purple-50/60 border border-purple-100 rounded-2xl">
-                  {sortedDestinations.map((dest: any, idx: number) => (
-                    <React.Fragment key={dest.id || idx}>
-                      <span className="px-3 py-1 bg-white border border-purple-200 text-purple-900 font-bold text-xs rounded-xl shadow-2xs">
-                        {dest.destination?.name || dest.name || "Destination"}
-                      </span>
-                      {idx < sortedDestinations.length - 1 && (
-                        <span className="text-purple-400 font-black text-xs">➔</span>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </div>
-              </div>
-            )} */}
-
             {/* 5. Day-by-Day Itinerary Schedule */}
             {quotation.trip.itineraryItems.length > 0 && (
-              <div className="space-y-4">
-                <div className="border-b border-slate-200 pb-3">
-                  <h2 className="text-lg font-black text-slate-900 tracking-tight">Day-by-Day Itinerary Schedule</h2>
-                  <p className="text-xs text-slate-500">Planned sightseeing, transfers, and experiences</p>
+              <div className="space-y-3 sm:space-y-4">
+                <div className="border-b border-slate-200 pb-2 sm:pb-3">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Day-by-Day Itinerary Schedule</h2>
+                  <p className="text-[11px] sm:text-xs text-slate-500">Planned sightseeing, transfers, and experiences</p>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {quotation.trip.itineraryItems.map((item) => (
                     <div
                       key={item.id}
-                      className="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col sm:flex-row gap-4"
+                      className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col sm:flex-row gap-3 sm:gap-4"
                     >
                       <div className="shrink-0 flex sm:flex-col items-center justify-start gap-1 sm:w-20">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md sm:rounded-lg shrink-0">
                           Day {item.dayNumber}
                         </span>
                         {item.date && (
@@ -441,17 +417,17 @@ export default function PublicQuotationPage() {
                         )}
                       </div>
 
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">{item.title}</h4>
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 sm:gap-2">
+                          <h4 className="font-extrabold text-slate-900 text-xs sm:text-base break-words">{item.title}</h4>
                           {item.location && (
-                            <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                            <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md self-start sm:self-auto shrink-0">
                               {item.location}
                             </span>
                           )}
                         </div>
                         {item.description && (
-                          <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{item.description}</p>
+                          <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{item.description}</p>
                         )}
                       </div>
                     </div>
@@ -462,37 +438,41 @@ export default function PublicQuotationPage() {
 
             {/* 6. Accommodation & Stay Details (NO PRICING) */}
             {hotelsList.length > 0 && (
-              <div className="space-y-4">
-                <div className="border-b border-slate-200 pb-3">
-                  <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                    <Hotel className="h-5 w-5 text-indigo-600" />
+              <div className="space-y-3 sm:space-y-4">
+                <div className="border-b border-slate-200 pb-2 sm:pb-3">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <Hotel className="h-4 sm:h-5 w-4 sm:w-5 text-indigo-600 shrink-0" />
                     Hotel Accommodations
                   </h2>
-                  <p className="text-xs text-slate-500">Handpicked luxury and comfortable stays</p>
+                  <p className="text-[11px] sm:text-xs text-slate-500">Handpicked luxury and comfortable stays</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                   {hotelsList.map((h) => {
                     const hotelName = h.hotel?.name || "Selected Hotel";
                     const cityName = h.hotel?.city || "";
                     const nights = Math.max(1, Math.round((new Date(h.checkOut).getTime() - new Date(h.checkIn).getTime()) / (1000 * 60 * 60 * 24)));
 
                     return (
-                      <div key={h.id} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2 text-xs">
+                      <div key={h.id} className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2 text-xs">
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">{hotelName}</h4>
-                            {cityName && <span className="text-xs text-indigo-600 font-semibold">{cityName}</span>}
+                          <div className="min-w-0">
+                            <h4 className="font-extrabold text-slate-900 text-xs sm:text-base break-words">{hotelName}</h4>
+                            {cityName && <span className="text-[11px] sm:text-xs text-indigo-600 font-semibold block">{cityName}</span>}
                           </div>
-                          <span className="px-2.5 py-1 bg-slate-100 text-slate-700 font-bold text-xs rounded-lg shrink-0">
-                            {nights} Night(s)
+                          <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-slate-100 text-slate-700 font-bold text-[10px] sm:text-xs rounded-md sm:rounded-lg shrink-0">
+                            {nights} Night{nights > 1 ? "s" : ""}
                           </span>
                         </div>
 
                         <div className="space-y-1 text-slate-600 text-xs pt-1">
-                          <div><strong className="text-slate-800">Room Category:</strong> {h.roomType}</div>
-                          {h.mealPlan && <div><strong className="text-slate-800">Meal Plan:</strong> {h.mealPlan}</div>}
-                          <div><strong className="text-slate-800">Check-in:</strong> {new Date(h.checkIn).toLocaleDateString("en-US", { month: "short", day: "numeric" })} • <strong className="text-slate-800">Check-out:</strong> {new Date(h.checkOut).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                          <div className="break-words"><strong className="text-slate-800">Room Category:</strong> {h.roomType}</div>
+                          {h.mealPlan && <div className="break-words"><strong className="text-slate-800">Meal Plan:</strong> {h.mealPlan}</div>}
+                          <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                            <span><strong className="text-slate-800">Check-in:</strong> {new Date(h.checkIn).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                            <span>•</span>
+                            <span><strong className="text-slate-800">Check-out:</strong> {new Date(h.checkOut).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                          </div>
                         </div>
                       </div>
                     );
@@ -503,27 +483,27 @@ export default function PublicQuotationPage() {
 
             {/* 7. Transportation & Logistics (NO PRICING) */}
             {vehiclesList.length > 0 && (
-              <div className="space-y-4">
-                <div className="border-b border-slate-200 pb-3">
-                  <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                    <Car className="h-5 w-5 text-indigo-600" />
+              <div className="space-y-3 sm:space-y-4">
+                <div className="border-b border-slate-200 pb-2 sm:pb-3">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <Car className="h-4 sm:h-5 w-4 sm:w-5 text-indigo-600 shrink-0" />
                     Transportation & Transfers
                   </h2>
-                  <p className="text-xs text-slate-500">Private vehicle arrangements and chauffeured transit</p>
+                  <p className="text-[11px] sm:text-xs text-slate-500">Private vehicle arrangements and chauffeured transit</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                   {vehiclesList.map((v) => (
-                    <div key={v.id} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2 text-xs">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">{v.vehicleName || v.vehicle?.name || "Private Vehicle"}</h4>
+                    <div key={v.id} className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2 text-xs">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-extrabold text-slate-900 text-xs sm:text-base break-words min-w-0">{v.vehicleName || v.vehicle?.name || "Private Vehicle"}</h4>
                         {v.vehicle?.capacity && (
-                          <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-bold text-xs rounded-lg">
+                          <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-indigo-50 text-indigo-700 font-bold text-[10px] sm:text-xs rounded-md sm:rounded-lg shrink-0">
                             {v.vehicle.capacity} Seater
                           </span>
                         )}
                       </div>
-                      <p className="text-slate-600 text-xs">
+                      <p className="text-slate-600 text-xs break-words">
                         {v.vehicleType || v.vehicle?.type || "Dedicated Private Transport"} • {v.notes || "Airport transfers, sightseeing, and intercity transit as per itinerary"}
                       </p>
                     </div>
@@ -534,29 +514,29 @@ export default function PublicQuotationPage() {
 
             {/* 8. Sightseeing & Activities (NO PRICING) */}
             {activitiesList.length > 0 && (
-              <div className="space-y-4">
-                <div className="border-b border-slate-200 pb-3">
-                  <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                    <Ticket className="h-5 w-5 text-indigo-600" />
+              <div className="space-y-3 sm:space-y-4">
+                <div className="border-b border-slate-200 pb-2 sm:pb-3">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <Ticket className="h-4 sm:h-5 w-4 sm:w-5 text-indigo-600 shrink-0" />
                     Sightseeing & Activities
                   </h2>
-                  <p className="text-xs text-slate-500">Curated experiences and entry excursions</p>
+                  <p className="text-[11px] sm:text-xs text-slate-500">Curated experiences and entry excursions</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   {activitiesList.map((act) => {
                     const isExcluded = act.type === "EXCLUDED" || act.type === "OPTIONAL";
                     return (
-                      <div key={act.id} className="p-4 bg-white border border-slate-200 shadow-2xs rounded-2xl space-y-2 text-xs">
+                      <div key={act.id} className="p-3.5 sm:p-4 bg-white border border-slate-200 shadow-2xs rounded-2xl space-y-2 text-xs">
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h4 className="font-extrabold text-slate-900 text-sm">{act.name || act.activity?.name || "Excursion"}</h4>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm break-words">{act.name || act.activity?.name || "Excursion"}</h4>
                             {act.description && (
-                              <p className="text-slate-600 text-xs leading-relaxed mt-1">{act.description}</p>
+                              <p className="text-slate-600 text-[11px] sm:text-xs leading-relaxed mt-1 break-words">{act.description}</p>
                             )}
                           </div>
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 border ${
+                            className={`px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-full text-[10px] font-bold shrink-0 border ${
                               isExcluded
                                 ? "bg-amber-50 text-amber-800 border-amber-200"
                                 : "bg-emerald-50 text-emerald-800 border-emerald-200"
@@ -566,7 +546,7 @@ export default function PublicQuotationPage() {
                           </span>
                         </div>
                         {isExcluded && (
-                          <p className="text-[11px] text-amber-700 bg-amber-50/50 rounded-lg p-2 border border-amber-100">
+                          <p className="text-[10px] sm:text-[11px] text-amber-700 bg-amber-50/50 rounded-lg p-1.5 sm:p-2 border border-amber-100 break-words">
                             Ticket/admission payable directly on location by guest.
                           </p>
                         )}
@@ -579,26 +559,26 @@ export default function PublicQuotationPage() {
 
             {/* 9. Structured Inclusions & Exclusions */}
             {(inclusions.length > 0 || exclusions.length > 0) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 {/* Inclusions */}
-                <div className="p-6 rounded-3xl bg-emerald-50/40 border border-emerald-100 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-emerald-200/60 pb-3">
-                    <div className="h-7 w-7 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
-                      <Check className="h-4 w-4" />
+                <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-emerald-50/40 border border-emerald-100 space-y-3 sm:space-y-4">
+                  <div className="flex items-center gap-2 border-b border-emerald-200/60 pb-2 sm:pb-3">
+                    <div className="h-6 sm:h-7 w-6 sm:w-7 rounded-lg sm:rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0">
+                      <Check className="h-3.5 sm:h-4 w-3.5 sm:w-4" />
                     </div>
-                    <div>
-                      <h3 className="font-extrabold text-emerald-950 text-sm">Package Inclusions</h3>
-                      <p className="text-[11px] text-emerald-700">{quotation.inclusionsIntro || "Covered in this proposal"}</p>
+                    <div className="min-w-0">
+                      <h3 className="font-extrabold text-emerald-950 text-xs sm:text-sm">Package Inclusions</h3>
+                      <p className="text-[10px] sm:text-[11px] text-emerald-700 truncate">{quotation.inclusionsIntro || "Covered in this proposal"}</p>
                     </div>
                   </div>
 
-                  <ul className="space-y-3 text-xs">
+                  <ul className="space-y-2.5 sm:space-y-3 text-xs">
                     {inclusions.map((inc) => (
-                      <li key={inc.id} className="flex items-start gap-2.5">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                        <div>
-                          <strong className="text-emerald-950 font-bold block">{inc.title}</strong>
-                          {inc.description && <p className="text-emerald-800 text-[11px] mt-0.5">{inc.description}</p>}
+                      <li key={inc.id} className="flex items-start gap-2 sm:gap-2.5">
+                        <CheckCircle2 className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <strong className="text-emerald-950 font-bold block break-words">{inc.title}</strong>
+                          {inc.description && <p className="text-emerald-800 text-[11px] mt-0.5 break-words">{inc.description}</p>}
                         </div>
                       </li>
                     ))}
@@ -606,24 +586,24 @@ export default function PublicQuotationPage() {
                 </div>
 
                 {/* Exclusions */}
-                <div className="p-6 rounded-3xl bg-rose-50/40 border border-rose-100 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-rose-200/60 pb-3">
-                    <div className="h-7 w-7 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold">
-                      <X className="h-4 w-4" />
+                <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-rose-50/40 border border-rose-100 space-y-3 sm:space-y-4">
+                  <div className="flex items-center gap-2 border-b border-rose-200/60 pb-2 sm:pb-3">
+                    <div className="h-6 sm:h-7 w-6 sm:w-7 rounded-lg sm:rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold shrink-0">
+                      <X className="h-3.5 sm:h-4 w-3.5 sm:w-4" />
                     </div>
-                    <div>
-                      <h3 className="font-extrabold text-rose-950 text-sm">Package Exclusions</h3>
-                      <p className="text-[11px] text-rose-700">{quotation.exclusionsIntro || "Not covered in this package"}</p>
+                    <div className="min-w-0">
+                      <h3 className="font-extrabold text-rose-950 text-xs sm:text-sm">Package Exclusions</h3>
+                      <p className="text-[10px] sm:text-[11px] text-rose-700 truncate">{quotation.exclusionsIntro || "Not covered in this package"}</p>
                     </div>
                   </div>
 
-                  <ul className="space-y-3 text-xs">
+                  <ul className="space-y-2.5 sm:space-y-3 text-xs">
                     {exclusions.map((exc) => (
                       <li key={exc.id} className="flex items-start gap-2.5">
-                        <X className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
-                        <div>
-                          <strong className="text-rose-950 font-bold block">{exc.title}</strong>
-                          {exc.description && <p className="text-rose-800 text-[11px] mt-0.5">{exc.description}</p>}
+                        <X className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <strong className="text-rose-950 font-bold block break-words">{exc.title}</strong>
+                          {exc.description && <p className="text-rose-800 text-[11px] mt-0.5 break-words">{exc.description}</p>}
                         </div>
                       </li>
                     ))}
@@ -632,75 +612,31 @@ export default function PublicQuotationPage() {
               </div>
             )}
 
-            {/* 10. Payment Milestone Schedule (PERCENTAGES ONLY) */}
-            {/* {milestones.length > 0 && (
-              <div className="space-y-4">
-                <div className="border-b border-slate-200 pb-3">
-                  <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                    <CreditCard className="h-5 w-5 text-indigo-600" />
-                    Payment Milestone Schedule
-                  </h2>
-                  <p className="text-xs text-slate-500">Staged payment timeline and deposit breakdown</p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {milestones.map((m, idx) => (
-                    <div
-                      key={m.id}
-                      className="p-5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                          Milestone {idx + 1}
-                        </span>
-                        {m.percentage && (
-                          <span className="text-xs font-black text-indigo-900 bg-indigo-100/80 px-2 py-0.5 rounded-md">
-                            {Number(m.percentage)}%
-                          </span>
-                        )}
-                      </div>
-
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-sm">{m.title}</h4>
-                        {m.description && <p className="text-[11px] text-slate-500 mt-0.5">{m.description}</p>}
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-200 flex items-baseline justify-between text-[11px] text-slate-500">
-                        <span>
-                          {m.dueDate ? `Due: ${new Date(m.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "Upon schedule"}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )} */}
-
             {/* 11. Important Notes & Policies */}
             {(importantNotes.length > 0 || quotation.importantNotes || quotation.cancellationPolicy || quotation.terms || quotation.privacyPolicy) && (
-              <div className="space-y-4">
-                <div className="border-b border-slate-200 pb-3">
-                  <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                    <ShieldCheck className="h-5 w-5 text-indigo-600" />
+              <div className="space-y-3 sm:space-y-4">
+                <div className="border-b border-slate-200 pb-2 sm:pb-3">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <ShieldCheck className="h-4 sm:h-5 w-4 sm:w-5 text-indigo-600 shrink-0" />
                     Important Notes & Policy Terms
                   </h2>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
                   {(importantNotes.length > 0 || quotation.importantNotes) && (
-                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
                       <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Traveler Advisories</h4>
                       {quotation.importantNotes && (
-                        <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{quotation.importantNotes}</p>
+                        <p className="text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{quotation.importantNotes}</p>
                       )}
                       {importantNotes.length > 0 && (
                         <ul className="space-y-2">
                           {importantNotes.map((n) => (
                             <li key={n.id} className="flex items-start gap-2">
                               <Info className="h-3.5 w-3.5 text-indigo-600 shrink-0 mt-0.5" />
-                              <div>
-                                <strong className="text-slate-900">{n.title}:</strong>{" "}
-                                <span className="text-slate-600">{n.description}</span>
+                              <div className="min-w-0">
+                                <strong className="text-slate-900 break-words">{n.title}:</strong>{" "}
+                                <span className="text-slate-600 break-words">{n.description}</span>
                               </div>
                             </li>
                           ))}
@@ -710,23 +646,23 @@ export default function PublicQuotationPage() {
                   )}
 
                   {quotation.cancellationPolicy && (
-                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
                       <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Cancellation Policy</h4>
-                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{quotation.cancellationPolicy}</p>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{quotation.cancellationPolicy}</p>
                     </div>
                   )}
 
                   {quotation.terms && (
-                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
                       <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Terms & Conditions</h4>
-                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{quotation.terms}</p>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{quotation.terms}</p>
                     </div>
                   )}
 
                   {quotation.privacyPolicy && (
-                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
                       <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Privacy Policy</h4>
-                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{quotation.privacyPolicy}</p>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{quotation.privacyPolicy}</p>
                     </div>
                   )}
                 </div>
@@ -734,40 +670,40 @@ export default function PublicQuotationPage() {
             )}
 
             {/* 12. Total Commercial Package Price Summary - Final Amount ONLY */}
-            <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 text-white space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
+            <div className="p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-slate-900 text-white space-y-4 sm:space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 sm:gap-4 text-center sm:text-left">
                 <div>
                   <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-400">
                     Total Package Investment
                   </span>
-                  <h3 className="text-xl sm:text-2xl font-black text-white mt-1">
+                  <h3 className="text-lg sm:text-2xl font-black text-white mt-0.5 sm:mt-1">
                     Complete Tour Price
                   </h3>
                 </div>
 
-                <div className="text-left sm:text-right">
-                  <div className="text-3xl sm:text-5xl font-black text-emerald-400 tracking-tight">
+                <div className="sm:text-right">
+                  <div className="text-2xl sm:text-5xl font-black text-emerald-400 tracking-tight">
                     {formatCurrency(effectiveFinalAmount)}
                   </div>
-                  <span className="text-[11px] text-slate-400 mt-1 block">
+                  <span className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 sm:mt-1 block">
                     All-inclusive customer package price ({quotation.currency})
                   </span>
                 </div>
               </div>
 
               {/* Bottom Interactive Decision Action Bar */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 print:hidden">
-                <div className="text-xs text-slate-300 flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-emerald-400" />
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 pt-3 sm:pt-4 border-t border-slate-800 print:hidden">
+                <div className="text-xs text-slate-300 flex items-center gap-2 text-center sm:text-left">
+                  <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
                   <span>Transparent Pricing • Direct Advisor Support</span>
                 </div>
 
-                <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
                   <a
                     href={`/api/quotations/public/${encodeURIComponent(shareToken)}/pdf`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-semibold h-10 px-4 rounded-xl cursor-pointer"
+                    className="inline-flex items-center justify-center bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-semibold h-9 sm:h-10 px-3 sm:px-4 rounded-xl cursor-pointer"
                   >
                     <Download className="h-4 w-4 mr-1.5 text-indigo-300" />
                     PDF
@@ -776,7 +712,7 @@ export default function PublicQuotationPage() {
                   <Button
                     variant="outline"
                     onClick={handleWhatsAppContact}
-                    className="flex-1 sm:flex-initial bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs font-semibold h-10 px-4 rounded-xl cursor-pointer"
+                    className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs font-semibold h-9 sm:h-10 px-3 sm:px-4 rounded-xl cursor-pointer"
                   >
                     <MessageSquare className="h-4 w-4 mr-1.5 text-emerald-400" />
                     WhatsApp
@@ -787,17 +723,17 @@ export default function PublicQuotationPage() {
                       <Button
                         variant="outline"
                         onClick={() => setIsChangeModalOpen(true)}
-                        className="flex-1 sm:flex-initial bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs font-semibold h-10 px-4 rounded-xl cursor-pointer"
+                        className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs font-semibold h-9 sm:h-10 px-3 sm:px-4 rounded-xl cursor-pointer"
                       >
-                        Request Changes
+                        Revisions
                       </Button>
 
                       <Button
                         onClick={() => setIsAcceptModalOpen(true)}
-                        className="flex-1 sm:flex-initial bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs h-10 px-6 rounded-xl shadow-lg cursor-pointer"
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs h-9 sm:h-10 px-4 sm:px-6 rounded-xl shadow-lg cursor-pointer"
                       >
                         <Check className="h-4 w-4 mr-1.5" />
-                        Accept Proposal
+                        Accept
                       </Button>
                     </>
                   )}
@@ -808,15 +744,15 @@ export default function PublicQuotationPage() {
             {/* 13. Agency Contact Footer */}
             <div className="pt-6 border-t border-slate-200 text-center text-xs text-slate-500 space-y-2">
               <p className="font-bold text-slate-700">{quotation.agency.name}</p>
-              <div className="flex flex-wrap items-center justify-center gap-4 text-[11px]">
+              <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[11px]">
                 {quotation.agency.phone && (
-                  <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {quotation.agency.phone}</span>
+                  <span className="flex items-center gap-1"><Phone className="h-3 w-3 shrink-0" /> {quotation.agency.phone}</span>
                 )}
                 {quotation.agency.email && (
-                  <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {quotation.agency.email}</span>
+                  <span className="flex items-center gap-1"><Mail className="h-3 w-3 shrink-0" /> {quotation.agency.email}</span>
                 )}
                 {quotation.agency.address && (
-                  <span className="flex items-center gap-1"><Building className="h-3 w-3" /> {quotation.agency.address}</span>
+                  <span className="flex items-center gap-1"><Building className="h-3 w-3 shrink-0" /> {quotation.agency.address}</span>
                 )}
               </div>
             </div>
@@ -826,24 +762,24 @@ export default function PublicQuotationPage() {
 
       {/* ─── ACCEPT PROPOSAL MODAL ─── */}
       <Dialog open={isAcceptModalOpen} onOpenChange={setIsAcceptModalOpen}>
-        <DialogContent className="bg-white border border-slate-200 rounded-3xl max-w-md p-6 shadow-2xl">
+        <DialogContent className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl max-w-[94vw] sm:max-w-md p-4 sm:p-6 shadow-2xl">
           <form onSubmit={handleAcceptProposal}>
             <DialogHeader>
-              <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
-                <Check className="h-6 w-6" />
+              <div className="h-10 sm:h-12 w-10 sm:w-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
+                <Check className="h-5 sm:h-6 w-5 sm:w-6" />
               </div>
-              <DialogTitle className="text-slate-900 font-bold text-lg">Accept Itinerary Proposal</DialogTitle>
+              <DialogTitle className="text-slate-900 font-bold text-base sm:text-lg">Accept Itinerary Proposal</DialogTitle>
               <DialogDescription className="text-slate-500 text-xs mt-1">
                 Confirm your acceptance of quotation {quotation.quotationNumber}.
                 Your travel advisor will be notified immediately to proceed with reservation bookings.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3.5 mt-4 text-xs">
+            <div className="space-y-3 mt-3 sm:mt-4 text-xs">
 
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase">Traveler Name</label>
-                <Input value={quotation.customer.name} disabled className="h-9 bg-slate-50 text-xs" />
+                <Input value={quotation.customer.name} disabled className="h-8 sm:h-9 bg-slate-50 text-xs" />
               </div>
 
               <div className="space-y-1">
@@ -858,14 +794,14 @@ export default function PublicQuotationPage() {
               </div>
             </div>
 
-            <DialogFooter className="mt-6 flex gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsAcceptModalOpen(false)} className="h-9 text-xs">
+            <DialogFooter className="mt-4 sm:mt-6 flex flex-row justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsAcceptModalOpen(false)} className="h-8 sm:h-9 text-xs">
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={accepting}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9 px-5 font-bold"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8 sm:h-9 px-4 sm:px-5 font-bold"
               >
                 {accepting ? "Confirming..." : "Confirm & Accept"}
               </Button>
@@ -876,19 +812,19 @@ export default function PublicQuotationPage() {
 
       {/* ─── REQUEST CHANGES MODAL ─── */}
       <Dialog open={isChangeModalOpen} onOpenChange={setIsChangeModalOpen}>
-        <DialogContent className="bg-white border border-slate-200 rounded-3xl max-w-md p-6 shadow-2xl">
+        <DialogContent className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl max-w-[94vw] sm:max-w-md p-4 sm:p-6 shadow-2xl">
           <form onSubmit={handleRequestChanges}>
             <DialogHeader>
-              <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-2">
-                <MessageSquare className="h-6 w-6" />
+              <div className="h-10 sm:h-12 w-10 sm:w-12 rounded-xl sm:rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-2">
+                <MessageSquare className="h-5 sm:h-6 w-5 sm:w-6" />
               </div>
-              <DialogTitle className="text-slate-900 font-bold text-lg">Request Revisions</DialogTitle>
+              <DialogTitle className="text-slate-900 font-bold text-base sm:text-lg">Request Revisions</DialogTitle>
               <DialogDescription className="text-slate-500 text-xs mt-1">
                 Let your advisor know what changes or adjustments you would like in hotels, dates, or activities.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3.5 mt-4 text-xs">
+            <div className="space-y-3 mt-3 sm:mt-4 text-xs">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase">Requested Adjustments *</label>
                 <Textarea
@@ -902,14 +838,14 @@ export default function PublicQuotationPage() {
               </div>
             </div>
 
-            <DialogFooter className="mt-6 flex gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsChangeModalOpen(false)} className="h-9 text-xs">
+            <DialogFooter className="mt-4 sm:mt-6 flex flex-row justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsChangeModalOpen(false)} className="h-8 sm:h-9 text-xs">
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={submittingChanges || !changeMessage}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9 px-5 font-bold"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-8 sm:h-9 px-4 sm:px-5 font-bold"
               >
                 {submittingChanges ? "Submitting..." : "Send to Advisor"}
               </Button>

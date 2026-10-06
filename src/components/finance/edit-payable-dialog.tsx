@@ -8,7 +8,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,7 +50,6 @@ export function EditPayableDialog({
   const [dueDate, setDueDate] = React.useState("");
   const [status, setStatus] = React.useState<SupplierPayableStatus>(SupplierPayableStatus.PENDING);
   const [notes, setNotes] = React.useState("");
-  const [reason, setReason] = React.useState("");
 
   React.useEffect(() => {
     if (open) {
@@ -78,7 +76,6 @@ export function EditPayableDialog({
     setDueDate(p.dueDate ? new Date(p.dueDate).toISOString().slice(0, 10) : "");
     setStatus(p.status || SupplierPayableStatus.PENDING);
     setNotes(p.notes || "");
-    setReason("");
   };
 
   if (!currentPayable) return null;
@@ -96,8 +93,12 @@ export function EditPayableDialog({
       return;
     }
     const numAmount = parseFloat(actualAmount);
-    if (isNaN(numAmount) || numAmount < 0) {
-      toast.error("Please enter a valid amount.");
+    if (isNaN(numAmount) || numAmount <= 0) {
+      toast.error("Please enter a valid amount greater than 0.");
+      return;
+    }
+    if (numAmount < paid - 0.001) {
+      toast.error(`Payable amount cannot be less than the amount already paid of ${formatCurrency(paid)}.`);
       return;
     }
 
@@ -110,7 +111,6 @@ export function EditPayableDialog({
         dueDate: dueDate ? new Date(dueDate).toISOString() : null,
         status,
         notes: notes ? notes.trim() : null,
-        reason: reason.trim() || undefined,
       });
 
       toast.success("Payable updated successfully!");
@@ -234,22 +234,6 @@ export function EditPayableDialog({
               />
             </div>
           </div>
-
-          {/* Reason for Adjustment (if amount changed) */}
-          {isDiff && (
-            <div className="space-y-1.5">
-              <Label htmlFor="editReason" className="text-xs text-amber-800 font-medium">
-                Reason for Adjustment (Optional)
-              </Label>
-              <Input
-                id="editReason"
-                placeholder="e.g. Negotiated discounted rate with hotel manager"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                className="h-9 text-xs border-amber-300 focus-visible:ring-amber-500"
-              />
-            </div>
-          )}
 
           {/* Notes */}
           <div className="space-y-1.5">

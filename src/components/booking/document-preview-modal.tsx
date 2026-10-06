@@ -5,6 +5,7 @@ import { Booking, BookingItem, CustomerPayment, BookingDocument } from "@/types"
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/costing-engine";
 import { triggerDocumentPrint } from "@/lib/booking/document-templates";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import {
   X,
   Printer,
@@ -38,6 +39,7 @@ export function DocumentPreviewModal({
   isOpen,
   onClose,
 }: DocumentPreviewModalProps) {
+  useModalScrollLock(isOpen);
   if (!isOpen) return null;
 
   const agency = booking.agencySnapshot || {

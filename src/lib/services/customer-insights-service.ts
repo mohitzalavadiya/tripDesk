@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { entitlementService } from "@/lib/services/entitlement-service";
 
 export interface CustomerInsightsData {
   overview: {
@@ -50,6 +51,8 @@ export const customerInsightsService = {
    * Aggregate real-time customer analytics with strict tenant isolation
    */
   async getCustomerInsights(agencyId: string): Promise<CustomerInsightsData> {
+    await entitlementService.checkFeatureAllowed(agencyId, "CUSTOMER_INSIGHTS");
+
     const [
       customers,
       trips,

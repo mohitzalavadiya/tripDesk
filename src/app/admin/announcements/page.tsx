@@ -28,6 +28,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { getErrorMessage } from "@/lib/utils";
 import { adminClient } from "@/lib/api-client/admin-client";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 const ANNOUNCEMENT_TYPE_LABELS: Record<string, string> = {
   INFO: "Info",
@@ -49,6 +50,8 @@ export default function AdminAnnouncementsPage() {
 
   // Create / Edit Modal State
   const [modalMode, setModalMode] = React.useState<"CREATE" | "EDIT" | null>(null);
+
+  useModalScrollLock(Boolean(modalMode));
   const [targetId, setTargetId] = React.useState<string | null>(null);
   const [title, setTitle] = React.useState("");
   const [message, setMessage] = React.useState("");

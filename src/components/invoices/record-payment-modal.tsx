@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ export function RecordPaymentModal({
   balanceAmount,
   onSuccess,
 }: RecordPaymentModalProps) {
+  useModalScrollLock(isOpen);
   const [amount, setAmount] = React.useState<string>(String(balanceAmount || ""));
   const [paymentMethod, setPaymentMethod] = React.useState<string>("UPI");
   const [paymentDate, setPaymentDate] = React.useState<string>(

@@ -37,6 +37,8 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/costing-engine";
 import { reportingClient } from "@/lib/api-client/reporting-client";
+import { useSubscription } from "@/context/subscription-context";
+import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
 import {
   AgencyBIReportResult,
   ReportExecutiveKPIs,
@@ -52,6 +54,9 @@ const EXPORT_CSV_LABELS: Record<string, string> = {
 };
 
 export default function ReportsPage() {
+  const { isFeatureAllowed, loading: subLoading } = useSubscription();
+  const isAllowed = isFeatureAllowed("REPORTS_ANALYTICS");
+
   const [reportData, setReportData] = React.useState<AgencyBIReportResult | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState<
@@ -75,19 +80,24 @@ export default function ReportsPage() {
         startDate: preset === "CUSTOM_RANGE" ? customStart : undefined,
         endDate: preset === "CUSTOM_RANGE" ? customEnd : undefined,
       });
+
       if (res.success && res.data) {
         setReportData(res.data);
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to load report data");
+      if (err?.code !== "FEATURE_NOT_ALLOWED" && err?.statusCode !== 403) {
+        toast.error(err.message || "Failed to load report data");
+      }
     } finally {
       setLoading(false);
     }
   }, [preset, customStart, customEnd]);
 
   React.useEffect(() => {
-    fetchReport();
-  }, [fetchReport]);
+    if (isAllowed) {
+      fetchReport();
+    }
+  }, [isAllowed, fetchReport]);
 
   const handlePresetSelect = (val: string | null) => {
     if (!val) return;
@@ -130,6 +140,40 @@ export default function ReportsPage() {
     if (val >= 100000) return `₹${(val / 100000).toFixed(2)}L`;
     return `₹${val.toLocaleString("en-IN")}`;
   };
+
+  if (subLoading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
+        <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+          <PageHeader
+            title="Reports & Analytics"
+            description="Real-time executive telemetry, sales conversion, profit margins, receivables, and vendor liabilities."
+            breadcrumbs={[{ label: "Reports & Analytics" }]}
+          />
+          <div className="h-64 bg-slate-100 rounded-3xl border border-slate-200/80 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAllowed) {
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
+        <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+          <PageHeader
+            title="Reports & Analytics"
+            description="Real-time executive telemetry, sales conversion, profit margins, receivables, and vendor liabilities."
+            breadcrumbs={[{ label: "Reports & Analytics" }]}
+          />
+          <LockedFeatureCard
+            featureName="Reports & Analytics"
+            featureKey="REPORTS_ANALYTICS"
+            description="Periodic sales trajectories, gross profit margins, customer receivables, and supplier liability ledgers are available with the Professional Plan."
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
@@ -291,90 +335,90 @@ export default function ReportsPage() {
         </div>
 
         {/* ─── 6 EXECUTIVE SUMMARY KPI SCORECARDS ─────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3.5">
           {/* 1. Gross Booking Value (GBV) */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-indigo-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Gross Bookings</span>
-              <TrendingUp className="h-4 w-4 text-indigo-500" />
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-1 min-w-0">
+            <div className="flex items-center justify-between text-indigo-600 gap-1">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">Gross Bookings</span>
+              <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500 shrink-0" />
             </div>
-            <p className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            <p className="text-base min-[380px]:text-lg sm:text-xl lg:text-2xl font-black text-slate-900 tracking-tight truncate" title={formatCurrency(kpis?.grossBookingValue || 0)}>
               {loading ? "..." : formatCurrency(kpis?.grossBookingValue || 0)}
             </p>
-            <p className="text-[11px] text-slate-500 font-medium">
+            <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate">
               {kpis?.confirmedBookings || 0} confirmed bookings
             </p>
           </div>
 
           {/* 2. Collections Received */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-emerald-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Collections</span>
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-1 min-w-0">
+            <div className="flex items-center justify-between text-emerald-600 gap-1">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">Collections</span>
+              <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-500 shrink-0" />
             </div>
-            <p className="text-xl sm:text-2xl font-black text-emerald-700 tracking-tight">
+            <p className="text-base min-[380px]:text-lg sm:text-xl lg:text-2xl font-black text-emerald-700 tracking-tight truncate" title={formatCurrency(kpis?.amountCollected || 0)}>
               {loading ? "..." : formatCurrency(kpis?.amountCollected || 0)}
             </p>
-            <p className="text-[11px] text-slate-500 font-medium">Actual net payments</p>
+            <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate">Actual net payments</p>
           </div>
 
           {/* 3. Outstanding Receivables */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-amber-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Receivables</span>
-              <CreditCard className="h-4 w-4 text-amber-500" />
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-1 min-w-0">
+            <div className="flex items-center justify-between text-amber-600 gap-1">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">Receivables</span>
+              <CreditCard className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500 shrink-0" />
             </div>
-            <p className="text-xl sm:text-2xl font-black text-amber-700 tracking-tight">
+            <p className="text-base min-[380px]:text-lg sm:text-xl lg:text-2xl font-black text-amber-700 tracking-tight truncate" title={formatCurrency(kpis?.outstandingReceivables || 0)}>
               {loading ? "..." : formatCurrency(kpis?.outstandingReceivables || 0)}
             </p>
-            <p className="text-[11px] text-slate-500 font-medium">Pending customer balances</p>
+            <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate">Pending customer balances</p>
           </div>
 
           {/* 4. Gross Profit & Margin */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-purple-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Gross Profit</span>
-              <PieChart className="h-4 w-4 text-purple-500" />
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-1 min-w-0">
+            <div className="flex items-center justify-between text-purple-600 gap-1">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">Gross Profit</span>
+              <PieChart className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-500 shrink-0" />
             </div>
-            <p className="text-xl sm:text-2xl font-black text-purple-700 tracking-tight">
+            <p className="text-base min-[380px]:text-lg sm:text-xl lg:text-2xl font-black text-purple-700 tracking-tight truncate" title={formatCurrency(kpis?.grossProfit || 0)}>
               {loading ? "..." : formatCurrency(kpis?.grossProfit || 0)}
             </p>
-            <p className="text-[11px] text-purple-600 font-semibold">
+            <p className="text-[10px] sm:text-[11px] text-purple-600 font-semibold truncate">
               {kpis?.grossMarginPercent || 0}% profit margin
             </p>
           </div>
 
           {/* 5. Supplier Payables */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-rose-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Payables</span>
-              <Building2 className="h-4 w-4 text-rose-500" />
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-1 min-w-0">
+            <div className="flex items-center justify-between text-rose-600 gap-1">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">Payables</span>
+              <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-500 shrink-0" />
             </div>
-            <p className="text-xl sm:text-2xl font-black text-rose-700 tracking-tight">
+            <p className="text-base min-[380px]:text-lg sm:text-xl lg:text-2xl font-black text-rose-700 tracking-tight truncate" title={formatCurrency(kpis?.supplierOutstanding || 0)}>
               {loading ? "..." : formatCurrency(kpis?.supplierOutstanding || 0)}
             </p>
-            <p className="text-[11px] text-slate-500 font-medium">
+            <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate">
               of {formatCurrency(kpis?.supplierPayables || 0)} total
             </p>
           </div>
 
           {/* 6. CRM Conversion Rate */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-1">
-            <div className="flex items-center justify-between text-blue-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Conversion</span>
-              <Users className="h-4 w-4 text-blue-500" />
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-1 min-w-0">
+            <div className="flex items-center justify-between text-blue-600 gap-1">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">Conversion</span>
+              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500 shrink-0" />
             </div>
-            <p className="text-xl sm:text-2xl font-black text-blue-700 tracking-tight">
+            <p className="text-base min-[380px]:text-lg sm:text-xl lg:text-2xl font-black text-blue-700 tracking-tight truncate">
               {loading ? "..." : `${kpis?.enquiryConversionRate || 0}%`}
             </p>
-            <p className="text-[11px] text-slate-500 font-medium">
+            <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate">
               {kpis?.wonEnquiries || 0} won of {kpis?.totalEnquiries || 0} leads
             </p>
           </div>
         </div>
 
         {/* ─── TAB NAVIGATION BAR ────────────────────────────────────────── */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-200/80">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scrollbar-none flex-nowrap pb-1 border-b border-slate-200/80">
           {[
             { id: "OVERVIEW", label: "Executive Overview", icon: Layers },
             { id: "REVENUE", label: "Revenue & Profit", icon: TrendingUp },
@@ -390,13 +434,13 @@ export default function ReportsPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all cursor-pointer ${
                   isActive
                     ? "bg-indigo-600 text-white shadow-xs"
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
                 }`}
               >
-                <Icon className="h-3.5 w-3.5" />
+                <Icon className="h-3.5 w-3.5 shrink-0" />
                 <span>{tab.label}</span>
               </button>
             );
@@ -407,26 +451,26 @@ export default function ReportsPage() {
         {activeTab === "OVERVIEW" && (
           <div className="space-y-6">
             {/* Visual Canvas: Revenue & Collections Trend */}
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 shadow-2xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-emerald-600" />
+                    <TrendingUp className="h-4 w-4 text-emerald-600 shrink-0" />
                     <span>Revenue, Collections & Profit Trajectory</span>
                   </h3>
                   <p className="text-xs text-slate-500">
                     Gross booking volume, real customer cash collections, and estimated gross profit.
                   </p>
                 </div>
-                <div className="flex items-center gap-4 text-xs font-bold">
+                <div className="flex items-center gap-3 sm:gap-4 text-xs font-bold flex-wrap">
                   <div className="flex items-center gap-1.5 text-indigo-700">
-                    <span className="h-2.5 w-2.5 rounded-full bg-indigo-600" /> Bookings
+                    <span className="h-2.5 w-2.5 rounded-full bg-indigo-600 shrink-0" /> Bookings
                   </div>
                   <div className="flex items-center gap-1.5 text-emerald-700">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Collections
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0" /> Collections
                   </div>
                   <div className="flex items-center gap-1.5 text-purple-700">
-                    <span className="h-2.5 w-2.5 rounded-full bg-purple-500" /> Profit
+                    <span className="h-2.5 w-2.5 rounded-full bg-purple-500 shrink-0" /> Profit
                   </div>
                 </div>
               </div>
@@ -438,13 +482,13 @@ export default function ReportsPage() {
                 </div>
               ) : (
                 <div className="relative w-full h-[220px] flex pt-2">
-                  <div className="w-14 h-full flex flex-col justify-between text-[10px] text-slate-400 pr-2 text-right font-mono select-none">
+                  <div className="w-12 sm:w-14 h-full flex flex-col justify-between text-[9px] sm:text-[10px] text-slate-400 pr-1.5 sm:pr-2 text-right font-mono select-none shrink-0">
                     {yAxisTicks.map((t) => (
                       <span key={t}>{formatShortRupees(t)}</span>
                     ))}
                   </div>
-                  <div className="flex-1 h-full relative border-l border-b border-slate-100">
-                    <div className="absolute inset-0 flex items-end justify-around px-1 pt-4">
+                  <div className="flex-1 h-full relative border-l border-b border-slate-100 min-w-0">
+                    <div className="absolute inset-0 flex items-end justify-around px-0.5 sm:px-1 pt-4">
                       {timeSeries.map((point) => {
                         const bH = maxAmount > 0 ? (point.bookingValue / maxAmount) * 100 : 0;
                         const cH = maxAmount > 0 ? (point.collectedAmount / maxAmount) * 100 : 0;
@@ -453,24 +497,25 @@ export default function ReportsPage() {
                         return (
                           <div
                             key={point.label}
-                            className="relative flex flex-col items-center h-full justify-end group px-1 flex-1 max-w-[55px] cursor-pointer"
+                            className="relative flex flex-col items-center h-full justify-end group px-0.5 sm:px-1 flex-1 max-w-[55px] cursor-pointer"
                           >
-                            <div className="flex items-end gap-1 w-full justify-center">
+                            <div className="flex items-end gap-0.5 sm:gap-1 w-full justify-center">
                               <div
-                                className="w-2.5 bg-indigo-500 rounded-t-sm transition-all duration-300 group-hover:bg-indigo-600"
+                                className="w-2 sm:w-2.5 bg-indigo-500 rounded-t-sm transition-all duration-300 group-hover:bg-indigo-600"
                                 style={{ height: `${Math.max(4, bH)}%` }}
                               />
                               <div
-                                className="w-2.5 bg-emerald-500 rounded-t-sm transition-all duration-300 group-hover:bg-emerald-600"
+                                className="w-2 sm:w-2.5 bg-emerald-500 rounded-t-sm transition-all duration-300 group-hover:bg-emerald-600"
                                 style={{ height: `${Math.max(4, cH)}%` }}
                               />
                               <div
-                                className="w-2.5 bg-purple-500 rounded-t-sm transition-all duration-300 group-hover:bg-purple-600"
+                                className="w-2 sm:w-2.5 bg-purple-500 rounded-t-sm transition-all duration-300 group-hover:bg-purple-600"
                                 style={{ height: `${Math.max(4, pH)}%` }}
                               />
                             </div>
-                            <span className="text-[10px] text-slate-500 font-semibold mt-2 truncate w-full text-center">
-                              {point.label}
+                            <span className="text-[9px] sm:text-[10px] text-slate-500 font-semibold mt-2 text-center whitespace-nowrap block truncate w-full" title={point.label}>
+                              <span className="sm:hidden">{point.label.split(' ')[0]}</span>
+                              <span className="hidden sm:inline">{point.label}</span>
                             </span>
                           </div>
                         );
@@ -757,22 +802,22 @@ export default function ReportsPage() {
         {activeTab === "CUSTOMERS" && (
           <div className="space-y-6">
             {/* Customer Retention KPIs */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-1">
-                <span className="text-[11px] font-bold uppercase text-slate-500">Total Customer Base</span>
-                <p className="text-2xl font-black text-slate-900">{reportData?.customers.totalCustomers || 0}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3.5">
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-1 min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase text-slate-500 truncate block">Total Customer Base</span>
+                <p className="text-lg sm:text-2xl font-black text-slate-900 truncate">{reportData?.customers.totalCustomers || 0}</p>
               </div>
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-1">
-                <span className="text-[11px] font-bold uppercase text-indigo-600">Repeat Customers</span>
-                <p className="text-2xl font-black text-indigo-700">{reportData?.customers.repeatCustomers || 0}</p>
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-1 min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase text-indigo-600 truncate block">Repeat Customers</span>
+                <p className="text-lg sm:text-2xl font-black text-indigo-700 truncate">{reportData?.customers.repeatCustomers || 0}</p>
               </div>
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-1">
-                <span className="text-[11px] font-bold uppercase text-emerald-600">Repeat Booking Rate</span>
-                <p className="text-2xl font-black text-emerald-700">{reportData?.customers.repeatRatePercent || 0}%</p>
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-1 min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase text-emerald-600 truncate block">Repeat Booking Rate</span>
+                <p className="text-lg sm:text-2xl font-black text-emerald-700 truncate">{reportData?.customers.repeatRatePercent || 0}%</p>
               </div>
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs space-y-1">
-                <span className="text-[11px] font-bold uppercase text-purple-600">Average Customer LTV</span>
-                <p className="text-2xl font-black text-purple-700">
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-1 min-w-0">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase text-purple-600 truncate block">Average Customer LTV</span>
+                <p className="text-base sm:text-2xl font-black text-purple-700 truncate" title={formatCurrency(reportData?.customers.averageCustomerLTV || 0)}>
                   {formatCurrency(reportData?.customers.averageCustomerLTV || 0)}
                 </p>
               </div>

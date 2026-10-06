@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import { X, CheckCircle2, Hotel, Car, Ticket, Calendar, Hash, Phone, User } from "lucide-react";
 
 interface ConfirmItemModalProps {
@@ -40,6 +41,7 @@ export function ConfirmItemModal({
   isOpen,
   onClose,
 }: ConfirmItemModalProps) {
+  useModalScrollLock(isOpen);
   const { updateBookingItem } = useBooking();
 
   const formik = useFormik({

@@ -95,21 +95,21 @@ export function PostTourReviewCard({
   };
 
   return (
-    <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-5">
+    <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-5 shadow-2xs space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+      <div className="flex flex-col min-[420px]:flex-row items-start min-[420px]:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-amber-500" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+          <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 leading-tight">
             Post-Tour Quality & Debrief Review
           </h3>
         </div>
         {existingReview ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-            <CheckCircle2 className="h-3 w-3" /> Review Recorded
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full shrink-0 whitespace-nowrap">
+            <CheckCircle2 className="h-3 w-3 shrink-0" /> Review Recorded
           </span>
         ) : (
-          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full shrink-0 whitespace-nowrap">
             Pending Post-Tour Review
           </span>
         )}
@@ -278,7 +278,7 @@ export function PostTourReviewCard({
             type="button"
             onClick={handleSaveReview}
             disabled={saving}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold h-9 px-4 cursor-pointer shadow-xs"
+            className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold h-9 px-4 cursor-pointer shadow-xs"
           >
             {saving ? (
               <>

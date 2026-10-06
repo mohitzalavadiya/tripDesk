@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import {
   X,
   Compass,
@@ -44,6 +45,7 @@ export function ActivityConfirmationDialog({
   onClose,
   onSuccess,
 }: ActivityConfirmationDialogProps) {
+  useModalScrollLock(isOpen);
   const [loading, setLoading] = React.useState(false);
 
   const activityName =

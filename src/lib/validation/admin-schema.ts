@@ -37,6 +37,17 @@ export const planCreateSchema = z.object({
   isPopular: z.boolean().default(false),
   displayOrder: z.number().int().default(0),
   isActive: z.boolean().default(true),
+  entitlements: z.object({
+    CUSTOM_AGENCY_LOGO: z.boolean().optional(),
+    FEEDBACK_REVIEWS: z.boolean().optional(),
+    CUSTOMER_INSIGHTS: z.boolean().optional(),
+    REPORTS_ANALYTICS: z.boolean().optional(),
+  }).optional().nullable(),
+  usageLimits: z.object({
+    TRIPS: z.number().int().min(0).nullable().optional(),
+    QUOTATIONS: z.number().int().min(0).nullable().optional(),
+    BOOKINGS: z.number().int().min(0).nullable().optional(),
+  }).optional().nullable(),
 });
 
 export type PlanCreateInput = z.infer<typeof planCreateSchema>;
@@ -51,6 +62,17 @@ export const planUpdateSchema = z.object({
   isPopular: z.boolean().optional(),
   displayOrder: z.number().int().optional(),
   isActive: z.boolean().optional(),
+  entitlements: z.object({
+    CUSTOM_AGENCY_LOGO: z.boolean().optional(),
+    FEEDBACK_REVIEWS: z.boolean().optional(),
+    CUSTOMER_INSIGHTS: z.boolean().optional(),
+    REPORTS_ANALYTICS: z.boolean().optional(),
+  }).optional().nullable(),
+  usageLimits: z.object({
+    TRIPS: z.number().int().min(0).nullable().optional(),
+    QUOTATIONS: z.number().int().min(0).nullable().optional(),
+    BOOKINGS: z.number().int().min(0).nullable().optional(),
+  }).optional().nullable(),
 });
 
 export type PlanUpdateInput = z.infer<typeof planUpdateSchema>;

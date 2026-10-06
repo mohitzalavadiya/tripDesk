@@ -4,9 +4,12 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { FileText, ArrowLeft, Loader2, Plus, AlertCircle, Sparkles, Compass } from "lucide-react";
+import { FileText, ArrowLeft, Loader2, Plus, AlertCircle, AlertTriangle, Sparkles, Compass } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { QuotaExceededCard } from "@/components/shared/quota-exceeded-card";
+import { ReadOnlyModeCard } from "@/components/shared/read-only-mode-card";
+import { useSubscription } from "@/context/subscription-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -42,9 +45,21 @@ const createQuotationValidationSchema = Yup.object().shape({
 
 export default function NewQuotationPage() {
   const router = useRouter();
+  const {
+    canCreate,
+    incrementUsage,
+    refreshSubscription,
+    loading: subscriptionLoading,
+    overview,
+    isReadOnly: subReadOnly,
+    readOnlyReason,
+  } = useSubscription();
   const [trips, setTrips] = React.useState<TripWithRelations[]>([]);
   const [loadingTrips, setLoadingTrips] = React.useState(true);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
+
+  const effectiveReadOnly = isReadOnly || subReadOnly;
+  const decision = canCreate("QUOTATIONS");
 
   const formik = useFormik({
     initialValues: {
@@ -69,6 +84,7 @@ export default function NewQuotationPage() {
         });
 
         if (res.success && res.data) {
+          incrementUsage("QUOTATIONS");
           toast.success(`Quotation ${res.data.quotationNumber} generated successfully!`);
           router.push(`/trips/${values.selectedTripId}/quotation`);
         }
@@ -76,6 +92,9 @@ export default function NewQuotationPage() {
         if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
           setIsReadOnly(true);
           toast.error("Subscription expired. Read-only mode is active.");
+        } else if (err?.code === "QUOTA_EXCEEDED" || err?.statusCode === 403) {
+          await refreshSubscription();
+          toast.error("Quotation creation quota limit reached for this billing period.");
         } else {
           toast.error(err?.message || "Failed to generate quotation.");
         }
@@ -89,12 +108,13 @@ export default function NewQuotationPage() {
     return formik.touched[field] && formik.errors[field] ? (formik.errors[field] as string) : null;
   };
 
-  // Load active trips
+  // Load active trips from API
   React.useEffect(() => {
     async function loadTrips() {
       try {
         setLoadingTrips(true);
         const res = await tripClient.getTrips({ limit: 100 });
+
         if (res.success && res.data) {
           setTrips(res.data);
           if (res.data.length > 0 && !formik.values.selectedTripId) {
@@ -126,8 +146,48 @@ export default function NewQuotationPage() {
           ]}
         />
 
-        <div className="max-w-2xl mx-auto w-full">
-          <form onSubmit={formik.handleSubmit} noValidate className="space-y-6">
+        {/* Direct URL Guards (Read-Only Mode takes precedence over Quota) */}
+        {!subscriptionLoading && effectiveReadOnly ? (
+          <ReadOnlyModeCard
+            resourceName="Quotation"
+            reason={readOnlyReason}
+            backHref="/quotations"
+            backLabel="Back to Quotations"
+          />
+        ) : !subscriptionLoading && !decision.allowed && decision.reason === "QUOTA_EXCEEDED" ? (
+          <QuotaExceededCard
+            resourceName="Quotation"
+            currentUsage={decision.currentUsage}
+            limit={decision.limit}
+            planName={overview?.subscription?.plan?.name}
+            backHref="/quotations"
+            backLabel="Back to Quotations"
+          />
+        ) : (
+          <>
+            {!decision.isExceeded && decision.remaining !== null && decision.remaining <= 2 && decision.remaining > 0 && (
+              <div className="max-w-2xl mx-auto p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+                  <div>
+                    <p className="font-bold">Approaching Quota Limit ({decision.currentUsage} / {decision.limit} Quotations Created)</p>
+                    <p className="text-[11px] text-amber-700 font-normal mt-0.5">
+                      Only {decision.remaining} quotation{decision.remaining > 1 ? "s" : ""} remaining in your current billing cycle.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => router.push("/subscription")}
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 h-auto rounded-xl shrink-0 cursor-pointer"
+                >
+                  Upgrade
+                </Button>
+              </div>
+            )}
+
+            <div className="max-w-2xl mx-auto w-full">
+              <form onSubmit={formik.handleSubmit} noValidate className="space-y-6">
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-5">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-2">
                 <Compass className="h-4 w-4 text-indigo-600" />
@@ -286,7 +346,9 @@ export default function NewQuotationPage() {
             </div>
           </form>
         </div>
-      </div>
-    </div>
+      </>
+    )}
+  </div>
+</div>
   );
 }

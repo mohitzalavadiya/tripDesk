@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { entitlementService } from "@/lib/services/entitlement-service";
 import {
   FeedbackFilterInput,
   FeedbackCreateInput,
@@ -24,6 +25,11 @@ export interface CustomerPublicFeedbackView {
   createdAt: string;
 }
 
+export interface PublicReviewLinksView {
+  googleReviewUrl?: string | null;
+  tripAdvisorReviewUrl?: string | null;
+}
+
 export interface PublicFeedbackStatusResponse {
   isEligible: boolean;
   reason?: string;
@@ -41,6 +47,7 @@ export interface PublicFeedbackStatusResponse {
   agency: {
     name: string;
   } | null;
+  reviewLinks?: PublicReviewLinksView | null;
 }
 
 export interface FeedbackStats {
@@ -87,6 +94,8 @@ export const feedbackService = {
    * 1. List feedbacks with tenant isolation, filtering, and summary statistics
    */
   async listFeedbacks(agencyId: string, filter?: FeedbackFilterInput) {
+    await entitlementService.checkFeatureAllowed(agencyId, "FEEDBACK_REVIEWS");
+
     const where: Prisma.CustomerFeedbackWhereInput = {
       agencyId,
     };
@@ -239,6 +248,8 @@ export const feedbackService = {
    * 2. Get single feedback with strict tenant isolation
    */
   async getFeedback(agencyId: string, feedbackId: string): Promise<AgencyFeedbackItem | null> {
+    await entitlementService.checkFeatureAllowed(agencyId, "FEEDBACK_REVIEWS");
+
     const f: any = await prisma.customerFeedback.findFirst({
       where: { id: feedbackId, agencyId },
       include: {
@@ -282,6 +293,8 @@ export const feedbackService = {
    * 3. Create feedback manually on behalf of customer
    */
   async createFeedback(agencyId: string, input: FeedbackCreateInput) {
+    await entitlementService.checkFeatureAllowed(agencyId, "FEEDBACK_REVIEWS");
+
     // Validate customer and trip ownership
     const customer = await prisma.customer.findFirst({
       where: { id: input.customerId, agencyId },
@@ -352,6 +365,8 @@ export const feedbackService = {
     feedbackId: string,
     input: FeedbackUpdateRecoveryInput
   ) {
+    await entitlementService.checkFeatureAllowed(agencyId, "FEEDBACK_REVIEWS");
+
     const feedback = await prisma.customerFeedback.findFirst({
       where: { id: feedbackId, agencyId },
     });
@@ -394,7 +409,20 @@ export const feedbackService = {
       include: {
         trip: {
           include: {
-            agency: { select: { id: true, name: true, phone: true, email: true } },
+            agency: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                email: true,
+                communicationSetting: {
+                  select: {
+                    googleReviewUrl: true,
+                    tripAdvisorReviewUrl: true,
+                  },
+                },
+              },
+            },
             customer: { select: { id: true, name: true, phone: true, email: true } },
             tripOperation: true,
             bookings: {
@@ -418,7 +446,20 @@ export const feedbackService = {
         archivedAt: null,
       },
       include: {
-        agency: { select: { id: true, name: true, phone: true, email: true } },
+        agency: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            communicationSetting: {
+              select: {
+                googleReviewUrl: true,
+                tripAdvisorReviewUrl: true,
+              },
+            },
+          },
+        },
         customer: { select: { id: true, name: true, phone: true, email: true } },
         tripOperation: true,
         bookings: {
@@ -447,6 +488,7 @@ export const feedbackService = {
         trip: null,
         customer: null,
         agency: null,
+        reviewLinks: null,
       };
     }
 
@@ -498,6 +540,10 @@ export const feedbackService = {
       },
       agency: {
         name: trip.agency.name,
+      },
+      reviewLinks: {
+        googleReviewUrl: trip.agency?.communicationSetting?.googleReviewUrl || null,
+        tripAdvisorReviewUrl: trip.agency?.communicationSetting?.tripAdvisorReviewUrl || null,
       },
     };
   },
@@ -610,6 +656,10 @@ export const feedbackService = {
       travelAgain: feedbackRecord.travelAgain,
       comments: feedbackRecord.comments,
       createdAt: feedbackRecord.createdAt.toISOString(),
+      reviewLinks: {
+        googleReviewUrl: trip.agency?.communicationSetting?.googleReviewUrl || null,
+        tripAdvisorReviewUrl: trip.agency?.communicationSetting?.tripAdvisorReviewUrl || null,
+      },
     };
   },
 };

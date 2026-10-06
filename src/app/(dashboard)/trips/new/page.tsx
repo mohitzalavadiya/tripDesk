@@ -7,6 +7,9 @@ import * as Yup from "yup";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { DestinationMultiSelect } from "@/components/shared/destination-multi-select";
+import { QuotaExceededCard } from "@/components/shared/quota-exceeded-card";
+import { ReadOnlyModeCard } from "@/components/shared/read-only-mode-card";
+import { useSubscription } from "@/context/subscription-context";
 import { customerClient, tripClient, destinationClient } from "@/lib/api-client";
 import { Customer, Destination, TripStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -20,6 +23,7 @@ import {
   Info,
   Loader2,
   AlertCircle,
+  AlertTriangle,
   Plus,
 } from "lucide-react";
 
@@ -75,6 +79,15 @@ function NewTripForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerIdParam = searchParams.get("customerId");
+  const {
+    canCreate,
+    incrementUsage,
+    refreshSubscription,
+    loading: subscriptionLoading,
+    overview,
+    isReadOnly: subReadOnly,
+    readOnlyReason,
+  } = useSubscription();
 
   // State
   const [customers, setCustomers] = React.useState<Customer[]>([]);
@@ -83,6 +96,9 @@ function NewTripForm() {
   const [loadingDestinations, setLoadingDestinations] = React.useState(true);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [apiError, setApiError] = React.useState<string | null>(null);
+
+  const effectiveReadOnly = isReadOnly || subReadOnly;
+  const decision = canCreate("TRIPS");
 
   // Fetch real customers and active destinations from API
   React.useEffect(() => {
@@ -145,6 +161,7 @@ function NewTripForm() {
         });
 
         if (res.success && res.data) {
+          incrementUsage("TRIPS");
           toast.success(`Trip "${res.data.title}" created successfully.`);
           router.push(`/trips/${res.data.id}`);
         }
@@ -152,6 +169,10 @@ function NewTripForm() {
         if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
           setIsReadOnly(true);
           toast.error("Subscription expired. Read-only mode is active.");
+        } else if (err?.code === "QUOTA_EXCEEDED" || err?.statusCode === 403) {
+          await refreshSubscription();
+          setApiError("Trip creation quota limit reached for this billing period.");
+          toast.error("Trip quota exceeded. Please upgrade to continue creating trips.");
         } else {
           setApiError(err?.message || "Failed to create trip workspace. Please try again.");
           toast.error(err?.message || "Failed to create trip.");
@@ -201,17 +222,57 @@ function NewTripForm() {
           ]}
         />
 
-        {apiError && (
-          <div className="max-w-4xl mx-auto p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-            <span>{apiError}</span>
-          </div>
-        )}
+        {/* Direct URL Guards (Read-Only Mode takes precedence over Quota) */}
+        {!subscriptionLoading && effectiveReadOnly ? (
+          <ReadOnlyModeCard
+            resourceName="Trip"
+            reason={readOnlyReason}
+            backHref="/trips"
+            backLabel="Back to Trips"
+          />
+        ) : !subscriptionLoading && !decision.allowed && decision.reason === "QUOTA_EXCEEDED" ? (
+          <QuotaExceededCard
+            resourceName="Trip"
+            currentUsage={decision.currentUsage}
+            limit={decision.limit}
+            planName={overview?.subscription?.plan?.name}
+            backHref="/trips"
+            backLabel="Back to Trips"
+          />
+        ) : (
+          <>
+            {!decision.isExceeded && decision.remaining !== null && decision.remaining <= 2 && decision.remaining > 0 && (
+              <div className="max-w-4xl mx-auto p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+                  <div>
+                    <p className="font-bold">Approaching Quota Limit ({decision.currentUsage} / {decision.limit} Trips Created)</p>
+                    <p className="text-[11px] text-amber-700 font-normal mt-0.5">
+                      Only {decision.remaining} trip{decision.remaining > 1 ? "s" : ""} remaining in your current billing cycle.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => router.push("/subscription")}
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 h-auto rounded-xl shrink-0 cursor-pointer"
+                >
+                  Upgrade
+                </Button>
+              </div>
+            )}
 
-        <div className="max-w-4xl mx-auto w-full">
-          <form onSubmit={formik.handleSubmit} className="space-y-6">
+            {apiError && (
+              <div className="max-w-4xl mx-auto p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                <span>{apiError}</span>
+              </div>
+            )}
+
+            <div className="max-w-4xl mx-auto w-full">
+              <form onSubmit={formik.handleSubmit} className="space-y-6">
             {/* Main Details block */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-6">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Compass className="h-5 w-5 text-indigo-600" />
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
@@ -248,7 +309,7 @@ function NewTripForm() {
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200">
                       {customers.map((c) => (
-                        <SelectItem key={c.id} value={c.id} className="text-xs">
+                         <SelectItem key={c.id} value={c.id} className="text-xs">
                           {c.name} ({c.phone})
                         </SelectItem>
                       ))}
@@ -339,7 +400,7 @@ function NewTripForm() {
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-6">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Calendar className="h-5 w-5 text-indigo-600" />
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
@@ -398,7 +459,7 @@ function NewTripForm() {
             </div>
 
             {/* Notes Block */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-4">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
                   Planning Notes / Special Client Requests
@@ -420,27 +481,27 @@ function NewTripForm() {
             </div>
 
             {/* Actions panel */}
-            <div className="flex items-center justify-between gap-4 pt-4 border-t border-slate-100">
-              <div className="flex gap-2 text-slate-400 text-xs leading-normal">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-100">
+              <div className="flex items-start gap-2 text-slate-400 text-xs leading-normal">
                 <Info className="h-4 w-4 shrink-0 text-slate-400 mt-0.5" />
                 <span>
                   After creating the workspace, you can manage day-by-day itineraries and travelers.
                 </span>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => router.push("/trips")}
-                  className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-10 px-5 cursor-pointer"
+                  className="flex-1 sm:flex-initial bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-10 px-4 cursor-pointer justify-center"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={formik.isSubmitting || isReadOnly}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-5 cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                  className="flex-1 sm:flex-initial bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-4 cursor-pointer shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 whitespace-nowrap"
                 >
                   {formik.isSubmitting ? (
                     <>
@@ -458,7 +519,9 @@ function NewTripForm() {
             </div>
           </form>
         </div>
-      </div>
-    </div>
+      </>
+    )}
+  </div>
+</div>
   );
 }

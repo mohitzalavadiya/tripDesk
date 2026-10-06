@@ -6,6 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   communicationClient,
   CommunicationSettings,
   CommunicationLogItem,
@@ -15,6 +22,7 @@ import {
   TaxRateItem,
   AgencyTaxProfileData,
 } from "@/lib/api-client/tax-client";
+import { useSubscription } from "@/context/subscription-context";
 import { TaxMode, GstTreatment } from "@prisma/client";
 import {
   Mail,
@@ -35,15 +43,47 @@ import {
   Building2,
   Percent,
   HelpCircle,
+  Lock,
+  Image as ImageIcon,
+  Upload,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = React.useState<"communication" | "tax">("communication");
+  const { isFeatureAllowed, overview, isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
+  const [activeTab, setActiveTab] = React.useState<"communication" | "tax" | "branding">("communication");
   const [settings, setSettings] = React.useState<CommunicationSettings | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [runningSweep, setRunningSweep] = React.useState(false);
+
+  // Logo & Branding state
+  const [logoAllowed, setLogoAllowed] = React.useState(true);
+  const [agencyLogoUrl, setAgencyLogoUrl] = React.useState<string | null>(null);
+  const [selectedLogoFile, setSelectedLogoFile] = React.useState<File | null>(null);
+  const [selectedLogoPreview, setSelectedLogoPreview] = React.useState<string | null>(null);
+  const [savingLogo, setSavingLogo] = React.useState(false);
+  const [confirmRemoveLogoOpen, setConfirmRemoveLogoOpen] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Sync logo entitlement and URL from central subscription context
+  React.useEffect(() => {
+    const isLogoEntitled = isFeatureAllowed("CUSTOM_AGENCY_LOGO");
+    setLogoAllowed(isLogoEntitled);
+
+    if (overview?.logo?.customLogoUrl) {
+      setAgencyLogoUrl(overview.logo.customLogoUrl);
+    } else if (overview?.agency?.logo) {
+      setAgencyLogoUrl(overview.agency.logo);
+    } else {
+      setAgencyLogoUrl(null);
+    }
+  }, [isFeatureAllowed, overview]);
 
   // Tax Profile state
   const [taxRates, setTaxRates] = React.useState<TaxRateItem[]>([]);
@@ -100,6 +140,111 @@ export default function SettingsPage() {
       setLoading(false);
     }
   }, []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("File exceeds 2MB limit. Please choose a smaller image.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+    if (!allowedTypes.includes(file.type.toLowerCase())) {
+      toast.error("Unsupported format. Please select a PNG, JPEG, or WEBP image.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    if (selectedLogoPreview) {
+      URL.revokeObjectURL(selectedLogoPreview);
+    }
+
+    setSelectedLogoFile(file);
+    setSelectedLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleCancelSelectedFile = () => {
+    if (selectedLogoPreview) {
+      URL.revokeObjectURL(selectedLogoPreview);
+    }
+    setSelectedLogoFile(null);
+    setSelectedLogoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleUploadLogo = async () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    if (!logoAllowed) {
+      toast.error("Custom agency logo is a Professional feature. Please upgrade your plan.");
+      return;
+    }
+    if (!selectedLogoFile) {
+      toast.error("Please select a logo image file to upload.");
+      return;
+    }
+
+    setSavingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedLogoFile);
+
+      const res = await fetch("/api/agency/logo", {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to upload agency logo.");
+      }
+
+      setAgencyLogoUrl(json.data.logo);
+      handleCancelSelectedFile();
+      await refreshSubscription();
+      toast.success("Custom agency logo uploaded successfully!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upload agency logo.");
+    } finally {
+      setSavingLogo(false);
+    }
+  };
+
+  const handleConfirmRemoveLogo = async () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    if (!logoAllowed) {
+      toast.error("Custom agency logo is a Professional feature. Please upgrade your plan.");
+      return;
+    }
+
+    setSavingLogo(true);
+    try {
+      const res = await fetch("/api/agency/logo", {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to remove agency logo.");
+      }
+
+      setAgencyLogoUrl(null);
+      setConfirmRemoveLogoOpen(false);
+      handleCancelSelectedFile();
+      await refreshSubscription();
+      toast.success("Custom agency logo removed.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove agency logo.");
+    } finally {
+      setSavingLogo(false);
+    }
+  };
 
   const fetchLogs = React.useCallback(async () => {
     try {
@@ -257,28 +402,44 @@ export default function SettingsPage() {
 
         <div className="max-w-6xl w-full mx-auto space-y-6">
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-200">
+        <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto no-scrollbar scrollbar-none flex-nowrap pb-px">
           <button
             onClick={() => setActiveTab("communication")}
-            className={`px-4 py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            className={`px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === "communication"
                 ? "border-indigo-600 text-indigo-600 bg-indigo-50/30 rounded-t-lg"
                 : "border-transparent text-slate-500 hover:text-slate-900"
             }`}
           >
-            <MessageSquare className="h-4 w-4" />
+            <MessageSquare className="h-4 w-4 shrink-0" />
             WhatsApp & Email Automation
           </button>
           <button
             onClick={() => setActiveTab("tax")}
-            className={`px-4 py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            className={`px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === "tax"
                 ? "border-indigo-600 text-indigo-600 bg-indigo-50/30 rounded-t-lg"
                 : "border-transparent text-slate-500 hover:text-slate-900"
             }`}
           >
-            <Receipt className="h-4 w-4" />
+            <Receipt className="h-4 w-4 shrink-0" />
             Agency Tax & GST Profile
+          </button>
+          <button
+            onClick={() => setActiveTab("branding")}
+            className={`px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+              activeTab === "branding"
+                ? "border-indigo-600 text-indigo-600 bg-indigo-50/30 rounded-t-lg"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <ImageIcon className="h-4 w-4 shrink-0" />
+            Agency Branding & Logo
+            {!logoAllowed && (
+              <span className="text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                <Lock className="h-2.5 w-2.5" /> PRO
+              </span>
+            )}
           </button>
         </div>
 
@@ -294,10 +455,10 @@ export default function SettingsPage() {
               <div className="lg:col-span-2 space-y-6">
                 <form onSubmit={handleSaveSettings} className="space-y-6">
                   {/* Communication Channels Box */}
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+                  <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                        <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
                           <Sliders className="h-4 w-4" />
                         </div>
                         <div>
@@ -311,31 +472,31 @@ export default function SettingsPage() {
                       {/* Email Toggle */}
                       <div
                         onClick={() => setEmailEnabled(!emailEnabled)}
-                        className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3.5 ${
+                        className={`p-3 sm:p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
                           emailEnabled
                             ? "bg-indigo-50/40 border-indigo-200 shadow-2xs"
                             : "bg-slate-50 border-slate-200 opacity-60"
                         }`}
                       >
                         <div
-                          className={`h-9 w-9 rounded-lg flex items-center justify-center font-bold ${
+                          className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center font-bold shrink-0 mt-0.5 ${
                             emailEnabled ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-500"
                           }`}
                         >
-                          <Mail className="h-4.5 w-4.5" />
+                          <Mail className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1.5 flex-wrap">
                             <span className="text-xs font-bold text-slate-900">Email Delivery</span>
                             <span
-                              className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
+                              className={`text-[9px] sm:text-[10px] font-extrabold uppercase px-1.5 sm:px-2 py-0.5 rounded-md shrink-0 ${
                                 emailEnabled ? "bg-indigo-100 text-indigo-800" : "bg-slate-200 text-slate-600"
                               }`}
                             >
                               {emailEnabled ? "ACTIVE" : "DISABLED"}
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-500 mt-1">
+                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                             Sends responsive HTML proposals, confirmations, and milestone invoices.
                           </p>
                         </div>
@@ -344,31 +505,31 @@ export default function SettingsPage() {
                       {/* WhatsApp Toggle */}
                       <div
                         onClick={() => setWhatsappEnabled(!whatsappEnabled)}
-                        className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3.5 ${
+                        className={`p-3 sm:p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
                           whatsappEnabled
                             ? "bg-emerald-50/40 border-emerald-200 shadow-2xs"
                             : "bg-slate-50 border-slate-200 opacity-60"
                         }`}
                       >
                         <div
-                          className={`h-9 w-9 rounded-lg flex items-center justify-center font-bold ${
+                          className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center font-bold shrink-0 mt-0.5 ${
                             whatsappEnabled ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500"
                           }`}
                         >
-                          <MessageSquare className="h-4.5 w-4.5" />
+                          <MessageSquare className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1.5 flex-wrap">
                             <span className="text-xs font-bold text-slate-900">WhatsApp Delivery</span>
                             <span
-                              className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
+                              className={`text-[9px] sm:text-[10px] font-extrabold uppercase px-1.5 sm:px-2 py-0.5 rounded-md shrink-0 ${
                                 whatsappEnabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"
                               }`}
                             >
                               {whatsappEnabled ? "ACTIVE" : "DISABLED"}
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-500 mt-1">
+                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                             Sends structured WhatsApp template updates and instant itinerary links.
                           </p>
                         </div>
@@ -400,10 +561,10 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Automation Rules Box */}
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+                  <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="h-8 w-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                        <div className="h-8 w-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
                           <Sparkles className="h-4 w-4" />
                         </div>
                         <div>
@@ -428,7 +589,7 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={autoQuotationSent}
                           onChange={(e) => setAutoQuotationSent(e.target.checked)}
-                          className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                          className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0 ml-2"
                         />
                       </label>
 
@@ -444,7 +605,7 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={autoBookingConfirmed}
                           onChange={(e) => setAutoBookingConfirmed(e.target.checked)}
-                          className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                          className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0 ml-2"
                         />
                       </label>
 
@@ -461,11 +622,11 @@ export default function SettingsPage() {
                             type="checkbox"
                             checked={autoPaymentReminders}
                             onChange={(e) => setAutoPaymentReminders(e.target.checked)}
-                            className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                            className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0 ml-2"
                           />
                         </div>
                         {autoPaymentReminders && (
-                          <div className="pt-2 flex items-center gap-2 text-xs text-slate-600">
+                          <div className="pt-2 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-slate-600">
                             <span>Remind customer</span>
                             <Input
                               type="number"
@@ -473,7 +634,7 @@ export default function SettingsPage() {
                               max={30}
                               value={paymentReminderDays}
                               onChange={(e) => setPaymentReminderDays(parseInt(e.target.value, 10) || 1)}
-                              className="w-16 h-7 text-xs bg-white"
+                              className="w-14 sm:w-16 h-7 text-xs bg-white inline-block text-center font-bold"
                             />
                             <span>days before milestone due date.</span>
                           </div>
@@ -493,11 +654,11 @@ export default function SettingsPage() {
                             type="checkbox"
                             checked={autoTravelReminders}
                             onChange={(e) => setAutoTravelReminders(e.target.checked)}
-                            className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                            className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0 ml-2"
                           />
                         </div>
                         {autoTravelReminders && (
-                          <div className="pt-2 flex items-center gap-2 text-xs text-slate-600">
+                          <div className="pt-2 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-slate-600">
                             <span>Send departure alert</span>
                             <Input
                               type="number"
@@ -505,7 +666,7 @@ export default function SettingsPage() {
                               max={30}
                               value={travelReminderDays}
                               onChange={(e) => setTravelReminderDays(parseInt(e.target.value, 10) || 1)}
-                              className="w-16 h-7 text-xs bg-white"
+                              className="w-14 sm:w-16 h-7 text-xs bg-white inline-block text-center font-bold"
                             />
                             <span>days before tour start date.</span>
                           </div>
@@ -524,17 +685,17 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={autoFeedbackRequests}
                           onChange={(e) => setAutoFeedbackRequests(e.target.checked)}
-                          className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                          className="h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0 ml-2"
                         />
                       </label>
                     </div>
                   </div>
 
-                  <div className="flex justify-end">
+                  <div className="flex justify-end pt-2">
                     <Button
                       type="submit"
                       disabled={saving}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 px-6 rounded-xl cursor-pointer shadow-2xs gap-1.5"
+                      className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 px-6 rounded-xl cursor-pointer shadow-2xs gap-1.5"
                     >
                       <Check className="h-4 w-4" />
                       {saving ? "Saving Changes..." : "Save Communication Settings"}
@@ -641,11 +802,11 @@ export default function SettingsPage() {
                       ))}
                     </div>
                   )}
-                </div>
               </div>
             </div>
-          )
-        ) : (
+          </div>
+        )
+      ) : activeTab === "tax" ? (
           /* ─── AGENCY TAX & GST SETTINGS TAB ─── */
           loadingTax ? (
             <div className="bg-white p-12 rounded-2xl border border-slate-200 flex flex-col items-center justify-center space-y-3">
@@ -655,7 +816,7 @@ export default function SettingsPage() {
           ) : (
             <form onSubmit={handleSaveTaxProfile} className="space-y-6">
               {/* Informational Scope Callout */}
-              <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5">
+              <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-3.5 sm:p-5 flex items-start gap-3 sm:gap-3.5">
                 <div className="h-8 w-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
                   <Receipt className="h-4.5 w-4.5" />
                 </div>
@@ -669,10 +830,10 @@ export default function SettingsPage() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Card 1: GST Registration Profile */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+                <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                      <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
                         <Building2 className="h-4 w-4" />
                       </div>
                       <div>
@@ -685,18 +846,18 @@ export default function SettingsPage() {
                   {/* Registered Toggle Card */}
                   <div
                     onClick={() => setIsGstRegistered(!isGstRegistered)}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                    className={`p-3 sm:p-4 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-3 ${
                       isGstRegistered
                         ? "bg-emerald-50/40 border-emerald-200 shadow-2xs"
                         : "bg-slate-50 border-slate-200"
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <span className="text-xs font-bold text-slate-900">GST Registered Business</span>
                         <Badge
                           variant="outline"
-                          className={`text-[10px] font-extrabold uppercase px-2 py-0.5 ${
+                          className={`text-[9px] sm:text-[10px] font-extrabold uppercase px-1.5 sm:px-2 py-0.5 shrink-0 ${
                             isGstRegistered
                               ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                               : "bg-slate-200 text-slate-600 border-slate-300"
@@ -705,7 +866,7 @@ export default function SettingsPage() {
                           {isGstRegistered ? "REGISTERED" : "UNREGISTERED"}
                         </Badge>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                         Enable if your agency has an active GSTIN to include on commercial proposals and invoices.
                       </p>
                     </div>
@@ -714,7 +875,7 @@ export default function SettingsPage() {
                       checked={isGstRegistered}
                       onChange={(e) => setIsGstRegistered(e.target.checked)}
                       onClick={(e) => e.stopPropagation()}
-                      className="h-5 w-5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                      className="h-5 w-5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer shrink-0 mt-0.5"
                     />
                   </div>
 
@@ -788,10 +949,10 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Card 2: Commercial Quotation Defaults */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+                <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                      <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
                         <Percent className="h-4 w-4" />
                       </div>
                       <div>
@@ -803,23 +964,32 @@ export default function SettingsPage() {
 
                   {/* Default Tax Rate Selector */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-700 flex flex-wrap items-center justify-between gap-1">
                       <span>Default Tax Rate (Catalog Presets)</span>
-                      <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                      <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded shrink-0">
                         Selected: {defaultGstRate}%
                       </span>
                     </label>
-                    <select
-                      value={defaultGstRate}
-                      onChange={(e) => setDefaultGstRate(Number(e.target.value))}
-                      className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-medium cursor-pointer"
+                    <Select
+                      value={String(defaultGstRate)}
+                      onValueChange={(val) => {
+                        if (val !== undefined && val !== null) {
+                          setDefaultGstRate(Number(val));
+                        }
+                      }}
+                      disabled={savingTax}
                     >
-                      {taxRates.map((rateItem) => (
-                        <option key={rateItem.id} value={rateItem.rate}>
-                          {rateItem.name} — ({rateItem.rate === 0 ? "0% No Tax / Exempt" : `${rateItem.rate}% Standard Rate`})
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full h-9 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {taxRates.map((rateItem) => (
+                          <SelectItem key={rateItem.id} value={String(rateItem.rate)} className="text-xs">
+                            {rateItem.name} — ({rateItem.rate === 0 ? "0% No Tax / Exempt" : `${rateItem.rate}% Standard Rate`})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <p className="text-[10px] text-slate-400">
                       Applied at the quotation/package total level (no item-level rate splits).
                     </p>
@@ -930,7 +1100,7 @@ export default function SettingsPage() {
                 <Button
                   type="submit"
                   disabled={savingTax}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 px-6 rounded-xl cursor-pointer shadow-2xs gap-1.5"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 px-6 rounded-xl cursor-pointer shadow-2xs gap-1.5"
                 >
                   <Check className="h-4 w-4" />
                   {savingTax ? "Saving Tax Profile..." : "Save Agency Tax Profile"}
@@ -938,9 +1108,230 @@ export default function SettingsPage() {
               </div>
             </form>
           )
+        ) : (
+          /* ─── AGENCY BRANDING & LOGO TAB ─── */
+          <div className="space-y-6">
+            {!logoAllowed && (
+              <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-amber-100 text-amber-700 rounded-xl shrink-0 mt-0.5">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-amber-950 flex items-center gap-2">
+                        <span>Custom Agency Logo Management — Professional Feature</span>
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">
+                          Starter Locked
+                        </span>
+                      </h4>
+                      <p className="text-xs text-amber-800 leading-relaxed mt-1">
+                        Uploading a custom agency logo for PDF proposals, vouchers, and customer portals is available with the <strong>Professional Plan</strong>. Upgrade to customize your agency brand identity.
+                      </p>
+                    </div>
+                  </div>
+                  <Link href="/subscription" className="shrink-0">
+                    <Button type="button" className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-9 px-4 rounded-xl cursor-pointer">
+                      Upgrade to Professional
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white p-4 sm:p-6 md:p-8 rounded-3xl border border-slate-200/90 shadow-2xs space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                  <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
+                    <ImageIcon className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900">Custom Agency Logo</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Displayed on quotation PDFs, booking vouchers, and public customer share links.
+                    </p>
+                  </div>
+                </div>
+                {logoAllowed ? (
+                  <span className="self-start sm:self-auto text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full shrink-0">
+                    Feature Enabled
+                  </span>
+                ) : (
+                  <span className="self-start sm:self-auto text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-700 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full flex items-center gap-1 shrink-0">
+                    <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> Locked on Starter
+                  </span>
+                )}
+              </div>
+
+              {/* Hidden File Input */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                disabled={!logoAllowed || savingLogo}
+              />
+
+              {/* Existing Logo Display */}
+              {agencyLogoUrl && !selectedLogoFile && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={agencyLogoUrl}
+                    alt="Agency Logo"
+                    className="max-h-16 sm:max-h-20 max-w-44 sm:max-w-48 object-contain bg-white p-2 rounded-xl border border-slate-200 shadow-2xs"
+                  />
+                  <div className="space-y-1.5 text-center sm:text-left flex-1 min-w-0 w-full">
+                    <span className="text-xs font-bold text-slate-900 block">Current Active Logo</span>
+                    <p className="text-[10px] sm:text-[11px] font-mono text-slate-400 break-all select-all line-clamp-2 max-w-full">
+                      {agencyLogoUrl}
+                    </p>
+                    {logoAllowed && (
+                      <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={savingLogo}
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 h-8 px-3 rounded-xl border-indigo-200 cursor-pointer"
+                        >
+                          <Upload className="h-3.5 w-3.5 mr-1" /> Change Logo
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setConfirmRemoveLogoOpen(true)}
+                          disabled={savingLogo}
+                          className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 h-8 px-3 rounded-xl border-rose-200 cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove Logo
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Staged File Preview Card */}
+              {selectedLogoFile && selectedLogoPreview && (
+                <div className="bg-indigo-50/40 border border-indigo-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={selectedLogoPreview}
+                    alt="New Logo Preview"
+                    className="max-h-16 sm:max-h-20 max-w-44 sm:max-w-48 object-contain bg-white p-2 rounded-xl border border-indigo-200 shadow-2xs"
+                  />
+                  <div className="space-y-1.5 text-center sm:text-left flex-1 min-w-0 w-full">
+                    <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-indigo-950 block">Ready to Upload</span>
+                      <span className="text-[10px] font-mono bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">
+                        {(selectedLogoFile.size / 1024).toFixed(1)} KB
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 font-medium truncate">
+                      {selectedLogoFile.name}
+                    </p>
+                    <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleUploadLogo}
+                        disabled={savingLogo}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold h-8 px-4 rounded-xl cursor-pointer"
+                      >
+                        {savingLogo ? "Uploading..." : "Confirm & Save Logo"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelSelectedFile}
+                        disabled={savingLogo}
+                        className="text-xs font-semibold text-slate-600 hover:text-slate-800 h-8 rounded-xl border-slate-200 cursor-pointer"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Dropzone (when no file selected and no existing logo, or when changing) */}
+              {!agencyLogoUrl && !selectedLogoFile && (
+                <div
+                  onClick={() => {
+                    if (!logoAllowed) {
+                      toast.error("Custom agency logo is a Professional feature. Please upgrade your plan.");
+                      return;
+                    }
+                    fileInputRef.current?.click();
+                  }}
+                  className={`p-8 text-center rounded-2xl border-2 border-dashed transition-all cursor-pointer space-y-3 ${
+                    logoAllowed
+                      ? "bg-slate-50/70 border-slate-200 hover:bg-indigo-50/30 hover:border-indigo-300"
+                      : "bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed"
+                  }`}
+                >
+                  <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-2xs">
+                    <Upload className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">
+                      {logoAllowed ? "Click to select a logo image" : "Custom Logo Locked on Starter"}
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Supports PNG, JPEG, or WEBP up to 2MB.
+                    </p>
+                  </div>
+                  {logoAllowed && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 h-8 px-4 rounded-xl"
+                    >
+                      Browse Files
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Guidance Info */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-[11px] text-slate-600 space-y-1">
+                <p className="font-bold text-slate-800">Recommended Specifications:</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-slate-500">
+                  <li>Transparent PNG or high-contrast JPG/WEBP formatted in horizontal aspect ratio (e.g. 3:1 or 4:1).</li>
+                  <li>Maximum file size: 2MB. Files are securely hosted in agency-scoped storage.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         )}
       </div>
       </div>
+
+      {/* Confirm Remove Logo Modal */}
+      <ConfirmDialog
+        open={confirmRemoveLogoOpen}
+        onOpenChange={setConfirmRemoveLogoOpen}
+        title="Remove Custom Agency Logo"
+        description="Are you sure you want to remove your custom agency logo? Your customer quotations, booking vouchers, and share links will revert to the standard TripDesk agency header."
+        confirmText="Remove Logo"
+        variant="destructive"
+        loading={savingLogo}
+        onConfirm={handleConfirmRemoveLogo}
+      />
+
+      {/* Read-Only Mode Dialog */}
+      <ReadOnlyModeDialog
+        open={showReadOnlyDialog}
+        onOpenChange={setShowReadOnlyDialog}
+        reason={readOnlyReason}
+        actionName="Modifying agency branding and logo"
+      />
     </div>
   );
 }

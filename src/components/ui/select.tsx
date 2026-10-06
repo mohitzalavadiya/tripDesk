@@ -23,7 +23,7 @@ function SelectValue({ className, children, ...props }: SelectPrimitive.Value.Pr
   return (
     <SelectPrimitive.Value
       data-slot="select-value"
-      className={cn("flex flex-1 text-left", className)}
+      className={cn("flex-1 text-left truncate min-w-0 block", className)}
       {...props}
     >
       {typeof children === "function"
@@ -48,7 +48,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white/80 hover:bg-white px-3 py-2 text-xs text-slate-800 transition-colors outline-none select-none focus:border-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 data-placeholder:text-slate-400 data-[size=default]:h-9 data-[size=sm]:h-7.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+        "flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white/80 hover:bg-white px-3 py-2 text-xs text-slate-800 transition-colors outline-none select-none focus:border-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 data-placeholder:text-slate-400 data-[size=default]:h-9 data-[size=sm]:h-7.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 overflow-hidden",
         className
       )}
       {...props}
@@ -56,7 +56,7 @@ function SelectTrigger({
       {children}
       <SelectPrimitive.Icon
         render={
-          <ChevronDownIcon className="pointer-events-none size-3.5 text-slate-400" />
+          <ChevronDownIcon className="pointer-events-none size-3.5 text-slate-400 shrink-0" />
         }
       />
     </SelectPrimitive.Trigger>

@@ -26,3 +26,6 @@ export * from "./admin-client";
 export * from "./tax-client";
 export * from "./destination-client";
 export * from "./trip-destination-client";
+export * from "./subscription-client";
+export * from "./experience-client";
+export * from "./reporting-client";

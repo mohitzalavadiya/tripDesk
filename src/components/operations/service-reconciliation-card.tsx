@@ -44,53 +44,53 @@ export function ServiceReconciliationCard({
   return (
     <div className="space-y-6">
       {/* Issues Reconciliation Stats */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-5 shadow-2xs space-y-3">
+        <div className="flex flex-col min-[440px]:flex-row items-start min-[440px]:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
           <div className="flex items-center gap-2">
             <ShieldAlert
-              className={`h-4 w-4 ${
+              className={`h-4 w-4 shrink-0 ${
                 issuesReconciliation.hasCriticalBlocker
                   ? "text-rose-600"
                   : "text-emerald-600"
               }`}
             />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 leading-tight">
               Operational Issues & Ticket Reconciliation
             </h3>
           </div>
           {issuesReconciliation.hasCriticalBlocker ? (
-            <span className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
+            <span className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full shrink-0 whitespace-nowrap">
               {issuesReconciliation.openIssues} Active Critical Blocker(s)
             </span>
           ) : (
-            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full shrink-0 whitespace-nowrap">
               All Critical Issues Resolved
             </span>
           )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 pt-1">
-          <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 sm:gap-3 pt-1">
+          <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 sm:p-3 text-center">
             <span className="text-[10px] text-slate-400 font-bold block uppercase">Total Issues</span>
             <span className="text-base font-black text-slate-900">{issuesReconciliation.totalIssues}</span>
           </div>
-          <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-3 text-center">
+          <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-2.5 sm:p-3 text-center">
             <span className="text-[10px] text-rose-500 font-bold block uppercase">Critical</span>
             <span className="text-base font-black text-rose-700">{issuesReconciliation.criticalIssues}</span>
           </div>
-          <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-3 text-center">
+          <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-2.5 sm:p-3 text-center">
             <span className="text-[10px] text-amber-500 font-bold block uppercase">High Priority</span>
             <span className="text-base font-black text-amber-700">{issuesReconciliation.highIssues}</span>
           </div>
-          <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-3 text-center">
+          <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-2.5 sm:p-3 text-center">
             <span className="text-[10px] text-blue-500 font-bold block uppercase">Open / Active</span>
             <span className="text-base font-black text-blue-700">{issuesReconciliation.openIssues}</span>
           </div>
-          <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3 text-center">
+          <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-2.5 sm:p-3 text-center">
             <span className="text-[10px] text-emerald-500 font-bold block uppercase">Resolved</span>
             <span className="text-base font-black text-emerald-700">{issuesReconciliation.resolvedIssues}</span>
           </div>
-          <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+          <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 sm:p-3 text-center">
             <span className="text-[10px] text-slate-400 font-bold block uppercase">Closed</span>
             <span className="text-base font-black text-slate-700">{issuesReconciliation.closedIssues}</span>
           </div>
@@ -98,11 +98,11 @@ export function ServiceReconciliationCard({
       </div>
 
       {/* 1. Hotel Accommodations Delivery */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-5 shadow-2xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
           <div className="flex items-center gap-2">
-            <Hotel className="h-4 w-4 text-indigo-600" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+            <Hotel className="h-4 w-4 text-indigo-600 shrink-0" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 leading-tight">
               Accommodations Planned vs Actual Delivery ({hotels.length})
             </h3>
           </div>
@@ -114,27 +114,27 @@ export function ServiceReconciliationCard({
           <div className="divide-y divide-slate-100">
             {hotels.map((h) => (
               <div key={h.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-1.5 w-full">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-bold text-slate-900 text-sm">{h.hotelName}</span>
                     <span className="text-slate-500">({h.city})</span>
                     {h.isDelivered ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-                        <CheckCircle2 className="h-3 w-3" /> Confirmed Stay
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap">
+                        <CheckCircle2 className="h-3 w-3 shrink-0" /> Confirmed Stay
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
-                        <XCircle className="h-3 w-3" /> {SERVICE_STATUS_LABELS[h.status] ?? h.status}
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap">
+                        <XCircle className="h-3 w-3 shrink-0" /> {SERVICE_STATUS_LABELS[h.status] ?? h.status}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500 font-mono">
                     <span>Planned: {h.plannedRoom}</span>
-                    <span>•</span>
+                    <span className="text-slate-300 hidden min-[360px]:inline">•</span>
                     <span>Delivered: {h.confirmedRoom}</span>
                     {h.confirmationNumber && (
                       <>
-                        <span>•</span>
+                        <span className="text-slate-300 hidden min-[360px]:inline">•</span>
                         <span className="text-indigo-600 font-semibold">Voucher: {h.confirmationNumber}</span>
                       </>
                     )}
@@ -153,11 +153,11 @@ export function ServiceReconciliationCard({
       </div>
 
       {/* 2. Fleet & Driver Dispatches */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-5 shadow-2xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
           <div className="flex items-center gap-2">
-            <Car className="h-4 w-4 text-emerald-600" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+            <Car className="h-4 w-4 text-emerald-600 shrink-0" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 leading-tight">
               Fleet & Driver Dispatches ({fleet.length})
             </h3>
           </div>
@@ -169,25 +169,25 @@ export function ServiceReconciliationCard({
           <div className="divide-y divide-slate-100">
             {fleet.map((v) => (
               <div key={v.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-1.5 w-full">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-bold text-slate-900 text-sm">{v.vehicleName}</span>
                     <span className="text-slate-500">({v.vehicleType})</span>
                     {v.isDelivered ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-                        <CheckCircle2 className="h-3 w-3" /> Duty Fulfilled
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap">
+                        <CheckCircle2 className="h-3 w-3 shrink-0" /> Duty Fulfilled
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                        <Clock className="h-3 w-3" /> {SERVICE_STATUS_LABELS[v.status] ?? v.status}
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap">
+                        <Clock className="h-3 w-3 shrink-0" /> {SERVICE_STATUS_LABELS[v.status] ?? v.status}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500 font-mono">
                     <span>Driver: {v.driverName || "Unassigned"}</span>
-                    <span>•</span>
+                    <span className="text-slate-300 hidden min-[360px]:inline">•</span>
                     <span>Contact: {v.driverPhone || "N/A"}</span>
-                    <span>•</span>
+                    <span className="text-slate-300 hidden min-[360px]:inline">•</span>
                     <span>Plate: {v.vehiclePlate || "N/A"}</span>
                   </div>
                   {v.discrepancy && (

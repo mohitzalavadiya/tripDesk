@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import {
   X,
   MessageSquare,
@@ -55,6 +56,7 @@ export function CommunicationModal({
   onClose,
   onSuccess,
 }: CommunicationModalProps) {
+  useModalScrollLock(isOpen);
   const [templateType, setTemplateType] =
     React.useState<CommunicationTemplateType>(initialTemplate);
   const [copied, setCopied] = React.useState(false);
@@ -194,17 +196,17 @@ export function CommunicationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
-      <div className="bg-white border border-slate-200/90 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
+      <div className="bg-white border border-slate-200/90 rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl space-y-3.5 sm:space-y-4 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-600 flex items-center justify-center font-bold text-sm">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0">
               <MessageSquare className="h-5 w-5" />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900">Guest Communication</h3>
-              <p className="text-xs text-slate-500 font-mono">
+            <div className="min-w-0">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">Guest Communication</h3>
+              <p className="text-xs text-slate-500 font-mono truncate">
                 {customerName} • {customerPhone || "No Phone"}
               </p>
             </div>
@@ -212,7 +214,7 @@ export function CommunicationModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
           >
             <X className="h-4 w-4" />
           </button>
@@ -257,13 +259,13 @@ export function CommunicationModal({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-between pt-3 border-t border-slate-100 gap-2">
           <Button
             type="button"
             variant="outline"
             onClick={handleCopy}
             disabled={logging}
-            className="text-xs font-bold h-9 px-3.5 border-slate-200 cursor-pointer"
+            className="text-xs font-bold h-9 px-3.5 border-slate-200 cursor-pointer w-full sm:w-auto justify-center"
           >
             {copied ? (
               <>
@@ -278,12 +280,12 @@ export function CommunicationModal({
             )}
           </Button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
             <Button
               type="button"
               variant="ghost"
               onClick={onClose}
-              className="text-xs font-semibold h-9 px-3 text-slate-500 cursor-pointer"
+              className="text-xs font-semibold h-9 px-3 text-slate-500 cursor-pointer justify-center"
             >
               Cancel
             </Button>
@@ -291,9 +293,9 @@ export function CommunicationModal({
               type="button"
               onClick={handleOpenWhatsApp}
               disabled={logging || !customerPhone}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-9 px-4 cursor-pointer shadow-xs"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-9 px-4 cursor-pointer shadow-xs justify-center whitespace-nowrap"
             >
-              <Send className="h-3.5 w-3.5 mr-1.5" />
+              <Send className="h-3.5 w-3.5 mr-1.5 shrink-0" />
               Send on WhatsApp
             </Button>
           </div>

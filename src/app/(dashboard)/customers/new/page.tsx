@@ -449,12 +449,12 @@ export default function NewCustomerPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-between gap-4 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push("/customers")}
-                className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-10 px-5 cursor-pointer"
+                className="w-full sm:w-auto bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-10 px-5 cursor-pointer justify-center"
               >
                 Cancel
               </Button>
@@ -462,7 +462,7 @@ export default function NewCustomerPage() {
               <Button
                 type="submit"
                 disabled={formik.isSubmitting || isReadOnly}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-6 cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-6 cursor-pointer shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 whitespace-nowrap"
               >
                 {formik.isSubmitting ? (
                   <>
@@ -471,7 +471,7 @@ export default function NewCustomerPage() {
                   </>
                 ) : (
                   <>
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-4 w-4 shrink-0" />
                     Save & Register Customer
                   </>
                 )}

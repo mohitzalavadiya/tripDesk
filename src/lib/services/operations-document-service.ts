@@ -2,6 +2,7 @@ import "server-only";
 
 import PDFDocument from "pdfkit";
 import { prisma } from "@/lib/prisma";
+import { pdfBrandingHelper } from "@/lib/services/pdf-branding-helper";
 import {
   ConfirmationStatus,
   DispatchStatus,
@@ -107,6 +108,11 @@ export class OperationsDocumentService {
     const documentNumber = this.generateDocumentNumber("THV", operation.trip.tripNumber || "0001", 1);
     const filename = `Hotel-Voucher-${hotelConf.confirmationNumber || documentNumber}.pdf`;
 
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: operation.agencyId,
+      logoUrl: operation.agency.logo,
+    });
+
     const buffer = await new Promise<Buffer>((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -190,7 +196,8 @@ export class OperationsDocumentService {
         const nameH = doc.heightOfString(agencyName, { width: leftWidth });
         doc.font("Helvetica").fontSize(7.5);
         const contactH = agencyContact ? doc.heightOfString(agencyContact, { width: leftWidth }) : 0;
-        const leftContentH = nameH + contactH + 46;
+        const logoH = logoBuffer ? 44 : 0;
+        const leftContentH = nameH + contactH + 46 + logoH;
 
         // Right Badge text & dynamic height measurement
         const docNumText = `VOUCHER #: ${documentNumber}`;
@@ -209,17 +216,27 @@ export class OperationsDocumentService {
         const totalRightContentH = docNumH + 3 + dateH + 2 + refH + 5 + pillH;
         const minRightBoxH = totalRightContentH + 16;
 
-        const bannerHeight = Math.max(88, leftContentH, minRightBoxH + 28);
+        const bannerHeight = Math.max(90, leftContentH, minRightBoxH + 28);
 
         // Slate 900 Hero Container with rounded corners
         doc.roundedRect(margin, margin, contentWidth, bannerHeight, 8).fill(brandDark);
 
         // Left: Agency Branding
+        let curLeftY = margin + 14;
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 18, curLeftY, { fit: [130, 40] });
+            curLeftY += 44;
+          } catch {
+            // fallback
+          }
+        }
+
         doc
           .fillColor("#FFFFFF")
           .fontSize(14)
           .font("Helvetica-Bold")
-          .text(agencyName, margin + 18, margin + 16, { width: leftWidth });
+          .text(agencyName, margin + 18, curLeftY, { width: leftWidth });
 
         doc
           .fillColor("#99F6E4")
@@ -477,53 +494,59 @@ export class OperationsDocumentService {
         const range = doc.bufferedPageRange();
         for (let i = 0; i < range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          // Top running header on multi-page documents
-          if (i > 0) {
+          try {
+            // Top running header on multi-page documents
+            if (i > 0) {
+              doc
+                .fontSize(7)
+                .font("Helvetica")
+                .fillColor(textLight)
+                .text(`Hotel Voucher • ${documentNumber} • ${hotelNameStr}`, margin, margin - 14, {
+                  width: contentWidth,
+                  align: "left",
+                });
+              doc
+                .moveTo(margin, margin - 6)
+                .lineTo(margin + contentWidth, margin - 6)
+                .strokeColor(borderLight)
+                .lineWidth(0.5)
+                .stroke();
+            }
+
+            // Bottom Running Footer
+            const footerY = pageHeight - 34;
             doc
-              .fontSize(7)
+              .moveTo(margin, footerY)
+              .lineTo(margin + contentWidth, footerY)
+              .strokeColor(borderLight)
+              .lineWidth(0.75)
+              .stroke();
+
+            doc
+              .fontSize(7.5)
               .font("Helvetica")
               .fillColor(textLight)
-              .text(`Hotel Voucher • ${documentNumber} • ${hotelNameStr}`, margin, margin - 14, {
-                width: contentWidth,
-                align: "left",
-              });
+              .text(
+                `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
+                margin,
+                footerY + 8,
+                { width: contentWidth - 80, align: "left" }
+              );
+
             doc
-              .moveTo(margin, margin - 6)
-              .lineTo(margin + contentWidth, margin - 6)
-              .strokeColor(borderLight)
-              .lineWidth(0.5)
-              .stroke();
+              .fontSize(7.5)
+              .font("Helvetica-Bold")
+              .fillColor(textLight)
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+                width: 75,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
           }
-
-          // Bottom Running Footer
-          const footerY = pageHeight - 34;
-          doc
-            .moveTo(margin, footerY)
-            .lineTo(margin + contentWidth, footerY)
-            .strokeColor(borderLight)
-            .lineWidth(0.75)
-            .stroke();
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica")
-            .fillColor(textLight)
-            .text(
-              `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
-              margin,
-              footerY + 8,
-              { width: contentWidth - 80, align: "left" }
-            );
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica-Bold")
-            .fillColor(textLight)
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
-              width: 75,
-              align: "right",
-            });
         }
 
         doc.end();
@@ -594,6 +617,11 @@ export class OperationsDocumentService {
     const vehicle = dispatch.vehicle || dispatch.tripVehicle?.vehicle;
     const documentNumber = this.generateDocumentNumber("TVV", operation.trip.tripNumber || "0001", 1);
     const filename = `Vehicle-Voucher-${documentNumber}.pdf`;
+
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: operation.agencyId,
+      logoUrl: operation.agency.logo,
+    });
 
     const buffer = await new Promise<Buffer>((resolve, reject) => {
       try {
@@ -673,7 +701,8 @@ export class OperationsDocumentService {
         const nameH = doc.heightOfString(agencyName, { width: leftWidth });
         doc.font("Helvetica").fontSize(7.5);
         const contactH = agencyContact ? doc.heightOfString(agencyContact, { width: leftWidth }) : 0;
-        const leftContentH = nameH + contactH + 46;
+        const logoH = logoBuffer ? 44 : 0;
+        const leftContentH = nameH + contactH + 46 + logoH;
 
         // Right Badge text & dynamic height measurement
         const docNumText = `VOUCHER #: ${documentNumber}`;
@@ -694,15 +723,25 @@ export class OperationsDocumentService {
         const totalRightContentH = docNumH + 3 + dateH + 2 + refH + 5 + pillH;
         const minRightBoxH = totalRightContentH + 16;
 
-        const bannerHeight = Math.max(88, leftContentH, minRightBoxH + 28);
+        const bannerHeight = Math.max(90, leftContentH, minRightBoxH + 28);
 
         doc.roundedRect(margin, margin, contentWidth, bannerHeight, 8).fill(brandDark);
+
+        let curLeftY = margin + 14;
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 18, curLeftY, { fit: [130, 40] });
+            curLeftY += 44;
+          } catch {
+            // fallback
+          }
+        }
 
         doc
           .fillColor("#FFFFFF")
           .fontSize(14)
           .font("Helvetica-Bold")
-          .text(agencyName, margin + 18, margin + 16, { width: leftWidth });
+          .text(agencyName, margin + 18, curLeftY, { width: leftWidth });
 
         doc
           .fillColor("#93C5FD")
@@ -934,51 +973,57 @@ export class OperationsDocumentService {
         const range = doc.bufferedPageRange();
         for (let i = 0; i < range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          if (i > 0) {
+          try {
+            if (i > 0) {
+              doc
+                .fontSize(7)
+                .font("Helvetica")
+                .fillColor(textLight)
+                .text(`Transport Voucher • ${documentNumber} • ${vehicleNameStr}`, margin, margin - 14, {
+                  width: contentWidth,
+                  align: "left",
+                });
+              doc
+                .moveTo(margin, margin - 6)
+                .lineTo(margin + contentWidth, margin - 6)
+                .strokeColor(borderLight)
+                .lineWidth(0.5)
+                .stroke();
+            }
+
+            const footerY = pageHeight - 34;
             doc
-              .fontSize(7)
+              .moveTo(margin, footerY)
+              .lineTo(margin + contentWidth, footerY)
+              .strokeColor(borderLight)
+              .lineWidth(0.75)
+              .stroke();
+
+            doc
+              .fontSize(7.5)
               .font("Helvetica")
               .fillColor(textLight)
-              .text(`Transport Voucher • ${documentNumber} • ${vehicleNameStr}`, margin, margin - 14, {
-                width: contentWidth,
-                align: "left",
-              });
+              .text(
+                `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
+                margin,
+                footerY + 8,
+                { width: contentWidth - 80, align: "left" }
+              );
+
             doc
-              .moveTo(margin, margin - 6)
-              .lineTo(margin + contentWidth, margin - 6)
-              .strokeColor(borderLight)
-              .lineWidth(0.5)
-              .stroke();
+              .fontSize(7.5)
+              .font("Helvetica-Bold")
+              .fillColor(textLight)
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+                width: 75,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
           }
-
-          const footerY = pageHeight - 34;
-          doc
-            .moveTo(margin, footerY)
-            .lineTo(margin + contentWidth, footerY)
-            .strokeColor(borderLight)
-            .lineWidth(0.75)
-            .stroke();
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica")
-            .fillColor(textLight)
-            .text(
-              `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
-              margin,
-              footerY + 8,
-              { width: contentWidth - 80, align: "left" }
-            );
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica-Bold")
-            .fillColor(textLight)
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
-              width: 75,
-              align: "right",
-            });
         }
 
         doc.end();
@@ -1049,6 +1094,11 @@ export class OperationsDocumentService {
     const activity = activityConf.activity || activityConf.tripActivity?.activity;
     const documentNumber = this.generateDocumentNumber("TAV", operation.trip.tripNumber || "0001", 1);
     const filename = `Activity-Voucher-${activityConf.ticketNumber || documentNumber}.pdf`;
+
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: operation.agencyId,
+      logoUrl: operation.agency.logo,
+    });
 
     const buffer = await new Promise<Buffer>((resolve, reject) => {
       try {
@@ -1127,7 +1177,8 @@ export class OperationsDocumentService {
         const nameH = doc.heightOfString(agencyName, { width: leftWidth });
         doc.font("Helvetica").fontSize(7.5);
         const contactH = agencyContact ? doc.heightOfString(agencyContact, { width: leftWidth }) : 0;
-        const leftContentH = nameH + contactH + 46;
+        const logoH = logoBuffer ? 44 : 0;
+        const leftContentH = nameH + contactH + 46 + logoH;
 
         // Right Badge text & dynamic height measurement
         const docNumText = `PASS #: ${documentNumber}`;
@@ -1146,15 +1197,25 @@ export class OperationsDocumentService {
         const totalRightContentH = docNumH + 3 + dateH + 2 + refH + 5 + pillH;
         const minRightBoxH = totalRightContentH + 16;
 
-        const bannerHeight = Math.max(88, leftContentH, minRightBoxH + 28);
+        const bannerHeight = Math.max(90, leftContentH, minRightBoxH + 28);
 
         doc.roundedRect(margin, margin, contentWidth, bannerHeight, 8).fill(brandDark);
+
+        let curLeftY = margin + 14;
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 18, curLeftY, { fit: [130, 40] });
+            curLeftY += 44;
+          } catch {
+            // fallback
+          }
+        }
 
         doc
           .fillColor("#FFFFFF")
           .fontSize(14)
           .font("Helvetica-Bold")
-          .text(agencyName, margin + 18, margin + 16, { width: leftWidth });
+          .text(agencyName, margin + 18, curLeftY, { width: leftWidth });
 
         doc
           .fillColor("#DDD6FE")
@@ -1390,51 +1451,57 @@ export class OperationsDocumentService {
         const range = doc.bufferedPageRange();
         for (let i = 0; i < range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          if (i > 0) {
+          try {
+            if (i > 0) {
+              doc
+                .fontSize(7)
+                .font("Helvetica")
+                .fillColor(textLight)
+                .text(`Activity Pass • ${documentNumber} • ${activityTitleStr}`, margin, margin - 14, {
+                  width: contentWidth,
+                  align: "left",
+                });
+              doc
+                .moveTo(margin, margin - 6)
+                .lineTo(margin + contentWidth, margin - 6)
+                .strokeColor(borderLight)
+                .lineWidth(0.5)
+                .stroke();
+            }
+
+            const footerY = pageHeight - 34;
             doc
-              .fontSize(7)
+              .moveTo(margin, footerY)
+              .lineTo(margin + contentWidth, footerY)
+              .strokeColor(borderLight)
+              .lineWidth(0.75)
+              .stroke();
+
+            doc
+              .fontSize(7.5)
               .font("Helvetica")
               .fillColor(textLight)
-              .text(`Activity Pass • ${documentNumber} • ${activityTitleStr}`, margin, margin - 14, {
-                width: contentWidth,
-                align: "left",
-              });
+              .text(
+                `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
+                margin,
+                footerY + 8,
+                { width: contentWidth - 80, align: "left" }
+              );
+
             doc
-              .moveTo(margin, margin - 6)
-              .lineTo(margin + contentWidth, margin - 6)
-              .strokeColor(borderLight)
-              .lineWidth(0.5)
-              .stroke();
+              .fontSize(7.5)
+              .font("Helvetica-Bold")
+              .fillColor(textLight)
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+                width: 75,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
           }
-
-          const footerY = pageHeight - 34;
-          doc
-            .moveTo(margin, footerY)
-            .lineTo(margin + contentWidth, footerY)
-            .strokeColor(borderLight)
-            .lineWidth(0.75)
-            .stroke();
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica")
-            .fillColor(textLight)
-            .text(
-              `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
-              margin,
-              footerY + 8,
-              { width: contentWidth - 80, align: "left" }
-            );
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica-Bold")
-            .fillColor(textLight)
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
-              width: 75,
-              align: "right",
-            });
         }
 
         doc.end();
@@ -1519,6 +1586,12 @@ export class OperationsDocumentService {
     const documentNumber = this.generateDocumentNumber("TBC", operation.trip.tripNumber || "0001", 1);
     const filename = `Booking-Confirmation-${operation.trip.tripNumber || documentNumber}.pdf`;
 
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: operation.agency.id,
+      logoUrl: operation.agency.logo,
+      checkEntitlement: true,
+    });
+
     const buffer = await new Promise<Buffer>((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -1595,7 +1668,8 @@ export class OperationsDocumentService {
         const nameH = doc.heightOfString(agencyName, { width: leftWidth });
         doc.font("Helvetica").fontSize(7.5);
         const contactH = agencyContact ? doc.heightOfString(agencyContact, { width: leftWidth }) : 0;
-        const leftContentH = nameH + contactH + 46;
+        const logoH = logoBuffer ? 44 : 0;
+        const leftContentH = nameH + contactH + 46 + logoH;
 
         // Right Badge text & dynamic height measurement
         const docNumText = `CONFIRMATION #: ${documentNumber}`;
@@ -1614,15 +1688,25 @@ export class OperationsDocumentService {
         const totalRightContentH = docNumH + 3 + dateH + 2 + refH + 5 + pillH;
         const minRightBoxH = totalRightContentH + 16;
 
-        const bannerHeight = Math.max(88, leftContentH, minRightBoxH + 28);
+        const bannerHeight = Math.max(90, leftContentH, minRightBoxH + 28);
 
         doc.roundedRect(margin, margin, contentWidth, bannerHeight, 8).fill(brandDark);
+
+        let curLeftY = margin + 14;
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 18, curLeftY, { fit: [130, 40] });
+            curLeftY += 44;
+          } catch {
+            // fallback gracefully
+          }
+        }
 
         doc
           .fillColor("#FFFFFF")
           .fontSize(14)
           .font("Helvetica-Bold")
-          .text(agencyName, margin + 18, margin + 16, { width: leftWidth });
+          .text(agencyName, margin + 18, curLeftY, { width: leftWidth });
 
         doc
           .fillColor("#BAE6FD")
@@ -1868,51 +1952,57 @@ export class OperationsDocumentService {
         const range = doc.bufferedPageRange();
         for (let i = 0; i < range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          if (i > 0) {
+          try {
+            if (i > 0) {
+              doc
+                .fontSize(7)
+                .font("Helvetica")
+                .fillColor(textLight)
+                .text(`Booking Confirmation • ${documentNumber} • ${operation.trip.title}`, margin, margin - 14, {
+                  width: contentWidth,
+                  align: "left",
+                });
+              doc
+                .moveTo(margin, margin - 6)
+                .lineTo(margin + contentWidth, margin - 6)
+                .strokeColor(borderLight)
+                .lineWidth(0.5)
+                .stroke();
+            }
+
+            const footerY = pageHeight - 34;
             doc
-              .fontSize(7)
+              .moveTo(margin, footerY)
+              .lineTo(margin + contentWidth, footerY)
+              .strokeColor(borderLight)
+              .lineWidth(0.75)
+              .stroke();
+
+            doc
+              .fontSize(7.5)
               .font("Helvetica")
               .fillColor(textLight)
-              .text(`Booking Confirmation • ${documentNumber} • ${operation.trip.title}`, margin, margin - 14, {
-                width: contentWidth,
-                align: "left",
-              });
+              .text(
+                `Generated securely via TripDesk • Official Booking Confirmation • ${operation.agency.name}`,
+                margin,
+                footerY + 8,
+                { width: contentWidth - 80, align: "left" }
+              );
+
             doc
-              .moveTo(margin, margin - 6)
-              .lineTo(margin + contentWidth, margin - 6)
-              .strokeColor(borderLight)
-              .lineWidth(0.5)
-              .stroke();
+              .fontSize(7.5)
+              .font("Helvetica-Bold")
+              .fillColor(textLight)
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+                width: 75,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
           }
-
-          const footerY = pageHeight - 34;
-          doc
-            .moveTo(margin, footerY)
-            .lineTo(margin + contentWidth, footerY)
-            .strokeColor(borderLight)
-            .lineWidth(0.75)
-            .stroke();
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica")
-            .fillColor(textLight)
-            .text(
-              `Generated securely via TripDesk • Official Booking Confirmation • ${operation.agency.name}`,
-              margin,
-              footerY + 8,
-              { width: contentWidth - 80, align: "left" }
-            );
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica-Bold")
-            .fillColor(textLight)
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
-              width: 75,
-              align: "right",
-            });
         }
 
         doc.end();
@@ -1999,6 +2089,12 @@ export class OperationsDocumentService {
     const documentNumber = this.generateDocumentNumber("TTK", operation.trip.tripNumber || "0001", 1);
     const filename = `Travel-Kit-${operation.trip.tripNumber || documentNumber}.pdf`;
 
+    const logoBuffer = await pdfBrandingHelper.resolveLogoBuffer({
+      agencyId: operation.agency.id,
+      logoUrl: operation.agency.logo,
+      checkEntitlement: true,
+    });
+
     const buffer = await new Promise<Buffer>((resolve, reject) => {
       try {
         const doc = new PDFDocument({
@@ -2076,7 +2172,8 @@ export class OperationsDocumentService {
         const nameH = doc.heightOfString(agencyName, { width: leftWidth });
         doc.font("Helvetica").fontSize(7.5);
         const contactH = agencyContact ? doc.heightOfString(agencyContact, { width: leftWidth }) : 0;
-        const leftContentH = nameH + contactH + 48;
+        const logoH = logoBuffer ? 48 : 0;
+        const leftContentH = nameH + contactH + 48 + logoH;
 
         // Right Badge text & dynamic height measurement
         const docNumText = `KIT #: ${documentNumber}`;
@@ -2095,15 +2192,25 @@ export class OperationsDocumentService {
         const totalRightContentH = docNumH + 3 + dateH + 2 + refH + 5 + pillH;
         const minRightBoxH = totalRightContentH + 16;
 
-        const bannerHeight = Math.max(92, leftContentH, minRightBoxH + 28);
+        const bannerHeight = Math.max(94, leftContentH, minRightBoxH + 28);
 
         doc.roundedRect(margin, margin, contentWidth, bannerHeight, 8).fill(brandDark);
+
+        let curLeftY = margin + 14;
+        if (logoBuffer) {
+          try {
+            doc.image(logoBuffer, margin + 18, curLeftY, { fit: [140, 44] });
+            curLeftY += 48;
+          } catch {
+            // fallback gracefully
+          }
+        }
 
         doc
           .fillColor("#FFFFFF")
           .fontSize(15)
           .font("Helvetica-Bold")
-          .text(agencyName, margin + 18, margin + 16, { width: leftWidth });
+          .text(agencyName, margin + 18, curLeftY, { width: leftWidth });
 
         doc
           .fillColor("#C7D2FE")
@@ -2373,51 +2480,57 @@ export class OperationsDocumentService {
         const range = doc.bufferedPageRange();
         for (let i = 0; i < range.count; i++) {
           doc.switchToPage(i);
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
 
-          if (i > 0) {
+          try {
+            if (i > 0) {
+              doc
+                .fontSize(7)
+                .font("Helvetica")
+                .fillColor(textLight)
+                .text(`Final Travel Kit • ${documentNumber} • ${operation.trip.title}`, margin, margin - 14, {
+                  width: contentWidth,
+                  align: "left",
+                });
+              doc
+                .moveTo(margin, margin - 6)
+                .lineTo(margin + contentWidth, margin - 6)
+                .strokeColor(borderLight)
+                .lineWidth(0.5)
+                .stroke();
+            }
+
+            const footerY = pageHeight - 34;
             doc
-              .fontSize(7)
+              .moveTo(margin, footerY)
+              .lineTo(margin + contentWidth, footerY)
+              .strokeColor(borderLight)
+              .lineWidth(0.75)
+              .stroke();
+
+            doc
+              .fontSize(7.5)
               .font("Helvetica")
               .fillColor(textLight)
-              .text(`Final Travel Kit • ${documentNumber} • ${operation.trip.title}`, margin, margin - 14, {
-                width: contentWidth,
-                align: "left",
-              });
+              .text(
+                `Generated securely via TripDesk • Final Travel Kit & Itinerary • ${operation.agency.name}`,
+                margin,
+                footerY + 8,
+                { width: contentWidth - 80, align: "left" }
+              );
+
             doc
-              .moveTo(margin, margin - 6)
-              .lineTo(margin + contentWidth, margin - 6)
-              .strokeColor(borderLight)
-              .lineWidth(0.5)
-              .stroke();
+              .fontSize(7.5)
+              .font("Helvetica-Bold")
+              .fillColor(textLight)
+              .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
+                width: 75,
+                align: "right",
+              });
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
           }
-
-          const footerY = pageHeight - 34;
-          doc
-            .moveTo(margin, footerY)
-            .lineTo(margin + contentWidth, footerY)
-            .strokeColor(borderLight)
-            .lineWidth(0.75)
-            .stroke();
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica")
-            .fillColor(textLight)
-            .text(
-              `Generated securely via TripDesk • Final Travel Kit & Itinerary • ${operation.agency.name}`,
-              margin,
-              footerY + 8,
-              { width: contentWidth - 80, align: "left" }
-            );
-
-          doc
-            .fontSize(7.5)
-            .font("Helvetica-Bold")
-            .fillColor(textLight)
-            .text(`Page ${i + 1} of ${range.count}`, margin + contentWidth - 75, footerY + 8, {
-              width: 75,
-              align: "right",
-            });
         }
 
         doc.end();
@@ -3037,16 +3150,23 @@ export class OperationsDocumentService {
         const pages = doc.bufferedPageRange();
         for (let i = 0; i < pages.count; i++) {
           doc.switchToPage(i);
-          doc
-            .fillColor(textMuted)
-            .fontSize(7.5)
-            .font("Helvetica")
-            .text(
-              `${operation.agency.name} • Internal Operations Document • Page ${i + 1} of ${pages.count}`,
-              margin,
-              pageHeight - 30,
-              { align: "center", width: contentWidth }
-            );
+          const origBottomMargin = doc.page.margins.bottom;
+          doc.page.margins.bottom = 0;
+
+          try {
+            doc
+              .fillColor(textMuted)
+              .fontSize(7.5)
+              .font("Helvetica")
+              .text(
+                `${operation.agency.name} • Internal Operations Document • Page ${i + 1} of ${pages.count}`,
+                margin,
+                pageHeight - 30,
+                { align: "center", width: contentWidth }
+              );
+          } finally {
+            doc.page.margins.bottom = origBottomMargin;
+          }
         }
 
         doc.end();

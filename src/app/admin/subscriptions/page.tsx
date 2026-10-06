@@ -37,6 +37,7 @@ import {
   Ban,
 } from "lucide-react";
 import { adminClient } from "@/lib/api-client/admin-client";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 
 export default function AdminSubscriptionsPage() {
   const router = useRouter();
@@ -50,6 +51,8 @@ export default function AdminSubscriptionsPage() {
   const [extendDays, setExtendDays] = React.useState(7);
   const [extendReason, setExtendReason] = React.useState("Promotional trial extension");
   const [extending, setExtending] = React.useState(false);
+
+  useModalScrollLock(Boolean(extendSub));
 
   const fetchSubscriptions = React.useCallback(async () => {
     setLoading(true);

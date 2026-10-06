@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { entitlementService } from "./entitlement-service";
 import {
   Booking,
   BookingStatus,
@@ -362,65 +363,73 @@ export const bookingService = {
    * Create a new booking
    */
   async createBooking(agencyId: string, data: CreateBookingInput): Promise<BookingWithRelations> {
-    const trip = await prisma.trip.findFirst({
-      where: { id: data.tripId, agencyId, archivedAt: null },
-    });
-    if (!trip) {
-      throw new Error("Trip not found or does not belong to this agency.");
-    }
+    const { createdBooking, tripTitle } = await prisma.$transaction(async (tx) => {
+      // 1. Lock authoritative agency subscription FOR UPDATE
+      await entitlementService.lockAgencySubscription(agencyId, tx);
 
-    const customer = await prisma.customer.findFirst({
-      where: { id: data.customerId, agencyId, archivedAt: null },
-    });
-    if (!customer) {
-      throw new Error("Customer not found or does not belong to this agency.");
-    }
+      // 2. Validate quota for "BOOKINGS" resource inside transaction
+      await entitlementService.checkQuota(agencyId, "BOOKINGS", tx);
 
-    let quoteTax: {
-      taxableAmount: Prisma.Decimal | null;
-      taxAmount: Prisma.Decimal | null;
-      taxRate: Prisma.Decimal | null;
-      taxMode: any;
-      gstTreatment: any;
-      cgstAmount: Prisma.Decimal | null;
-      sgstAmount: Prisma.Decimal | null;
-      igstAmount: Prisma.Decimal | null;
-      packageOptionName?: string | null;
-    } | null = null;
-
-    if (data.quotationId) {
-      const quotation = await prisma.quotation.findFirst({
-        where: { id: data.quotationId, agencyId, archivedAt: null },
+      // 3. Verify Trip exists under this agency and is active
+      const trip = await tx.trip.findFirst({
+        where: { id: data.tripId, agencyId, archivedAt: null },
       });
-      if (!quotation) {
-        throw new Error("Quotation not found or does not belong to this agency.");
+      if (!trip) {
+        throw new Error("Trip not found or does not belong to this agency.");
       }
-      quoteTax = {
-        taxableAmount: quotation.taxableAmount !== null ? new Prisma.Decimal(quotation.taxableAmount) : null,
-        taxAmount: quotation.taxAmount !== null ? new Prisma.Decimal(quotation.taxAmount) : null,
-        taxRate: quotation.taxRate !== null ? new Prisma.Decimal(quotation.taxRate) : null,
-        taxMode: quotation.taxMode ?? null,
-        gstTreatment: quotation.gstTreatment ?? null,
-        cgstAmount: quotation.cgstAmount !== null ? new Prisma.Decimal(quotation.cgstAmount) : null,
-        sgstAmount: quotation.sgstAmount !== null ? new Prisma.Decimal(quotation.sgstAmount) : null,
-        igstAmount: quotation.igstAmount !== null ? new Prisma.Decimal(quotation.igstAmount) : null,
-        packageOptionName: quotation.tier || null,
-      };
-    }
 
-    const bookingNumber = await this.generateNextBookingNumber(agencyId);
-    const totalAmount = data.totalAmount;
-    const paidAmount = data.paidAmount || 0;
-    const balanceAmount = Math.max(0, totalAmount - paidAmount);
+      // 4. Verify Customer exists under this agency and is active
+      const customer = await tx.customer.findFirst({
+        where: { id: data.customerId, agencyId, archivedAt: null },
+      });
+      if (!customer) {
+        throw new Error("Customer not found or does not belong to this agency.");
+      }
 
-    let paymentStatus: BookingPaymentStatus = BookingPaymentStatus.UNPAID;
-    if (paidAmount >= totalAmount && totalAmount > 0) {
-      paymentStatus = BookingPaymentStatus.PAID;
-    } else if (paidAmount > 0) {
-      paymentStatus = BookingPaymentStatus.PARTIALLY_PAID;
-    }
+      let quoteTax: {
+        taxableAmount: Prisma.Decimal | null;
+        taxAmount: Prisma.Decimal | null;
+        taxRate: Prisma.Decimal | null;
+        taxMode: any;
+        gstTreatment: any;
+        cgstAmount: Prisma.Decimal | null;
+        sgstAmount: Prisma.Decimal | null;
+        igstAmount: Prisma.Decimal | null;
+        packageOptionName?: string | null;
+      } | null = null;
 
-    const booking = await prisma.$transaction(async (tx) => {
+      if (data.quotationId) {
+        const quotation = await tx.quotation.findFirst({
+          where: { id: data.quotationId, agencyId, archivedAt: null },
+        });
+        if (!quotation) {
+          throw new Error("Quotation not found or does not belong to this agency.");
+        }
+        quoteTax = {
+          taxableAmount: quotation.taxableAmount !== null ? new Prisma.Decimal(quotation.taxableAmount) : null,
+          taxAmount: quotation.taxAmount !== null ? new Prisma.Decimal(quotation.taxAmount) : null,
+          taxRate: quotation.taxRate !== null ? new Prisma.Decimal(quotation.taxRate) : null,
+          taxMode: quotation.taxMode ?? null,
+          gstTreatment: quotation.gstTreatment ?? null,
+          cgstAmount: quotation.cgstAmount !== null ? new Prisma.Decimal(quotation.cgstAmount) : null,
+          sgstAmount: quotation.sgstAmount !== null ? new Prisma.Decimal(quotation.sgstAmount) : null,
+          igstAmount: quotation.igstAmount !== null ? new Prisma.Decimal(quotation.igstAmount) : null,
+          packageOptionName: quotation.tier || null,
+        };
+      }
+
+      const bookingNumber = await this.generateNextBookingNumber(agencyId, tx);
+      const totalAmount = data.totalAmount;
+      const paidAmount = data.paidAmount || 0;
+      const balanceAmount = Math.max(0, totalAmount - paidAmount);
+
+      let paymentStatus: BookingPaymentStatus = BookingPaymentStatus.UNPAID;
+      if (paidAmount >= totalAmount && totalAmount > 0) {
+        paymentStatus = BookingPaymentStatus.PAID;
+      } else if (paidAmount > 0) {
+        paymentStatus = BookingPaymentStatus.PARTIALLY_PAID;
+      }
+
       const b = await tx.booking.create({
         data: {
           agencyId,
@@ -493,19 +502,19 @@ export const bookingService = {
         });
       }
 
-      return b;
+      return { createdBooking: b, tripTitle: trip.title };
     });
 
     // Auto-initialize operations and dispatch notifications outside transaction
     try {
       const operation = await operationsService.initializeOperation(agencyId, {
         tripId: data.tripId,
-        bookingId: booking.id,
+        bookingId: createdBooking.id,
       });
 
       await operationsService.logEvent(agencyId, operation.id, {
         eventType: "BOOKING_CREATED",
-        description: `Booking ${booking.bookingNumber} created for trip ${trip.title}. Initial status: ${booking.status}.`,
+        description: `Booking ${createdBooking.bookingNumber} created for trip ${tripTitle}. Initial status: ${createdBooking.status}.`,
       });
 
       await customerNotificationService.notifyTripStatusChange(
@@ -514,33 +523,33 @@ export const bookingService = {
         "CONFIRMED"
       );
 
-      communicationService.notifyBookingConfirmed(agencyId, booking.id).catch((err) => {
+      communicationService.notifyBookingConfirmed(agencyId, createdBooking.id).catch((err) => {
         console.warn("[Communication Non-blocking Notice] Failed to notify booking confirmed:", err?.message || err);
       });
 
       internalNotificationService.notifyAgencyOwner(agencyId, {
         type: "BOOKING_CREATED",
         title: "New Booking Created",
-        message: `Booking #${booking.bookingNumber} created for ₹${Number(booking.totalAmount).toLocaleString("en-IN")}.`,
-        linkUrl: `/bookings/${booking.id}`,
+        message: `Booking #${createdBooking.bookingNumber} created for ₹${Number(createdBooking.totalAmount).toLocaleString("en-IN")}.`,
+        linkUrl: `/bookings/${createdBooking.id}`,
         metadata: {
-          bookingId: booking.id,
-          bookingNumber: booking.bookingNumber,
-          totalAmount: Number(booking.totalAmount),
+          bookingId: createdBooking.id,
+          bookingNumber: createdBooking.bookingNumber,
+          totalAmount: Number(createdBooking.totalAmount),
         },
       }).catch((err) => {
         console.warn("[BookingService] Failed to notify agency owner:", err);
       });
 
       // Auto-generate service payables (Hotels, Vehicles) for the booking
-      await financeService.generateBookingServicePayables(agencyId, booking.id).catch((err) => {
+      await financeService.generateBookingServicePayables(agencyId, createdBooking.id).catch((err) => {
         console.warn("[BookingService] Failed to auto-generate booking service payables:", err);
       });
     } catch {
       // Non-blocking operations synchronization
     }
 
-    return (await this.getBooking(agencyId, booking.id))!;
+    return (await this.getBooking(agencyId, createdBooking.id))!;
   },
 
   /**
@@ -595,7 +604,13 @@ export const bookingService = {
     const igstAmount = quotation.igstAmount ?? null;
 
     const booking = await prisma.$transaction(async (tx) => {
-      // 1. Create Booking with full Tax V1 snapshot
+      // 1. Lock authoritative agency subscription FOR UPDATE
+      await entitlementService.lockAgencySubscription(agencyId, tx);
+
+      // 2. Validate quota for "BOOKINGS" resource inside transaction
+      await entitlementService.checkQuota(agencyId, "BOOKINGS", tx);
+
+      // 3. Create Booking with full Tax V1 snapshot
       const b = await tx.booking.create({
         data: {
           agencyId,
