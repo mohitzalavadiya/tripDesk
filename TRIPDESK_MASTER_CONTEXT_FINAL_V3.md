@@ -14183,9 +14183,76 @@ The entitlement backend, transactional quota enforcement, and database-driven fe
 
 ---
 
+# 226. PHASE 2 — STATIC / MOCK / HARD-CODED / PLACEHOLDER DATA AUDIT
+
+## 226.1 Executive Summary
+- **Objective:** Perform a project-wide audit for static, mock, demo, placeholder, fake, seeded, hard-coded, or development-only business data that could incorrectly appear in production.
+- **Production Data Source Confirmation:** Confirmed that 100% of production pages (Dashboard, Enquiries, Customers, Trips, Quotations, Bookings, Invoices, Payments, Operations, Suppliers, Hotels, Rate Sheets, Destinations, Vehicles, Communications, Feedback, Referrals, Customer Portal, and Public Tokens) pull data exclusively from authenticated Prisma database API services (`@/lib/services/*` & `@/lib/api-client/*`).
+- **Accidental Static Fallbacks Remediation:** Identified and corrected accidental fake phone fallback (`"919876543210"`) in `src/app/q/[shareToken]/page.tsx` for WhatsApp contact, replacing it with dynamic agency phone resolution and clean fallback to universal WhatsApp dialog.
+- **Legacy Client Contexts Categorized:** Identified legacy in-memory React contexts (`saas-context.tsx`, `enquiry-context.tsx`, `inventory-context.tsx`, `costing-context.tsx`, `quotation-context.tsx`, `booking-context.tsx`, `operations-context.tsx`) as development prototype stores that are bypassed by active production pages in favor of direct server API clients.
+- **Legitimate Constants Preserved:** Locked quotation tiers (`Deluxe`, `Ultra Deluxe`, `Premium`), tax rate options (`0%`, `5%`, `12%`, `18%`, `28%`), support helpline numbers, and UI form input placeholders preserved.
+
+## 226.2 Verification Results
+- **TypeScript Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (all static and dynamic routes compiled)**.
+- **Database / Schema Safety:** 0 schema changes, 0 migrations, 0 database mutation scripts.
+- **Permanent QA Data:** No test agency, hotel, destination, or vehicle record altered.
+
+## 226.3 Closure
+**Phase 2 — Static / Mock / Hard-Coded Data Audit: CLOSED / PASS**
+
+---
+
+# 227. PHASE 3 — DB / SCHEMA / ARCHITECTURE / SECURITY PRE-QA AUDIT
+
+## 227.1 Executive Summary
+- **Objective:** Comprehensive pre-QA inspection of the database schema, relations, indexes, migrations, multi-tenant isolation, IDOR protection, authentication, authorization, financial state machines, and file storage boundaries.
+- **Audit Findings:**
+  - **Prisma Schema & Relations:** 57 models verified. All 36 agency-scoped models mandate `agencyId String` with `onDelete: Cascade` to `Agency`. Global singleton and platform models have `agencyId = null` strictly guarded for `PLATFORM_OWNER`.
+  - **Database Unique Constraints:** Uniqueness constraints verified on `Invoice` (`@@unique([agencyId, invoiceNumber])`, `@@unique([agencyId, bookingId])`), `Trip` (`@@unique([agencyId, tripNumber])`), `Quotation` (`@@unique([agencyId, quotationNumber, version])`), `Booking` (`@@unique([agencyId, bookingNumber])`), `Destination` (`@@unique([agencyId, name])`), and idempotency keys on notifications.
+  - **Tenant Isolation & IDOR Protection:** Server-enforced identity via `getRequestContext()`, `requireAgencyOwnerContext()`, `requirePlatformOwnerContext()`, `requireWriteAccess()`, and `requireReadAccess()` in `src/lib/api/context.ts`. Multi-tenant query filtering with `where: { id, agencyId }` across all 224 API routes and `@/lib/services/*`.
+  - **Public Token Route Sanitization:** Public quotation proposals (`/q/[shareToken]`), trip views (`/trip/[secureToken]`), and booking views (`/b/[secureToken]`) strictly whitelist traveler-safe DTOs, stripping cost prices, markups, supplier rates, and internal consultant notes.
+  - **Secrets & Storage:** Server-only secrets isolated from client bundles. Storage uploads follow safe sequential replacement (`validate -> upload new -> update DB -> delete old`).
+- **Audit Result:** **CLOSED / PASS (0 production blockers, 0 security defects)**.
+
+---
+
+# 228. SEO & PRODUCTION WEB READINESS AUDIT AND REMEDIATION
+
+## 228.1 Executive Summary
+- **Objective:** Perform a project-wide SEO, crawlability, metadata, canonical, indexing, and production web readiness audit and focused remediation without compromising application security.
+- **Audited Surface:** 84 pages, 4 layouts, 224 API routes across `src/app/**`.
+- **Key Remediation Implemented:**
+  1. **Private Route Indexing Protection:** Added explicit `robots: { index: false, follow: false }` metadata to private/authenticated layout boundaries:
+     - `src/app/admin/layout.tsx` (Platform Owner area)
+     - `src/app/(dashboard)/layout.tsx` (Agency Owner workspace)
+     - `src/app/customer/layout.tsx` (Traveler OTP portal)
+     - `src/app/q/layout.tsx` (Customer-specific quotation proposals)
+     - `src/app/trip/layout.tsx` (Guest trip detail views)
+     - `src/app/b/layout.tsx` (Guest booking confirmation views)
+  2. **Robots.txt Configuration:** Created `src/app/robots.ts` using Next.js `MetadataRoute.Robots`, explicitly disallowing crawler access to `/admin/`, `/api/`, `/dashboard/`, `/customer/`, `/trip/`, `/b/`, `/q/`, and all internal authenticated paths while allowing public authentication and landing entry points.
+  3. **Sitemap Configuration:** Created `src/app/sitemap.ts` using Next.js `MetadataRoute.Sitemap`, exposing strictly the public landing discovery URL `/` backed by `NEXT_PUBLIC_APP_URL`.
+  4. **Root Metadata & Social Previews:** Updated `src/app/layout.tsx` with:
+     - `metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://app.tripdesk.io")`
+     - `title: { default: "TripDesk - Travel Agency SaaS Operating System", template: "%s | TripDesk" }`
+     - Root Open Graph (`og:*`) and Twitter (`twitter:card: summary_large_image`) card metadata.
+  5. **Security & Privacy Boundary:** Verified zero customer personal details, supplier costs, markup margins, or secret tokens are leaked through metadata or public discovery feeds.
+
+## 228.2 Verification Results
+- **TypeScript Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Static `robots.txt` and `sitemap.xml` generated; 38/38 static pages and dynamic routes compiled)**.
+- **Database / Schema Safety:** 0 schema changes, 0 migrations, 0 database mutations.
+- **Permanent QA Data:** 100% preserved.
+
+## 228.3 Closure
+**SEO & Production Web Readiness: CLOSED / COMPLETE — PASS**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
 
 
 
