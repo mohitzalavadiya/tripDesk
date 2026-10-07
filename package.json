@@ -8,7 +8,11 @@
     "start": "next start -p 3001",
     "lint": "eslint",
     "bootstrap:owner": "tsx prisma/bootstrap-owner.ts",
-    "bootstrap:agency-owner": "tsx prisma/bootstrap-agency-owner.ts"
+    "bootstrap:owner:staging": "tsx --env-file=.env.staging prisma/bootstrap-owner.ts",
+    "bootstrap:agency-owner": "tsx prisma/bootstrap-agency-owner.ts",
+    "prisma:status:staging": "node --env-file=.env.staging node_modules/prisma/build/index.js migrate status",
+    "prisma:migrate:staging": "node --env-file=.env.staging node_modules/prisma/build/index.js migrate deploy",
+    "prisma:seed:staging": "tsx --env-file=.env.staging prisma/seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
