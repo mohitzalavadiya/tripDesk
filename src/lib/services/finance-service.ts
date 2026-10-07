@@ -5,13 +5,11 @@ import {
   Payment,
   PaymentMethod,
   PaymentStatus,
-  PaymentType,
   SupplierPayable,
   SupplierPayableStatus,
   SupplierPayment,
   SupplierPaymentStatus,
   OperationalExpense,
-  ExpenseCategory,
   BookingStatus,
   BookingPaymentStatus,
   Prisma,
@@ -27,7 +25,6 @@ import {
   CreateExpenseInput,
   UpdateExpenseInput,
   TransactionQueryInput,
-  TransactionType,
 } from "@/lib/validation/finance-schema";
 
 // ═════════════════════════════════════════════════════════════════════
@@ -648,7 +645,7 @@ export const financeService = {
   async createSupplierPayable(
     agencyId: string,
     input: CreateSupplierPayableInput,
-    userId?: string
+    _userId?: string
   ): Promise<SupplierPayable> {
     let supplierName: string | null = null;
     if (input.supplierId) {
@@ -1315,7 +1312,7 @@ export const financeService = {
     agencyId: string,
     expenseId: string,
     input: UpdateExpenseInput,
-    userId?: string
+    _userId?: string
   ): Promise<OperationalExpense> {
     const expense = await prisma.operationalExpense.findFirst({
       where: { id: expenseId, agencyId, archivedAt: null },
@@ -1344,7 +1341,7 @@ export const financeService = {
   /**
    * Delete / Archive Operational Expense
    */
-  async deleteExpense(agencyId: string, expenseId: string, userId?: string): Promise<OperationalExpense> {
+  async deleteExpense(agencyId: string, expenseId: string, _userId?: string): Promise<OperationalExpense> {
     const expense = await prisma.operationalExpense.findFirst({
       where: { id: expenseId, agencyId, archivedAt: null },
     });

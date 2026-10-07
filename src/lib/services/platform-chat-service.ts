@@ -1,8 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import {
-  PlatformChatConversation,
-  PlatformChatMessage,
   Prisma,
   UserRole,
   UserNotificationType,

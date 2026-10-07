@@ -1,11 +1,6 @@
 import {
   Enquiry,
-  EnquiryStatus,
-  EnquiryPriority,
-  EnquirySource,
   EnquiryFollowUp,
-  FollowUpType,
-  FollowUpStatus,
 } from "@prisma/client";
 import {
   CreateEnquiryInput,
@@ -16,7 +11,6 @@ import {
   UpdateFollowUpInput,
   TransitionStageInput,
   MarkEnquiryLostInput,
-  MarkEnquiryWonInput,
   CheckDuplicateEnquiryQuery,
 } from "@/lib/validation/enquiry-schema";
 import {

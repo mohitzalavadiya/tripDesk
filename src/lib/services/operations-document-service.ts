@@ -6,7 +6,6 @@ import { pdfBrandingHelper } from "@/lib/services/pdf-branding-helper";
 import {
   ConfirmationStatus,
   DispatchStatus,
-  Prisma,
 } from "@prisma/client";
 
 export interface DocumentSummaryItem {
@@ -142,15 +141,11 @@ export class OperationsDocumentService {
         // Elegant Modern Color Palette aligned with Quotation PDF
         const brandDark = "#0F172A"; // Slate 900
         const brandAccent = "#0D9488"; // Teal 600
-        const brandLight = "#F0FDFA"; // Teal 50
         const textDark = "#0F172A"; // Slate 900
         const textMuted = "#475569"; // Slate 600
         const textLight = "#94A3B8"; // Slate 400
         const bgCard = "#F8FAFC"; // Slate 50
         const borderLight = "#E2E8F0"; // Slate 200
-        const emeraldBg = "#ECFDF5";
-        const emeraldBorder = "#A7F3D0";
-        const emeraldText = "#065F46";
 
         // Page break helper
         const ensureSpace = (neededHeight: number) => {
@@ -652,7 +647,6 @@ export class OperationsDocumentService {
         // Colors
         const brandDark = "#0F172A"; // Slate 900
         const brandAccent = "#2563EB"; // Blue 600
-        const brandLight = "#EFF6FF"; // Blue 50
         const textDark = "#0F172A";
         const textMuted = "#475569";
         const textLight = "#94A3B8";
@@ -1128,7 +1122,6 @@ export class OperationsDocumentService {
 
         const brandDark = "#0F172A"; // Slate 900
         const brandAccent = "#7C3AED"; // Purple 600
-        const brandLight = "#FAF5FF"; // Purple 50
         const textDark = "#0F172A";
         const textMuted = "#475569";
         const textLight = "#94A3B8";

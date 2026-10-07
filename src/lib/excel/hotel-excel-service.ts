@@ -1,8 +1,6 @@
 import "server-only";
 import * as XLSX from "xlsx";
 import prisma from "@/lib/prisma";
-import { hotelService } from "@/lib/services/hotel-service";
-import { createHotelSchema } from "@/lib/validation/hotel-schema";
 
 export type ImportMode = "SKIP" | "UPDATE" | "REJECT";
 

@@ -9,23 +9,18 @@ import {
   Hotel,
   Car,
   Ticket,
-  Truck,
   FileSpreadsheet,
   IndianRupee,
   BarChart,
   Settings,
-  HelpCircle,
   CalendarCheck,
   Activity,
   Star,
-  Gift,
   TrendingUp,
   Building,
   CreditCard,
   Layers,
-  ShieldCheck,
   MessageSquare,
-  Receipt,
   LucideIcon
 } from "lucide-react";
 

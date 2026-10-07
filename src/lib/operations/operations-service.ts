@@ -1,11 +1,9 @@
 import {
   Booking,
-  CustomerSnapshot,
   TripOperation,
   TripReadiness,
   ReadinessCheck,
   TransportOperation,
-  Driver,
 } from "@/types";
 import { formatCurrency } from "@/lib/costing-engine";
 

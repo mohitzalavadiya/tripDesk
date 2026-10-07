@@ -12,7 +12,6 @@ import {
   Clock,
   MapPin,
   Users,
-  Building2,
   Hotel,
   Car,
   Ticket,
@@ -21,11 +20,7 @@ import {
   Phone,
   Mail,
   Globe,
-  ShieldCheck,
   Sparkles,
-  Info,
-  DollarSign,
-  AlertCircle,
   FileText,
   Compass,
 } from "lucide-react"
@@ -40,7 +35,7 @@ interface QuotationRendererProps {
 export function QuotationRenderer({
   quotation,
   previewMode = "desktop",
-  isPublicView = false,
+  isPublicView: _isPublicView = false,
 }: QuotationRendererProps) {
   // Determine customer data whether from Quotation or PublicQuotation
   const customer = "customerSnapshot" in quotation ? quotation.customerSnapshot : quotation.customer

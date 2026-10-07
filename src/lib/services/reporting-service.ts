@@ -9,7 +9,6 @@ import {
   EnquiryStatus,
   TripStatus,
   SupplierPayableStatus,
-  Prisma,
 } from "@prisma/client";
 import {
   ReportFilterInput,

@@ -1,10 +1,8 @@
 import { z } from "zod";
 import {
   PaymentMethod,
-  PaymentStatus,
   PaymentType,
   SupplierPayableStatus,
-  SupplierPaymentStatus,
   ExpenseCategory,
 } from "@prisma/client";
 

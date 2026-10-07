@@ -8,15 +8,12 @@ import {
   BookingPaymentStatus,
   PaymentStatus,
   FollowUpStatus,
-  SupplierStatus,
   SupplierPayableStatus,
   NotificationDeliveryStatus,
   NotificationChannel,
   TravelDocumentType,
   TravelDocumentStatus,
   IssueStatus,
-  IssuePriority,
-  Prisma,
 } from "@prisma/client";
 import {
   DashboardPreset,

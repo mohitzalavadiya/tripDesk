@@ -3,9 +3,15 @@ import Link from "next/link";
 import { Compass, FileText, CreditCard, User, HelpCircle, ShieldCheck, Phone, MessageSquare, Bell } from "lucide-react";
 import { CustomerNotificationBell } from "@/components/customer/customer-notification-bell";
 
-export const metadata = {
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
   title: "TripDesk Traveler Portal — My Trips & Documents",
   description: "Secure, real-time travel itinerary, hotel vouchers, transfers, and booking documentation.",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function CustomerPortalLayout({
