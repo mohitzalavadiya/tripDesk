@@ -84,6 +84,9 @@ responsive 320 screen
 
 **TODO**
 
+scroll
+
+in numnber field we can not add alphabetic value
 
 
 itinerary builder
@@ -100,8 +103,6 @@ SEO
 
 compalate QA. => All Type of testing (Functional Testing, Integration Testing, E2E, Security, Database Testing, Performance Testing, UI/UX TestingUI/UX Testing, Compatibility Testing, Reliability / Failure Testing, Data & Backup/Recovery Testing, Production Environment Testing,
 User Acceptance Testing)
-
- 
 
 
 whatsapp and email msg checking in all steps
@@ -127,6 +128,9 @@ UAT
 Final regression
 Production
 Production smoke test -->
+
+<!-- traveltripdesk -->
+<!-- https://smarttripdesk.com/ -->
 
 
 
