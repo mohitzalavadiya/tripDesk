@@ -1,7 +1,7 @@
 import { Quotation, PublicQuotation } from "@/types"
 import { toast } from "sonner"
 
-export function exportQuotationPDF(quotation: Quotation | PublicQuotation) {
+export function exportQuotationPDF(_quotation?: Quotation | PublicQuotation) {
   if (typeof window === "undefined") return
 
   try {

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
-import { User, Agency, Subscription, SubscriptionPlan, UserRole, SubscriptionStatus } from "@prisma/client";
+import { User, Agency, Subscription, SubscriptionPlan, SubscriptionStatus } from "@prisma/client";
 
 export interface AuthenticatedContext {
   supabaseUser: {

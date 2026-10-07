@@ -18,7 +18,7 @@ const BUCKET_NAME = "agency-assets";
  */
 export function validateLogoFile(
   fileBuffer: Buffer,
-  fileName: string,
+  _fileName: string,
   mimeType: string
 ): { ext: string; sanitizedMime: string } {
   if (!fileBuffer || fileBuffer.length === 0) {

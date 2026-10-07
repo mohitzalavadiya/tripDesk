@@ -29,7 +29,6 @@ import {
   FinancialReconciliationInput,
   FinalizeOperationInput,
   ReopenOperationInput,
-  CostAdjustmentItem,
 } from "@/lib/validation/operations-schema";
 
 export interface ReadinessSummary {

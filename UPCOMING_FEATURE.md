@@ -80,6 +80,7 @@ manage read only from frontend also
 
 subscription model changes
 When any model openthat time main page scroll should not work. 
+responsive 320 screen
 
 **TODO**
 
@@ -97,15 +98,35 @@ check no static data anywhere
 
 SEO
 
-speed test
+compalate QA. => All Type of testing (Functional Testing, Integration Testing, E2E, Security, Database Testing, Performance Testing, UI/UX TestingUI/UX Testing, Compatibility Testing, Reliability / Failure Testing, Data & Backup/Recovery Testing, Production Environment Testing,
+User Acceptance Testing)
 
-compalate QA. 
+ 
 
-responsive 320 screen
 
 whatsapp and email msg checking in all steps
 
 understand flow
+
+<!-- Source-of-truth + baseline audit
+Dead/unused code cleanup
+Static/mock/hard-coded data audit
+DB/schema/architecture/security pre-QA audit
+SEO
+Functional QA
+Integration QA
+E2E QA
+Security QA
+Database/data-integrity QA
+Performance QA
+UI/UX + compatibility QA
+Reliability/failure QA
+Backup/recovery QA
+Production environment QA
+UAT
+Final regression
+Production
+Production smoke test -->
 
 
 

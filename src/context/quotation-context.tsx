@@ -3,7 +3,6 @@
 import * as React from "react"
 import {
   Quotation,
-  QuotationStatus,
   PublicQuotation,
   AgencyBranding,
   Trip,
@@ -25,9 +24,7 @@ import {
   DEFAULT_EXCLUSIONS,
   createQuotationSnapshot,
   sanitizeToPublicQuotation,
-  generateQuotationNumber,
   generateShareToken,
-  isQuotationExpired,
 } from "@/lib/quotation/quotation-service"
 import { toast } from "sonner"
 
@@ -415,7 +412,6 @@ export function QuotationProvider({ children }: { children: React.ReactNode }) {
         activities: Activity[]
       }
     ) => {
-      const existingTripQuotations = quotations.filter((q) => q.tripId === trip.id)
       const nextIndex = quotations.length + 1
 
       const newQuotation = createQuotationSnapshot(

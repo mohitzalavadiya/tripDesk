@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
@@ -92,8 +91,6 @@ const defaultAgency: AgencyAccount = {
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-
   const [currentUser, setCurrentUser] = React.useState<UserProfile>(defaultUser);
   const [currentAgency, setCurrentAgency] = React.useState<AgencyAccount>(defaultAgency);
   const [agencies, setAgencies] = React.useState<AgencyAccount[]>([]);

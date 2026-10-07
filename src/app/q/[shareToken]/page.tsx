@@ -137,9 +137,12 @@ export default function PublicQuotationPage() {
 
   const handleWhatsAppContact = () => {
     if (!quotation) return;
-    const phone = quotation.agency.phone?.replace(/[^0-9]/g, "") || "919876543210";
+    const phone = quotation.agency.phone?.replace(/[^0-9]/g, "");
     const text = `Hi ${quotation.agency.name}! I am reviewing quotation ${quotation.quotationNumber} (${quotation.title}). I would like to discuss and confirm this trip.`;
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
+    const url = phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank");
   };
 
   if (loading) {

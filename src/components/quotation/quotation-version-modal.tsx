@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Quotation } from "@/types"
-import { Copy, Plus, Sparkles, ShieldCheck } from "lucide-react"
+import { Copy, Plus, ShieldCheck } from "lucide-react"
 
 interface QuotationVersionModalProps {
   open: boolean

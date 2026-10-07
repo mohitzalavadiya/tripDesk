@@ -5,7 +5,6 @@ import {
   ActivityConfirmation,
   OperationalIssue,
   OperationEvent,
-  OperationStatus,
   ConfirmationStatus,
   DispatchStatus,
   IssuePriority,

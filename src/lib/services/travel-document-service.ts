@@ -13,7 +13,6 @@ import {
 import {
   ListDocumentsInput,
   GenerateBookingDocumentsInput,
-  GenerateSingleDocumentInput,
   IssueDocumentInput,
   RevokeDocumentInput,
   ResendDocumentInput,

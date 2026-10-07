@@ -8,7 +8,6 @@ import {
   PricingSettings,
   TripCosting,
   CostingSummary,
-  RateSnapshot,
   TripHotel,
   TripVehicle,
   TripActivity,
@@ -717,7 +716,7 @@ export function CostingProvider({ children }: { children: React.ReactNode }) {
         vehicles: TripVehicle[]
         activities: TripActivity[]
       },
-      inventoryRates: {
+      _inventoryRates?: {
         hotelRates: HotelRate[]
         vehicleRates: VehicleRate[]
         activityRates: ActivityRate[]
