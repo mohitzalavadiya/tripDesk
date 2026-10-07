@@ -908,11 +908,15 @@ export const quotationService = {
 
     const subtotal = data.subtotal !== undefined ? Number(data.subtotal) : Number(existing.subtotal);
     const markupPct = data.markupPercentage !== undefined ? Number(data.markupPercentage) : Number(existing.markupPercentage);
-    const markupAmount = data.markupAmount !== undefined ? Number(data.markupAmount) : Math.round((subtotal * markupPct) / 100);
+    const markupAmount = data.markupAmount !== undefined
+      ? Number(data.markupAmount)
+      : (data.markupPercentage !== undefined ? Math.round((subtotal * markupPct) / 100) : Number(existing.markupAmount));
     const baseWithMarkup = subtotal + markupAmount;
 
     const discountPct = data.discountPercentage !== undefined ? Number(data.discountPercentage) : Number(existing.discountPercentage);
-    const discountAmount = data.discountAmount !== undefined ? Number(data.discountAmount) : Math.round((baseWithMarkup * discountPct) / 100);
+    const discountAmount = data.discountAmount !== undefined
+      ? Number(data.discountAmount)
+      : (data.discountPercentage !== undefined ? Math.round((baseWithMarkup * discountPct) / 100) : Number(existing.discountAmount));
     const afterDiscount = Math.max(0, baseWithMarkup - discountAmount);
 
     const taxResult = taxService.calculate({
@@ -2814,10 +2818,12 @@ export const quotationService = {
       throw new Error("This proposal has already been confirmed as a booking.");
     }
 
+    const feedbackMsg = input.message || (input as any).notes || "Revision requested";
+
     const updated = await prisma.quotation.update({
       where: { id: quotation.id },
       data: {
-        customerFeedback: input.message,
+        customerFeedback: feedbackMsg,
         customerFeedbackAt: new Date(),
       },
     });
@@ -2825,12 +2831,12 @@ export const quotationService = {
     internalNotificationService.notifyAgencyOwner(quotation.agencyId, {
       type: "QUOTATION_CHANGE_REQUESTED",
       title: "Quotation Revision Requested",
-      message: `Client requested changes for Quotation #${quotation.quotationNumber}: "${input.message.slice(0, 100)}"`,
+      message: `Client requested changes for Quotation #${quotation.quotationNumber}: "${feedbackMsg.slice(0, 100)}"`,
       linkUrl: `/quotations/${quotation.id}`,
       metadata: {
         quotationId: quotation.id,
         quotationNumber: quotation.quotationNumber,
-        message: input.message,
+        message: feedbackMsg,
       },
       idempotencyKey: `quote-changes-${quotation.id}-${Date.now()}`,
     }).catch((err) => {
