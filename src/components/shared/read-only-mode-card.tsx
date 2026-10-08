@@ -28,7 +28,7 @@ export function ReadOnlyModeCard({
   const handleContactSupport = () => {
     window.open(
       `https://wa.me/919847099000?text=${encodeURIComponent(
-        `Hi TripDesk Support! Our agency workspace is currently suspended and we cannot create new ${resourceName}s. Please assist us in reactivating our account.`
+        `Hi Your Travel Desk Support! Our agency workspace is currently suspended and we cannot create new ${resourceName}s. Please assist us in reactivating our account.`
       )}`,
       "_blank"
     );
@@ -132,7 +132,7 @@ export function ReadOnlyModeCard({
               className="w-full sm:w-auto bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm px-6 h-11 rounded-xl shadow-lg shadow-rose-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
             >
               <Phone className="h-4 w-4" />
-              <span>Contact TripDesk Support</span>
+              <span>Contact Your Travel Desk Support</span>
             </Button>
           ) : (
             <Link href="/subscription" className="w-full sm:w-auto">

@@ -99,8 +99,8 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                     <PlaneTakeoff className="h-4.5 w-4.5 text-white" />
                   )}
                 </div>
-                <span className="text-base font-black">
-                  Trip<span className={isPlatform ? "text-purple-400" : "text-indigo-400"}>Desk</span>
+                <span className="text-sm font-black">
+                  Your Travel <span className={isPlatform ? "text-purple-400" : "text-indigo-400"}>Desk</span>
                 </span>
               </Link>
 

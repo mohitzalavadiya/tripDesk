@@ -54,7 +54,7 @@ export function Topbar({ onOpenMobileMenu, onToggleSidebar }: TopbarProps) {
                 <PlaneTakeoff className="h-4 w-4" />
               )}
             </div>
-            <span className="text-sm font-black hidden sm:inline">TripDesk</span>
+            <span className="text-sm font-black hidden sm:inline">Your Travel Desk</span>
           </Link>
 
           {/* Agency Context Pill for Agency Owner */}

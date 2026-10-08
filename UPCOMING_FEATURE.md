@@ -86,7 +86,14 @@ responsive 320 screen
 
 scroll
 
+favicon icon
+
 in numnber field we can not add alphabetic value
+
+
+email verification for login
+
+email and whatsapp send
 
 
 itinerary builder

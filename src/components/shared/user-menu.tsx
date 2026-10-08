@@ -19,7 +19,7 @@ export function UserMenu() {
   const router = useRouter();
   const { currentUser, currentAgency, isPlatformOwner, logout } = useAuth();
 
-  const displayName = currentUser.name || "TripDesk User";
+  const displayName = currentUser.name || "Your Travel Desk User";
   const initials = isPlatformOwner
     ? "AD"
     : displayName
@@ -27,7 +27,7 @@ export function UserMenu() {
         .map((n) => n[0])
         .join("")
         .slice(0, 2)
-        .toUpperCase() || "TD";
+        .toUpperCase() || "YD";
 
   return (
     <DropdownMenu>
@@ -56,7 +56,7 @@ export function UserMenu() {
             <span className="font-bold text-sm text-foreground">{displayName}</span>
             <span className="text-[11px] text-muted-foreground font-normal">
               {isPlatformOwner
-                ? "TripDesk Platform Owner"
+                ? "Your Travel Desk Platform Owner"
                 : `${currentAgency.name || "Agency"} (Agency Owner)`}
             </span>
           </DropdownMenuLabel>

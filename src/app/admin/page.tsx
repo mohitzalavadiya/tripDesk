@@ -114,7 +114,7 @@ export default function AdminDashboardPage() {
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
         {/* Header */}
         <PageHeader
-          title="TripDesk Platform Administration"
+          title="Your Travel Desk Platform Administration"
           description="SaaS Control Center — Executive metrics, agency governance, trial lifecycles, and cross-tenant intelligence."
           breadcrumbs={[{ label: "SaaS Platform" }, { label: "Admin Control Center" }]}
           primaryAction={{

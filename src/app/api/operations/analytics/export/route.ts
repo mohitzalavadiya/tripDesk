@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       filters
     );
 
-    const filename = `tripdesk-operations-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+    const filename = `yourtraveldesk-operations-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
 
     return new NextResponse(csvContent, {
       status: 200,

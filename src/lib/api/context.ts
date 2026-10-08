@@ -232,7 +232,7 @@ export async function requireWriteAccess(): Promise<AgencyOwnerRequestContext> {
   const context = await requireAgencyOwnerContext();
   if (context.agency.status === AgencyStatus.SUSPENDED) {
     throw new ReadOnlyAccessError(
-      "Your agency workspace is currently suspended. Creating or modifying business records is restricted. Please contact TripDesk support to reactivate your workspace."
+      "Your agency workspace is currently suspended. Creating or modifying business records is restricted. Please contact Your Travel Desk support to reactivate your workspace."
     );
   }
   if (!context.subscriptionAccess.canWrite) {

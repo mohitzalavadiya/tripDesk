@@ -98,7 +98,7 @@ export function CommunicationModal({
               })
             : "Scheduled Pickup Time");
 
-        return `🚗 *TripDesk Chauffeur & Transfer Dispatch Details*\n\nDear *${customerName}*,\n\nYour chauffeur for *${tripTitle}* (${tripNumber}) has been dispatched:\n\n👤 *Driver Name:* ${driverName}\n📞 *Driver Contact:* ${driverPhone}\n🚙 *Vehicle:* ${vehicle} (${plate})\n📍 *Pickup Location:* ${pickupLoc}\n⏰ *Pickup Time:* ${pickupTime}\n\nPlease keep your phone reachable. For urgent coordination, contact operations desk. Have a pleasant journey!`;
+        return `🚗 *Your Travel Desk Chauffeur & Transfer Dispatch Details*\n\nDear *${customerName}*,\n\nYour chauffeur for *${tripTitle}* (${tripNumber}) has been dispatched:\n\n👤 *Driver Name:* ${driverName}\n📞 *Driver Contact:* ${driverPhone}\n🚙 *Vehicle:* ${vehicle} (${plate})\n📍 *Pickup Location:* ${pickupLoc}\n⏰ *Pickup Time:* ${pickupTime}\n\nPlease keep your phone reachable. For urgent coordination, contact operations desk. Have a pleasant journey!`;
       }
 
       case "HOTEL_VOUCHER": {
@@ -114,7 +114,7 @@ export function CommunicationModal({
         const voucher =
           primaryHotel?.confirmationNumber || "Voucher Generated";
 
-        return `🏨 *TripDesk Accommodation Confirmation*\n\nDear *${customerName}*,\n\nYour hotel stay details for *${tripTitle}* are confirmed:\n\n🏢 *Hotel:* ${hotelName}\n📍 *City:* ${city}\n🛏️ *Room Type:* ${room}\n📋 *Confirmation Voucher #:* ${voucher}\n\nPresent this message or your TripDesk Voucher PDF at the front desk during check-in. Wish you a wonderful stay!`;
+        return `🏨 *Your Travel Desk Accommodation Confirmation*\n\nDear *${customerName}*,\n\nYour hotel stay details for *${tripTitle}* are confirmed:\n\n🏢 *Hotel:* ${hotelName}\n📍 *City:* ${city}\n🛏️ *Room Type:* ${room}\n📋 *Confirmation Voucher #:* ${voucher}\n\nPresent this message or your Voucher PDF at the front desk during check-in. Wish you a wonderful stay!`;
       }
 
       case "ACTIVITY_PASS": {
@@ -132,7 +132,7 @@ export function CommunicationModal({
           "E-PASS-CONFIRMED";
         const time = primaryActivity?.tripActivity?.time || "09:30 AM";
 
-        return `🎟️ *TripDesk Activity & Sightseeing E-Pass*\n\nDear *${customerName}*,\n\nYour entry pass for *${actName}* is ready:\n\n🎯 *Activity:* ${actName}\n📍 *Meeting Point:* ${loc}\n⏰ *Reporting Time:* ${time}\n🎫 *E-Ticket / Pass #:* ${passNo}\n\nPlease arrive 15 minutes prior to the scheduled slot. Enjoy the experience!`;
+        return `🎟️ *Your Travel Desk Activity & Sightseeing E-Pass*\n\nDear *${customerName}*,\n\nYour entry pass for *${actName}* is ready:\n\n🎯 *Activity:* ${actName}\n📍 *Meeting Point:* ${loc}\n⏰ *Reporting Time:* ${time}\n🎫 *E-Ticket / Pass #:* ${passNo}\n\nPlease arrive 15 minutes prior to the scheduled slot. Enjoy the experience!`;
       }
 
       case "WELCOME_BRIEFING": {
@@ -140,7 +140,7 @@ export function CommunicationModal({
           "en-IN",
           { day: "numeric", month: "short", year: "numeric" }
         );
-        return `🌟 *Welcome to Your Holiday Experience!*\n\nDear *${customerName}*,\n\nGreetings from TripDesk Operations! Your tour *${tripTitle}* begins on *${startDate}*.\n\nAll your hotel vouchers, transport dispatches, and excursion passes have been prepared. Your 24x7 operations emergency desk is active.\n\nHave an unforgettable journey!`;
+        return `🌟 *Welcome to Your Holiday Experience!*\n\nDear *${customerName}*,\n\nGreetings from Your Travel Desk Operations! Your tour *${tripTitle}* begins on *${startDate}*.\n\nAll your hotel vouchers, transport dispatches, and excursion passes have been prepared. Your 24x7 operations emergency desk is active.\n\nHave an unforgettable journey!`;
       }
 
       case "EMERGENCY_BROADCAST": {

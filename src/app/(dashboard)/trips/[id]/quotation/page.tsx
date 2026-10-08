@@ -1344,7 +1344,7 @@ export default function TripQuotationEditorPage() {
                       </SelectContent>
                     </Select>
                     <p className="text-[10px] text-slate-400 italic pt-0.5 leading-tight">
-                      Select commercial GST treatment for this quotation. TripDesk does not automatically determine legal GST treatment.
+                      Select commercial GST treatment for this quotation. Your Travel Desk does not automatically determine legal GST treatment.
                     </p>
                   </div>
                 </div>

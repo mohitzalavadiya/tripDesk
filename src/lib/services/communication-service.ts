@@ -173,8 +173,8 @@ export class CommunicationService {
       settings = await prisma.agencyCommunicationSetting.create({
         data: {
           agencyId,
-          defaultSenderName: agency?.name || "TripDesk Support",
-          defaultSenderEmail: agency?.email || "notifications@tripdesk.internal",
+          defaultSenderName: agency?.name || "Your Travel Desk Support",
+          defaultSenderEmail: agency?.email || "notifications@yourtraveldesk.in",
           emailEnabled: true,
           whatsappEnabled: true,
           autoQuotationSent: true,

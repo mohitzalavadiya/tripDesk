@@ -308,7 +308,7 @@ export function usePlatformChat({
               agencyId: rowAgencyId,
               senderUserId: rowSenderUserId,
               senderName:
-                rowSenderRole === "PLATFORM_OWNER" ? "TripDesk Support" : "Agency",
+                rowSenderRole === "PLATFORM_OWNER" ? "Your Travel Desk Support" : "Agency",
               senderEmail: "",
               senderRole: rowSenderRole,
               messageText: rowMessageText,

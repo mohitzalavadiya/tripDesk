@@ -54,10 +54,10 @@ export const invoicePdfService = {
           bufferPages: true,
           info: {
             Title: `Invoice ${invoice.invoiceNumber || "Draft"}`,
-            Author: (invoice.agencySnapshot as any)?.name || invoice.agency?.name || "TripDesk Travel Agency",
+            Author: (invoice.agencySnapshot as any)?.name || invoice.agency?.name || "Your Travel Desk Travel Agency",
             Subject: `Official Travel Invoice for Booking ${invoice.booking?.bookingNumber || "—"}`,
             Keywords: `Invoice: ${invoice.invoiceNumber || "DRAFT"}, Booking: ${invoice.booking?.bookingNumber || "—"}`,
-            Creator: "TripDesk Travel Operating System",
+            Creator: "Your Travel Desk Travel Operating System",
           },
         });
 
@@ -103,7 +103,7 @@ export const invoicePdfService = {
         // ═════════════════════════════════════════════════════════════════════
         // 1. HEADER & AGENCY BRANDING
         // ═════════════════════════════════════════════════════════════════════
-        const agencyName = agencySnap.name || "TripDesk Partner Agency";
+        const agencyName = agencySnap.name || "Your Travel Desk Partner Agency";
         const agencyEmail = agencySnap.email || "";
         const agencyPhone = agencySnap.phone || "";
         const agencyAddress = agencySnap.address || "";
@@ -660,7 +660,7 @@ export const invoicePdfService = {
               .fontSize(7)
               .font("Helvetica")
               .text(
-                `This is a computer-generated invoice from ${agencyName} • Powered by TripDesk`,
+                `This is a computer-generated invoice from ${agencyName} • Powered by Your Travel Desk`,
                 margin,
                 footerY + 6,
                 { width: contentWidth - 85, ellipsis: true }

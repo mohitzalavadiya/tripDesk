@@ -581,7 +581,7 @@ export function QuotationRenderer({
 
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400 flex-wrap gap-2">
               <span>Thank you for choosing {agency.name}. Travel with confidence.</span>
-              <span>Generated via TripDesk Operating System · {quotation.quotationNumber}</span>
+              <span>Generated via Your Travel Desk · {quotation.quotationNumber}</span>
             </div>
           </footer>
         )}

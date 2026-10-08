@@ -43,10 +43,10 @@ export function DocumentPreviewModal({
   if (!isOpen) return null;
 
   const agency = booking.agencySnapshot || {
-    name: "TripDesk Travel Studio",
+    name: "Your Travel Desk Studio",
     tagline: "Tailor-Made Luxury & Experiential Journeys",
     phone: "+91 98470 12345",
-    email: "holidays@tripdesk.in",
+    email: "holidays@yourtraveldesk.in",
     address: "Suite 402, Trade Tower, MG Road, Kochi, Kerala",
   };
 

@@ -250,7 +250,7 @@ export default function InvoiceDetailPage() {
   const subtotal = Number(invoice.subtotal || liveTotal + discountAmount);
 
   // Agency info
-  const agencyName = invoice.agency?.name || (invoice.agencySnapshot as any)?.name || "TripDesk Travel Agency";
+  const agencyName = invoice.agency?.name || (invoice.agencySnapshot as any)?.name || "Your Travel Desk Agency";
   const agencyPhone = invoice.agency?.phone || (invoice.agencySnapshot as any)?.phone || "";
   const agencyEmail = invoice.agency?.email || (invoice.agencySnapshot as any)?.email || "";
   const agencyAddress = invoice.agency?.address || (invoice.agencySnapshot as any)?.address || "";

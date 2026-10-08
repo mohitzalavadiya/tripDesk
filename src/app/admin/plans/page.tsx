@@ -224,7 +224,7 @@ export default function AdminPlansPage() {
         <div className="bg-purple-50/80 border border-purple-200/80 rounded-2xl p-4 flex items-center gap-3 text-xs text-purple-900 shadow-2xs">
           <Sparkles className="h-5 w-5 text-purple-600 shrink-0" />
           <span>
-            <strong>TripDesk Subscription Engine:</strong> Pricing plans define agency billing options, feature entitlements, and creation usage limits. Changes updated here take effect immediately across all active agency subscriptions.
+            <strong>Your Travel Desk Subscription Engine:</strong> Pricing plans define agency billing options, feature entitlements, and creation usage limits. Changes updated here take effect immediately across all active agency subscriptions.
           </span>
         </div>
 

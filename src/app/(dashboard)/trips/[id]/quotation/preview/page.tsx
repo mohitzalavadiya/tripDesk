@@ -181,7 +181,7 @@ export default function TripQuotationPreviewPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 sm:pb-6 mb-6 sm:mb-8 gap-3">
               <div className="min-w-0">
                 <div className="text-xs sm:text-sm font-black tracking-wider text-indigo-300 uppercase truncate">
-                  {quotation.agency?.name || "TRIPDESK TRAVEL AGENCY"}
+                  {quotation.agency?.name || "YOUR TRAVEL DESK"}
                 </div>
                 <div className="text-[10px] sm:text-[11px] text-slate-300 tracking-wide mt-0.5 break-words">
                   {agencySubtext}
@@ -558,7 +558,7 @@ export default function TripQuotationPreviewPage() {
 
             {/* 14. Agency Contact Footer */}
             <div className="pt-6 border-t border-slate-200 text-center text-xs text-slate-500 space-y-2">
-              <p className="font-bold text-slate-700">{quotation.agency?.name || "TripDesk Travel Platform"}</p>
+              <p className="font-bold text-slate-700">{quotation.agency?.name || "Your Travel Desk Platform"}</p>
               <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[11px]">
                 {quotation.agency?.phone && (
                   <span className="flex items-center gap-1"><Phone className="h-3 w-3 shrink-0" /> {quotation.agency.phone}</span>

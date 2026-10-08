@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { normalizeSupabaseUrl } from "./normalize";
+import { assertNotPlatformOwner } from "@/lib/auth/platform-owner-guard";
 
 /**
  * Server-only Supabase Admin client initialized with the SUPABASE_SERVICE_ROLE_KEY.
@@ -26,9 +27,12 @@ export function getAdminClient() {
 
 /**
  * Safely deletes a newly-created Supabase Auth user during onboarding cleanup.
+ * Strictly guarded against targeting the permanent Platform Owner account.
  */
 export async function deleteAuthUser(userId: string): Promise<boolean> {
   try {
+    await assertNotPlatformOwner({ userId }, { context: "deleteAuthUser" });
+
     const adminClient = getAdminClient();
     if (!adminClient) {
       console.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY not configured. Skipping Auth user cleanup.");

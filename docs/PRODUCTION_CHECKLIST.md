@@ -1,6 +1,6 @@
-# TripDesk — Production Release Readiness Checklist
+# Your Travel Desk — Production Release Readiness Checklist
 
-This checklist must be reviewed and signed off prior to deploying TripDesk to production.
+This checklist must be reviewed and signed off prior to deploying Your Travel Desk to production.
 
 ---
 

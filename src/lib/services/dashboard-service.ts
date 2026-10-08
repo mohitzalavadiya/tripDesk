@@ -1512,7 +1512,7 @@ export const dashboardService = {
     const topEntities = await this.getTopDestinationsAndCustomers(agencyId, filter);
 
     const rows = [
-      ["TripDesk Executive Analytics Report"],
+      ["Your Travel Desk Executive Analytics Report"],
       [`Generated At`, new Date().toISOString()],
       [`Date Range`, `${summary.dateRange.start} to ${summary.dateRange.end} (${summary.dateRange.preset})`],
       [],
@@ -1572,7 +1572,7 @@ export const dashboardService = {
     ];
 
     const csv = rows.map((r) => r.map((c) => `"${(c || "").replace(/"/g, '""')}"`).join(",")).join("\n");
-    const filename = `tripdesk_executive_report_${summary.dateRange.preset.toLowerCase()}_${Date.now()}.csv`;
+    const filename = `yourtraveldesk_executive_report_${summary.dateRange.preset.toLowerCase()}_${Date.now()}.csv`;
 
     return { csv, filename };
   },

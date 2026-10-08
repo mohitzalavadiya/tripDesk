@@ -16,6 +16,8 @@ const supabaseUrl = rawUrl
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+import { assertNotPlatformOwner } from "../src/lib/auth/platform-owner-guard";
+
 const agencyEmail = (
   process.env.AGENCY_OWNER_EMAIL ||
   "test1agency@gmail.com"
@@ -41,6 +43,10 @@ async function runQATests() {
     throw new Error("[CONFIG ERROR] Agency Owner email cannot be identical to Platform Owner / Admin email.");
   }
 
+  // --- HARD SAFETY GUARD: Fail closed if configured emails resolve to protected Platform Owner ---
+  await assertNotPlatformOwner({ email: adminEmail }, { prismaClient: prisma, context: "QA-01 adminEmail config" });
+  await assertNotPlatformOwner({ email: agencyEmail }, { prismaClient: prisma, context: "QA-01 agencyEmail config" });
+
   // --- Ensure Platform Owner user exists in Supabase & DB for testing ---
   if (serviceRoleKey) {
     const adminSb = createClient(supabaseUrl, serviceRoleKey);
@@ -49,6 +55,7 @@ async function runQATests() {
     let adminAuthUserId = existingAdmin?.id;
 
     if (!adminAuthUserId) {
+      await assertNotPlatformOwner({ email: adminEmail, role: "PLATFORM_OWNER" }, { prismaClient: prisma, context: "QA-01 createAdmin" });
       const { data: newAdmin } = await adminSb.auth.admin.createUser({
         email: adminEmail,
         password: adminPassword,
@@ -56,6 +63,7 @@ async function runQATests() {
       });
       adminAuthUserId = newAdmin?.user?.id;
     } else {
+      await assertNotPlatformOwner({ userId: adminAuthUserId, email: adminEmail, role: "PLATFORM_OWNER" }, { prismaClient: prisma, context: "QA-01 updateAdmin" });
       await adminSb.auth.admin.updateUserById(adminAuthUserId, {
         password: adminPassword,
         email_confirm: true,
@@ -90,6 +98,7 @@ async function runQATests() {
     const existingAgencyAuth = userList?.users.find((u) => u.email?.toLowerCase() === agencyEmail);
     let agencyAuthUserId = existingAgencyAuth?.id;
     if (!agencyAuthUserId) {
+      await assertNotPlatformOwner({ email: agencyEmail }, { prismaClient: prisma, context: "QA-01 createAgency" });
       const { data: newAgency } = await adminSb.auth.admin.createUser({
         email: agencyEmail,
         password: agencyPassword,
@@ -97,6 +106,7 @@ async function runQATests() {
       });
       agencyAuthUserId = newAgency?.user?.id;
     } else {
+      await assertNotPlatformOwner({ userId: agencyAuthUserId, email: agencyEmail }, { prismaClient: prisma, context: "QA-01 updateAgency" });
       await adminSb.auth.admin.updateUserById(agencyAuthUserId, {
         password: agencyPassword,
         email_confirm: true,

@@ -94,7 +94,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
 
     const safeRef = quotation.quotationNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
-    const filename = `TripDesk-Proposal-${safeRef}-v${quotation.version}.pdf`;
+    const filename = `YourTravelDesk-Proposal-${safeRef}-v${quotation.version}.pdf`;
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,

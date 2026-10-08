@@ -368,9 +368,9 @@ export const subscriptionService = {
 
     if (!settings) {
       return {
-        upiId: "tripdesk.billing@icici",
-        upiDisplayName: "TripDesk Billing",
-        accountHolder: "TripDesk SaaS Technologies Pvt Ltd",
+        upiId: "yourtraveldesk.billing@icici",
+        upiDisplayName: "Your Travel Desk Billing",
+        accountHolder: "Your Travel Desk SaaS Technologies Pvt Ltd",
         bankName: "ICICI Bank",
         accountNumber: "002105009844",
         ifscCode: "ICIC0000021",

@@ -27,14 +27,12 @@ async function runBrowserE2E() {
   console.log('       TRIPDESK COMPREHENSIVE BROWSER UI/UX, A11Y, SEO & UAT QA           ');
   console.log('==========================================================================\n');
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
-  // Set known test password for permanent test user
-  const testEmail = 'tripmadeeasy.in@gmail.com';
-  const testPass = 'TestPassword123!';
-  await supabase.auth.admin.updateUserById('1a5b8334-aef6-4754-83bc-8eb8b0c54151', { password: testPass });
+  // Use existing permanent test user credentials from environment without mutating account
+  const testEmail = process.env.BOOTSTRAP_AGENCY_EMAIL || 'tripmadeeasy.in@gmail.com';
+  const testPass = process.env.BOOTSTRAP_AGENCY_PASSWORD;
+  if (!testPass) {
+    throw new Error('Missing BOOTSTRAP_AGENCY_PASSWORD in environment.');
+  }
 
   const BASE_URL = 'http://localhost:3001';
 

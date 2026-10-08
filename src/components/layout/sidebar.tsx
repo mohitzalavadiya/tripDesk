@@ -56,8 +56,8 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
             </div>
             {!collapsed && (
               <div className="flex flex-col">
-                <span className="text-lg font-black tracking-tight text-white">
-                  Trip<span className={isPlatform ? "text-purple-400" : "text-indigo-400"}>Desk</span>
+                <span className="text-sm font-black tracking-tight text-white leading-tight">
+                  Your Travel <span className={isPlatform ? "text-purple-400" : "text-indigo-400"}>Desk</span>
                 </span>
                 <span className="text-[9px] uppercase font-bold tracking-widest text-slate-400">
                   {isPlatform ? "SaaS Platform" : "Agency Suite"}

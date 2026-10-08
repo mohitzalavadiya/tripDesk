@@ -6,7 +6,7 @@ import { CustomerNotificationBell } from "@/components/customer/customer-notific
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "TripDesk Traveler Portal — My Trips & Documents",
+  title: "Your Travel Desk Traveler Portal — My Trips & Documents",
   description: "Secure, real-time travel itinerary, hotel vouchers, transfers, and booking documentation.",
   robots: {
     index: false,
@@ -30,7 +30,7 @@ export default function CustomerPortalLayout({
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-base tracking-tight text-slate-900">TripDesk</span>
+                <span className="font-extrabold text-base tracking-tight text-slate-900">Your Travel Desk</span>
                 <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/60">
                   Guest
                 </span>
@@ -109,7 +109,7 @@ export default function CustomerPortalLayout({
       <footer className="border-t border-slate-200/80 bg-white py-8 text-center text-xs text-slate-500 pb-16 sm:pb-8">
         <div className="max-w-6xl mx-auto px-4 space-y-2">
           <div className="flex items-center justify-center gap-2 font-semibold text-slate-700">
-            <span>Powered by TripDesk Travel Management</span>
+            <span>Powered by Your Travel Desk Travel Management</span>
           </div>
           <p className="text-[11px] text-slate-400">
             For travel amendments or emergency assistance, please contact your tour manager.

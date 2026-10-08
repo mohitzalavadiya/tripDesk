@@ -33,7 +33,7 @@ export class EmailTemplateEngine {
     type: CustomerNotificationType,
     vars: EmailTemplateVariables
   ): EmailRenderOutput {
-    const agencyName = vars.agencyName || "TripDesk Travel Specialist";
+    const agencyName = vars.agencyName || "Your Travel Desk Travel Specialist";
     const customerName = vars.customerName || "Valued Traveler";
     const brandColor = "#4f46e5"; // Indigo 600
 
@@ -228,7 +228,7 @@ export class EmailTemplateEngine {
                 ${agencyName} ${vars.agencyPhone ? `• ${vars.agencyPhone}` : ""} ${vars.agencyEmail ? `• ${vars.agencyEmail}` : ""}
               </p>
               <p style="font-size: 11px; color: #cbd5e1; margin: 0;">
-                Delivered via TripDesk Travel Agency Platform
+                Delivered via Your Travel Desk Travel Agency Platform
               </p>
             </td>
           </tr>

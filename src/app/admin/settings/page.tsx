@@ -33,9 +33,9 @@ export default function AdminSettingsPage() {
   const [confirmDeleteQrOpen, setConfirmDeleteQrOpen] = React.useState(false);
 
   // General Settings
-  const [platformName, setPlatformName] = React.useState("TripDesk SaaS Platform");
+  const [platformName, setPlatformName] = React.useState("Your Travel Desk SaaS Platform");
   const [defaultTrialDays, setDefaultTrialDays] = React.useState("7");
-  const [supportEmail, setSupportEmail] = React.useState("support@tripdesk.io");
+  const [supportEmail, setSupportEmail] = React.useState("support@yourtraveldesk.in");
   const [supportPhone, setSupportPhone] = React.useState("+91 98470 99000");
   const [maintenanceMode, setMaintenanceMode] = React.useState("false");
   const [platformNotice, setPlatformNotice] = React.useState("");
@@ -199,7 +199,7 @@ export default function AdminSettingsPage() {
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
         {/* Top Header */}
         <PageHeader
-          title="TripDesk Platform Settings"
+          title="Your Travel Desk Platform Settings"
           description="Configure global SaaS environment defaults, trial periods, subscription billing instructions, and support channels."
           breadcrumbs={[{ label: "SaaS Platform", href: "/admin" }, { label: "Platform Settings" }]}
           primaryAction={{
@@ -249,12 +249,12 @@ export default function AdminSettingsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700">
-                        TripDesk Official UPI ID <span className="text-rose-500">*</span>
+                        Your Travel Desk Official UPI ID <span className="text-rose-500">*</span>
                       </label>
                       <Input
                         value={upiId}
                         onChange={(e) => setUpiId(e.target.value)}
-                        placeholder="e.g. tripdesk.billing@icici"
+                        placeholder="e.g. yourtraveldesk.billing@icici"
                         className="h-9 text-xs font-mono"
                         required
                       />
@@ -268,7 +268,7 @@ export default function AdminSettingsPage() {
                       <Input
                         value={upiDisplayName}
                         onChange={(e) => setUpiDisplayName(e.target.value)}
-                        placeholder="e.g. TripDesk Billing"
+                        placeholder="e.g. Your Travel Desk Billing"
                         className="h-9 text-xs"
                       />
                       <p className="text-[10px] text-slate-400">
@@ -292,7 +292,7 @@ export default function AdminSettingsPage() {
                       <Input
                         value={accountHolder}
                         onChange={(e) => setAccountHolder(e.target.value)}
-                        placeholder="e.g. TripDesk SaaS Technologies Pvt Ltd"
+                        placeholder="e.g. Your Travel Desk SaaS Technologies Pvt Ltd"
                         className="h-9 text-xs"
                         required
                       />

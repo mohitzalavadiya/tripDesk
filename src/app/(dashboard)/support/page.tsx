@@ -105,7 +105,7 @@ export default function SupportPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
         <RefreshCw className="h-8 w-8 text-purple-600 animate-spin" />
-        <p className="text-sm font-medium text-slate-600">Connecting to TripDesk Support...</p>
+        <p className="text-sm font-medium text-slate-600">Connecting to Your Travel Desk Support...</p>
       </div>
     );
   }
@@ -133,7 +133,7 @@ export default function SupportPage() {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              <h1 className="text-sm sm:text-lg font-bold text-slate-900 truncate">TripDesk Support</h1>
+              <h1 className="text-sm sm:text-lg font-bold text-slate-900 truncate">Your Travel Desk Support</h1>
               <span className="text-[9px] sm:text-[10px] font-semibold tracking-wider uppercase px-1.5 sm:px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
                 Official Platform Team
               </span>
@@ -182,7 +182,7 @@ export default function SupportPage() {
             <div className="h-12 w-12 rounded-full bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600">
               <MessageSquare className="h-6 w-6" />
             </div>
-            <h3 className="text-sm font-bold text-slate-800">Welcome to TripDesk Support!</h3>
+            <h3 className="text-sm font-bold text-slate-800">Welcome to Your Travel Desk Support!</h3>
             <p className="text-xs text-slate-500 max-w-sm">
               Ask anything about your workspace setup, rates, itineraries, subscriptions, or feature requests. A platform specialist will assist you promptly.
             </p>
@@ -199,7 +199,7 @@ export default function SupportPage() {
               >
                 <div className="flex items-center gap-1.5 mb-1 px-1">
                   <span className="text-[11px] font-semibold text-slate-700">
-                    {isMe ? "You" : "TripDesk Team"}
+                    {isMe ? "You" : "Your Travel Desk Team"}
                   </span>
                   {!isMe && (
                     <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 text-purple-800">

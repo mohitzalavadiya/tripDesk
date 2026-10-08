@@ -1288,7 +1288,7 @@ export const adminService = {
     const result: Record<string, string> = {
       defaultTrialDays: "7",
       maintenanceMode: "false",
-      supportEmail: "support@tripdesk.io",
+      supportEmail: "support@yourtraveldesk.in",
       platformNotice: "",
     };
 
@@ -1342,9 +1342,9 @@ export const adminService = {
         where: { id: "default" },
         create: {
           id: "default",
-          upiId: "tripdesk.billing@icici",
-          upiDisplayName: "TripDesk Billing",
-          accountHolder: "TripDesk SaaS Technologies Pvt Ltd",
+          upiId: "yourtraveldesk.billing@icici",
+          upiDisplayName: "Your Travel Desk Billing",
+          accountHolder: "Your Travel Desk SaaS Technologies Pvt Ltd",
           bankName: "ICICI Bank",
           accountNumber: "002105009844",
           ifscCode: "ICIC0000021",
@@ -1357,9 +1357,9 @@ export const adminService = {
     if (!settings) {
       return {
         id: "default",
-        upiId: "tripdesk.billing@icici",
-        upiDisplayName: "TripDesk Billing",
-        accountHolder: "TripDesk SaaS Technologies Pvt Ltd",
+        upiId: "yourtraveldesk.billing@icici",
+        upiDisplayName: "Your Travel Desk Billing",
+        accountHolder: "Your Travel Desk SaaS Technologies Pvt Ltd",
         bankName: "ICICI Bank",
         accountNumber: "002105009844",
         ifscCode: "ICIC0000021",

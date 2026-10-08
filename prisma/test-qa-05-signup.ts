@@ -4,6 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, UserRole } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
 import { signupAgencyOwnerAction } from "../src/actions/auth-actions";
+import { assertNotPlatformOwner } from "../src/lib/auth/platform-owner-guard";
 
 const connectionString = process.env.DATABASE_URL;
 const pool = new Pool({ connectionString });
@@ -152,6 +153,10 @@ async function runSignupVerificationTest() {
   console.log(`  ✔ Platform Owner verified: "${platformOwner.email}" remains ${platformOwner.role} (Untouched)`);
 
   console.log(`\n▶ Step 8: Safe cleanup of newly-created test Auth user`);
+  await assertNotPlatformOwner(
+    { userId: createdAuthUser.id, email: createdAuthUser.email },
+    { prismaClient: prisma, context: "QA-05 deleteUser cleanup" }
+  );
   await adminSb.auth.admin.deleteUser(createdAuthUser.id);
   console.log(`  ✔ Test Auth user "${createdAuthUser.id}" cleaned up successfully.`);
 

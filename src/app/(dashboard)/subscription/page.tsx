@@ -210,10 +210,10 @@ export default function AgencySubscriptionPage() {
   }, [fetchData]);
 
   const handleContactSupport = () => {
-    const agencyName = data?.agency.name || "TripDesk Agency";
+    const agencyName = data?.agency.name || "Agency";
     window.open(
       `https://wa.me/919847099000?text=${encodeURIComponent(
-        `Hi TripDesk Billing Support! I am from ${agencyName}. I need assistance with our SaaS subscription & plan upgrade.`
+        `Hi Your Travel Desk Billing Support! I am from ${agencyName}. I need assistance with our SaaS subscription & plan upgrade.`
       )}`,
       "_blank"
     );
@@ -307,7 +307,7 @@ export default function AgencySubscriptionPage() {
         {/* Top Header */}
         <PageHeader
           title="Agency Subscription & Billing"
-          description="Manage your TripDesk SaaS subscription tier, renewals, billing cycle, and manual payment verification."
+          description="Manage your Your Travel Desk subscription tier, renewals, billing cycle, and manual payment verification."
           breadcrumbs={[{ label: "Agency Settings" }, { label: "Subscription" }]}
           primaryAction={{
             label: "Contact Billing Support",
@@ -1061,7 +1061,7 @@ export default function AgencySubscriptionPage() {
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                            TripDesk Official Billing UPI ID
+                            Your Travel Desk Official Billing UPI ID
                           </span>
                           {upiName && (
                             <span className="text-[10px] text-slate-500 font-medium">

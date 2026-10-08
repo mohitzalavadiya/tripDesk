@@ -760,7 +760,7 @@ export class ReportingService {
     };
 
     let lines: string[] = [];
-    let filename = `tripdesk-${reportType.toLowerCase()}-report-${dateStamp}.csv`;
+    let filename = `yourtraveldesk-${reportType.toLowerCase()}-report-${dateStamp}.csv`;
 
     switch (reportType) {
       case "RECEIVABLES": {
@@ -820,7 +820,7 @@ export class ReportingService {
 
       case "OVERVIEW":
       default: {
-        lines.push(`"TRIPDESK EXECUTIVE BI & FINANCIAL REPORT - ${data.agencyInfo.name}"`);
+        lines.push(`"YOUR TRAVEL DESK EXECUTIVE BI & FINANCIAL REPORT - ${data.agencyInfo.name}"`);
         lines.push(`"Period: ${data.dateRange.startDate} to ${data.dateRange.endDate} (${data.dateRange.preset})"`);
         lines.push("");
         lines.push(["EXECUTIVE METRIC", "VALUE"].map(sanitize).join(","));
@@ -859,7 +859,7 @@ export class ReportingService {
   ): Promise<{ buffer: Buffer; filename: string }> {
     const data = await this.getAgencyBIReport(agencyId, filter);
     const dateStamp = new Date().toISOString().slice(0, 10);
-    const filename = `tripdesk-executive-report-${dateStamp}.pdf`;
+    const filename = `yourtraveldesk-executive-report-${dateStamp}.pdf`;
 
     return new Promise((resolve, reject) => {
       try {
@@ -871,7 +871,7 @@ export class ReportingService {
         doc.on("error", (err: Error) => reject(err));
 
         // 1. Header & Agency Info
-        doc.fillColor("#1E293B").fontSize(20).text("TRIPDESK EXECUTIVE BI REPORT", { bold: true } as any);
+        doc.fillColor("#1E293B").fontSize(20).text("YOUR TRAVEL DESK EXECUTIVE BI REPORT", { bold: true } as any);
         doc.fontSize(10).fillColor("#64748B").text(`Agency: ${data.agencyInfo.name} (${data.agencyInfo.email})`);
         doc.text(`Reporting Horizon: ${data.dateRange.startDate} to ${data.dateRange.endDate} (${data.dateRange.preset})`);
         doc.text(`Generated On: ${new Date().toUTCString()}`);
@@ -967,7 +967,7 @@ export class ReportingService {
 
         // Footer
         doc.fontSize(8).fillColor("#94A3B8").text(
-          "TripDesk SaaS B2B Platform • Confidential Agency BI & Financial Report • Zero Commercial Leakage",
+          "Your Travel Desk SaaS B2B Platform • Confidential Agency BI & Financial Report • Zero Commercial Leakage",
           40,
           770,
           { align: "center", width: 515 }

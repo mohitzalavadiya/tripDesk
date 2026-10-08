@@ -134,7 +134,7 @@ export async function loginAction(
       authError?.message?.toLowerCase().includes("email_not_confirmed")
     ) {
       return {
-        error: "Please verify your email address before signing in to TripDesk.",
+        error: "Please verify your email address before signing in to Your Travel Desk.",
         unverified: true,
         email,
       };
@@ -158,7 +158,7 @@ export async function loginAction(
     await supabase.auth.signOut();
     return {
       error:
-        "Your authentication credentials are valid, but no TripDesk workspace profile was found. Please contact support.",
+        "Your authentication credentials are valid, but no Your Travel Desk workspace profile was found. Please contact support.",
     };
   }
 
@@ -174,7 +174,7 @@ export async function loginAction(
     // Unverified Agency Owner: safely destroy the session and block workspace access
     await supabase.auth.signOut();
     return {
-      error: "Please verify your email address before signing in to TripDesk.",
+      error: "Please verify your email address before signing in to Your Travel Desk.",
       unverified: true,
       email,
     };

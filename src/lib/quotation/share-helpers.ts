@@ -6,7 +6,8 @@ export function getPublicQuotationUrl(shareToken: string): string {
   if (typeof window !== "undefined") {
     return `${window.location.origin}/q/${shareToken}`
   }
-  return `https://tripdesk.in/q/${shareToken}`
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://yourtraveldesk.in"
+  return `${appUrl.replace(/\/$/, "")}/q/${shareToken}`
 }
 
 export function formatWhatsAppShareText(

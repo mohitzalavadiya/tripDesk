@@ -1229,7 +1229,7 @@ export const operationsAnalyticsService = {
     const data = await this.getOperationsAnalyticsDashboard(agencyId, filters);
 
     const rows: string[] = [];
-    rows.push("TRIPDESK OPERATIONS MANAGEMENT ANALYTICS REPORT");
+    rows.push("YOUR TRAVEL DESK OPERATIONS MANAGEMENT ANALYTICS REPORT");
     rows.push(`Generated At,${new Date().toISOString()}`);
     rows.push(`Date Range Preset,${data.dateRange.preset}`);
     rows.push(`Date Range,${data.dateRange.start.slice(0, 10)} to ${data.dateRange.end.slice(0, 10)}`);

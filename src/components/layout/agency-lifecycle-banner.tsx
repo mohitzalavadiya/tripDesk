@@ -23,7 +23,7 @@ export function AgencyLifecycleBanner() {
   const handleContactSupport = () => {
     window.open(
       `https://wa.me/919847099000?text=${encodeURIComponent(
-        `Hi TripDesk Support! I am ${currentUser.name} from ${agencyName}. I need assistance with our SaaS account status.`
+        `Hi Your Travel Desk Support! I am ${currentUser.name} from ${agencyName}. I need assistance with our SaaS account status.`
       )}`,
       "_blank"
     );
@@ -36,7 +36,7 @@ export function AgencyLifecycleBanner() {
         <div className="flex items-center gap-2 font-medium">
           <ShieldAlert className="h-4 w-4 shrink-0 text-rose-200" />
           <span>
-            <strong>Account Suspended:</strong> Your TripDesk agency workspace is currently suspended. Please contact TripDesk support to reactivate your account.
+            <strong>Account Suspended:</strong> Your agency workspace is currently suspended. Please contact Your Travel Desk support to reactivate your account.
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -46,7 +46,7 @@ export function AgencyLifecycleBanner() {
             className="bg-white text-rose-700 hover:bg-rose-50 font-bold text-xs h-7 px-3 rounded-lg cursor-pointer"
           >
             <Phone className="h-3 w-3 mr-1" />
-            Contact TripDesk
+            Contact Your Travel Desk
           </Button>
         </div>
       </div>
@@ -77,7 +77,7 @@ export function AgencyLifecycleBanner() {
             onClick={handleContactSupport}
             className="bg-blue-700 text-white hover:bg-blue-800 font-bold text-xs h-7 px-3 rounded-lg cursor-pointer"
           >
-            Contact TripDesk
+            Contact Your Travel Desk
           </Button>
         </div>
       </div>
@@ -91,7 +91,7 @@ export function AgencyLifecycleBanner() {
         <div className="flex items-center gap-2 font-medium">
           <AlertTriangle className="h-4 w-4 shrink-0 text-amber-200" />
           <span>
-            <strong>Trial Expiring {trialDaysRemaining === 0 ? "Today" : "Tomorrow"}:</strong> Your 7-day TripDesk free trial ends {trialDaysRemaining === 0 ? "today" : "tomorrow"}. Upgrade your plan to prevent service interruption.
+            <strong>Trial Expiring {trialDaysRemaining === 0 ? "Today" : "Tomorrow"}:</strong> Your 7-day free trial ends {trialDaysRemaining === 0 ? "today" : "tomorrow"}. Upgrade your plan to prevent service interruption.
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -107,7 +107,7 @@ export function AgencyLifecycleBanner() {
             onClick={handleContactSupport}
             className="bg-amber-700 text-white hover:bg-amber-800 font-bold text-xs h-7 px-3 rounded-lg cursor-pointer"
           >
-            Contact TripDesk
+            Contact Your Travel Desk
           </Button>
         </div>
       </div>
@@ -138,7 +138,7 @@ export function AgencyLifecycleBanner() {
             onClick={handleContactSupport}
             className="text-white hover:bg-white/10 text-xs h-6.5 px-2.5 rounded-lg cursor-pointer"
           >
-            Contact TripDesk
+            Contact Your Travel Desk
           </Button>
         </div>
       </div>

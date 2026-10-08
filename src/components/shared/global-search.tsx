@@ -87,16 +87,16 @@ export function GlobalSearch() {
     <>
       <button
         onClick={() => setOpen(true)}
-        aria-label="Search TripDesk"
+        aria-label="Search Your Travel Desk"
         className="flex h-9 items-center justify-between rounded-lg border border-border bg-slate-50 px-2.5 sm:px-3 text-sm text-muted-foreground transition-all hover:bg-slate-100 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:w-64 lg:w-80 cursor-pointer"
       >
         <span className="flex items-center gap-2">
           <Search className="h-4 w-4 stroke-[1.5]" />
           <span className="hidden sm:inline">Search anything...</span>
         </span>
-        <kbd className="pointer-events-none hidden h-5 select-none items-center gap-0.5 rounded border border-border bg-white px-1.5 font-mono text-[10px] font-medium text-muted-foreground md:flex">
+        {/* <kbd className="pointer-events-none hidden h-5 select-none items-center gap-0.5 rounded border border-border bg-white px-1.5 font-mono text-[10px] font-medium text-muted-foreground md:flex">
           <span className="text-xs">⌘</span>K
-        </kbd>
+        </kbd> */}
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -104,7 +104,7 @@ export function GlobalSearch() {
           <DialogHeader className="p-4 border-b border-border">
             <DialogTitle className="flex items-center gap-2 text-sm text-muted-foreground">
               <Search className="h-4 w-4" />
-              Search TripDesk
+              Search Your Travel Desk
             </DialogTitle>
           </DialogHeader>
           <div className="p-3">

@@ -73,7 +73,7 @@ const defaultUser: UserProfile = {
 
 const defaultAgency: AgencyAccount = {
   id: "",
-  name: "TripDesk Workspace",
+  name: "Your Travel Desk Workspace",
   email: "",
   phone: "",
   city: "",
@@ -113,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           setCurrentUser({
             id: u.id,
-            name: u.name || "TripDesk User",
+            name: u.name || "Your Travel Desk User",
             email: u.email || "",
             role: role,
             agencyId: u.agencyId || null,

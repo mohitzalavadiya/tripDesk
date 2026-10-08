@@ -38,7 +38,7 @@ export function ReadOnlyModeDialog({
     onOpenChange(false);
     window.open(
       `https://wa.me/919847099000?text=${encodeURIComponent(
-        "Hi TripDesk Support! Our agency workspace is currently suspended. Please assist us in reactivating our account."
+        "Hi Your Travel Desk Support! Our agency workspace is currently suspended. Please assist us in reactivating our account."
       )}`,
       "_blank"
     );
@@ -86,7 +86,7 @@ export function ReadOnlyModeDialog({
             <DialogDescription className="text-xs text-slate-600 leading-relaxed pt-1">
               {isSuspended ? (
                 <span>
-                  Your agency workspace has been suspended by Platform Administration. <strong>{effectiveActionName}</strong> and other business modification actions are disabled. Please contact TripDesk support to reactivate your workspace.
+                  Your agency workspace has been suspended by Platform Administration. <strong>{effectiveActionName}</strong> and other business modification actions are disabled. Please contact Your Travel Desk support to reactivate your workspace.
                 </span>
               ) : (
                 <span>

@@ -1089,7 +1089,7 @@ export default function SettingsPage() {
                   <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-200/70 flex items-start gap-2 text-[11px] text-amber-900 leading-relaxed">
                     <HelpCircle className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
                     <span>
-                      Commercial GST treatment is a manually chosen commercial preference. TripDesk does not perform automated place-of-supply legal determination.
+                      Commercial GST treatment is a manually chosen commercial preference. Your Travel Desk does not perform automated place-of-supply legal determination.
                     </span>
                   </div>
                 </div>
@@ -1318,7 +1318,7 @@ export default function SettingsPage() {
         open={confirmRemoveLogoOpen}
         onOpenChange={setConfirmRemoveLogoOpen}
         title="Remove Custom Agency Logo"
-        description="Are you sure you want to remove your custom agency logo? Your customer quotations, booking vouchers, and share links will revert to the standard TripDesk agency header."
+        description="Are you sure you want to remove your custom agency logo? Your customer quotations, booking vouchers, and share links will revert to the standard Your Travel Desk agency header."
         confirmText="Remove Logo"
         variant="destructive"
         loading={savingLogo}

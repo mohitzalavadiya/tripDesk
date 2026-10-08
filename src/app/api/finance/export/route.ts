@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     const csvData = await financeService.generateFinanceCsv(context.agencyId, query);
 
-    const filename = `tripdesk-finance-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    const filename = `yourtraveldesk-finance-report-${new Date().toISOString().slice(0, 10)}.csv`;
 
     return new NextResponse(csvData, {
       status: 200,

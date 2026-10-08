@@ -380,7 +380,7 @@ export class PlatformChatService {
       } else {
         await internalNotificationService.notifyAgencyOwner(agencyId, {
           type: UserNotificationType.PLATFORM_CHAT_MESSAGE,
-          title: "TripDesk Platform Support",
+          title: "Your Travel Desk Support",
           message: snippet,
           linkUrl: "/support",
           idempotencyKey: `chat-notif-${createdMessage.id}`,
@@ -519,7 +519,7 @@ export class PlatformChatService {
       conversationId: msg.conversationId,
       agencyId: msg.agencyId,
       senderUserId: msg.senderUserId,
-      senderName: msg.senderUser?.name || (msg.senderRole === UserRole.PLATFORM_OWNER ? "TripDesk Platform" : "Agency Owner"),
+      senderName: msg.senderUser?.name || (msg.senderRole === UserRole.PLATFORM_OWNER ? "Your Travel Desk Platform" : "Agency Owner"),
       senderEmail: msg.senderUser?.email || "",
       senderRole: msg.senderRole,
       messageText: msg.messageText,

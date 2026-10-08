@@ -2236,7 +2236,7 @@ export default function TripDetailPage() {
                 <div className="text-xs text-indigo-950 space-y-1">
                   <p className="font-bold">Dynamic Contracted Rate Sheet Resolution</p>
                   <p className="text-indigo-900/80 leading-relaxed">
-                    TripDesk automatically matches contracted supplier rate sheets for dates, room categories, vehicle types, and participant counts. View itemized supplier outlays, configure agency markups, and calculate final customer selling prices in the Costing Studio.
+                    Your Travel Desk automatically matches contracted supplier rate sheets for dates, room categories, vehicle types, and participant counts. View itemized supplier outlays, configure agency markups, and calculate final customer selling prices in the Costing Studio.
                   </p>
                 </div>
               </div>

@@ -238,7 +238,7 @@ export class DocumentPdfService {
             Title: `Hotel Voucher - ${data.hotelName}`,
             Author: data.agency.name,
             Subject: `Voucher ${data.documentNumber} v${data.version}`,
-            Creator: "TripDesk Document Suite",
+            Creator: "Your Travel Desk Document Suite",
           },
         });
 
@@ -376,7 +376,7 @@ export class DocumentPdfService {
           .font("Helvetica")
           .fillColor("#94A3B8")
           .text(
-            `Generated securely via TripDesk • ${data.agency.name} • For emergency support call ${data.agency.phone || "your travel advisor"}`,
+            `Generated securely via Your Travel Desk • ${data.agency.name} • For emergency support call ${data.agency.phone || "your travel advisor"}`,
             margin,
             780,
             { align: "center", width: contentWidth }
@@ -410,7 +410,7 @@ export class DocumentPdfService {
             Title: `Vehicle Voucher - ${data.vehicleName}`,
             Author: data.agency.name,
             Subject: `Voucher ${data.documentNumber} v${data.version}`,
-            Creator: "TripDesk Document Suite",
+            Creator: "Your Travel Desk Document Suite",
           },
         });
 
@@ -545,7 +545,7 @@ export class DocumentPdfService {
           .font("Helvetica")
           .fillColor("#94A3B8")
           .text(
-            `Generated securely via TripDesk • ${data.agency.name} • Helpline: ${data.agency.phone || "Available on portal"}`,
+            `Generated securely via Your Travel Desk • ${data.agency.name} • Helpline: ${data.agency.phone || "Available on portal"}`,
             margin,
             780,
             { align: "center", width: contentWidth }
@@ -579,7 +579,7 @@ export class DocumentPdfService {
             Title: `Activity Voucher - ${data.activityName}`,
             Author: data.agency.name,
             Subject: `Voucher ${data.documentNumber} v${data.version}`,
-            Creator: "TripDesk Document Suite",
+            Creator: "Your Travel Desk Document Suite",
           },
         });
 
@@ -709,7 +709,7 @@ export class DocumentPdfService {
           .font("Helvetica")
           .fillColor("#94A3B8")
           .text(
-            `Generated securely via TripDesk • ${data.agency.name} • Contact: ${data.agency.phone || "Available on customer portal"}`,
+            `Generated securely via Your Travel Desk • ${data.agency.name} • Contact: ${data.agency.phone || "Available on customer portal"}`,
             margin,
             780,
             { align: "center", width: contentWidth }
@@ -743,7 +743,7 @@ export class DocumentPdfService {
             Title: `Booking Confirmation - ${data.bookingNumber}`,
             Author: data.agency.name,
             Subject: `Confirmation ${data.documentNumber}`,
-            Creator: "TripDesk Document Suite",
+            Creator: "Your Travel Desk Document Suite",
           },
         });
 
@@ -916,7 +916,7 @@ export class DocumentPdfService {
           .font("Helvetica")
           .fillColor("#94A3B8")
           .text(
-            `Generated securely via TripDesk • ${data.agency.name} • Contact: ${data.agency.phone || "Available on portal"}`,
+            `Generated securely via Your Travel Desk • ${data.agency.name} • Contact: ${data.agency.phone || "Available on portal"}`,
             margin,
             780,
             { align: "center", width: contentWidth }
@@ -950,7 +950,7 @@ export class DocumentPdfService {
             Title: `Payment Receipt - ${data.paymentNumber}`,
             Author: data.agency.name,
             Subject: `Receipt ${data.documentNumber}`,
-            Creator: "TripDesk Document Suite",
+            Creator: "Your Travel Desk Document Suite",
           },
         });
 
@@ -1071,7 +1071,7 @@ export class DocumentPdfService {
         doc.rect(margin, y, contentWidth, 65).fillAndStroke("#F8FAFC", "#E2E8F0");
         doc.fillColor("#0F172A").fontSize(8.5).font("Helvetica-Bold").text("Acknowledgement & Terms", margin + 15, y + 8);
         const notes = [
-          "• This is an official computer-generated receipt issued by TripDesk on behalf of the agency.",
+          "• This is an official computer-generated receipt issued by Your Travel Desk on behalf of the agency.",
           "• Payments made by cheque or bank transfer are subject to realization.",
           data.notes ? `• Note: ${data.notes}` : null,
         ].filter(Boolean);
@@ -1088,7 +1088,7 @@ export class DocumentPdfService {
           .font("Helvetica")
           .fillColor("#94A3B8")
           .text(
-            `Generated securely via TripDesk • ${data.agency.name} • Contact: ${data.agency.phone || "Available on portal"}`,
+            `Generated securely via Your Travel Desk • ${data.agency.name} • Contact: ${data.agency.phone || "Available on portal"}`,
             margin,
             780,
             { align: "center", width: contentWidth }
@@ -1122,7 +1122,7 @@ export class DocumentPdfService {
             Title: `Itinerary & Travel Kit - ${data.tripTitle}`,
             Author: data.agency.name,
             Subject: `Itinerary ${data.documentNumber}`,
-            Creator: "TripDesk Document Suite",
+            Creator: "Your Travel Desk Document Suite",
           },
         });
 
@@ -1252,7 +1252,7 @@ export class DocumentPdfService {
           .font("Helvetica")
           .fillColor("#94A3B8")
           .text(
-            `Generated securely via TripDesk • ${data.agency.name} • Contact: ${data.agency.phone || "Available on portal"}`,
+            `Generated securely via Your Travel Desk • ${data.agency.name} • Contact: ${data.agency.phone || "Available on portal"}`,
             margin,
             780,
             { align: "center", width: contentWidth }
@@ -1280,7 +1280,7 @@ export class DocumentPdfService {
             Title: `Supplier Operational Voucher - ${data.serviceName}`,
             Author: data.agency.name,
             Subject: `Voucher ${data.documentNumber}`,
-            Creator: "TripDesk Document Suite",
+            Creator: "Your Travel Desk Document Suite",
           },
         });
 
@@ -1385,7 +1385,7 @@ export class DocumentPdfService {
           .font("Helvetica")
           .fillColor("#94A3B8")
           .text(
-            `Generated securely via TripDesk • ${data.agency.name} • Internal Accounts Desk`,
+            `Generated securely via Your Travel Desk • ${data.agency.name} • Internal Accounts Desk`,
             margin,
             780,
             { align: "center", width: contentWidth }

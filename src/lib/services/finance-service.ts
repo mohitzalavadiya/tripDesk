@@ -2111,7 +2111,7 @@ export const financeService = {
 
     const rows: string[] = [];
 
-    rows.push(escape("TRIPDESK FINANCE & PROFITABILITY REPORT"));
+    rows.push(escape("YOUR TRAVEL DESK FINANCE & PROFITABILITY REPORT"));
     rows.push(escape(`Date Range: ${dashboard.dateRange.start.slice(0, 10)} to ${dashboard.dateRange.end.slice(0, 10)} (${dashboard.dateRange.preset})`));
     rows.push(escape(`Generated At: ${new Date().toISOString()}`));
     rows.push("");

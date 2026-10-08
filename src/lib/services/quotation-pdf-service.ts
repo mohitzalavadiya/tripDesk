@@ -147,10 +147,10 @@ export class QuotationPdfService {
           compress: false,
           info: {
             Title: `${data.title || "Travel Itinerary Proposal"} - ${data.quotationNumber}`,
-            Author: data.agency?.name || "TripDesk Travel Agency",
+            Author: data.agency?.name || "Your Travel Desk Travel Agency",
             Subject: `Holiday Itinerary Proposal ${data.quotationNumber} V${data.version}`,
             Keywords: `Proposal: ${data.quotationNumber}, Traveler: ${data.customer?.name || "Valued Customer"}`,
-            Creator: "TripDesk Travel Platform",
+            Creator: "Your Travel Desk Travel Platform",
           },
         });
 
@@ -249,7 +249,7 @@ export class QuotationPdfService {
           durationText = `${nights} Nights / ${nights + 1} Days`;
         }
 
-        const agencyName = data.agency?.name || "TRIPDESK TRAVEL AGENCY";
+        const agencyName = data.agency?.name || "YOUR TRAVEL DESK TRAVEL AGENCY";
         const customerName = data.customer?.name || "Valued Traveler";
 
         // ═════════════════════════════════════════════════════════════════════

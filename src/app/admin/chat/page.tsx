@@ -417,7 +417,7 @@ export default function AdminChatPage() {
                     >
                       <div className="flex items-center gap-1.5 mb-1 px-1">
                         <span className="text-[11px] font-semibold text-slate-700">
-                          {isMe ? "You (TripDesk)" : selectedConversation.agencyName || "Agency"}
+                          {isMe ? "You (Your Travel Desk)" : selectedConversation.agencyName || "Agency"}
                         </span>
                         <span className="text-[10px] text-slate-400">{formattedTime}</span>
                       </div>

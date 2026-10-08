@@ -13,6 +13,7 @@ Module.prototype.require = function (id: string) {
 };
 
 import { prisma } from "../src/lib/prisma";
+import { assertNotPlatformOwner } from "../src/lib/auth/platform-owner-guard";
 import {
   UserRole,
   AgencyStatus,
@@ -136,6 +137,7 @@ async function runPhase20_6_SmokeTest() {
   let pilotAuthUserId: string;
 
   if (adminClient) {
+    await assertNotPlatformOwner({ email: pilotEmail }, { prismaClient: prisma, context: "Phase 20.6 Smoke pilot user" });
     const { data: createdAuth, error: authErr } = await adminClient.auth.admin.createUser({
       email: pilotEmail,
       password: pilotPassword,

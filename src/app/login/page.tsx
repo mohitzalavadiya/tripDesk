@@ -73,7 +73,7 @@ function LoginForm() {
           <Compass className="h-6 w-6" />
         </div>
         <h1 className="text-2xl font-black tracking-tight text-slate-900">
-          Welcome to TripDesk
+          Welcome to Your Travel Desk
         </h1>
         <p className="text-xs text-slate-500 font-medium">
           Travel Agency SaaS Operating System — Log in to your workspace
@@ -107,7 +107,7 @@ function LoginForm() {
             <div className="space-y-1">
               <span className="font-bold block">Verification Required</span>
               <p className="text-amber-800 leading-relaxed">
-                Please verify your email address before signing in to TripDesk.
+                Please verify your email address before signing in to Your Travel Desk.
               </p>
             </div>
           </div>

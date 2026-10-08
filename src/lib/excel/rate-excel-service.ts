@@ -181,7 +181,7 @@ export const rateExcelService = {
 
     // Sheet 1: Instructions
     const instructionsData = [
-      ["TRIPDESK — HOTEL RATES IMPORT INSTRUCTIONS"],
+      ["YOUR TRAVEL DESK — HOTEL RATES IMPORT INSTRUCTIONS"],
       [],
       ["FIELD NAME", "REQUIRED", "DESCRIPTION", "ALLOWED VALUES / FORMAT"],
       ["Hotel Code", "YES", "Exact code from your Hotels master", "HTL-0001 (See 'Hotels Reference' sheet)"],

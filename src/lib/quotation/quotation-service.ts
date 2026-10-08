@@ -25,11 +25,11 @@ import {
 
 // ─── Default Agency Profile ───────────────────────────────────────────
 export const DEFAULT_AGENCY_BRANDING: AgencyBranding = {
-  name: "TripDesk Holidays & Experiences",
+  name: "Your Travel Desk Holidays & Experiences",
   tagline: "Tailored Journeys, Unforgettable Memories",
-  email: "holidays@tripdesk.in",
+  email: "holidays@yourtraveldesk.in",
   phone: "+91 98470 12345 / +91 94471 23456",
-  website: "https://tripdesk.in",
+  website: "https://yourtraveldesk.in",
   address: "Marine Drive, Kochi, Kerala 682031, India",
   logoUrl: "/logo.svg",
   licenseNumber: "DOT/KER/TOUR/2026/8942",

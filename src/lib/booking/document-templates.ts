@@ -32,7 +32,7 @@ This is a gentle payment reminder regarding your confirmed ${destination} holida
 Please feel free to reach out to us at ${agencyPhone || "+91 98470 12345"} or reply here to complete the transaction.
 
 Thank you,
-*${booking.agencySnapshot?.name || "TripDesk Holidays"}*`;
+*${booking.agencySnapshot?.name || "Your Travel Desk Holidays"}*`;
 }
 
 /**
@@ -52,7 +52,7 @@ export function generateBookingShareMessage(
   const agencyName =
     "agency" in booking
       ? booking.agency?.name
-      : (booking as Booking).agencySnapshot?.name || "TripDesk Holidays";
+      : (booking as Booking).agencySnapshot?.name || "Your Travel Desk Holidays";
 
   return `🎉 *Your Trip Booking is Confirmed!*
 

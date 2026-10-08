@@ -93,7 +93,7 @@ export default function CustomerDashboardPage() {
         <div className="relative z-10 space-y-3 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-semibold text-indigo-200">
             <Sparkles className="w-3.5 h-3.5 text-indigo-300" />
-            <span>TripDesk Guest Portal</span>
+            <span>Your Travel Desk Guest Portal</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
             Your Personal Travel Hub

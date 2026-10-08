@@ -75,7 +75,7 @@ export const hotelExcelService = {
 
     // Sheet 1: Instructions
     const instructionsData = [
-      ["TRIPDESK — HOTEL MASTER IMPORT INSTRUCTIONS"],
+      ["YOUR TRAVEL DESK — HOTEL MASTER IMPORT INSTRUCTIONS"],
       [],
       ["FIELD NAME", "REQUIRED", "DESCRIPTION", "SAMPLE VALUE"],
       ["Hotel Name", "YES", "Property name (1-200 characters)", "Grand Palace Resort"],
@@ -92,9 +92,9 @@ export const hotelExcelService = {
       [],
       ["IMPORTANT RULES:"],
       ["1. Do NOT add or change column headers in the 'Hotels' sheet."],
-      ["2. Hotel Code is generated automatically by TripDesk (e.g. HTL-0001) and must NOT be entered."],
+      ["2. Hotel Code is generated automatically by Your Travel Desk (e.g. HTL-0001) and must NOT be entered."],
       ["3. Hotel Name and Destination are required fields for every hotel row."],
-      ["4. Destination must match an existing active Destination in your TripDesk account (exact match, case-insensitive)."],
+      ["4. Destination must match an existing active Destination in your Your Travel Desk account (exact match, case-insensitive)."],
       ["5. City represents the physical municipality (e.g. Benaulim) while Destination is the travel grouping (e.g. Goa)."],
       ["6. Supplier and GST/tax are not included in this Hotel Master import format."],
       ["7. Supported file format: .xlsx (Max 5 MB, Max 1,000 rows)."],

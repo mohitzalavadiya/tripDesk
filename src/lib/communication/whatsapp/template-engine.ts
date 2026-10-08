@@ -28,7 +28,7 @@ export class WhatsAppTemplateEngine {
     vars: WhatsAppTemplateVariables
   ): WhatsAppRenderOutput {
     const customer = vars.customerName || "Traveler";
-    const agency = vars.agencyName || "TripDesk";
+    const agency = vars.agencyName || "Your Travel Desk";
     const currency = vars.currency || "₹";
 
     switch (type) {

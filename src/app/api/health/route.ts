@@ -11,7 +11,7 @@ export async function GET() {
 
     return apiSuccess({
       status: "healthy",
-      service: "TripDesk API",
+      service: "Your Travel Desk API",
       database: "connected",
       timestamp: new Date().toISOString(),
     });

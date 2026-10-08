@@ -19,6 +19,7 @@ import {
   ConfirmationStatus,
   Prisma,
 } from "@prisma/client";
+import { assertNotPlatformOwner } from "../src/lib/auth/platform-owner-guard";
 import { createClient } from "@supabase/supabase-js";
 import { dashboardService } from "../src/lib/services/dashboard-service";
 import { enquiryService } from "../src/lib/services/enquiry-service";
@@ -48,8 +49,14 @@ const prisma = new PrismaClient({ adapter });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const agencyEmail = process.env.BOOTSTRAP_OWNER_EMAIL?.trim().toLowerCase();
-const agencyPassword = process.env.BOOTSTRAP_OWNER_PASSWORD;
+const agencyEmail = (
+  process.env.BOOTSTRAP_AGENCY_EMAIL ||
+  process.env.AGENCY_OWNER_EMAIL ||
+  "tripmadeeasy.in@gmail.com"
+).trim().toLowerCase();
+const agencyPassword =
+  process.env.BOOTSTRAP_AGENCY_PASSWORD ||
+  process.env.AGENCY_OWNER_PASSWORD;
 
 async function runQA04RealUserJourneyAudit() {
   console.log("===============================================================================");
@@ -63,6 +70,9 @@ async function runQA04RealUserJourneyAudit() {
   if (!supabaseUrl || !supabaseKey) {
     throw new Error("[QA-04] Missing Supabase configuration!");
   }
+
+  // HARD SAFETY GUARD: Verify agencyEmail never points to Platform Owner
+  await assertNotPlatformOwner({ email: agencyEmail }, { prismaClient: prisma, context: "QA-04 agencyEmail" });
 
   const sbClient = createClient(supabaseUrl, supabaseKey);
   const { data: authData, error: authError } = await sbClient.auth.signInWithPassword({

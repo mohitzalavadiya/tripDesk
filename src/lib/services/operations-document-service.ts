@@ -123,7 +123,7 @@ export class OperationsDocumentService {
             Title: `Hotel Voucher - ${hotel?.name || "Hotel Accommodation"}`,
             Author: operation.agency.name,
             Subject: `Hotel Voucher ${documentNumber}`,
-            Creator: "TripDesk Operations Suite",
+            Creator: "Your Travel Desk Operations Suite",
           },
         });
 
@@ -181,7 +181,7 @@ export class OperationsDocumentService {
         };
 
         // ─── HERO HEADER BANNER ──────────────────────────────────────────────
-        const agencyName = operation.agency.name || "TripDesk Travel Partner";
+        const agencyName = operation.agency.name || "Your Travel Desk Travel Partner";
         const agencyContact = [operation.agency.phone, operation.agency.email, operation.agency.address]
           .filter(Boolean)
           .join(" • ");
@@ -479,7 +479,7 @@ export class OperationsDocumentService {
           .fontSize(7.5)
           .font("Helvetica")
           .text(
-            `For on-ground assistance, itinerary modifications, or urgent hotel coordination, please contact ${operation.agency.name} Concierge Desk at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@tripdesk.com"}.`,
+            `For on-ground assistance, itinerary modifications, or urgent hotel coordination, please contact ${operation.agency.name} Concierge Desk at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@yourtraveldesk.in"}.`,
             margin + 16,
             supportBoxY + 23,
             { width: contentWidth - 32, lineGap: 1.5 }
@@ -525,7 +525,7 @@ export class OperationsDocumentService {
               .font("Helvetica")
               .fillColor(textLight)
               .text(
-                `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
+                `Generated securely via Your Travel Desk • Confidential Travel Document • ${operation.agency.name}`,
                 margin,
                 footerY + 8,
                 { width: contentWidth - 80, align: "left" }
@@ -629,7 +629,7 @@ export class OperationsDocumentService {
             Title: `Vehicle Voucher - ${vehicle?.name || "Transport Service"}`,
             Author: operation.agency.name,
             Subject: `Transport Voucher ${documentNumber}`,
-            Creator: "TripDesk Operations Suite",
+            Creator: "Your Travel Desk Operations Suite",
           },
         });
 
@@ -685,7 +685,7 @@ export class OperationsDocumentService {
         };
 
         // ─── HERO HEADER BANNER ──────────────────────────────────────────────
-        const agencyName = operation.agency.name || "TripDesk Travel Partner";
+        const agencyName = operation.agency.name || "Your Travel Desk Travel Partner";
         const agencyContact = [operation.agency.phone, operation.agency.email, operation.agency.address]
           .filter(Boolean)
           .join(" • ");
@@ -957,7 +957,7 @@ export class OperationsDocumentService {
           .fontSize(7.5)
           .font("Helvetica")
           .text(
-            `For real-time dispatch updates, driver tracking, or schedule modifications, contact ${operation.agency.name} Transport Desk at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@tripdesk.com"}.`,
+            `For real-time dispatch updates, driver tracking, or schedule modifications, contact ${operation.agency.name} Transport Desk at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@yourtraveldesk.in"}.`,
             margin + 16,
             supportBoxY + 23,
             { width: contentWidth - 32, lineGap: 1.5 }
@@ -1001,7 +1001,7 @@ export class OperationsDocumentService {
               .font("Helvetica")
               .fillColor(textLight)
               .text(
-                `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
+                `Generated securely via Your Travel Desk • Confidential Travel Document • ${operation.agency.name}`,
                 margin,
                 footerY + 8,
                 { width: contentWidth - 80, align: "left" }
@@ -1105,7 +1105,7 @@ export class OperationsDocumentService {
             Title: `Activity Voucher - ${activity?.name || "Excursion Experience"}`,
             Author: operation.agency.name,
             Subject: `Activity Voucher ${documentNumber}`,
-            Creator: "TripDesk Operations Suite",
+            Creator: "Your Travel Desk Operations Suite",
           },
         });
 
@@ -1160,7 +1160,7 @@ export class OperationsDocumentService {
         };
 
         // ─── HERO HEADER BANNER ──────────────────────────────────────────────
-        const agencyName = operation.agency.name || "TripDesk Travel Partner";
+        const agencyName = operation.agency.name || "Your Travel Desk Travel Partner";
         const agencyContact = [operation.agency.phone, operation.agency.email, operation.agency.address]
           .filter(Boolean)
           .join(" • ");
@@ -1434,7 +1434,7 @@ export class OperationsDocumentService {
           .fontSize(7.5)
           .font("Helvetica")
           .text(
-            `For queries, tour guide coordination, or immediate support during your excursion, call ${operation.agency.name} at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@tripdesk.com"}.`,
+            `For queries, tour guide coordination, or immediate support during your excursion, call ${operation.agency.name} at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@yourtraveldesk.in"}.`,
             margin + 16,
             supportBoxY + 23,
             { width: contentWidth - 32, lineGap: 1.5 }
@@ -1478,7 +1478,7 @@ export class OperationsDocumentService {
               .font("Helvetica")
               .fillColor(textLight)
               .text(
-                `Generated securely via TripDesk • Confidential Travel Document • ${operation.agency.name}`,
+                `Generated securely via Your Travel Desk • Confidential Travel Document • ${operation.agency.name}`,
                 margin,
                 footerY + 8,
                 { width: contentWidth - 80, align: "left" }
@@ -1596,7 +1596,7 @@ export class OperationsDocumentService {
             Title: `Booking Confirmation - ${operation.trip.title}`,
             Author: operation.agency.name,
             Subject: `Booking Confirmation ${documentNumber}`,
-            Creator: "TripDesk Operations Suite",
+            Creator: "Your Travel Desk Operations Suite",
           },
         });
 
@@ -1651,7 +1651,7 @@ export class OperationsDocumentService {
         };
 
         // ─── HERO HEADER BANNER ──────────────────────────────────────────────
-        const agencyName = operation.agency.name || "TripDesk Travel Partner";
+        const agencyName = operation.agency.name || "Your Travel Desk Travel Partner";
         const agencyContact = [operation.agency.phone, operation.agency.email, operation.agency.address]
           .filter(Boolean)
           .join(" • ");
@@ -1935,7 +1935,7 @@ export class OperationsDocumentService {
           .fontSize(7.5)
           .font("Helvetica")
           .text(
-            `• For 24/7 on-ground concierge support, contact ${operation.agency.name} at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@tripdesk.com"}.\n• Please carry valid government-approved photo identification (Passport / Aadhaar / Voter ID) for all guests throughout the trip.\n• Standard check-in time is 14:00 hrs and check-out time is 11:00 hrs unless specified otherwise by the hotel.`,
+            `• For 24/7 on-ground concierge support, contact ${operation.agency.name} at ${operation.agency.phone || "+91 98800 11223"} or email ${operation.agency.email || "support@yourtraveldesk.in"}.\n• Please carry valid government-approved photo identification (Passport / Aadhaar / Voter ID) for all guests throughout the trip.\n• Standard check-in time is 14:00 hrs and check-out time is 11:00 hrs unless specified otherwise by the hotel.`,
             margin + 16,
             footerBoxY + 22,
             { width: contentWidth - 32, lineGap: 1.5 }
@@ -1979,7 +1979,7 @@ export class OperationsDocumentService {
               .font("Helvetica")
               .fillColor(textLight)
               .text(
-                `Generated securely via TripDesk • Official Booking Confirmation • ${operation.agency.name}`,
+                `Generated securely via Your Travel Desk • Official Booking Confirmation • ${operation.agency.name}`,
                 margin,
                 footerY + 8,
                 { width: contentWidth - 80, align: "left" }
@@ -2099,7 +2099,7 @@ export class OperationsDocumentService {
             Title: `Travel Kit - ${operation.trip.title}`,
             Author: operation.agency.name,
             Subject: `Final Travel Kit & Itinerary ${documentNumber}`,
-            Creator: "TripDesk Operations Suite",
+            Creator: "Your Travel Desk Operations Suite",
           },
         });
 
@@ -2155,7 +2155,7 @@ export class OperationsDocumentService {
         };
 
         // ─── HERO HEADER BANNER ──────────────────────────────────────────────
-        const agencyName = operation.agency.name || "TripDesk Travel Partner";
+        const agencyName = operation.agency.name || "Your Travel Desk Travel Partner";
         const agencyContact = [operation.agency.phone, operation.agency.email, operation.agency.address]
           .filter(Boolean)
           .join(" • ");
@@ -2463,7 +2463,7 @@ export class OperationsDocumentService {
 
         doc.fillColor("#166534").fontSize(8).font("Helvetica-Bold").text("24/7 GUEST CONCIERGE & EMERGENCY ASSISTANCE", margin + 16, helpBoxY + 10);
         doc.fillColor("#14532D").fontSize(7.5).font("Helvetica").text(
-          `• Dedicated Operations Desk: ${operation.agency.phone || "+91 98800 11223"} | Email: ${operation.agency.email || "concierge@tripdesk.com"}\n• Please carry valid government photo IDs for all passengers throughout the journey.\n• For flight or train delays, notify your travel coordinator promptly for seamless pickup rescheduling.`,
+          `• Dedicated Operations Desk: ${operation.agency.phone || "+91 98800 11223"} | Email: ${operation.agency.email || "concierge@yourtraveldesk.in"}\n• Please carry valid government photo IDs for all passengers throughout the journey.\n• For flight or train delays, notify your travel coordinator promptly for seamless pickup rescheduling.`,
           margin + 16,
           helpBoxY + 22,
           { width: contentWidth - 32, lineGap: 1.5 }
@@ -2507,7 +2507,7 @@ export class OperationsDocumentService {
               .font("Helvetica")
               .fillColor(textLight)
               .text(
-                `Generated securely via TripDesk • Final Travel Kit & Itinerary • ${operation.agency.name}`,
+                `Generated securely via Your Travel Desk • Final Travel Kit & Itinerary • ${operation.agency.name}`,
                 margin,
                 footerY + 8,
                 { width: contentWidth - 80, align: "left" }
@@ -2801,7 +2801,7 @@ export class OperationsDocumentService {
             Title: `Operations Closure - ${operation.trip.title}`,
             Author: operation.agency.name,
             Subject: `Internal Operations Closure Report ${documentNumber}`,
-            Creator: "TripDesk Operations Suite",
+            Creator: "Your Travel Desk Operations Suite",
           },
         });
 

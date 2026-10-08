@@ -17,6 +17,7 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 import { destinationService } from "../src/lib/services/destination-service";
+import { assertNotPlatformOwner } from "../src/lib/auth/platform-owner-guard";
 
 export async function bootstrapAgencyOwner(options?: {
   email?: string;
@@ -79,6 +80,9 @@ export async function bootstrapAgencyOwner(options?: {
     },
   });
 
+  // HARD SAFETY GUARD: Never allow bootstrapping an Agency Owner on a Platform Owner account
+  await assertNotPlatformOwner({ email }, { prismaClient: prisma, context: "bootstrapAgencyOwner email check" });
+
   // 1. Check existing Supabase Auth Users
   const { data: userList, error: listError } = await supabase.auth.admin.listUsers();
   if (listError) {
@@ -99,6 +103,10 @@ export async function bootstrapAgencyOwner(options?: {
   );
 
   if (existingExactUser) {
+    await assertNotPlatformOwner(
+      { userId: existingExactUser.id, email, userMetadata: existingExactUser.user_metadata },
+      { prismaClient: prisma, context: "bootstrapAgencyOwner exact user" }
+    );
     console.log(`ℹ️ Supabase Auth account found for ${email} (ID: ${existingExactUser.id}). Updating password & confirming email...`);
     supabaseUserId = existingExactUser.id;
     const { error: updateError } = await supabase.auth.admin.updateUserById(supabaseUserId, {
@@ -110,6 +118,10 @@ export async function bootstrapAgencyOwner(options?: {
       console.warn("⚠️ Note: Supabase update:", updateError.message);
     }
   } else if (existingTypoUser) {
+    await assertNotPlatformOwner(
+      { userId: existingTypoUser.id, email: existingTypoUser.email, userMetadata: existingTypoUser.user_metadata },
+      { prismaClient: prisma, context: "bootstrapAgencyOwner typo user" }
+    );
     console.log(`ℹ️ Found typo account ${existingTypoUser.email} (ID: ${existingTypoUser.id}). Migrating email to ${email} and updating credentials...`);
     supabaseUserId = existingTypoUser.id;
     const { error: updateError } = await supabase.auth.admin.updateUserById(supabaseUserId, {
@@ -124,6 +136,7 @@ export async function bootstrapAgencyOwner(options?: {
     }
     console.log(`✅ Successfully updated Supabase Auth email to: ${email}`);
   } else {
+    await assertNotPlatformOwner({ email }, { prismaClient: prisma, context: "bootstrapAgencyOwner new user" });
     console.log(`✨ Creating new Supabase Auth user for ${email}...`);
     const { data: createData, error: createError } = await supabase.auth.admin.createUser({
       email,

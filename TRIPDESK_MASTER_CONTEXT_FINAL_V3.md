@@ -14467,6 +14467,185 @@ The entitlement backend, transactional quota enforcement, and database-driven fe
 
 ---
 
+# 233. PLATFORM OWNER CREDENTIAL MUTATION PROTECTION — SECURITY HARDENING
+
+## 233.1 Overview & Requirements
+- **Objective:** Ensure ordinary QA, E2E, integration tests, and test-account provisioning scripts cannot accidentally or silently change, reset, overwrite, bootstrap, or otherwise mutate permanent Platform Owner credentials.
+- **Constraints Maintained:**
+  - Zero password changes/rotations during hardening.
+  - Zero exposure or hardcoding of passwords, service keys, tokens, or secrets.
+  - Permanent QA Agency Owner account (`tripmadeeasy.in@gmail.com`) strictly preserved.
+  - Platform Owner password was NOT changed, rotated, inspected, or leaked.
+  - No permanent test data was mutated.
+  - Legitimate administrative tools (`prisma/bootstrap-owner.ts`, `prisma/reset-platform-owner-password.ts`) remain separate and functional for deliberate manual administrative execution.
+
+## 233.2 Architecture & Guard Design
+- **Central Reusable Guard:** [`src/lib/auth/platform-owner-guard.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/auth/platform-owner-guard.ts)
+  - Enforces dual-layer protection:
+    1. **Identity Protection:** Matches known permanent Platform Owner email identifiers (`mzpatel14@gmail.com`, `BOOTSTRAP_OWNER_EMAIL`, `PLATFORM_OWNER_EMAIL`) and canonical user IDs (`de5c1377-0e7c-4747-b3ed-aaee8b7e32a9`, `e03a6a21-a355-4afe-ab3e-c8097b6be773`).
+    2. **Role-Based Defense in Depth:** Detects and blocks operations if target resolves to `PLATFORM_OWNER` via explicit parameter, Supabase user metadata, or Prisma database lookup.
+  - Fails closed immediately before any Supabase Auth or database mutation executes.
+  - Throws standardized error: `Blocked: QA/test automation cannot mutate a protected Platform Owner account.` with zero credential leakage.
+
+## 233.3 Protected QA / Test Paths
+- [`src/lib/supabase/admin.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/supabase/admin.ts): `deleteAuthUser` now guards against deletion of the Platform Owner account.
+- [`prisma/test-qa-01-auth.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-01-auth.ts): Added top-level config guards and pre-mutation guards before all `createUser` and `updateUserById` calls.
+- [`prisma/test-qa-02-auth-routing.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-02-auth-routing.ts): Removed dangerous environment fallback (`PLATFORM_OWNER_EMAIL`); added top-level config guards and pre-mutation guards.
+- [`prisma/test-qa-05-signup.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-05-signup.ts): Guarded user cleanup step before invoking `deleteUser`.
+- [`prisma/bootstrap-agency-owner.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/bootstrap-agency-owner.ts): Pre-emptively fails closed if invoked against Platform Owner email, ID, or role.
+- [`prisma/test-phase20.6-smoke.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-phase20.6-smoke.ts): Guarded pilot auth user creation.
+- [`prisma/test-qa-04-journey.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-04-journey.ts): Switched agency email from `BOOTSTRAP_OWNER_EMAIL` to agency variables and added guard.
+- [`prisma/qa-browser-e2e.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/qa-browser-e2e.ts): Retained safe non-mutating credential usage from environment without Auth-admin password mutations.
+
+## 233.4 Preserved Legitimate Administrative Paths
+- `prisma/reset-platform-owner-password.ts`: Explicit interactive CLI tool with stdin hidden password input and target verification.
+- `prisma/bootstrap-owner.ts`: Bootstraps initial owner or maintains email confirmation/metadata idempotently without resetting existing passwords.
+- `prisma/reset-pilot-database.ts`: Explicitly preserves canonical Platform Owner ID and requires confirmation flag.
+
+## 233.5 Verification & Security Test Suite
+- Comprehensive Security Test Suite ([`prisma/test-platform-owner-guard.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-platform-owner-guard.ts)):
+  - **Test 1 — Platform Owner target blocked by email:** PASS (BLOCKED)
+  - **Test 2 — Platform Owner detected by role:** PASS (BLOCKED)
+  - **Test 3 — Permanent Platform Owner ID protected:** PASS (BLOCKED)
+  - **Test 4 — Environment fallback protected:** PASS (BLOCKED)
+  - **Test 5 — Disposable test account still works:** PASS (ALLOWED)
+  - **Test 6 — Legitimate admin tool remains available:** PASS (Static/operational check intact)
+  - **Test 7 — No password leakage:** PASS (Zero secrets exposed)
+- Static & Build Validation:
+  - `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+  - `git diff --check` $\to$ **PASS (clean)**.
+  - `npm run build` $\to$ **PASS (Compiled successfully with Turbopack, all 108 routes generated)**.
+
+## 233.6 Status
+**Platform Owner Credential Mutation Protection: COMPLETE & VERIFIED — PASS**
+
+---
+
+# 234. YOUR TRAVEL DESK BRANDING MIGRATION — VERIFIED & COMPLETE
+
+## 234.1 Overview & Official Branding Decision
+- **Official Brand Migration:** The SaaS product and public-facing site brand has officially migrated from:
+  - **Previous Brand:** `TripDesk` / `Trip Desk`
+  - **Current Official Brand:** **Your Travel Desk**
+- **Canonical Domain Targets:**
+  - **Production Domain:** `https://yourtraveldesk.in`
+  - **Staging Domain:** `https://staging.yourtraveldesk.in`
+  - `NEXT_PUBLIC_APP_URL` remains the authoritative environment variable source of truth, with `https://yourtraveldesk.in` as the default production fallback.
+- **Migration Status:** **COMPLETE / VERIFIED / APPROVED**
+
+## 234.2 Migration Scope & Coverage
+The branding migration was conducted as a presentation-focused, non-destructive migration across customer-facing, agency-facing, and platform-admin surfaces:
+- **Application Metadata & Layouts:** Root layout HTML `<title>`, descriptions, OpenGraph tags, Twitter cards, favicon references, and robots/sitemap canonical fallback URLs.
+- **Authentication & Onboarding:** Login page title, card headers, subtitles, verification notices, registration branding, and client auth context initial state.
+- **Navigation & Shell:** Sidebar desktop logo text, mobile navigation drawer brand header, topbar breadcrumbs, and platform role display badges.
+- **Customer Portal:** Customer portal layout header, footer attribution ("Powered by Your Travel Desk"), welcome view, and public itinerary view.
+- **Quotation System:** Public quotation proposal renderer, cover metadata defaults, quotation share link generator (`share-helpers.ts`), and quotation PDF service creator metadata.
+- **Invoices & Booking Documents:** Document generator metadata, invoice PDF creator metadata, fallback agency branding strings, and footer attribution text ("Generated via Your Travel Desk").
+- **Operations & Communication UI:** Communication modal placeholders, support chat greeting messages, timeline audit actor labels, and read-only mode dialogs.
+- **Platform Administration & Settings:** Admin overview greeting, plan tier descriptions, platform settings form placeholders, and agency lifecycle subscription banners.
+- **Documentation & Deployment Reference:** Updated `README.md`, `UPCOMING_FEATURE.md`, `docs/PRODUCTION_DEPLOYMENT.md`, and `docs/PRODUCTION_CHECKLIST.md`.
+
+*Note: This migration updated codebase assets and application configuration. External domain registrar, DNS, and hosting infrastructure cutovers remain separate operational deployment steps.*
+
+## 234.3 Technical Identifier Preservation Policy
+**Critical Policy:** Branding migration does **NOT** rename technical compatibility identifiers.
+
+To guarantee zero regression in authentication, browser persistence, cross-tab communication, third-party messaging integrations, database relations, and API endpoints, the following contracts are intentionally preserved:
+1. **Authentication Session Cookies:** `tripdesk_customer_session` remains the active customer portal cookie name.
+2. **Cross-Tab Window Events:** `tripdesk:chat-unread-updated` remains the real-time chat unread notification event.
+3. **LocalStorage Compatibility Keys:** `tripdesk_cost_items_v1`, `tripdesk_internal_expenses_v1`, `tripdesk_trip_costings_v1`, `tripdesk_quotations_v1`, and `tripdesk_agency_profile_v1` remain unchanged.
+4. **Prisma Role Enums & Constants:** `PLATFORM_OWNER`, `AGENCY_OWNER`, and compatibility constant `TRIPDESK_OWNER` remain untouched.
+5. **Approved Meta WhatsApp Template Keys:** All pre-approved Meta WhatsApp template identifiers (`tripdesk_enquiry_received`, `tripdesk_quotation_proposal`, `tripdesk_booking_confirmed`, `tripdesk_payment_reminder`, `tripdesk_payment_receipt`, `tripdesk_trip_reminder`, `tripdesk_feedback_request`) remain strictly unchanged.
+6. **API Route Endpoints:** All `/api/*` route paths and contracts remain 100% unchanged.
+7. **Environment Variable Names:** `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL`, etc., remain untouched.
+8. **Prisma Schema Models & Fields:** Zero models or database columns were renamed.
+
+## 234.4 Database & Schema Safety
+- `prisma/schema.prisma` is **100% UNCHANGED** by the branding migration.
+- `prisma/migrations` is **100% UNCHANGED**.
+- Zero Prisma migrations created; zero migrations executed; zero `prisma db push` commands executed.
+- Zero seed scripts executed.
+- Zero database schema alterations required.
+- Zero permanent production or QA database records renamed.
+- Zero historical subscription records or `SubscriptionPayment` rows altered.
+
+## 234.5 Platform Owner Safety & Credential Integrity
+- **Platform Owner Credentials:** No changes were made to Platform Owner email (`mzpatel14@gmail.com`), canonical User ID, role, or credentials.
+- **Credential Protection Guard:** [`src/lib/auth/platform-owner-guard.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/auth/platform-owner-guard.ts) remains active and untouched.
+- **Zero Credential Mutations:** Auditing the Git diff confirms zero additions of credential mutation operations (`updateUserById`, `deleteUser`, etc.). Pre-existing Section 233 protection remains authoritative.
+- **Zero Secrets Recorded:** No passwords, service keys, JWTs, or secrets are exposed or modified.
+
+## 234.6 Permanent QA Account Safety
+- **Permanent QA Baseline:** The permanent TripDesk QA Agency Owner account remains strictly preserved and unmodified:
+  - **Agency Name:** `"TripDesk Offical Test Agnecy"` (preserved as established baseline; not renamed).
+  - **Agency Owner Email:** `"tripmadeeasy.in@gmail.com"`.
+  - **Agency ID:** `cmu2g9rgq0000swtqbr5aie7x`.
+  - **Owner User ID:** `1a5b8334-aef6-4754-83bc-8eb8b0c54151`.
+- Zero automated tests or scripts renamed this permanent baseline fixture.
+
+## 234.7 Billing Fallback Findings & Precedence Architecture
+A rigorous line-by-line inspection of subscription and admin billing services established the following:
+1. **Database Precedence:** When `PlatformBillingSettings` exists in the database, `subscriptionService.getPaymentSettings()` returns database values (`upiId`, `accountHolder`, `bankName`, etc.) directly. Fallback values are completely bypassed.
+2. **Missing-Record Runtime Fallback:** When no database record exists, in-memory fallback values are returned (`yourtraveldesk.billing@icici`, `"Your Travel Desk Billing"`, `"Your Travel Desk SaaS Technologies Pvt Ltd"`).
+3. **Read-Only Safety:** Viewing the `/subscription` page issues a read-only `findUnique` query; zero records are created in `PlatformBillingSettings` or `SubscriptionPayment` simply by reading the page.
+4. **Historical Payment Safety:** All `SubscriptionPayment` records, transaction references (UTR), payment proof storage URLs, and verification workflows remain governed strictly by database relations and are unaffected by branding changes.
+5. **Mandatory Production Prerequisite:**
+   > **Before enabling live subscription payment collection, the Platform Owner must save and verify real bank/UPI billing settings in `/admin/settings`. The fallback UPI value is not a real production payment destination and must not be relied upon for live collection.**
+
+## 234.8 External Communication Delivery Status (Deferred)
+- External Email, WhatsApp, and SMS delivery remains **completely deferred**.
+- The branding migration:
+  - Did NOT activate external messaging delivery.
+  - Did NOT add email transport providers (zero SMTP, Resend, SendGrid, or AWS SES packages added to `package.json`).
+  - Did NOT add external WhatsApp dispatch mechanisms.
+  - Preserved all Meta approved template identifiers.
+- New brand email references (`support@yourtraveldesk.in`, `notifications@yourtraveldesk.in`, `holidays@yourtraveldesk.in`) are presentation and fallback values only. Mailboxes have not been provisioned externally yet.
+
+## 234.9 Security & Tenant Isolation Integrity
+- Supabase authentication logic, password verification, and session token resolution remain unchanged.
+- Next.js server-side cookie handling and middleware routing remain unchanged.
+- Tenant isolation enforcement (`where: { agencyId }`) across all Prisma queries remains unchanged.
+- Multi-tier role authorization (`PLATFORM_OWNER`, `AGENCY_OWNER`, `AGENT`) and read/write workspace protection remain unchanged.
+- Customer portal authentication contracts remain intact.
+
+## 234.10 Independent Verification Evidence
+Independent automated checks and runtime smoke tests executed cleanly:
+- **Whitespace / Conflict Marker Check:** `git diff --check` $\to$ **PASS (0 errors)**.
+- **TypeScript Static Verification:** `npx tsc --noEmit` $\to$ **PASS (0 errors across codebase)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, 108 routes compiled successfully)**.
+- **Runtime Smoke Verification:**
+  - `/api/health` $\to$ Returned `200 OK`, `service: "Your Travel Desk API"`, `database: "connected"`.
+  - `/login` $\to$ Rendered successfully with `<title>Your Travel Desk - Travel Agency SaaS Operating System</title>`, clean headings, and zero hydration errors.
+  - Robots & Sitemap $\to$ Correctly resolve fallback URLs to `https://yourtraveldesk.in`.
+
+## 234.11 Branding Search Results & Legacy String Audit
+Repository search across `src/` confirmed:
+- `git grep -n -i "Trip Desk" src/`: **0 matches** (100% eliminated).
+- `git grep -n -i "tripdesk.io" src/`: **0 matches**.
+- `git grep -n -i "tripdesk.com" src/`: **0 matches**.
+- `git grep -n -i "support@tripdesk" src/`: **0 matches**.
+- `git grep -n -i "notifications@tripdesk" src/`: **0 matches**.
+- Remaining `TripDesk` occurrences are 100% classified as approved technical contracts (cookies, local storage keys, window events, Meta template keys, internal code docstrings, and pre-SaaS mock fixtures).
+- **Result:** **Zero unexplained customer-facing old-brand occurrences remain.**
+
+## 234.12 Outstanding Production Prerequisites
+The following operational items remain required before commercial production launch:
+1. **Configure Real Platform Billing Settings:** Platform Owner must log in to `/admin/settings` and enter verified bank account details and a real UPI VPA before accepting live payments.
+2. **Production DNS Cutover:** Configure apex and `www` DNS records pointing `yourtraveldesk.in` to the production deployment.
+3. **Provision Email Mailboxes & DNS Records:** Configure SPF, DKIM, and DMARC for `yourtraveldesk.in` and provision mailboxes (`support@yourtraveldesk.in`, etc.) when email delivery is activated.
+4. **Meta WhatsApp Business Profile Display Name:** Submit a business display name update in Meta Business Manager from "TripDesk" to "Your Travel Desk" while retaining approved template keys.
+5. **Search Console & SEO Indexing:** Submit `https://yourtraveldesk.in/sitemap.xml` to Google Search Console upon DNS cutover.
+6. **Production UAT Smoke Test:** Execute final browser smoke test on the live production domain once deployed.
+
+## 234.13 Launch-Readiness Distinction
+> **The Your Travel Desk branding migration is codebase-complete and verified, but this does NOT mean the overall SaaS platform is production-launch complete.**
+> Existing production-readiness prerequisites and infrastructure/UAT requirements remain governed by their respective V3 sections.
+
+## 234.14 Status
+**Your Travel Desk Branding Migration: COMPLETE / VERIFIED / APPROVED — PASS**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

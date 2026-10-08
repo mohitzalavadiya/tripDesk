@@ -11,25 +11,25 @@ const inter = Inter({
   variable: "--font-sans",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.tripdesk.io";
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://yourtraveldesk.in";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "TripDesk - Travel Agency SaaS Operating System",
-    template: "%s | TripDesk",
+    default: "Your Travel Desk - Travel Agency SaaS Operating System",
+    template: "%s | Your Travel Desk",
   },
   description: "Modern CRM & Travel Management platform for travel agencies and tour operators.",
   openGraph: {
-    title: "TripDesk - Travel Agency SaaS Operating System",
+    title: "Your Travel Desk - Travel Agency SaaS Operating System",
     description: "Modern CRM & Travel Management platform for travel agencies and tour operators.",
-    siteName: "TripDesk",
+    siteName: "Your Travel Desk",
     type: "website",
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "TripDesk - Travel Agency SaaS Operating System",
+    title: "Your Travel Desk - Travel Agency SaaS Operating System",
     description: "Modern CRM & Travel Management platform for travel agencies and tour operators.",
   },
 };
