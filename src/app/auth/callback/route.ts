@@ -65,32 +65,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=auth_failed", request.url));
   }
 
-  // Verify email is confirmed
-  const isEmailConfirmed = !!(user.email_confirmed_at || (user as any).confirmed_at);
-  if (!isEmailConfirmed) {
-    console.error("Auth callback received unconfirmed user:", user.id);
-    await supabase.auth.signOut();
-    return NextResponse.redirect(new URL("/verify-email?error=unverified_account", request.url));
-  }
+  // Verification Gate: Email confirmation is temporarily disabled for all roles.
+  // When re-enabling email verification, restore this check:
+  // const isEmailConfirmed = !!(user.email_confirmed_at || (user as any).confirmed_at);
+  // if (!isEmailConfirmed) {
+  //   console.error("Auth callback received unconfirmed user:", user.id);
+  //   await supabase.auth.signOut();
+  //   return NextResponse.redirect(new URL("/login?error=unverified_account", request.url));
+  // }
 
   // 4. Execute Atomic Onboarding Transaction
   const onboardingResult = await provisionOnboardedAgencyOwner(user, supabase);
 
   if (!onboardingResult.success) {
     await supabase.auth.signOut();
-    if (onboardingResult.error === "unverified_account") {
-      return NextResponse.redirect(new URL("/verify-email?error=unverified_account", request.url));
-    }
     if (onboardingResult.error === "missing_onboarding_data") {
       return NextResponse.redirect(new URL("/login?error=missing_onboarding_data", request.url));
     }
     if (onboardingResult.error === "plan_unavailable") {
       return NextResponse.redirect(new URL("/login?error=plan_unavailable", request.url));
     }
-    return NextResponse.redirect(new URL("/verify-email?error=onboarding_failed", request.url));
+    return NextResponse.redirect(new URL("/login?error=onboarding_failed", request.url));
   }
 
-  // 5. Sign Out to Prevent Auto-Login and Redirect to Login with Verified Indicator
+  // 5. Sign Out to Prevent Auto-Login and Redirect to Login with Registered Indicator
   await supabase.auth.signOut();
-  return NextResponse.redirect(new URL("/login?verified=true", request.url));
+  return NextResponse.redirect(new URL("/login?registered=true", request.url));
 }

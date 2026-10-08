@@ -14646,6 +14646,127 @@ The following operational items remain required before commercial production lau
 
 ---
 
+# 235. TEMPORARY EMAIL VERIFICATION DISABLEMENT — ALL ROLES (October 2026)
+
+## 235.1 Context & Architectural Objective
+- **Objective:** Temporarily disable the entire email verification and OTP requirement from the Your Travel Desk authentication and onboarding system across **BOTH supported roles**:
+  1. `AGENCY_OWNER`
+  2. `PLATFORM_OWNER`
+- **Core Decision:** Email verification is being **deferred completely** and will be re-enabled in a future phase.
+- **Strict Distinction:** Disable **email verification**, NOT authentication. Supabase Auth, email/password validation, session cookie management, tenant isolation, role-based access control, subscription entitlement enforcement, and Platform Owner credential protection remain 100% mandatory and active.
+- **Desired Flow:**
+  - **Agency Owner (`AGENCY_OWNER`):** `/signup` $\to$ validate signup data $\to$ Supabase Auth `signUp()` $\to$ immediate existing atomic onboarding service (`provisionOnboardedAgencyOwner`) $\to$ Agency + User (`AGENCY_OWNER`) + Starter 7-day Trial provisioned $\to$ redirect to `/login?registered=true` (zero OTP screens, zero "check your email" gates).
+  - **Platform Owner (`PLATFORM_OWNER`):** Direct Supabase Auth email/password login $\to$ zero email confirmation gate $\to$ normal administrative access at `/admin`.
+
+---
+
+## 235.2 Reversible Architecture & File Modifications
+The verification infrastructure was intentionally preserved in a dormant, non-breaking state rather than destructively purged, allowing future reactivation without redesigning the authentication architecture.
+
+### 1. Onboarding Service (`src/lib/services/onboarding-service.ts`)
+- **Modification:** Made `isEmailConfirmed` gate dormant by commenting out the check with explicit phase-deferral documentation.
+- **Direct Provisioning:** Extended `provisionOnboardedAgencyOwner(supabaseUser, explicitMetadata?)` to accept explicit signup metadata directly from `signUp()`, allowing atomic Agency, User (`AGENCY_OWNER`), and Starter 7-day trial creation immediately upon signup without waiting for Supabase session re-hydration or email confirmation callbacks.
+- **Idempotency:** Reused existing transactional onboarding logic; preserved duplicate check (`findUnique` on `ownerEmail` or `id`) to prevent duplicate agency creation.
+
+### 2. Authentication Server Actions (`src/actions/auth-actions.ts`)
+- **`signupAgencyOwnerAction`:**
+  - Invokes `supabase.auth.signUp()`.
+  - Immediately invokes `onboardingService.provisionOnboardedAgencyOwner()` to create Agency, User, and Starter 7-day trial.
+  - Signs out any temporary browser session from `signUp()` to maintain the standard login credential pattern.
+  - Redirects directly to `/login?registered=true` with zero intermediate `/verify-email` redirection.
+- **`loginAction`:**
+  - Removed the `email not confirmed` error check and `unverified: true` return payload.
+  - Removed the `!isPlatformOwner && !isEmailConfirmed` verification gate.
+  - Added lazy fallback onboarding: If an agency owner registered previously and their database record is not yet present, `loginAction` runs `provisionOnboardedAgencyOwner` before completing login.
+- **Dormant Helpers Retained:**
+  - `verifyEmailOtpAction` and `resendVerificationEmailAction` were preserved in place in a dormant state for future reactivation.
+
+### 3. Login Interface (`src/app/login/page.tsx`)
+- **Removed:** Removed `serverResult?.unverified` block and link to `/verify-email`.
+- **Added:** Added prominent emerald success banner when `registered=true` query param is present: `"Account created successfully! Your 7-day Starter trial is active. Please log in with your credentials to get started."`
+- **Maintained:** Formik + Yup email and password validation, invalid credentials error handling, and session redirection.
+
+### 4. Verification Route (`src/app/verify-email/page.tsx`)
+- **Dormant & Trap-Prevention State:** Route preserved so existing links or direct bookmarks do not 404, but users cannot become trapped.
+- **Banner Added:** Renders an informational notice: `"Email Verification Deferred: Email verification is temporarily disabled. You can log in directly to your account."` with a primary `"Proceed to Login"` button.
+- **Dormant Component:** The OTP input form and resend button remain in dormant state below the banner for seamless future reactivation.
+
+### 5. Auth Callback Handler (`src/app/auth/callback/route.ts`)
+- Made `isEmailConfirmed` check dormant.
+- Proactively executes `provisionOnboardedAgencyOwner` if user has onboarding metadata, then redirects to `/login?registered=true` (or error page if exchange fails).
+
+---
+
+## 235.3 Platform Owner Security & Guard Immutability
+- **Security Guard Unchanged:** `src/lib/auth/platform-owner-guard.ts` remains 100% active, untouched, and unbypassed.
+- **Protected Identities:**
+  - Protected Email: `"mzpatel14@gmail.com"`
+  - Canonical Local/QA User ID: `"de5c1377-0e7c-4747-b3ed-aaee8b7e32a9"` (nsqarlegqxymqfyvfrjw)
+  - Staging User ID: `"e03a6a21-a355-4afe-ab3e-c8097b6be773"` (qypkowejgqrmilckemcr)
+  - Role: `PLATFORM_OWNER`
+  - Agency ID: `null`
+- **Zero Credential Mutations:** Removing email verification was strictly isolated from credential mutation. No endpoints or scripts were added to modify Platform Owner credentials.
+- **Guard Test Suite:** `prisma/test-platform-owner-guard.ts` executed and verified (7/7 tests passed).
+
+---
+
+## 235.4 Permanent QA Baseline & Tenant Isolation
+- **Permanent Agency Owner Baseline:**
+  - Agency: `"TripDesk Offical Test Agnecy"` (`cmu2g9rgq0000swtqbr5aie7x`)
+  - Owner: `"tripmadeeasy.in@gmail.com"` (`1a5b8334-aef6-4754-83bc-8eb8b0c54151`)
+  - Preserved 100% intact with zero modifications to email, role, agency association, or subscription.
+- **Multi-Tenant Security Invariants:**
+  - Session JWT resolution via `getRequestContext()`, `requireAgencyOwnerContext()`, `requirePlatformOwnerContext()`, `requireReadAccess()`, and `requireWriteAccess()` remains unchanged.
+  - Zero client-supplied `agencyId` trust.
+
+---
+
+## 235.5 Database & Schema Safety
+- `prisma/schema.prisma` is **100% UNCHANGED**.
+- `prisma/migrations` is **100% UNCHANGED**.
+- Zero Prisma migrations created or run; zero `prisma db push` executed; zero seed scripts executed.
+- Zero database rows deleted, overwritten, or corrupted.
+
+---
+
+## 235.6 Supabase Configuration Observation
+- **Application Configuration:** Application code does not require `isEmailConfirmed` or trigger verification emails.
+- **Target Staging Environment Verified:** Probing the staging Supabase project (`https://qypkowejgqrmilckemcr.supabase.co`, `staging.yourtraveldesk.in`) confirmed that "Confirm email" is **DISABLED**; `signUp()` returns `email_confirmed_at` and an active session immediately with zero confirmation email sent.
+- **QA Environment State:** In the local QA Supabase project (`https://nsqarlegqxymqfyvfrjw.supabase.co`), Supabase Auth returns `Email not confirmed` when `signInWithPassword` is called for users created while email confirmation was toggled ON.
+- **No Manual Automation Added:** Per instructions, zero service-role backdoor confirmation scripts or manual password overrides were created.
+
+---
+
+## 235.7 Verification & Validation Results
+- **Whitespace / Git Diff Check:** `git diff --check` $\to$ **PASS (0 errors)**.
+- **TypeScript Static Verification:** `npx tsc --noEmit` $\to$ **PASS (0 errors across entire repository)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, 108 routes compiled successfully with exit code 0)**.
+- **Automated Signup & Onboarding Verification (`prisma/test-qa-05-signup.ts`):**
+  - Executed end-to-end Agency Owner signup flow simulation with `onboardingService.provisionOnboardedAgencyOwner()`.
+  - Verified: Prisma User created with `role: AGENCY_OWNER`, Agency created with `status: ACTIVE`, Subscription created with `plan: STARTER`, `status: TRIAL`, `trialEndsAt: now + 7 days`.
+  - Result: **100% PASS**.
+- **Platform Owner Guard Verification (`prisma/test-platform-owner-guard.ts`):**
+  - Result: **7/7 PASS (100% protected)**.
+
+---
+
+## 235.8 Future Reactivation Procedure
+When email verification / OTP is reintroduced in a future phase, perform the following steps to restore:
+1. **Supabase Auth Console:** Re-enable "Confirm email" in the Supabase Dashboard Authentication settings.
+2. **`onboarding-service.ts`:** Re-uncomment the `isEmailConfirmed` validation check inside `provisionOnboardedAgencyOwner`.
+3. **`auth-actions.ts`:**
+   - In `signupAgencyOwnerAction`: Restore the redirect to `/verify-email?email=${encodeURIComponent(email)}` instead of direct onboarding.
+   - In `loginAction`: Re-enable the `!isPlatformOwner && !isEmailConfirmed` gate returning `{ success: false, unverified: true }`.
+4. **`login/page.tsx`:** Restore the unverified notification banner with the link to `/verify-email`.
+5. **`verify-email/page.tsx`:** Remove the temporary deferral notice banner, re-enabling standard OTP verification submission.
+
+---
+
+## 235.9 Status
+**Temporary Email Verification Disablement (All Roles): COMPLETE / VERIFIED / SAFE — PASS**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

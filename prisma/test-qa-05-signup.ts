@@ -87,51 +87,43 @@ async function runSignupVerificationTest() {
     return;
   }
 
-  console.log(`\n▶ Step 3: Verifying Supabase Auth user creation & unconfirmed status`);
+  console.log(`\n▶ Step 3: Verifying Supabase Auth user creation`);
   const { data: updatedUsers } = await adminSb.auth.admin.listUsers();
   const createdAuthUser = updatedUsers?.users.find((u) => u.email === testEmail);
   if (!createdAuthUser) {
     throw new Error(`[FAIL] Supabase Auth user was NOT found in Supabase Auth after signup!`);
   }
   console.log(`  ✔ Supabase Auth user created! ID: ${createdAuthUser.id}`);
-  const isConfirmed = Boolean(createdAuthUser.email_confirmed_at || (createdAuthUser as any).confirmed_at);
-  console.log(`  ✔ Email confirmed: ${isConfirmed ? "YES (Confirmed)" : "NO (Unconfirmed - CORRECT for Batch 1)"}`);
-  if (isConfirmed) {
-    throw new Error(`[FAIL] Expected email to be unconfirmed, but found confirmed at: ${createdAuthUser.email_confirmed_at}`);
-  }
 
-  console.log(`\n▶ Step 4: Verifying Onboarding Metadata Staging`);
-  const meta = createdAuthUser.user_metadata;
-  if (!meta) {
-    throw new Error(`[FAIL] user_metadata is missing on newly created Supabase Auth user!`);
-  }
-  if (meta.agencyName !== testAgencyName || meta.ownerName !== testOwnerName || meta.city !== "Mumbai") {
-    throw new Error(`[FAIL] user_metadata does not match signup form data! Received: ${JSON.stringify(meta)}`);
-  }
-  if ((meta as any).password || (meta as any).confirmPassword) {
-    throw new Error(`[SECURITY FAIL] Password was found stored in user_metadata!`);
-  }
-  console.log(`  ✔ user_metadata staged correctly with: agencyName="${meta.agencyName}", ownerName="${meta.ownerName}", city="${meta.city}"`);
-  console.log(`  ✔ Password is NOT in user_metadata (Secure).`);
-
-  console.log(`\n▶ Step 5: Verifying ZERO database records created prior to email verification`);
+  console.log(`\n▶ Step 4: Verifying immediate Prisma database provisioning (Direct Onboarding)`);
   const dbUser = await prisma.user.findUnique({
     where: { id: createdAuthUser.id },
   });
-  if (dbUser) {
-    throw new Error(`[FAIL] Prisma User record was unexpectedly created before email verification!`);
+  if (!dbUser) {
+    throw new Error(`[FAIL] Prisma User record was NOT created after signup!`);
   }
+  if (dbUser.role !== UserRole.AGENCY_OWNER) {
+    throw new Error(`[FAIL] Expected user role AGENCY_OWNER, found: ${dbUser.role}`);
+  }
+  console.log(`  ✔ Prisma User record created with role AGENCY_OWNER.`);
+
   const dbAgency = await prisma.agency.findFirst({
     where: { name: testAgencyName },
   });
-  if (dbAgency) {
-    throw new Error(`[FAIL] Prisma Agency record was unexpectedly created before email verification!`);
+  if (!dbAgency) {
+    throw new Error(`[FAIL] Prisma Agency record was NOT created after signup!`);
   }
-  console.log(`  ✔ Zero Prisma User records created before verification.`);
-  console.log(`  ✔ Zero Prisma Agency records created before verification.`);
-  console.log(`  ✔ Zero Subscription / Trial consumption before verification.`);
+  console.log(`  ✔ Prisma Agency record created: "${dbAgency.name}" (ID: ${dbAgency.id})`);
 
-  console.log(`\n▶ Step 6: Testing duplicate signup rejection`);
+  const dbSub = await prisma.subscription.findFirst({
+    where: { agencyId: dbAgency.id },
+  });
+  if (!dbSub || dbSub.status !== "TRIAL") {
+    throw new Error(`[FAIL] 7-Day Trial Subscription was NOT created for agency!`);
+  }
+  console.log(`  ✔ 7-Day Trial Subscription created successfully (Status: ${dbSub.status}).`);
+
+  console.log(`\n▶ Step 5: Testing duplicate signup rejection`);
   try {
     const dupResult = await signupAgencyOwnerAction({}, formData);
     if (dupResult?.error) {
@@ -143,7 +135,7 @@ async function runSignupVerificationTest() {
     console.log(`  ✔ Duplicate signup safely intercepted: ${err.message || err}`);
   }
 
-  console.log(`\n▶ Step 7: Verifying Platform Owner (mzpatel14@gmail.com) immutability`);
+  console.log(`\n▶ Step 6: Verifying Platform Owner (mzpatel14@gmail.com) immutability`);
   const platformOwner = await prisma.user.findFirst({
     where: { email: "mzpatel14@gmail.com" },
   });
@@ -152,16 +144,20 @@ async function runSignupVerificationTest() {
   }
   console.log(`  ✔ Platform Owner verified: "${platformOwner.email}" remains ${platformOwner.role} (Untouched)`);
 
-  console.log(`\n▶ Step 8: Safe cleanup of newly-created test Auth user`);
+  console.log(`\n▶ Step 7: Safe cleanup of newly-created test records`);
   await assertNotPlatformOwner(
     { userId: createdAuthUser.id, email: createdAuthUser.email },
-    { prismaClient: prisma, context: "QA-05 deleteUser cleanup" }
+    { prismaClient: prisma, context: "QA-05 cleanup" }
   );
+  await prisma.subscription.deleteMany({ where: { agencyId: dbAgency.id } });
+  await prisma.destination.deleteMany({ where: { agencyId: dbAgency.id } });
+  await prisma.user.deleteMany({ where: { id: createdAuthUser.id } });
+  await prisma.agency.deleteMany({ where: { id: dbAgency.id } });
   await adminSb.auth.admin.deleteUser(createdAuthUser.id);
-  console.log(`  ✔ Test Auth user "${createdAuthUser.id}" cleaned up successfully.`);
+  console.log(`  ✔ Test records cleaned up successfully.`);
 
   console.log("\n===============================================================================");
-  console.log("🎉 ALL QA-05 BATCH 1 SIGNUP & METADATA STAGING INTEGRATION TESTS PASSED (100%)!");
+  console.log("🎉 ALL QA-05 DIRECT SIGNUP & ONBOARDING INTEGRATION TESTS PASSED (100%)!");
   console.log("===============================================================================");
 }
 

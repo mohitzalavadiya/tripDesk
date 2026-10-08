@@ -103,8 +103,31 @@ export async function signupAgencyOwnerAction(
     return { error: "An account with this email already exists. Please log in instead." };
   }
 
-  // 2. Redirect to /verify-email without creating database records or auto-logging in
-  redirect(`/verify-email?email=${encodeURIComponent(email)}`);
+  // 2. Direct Onboarding Provisioning (Email verification temporarily disabled for all roles)
+  const onboardingResult = await provisionOnboardedAgencyOwner(authData.user, supabase, {
+    agencyName,
+    agencyEmail,
+    agencyPhone,
+    address,
+    city,
+    state,
+    country,
+    ownerName,
+    phone,
+  });
+
+  if (!onboardingResult.success) {
+    if (onboardingResult.alreadyOnboarded) {
+      await supabase.auth.signOut();
+      redirect("/login?registered=true");
+    }
+    console.error("Direct agency onboarding failed during signup:", onboardingResult.error);
+    return { error: "Failed to initialize agency workspace. Please try again or contact support." };
+  }
+
+  // 3. Enforce "No Auto-Login" rule: sign out and redirect to login
+  await supabase.auth.signOut();
+  redirect("/login?registered=true");
 }
 
 /**
@@ -130,16 +153,6 @@ export async function loginAction(
 
   if (authError || !authData.user) {
     if (
-      authError?.message?.toLowerCase().includes("email not confirmed") ||
-      authError?.message?.toLowerCase().includes("email_not_confirmed")
-    ) {
-      return {
-        error: "Please verify your email address before signing in to Your Travel Desk.",
-        unverified: true,
-        email,
-      };
-     }
-    if (
       authError?.message?.toLowerCase().includes("invalid login credentials") ||
       authError?.status === 400
     ) {
@@ -149,9 +162,19 @@ export async function loginAction(
   }
 
   // Fetch DB User to check role and route correctly
-  const dbUser = await prisma.user.findUnique({
+  let dbUser = await prisma.user.findUnique({
     where: { id: authData.user.id },
   });
+
+  // Fallback onboarding if user exists in Supabase Auth but DB User was not yet provisioned
+  if (!dbUser && authData.user.user_metadata?.agencyName) {
+    const onboardRes = await provisionOnboardedAgencyOwner(authData.user, supabase);
+    if (onboardRes.success) {
+      dbUser = await prisma.user.findUnique({
+        where: { id: authData.user.id },
+      });
+    }
+  }
 
   if (!dbUser) {
     // Explicitly destroy session to prevent orphaned access
@@ -164,21 +187,13 @@ export async function loginAction(
 
   const isPlatformOwner = dbUser.role === "PLATFORM_OWNER";
 
-  // Login Verification Gate (Agency Users must be confirmed in Supabase Auth; Platform Owner is exempt)
-  const isEmailConfirmed = !!(
-    authData.user.email_confirmed_at ||
-    (authData.user as any).confirmed_at
-  );
-
-  if (!isPlatformOwner && !isEmailConfirmed) {
-    // Unverified Agency Owner: safely destroy the session and block workspace access
-    await supabase.auth.signOut();
-    return {
-      error: "Please verify your email address before signing in to Your Travel Desk.",
-      unverified: true,
-      email,
-    };
-  }
+  // Login Verification Gate: Temporarily disabled for ALL roles (AGENCY_OWNER and PLATFORM_OWNER).
+  // When re-enabling email verification in a future phase, restore this gate:
+  // const isEmailConfirmed = !!(authData.user.email_confirmed_at || (authData.user as any).confirmed_at);
+  // if (!isPlatformOwner && !isEmailConfirmed) {
+  //   await supabase.auth.signOut();
+  //   return { error: "Please verify your email address before signing in to Your Travel Desk.", unverified: true, email };
+  // }
 
   if (isPlatformOwner) {
     if (

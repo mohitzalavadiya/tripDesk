@@ -94,11 +94,30 @@ function VerifyEmailContent() {
         </p>
       </div>
 
+      {/* Email Verification Deferred / Informative Notice Card */}
+      <div className="bg-purple-50 border border-purple-200 text-purple-900 text-xs rounded-2xl p-4 space-y-3">
+        <div className="flex items-start gap-2.5">
+          <CheckCircle2 className="h-5 w-5 text-purple-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-bold text-sm block">Email Verification Not Required</span>
+            <p className="text-purple-800 leading-relaxed text-xs">
+              Email verification is temporarily disabled for all roles. You can log in directly with your email and password to access your workspace.
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/login"
+          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold h-10 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-colors text-xs"
+        >
+          Proceed to Login &rarr;
+        </Link>
+      </div>
+
       {/* Target Email Display */}
       {email ? (
         <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-3.5 text-center space-y-1">
           <p className="text-[11px] font-semibold text-purple-700 uppercase tracking-wider">
-            Verification Sent To
+            Registered Account
           </p>
           <p className="text-xs font-bold text-slate-900 break-all">
             {email}
@@ -114,7 +133,7 @@ function VerifyEmailContent() {
         </div>
       )}
 
-      {/* OTP Verification Form */}
+      {/* OTP Verification Form (Dormant - Retained for future reactivation) */}
       <form action={otpFormAction} className="space-y-4">
         {email ? (
           <input type="hidden" name="email" value={email} />

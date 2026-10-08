@@ -18,14 +18,16 @@ export interface OnboardingResult {
  */
 export async function provisionOnboardedAgencyOwner(
   user: User,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  explicitMetadata?: Record<string, any>
 ): Promise<OnboardingResult> {
-  // 1. Verification Gate: Email must be confirmed in Supabase Auth
-  const isEmailConfirmed = !!(user.email_confirmed_at || (user as any).confirmed_at);
-  if (!isEmailConfirmed) {
-    console.error("Onboarding attempt with unconfirmed email for user:", user.id);
-    return { success: false, error: "unverified_account" };
-  }
+  // 1. Verification Gate: Email verification is temporarily disabled for all roles.
+  // When re-enabling email verification in a future phase, restore this check:
+  // const isEmailConfirmed = !!(user.email_confirmed_at || (user as any).confirmed_at);
+  // if (!isEmailConfirmed) {
+  //   console.error("Onboarding attempt with unconfirmed email for user:", user.id);
+  //   return { success: false, error: "unverified_account" };
+  // }
 
   // 2. Idempotency Check: Has onboarding already been completed?
   const existingUser = await prisma.user.findUnique({
@@ -37,7 +39,10 @@ export async function provisionOnboardedAgencyOwner(
   }
 
   // 3. Read and Validate Temporary Onboarding Metadata
-  const metadata = user.user_metadata || {};
+  const metadata = {
+    ...(user.user_metadata || {}),
+    ...(explicitMetadata || {}),
+  };
   const agencyName = metadata.agencyName?.trim();
   const agencyPhone = metadata.agencyPhone?.trim();
   const agencyEmail = metadata.agencyEmail?.trim();
