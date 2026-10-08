@@ -20,6 +20,11 @@ async function bootstrapPlatformOwner() {
 
   console.log(`🔐 Bootstrapping Platform Owner: ${email}`);
 
+  if (!email || !password) {
+    console.error("❌ Missing BOOTSTRAP_OWNER_EMAIL or BOOTSTRAP_OWNER_PASSWORD in environment.");
+    process.exit(1);
+  }
+
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error("❌ Missing Supabase URL or Supabase Key in environment.");
     process.exit(1);
@@ -39,38 +44,63 @@ async function bootstrapPlatformOwner() {
 
   if (existingOwner) {
     console.log(`ℹ️ Platform Owner already exists in database: ${existingOwner.email} (ID: ${existingOwner.id})`);
+    // Ensure existing Supabase Auth account maintains email confirmation
+    const { error: updateError } = await supabase.auth.admin.updateUserById(existingOwner.id, {
+      email_confirm: true,
+      user_metadata: {
+        name: existingOwner.name || name,
+        role: "PLATFORM_OWNER",
+      },
+    });
+    if (updateError) {
+      console.warn("⚠️ Warning: Failed to ensure email confirmation for existing Platform Owner in Supabase Auth:", updateError.message);
+    }
     return;
   }
 
   // 2. Create or verify Supabase Auth user
   let supabaseUserId: string;
 
-  // Try signing in first if account exists in Supabase Auth
-  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const { data: userList, error: listError } = await supabase.auth.admin.listUsers();
+  if (listError) {
+    console.error("❌ Failed to query Supabase Auth users:", listError.message);
+    process.exit(1);
+  }
 
-  if (signInData?.user) {
-    supabaseUserId = signInData.user.id;
+  const existingAuthUser = userList.users.find(
+    (u) => u.email?.toLowerCase() === email.toLowerCase()
+  );
+
+  if (existingAuthUser) {
+    console.log(`ℹ️ Supabase Auth account found for ${email} (ID: ${existingAuthUser.id}). Ensuring email confirmation...`);
+    supabaseUserId = existingAuthUser.id;
+    const { error: updateError } = await supabase.auth.admin.updateUserById(supabaseUserId, {
+      email_confirm: true,
+      user_metadata: {
+        name,
+        role: "PLATFORM_OWNER",
+      },
+    });
+    if (updateError) {
+      console.warn("⚠️ Warning: Failed to update Supabase Auth user:", updateError.message);
+    }
   } else {
-    // Attempt signup
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    console.log(`✨ Creating new Supabase Auth user for ${email}...`);
+    const { data: createData, error: createError } = await supabase.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          name,
-          role: "PLATFORM_OWNER",
-        },
+      email_confirm: true,
+      user_metadata: {
+        name,
+        role: "PLATFORM_OWNER",
       },
     });
 
-    if (signUpError || !signUpData.user) {
-      console.error("❌ Failed to create Supabase Auth user for Platform Owner:", signUpError?.message);
+    if (createError || !createData.user) {
+      console.error("❌ Failed to create Supabase Auth user for Platform Owner:", createError?.message);
       process.exit(1);
     }
-    supabaseUserId = signUpData.user.id;
+    supabaseUserId = createData.user.id;
   }
 
   // 3. Upsert Platform Owner in TripDesk database with agencyId = null and role = PLATFORM_OWNER
