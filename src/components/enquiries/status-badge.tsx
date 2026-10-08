@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
-import { EnquiryStatus, EnquiryPriority } from "@prisma/client";
+import type { EnquiryStatus, EnquiryPriority } from "@prisma/client";
 import { cn } from "@/lib/utils";
 
 interface StatusBadgeProps {

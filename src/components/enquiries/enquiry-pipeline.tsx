@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { MoreVertical, Calendar, Users, MapPin, ArrowRight } from "lucide-react";
 import { formatCurrency } from "@/lib/costing-engine";
-import { EnquiryStatus } from "@prisma/client";
+import type { EnquiryStatus } from "@prisma/client";
 
 interface EnquiryPipelineProps {
   enquiries: EnquiryWithRelations[];
@@ -23,13 +23,13 @@ interface EnquiryPipelineProps {
 }
 
 const PIPELINE_STAGES: { label: string; status: EnquiryStatus; color: string }[] = [
-  { label: "New", status: EnquiryStatus.NEW, color: "bg-blue-500" },
-  { label: "Contacted", status: EnquiryStatus.CONTACTED, color: "bg-purple-500" },
-  { label: "Qualified", status: EnquiryStatus.QUALIFIED, color: "bg-teal-500" },
-  { label: "Quoted", status: EnquiryStatus.QUOTATION_SENT, color: "bg-indigo-500" },
-  { label: "Follow-up", status: EnquiryStatus.FOLLOW_UP, color: "bg-amber-500" },
-  { label: "Negotiation", status: EnquiryStatus.NEGOTIATION, color: "bg-orange-500" },
-  { label: "Converted", status: EnquiryStatus.CONVERTED, color: "bg-emerald-500" },
+  { label: "New", status: "NEW", color: "bg-blue-500" },
+  { label: "Contacted", status: "CONTACTED", color: "bg-purple-500" },
+  { label: "Qualified", status: "QUALIFIED", color: "bg-teal-500" },
+  { label: "Quoted", status: "QUOTATION_SENT", color: "bg-indigo-500" },
+  { label: "Follow-up", status: "FOLLOW_UP", color: "bg-amber-500" },
+  { label: "Negotiation", status: "NEGOTIATION", color: "bg-orange-500" },
+  { label: "Converted", status: "CONVERTED", color: "bg-emerald-500" },
 ];
 
 export function EnquiryPipeline({

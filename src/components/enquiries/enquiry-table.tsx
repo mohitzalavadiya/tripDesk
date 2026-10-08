@@ -34,7 +34,7 @@ import {
   IndianRupee,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/costing-engine";
-import { EnquiryStatus } from "@prisma/client";
+import type { EnquiryStatus } from "@prisma/client";
 
 interface EnquiryTableProps {
   enquiries: EnquiryWithRelations[];

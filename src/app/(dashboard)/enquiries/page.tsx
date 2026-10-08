@@ -44,28 +44,28 @@ import {
   enquiryClient,
   EnquiryWithRelations,
 } from "@/lib/api-client";
-import { EnquiryStatus, EnquiryPriority, EnquirySource } from "@prisma/client";
+import type { EnquiryStatus, EnquiryPriority, EnquirySource } from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
 
 const PRIORITY_FILTER_LABELS: Record<string, string> = {
   all: "All",
-  [EnquiryPriority.URGENT]: "Urgent",
-  [EnquiryPriority.HIGH]: "High",
-  [EnquiryPriority.MEDIUM]: "Medium",
-  [EnquiryPriority.LOW]: "Low",
+  URGENT: "Urgent",
+  HIGH: "High",
+  MEDIUM: "Medium",
+  LOW: "Low",
 };
 
 const SOURCE_FILTER_LABELS: Record<string, string> = {
   all: "All",
-  [EnquirySource.WHATSAPP]: "WhatsApp",
-  [EnquirySource.WEBSITE]: "Website",
-  [EnquirySource.INSTAGRAM]: "Instagram",
-  [EnquirySource.FACEBOOK]: "Facebook",
-  [EnquirySource.PHONE]: "Phone",
-  [EnquirySource.EMAIL]: "Email",
-  [EnquirySource.REFERRAL]: "Referral",
-  [EnquirySource.WALK_IN]: "Walk-in",
+  WHATSAPP: "WhatsApp",
+  WEBSITE: "Website",
+  INSTAGRAM: "Instagram",
+  FACEBOOK: "Facebook",
+  PHONE: "Phone",
+  EMAIL: "Email",
+  REFERRAL: "Referral",
+  WALK_IN: "Walk-in",
 };
 
 export default function EnquiriesPage() {
@@ -243,19 +243,19 @@ export default function EnquiriesPage() {
   const stats = React.useMemo(() => {
     const total = pagination.total;
     const activeStatuses: EnquiryStatus[] = [
-      EnquiryStatus.NEW,
-      EnquiryStatus.CONTACTED,
-      EnquiryStatus.QUALIFIED,
-      EnquiryStatus.QUOTATION_SENT,
-      EnquiryStatus.FOLLOW_UP,
-      EnquiryStatus.NEGOTIATION,
+      "NEW",
+      "CONTACTED",
+      "QUALIFIED",
+      "QUOTATION_SENT",
+      "FOLLOW_UP",
+      "NEGOTIATION",
     ];
     const active = enquiries.filter((e) => activeStatuses.includes(e.status as EnquiryStatus)).length;
-    const converted = enquiries.filter((e) => e.status === EnquiryStatus.CONVERTED).length;
+    const converted = enquiries.filter((e) => e.status === "CONVERTED").length;
     const quotedStatuses: EnquiryStatus[] = [
-      EnquiryStatus.QUOTATION_SENT,
-      EnquiryStatus.NEGOTIATION,
-      EnquiryStatus.CONVERTED,
+      "QUOTATION_SENT",
+      "NEGOTIATION",
+      "CONVERTED",
     ];
     const quotedPipelineValue = enquiries
       .filter((e) => e.budget && quotedStatuses.includes(e.status as EnquiryStatus))
@@ -300,15 +300,15 @@ export default function EnquiriesPage() {
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scrollbar-none flex-nowrap pt-1 pb-1 -mx-1 px-1 text-xs">
               {[
                 { label: "All", value: "all" },
-                { label: "New", value: EnquiryStatus.NEW },
-                { label: "Contacted", value: EnquiryStatus.CONTACTED },
-                { label: "Qualified", value: EnquiryStatus.QUALIFIED },
-                { label: "Quotation Sent", value: EnquiryStatus.QUOTATION_SENT },
-                { label: "Follow-up", value: EnquiryStatus.FOLLOW_UP },
-                { label: "Negotiation", value: EnquiryStatus.NEGOTIATION },
-                { label: "Converted", value: EnquiryStatus.CONVERTED },
-                { label: "Lost", value: EnquiryStatus.LOST },
-                { label: "Cancelled", value: EnquiryStatus.CANCELLED },
+                { label: "New", value: "NEW" },
+                { label: "Contacted", value: "CONTACTED" },
+                { label: "Qualified", value: "QUALIFIED" },
+                { label: "Quotation Sent", value: "QUOTATION_SENT" },
+                { label: "Follow-up", value: "FOLLOW_UP" },
+                { label: "Negotiation", value: "NEGOTIATION" },
+                { label: "Converted", value: "CONVERTED" },
+                { label: "Lost", value: "LOST" },
+                { label: "Cancelled", value: "CANCELLED" },
               ].map((tab) => (
                 <button
                   key={tab.value}
@@ -452,10 +452,10 @@ export default function EnquiriesPage() {
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
                       <SelectItem value="all">All</SelectItem>
-                      <SelectItem value={EnquiryPriority.URGENT}>Urgent</SelectItem>
-                      <SelectItem value={EnquiryPriority.HIGH}>High</SelectItem>
-                      <SelectItem value={EnquiryPriority.MEDIUM}>Medium</SelectItem>
-                      <SelectItem value={EnquiryPriority.LOW}>Low</SelectItem>
+                      <SelectItem value="URGENT">Urgent</SelectItem>
+                      <SelectItem value="HIGH">High</SelectItem>
+                      <SelectItem value="MEDIUM">Medium</SelectItem>
+                      <SelectItem value="LOW">Low</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -478,14 +478,14 @@ export default function EnquiriesPage() {
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
                       <SelectItem value="all">All</SelectItem>
-                      <SelectItem value={EnquirySource.WHATSAPP}>WhatsApp</SelectItem>
-                      <SelectItem value={EnquirySource.WEBSITE}>Website</SelectItem>
-                      <SelectItem value={EnquirySource.INSTAGRAM}>Instagram</SelectItem>
-                      <SelectItem value={EnquirySource.FACEBOOK}>Facebook</SelectItem>
-                      <SelectItem value={EnquirySource.PHONE}>Phone</SelectItem>
-                      <SelectItem value={EnquirySource.EMAIL}>Email</SelectItem>
-                      <SelectItem value={EnquirySource.REFERRAL}>Referral</SelectItem>
-                      <SelectItem value={EnquirySource.WALK_IN}>Walk-in</SelectItem>
+                      <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
+                      <SelectItem value="WEBSITE">Website</SelectItem>
+                      <SelectItem value="INSTAGRAM">Instagram</SelectItem>
+                      <SelectItem value="FACEBOOK">Facebook</SelectItem>
+                      <SelectItem value="PHONE">Phone</SelectItem>
+                      <SelectItem value="EMAIL">Email</SelectItem>
+                      <SelectItem value="REFERRAL">Referral</SelectItem>
+                      <SelectItem value="WALK_IN">Walk-in</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
