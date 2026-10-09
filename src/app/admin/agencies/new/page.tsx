@@ -324,8 +324,18 @@ export default function CreateAgencyPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-white border-slate-200">
-                    <SelectItem value="starter">Starter Plan (₹1,999/mo)</SelectItem>
-                    <SelectItem value="professional">Professional Plan (₹4,999/mo)</SelectItem>
+                    {plans && plans.length > 0 ? (
+                      plans.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} Plan (₹{p.monthlyPrice.toLocaleString("en-IN")}/mo)
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <>
+                        <SelectItem value="starter">Starter Plan (₹499/mo)</SelectItem>
+                        <SelectItem value="professional">Professional Plan (₹999/mo)</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

@@ -2241,14 +2241,15 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
-                <Link href={`/trips/${trip.id}/costing`}>
+              <div className="w-full flex justify-stretch sm:justify-end pt-2">
+                <Link href={`/trips/${trip.id}/costing`} className="w-full sm:w-auto">
                   <Button
                     variant="outline"
-                    className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold h-9 rounded-xl cursor-pointer inline-flex items-center gap-1.5"
+                    className="w-full sm:w-auto justify-center border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold h-auto min-h-9 py-2 px-3 rounded-xl cursor-pointer inline-flex items-center gap-1.5 text-center leading-snug"
                   >
-                    View Supplier Breakdown in Costing Studio
-                    <ArrowLeft className="h-3 w-3 rotate-180 text-slate-400" />
+                    <span className="sm:hidden">Costing Studio Breakdown</span>
+                    <span className="hidden sm:inline">View Supplier Breakdown in Costing Studio</span>
+                    <ArrowLeft className="h-3 w-3 rotate-180 text-slate-400 shrink-0" />
                   </Button>
                 </Link>
               </div>

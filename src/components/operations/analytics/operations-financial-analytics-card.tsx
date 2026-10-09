@@ -31,25 +31,25 @@ export function OperationsFinancialAnalyticsCard({
   const isOverBudget = financialData.totalVariance > 0.01;
 
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full">
+    <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full">
       <div>
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-3 mb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+            <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
               <IndianRupee className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 uppercase tracking-wider">
                 Financial Variance & Cost Audit
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[11px] sm:text-xs text-slate-500">
                 Planned supplier costs vs actual settlement reconciliations
               </p>
             </div>
           </div>
 
           <div
-            className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${
+            className={`self-start sm:self-auto shrink-0 flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${
               isOverBudget
                 ? "bg-rose-50 text-rose-700 border-rose-200"
                 : "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -57,33 +57,33 @@ export function OperationsFinancialAnalyticsCard({
           >
             {isOverBudget ? (
               <>
-                <TrendingUp className="h-3.5 w-3.5" /> Overrun (+{financialData.averageVariancePercent}%)
+                <TrendingUp className="h-3.5 w-3.5 shrink-0" /> Overrun (+{financialData.averageVariancePercent}%)
               </>
             ) : (
               <>
-                <TrendingDown className="h-3.5 w-3.5" /> Under Budget ({financialData.averageVariancePercent}%)
+                <TrendingDown className="h-3.5 w-3.5 shrink-0" /> Under Budget ({financialData.averageVariancePercent}%)
               </>
             )}
           </div>
         </div>
 
         {/* Cost Summary Highlights */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-2.5">
-            <div className="text-[11px] font-medium text-slate-500">Total Planned</div>
-            <div className="text-base font-bold text-slate-900 mt-0.5">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-4">
+          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-1.5 sm:p-2.5 text-center sm:text-left">
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 truncate">Total Planned</div>
+            <div className="text-xs sm:text-base font-bold text-slate-900 mt-0.5 truncate">
               {formatCurrency(financialData.totalPlannedCost)}
             </div>
           </div>
-          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-2.5">
-            <div className="text-[11px] font-medium text-slate-500">Total Actual</div>
-            <div className="text-base font-bold text-slate-900 mt-0.5">
+          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-1.5 sm:p-2.5 text-center sm:text-left">
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 truncate">Total Actual</div>
+            <div className="text-xs sm:text-base font-bold text-slate-900 mt-0.5 truncate">
               {formatCurrency(financialData.totalActualCost)}
             </div>
           </div>
-          <div className={`rounded-lg p-2.5 border ${isOverBudget ? "bg-rose-50/50 border-rose-200 text-rose-900" : "bg-emerald-50/50 border-emerald-200 text-emerald-900"}`}>
-            <div className="text-[11px] font-medium opacity-80">Net Variance</div>
-            <div className="text-base font-bold mt-0.5">
+          <div className={`rounded-lg p-1.5 sm:p-2.5 border text-center sm:text-left ${isOverBudget ? "bg-rose-50/50 border-rose-200 text-rose-900" : "bg-emerald-50/50 border-emerald-200 text-emerald-900"}`}>
+            <div className="text-[10px] sm:text-[11px] font-medium opacity-80 truncate">Net Variance</div>
+            <div className="text-xs sm:text-base font-bold mt-0.5 truncate">
               {formatCurrency(financialData.totalVariance)}
             </div>
           </div>

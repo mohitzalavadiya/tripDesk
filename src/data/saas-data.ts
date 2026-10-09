@@ -95,8 +95,8 @@ export const initialSaaSPlans: SaaSPlan[] = [
   {
     id: "starter",
     name: "Starter",
-    monthlyPrice: 1999,
-    yearlyPrice: 19999,
+    monthlyPrice: 499,
+    yearlyPrice: 4999,
     tagline: "Essential travel planning & quotation workflow for boutique operators.",
     features: [
       "Customers & Traveler Directory",
@@ -112,8 +112,8 @@ export const initialSaaSPlans: SaaSPlan[] = [
   {
     id: "professional",
     name: "Professional",
-    monthlyPrice: 4999,
-    yearlyPrice: 49999,
+    monthlyPrice: 999,
+    yearlyPrice: 9999,
     tagline: "Comprehensive operating suite for established agencies and tour desks.",
     features: [
       "Everything in Starter",

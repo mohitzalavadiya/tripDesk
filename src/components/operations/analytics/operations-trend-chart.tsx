@@ -2,11 +2,36 @@
 
 import * as React from "react";
 import { TrendTimePoint } from "@/lib/api-client/operations-client";
-import { TrendingUp, Calendar } from "lucide-react";
+import {
+  Activity,
+  CheckCircle2,
+  Calendar,
+  AlertCircle,
+  TrendingUp,
+  Layers,
+  ShieldCheck,
+  Clock,
+  Compass,
+} from "lucide-react";
 
 interface OperationsTrendChartProps {
   trends?: TrendTimePoint[];
   loading?: boolean;
+}
+
+function formatDate(isoDate: string): string {
+  try {
+    const [y, m, d] = isoDate.split("-");
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    return date.toLocaleDateString("en-IN", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return isoDate;
+  }
 }
 
 export function OperationsTrendChart({
@@ -19,42 +44,86 @@ export function OperationsTrendChart({
     return (
       <div className="rounded-xl border border-slate-200/80 bg-white p-5 animate-pulse h-80">
         <div className="h-5 w-48 bg-slate-200 rounded mb-4" />
-        <div className="h-48 bg-slate-100 rounded-lg" />
+        <div className="h-20 bg-slate-100 rounded-lg mb-4" />
+        <div className="h-40 bg-slate-100 rounded-lg" />
       </div>
     );
   }
 
-  const maxVal = Math.max(
-    ...trends.map((t) =>
+  // Aggregate velocity metrics across timepoints
+  let totalOpsCreated = 0;
+  let totalOpsCompleted = 0;
+  let totalOpsCancelled = 0;
+  let totalIssuesCreated = 0;
+  let totalIssuesResolved = 0;
+  let activeDaysCount = 0;
+
+  for (const t of trends) {
+    totalOpsCreated += t.operationsCount;
+    totalOpsCompleted += t.operationsCompleted;
+    totalOpsCancelled += t.operationsCancelled || 0;
+    totalIssuesCreated += t.issuesCreated;
+    totalIssuesResolved += t.issuesResolved;
+    if (
+      t.operationsCount > 0 ||
+      t.operationsCompleted > 0 ||
+      t.issuesCreated > 0 ||
+      t.issuesResolved > 0
+    ) {
+      activeDaysCount++;
+    }
+  }
+
+  const opCompletionRate =
+    totalOpsCreated > 0
+      ? Math.round((totalOpsCompleted / totalOpsCreated) * 100)
+      : totalOpsCompleted > 0
+      ? 100
+      : 100;
+
+  const issueResolutionRate =
+    totalIssuesCreated > 0
+      ? Math.round((totalIssuesResolved / totalIssuesCreated) * 100)
+      : 100;
+
+  // Filter days that had events for the active metric (newest first)
+  const activeEvents = trends
+    .filter((t) =>
       metric === "OPERATIONS"
-        ? Math.max(t.operationsCount, t.operationsCompleted)
-        : Math.max(t.issuesCreated, t.issuesResolved)
-    ),
-    5
-  );
+        ? t.operationsCount > 0 ||
+          t.operationsCompleted > 0 ||
+          (t.operationsCancelled || 0) > 0
+        : t.issuesCreated > 0 || t.issuesResolved > 0
+    )
+    .slice()
+    .reverse();
+
+  // Most recent 3 days as baseline context when zero events occurred
+  const recentDays = trends.slice(-3).reverse();
 
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
+    <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
       <div>
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        {/* Card Header & Metric Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3 mb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-              <TrendingUp className="h-4 w-4" />
+            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600 shrink-0">
+              <Activity className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
-                Operations & Issue Velocity Trends
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 uppercase tracking-wider">
+                Operational Velocity & Execution Log
               </h3>
-              <p className="text-xs text-slate-500">
-                Time-series progression of tour execution and issue resolution velocity
+              <p className="text-[11px] sm:text-xs text-slate-500">
+                Cadence metrics, completion milestones, and resolution velocity
               </p>
             </div>
           </div>
 
-          <div className="flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+          <div className="flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50 self-start sm:self-auto shrink-0 w-full sm:w-auto">
             <button
               onClick={() => setMetric("OPERATIONS")}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+              className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-md text-xs font-medium text-center transition-colors ${
                 metric === "OPERATIONS"
                   ? "bg-white text-slate-900 shadow-2xs"
                   : "text-slate-500 hover:text-slate-900"
@@ -64,7 +133,7 @@ export function OperationsTrendChart({
             </button>
             <button
               onClick={() => setMetric("ISSUES")}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+              className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-md text-xs font-medium text-center transition-colors ${
                 metric === "ISSUES"
                   ? "bg-white text-slate-900 shadow-2xs"
                   : "text-slate-500 hover:text-slate-900"
@@ -75,68 +144,166 @@ export function OperationsTrendChart({
           </div>
         </div>
 
-        {/* SVG / Bar Chart Area */}
-        <div className="h-44 w-full flex items-end gap-1 pt-4 pb-2 border-b border-slate-100">
-          {trends.map((t, idx) => {
-            const val1 = metric === "OPERATIONS" ? t.operationsCount : t.issuesCreated;
-            const val2 = metric === "OPERATIONS" ? t.operationsCompleted : t.issuesResolved;
-            const height1 = maxVal > 0 ? (val1 / maxVal) * 100 : 0;
-            const height2 = maxVal > 0 ? (val2 / maxVal) * 100 : 0;
+        {/* Velocity Metric Summary Cards (2x2 on mobile, 4 columns on sm+) */}
+        {metric === "OPERATIONS" ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+            <div className="rounded-lg bg-blue-50/50 border border-blue-200/80 p-2.5 sm:p-3">
+              <div className="text-[10px] sm:text-xs font-medium text-blue-700">Tours Initiated</div>
+              <div className="text-lg sm:text-2xl font-bold text-blue-900 mt-0.5">
+                {totalOpsCreated}
+              </div>
+              <div className="text-[10px] text-blue-600/80 mt-0.5 truncate">Active in period</div>
+            </div>
 
-            return (
-              <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end group relative">
-                {/* Tooltip */}
-                <div className="absolute -top-10 bg-slate-900 text-white text-[10px] rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-md">
-                  <div>{t.dateLabel}</div>
-                  <div>
-                    {metric === "OPERATIONS"
-                      ? `Active: ${val1} | Completed: ${val2}`
-                      : `Created: ${val1} | Resolved: ${val2}`}
+            <div className="rounded-lg bg-emerald-50/50 border border-emerald-200/80 p-2.5 sm:p-3">
+              <div className="text-[10px] sm:text-xs font-medium text-emerald-700">Tours Completed</div>
+              <div className="text-lg sm:text-2xl font-bold text-emerald-900 mt-0.5">
+                {totalOpsCompleted}
+              </div>
+              <div className="text-[10px] text-emerald-600/80 mt-0.5 truncate">Fully executed</div>
+            </div>
+
+            <div className="rounded-lg bg-indigo-50/50 border border-indigo-200/80 p-2.5 sm:p-3">
+              <div className="text-[10px] sm:text-xs font-medium text-indigo-700">Completion Efficacy</div>
+              <div className="text-lg sm:text-2xl font-bold text-indigo-900 mt-0.5">
+                {opCompletionRate}%
+              </div>
+              <div className="text-[10px] text-indigo-600/80 mt-0.5 truncate">Completion ratio</div>
+            </div>
+
+            <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-2.5 sm:p-3">
+              <div className="text-[10px] sm:text-xs font-medium text-slate-600">Active Cadence</div>
+              <div className="text-lg sm:text-2xl font-bold text-slate-900 mt-0.5">
+                {activeDaysCount} <span className="text-xs font-normal text-slate-500">Days</span>
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5 truncate">With operation events</div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+            <div className="rounded-lg bg-rose-50/50 border border-rose-200/80 p-2.5 sm:p-3">
+              <div className="text-[10px] sm:text-xs font-medium text-rose-700">Issues Reported</div>
+              <div className="text-lg sm:text-2xl font-bold text-rose-900 mt-0.5">
+                {totalIssuesCreated}
+              </div>
+              <div className="text-[10px] text-rose-600/80 mt-0.5 truncate">Total incidents</div>
+            </div>
+
+            <div className="rounded-lg bg-emerald-50/50 border border-emerald-200/80 p-2.5 sm:p-3">
+              <div className="text-[10px] sm:text-xs font-medium text-emerald-700">Issues Resolved</div>
+              <div className="text-lg sm:text-2xl font-bold text-emerald-900 mt-0.5">
+                {totalIssuesResolved}
+              </div>
+              <div className="text-[10px] text-emerald-600/80 mt-0.5 truncate">Remediated & closed</div>
+            </div>
+
+            <div className="rounded-lg bg-teal-50/50 border border-teal-200/80 p-2.5 sm:p-3">
+              <div className="text-[10px] sm:text-xs font-medium text-teal-700">Resolution Rate</div>
+              <div className="text-lg sm:text-2xl font-bold text-teal-900 mt-0.5">
+                {issueResolutionRate}%
+              </div>
+              <div className="text-[10px] text-teal-600/80 mt-0.5 truncate">Turnaround efficiency</div>
+            </div>
+
+            <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-2.5 sm:p-3">
+              <div className="text-[10px] sm:text-xs font-medium text-slate-600">Operational Health</div>
+              <div className="text-lg sm:text-2xl font-bold text-slate-900 mt-0.5">
+                {totalIssuesCreated === 0 ? "100%" : totalIssuesCreated === totalIssuesResolved ? "Healthy" : "Active"}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                {totalIssuesCreated === 0 ? "Zero blockers logged" : `${totalIssuesCreated - totalIssuesResolved} pending`}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Daily Activity Log */}
+        <div>
+          <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-slate-400" />
+              {metric === "OPERATIONS" ? "Tour Execution Events" : "Issue Resolution Events"}
+            </span>
+            <span className="text-[10px] text-slate-400 font-normal">
+              {activeEvents.length > 0 ? `${activeEvents.length} Active Days` : "Clean execution"}
+            </span>
+          </div>
+
+          {activeEvents.length > 0 ? (
+            <div className="space-y-2">
+              {activeEvents.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 sm:p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-800 text-[11px] sm:text-xs">
+                      {formatDate(item.dateLabel)}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      ({item.dateLabel})
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {metric === "OPERATIONS" ? (
+                      <>
+                        {item.operationsCount > 0 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                            +{item.operationsCount} Initiated
+                          </span>
+                        )}
+                        {item.operationsCompleted > 0 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            ✓ {item.operationsCompleted} Completed
+                          </span>
+                        )}
+                        {(item.operationsCancelled || 0) > 0 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">
+                            ✕ {item.operationsCancelled} Cancelled
+                          </span>
+                        )}
+                        {item.averageReadiness > 0 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
+                            Readiness: {item.averageReadiness}%
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {item.issuesCreated > 0 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">
+                            +{item.issuesCreated} Reported
+                          </span>
+                        )}
+                        {item.issuesResolved > 0 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            ✓ {item.issuesResolved} Resolved
+                          </span>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
-
-                <div className="w-full flex items-end justify-center gap-0.5 h-full">
-                  <div
-                    className={`w-2 rounded-t transition-all ${
-                      metric === "OPERATIONS" ? "bg-blue-400 group-hover:bg-blue-600" : "bg-rose-400 group-hover:bg-rose-600"
-                    }`}
-                    style={{ height: `${Math.max(4, height1)}%` }}
-                  />
-                  <div
-                    className={`w-2 rounded-t transition-all ${
-                      metric === "OPERATIONS"
-                        ? "bg-emerald-400 group-hover:bg-emerald-600"
-                        : "bg-teal-400 group-hover:bg-teal-600"
-                    }`}
-                    style={{ height: `${Math.max(4, height2)}%` }}
-                  />
-                </div>
-                <span className="text-[9px] text-slate-400 mt-1 truncate w-full text-center">
-                  {idx % Math.ceil(trends.length / 7) === 0 ? t.dateLabel.slice(5) : ""}
-                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/40 p-4 text-center">
+              <div className="inline-flex p-2 rounded-full bg-emerald-50 text-emerald-600 mb-2">
+                <ShieldCheck className="h-5 w-5" />
               </div>
-            );
-          })}
-        </div>
-
-        {/* Legend */}
-        <div className="flex items-center justify-center gap-6 mt-3 text-xs text-slate-500">
-          <div className="flex items-center gap-1.5">
-            <span
-              className={`h-2.5 w-2.5 rounded-full ${
-                metric === "OPERATIONS" ? "bg-blue-500" : "bg-rose-500"
-              }`}
-            />
-            <span>{metric === "OPERATIONS" ? "Active Tours Created" : "Issues Reported"}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span
-              className={`h-2.5 w-2.5 rounded-full ${
-                metric === "OPERATIONS" ? "bg-emerald-500" : "bg-teal-500"
-              }`}
-            />
-            <span>{metric === "OPERATIONS" ? "Tours Completed" : "Issues Resolved"}</span>
-          </div>
+              <div className="text-xs font-semibold text-slate-800">
+                {metric === "OPERATIONS"
+                  ? "Zero Operational Disruptions"
+                  : "Zero Active Roadblocks"}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5 max-w-sm mx-auto">
+                {metric === "OPERATIONS"
+                  ? "All tours in this timeframe are operating on schedule without recorded status exceptions."
+                  : "No operational issues or resolution delays were filed in this date range."}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

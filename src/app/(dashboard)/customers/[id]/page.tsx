@@ -405,7 +405,7 @@ export default function CustomerDetailPage() {
 
         {/* Top Hero Command Header */}
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden space-y-4 sm:space-y-5">
-          <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
+          <div className="absolute top-0 right-0 w-80 h-full from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
           {/* Breadcrumb & Badges */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 z-10">

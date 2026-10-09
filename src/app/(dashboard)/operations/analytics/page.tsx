@@ -124,41 +124,43 @@ export default function OperationsAnalyticsPage() {
       />
 
       {/* 2. Controls & Date Presets Bar */}
-      <div className="px-4 md:px-8 mt-2">
-        <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            <span className="text-xs font-medium text-slate-500 mr-1.5 flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" /> Date Range:
-            </span>
-            {PRESET_LABELS.map((p) => (
-              <button
-                key={p.value}
-                onClick={() => setPreset(p.value)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                  preset === p.value
-                    ? "bg-slate-900 text-white shadow-2xs"
-                    : "bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/60"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
+      <div className="px-3 sm:px-4 md:px-8 mt-2">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-3 sm:p-3.5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            <div className="flex items-center gap-1.5 min-w-max">
+              <span className="text-xs font-medium text-slate-500 mr-1 flex items-center gap-1 shrink-0 whitespace-nowrap">
+                <Calendar className="h-3.5 w-3.5" /> Date Range:
+              </span>
+              {PRESET_LABELS.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => setPreset(p.value)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all shrink-0 whitespace-nowrap ${
+                    preset === p.value
+                      ? "bg-slate-900 text-white shadow-2xs"
+                      : "bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/60"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {preset === "CUSTOM" && (
-            <div className="flex items-center gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-2 text-xs w-full sm:w-auto">
               <Input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="h-8 text-xs w-36"
+                className="h-8 text-xs w-full sm:w-36"
               />
               <span className="text-slate-400">to</span>
               <Input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="h-8 text-xs w-36"
+                className="h-8 text-xs w-full sm:w-36"
               />
               <Button size="sm" onClick={() => fetchAnalytics()} className="h-8 text-xs">
                 Apply
@@ -166,7 +168,7 @@ export default function OperationsAnalyticsPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
             <Link href="/operations">
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 text-slate-600 hover:text-slate-900">
                 <Compass className="h-3.5 w-3.5" /> Command Center
@@ -178,7 +180,7 @@ export default function OperationsAnalyticsPage() {
 
       {/* 3. Error Alert */}
       {error && !loading && (
-        <div className="px-4 md:px-8 mt-4">
+        <div className="px-3 sm:px-4 md:px-8 mt-4">
           <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-4 text-rose-800 flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-medium">
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
@@ -192,7 +194,7 @@ export default function OperationsAnalyticsPage() {
       )}
 
       {/* 4. Main Dashboard Grid */}
-      <div className="px-4 py-6 md:px-8 space-y-6">
+      <div className="px-3 py-4 sm:px-4 sm:py-6 md:px-8 space-y-4 sm:space-y-6">
         {/* Executive KPI Grid */}
         <OperationsAnalyticsKpiGrid overview={data?.overview} loading={loading} />
 

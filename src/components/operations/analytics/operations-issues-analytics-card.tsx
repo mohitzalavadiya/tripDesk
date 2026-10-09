@@ -35,50 +35,50 @@ export function OperationsIssuesAnalyticsCard({
   };
 
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full">
+    <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full">
       <div>
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-3 mb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
+            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600 shrink-0">
               <AlertTriangle className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 uppercase tracking-wider">
                 Operational Issues & Velocity
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[11px] sm:text-xs text-slate-500">
                 Resolution duration, priority breakdown and recurring problem areas
               </p>
             </div>
           </div>
-          <span className="text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+          <span className="self-start sm:self-auto shrink-0 text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
             {issueData.totalIssues} Total
           </span>
         </div>
 
         {/* Resolution Velocity & Reopen Rate */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-2.5 text-center">
-            <div className="text-[11px] font-medium text-slate-500 flex items-center justify-center gap-1">
-              <Clock className="h-3 w-3" /> Avg Resolution
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-4">
+          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-1.5 sm:p-2.5 text-center">
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 flex items-center justify-center gap-1 truncate">
+              <Clock className="h-3 w-3 shrink-0" /> Avg Res.
             </div>
-            <div className="text-base font-bold text-slate-900 mt-0.5">
-              {issueData.averageResolutionHours} hrs
-            </div>
-          </div>
-          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-2.5 text-center">
-            <div className="text-[11px] font-medium text-slate-500 flex items-center justify-center gap-1">
-              <Clock className="h-3 w-3" /> Median Time
-            </div>
-            <div className="text-base font-bold text-slate-900 mt-0.5">
-              {issueData.medianResolutionHours} hrs
+            <div className="text-sm sm:text-base font-bold text-slate-900 mt-0.5">
+              {issueData.averageResolutionHours}h
             </div>
           </div>
-          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-2.5 text-center">
-            <div className="text-[11px] font-medium text-slate-500 flex items-center justify-center gap-1">
-              <RefreshCw className="h-3 w-3" /> Reopened Rate
+          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-1.5 sm:p-2.5 text-center">
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 flex items-center justify-center gap-1 truncate">
+              <Clock className="h-3 w-3 shrink-0" /> Median
             </div>
-            <div className="text-base font-bold text-slate-900 mt-0.5">
+            <div className="text-sm sm:text-base font-bold text-slate-900 mt-0.5">
+              {issueData.medianResolutionHours}h
+            </div>
+          </div>
+          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-1.5 sm:p-2.5 text-center">
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 flex items-center justify-center gap-1 truncate">
+              <RefreshCw className="h-3 w-3 shrink-0" /> Reopened
+            </div>
+            <div className="text-sm sm:text-base font-bold text-slate-900 mt-0.5">
               {issueData.reopenedRatePercent}%
             </div>
           </div>
@@ -89,7 +89,7 @@ export function OperationsIssuesAnalyticsCard({
           <div className="text-xs font-semibold text-slate-700 mb-2">
             Priority Distribution
           </div>
-          <div className="grid grid-cols-4 gap-2 text-center text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 text-center text-xs">
             <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800">
               <div className="font-bold text-sm">{issueData.byPriority.critical}</div>
               <div className="text-[10px] uppercase font-semibold">Critical</div>
@@ -124,14 +124,14 @@ export function OperationsIssuesAnalyticsCard({
               { label: "Other Operations", count: issueData.problemAreas.other },
             ].map((p, idx) => (
               <div key={idx} className="flex items-center justify-between text-slate-600">
-                <span className="w-44 truncate">{p.label}</span>
+                <span className="w-32 sm:w-44 truncate text-[11px] sm:text-xs">{p.label}</span>
                 <div className="flex-1 mx-2 bg-slate-100 rounded-full h-1.5 overflow-hidden">
                   <div
                     className="h-full bg-slate-600 rounded-full"
                     style={{ width: `${getPercentage(p.count)}%` }}
                   />
                 </div>
-                <span className="w-12 text-right font-medium text-slate-800">
+                <span className="w-12 text-right font-medium text-slate-800 text-[11px] sm:text-xs shrink-0">
                   {p.count} <span className="text-slate-400 text-[10px]">({getPercentage(p.count)}%)</span>
                 </span>
               </div>

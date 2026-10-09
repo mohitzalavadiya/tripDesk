@@ -25,27 +25,27 @@ export function OperationsSupplierScorecard({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full">
+    <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full">
       <div>
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3 mb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+            <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 shrink-0">
               <Building2 className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 uppercase tracking-wider">
                 Supplier & Driver Performance
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[11px] sm:text-xs text-slate-500">
                 Confirmation rates, amendments, cancellations and duty fulfillment
               </p>
             </div>
           </div>
 
-          <div className="flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+          <div className="flex items-center rounded-lg border border-slate-200 p-0.5 bg-slate-50 self-start sm:self-auto shrink-0 w-full sm:w-auto">
             <button
               onClick={() => setActiveTab("SUPPLIERS")}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+              className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-md text-xs font-medium text-center transition-colors ${
                 activeTab === "SUPPLIERS"
                   ? "bg-white text-slate-900 shadow-2xs"
                   : "text-slate-500 hover:text-slate-900"
@@ -55,7 +55,7 @@ export function OperationsSupplierScorecard({
             </button>
             <button
               onClick={() => setActiveTab("DRIVERS")}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+              className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-md text-xs font-medium text-center transition-colors ${
                 activeTab === "DRIVERS"
                   ? "bg-white text-slate-900 shadow-2xs"
                   : "text-slate-500 hover:text-slate-900"

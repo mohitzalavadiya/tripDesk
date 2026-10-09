@@ -31,8 +31,8 @@ export default function AdminPlansPage() {
   const [targetPlanId, setTargetPlanId] = React.useState<string | null>(null);
   const [planName, setPlanName] = React.useState("");
   const [planDesc, setPlanDesc] = React.useState("");
-  const [planPrice, setPlanPrice] = React.useState("1999");
-  const [planYearlyPrice, setPlanYearlyPrice] = React.useState("19999");
+  const [planPrice, setPlanPrice] = React.useState("499");
+  const [planYearlyPrice, setPlanYearlyPrice] = React.useState("4999");
   const [planDuration, setPlanDuration] = React.useState("30");
   const [planFeatures, setPlanFeatures] = React.useState("");
   const [isPopular, setIsPopular] = React.useState(false);
@@ -119,8 +119,8 @@ export default function AdminPlansPage() {
     setTargetPlanId(null);
     setPlanName("");
     setPlanDesc("");
-    setPlanPrice("2999");
-    setPlanYearlyPrice("29999");
+    setPlanPrice("999");
+    setPlanYearlyPrice("9999");
     setPlanDuration("30");
     setPlanFeatures(
       "Customer Management & CRM\nTrip Planning & Itinerary Builder\nQuotation Engine & PDF Export\nBooking Management & Vouchers"
@@ -438,7 +438,7 @@ export default function AdminPlansPage() {
                     type="number"
                     value={planPrice}
                     onChange={(e) => setPlanPrice(e.target.value)}
-                    placeholder="1999"
+                    placeholder="499"
                     className="text-xs"
                     required
                   />
@@ -449,7 +449,7 @@ export default function AdminPlansPage() {
                     type="number"
                     value={planYearlyPrice}
                     onChange={(e) => setPlanYearlyPrice(e.target.value)}
-                    placeholder="19999"
+                    placeholder="4999"
                     className="text-xs"
                   />
                 </div>

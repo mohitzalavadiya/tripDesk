@@ -63,50 +63,50 @@ export function OperationsRiskCard({ riskData, loading = false }: OperationsRisk
     riskData.riskDistribution.critical;
 
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
+    <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between">
       <div>
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-3 mb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
+            <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600 shrink-0">
               <ShieldAlert className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 uppercase tracking-wider">
                 Operational Risk & Health Matrix
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[11px] sm:text-xs text-slate-500">
                 Deterministic risk scoring based on readiness, departure proximity & active blockers
               </p>
             </div>
           </div>
-          <span className="text-xs font-medium text-slate-500">
+          <span className="self-start sm:self-auto shrink-0 text-xs font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200/60">
             {totalEvaluated} Tours Evaluated
           </span>
         </div>
 
         {/* Risk Distribution Bar */}
-        <div className="grid grid-cols-4 gap-2 mb-4">
-          <div className="rounded-lg bg-emerald-50 border border-emerald-200/80 p-2.5 text-center">
-            <div className="text-xs font-medium text-emerald-700">Low Risk</div>
-            <div className="text-lg font-bold text-emerald-900 mt-0.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+          <div className="rounded-lg bg-emerald-50 border border-emerald-200/80 p-2 sm:p-2.5 text-center">
+            <div className="text-[11px] sm:text-xs font-medium text-emerald-700">Low Risk</div>
+            <div className="text-base sm:text-lg font-bold text-emerald-900 mt-0.5">
               {riskData.riskDistribution.low}
             </div>
           </div>
-          <div className="rounded-lg bg-blue-50 border border-blue-200/80 p-2.5 text-center">
-            <div className="text-xs font-medium text-blue-700">Medium Risk</div>
-            <div className="text-lg font-bold text-blue-900 mt-0.5">
+          <div className="rounded-lg bg-blue-50 border border-blue-200/80 p-2 sm:p-2.5 text-center">
+            <div className="text-[11px] sm:text-xs font-medium text-blue-700">Medium Risk</div>
+            <div className="text-base sm:text-lg font-bold text-blue-900 mt-0.5">
               {riskData.riskDistribution.medium}
             </div>
           </div>
-          <div className="rounded-lg bg-amber-50 border border-amber-200/80 p-2.5 text-center">
-            <div className="text-xs font-medium text-amber-700">High Risk</div>
-            <div className="text-lg font-bold text-amber-900 mt-0.5">
+          <div className="rounded-lg bg-amber-50 border border-amber-200/80 p-2 sm:p-2.5 text-center">
+            <div className="text-[11px] sm:text-xs font-medium text-amber-700">High Risk</div>
+            <div className="text-base sm:text-lg font-bold text-amber-900 mt-0.5">
               {riskData.riskDistribution.high}
             </div>
           </div>
-          <div className="rounded-lg bg-rose-50 border border-rose-200/80 p-2.5 text-center">
-            <div className="text-xs font-medium text-rose-700">Critical Risk</div>
-            <div className="text-lg font-bold text-rose-900 mt-0.5">
+          <div className="rounded-lg bg-rose-50 border border-rose-200/80 p-2 sm:p-2.5 text-center">
+            <div className="text-[11px] sm:text-xs font-medium text-rose-700">Critical Risk</div>
+            <div className="text-base sm:text-lg font-bold text-rose-900 mt-0.5">
               {riskData.riskDistribution.critical}
             </div>
           </div>

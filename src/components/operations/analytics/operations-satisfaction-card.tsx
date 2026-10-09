@@ -49,52 +49,52 @@ export function OperationsSatisfactionCard({
   };
 
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full">
+    <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full">
       <div>
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-3 mb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
+            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600 shrink-0">
               <Award className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 uppercase tracking-wider">
                 Guest Experience & Quality
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[11px] sm:text-xs text-slate-500">
                 Post-tour guest satisfaction ratings and operations execution grading
               </p>
             </div>
           </div>
 
-          <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+          <span className="self-start sm:self-auto shrink-0 text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
             {satisfactionData.totalReviews} Reviews ({satisfactionData.reviewCompletionRate}% Rate)
           </span>
         </div>
 
         {/* Rating Highlights */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-3 flex items-center justify-between">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 mb-4">
+          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-2.5 sm:p-3 flex items-center justify-between gap-2">
             <div>
               <div className="text-xs text-slate-500 font-medium">Guest Satisfaction</div>
-              <div className="text-xl font-bold text-slate-900 mt-0.5">
+              <div className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">
                 {satisfactionData.averageGuestRating > 0
                   ? `${satisfactionData.averageGuestRating} / 5`
                   : "N/A"}
               </div>
             </div>
-            {renderStars(satisfactionData.averageGuestRating)}
+            <div className="shrink-0">{renderStars(satisfactionData.averageGuestRating)}</div>
           </div>
 
-          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-3 flex items-center justify-between">
+          <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-2.5 sm:p-3 flex items-center justify-between gap-2">
             <div>
               <div className="text-xs text-slate-500 font-medium">Operator Execution</div>
-              <div className="text-xl font-bold text-slate-900 mt-0.5">
+              <div className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">
                 {satisfactionData.averageOperatorRating > 0
                   ? `${satisfactionData.averageOperatorRating} / 5`
                   : "N/A"}
               </div>
             </div>
-            {renderStars(satisfactionData.averageOperatorRating)}
+            <div className="shrink-0">{renderStars(satisfactionData.averageOperatorRating)}</div>
           </div>
         </div>
 
@@ -103,27 +103,27 @@ export function OperationsSatisfactionCard({
           <div className="text-xs font-semibold text-slate-700 mb-2">
             Service Quality Distribution
           </div>
-          <div className="grid grid-cols-4 gap-2 text-center text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
             <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
-              <div className="font-bold text-base">
+              <div className="font-bold text-sm sm:text-base">
                 {satisfactionData.qualityDistribution.excellent}
               </div>
               <div className="text-[10px] uppercase font-semibold">Excellent ({getPercent(satisfactionData.qualityDistribution.excellent)}%)</div>
             </div>
             <div className="p-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-800">
-              <div className="font-bold text-base">
+              <div className="font-bold text-sm sm:text-base">
                 {satisfactionData.qualityDistribution.good}
               </div>
               <div className="text-[10px] uppercase font-semibold">Good ({getPercent(satisfactionData.qualityDistribution.good)}%)</div>
             </div>
             <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
-              <div className="font-bold text-base">
+              <div className="font-bold text-sm sm:text-base">
                 {satisfactionData.qualityDistribution.average}
               </div>
               <div className="text-[10px] uppercase font-semibold">Average ({getPercent(satisfactionData.qualityDistribution.average)}%)</div>
             </div>
             <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800">
-              <div className="font-bold text-base">
+              <div className="font-bold text-sm sm:text-base">
                 {satisfactionData.qualityDistribution.poor}
               </div>
               <div className="text-[10px] uppercase font-semibold">Poor ({getPercent(satisfactionData.qualityDistribution.poor)}%)</div>

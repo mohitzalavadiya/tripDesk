@@ -140,7 +140,7 @@ export default function AdminPaymentsPage() {
           setSelectedAgencyId(first.id);
           if (first.subscription) {
             setSelectedSubId(first.subscription.id);
-            setCreateAmount(String(first.subscription.planPrice || "1999"));
+            setCreateAmount(String(first.subscription.planPrice || "499"));
           }
         }
       }
@@ -159,7 +159,7 @@ export default function AdminPaymentsPage() {
     const agency = agenciesList.find((a) => a.id === agencyId);
     if (agency && agency.subscription) {
       setSelectedSubId(agency.subscription.id);
-      setCreateAmount(String(agency.subscription.planPrice || "1999"));
+      setCreateAmount(String(agency.subscription.planPrice || "499"));
     }
   };
 
@@ -677,7 +677,7 @@ export default function AdminPaymentsPage() {
                     type="number"
                     value={createAmount}
                     onChange={(e) => setCreateAmount(e.target.value)}
-                    placeholder="1999"
+                    placeholder="499"
                     className="h-9 text-xs font-mono font-bold"
                     required
                   />

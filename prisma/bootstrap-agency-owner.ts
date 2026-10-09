@@ -162,7 +162,8 @@ export async function bootstrapAgencyOwner(options?: {
       data: {
         name: "Starter",
         description: "Essential travel planning & quotation workflow for boutique operators.",
-        price: 1999.0,
+        price: 499.0,
+        yearlyPrice: 4999.0,
         durationDays: 30,
         isActive: true,
       },

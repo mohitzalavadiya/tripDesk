@@ -38,23 +38,23 @@ export function OperationsReadinessChart({
   };
 
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full">
+    <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full">
       <div>
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-3 mb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+            <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
               <CheckCircle2 className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 uppercase tracking-wider">
                 Readiness & Top Blockers
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[11px] sm:text-xs text-slate-500">
                 Readiness distribution and active confirmation bottlenecks
               </p>
             </div>
           </div>
-          <span className="text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+          <span className="self-start sm:self-auto shrink-0 text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
             Avg: {readinessData.averageReadinessScore}%
           </span>
         </div>
@@ -65,8 +65,8 @@ export function OperationsReadinessChart({
             Readiness Histogram
           </div>
           {readinessData.readinessDistribution.map((item, idx) => (
-            <div key={idx} className="flex items-center gap-3 text-xs">
-              <span className="w-20 text-slate-500 font-medium">{item.bucket}</span>
+            <div key={idx} className="flex items-center gap-2 sm:gap-3 text-xs">
+              <span className="w-16 sm:w-20 text-slate-500 font-medium text-[11px] sm:text-xs shrink-0">{item.bucket}</span>
               <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
                 <div
                   className={`h-full rounded-full ${
@@ -81,7 +81,7 @@ export function OperationsReadinessChart({
                   style={{ width: `${item.percentage}%` }}
                 />
               </div>
-              <span className="w-12 text-right font-semibold text-slate-700">
+              <span className="w-12 text-right font-semibold text-slate-700 shrink-0 text-[11px] sm:text-xs">
                 {item.count} <span className="text-slate-400 text-[10px]">({item.percentage}%)</span>
               </span>
             </div>
@@ -93,22 +93,22 @@ export function OperationsReadinessChart({
           <div className="text-xs font-semibold text-slate-700 mb-2">
             Primary Operational Blockers
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {readinessData.topBlockers.map((b, idx) => (
               <div
                 key={idx}
-                className="rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 flex items-center justify-between"
+                className="rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 flex items-center justify-between gap-2"
               >
-                <div className="flex items-center gap-2">
-                  <div className="p-1 rounded bg-white shadow-2xs border border-slate-100">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1 rounded bg-white shadow-2xs border border-slate-100 shrink-0">
                     {getBlockerIcon(b.category)}
                   </div>
-                  <div>
-                    <div className="text-xs font-medium text-slate-800">{b.label}</div>
-                    <div className="text-[10px] text-slate-400">{b.percentage}% of blockers</div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium text-slate-800 truncate">{b.label}</div>
+                    <div className="text-[10px] text-slate-400 truncate">{b.percentage}% of blockers</div>
                   </div>
                 </div>
-                <span className="text-xs font-bold text-slate-900">{b.count}</span>
+                <span className="text-xs font-bold text-slate-900 shrink-0 px-2 py-0.5 rounded bg-white border border-slate-200/60 shadow-2xs">{b.count}</span>
               </div>
             ))}
           </div>

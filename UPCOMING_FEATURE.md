@@ -81,12 +81,14 @@ manage read only from frontend also
 subscription model changes
 When any model openthat time main page scroll should not work. 
 responsive 320 screen
+favicon icon
 
 **TODO**
 
 scroll
 
-favicon icon
+
+need to add option for Hotel in trip
 
 in numnber field we can not add alphabetic value
 
@@ -151,3 +153,6 @@ create a wireframe for understand flow of project
 after sign up don't redirect direact on dashboard. redireact on login page
 error msg change
 
+
+
+Enquiry page responsive UI need to check properly and manage.

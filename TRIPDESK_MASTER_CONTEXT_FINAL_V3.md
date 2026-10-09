@@ -14767,6 +14767,72 @@ When email verification / OTP is reintroduced in a future phase, perform the fol
 
 ---
 
+# 236. CANONICAL SUBSCRIPTION PRICING ALIGNMENT (₹499 / ₹999)
+
+## 236.1 Background & Root Cause
+A read-only pricing audit identified a discrepancy between the local database and the staging environment:
+- **Local DB Catalog:** Starter ₹499/mo (₹4,999/yr), Professional ₹999/mo (₹9,999/yr) (configured earlier by Platform Owner via `/admin/plans`).
+- **Staging DB Catalog:** Starter ₹1,999/mo (yearlyPrice: null), Professional ₹4,999/mo (yearlyPrice: null).
+- **Root Cause:** Staging had been re-seeded on Oct 7, 2026 using `prisma:seed:staging` (`prisma/seed.ts`), which still contained legacy pre-pilot pricing (`1999` and `4999`). Additionally, `prisma/bootstrap-agency-owner.ts`, `prisma/reset-pilot-database.ts`, and admin fallback UI code held stale legacy price literals.
+
+## 236.2 Database-Driven Pricing Authority
+Runtime subscription pricing across TripDesk is 100% database-driven via `SubscriptionPlan.price` (monthly) and `SubscriptionPlan.yearlyPrice` (annual).
+The canonical public plan catalog is officially established as:
+
+| Plan | Monthly Catalog Price | Annual Catalog Price | Trial / Duration | Entitlements & Quotas |
+|---|---:|---:|---|---|
+| **Starter** | **₹499** | **₹4,999** | 7-day Free Trial / 30 Days recurring | 20 Trips, 20 Quotes, 20 Bookings, Unlimited Customers |
+| **Professional** | **₹999** | **₹9,999** | Immediate paid / 30 Days recurring | Unlimited Trips, Quotes, Bookings, Customers |
+
+*Note: Feature entitlements, quotas, trial behavior, and plan names remain completely unchanged.*
+
+## 236.3 Code & Seed Alignment
+1. **`prisma/seed.ts`:**
+   - Starter upsert aligned to `price: 499.0`, `yearlyPrice: 4999.0`.
+   - Professional upsert aligned to `price: 999.0`, `yearlyPrice: 9999.0`.
+2. **`prisma/bootstrap-agency-owner.ts`:**
+   - Starter plan bootstrap aligned to `price: 499.0`, `yearlyPrice: 4999.0`.
+3. **`prisma/reset-pilot-database.ts`:**
+   - Reset template aligned to Starter `499 / 4999` and Professional `999 / 9999` (script preserved without execution).
+4. **`src/app/admin/agencies/new/page.tsx`:**
+   - Removed hardcoded legacy strings (`Starter Plan (₹1,999/mo)` and `Professional Plan (₹4,999/mo)`).
+   - Replaced with dynamic database-backed plan mapping with canonical fallbacks (`₹499/mo` and `₹999/mo`).
+5. **`src/app/admin/plans/page.tsx`:**
+   - Plan editor form state defaults aligned to `499 / 4999` and `999 / 9999`. Placeholders updated to `499 / 4999`.
+6. **`src/app/admin/payments/page.tsx`:**
+   - Replaced legacy fallback `planPrice || "1999"` with `planPrice || "499"`. Input placeholder updated to `"499"`.
+7. **`src/data/saas-data.ts`:**
+   - Dormant SaaS fixture aligned to canonical plan rates (`Starter`: 499/4999, `Professional`: 999/9999). Historical mock payment amounts preserved immutable.
+
+## 236.4 Controlled Database State Alignment
+- **Staging Database (`.env.staging` Supabase):**
+  - Updated existing `SubscriptionPlan` catalog rows in place without re-seeding or recreating tables:
+    - `Starter` (`cmuy0rwxt0000vwtqb7nxxv6z`): `price = 499.00`, `yearlyPrice = 4999.00`, `isActive = true`.
+    - `Professional` (`cmuy0rxix0001vwtqikr8ncs3`): `price = 999.00`, `yearlyPrice = 9999.00`, `isActive = true`.
+  - Zero duplicate plans created (total plans = 2). Plan IDs preserved.
+- **Local Database (`.env`):**
+  - Verified catalog state:
+    - `Starter` (`cmt76818k000010tq0si2x3gb`): `price = 499.00`, `yearlyPrice = 4999.00`.
+    - `Professional` (`cmt7681uv000110tqk7x07058`): `price = 999.00`, `yearlyPrice = 9999.00`.
+  - Zero duplicate plans created (total plans = 2). Plan IDs preserved.
+
+## 236.5 Historical Billing & Payment Protection
+- **`SubscriptionPayment.amount`:** Preserved as strictly immutable `Decimal(10,2)`.
+- All historical payment records (e.g. ₹1,999 historical transactions), payment proofs, audit logs, and customer invoices remain completely untouched.
+- Existing tenant subscription associations remain preserved.
+
+## 236.6 Verification & Validation Results
+- **Git Diff Check:** `git diff --check` $\to$ **PASS (0 errors, 0 trailing whitespace)**.
+- **TypeScript Static Verification:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, all routes compiled successfully with exit code 0)**.
+- **Automated Entitlement & Plan QA Suite (`prisma/test-phase-213-entitlements.ts`):** $\to$ **PASS (22/22 tests passed)**, verifying dynamic pricing mutations, quota resolutions, fail-closed handling, and historical payment amount immutability.
+- **Repository Search Verification:** All occurrences of legacy pricing (`1999`, `4999`, `₹1,999`, `₹4,999`) in active application code eliminated; remaining references are strictly immutable historical test fixtures and documentation archives.
+
+## 236.7 Status
+**Canonical Subscription Pricing Alignment (₹499 / ₹999): COMPLETE / VERIFIED / SAFE — PASS**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

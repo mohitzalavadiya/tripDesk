@@ -461,11 +461,11 @@ export default function BookingDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+      <div className="max-w-[1550px] mx-auto px-2.5 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6">
         {isReadOnly && <ReadOnlyBanner moduleName="Booking Workspace" />}
 
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4 bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="space-y-3 z-10">
             <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
               <Link
@@ -663,11 +663,11 @@ export default function BookingDetailPage() {
 
         {/* Operational Readiness Banner */}
         {readiness && (
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-3">
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-5 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 border-b border-slate-100 pb-3">
               <div>
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <ShieldCheck className={`h-4 w-4 ${isReady ? "text-emerald-600" : "text-amber-500"}`} />
+                  <ShieldCheck className={`h-4 w-4 ${isReady ? "text-emerald-600" : "text-amber-500"} shrink-0`} />
                   <span>Operational Readiness Check</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -675,11 +675,11 @@ export default function BookingDetailPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-bold text-slate-700 font-mono">
+              <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3 w-full sm:w-auto">
+                <span className="text-xs font-bold text-slate-700 font-mono shrink-0">
                   {readinessScore}% Ready
                 </span>
-                <Link href={`/operations/${booking.tripId}`}>
+                <Link href={`/operations/${booking.tripId}`} className="shrink-0">
                   <Button size="sm" variant="outline" className="text-xs h-7.5 bg-slate-50 border-slate-200 cursor-pointer">
                     Manage Operations <ChevronRight className="h-3 w-3 ml-1" />
                   </Button>
@@ -698,17 +698,17 @@ export default function BookingDetailPage() {
             </div>
 
             {/* Checklist Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-1 text-xs">
               {readiness.checks.map((c) => (
                 <div
                   key={c.key}
-                  className={`p-3 rounded-xl border ${
+                  className={`p-2.5 sm:p-3 rounded-xl border ${
                     c.passed
                       ? "bg-emerald-50/50 border-emerald-100 text-emerald-900"
                       : "bg-amber-50/50 border-amber-100 text-amber-900"
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                  <div className="flex items-center gap-1.5 font-bold text-[11px] sm:text-xs">
                     {c.passed ? (
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                     ) : (
@@ -716,7 +716,7 @@ export default function BookingDetailPage() {
                     )}
                     <span>{c.label}</span>
                   </div>
-                  {c.details && <p className="text-[10px] text-slate-600 mt-1">{c.details}</p>}
+                  {c.details && <p className="text-[10px] text-slate-600 mt-1 leading-snug">{c.details}</p>}
                 </div>
               ))}
             </div>
@@ -1169,13 +1169,16 @@ export default function BookingDetailPage() {
             </div>
 
             {/* 3. Financial Status Summary Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-6 shadow-xs space-y-3.5 sm:space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-2">
+                <h3 className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 min-w-0">
                   <IndianRupee className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span>Commercial Financial Ledger</span>
+                  <span className="truncate">Commercial Ledger</span>
+                  <span className="hidden sm:inline">Financial</span>
                 </h3>
-                <span className="text-xs font-bold text-slate-500 font-mono shrink-0 whitespace-nowrap">{paidPercentage}% Collected</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 font-mono shrink-0 whitespace-nowrap bg-slate-100/80 px-2 py-0.5 rounded-md border border-slate-200/60">
+                  {paidPercentage}% Collected
+                </span>
               </div>
 
               {/* Progress Bar */}
@@ -1187,20 +1190,20 @@ export default function BookingDetailPage() {
               </div>
 
               {/* Stats Grid */}
-              <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-3 pt-1 text-xs">
-                <div className="p-3 sm:p-3.5 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-2.5 sm:gap-3 pt-1 text-xs">
+                <div className="p-2.5 sm:p-3.5 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Total Contract</span>
-                  <strong className="text-sm sm:text-base text-slate-900 block font-black">{formatCurrency(total)}</strong>
+                  <strong className="text-sm sm:text-base text-slate-900 block font-black tabular-nums">{formatCurrency(total)}</strong>
                 </div>
 
-                <div className="p-3 sm:p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl space-y-1">
+                <div className="p-2.5 sm:p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl space-y-1">
                   <span className="text-[10px] uppercase font-bold text-emerald-700">Total Received</span>
-                  <strong className="text-sm sm:text-base text-emerald-900 block font-black">{formatCurrency(paid)}</strong>
+                  <strong className="text-sm sm:text-base text-emerald-900 block font-black tabular-nums">{formatCurrency(paid)}</strong>
                 </div>
 
-                <div className="p-3 sm:p-3.5 bg-rose-50 border border-rose-100 rounded-xl space-y-1">
+                <div className="p-2.5 sm:p-3.5 bg-rose-50 border border-rose-100 rounded-xl space-y-1">
                   <span className="text-[10px] uppercase font-bold text-rose-700">Outstanding Due</span>
-                  <strong className="text-sm sm:text-base text-rose-900 block font-black">{formatCurrency(balance)}</strong>
+                  <strong className="text-sm sm:text-base text-rose-900 block font-black tabular-nums">{formatCurrency(balance)}</strong>
                 </div>
               </div>
 

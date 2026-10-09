@@ -467,30 +467,30 @@ export default function EnquiryDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+      <div className="max-w-[1550px] mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6">
         {isReadOnly && <ReadOnlyBanner moduleName="Enquiry Workspace" />}
 
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
-          <div className="space-y-3 z-10">
-            <div className="flex items-center gap-2.5">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
+          <div className="space-y-3 z-10 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/enquiries"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shrink-0"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
               </Link>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-blue-50 text-blue-700 border border-blue-100">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-blue-50 text-blue-700 border border-blue-100 shrink-0">
                 <Info className="h-3 w-3 text-blue-500" />
                 Lead CRM
               </span>
-              <span className="text-slate-300">•</span>
-              <StatusBadge status={enquiry.status} />
-              <PriorityBadge priority={enquiry.priority} />
+              <span className="text-slate-300 hidden sm:inline">•</span>
+              <StatusBadge status={enquiry.status} className="shrink-0" />
+              <PriorityBadge priority={enquiry.priority} className="shrink-0" />
             </div>
 
-            <div className="flex flex-wrap items-baseline gap-3">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-3">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 break-words">
                 {enquiry.title || `${enquiry.destination} Trip`}
               </h1>
               <span className="text-xs font-semibold text-slate-500">
@@ -498,30 +498,30 @@ export default function EnquiryDetailPage() {
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 sm:gap-4 text-xs text-slate-600">
               <span className="flex items-center gap-1 font-medium">
-                <Compass className="h-3.5 w-3.5 text-indigo-500" />
+                <Compass className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
                 Destination: <strong>{enquiry.destination}</strong>
               </span>
-              <span>•</span>
+              <span className="hidden sm:inline text-slate-300">•</span>
               <span className="flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 Dates: <strong>{formatDateDisplay(enquiry.startDate)} → {formatDateDisplay(enquiry.endDate)}</strong>
               </span>
-              <span>•</span>
+              <span className="hidden sm:inline text-slate-300">•</span>
               <span className="flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5 text-slate-400" />
+                <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 Captured on {formatDateDisplay(enquiry.createdAt)}
               </span>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2.5 z-10">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 z-10">
             {enquiry.convertedTripId ? (
               <Button
                 onClick={() => router.push(`/trips/${enquiry.convertedTripId}`)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 px-3.5 sm:px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer"
               >
                 <Compass className="h-4 w-4" />
                 Open Converted Trip
@@ -530,7 +530,7 @@ export default function EnquiryDetailPage() {
               <Button
                 onClick={() => setIsConvertOpen(true)}
                 disabled={isReadOnly || enquiry.status === "LOST" || enquiry.status === "CANCELLED"}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer disabled:opacity-50"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-3.5 sm:px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <Compass className="h-4 w-4" />
                 Convert to Trip
@@ -592,7 +592,7 @@ export default function EnquiryDetailPage() {
         </div>
 
         {/* PIPELINE STAGE PROGRESSION BAR */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 sm:p-4 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
               <TrendingUp className="h-3.5 w-3.5 text-indigo-600" />
@@ -635,40 +635,43 @@ export default function EnquiryDetailPage() {
         </div>
 
         {/* TAB CONTROLS */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar scrollbar-none flex-nowrap -mx-3 px-3 sm:mx-0 sm:px-0">
           <Button
             variant={activeTab === "overview" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("overview")}
-            className={`text-xs font-semibold ${
+            className={`text-xs font-semibold shrink-0 cursor-pointer ${
               activeTab === "overview" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            Lead Specification & Requirements
+            <span className="hidden sm:inline">Lead Specification & Requirements</span>
+            <span className="sm:hidden">Requirements</span>
           </Button>
 
           <Button
             variant={activeTab === "timeline" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("timeline")}
-            className={`text-xs font-semibold gap-1.5 ${
+            className={`text-xs font-semibold gap-1.5 shrink-0 cursor-pointer ${
               activeTab === "timeline" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            <Clock className="h-3.5 w-3.5" />
-            CRM Activity Timeline ({timeline.length})
+            <Clock className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden sm:inline">CRM Activity Timeline ({timeline.length})</span>
+            <span className="sm:hidden">Timeline ({timeline.length})</span>
           </Button>
 
           <Button
             variant={activeTab === "followups" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("followups")}
-            className={`text-xs font-semibold gap-1.5 ${
+            className={`text-xs font-semibold gap-1.5 shrink-0 cursor-pointer ${
               activeTab === "followups" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            <CalendarDays className="h-3.5 w-3.5" />
-            Follow-up Tasks ({enquiry.followUps?.length || 0})
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden sm:inline">Follow-up Tasks ({enquiry.followUps?.length || 0})</span>
+            <span className="sm:hidden">Follow-ups ({enquiry.followUps?.length || 0})</span>
           </Button>
         </div>
 
@@ -679,37 +682,37 @@ export default function EnquiryDetailPage() {
             {activeTab === "overview" && (
               <>
                 {/* Travel Specification Card */}
-                <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+                <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
                   <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
-                    <Compass className="h-4 w-4 text-indigo-600" />
+                    <Compass className="h-4 w-4 text-indigo-600 shrink-0" />
                     <span>Travel Specification & Passenger Matrix</span>
                   </h3>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 text-xs">
+                    <div className="p-2.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
                       <span className="text-[10px] font-bold text-slate-400 uppercase">Total Passengers</span>
-                      <strong className="text-sm text-slate-900 block font-black">
+                      <strong className="text-xs sm:text-sm text-slate-900 block font-black">
                         {totalPax} ({enquiry.adults}A, {enquiry.children}C, {enquiry.infants}I)
                       </strong>
                     </div>
 
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                    <div className="p-2.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
                       <span className="text-[10px] font-bold text-slate-400 uppercase">Target Budget</span>
-                      <strong className="text-sm text-emerald-700 block font-black">
+                      <strong className="text-xs sm:text-sm text-emerald-700 block font-black truncate" title={enquiry.budget ? `${formatCurrency(Number(enquiry.budget))}${enquiry.budgetType ? ` (${formatEnumLabel(enquiry.budgetType)})` : ""}` : "Flexible"}>
                         {enquiry.budget
                           ? `${formatCurrency(Number(enquiry.budget))}${enquiry.budgetType ? ` (${formatEnumLabel(enquiry.budgetType)})` : ""}`
                           : "Flexible"}
                       </strong>
                     </div>
 
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                    <div className="p-2.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
                       <span className="text-[10px] font-bold text-slate-400 uppercase">Hotel Category</span>
                       <strong className="text-xs text-slate-800 block font-bold truncate">
                         {enquiry.hotelCategory || "Not decided"}
                       </strong>
                     </div>
 
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                    <div className="p-2.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
                       <span className="text-[10px] font-bold text-slate-400 uppercase">Meal Plan</span>
                       <strong className="text-xs text-slate-800 block font-bold truncate">
                         {enquiry.mealPlan || "Not decided"}
@@ -745,7 +748,7 @@ export default function EnquiryDetailPage() {
                 </div>
 
                 {/* Internal Agency Notes */}
-                <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-3">
+                <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-3">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                     <h3 className="font-bold text-slate-900 text-sm">Internal Staff Notes</h3>
                     <Button
@@ -771,10 +774,10 @@ export default function EnquiryDetailPage() {
 
             {activeTab === "timeline" && (
               /* CRM Activity Timeline */
-              <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
-                <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+              <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
+                <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
                   <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-indigo-600" />
+                    <Clock className="h-4 w-4 text-indigo-600 shrink-0" />
                     <span>Chronological CRM Activity History</span>
                   </h3>
                   <span className="text-xs text-slate-500">{timeline.length} recorded events</span>
@@ -785,12 +788,12 @@ export default function EnquiryDetailPage() {
                     No CRM activity records logged yet.
                   </div>
                 ) : (
-                  <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                  <div className="relative pl-5 sm:pl-6 space-y-5 sm:space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
                     {timeline.map((ev) => (
                       <div key={ev.id} className="relative group">
-                        <div className="absolute -left-[27px] top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-indigo-600 shadow-sm" />
-                        <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80 text-xs space-y-1">
-                          <div className="flex items-center justify-between">
+                        <div className="absolute -left-[23px] sm:-left-[27px] top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-indigo-600 shadow-sm" />
+                        <div className="bg-slate-50/70 p-3 sm:p-3.5 rounded-xl border border-slate-200/80 text-xs space-y-1">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                             <span className="font-bold text-slate-900">{ev.title}</span>
                             <span className="text-[11px] text-slate-500">
                               {new Date(ev.timestamp).toLocaleDateString("en-IN", {
@@ -822,13 +825,13 @@ export default function EnquiryDetailPage() {
             {activeTab === "followups" && (
               /* Follow-up Tasks List */
               <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-                <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                <div className="p-3.5 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-amber-500" />
+                      <Clock className="h-4 w-4 text-amber-500 shrink-0" />
                       <span>CRM Follow-Up Tasks ({enquiry.followUps?.length || 0})</span>
                     </h3>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-500 mt-0.5">
                       Scheduled calls, WhatsApp follow-ups, and client checkpoints.
                     </p>
                   </div>
@@ -840,14 +843,14 @@ export default function EnquiryDetailPage() {
                       setIsFollowUpOpen(true);
                     }}
                     disabled={isReadOnly}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer disabled:opacity-50"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8 px-3 rounded-lg cursor-pointer disabled:opacity-50 shrink-0 self-start sm:self-auto"
                   >
                     <Plus className="h-3.5 w-3.5 mr-1" /> Add Task
                   </Button>
                 </div>
 
                 {enquiry.followUps?.length === 0 ? (
-                  <div className="p-10 text-center space-y-2">
+                  <div className="p-8 sm:p-10 text-center space-y-2">
                     <Clock className="h-8 w-8 text-slate-300 mx-auto" />
                     <p className="text-xs text-slate-500 font-medium">No follow-up activities logged yet.</p>
                     <Button
@@ -863,7 +866,7 @@ export default function EnquiryDetailPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="p-4 sm:p-5 space-y-4">
+                  <div className="p-3 sm:p-5 space-y-3 sm:space-y-4">
                     {enquiry.followUps.map((f) => {
                       const isCompleted = f.status === FollowUpStatus.COMPLETED;
                       const isPast = new Date(f.scheduledAt) < new Date() && !isCompleted;
@@ -871,7 +874,7 @@ export default function EnquiryDetailPage() {
                       return (
                         <div
                           key={f.id}
-                          className={`p-3.5 rounded-xl border transition-all flex items-start justify-between gap-3 text-xs ${
+                          className={`p-3 sm:p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 sm:gap-3 text-xs ${
                             isCompleted
                               ? "bg-slate-50/60 border-slate-200 text-slate-600"
                               : isPast
@@ -879,11 +882,11 @@ export default function EnquiryDetailPage() {
                               : "bg-white border-slate-200 text-slate-800 shadow-2xs"
                           }`}
                         >
-                          <div className="space-y-1 min-w-0">
-                            <div className="flex items-center gap-2">
+                          <div className="space-y-1.5 min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                               <Badge
                                 variant="outline"
-                                className={`text-[10px] font-bold uppercase ${
+                                className={`text-[10px] font-bold uppercase shrink-0 ${
                                   isCompleted
                                     ? "bg-slate-100 text-slate-600"
                                     : isPast
@@ -893,16 +896,16 @@ export default function EnquiryDetailPage() {
                               >
                                 {f.type}
                               </Badge>
-                              <span className="font-semibold text-slate-700">
+                              <span className="font-semibold text-slate-700 text-xs shrink-0">
                                 {formatDateTimeDisplay(f.scheduledAt)}
                               </span>
                               {isCompleted && (
-                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 shrink-0">
                                   Completed
                                 </span>
                               )}
                               {isPast && (
-                                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100 animate-pulse">
+                                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100 animate-pulse shrink-0">
                                   Overdue
                                 </span>
                               )}
@@ -918,14 +921,14 @@ export default function EnquiryDetailPage() {
                             )}
                           </div>
 
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-start pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 w-full sm:w-auto justify-end">
                             {!isCompleted && (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleOpenCompleteFollowUp(f)}
                                 disabled={isReadOnly}
-                                className="h-7 px-2 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 border-emerald-200 rounded-lg cursor-pointer"
+                                className="h-7 px-2.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 border-emerald-200 rounded-lg cursor-pointer"
                               >
                                 <CheckCircle2 className="h-3 w-3 mr-1" /> Mark Done
                               </Button>
@@ -934,7 +937,7 @@ export default function EnquiryDetailPage() {
                               onClick={() => handleDeleteFollowUp(f.id)}
                               disabled={isReadOnly}
                               title="Remove"
-                              className="p-1 text-slate-400 hover:text-rose-600 rounded-md cursor-pointer disabled:opacity-50"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md cursor-pointer disabled:opacity-50"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -951,7 +954,7 @@ export default function EnquiryDetailPage() {
           {/* Right Col: Operations Status & Customer Contact Card */}
           <div className="lg:col-span-1 space-y-6">
             {/* Status & Priority Control Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
               <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">
                 Lead Pipeline Control
               </h3>
@@ -999,7 +1002,7 @@ export default function EnquiryDetailPage() {
             </div>
 
             {/* Customer Contact Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-3.5">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-3.5">
               <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2 flex items-center gap-2">
                 <User className="h-4 w-4 text-indigo-600" />
                 <span>Customer Profile</span>
