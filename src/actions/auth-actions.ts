@@ -3,12 +3,14 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { provisionOnboardedAgencyOwner } from "@/lib/services/onboarding-service";
+import { getAdminClient } from "@/lib/supabase/admin";
 import prisma from "@/lib/prisma";
 
 export interface AuthActionResult {
   success?: boolean;
   error?: string;
   unverified?: boolean;
+  alreadyVerified?: boolean;
   email?: string;
 }
 
@@ -103,31 +105,9 @@ export async function signupAgencyOwnerAction(
     return { error: "An account with this email already exists. Please log in instead." };
   }
 
-  // 2. Direct Onboarding Provisioning (Email verification temporarily disabled for all roles)
-  const onboardingResult = await provisionOnboardedAgencyOwner(authData.user, supabase, {
-    agencyName,
-    agencyEmail,
-    agencyPhone,
-    address,
-    city,
-    state,
-    country,
-    ownerName,
-    phone,
-  });
-
-  if (!onboardingResult.success) {
-    if (onboardingResult.alreadyOnboarded) {
-      await supabase.auth.signOut();
-      redirect("/login?registered=true");
-    }
-    console.error("Direct agency onboarding failed during signup:", onboardingResult.error);
-    return { error: "Failed to initialize agency workspace. Please try again or contact support." };
-  }
-
-  // 3. Enforce "No Auto-Login" rule: sign out and redirect to login
+  // 2. Enforce "No Auto-Login" rule and redirect unconfirmed user to verify email
   await supabase.auth.signOut();
-  redirect("/login?registered=true");
+  redirect(`/verify-email?email=${encodeURIComponent(email)}`);
 }
 
 /**
@@ -152,13 +132,7 @@ export async function loginAction(
   });
 
   if (authError || !authData.user) {
-    if (
-      authError?.message?.toLowerCase().includes("invalid login credentials") ||
-      authError?.status === 400
-    ) {
-      return { error: "Invalid email or password. Please check your credentials and try again." };
-    }
-    return { error: authError?.message || "Invalid email or password." };
+    return classifyLoginError(authError, email);
   }
 
   // Fetch DB User to check role and route correctly
@@ -166,8 +140,21 @@ export async function loginAction(
     where: { id: authData.user.id },
   });
 
-  // Fallback onboarding if user exists in Supabase Auth but DB User was not yet provisioned
-  if (!dbUser && authData.user.user_metadata?.agencyName) {
+  const isPlatformOwner = dbUser?.role === "PLATFORM_OWNER";
+  const isEmailConfirmed = !!(authData.user.email_confirmed_at || (authData.user as any).confirmed_at);
+
+  // Login Verification Gate: Enforced for all non-Platform Owner accounts
+  if (!isPlatformOwner && !isEmailConfirmed) {
+    await supabase.auth.signOut();
+    return {
+      error: "Please verify your email address before signing in to Your Travel Desk.",
+      unverified: true,
+      email,
+    };
+  }
+
+  // Fallback onboarding ONLY if email is confirmed in Supabase Auth but DB User was not yet provisioned
+  if (!dbUser && isEmailConfirmed && authData.user.user_metadata?.agencyName) {
     const onboardRes = await provisionOnboardedAgencyOwner(authData.user, supabase);
     if (onboardRes.success) {
       dbUser = await prisma.user.findUnique({
@@ -184,16 +171,6 @@ export async function loginAction(
         "Your authentication credentials are valid, but no Your Travel Desk workspace profile was found. Please contact support.",
     };
   }
-
-  const isPlatformOwner = dbUser.role === "PLATFORM_OWNER";
-
-  // Login Verification Gate: Temporarily disabled for ALL roles (AGENCY_OWNER and PLATFORM_OWNER).
-  // When re-enabling email verification in a future phase, restore this gate:
-  // const isEmailConfirmed = !!(authData.user.email_confirmed_at || (authData.user as any).confirmed_at);
-  // if (!isPlatformOwner && !isEmailConfirmed) {
-  //   await supabase.auth.signOut();
-  //   return { error: "Please verify your email address before signing in to Your Travel Desk.", unverified: true, email };
-  // }
 
   if (isPlatformOwner) {
     if (
@@ -218,6 +195,52 @@ export async function loginAction(
     }
     redirect("/dashboard");
   }
+}
+
+/**
+ * Classifies Supabase Auth sign-in errors and maps them to safe, structured user-facing messages.
+ */
+export async function classifyLoginError(
+  authError: any,
+  email: string
+): Promise<AuthActionResult> {
+  // 1. Explicit unconfirmed email check (from Supabase Auth error code or message)
+  const isUnconfirmed =
+    (authError as any)?.code === "email_not_confirmed" ||
+    (authError as any)?.code === "provider_email_needs_verification" ||
+    authError?.message?.toLowerCase().includes("email not confirmed") ||
+    authError?.message?.toLowerCase().includes("not confirmed") ||
+    authError?.message?.toLowerCase().includes("unconfirmed");
+
+  if (isUnconfirmed) {
+    return {
+      error: "Please verify your email address before signing in to Your Travel Desk.",
+      unverified: true,
+      email,
+    };
+  }
+
+  // 2. Rate limit check
+  const isRateLimit =
+    (authError as any)?.code === "over_request_rate_limit" ||
+    authError?.status === 429 ||
+    authError?.message?.toLowerCase().includes("rate limit") ||
+    authError?.message?.toLowerCase().includes("security purposes");
+
+  if (isRateLimit) {
+    return { error: "Too many sign-in attempts. Please wait a moment before trying again." };
+  }
+
+  // 3. Invalid credentials or generic auth error
+  if (
+    (authError as any)?.code === "invalid_credentials" ||
+    authError?.message?.toLowerCase().includes("invalid login credentials") ||
+    authError?.status === 400
+  ) {
+    return { error: "Invalid email or password. Please check your credentials and try again." };
+  }
+
+  return { error: "Invalid email or password. Please check your credentials and try again." };
 }
 
 /**
@@ -295,6 +318,42 @@ export async function resendVerificationEmailAction(
     return { error: "Please enter your registered email address to resend verification." };
   }
 
+  // 1. Guard against resending for already-confirmed accounts.
+  // Supabase GoTrue silently drops resend({ type: 'signup' }) requests for already-confirmed accounts
+  // (returning 200 OK without dispatching an email). If confirmed, return alreadyVerified to guide user to login.
+  let isAlreadyConfirmed = false;
+
+  const dbUser = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, emailVerified: true },
+  });
+  if (dbUser?.emailVerified) {
+    isAlreadyConfirmed = true;
+  }
+
+  if (!isAlreadyConfirmed) {
+    try {
+      const adminClient = getAdminClient();
+      if (adminClient) {
+        const { data } = await adminClient.auth.admin.listUsers();
+        const authUser = data?.users?.find((u) => u.email?.toLowerCase() === email);
+        if (authUser?.email_confirmed_at) {
+          isAlreadyConfirmed = true;
+        }
+      }
+    } catch (adminErr) {
+      console.warn("[resendVerificationEmailAction] Admin check non-blocking warning:", adminErr);
+    }
+  }
+
+  if (isAlreadyConfirmed) {
+    return {
+      error: "This email address is already verified. Please sign in to access your workspace.",
+      alreadyVerified: true,
+      email,
+    };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.auth.resend({
     type: "signup",
@@ -305,22 +364,50 @@ export async function resendVerificationEmailAction(
   });
 
   if (error) {
-    if (
-      error.message?.toLowerCase().includes("rate limit") ||
-      error.message?.toLowerCase().includes("security purposes") ||
-      error.status === 429
-    ) {
-      return { error: "Please wait a moment before requesting another verification email." };
-    }
-    return { error: "Unable to resend verification email right now. Please try again." };
+    return classifyResendError(error);
   }
 
   return { success: true };
 }
 
 /**
+ * Classifies Supabase Auth resend errors and maps them to safe, friendly feedback.
+ */
+export async function classifyResendError(error: any): Promise<AuthActionResult> {
+  const isRateLimit =
+    (error as any)?.code === "over_request_rate_limit" ||
+    (error as any)?.code === "over_email_send_rate_limit" ||
+    error?.status === 429 ||
+    error?.message?.toLowerCase().includes("rate limit") ||
+    error?.message?.toLowerCase().includes("security purposes");
+
+  if (isRateLimit) {
+    return { error: "Please wait a moment before requesting another verification code." };
+  }
+
+  const isAlreadyConfirmed =
+    (error as any)?.code === "email_already_confirmed" ||
+    error?.message?.toLowerCase().includes("already confirmed") ||
+    error?.message?.toLowerCase().includes("already verified");
+
+  if (isAlreadyConfirmed) {
+    return { error: "This email address is already verified. Please sign in." };
+  }
+
+  const isUserNotFound =
+    (error as any)?.code === "user_not_found" ||
+    error?.message?.toLowerCase().includes("user not found");
+
+  if (isUserNotFound) {
+    return { error: "No registration found for this email address. Please sign up first." };
+  }
+
+  return { error: "Unable to resend verification code right now. Please try again." };
+}
+
+/**
  * Verify Native Supabase Email OTP for Agency Owner registration.
- * Validates 6-8 digit OTP with Supabase Auth, retrieves confirmed identity, executes atomic onboarding,
+ * Validates 6-digit OTP with Supabase Auth, retrieves confirmed identity, executes atomic onboarding,
  * wipes temporary metadata, and terminates the session to enforce no auto-login.
  */
 export async function verifyEmailOtpAction(
@@ -343,8 +430,8 @@ export async function verifyEmailOtpAction(
     return { error: "Please enter the verification code sent to your email." };
   }
 
-  if (!/^\d{6,8}$/.test(token)) {
-    return { error: "Verification code must be 6 to 8 numeric digits." };
+  if (!/^\d{6}$/.test(token)) {
+    return { error: "Verification code must be 6 numeric digits." };
   }
 
   const supabase = await createClient();
@@ -357,18 +444,7 @@ export async function verifyEmailOtpAction(
   });
 
   if (verifyError) {
-    console.error("Supabase OTP verification error:", verifyError.message);
-    const msg = verifyError.message?.toLowerCase() || "";
-    if (msg.includes("expired")) {
-      return { error: "This verification code has expired or is no longer valid. Please request a new code." };
-    }
-    if (msg.includes("invalid") || msg.includes("token") || verifyError.status === 400) {
-      return { error: "The verification code is incorrect. Please check the code and try again." };
-    }
-    if (msg.includes("rate limit") || msg.includes("security purposes") || verifyError.status === 429) {
-      return { error: "Too many verification attempts. Please wait a moment before trying again." };
-    }
-    return { error: verifyError.message || "Failed to verify verification code." };
+    return classifyOtpVerifyError(verifyError);
   }
 
   // 2. Retrieve Authenticated User Identity (never trust client-supplied ID)
@@ -381,6 +457,14 @@ export async function verifyEmailOtpAction(
     console.error("Failed to retrieve authenticated user after OTP verification:", userError?.message);
     await supabase.auth.signOut();
     return { error: "Authentication session could not be established. Please try again." };
+  }
+
+  // Confirm email is verified in Supabase Auth before proceeding with workspace provisioning
+  const isConfirmed = !!(user.email_confirmed_at || (user as any).confirmed_at);
+  if (!isConfirmed) {
+    console.error("User retrieved after OTP verification is not confirmed:", user.id);
+    await supabase.auth.signOut();
+    return { error: "Email verification could not be confirmed. Please request a new code." };
   }
 
   // 3. Execute Atomic Onboarding Transaction
@@ -404,4 +488,27 @@ export async function verifyEmailOtpAction(
   await supabase.auth.signOut();
 
   return { success: true };
+}
+
+/**
+ * Classifies Supabase Auth verifyOtp errors and maps them to safe, clear user-facing messages.
+ */
+export async function classifyOtpVerifyError(verifyError: any): Promise<AuthActionResult> {
+  console.error("Supabase OTP verification error:", verifyError?.message);
+  const msg = verifyError?.message?.toLowerCase() || "";
+  if (
+    (verifyError as any)?.code === "over_request_rate_limit" ||
+    verifyError?.status === 429 ||
+    msg.includes("rate limit") ||
+    msg.includes("security purposes")
+  ) {
+    return { error: "Too many verification attempts. Please wait a moment before trying again." };
+  }
+  if (msg.includes("expired") || (verifyError as any)?.code === "otp_expired") {
+    return { error: "This verification code has expired or is no longer valid. Please request a new code." };
+  }
+  if (msg.includes("invalid") || msg.includes("token") || verifyError?.status === 400) {
+    return { error: "The verification code is incorrect. Please check the code and try again." };
+  }
+  return { error: "Unable to verify verification code. Please try again." };
 }

@@ -113,7 +113,25 @@ function LoginForm() {
         </div>
       )}
 
-      {serverResult?.error ? (
+      {serverResult?.unverified ? (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-2xl p-4 space-y-2.5 animate-in fade-in-0 duration-150">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-bold block">Verification Required</span>
+              <p className="text-amber-800 leading-relaxed text-xs">
+                {serverResult.error || "Please verify your email address before signing in to Your Travel Desk."}
+              </p>
+            </div>
+          </div>
+          <Link
+            href={`/verify-email?email=${encodeURIComponent(serverResult.email || formik.values.email || "")}`}
+            className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold h-9 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-colors text-xs"
+          >
+            Enter Verification Code &rarr;
+          </Link>
+        </div>
+      ) : serverResult?.error ? (
         <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl p-3 flex items-center gap-2">
           <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
           <span>{serverResult.error}</span>
