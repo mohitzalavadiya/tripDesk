@@ -80,21 +80,21 @@ async function runEmailOtpVerificationQA() {
     fdAlphaToken.append("email", "agency@test.com");
     fdAlphaToken.append("token", "12345a");
     const res4 = await verifyEmailOtpAction({}, fdAlphaToken);
-    assert(!!res4.error && res4.error.includes("6 to 8 numeric digits"), "Rejects non-numeric characters in OTP token");
+    assert(!!res4.error && res4.error.includes("6 numeric digits"), "Rejects non-numeric characters in OTP token");
 
     // 2E: Short token (< 6 digits)
     const fdShortToken = new FormData();
     fdShortToken.append("email", "agency@test.com");
     fdShortToken.append("token", "12345");
     const res5 = await verifyEmailOtpAction({}, fdShortToken);
-    assert(!!res5.error && res5.error.includes("6 to 8 numeric digits"), "Rejects short OTP token (< 6 digits)");
+    assert(!!res5.error && res5.error.includes("6 numeric digits"), "Rejects short OTP token (< 6 digits)");
 
-    // 2F: Long token (> 8 digits)
+    // 2F: Long token (> 6 digits)
     const fdLongToken = new FormData();
     fdLongToken.append("email", "agency@test.com");
-    fdLongToken.append("token", "123456789");
+    fdLongToken.append("token", "1234567");
     const res6 = await verifyEmailOtpAction({}, fdLongToken);
-    assert(!!res6.error && res6.error.includes("6 to 8 numeric digits"), "Rejects long OTP token (> 8 digits)");
+    assert(!!res6.error && res6.error.includes("6 numeric digits"), "Rejects long OTP token (> 6 digits)");
 
     // -------------------------------------------------------------------------
     // TEST 3: Onboarding Service Isolation & Unverified Email Gate

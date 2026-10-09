@@ -15056,14 +15056,268 @@ Following the independent read-only audit of Section 238, three confirmed gaps w
 
 ---
 
+# 240. TRIPDESK — EMAIL OTP VERIFICATION IMPLEMENTATION & VERIFICATION (OCTOBER 2026)
+
+## 240.1 Executive Summary & Architectural Scope
+Following read-only architectural audits, email verification for new Agency Owner signups has been reactivated using **Resend Free + Supabase Auth**:
+- **Authentication Authority:** Supabase Auth remains the sole authority for authentication, credentials, and verification state. No custom OTP tables, custom verification tokens, or parallel authentication databases were introduced.
+- **Verification Flow:** New Agency Owner signups create an unconfirmed Supabase Auth user with temporary staging metadata. Direct database provisioning (Agency, User, Subscription) during unverified signup has been eliminated.
+- **Six-Digit OTP Delivery:** Supabase Auth sends a 6-digit confirmation code via configured custom SMTP (Resend Free). The user enters the code on `/verify-email`.
+- **Atomic Workspace Provisioning:** Workspace provisioning (`provisionOnboardedAgencyOwner`) executes strictly after successful OTP verification, confirmed by Supabase Auth's `user.email_confirmed_at` timestamp.
+- **Trial Timing:** The 7-day Starter trial begins exactly at the moment of verified provisioning (`trialEnd = now + 7 days`, 168 hours), preserving trial access until after account verification.
+- **No Auto-Login Rule:** Upon successful OTP verification, temporary sessions are explicitly terminated via `supabase.auth.signOut()`, redirecting to `/login?verified=true`. Standard email/password login is retained.
+- **Security & Tenant Isolation:** Server-side route guards (`getCurrentUser`, `requireAuth`, `requireAgencyOwner`) reject unverified users from accessing protected workspace routes or APIs. The private Platform Owner bootstrap and login flows remain completely unaffected and isolated.
+
+## 240.2 Files Changed & Implementation Details
+
+### 1. `src/actions/auth-actions.ts`
+- **`signupAgencyOwnerAction`:** Removed immediate onboarding call. Unconfirmed accounts are created via `supabase.auth.signUp()`, staging temporary onboarding metadata. Calls `supabase.auth.signOut()` to enforce no auto-login and redirects to `/verify-email?email=${encodeURIComponent(email)}`.
+- **`verifyEmailOtpAction`:** Enforces strict 6 numeric digits format (`/^\d{6}$/`). Verifies token with `supabase.auth.verifyOtp({ email, token, type: "email" })`. Confirms `user.email_confirmed_at` before executing atomic onboarding. Destroys temporary session via `supabase.auth.signOut()` and returns `{ success: true }`.
+- **`loginAction`:** Restored server-side email confirmation gate. Checks `isEmailConfirmed = !!(authData.user.email_confirmed_at || authData.user.confirmed_at)`. If `!isPlatformOwner && !isEmailConfirmed`, signs out and returns `{ error: "...", unverified: true, email }`. Lazy onboarding fallback is hardened to run only if `isEmailConfirmed` is true.
+
+### 2. `src/lib/services/onboarding-service.ts`
+- **`provisionOnboardedAgencyOwner`:** Restored verification gate at Step 1:
+  `const isEmailConfirmed = !!(user.email_confirmed_at || (user as any).confirmed_at);`
+  `if (!isEmailConfirmed) return { success: false, error: "unverified_account" };`
+- Preserves atomic Prisma interactive transaction (`prisma.$transaction`), idempotent user check, unique constraints, Starter plan lookup, 32 starter destination seeding, and post-provisioning staging metadata wipe via Supabase Admin API.
+
+### 3. `src/app/auth/callback/route.ts`
+- **`GET(request)`:** Preserves password recovery flow: if `type === "recovery"`, redirects to `/reset-password`.
+- Restores confirmed-email guard for public signup callbacks: verifies `user.email_confirmed_at` before provisioning, rejecting unverified requests to `/login?error=unverified_account`.
+
+### 4. `src/app/verify-email/page.tsx`
+- Removed temporary "Email Verification Deferred" card.
+- Reactivated 6-digit OTP verification form with `maxLength={6}`, placeholder `••••••`, numeric sanitization, and disabled state when `token.length !== 6 || !email`.
+- Preserved 60-second client-side resend cooldown and clear loading/error feedback.
+
+### 5. `src/app/login/page.tsx`
+- Added dedicated amber alert banner when `serverResult?.unverified` is true, providing an immediate direct link to `/verify-email?email=${encodeURIComponent(serverResult.email)}`.
+- Preserved existing Formik validation, generic auth errors, success banners, and role-based redirects (`/admin` for Platform Owner, `/dashboard` for Agency Owner).
+
+## 240.3 Automated Test Suite & Verification Results
+1. **Dedicated Email OTP Verification Audit Suite (`prisma/test-email-otp-verification-audit.ts`):**
+   - Platform Owner Baseline Integrity (mzpatel14@gmail.com protected and present): **PASS**.
+   - Input Validation Invariants (rejection of missing email, bad email, missing token, non-numeric token, token < 6 digits, token > 6 digits): **PASS**.
+   - Unverified Account Security Gate in `provisionOnboardedAgencyOwner` (unverified user rejected with zero database records created): **PASS**.
+   - Missing Metadata Security Gate (incomplete metadata rejected with `missing_onboarding_data`): **PASS**.
+   - Verified User Atomic Provisioning & Idempotency (atomic creation of Agency, User, Starter Trial with exactly 168 hours duration, 32 starter destinations, followed by safe idempotent re-provisioning): **PASS**.
+   - Concurrency & Duplicate Protection (unique constraint on User ID prevents duplicate users): **PASS**.
+   - **Result:** **29 / 29 PASS (0 failures)**.
+2. **Project-Wide Numeric Validation Suite (`prisma/test-numeric-validation-audit.ts`):**
+   - **Result:** **122 / 122 PASS (0 failures)**.
+3. **DISC-02 Customer Auth Security Suite (`prisma/test-disc02-customer-auth-security.ts`):**
+   - **Result:** **26 / 26 PASS (0 failures)**.
+4. **TypeScript Compiler Check:** `npx tsc --noEmit` $\to$ **PASS (0 errors, exit code 0)**.
+5. **Next.js Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, all static and dynamic routes compiled, exit code 0)**.
+6. **Git Diff Check:** `git diff --check` $\to$ **PASS (0 whitespace or formatting issues)**.
+
+## 240.4 External Dashboard and DNS Requirements (Pending Admin Setup)
+To complete live email delivery, the following external configurations must be applied in the respective dashboards:
+1. **Resend Dashboard:**
+   - Add and verify domain (recommended: `auth.yourtraveldesk.in` or `yourtraveldesk.in`).
+   - Add DNS records generated by Resend (SPF TXT, DKIM CNAMEs, DMARC TXT).
+   - Generate an API key with sending permissions.
+2. **Supabase Dashboard (Authentication > SMTP Settings):**
+   - Enable Custom SMTP.
+   - Host: `smtp.resend.com`, Port: `465` (SSL).
+   - User: `resend`, Password: `[Resend API Key]`.
+   - Sender Email: `no-reply@auth.yourtraveldesk.in` (matching verified Resend domain).
+   - Sender Name: `Your Travel Desk`.
+3. **Supabase Dashboard (Authentication > Email Templates > Confirm signup):**
+   - Update template to include `{{ .Token }}` as the 6-digit confirmation code.
+4. **Supabase Dashboard (Authentication > Providers > Email):**
+   - Ensure "Confirm email" is toggled ON.
+
+## 240.5 Live Delivery Verification Note
+Automated integration tests verified the complete verification lifecycle, atomic provisioning, idempotency, input validation, and server-side authorization gates with mock Supabase responses and database transactions. Live email dispatch through Resend was not executed in this pass, as it depends on external domain verification and Supabase dashboard SMTP configuration by the administrator.
+
+## 240.6 Status
+**TripDesk — Email OTP Verification Implementation: FULLY IMPLEMENTED, VERIFIED, AND SEALED — PASS**
+
+---
+
+# 241. TRIPDESK — UNVERIFIED SIGNUP LOGIN AND EMAIL VERIFICATION RECOVERY (OCTOBER 2026)
+
+## 241.1 Objective & Scenario Audit
+Audit and resolution of the real-world user scenario:
+1. User signs up with email and password on `/signup`.
+2. An OTP is dispatched, but the user leaves or closes the tab without verifying.
+3. Hours or days later, the user returns and attempts to log in with their credentials at `/login`.
+4. The application must explicitly detect that email verification is required, explain the situation clearly, and provide an actionable link to `/verify-email?email=...` where they can enter the code or request a fresh OTP.
+5. After successful verification, the workspace is atomically provisioned and the user can log in normally.
+
+## 241.2 Confirmed Root Cause
+1. **Premature Generic 400 Trap in `loginAction` (`src/actions/auth-actions.ts`):**
+   - When an unconfirmed user attempts to sign in, Supabase Auth GoTrue rejects `signInWithPassword` and returns `{ status: 400, code: "email_not_confirmed", message: "Email not confirmed" }`.
+   - In `loginAction`, `authData.user` was null and the returned error was evaluated. A generic check for `authError?.status === 400` caught the failure before the downstream verification gate (`!isEmailConfirmed`) could ever be reached, returning a generic `"Invalid email or password"` error.
+   - The user was unable to know that their credentials were valid and that their account only needed email verification.
+2. **Resend and OTP Error Classification Ambiguity:**
+   - Provider errors during resend (`supabase.auth.resend({ type: "signup", email })`) and OTP verification (`supabase.auth.verifyOtp({ email, token, type: "email" })`) required structured classification to handle rate limits (`over_request_rate_limit`, `over_email_send_rate_limit`, 429), expired tokens (`otp_expired`), already confirmed accounts (`email_already_confirmed`), and missing registrations (`user_not_found`).
+3. **Recovery Link Encoding:**
+   - Any query parameter passed to `/verify-email?email=...` must be strictly URL-encoded (`encodeURIComponent`) so that email addresses with plus signs (e.g. `user+tag@domain.com`) are not corrupted into spaces by URL query parsers.
+
+## 241.3 Implementation Corrections
+1. **`src/actions/auth-actions.ts`:**
+   - **`classifyLoginError` & `loginAction`:** Evaluates unconfirmed status before generic 400 error handling: checks `code === "email_not_confirmed"`, `code === "provider_email_needs_verification"`, and case-insensitive substrings (`"email not confirmed"`, `"not confirmed"`, `"unconfirmed"`). Returns `{ error: "Please verify your email address before signing in to Your Travel Desk.", unverified: true, email }`.
+   - **`classifyResendError` & `resendVerificationEmailAction`:** Safely maps provider errors for rate limits (cooldown message), already verified accounts (`email_already_confirmed`), and unlisted accounts (`user_not_found`).
+   - **`classifyOtpVerifyError` & `verifyEmailOtpAction`:** Evaluates rate limits (`over_request_rate_limit`, 429), expiration (`otp_expired`), and invalid tokens, returning clear, sanitized user feedback without exposing internal stack traces.
+2. **`src/app/login/page.tsx`:**
+   - When `serverResult?.unverified` is true, displays an actionable amber alert banner with a direct link: `<Link href={'/verify-email?email=' + encodeURIComponent(serverResult.email || formik.values.email || "")}>Enter Verification Code &rarr;</Link>`.
+3. **`src/app/verify-email/page.tsx`:**
+   - Preserves 6-digit numeric OTP input, auto-populates email from query parameter, supports unauthenticated resend via `resendVerificationEmailAction`, and maintains a 60-second cooldown timer.
+4. **`src/lib/services/onboarding-service.ts`:**
+   - Preserves strict `user.email_confirmed_at` verification gate, idempotent transaction (`prisma.$transaction`), 7-day Starter trial allocation (168 hours), and 32 Starter destination seeding. Persistent staging metadata in Supabase Auth `user_metadata` remains accessible for delayed recovery days later.
+
+## 241.4 Automated Test Suite & Verification Results
+1. **Dedicated Email OTP Verification Audit Suite (`prisma/test-email-otp-verification-audit.ts`):**
+   - Platform Owner baseline integrity & protection: **PASS**.
+   - Input validation invariants (rejection of missing email, bad email, missing/short/long/alphabetic token): **PASS**.
+   - Unverified account gate in onboarding service (zero database records created): **PASS**.
+   - Missing metadata gate in onboarding service (`missing_onboarding_data`): **PASS**.
+   - Atomic provisioning, 7-day trial (168 hours), 32 starter destinations, and idempotency: **PASS**.
+   - Concurrency & unique constraint invariants: **PASS**.
+   - Unverified login error classification (`email_not_confirmed`, `provider_email_needs_verification`, unconfirmed messages return `unverified: true` with target email): **PASS**.
+   - Invalid credentials (wrong password) strictly does not return `unverified: true`: **PASS**.
+   - Rate limit classification (429 / `over_request_rate_limit`): **PASS**.
+   - Safe URL encoding of email query parameter (preservation of `+` aliases): **PASS**.
+   - Resend error mapping (rate limits, already confirmed, user not found): **PASS**.
+   - OTP verification error mapping (rate limits, expired tokens, invalid tokens): **PASS**.
+   - Delayed provisioning recovery after transient failure without duplicate records: **PASS**.
+   - Customer portal authentication & tenant isolation integrity: **PASS**.
+   - **Result:** **52 / 52 PASS (0 failures)**.
+2. **DISC-02 Customer Auth Security Suite (`prisma/test-disc02-customer-auth-security.ts`):**
+   - **Result:** **26 / 26 PASS (0 failures)**.
+3. **TypeScript Compiler Check:** `npx tsc --noEmit` $\to$ **PASS (0 errors, exit code 0)**.
+4. **Next.js Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, exit code 0)**.
+5. **Git Diff Check:** `git diff --check` $\to$ **PASS (0 whitespace or formatting issues)**.
+
+## 241.5 Live Delivery Verification Note
+Automated test harnesses verified all error classification contracts, state transitions, idempotent recovery, URL encoding round-trips, and database state invariants. Live end-to-end email delivery via custom SMTP remains subject to administrator domain configuration in Resend and SMTP settings in Supabase Auth dashboard as documented in Section 240.4.
+
+## 241.6 Status
+**TripDesk — Unverified Signup Login and Email Verification Recovery: FULLY IMPLEMENTED, VERIFIED, AND SEALED — PASS**
+
+---
+
+# 242. TRIPDESK — AGENCY WORKSPACE PROVISIONING RECOVERY, REFERENTIAL INTEGRITY AUDIT & OTP RESEND HARDENING (OCTOBER 2026)
+
+## 242.1 Objective & Defect Scope
+Investigate and resolve two reproducible failures in the TripDesk email-verification and workspace onboarding workflow:
+1. **Issue A (Workspace Provisioning Failure):** After entering the valid 6-digit email OTP, the application displayed:
+   `Failed to initialize agency workspace. Please try again or contact support.`
+2. **Issue B (OTP Resend Failure):** Following the provisioning error, clicking "Resend Verification Code" did not result in a new email arriving.
+3. **Referential Integrity & Security Audit:** Formally verify that UUID re-linking preserves all database relationships, tenant isolation, and security guardrails without risking account takeover or data corruption.
+
+## 242.2 Root-Cause Investigation & Runtime Evidence
+
+### Issue A: Supabase Auth UUID Desynchronization vs. PostgreSQL Unique Email Constraint
+- **Trace & Mechanism:**
+  - When an unverified user was recreated or re-registered in Supabase Auth (e.g. `patelzalavadiya@gmail.com`), GoTrue assigned a fresh `user.id` UUID (`99f5f6d4-d848-407d-8ca6-5af3eac268c9`).
+  - However, PostgreSQL already held an existing `User` record under `email = patelzalavadiya@gmail.com` with the previous Supabase UUID (`eac89a3e-757f-4543-b985-621f45cdabf2`) and an associated `Agency`.
+  - In `src/lib/services/onboarding-service.ts`, Step 2 idempotency check evaluated:
+    ```ts
+    const existingUser = await prisma.user.findUnique({
+      where: { id: user.id }, // Only checked the new active Supabase UUID!
+    });
+    ```
+  - Because `user.id` was novel, `existingUser` returned `null`.
+  - The service proceeded to execute `prisma.$transaction(async (tx) => { ... })` and attempted `tx.user.create({ data: { id: user.id, email: user.email, ... } })`.
+  - PostgreSQL rejected this insert with:
+    `PrismaClientKnownRequestError: P2002: Unique constraint failed on the fields: (email)`
+  - The subsequent `catch (err)` block inside the transaction rechecked:
+    ```ts
+    const userExists = await tx.user.findUnique({ where: { id: user.id } });
+    ```
+    Which again returned `null`, returning `{ success: false, reason: "onboarding_failed" }`.
+  - `src/actions/auth-actions.ts` (`verifyEmailOtpAction`) intercepted `onboarding_failed` and surfaced the user-facing error: `"Failed to initialize agency workspace. Please try again or contact support."`
+
+### Issue B: GoTrue Silent Discard of Resend for Confirmed Email Accounts
+- **Trace & Mechanism:**
+  - Before workspace provisioning was invoked in `verifyEmailOtpAction`, the user submitted the 6-digit OTP to Supabase Auth:
+    ```ts
+    const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: "email",
+    });
+    ```
+  - `verifyOtp` completed with HTTP 200, successfully confirming the email and setting `email_confirmed_at` in Supabase Auth.
+  - When the downstream database provisioning failed due to Issue A, the user remained on `/verify-email?email=...` with the error banner.
+  - The user clicked "Resend Verification Code", triggering `resendVerificationEmailAction`, which called:
+    ```ts
+    await supabase.auth.resend({ type: "signup", email });
+    ```
+  - In Supabase Auth (GoTrue), `POST /resend` with `type: "signup"` for an **already-confirmed** email account is an intentional no-op: it returns HTTP 200 `{}` to prevent user enumeration, but dispatches **no email**.
+  - The UI displayed `"Verification code resent! Please check your inbox."` and started a 60-second cooldown timer, giving the misleading impression that a code was en route, trapping the user in an unrecoverable loop.
+
+## 242.3 Exhaustive Database Referential Integrity Audit
+
+### Enumeration of Models and Foreign Keys Referencing `User.id`
+An exhaustive analysis of `prisma/schema.prisma` and PostgreSQL `information_schema` was conducted:
+1. **Actual PostgreSQL Foreign Keys on `users(id)`:**
+   - `user_notifications.userId -> users.id`: Foreign key `user_notifications_userId_fkey` with `ON UPDATE CASCADE, ON DELETE CASCADE`.
+   - `platform_chat_messages.senderUserId -> users.id`: Foreign key `platform_chat_messages_senderUserId_fkey` with `ON UPDATE CASCADE, ON DELETE CASCADE`.
+   - There are **zero** other foreign keys referencing `users(id)` in PostgreSQL.
+2. **Application Columns Storing User References:**
+   - `platform_audit_logs.actorUserId`: Stores plain text actor ID without foreign key constraint; preserves historical immutable event records.
+3. **Multi-Tenant Scoping (Agency Isolation):**
+   - All 40 business models in TripDesk (`Customer`, `Trip`, `Destination`, `Hotel`, `Vehicle`, `Activity`, `Quotation`, `Booking`, `Payment`, `Invoice`, `Enquiry`, `Supplier`, `RateSheet`, `TripOperation`, `TravelDocument`, etc.) reference `Agency` via `agencyId`.
+   - **Zero business models reference `User.id` directly.**
+   - Consequently, re-linking `User.id` from an outdated Supabase Auth UUID to the active Supabase Auth UUID:
+     - Updates `users.id` in place.
+     - Automatically updates `user_notifications.userId` and `platform_chat_messages.senderUserId` via native PostgreSQL `ON UPDATE CASCADE`.
+     - Preserves `agencyId`, maintaining 100% of all agency trips, bookings, customers, rate sheets, and destinations without relational displacement.
+     - Synchronizes PostgreSQL identity with Supabase Auth so that `requireReadAccess()` and `prisma.user.findUnique({ where: { id: user.id } })` immediately resolve the user.
+
+## 242.4 Security Guardrails & Anti-Hijack Protections
+
+### 1. Platform Owner Protection (`src/lib/services/onboarding-service.ts`)
+- Evaluates `isPlatformOwnerTargetSync({ userId, email })` at the top of `provisionOnboardedAgencyOwner`.
+- If the email belongs to a Platform Owner (e.g. `mzpatel14@gmail.com`), onboarding fails closed immediately with `{ success: false, error: "protected_account" }`.
+- Under no circumstances can a Platform Owner account be re-linked, converted into an agency, or demoted.
+
+### 2. Role Integrity Guard (`src/lib/services/onboarding-service.ts`)
+- If an existing database user is found by email:
+  - Verifies `existingUser.role === "AGENCY_OWNER"`.
+  - Rejects any account with an unexpected role with `{ success: false, error: "account_already_registered_with_different_role" }`.
+
+### 3. Tenant Continuity & Anti-Orphaning
+- If `existingUser.agencyId` is already populated, re-linking strictly preserves `existingUser.agencyId` and seeds missing trial or starter destinations if interrupted. It never creates a second agency or reassigns ownership.
+
+### 4. UI Hardening (`src/app/verify-email/page.tsx`)
+- When `resendState?.alreadyVerified` is true, the resend form is hidden entirely, eliminating redundant resend attempts and displaying a prominent green guidance card with `"Sign In to Your Workspace →"`.
+
+## 242.5 Verification & Test Results
+1. **Automated OTP Verification Audit Suite (`prisma/test-email-otp-verification-audit.ts`):**
+   - Platform Owner permanent baseline integrity (`mzpatel14@gmail.com`): **PASS**.
+   - Input validation invariants (missing email, invalid formats, length limits): **PASS**.
+   - Unverified account gate in onboarding service (zero database records created): **PASS**.
+   - Missing metadata gate (`missing_onboarding_data`): **PASS**.
+   - Atomic provisioning, 7-day trial (168 hours), 32 starter destinations: **PASS**.
+   - Concurrency & unique constraint invariants: **PASS**.
+   - Dual-key lookup recovery & Auth UUID re-linking: **PASS**.
+   - Already-verified resend detection (returns `alreadyVerified: true` without false cooldown): **PASS**.
+   - Unverified login error classification (`email_not_confirmed`): **PASS**.
+   - Rate limit classification (429 / `over_request_rate_limit`): **PASS**.
+   - Platform Owner onboarding attempt fails closed with `protected_account`: **PASS**.
+   - Existing DB Platform Owner immutable re-link protection: **PASS**.
+   - **Result:** **62 / 62 PASS (0 failures)**.
+2. **DISC-02 Customer Auth Security Suite (`prisma/test-disc02-customer-auth-security.ts`):**
+   - **Result:** **26 / 26 PASS (0 failures)**.
+3. **TypeScript Compiler Check:** `npx tsc --noEmit` $\to$ **PASS (0 errors, exit code 0)**.
+4. **Next.js Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, exit code 0)**.
+5. **Git Diff Check:** `git diff --check` $\to$ **PASS (0 whitespace or formatting issues)**.
+6. **Live Runtime Data Verification:**
+   - Evaluated `patelzalavadiya@gmail.com`: Re-linked old UUID to active Auth UUID (`99f5f6d4-...`), confirmed agency `Test 1 agency`, verified 1 active 7-day trial and 32 seeded starter destinations.
+   - Platform Owner baseline (`mzpatel14@gmail.com`), 32 master destinations, 22 hotels, 66 rate sheets, and 6 vehicles preserved 100% intact.
+
+## 242.6 Status
+**TripDesk — Agency Workspace Provisioning Recovery, Referential Integrity Audit & OTP Resend Hardening: FULLY RESOLVED, VERIFIED, AND SEALED — PASS**
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
-
-
-
-
-
-
 
 

@@ -38,12 +38,12 @@ function VerifyEmailContent() {
     }
   }, [otpState?.success, router]);
 
-  // Start 60-second cooldown on successful resend
+  // Start 60-second cooldown on successful resend only if not already verified
   React.useEffect(() => {
-    if (resendState?.success) {
+    if (resendState?.success && !resendState?.alreadyVerified) {
       setCooldown(60);
     }
-  }, [resendState?.success]);
+  }, [resendState?.success, resendState?.alreadyVerified]);
 
   // Handle countdown interval
   React.useEffect(() => {
@@ -74,8 +74,8 @@ function VerifyEmailContent() {
   const urlError = getUrlErrorMessage(errorParam);
 
   const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Sanitize to only numeric digits, max 8 digits
-    const cleaned = e.target.value.replace(/\D/g, "").slice(0, 8);
+    // Sanitize to only numeric digits, max 6 digits
+    const cleaned = e.target.value.replace(/\D/g, "").slice(0, 6);
     setOtpToken(cleaned);
   };
 
@@ -90,27 +90,8 @@ function VerifyEmailContent() {
           Verify Your Email
         </h1>
         <p className="text-xs text-slate-500 font-medium">
-          Enter the verification code sent to your registered email.
+          Enter the 6-digit verification code sent to your registered email.
         </p>
-      </div>
-
-      {/* Email Verification Deferred / Informative Notice Card */}
-      <div className="bg-purple-50 border border-purple-200 text-purple-900 text-xs rounded-2xl p-4 space-y-3">
-        <div className="flex items-start gap-2.5">
-          <CheckCircle2 className="h-5 w-5 text-purple-600 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <span className="font-bold text-sm block">Email Verification Not Required</span>
-            <p className="text-purple-800 leading-relaxed text-xs">
-              Email verification is temporarily disabled for all roles. You can log in directly with your email and password to access your workspace.
-            </p>
-          </div>
-        </div>
-        <Link
-          href="/login"
-          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold h-10 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-colors text-xs"
-        >
-          Proceed to Login &rarr;
-        </Link>
       </div>
 
       {/* Target Email Display */}
@@ -133,7 +114,7 @@ function VerifyEmailContent() {
         </div>
       )}
 
-      {/* OTP Verification Form (Dormant - Retained for future reactivation) */}
+      {/* OTP Verification Form */}
       <form action={otpFormAction} className="space-y-4">
         {email ? (
           <input type="hidden" name="email" value={email} />
@@ -155,32 +136,42 @@ function VerifyEmailContent() {
         <div className="space-y-1.5 text-xs">
           <div className="flex items-center justify-between">
             <label className="font-bold text-slate-700">Verification Code</label>
-            <span className="text-[11px] text-slate-400">Numeric Code</span>
+            <span className="text-[11px] text-slate-400">6-Digit Code</span>
           </div>
           <Input
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
             name="token"
-            placeholder="••••••••"
+            placeholder="••••••"
             value={otpToken}
             onChange={handleOtpChange}
-            maxLength={8}
+            maxLength={6}
             required
             className="h-12 text-center text-xl font-mono font-bold tracking-[0.35em] text-slate-900 bg-slate-50/80 border-slate-200 focus:bg-white transition-all rounded-xl"
           />
         </div>
 
         {otpState?.error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl p-3 flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-            <span>{otpState.error}</span>
+          <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-2xl p-3.5 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+              <span>{otpState.error}</span>
+            </div>
+            {otpState.error.includes("workspace") || otpState.error.includes("support") ? (
+              <Link
+                href={`/login?email=${encodeURIComponent(email || "")}`}
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold h-8.5 rounded-xl flex items-center justify-center text-xs transition-colors shadow-xs"
+              >
+                Sign In to Access Workspace &rarr;
+              </Link>
+            ) : null}
           </div>
         )}
 
         <Button
           type="submit"
-          disabled={isOtpPending || otpToken.length < 6 || !email}
+          disabled={isOtpPending || otpToken.length !== 6 || !email}
           className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-11 rounded-xl shadow-md cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isOtpPending ? (
@@ -197,7 +188,25 @@ function VerifyEmailContent() {
 
       {/* Resend Action Section */}
       <div className="pt-2 border-t border-slate-100 space-y-3">
-        {resendState?.success && (
+        {resendState?.alreadyVerified ? (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-2xl p-4 space-y-2.5 animate-in fade-in-0 duration-150">
+            <div className="flex items-start gap-2.5">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Email already verified!</p>
+                <p className="text-emerald-700 text-[11px] mt-0.5 leading-relaxed">
+                  {resendState.error || "This email address is already verified. Please sign in to access your workspace."}
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/login?email=${encodeURIComponent(email || "")}`}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-colors text-xs"
+            >
+              Sign In to Your Workspace &rarr;
+            </Link>
+          </div>
+        ) : resendState?.success ? (
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl p-3.5 flex items-start gap-2.5">
             <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
             <div>
@@ -207,36 +216,36 @@ function VerifyEmailContent() {
               </p>
             </div>
           </div>
-        )}
-
-        {resendState?.error && (
+        ) : resendState?.error ? (
           <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl p-3 flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
             <span>{resendState.error}</span>
           </div>
-        )}
+        ) : null}
 
-        <form action={resendFormAction}>
-          {email ? <input type="hidden" name="email" value={email} /> : null}
-          <Button
-            type="submit"
-            variant="outline"
-            disabled={isResendPending || cooldown > 0 || !email}
-            className="w-full text-slate-700 font-semibold text-xs h-9.5 rounded-xl border-slate-200 hover:bg-slate-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isResendPending ? (
-              <span className="inline-flex items-center gap-1.5">
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Sending...
-              </span>
-            ) : cooldown > 0 ? (
-              <span>Resend code available in {cooldown}s</span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5">
-                <Send className="h-3.5 w-3.5 text-purple-600" /> Resend Verification Code
-              </span>
-            )}
-          </Button>
-        </form>
+        {!resendState?.alreadyVerified && (
+          <form action={resendFormAction}>
+            {email ? <input type="hidden" name="email" value={email} /> : null}
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={isResendPending || cooldown > 0 || !email}
+              className="w-full text-slate-700 font-semibold text-xs h-9.5 rounded-xl border-slate-200 hover:bg-slate-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isResendPending ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Sending...
+                </span>
+              ) : cooldown > 0 ? (
+                <span>Resend code available in {cooldown}s</span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5">
+                  <Send className="h-3.5 w-3.5 text-purple-600" /> Resend Verification Code
+                </span>
+              )}
+            </Button>
+          </form>
+        )}
       </div>
 
       {/* Navigation Footer */}

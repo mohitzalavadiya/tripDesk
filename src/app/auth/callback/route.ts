@@ -65,14 +65,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=auth_failed", request.url));
   }
 
-  // Verification Gate: Email confirmation is temporarily disabled for all roles.
-  // When re-enabling email verification, restore this check:
-  // const isEmailConfirmed = !!(user.email_confirmed_at || (user as any).confirmed_at);
-  // if (!isEmailConfirmed) {
-  //   console.error("Auth callback received unconfirmed user:", user.id);
-  //   await supabase.auth.signOut();
-  //   return NextResponse.redirect(new URL("/login?error=unverified_account", request.url));
-  // }
+  // Preserve recovery / password reset callback flow
+  if (type === "recovery") {
+    return NextResponse.redirect(new URL("/reset-password", request.url));
+  }
+
+  // Verification Gate: Require confirmed email in Supabase Auth for public signup
+  const isEmailConfirmed = !!(user.email_confirmed_at || (user as any).confirmed_at);
+  if (!isEmailConfirmed) {
+    console.error("Auth callback received unconfirmed user:", user.id);
+    await supabase.auth.signOut();
+    return NextResponse.redirect(new URL("/login?error=unverified_account", request.url));
+  }
 
   // 4. Execute Atomic Onboarding Transaction
   const onboardingResult = await provisionOnboardedAgencyOwner(user, supabase);
