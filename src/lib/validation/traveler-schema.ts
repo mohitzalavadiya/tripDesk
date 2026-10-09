@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TravelerType } from "@prisma/client";
+import { isValidPhoneNumber } from "./field-validators";
 
 /**
  * Zod validation schema for creating a new Traveler under a Trip.
@@ -36,7 +37,8 @@ export const createTravelerSchema = z.object({
     .max(30, "Phone number must be at most 30 characters.")
     .optional()
     .nullable()
-    .or(z.literal("")),
+    .or(z.literal(""))
+    .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid phone number."),
   email: z
     .string()
     .trim()
@@ -106,7 +108,8 @@ export const updateTravelerSchema = z
       .max(30, "Phone number must be at most 30 characters.")
       .optional()
       .nullable()
-      .or(z.literal("")),
+      .or(z.literal(""))
+      .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid phone number."),
     email: z
       .string()
       .trim()

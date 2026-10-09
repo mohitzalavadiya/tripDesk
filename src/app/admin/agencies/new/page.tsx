@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { isValidPhoneNumber } from "@/lib/validation/field-validators";
 import {
   ArrowLeft,
   Building2,
@@ -72,8 +73,16 @@ export default function CreateAgencyPage() {
       toast.error("Please fill in Agency Name, Email, Phone, and City.");
       return;
     }
+    if (!isValidPhoneNumber(phone)) {
+      toast.error("Please enter a valid Agency Phone number (digits, country code, 7-15 digits).");
+      return;
+    }
     if (!ownerName.trim() || !ownerEmail.trim() || !ownerPhone.trim()) {
       toast.error("Please fill in Agency Owner Name, Email, and Phone.");
+      return;
+    }
+    if (!isValidPhoneNumber(ownerPhone)) {
+      toast.error("Please enter a valid Owner Phone number (digits, country code, 7-15 digits).");
       return;
     }
 

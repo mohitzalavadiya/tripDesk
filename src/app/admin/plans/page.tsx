@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { isValidDecimal, isValidInteger } from "@/lib/validation/field-validators";
 import {
   Sparkles,
   Layers,
@@ -145,6 +146,40 @@ export default function AdminPlansPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!planName.trim()) {
+      toast.error("Plan name is required.");
+      return;
+    }
+    if (!isValidDecimal(planPrice, { min: 0 })) {
+      toast.error("Monthly price must be a valid non-negative amount.");
+      return;
+    }
+    if (planYearlyPrice.trim() && !isValidDecimal(planYearlyPrice, { min: 0 })) {
+      toast.error("Yearly price must be a valid non-negative amount.");
+      return;
+    }
+    if (!isValidInteger(planDuration, { min: 1, max: 3650 })) {
+      toast.error("Duration must be a whole number between 1 and 3650 days.");
+      return;
+    }
+    if (!isValidInteger(displayOrder, { min: 0, max: 1000 })) {
+      toast.error("Display order must be a whole number between 0 and 1000.");
+      return;
+    }
+    if (!usageLimits.TRIPS.isUnlimited && !isValidInteger(usageLimits.TRIPS.value, { min: 0 })) {
+      toast.error("Trips quota limit must be a valid non-negative whole number.");
+      return;
+    }
+    if (!usageLimits.QUOTATIONS.isUnlimited && !isValidInteger(usageLimits.QUOTATIONS.value, { min: 0 })) {
+      toast.error("Quotations quota limit must be a valid non-negative whole number.");
+      return;
+    }
+    if (!usageLimits.BOOKINGS.isUnlimited && !isValidInteger(usageLimits.BOOKINGS.value, { min: 0 })) {
+      toast.error("Bookings quota limit must be a valid non-negative whole number.");
+      return;
+    }
+
     setSaving(true);
     try {
       const parsedFeatures = planFeatures
@@ -160,21 +195,26 @@ export default function AdminPlansPage() {
       };
 
       const parsedUsageLimits = {
-        TRIPS: usageLimits.TRIPS.isUnlimited ? null : (parseInt(usageLimits.TRIPS.value) >= 0 ? parseInt(usageLimits.TRIPS.value) : 0),
-        QUOTATIONS: usageLimits.QUOTATIONS.isUnlimited ? null : (parseInt(usageLimits.QUOTATIONS.value) >= 0 ? parseInt(usageLimits.QUOTATIONS.value) : 0),
-        BOOKINGS: usageLimits.BOOKINGS.isUnlimited ? null : (parseInt(usageLimits.BOOKINGS.value) >= 0 ? parseInt(usageLimits.BOOKINGS.value) : 0),
+        TRIPS: usageLimits.TRIPS.isUnlimited ? null : parseInt(usageLimits.TRIPS.value, 10),
+        QUOTATIONS: usageLimits.QUOTATIONS.isUnlimited ? null : parseInt(usageLimits.QUOTATIONS.value, 10),
+        BOOKINGS: usageLimits.BOOKINGS.isUnlimited ? null : parseInt(usageLimits.BOOKINGS.value, 10),
       };
+
+      const finalPrice = Number(planPrice);
+      const finalYearlyPrice = planYearlyPrice.trim() ? Number(planYearlyPrice) : null;
+      const finalDuration = parseInt(planDuration, 10);
+      const finalDisplayOrder = parseInt(displayOrder, 10);
 
       if (modalMode === "CREATE") {
         await adminClient.createPlan({
           name: planName.trim(),
           description: planDesc.trim() || undefined,
-          price: parseFloat(planPrice) || 0,
-          yearlyPrice: planYearlyPrice.trim() ? parseFloat(planYearlyPrice) : null,
-          durationDays: parseInt(planDuration) || 30,
+          price: finalPrice,
+          yearlyPrice: finalYearlyPrice,
+          durationDays: finalDuration,
           features: parsedFeatures,
           isPopular,
-          displayOrder: parseInt(displayOrder) || 0,
+          displayOrder: finalDisplayOrder,
           isActive,
           entitlements: parsedEntitlements,
           usageLimits: parsedUsageLimits,
@@ -184,12 +224,12 @@ export default function AdminPlansPage() {
         await adminClient.updatePlan(targetPlanId, {
           name: planName.trim(),
           description: planDesc.trim() || undefined,
-          price: parseFloat(planPrice) || 0,
-          yearlyPrice: planYearlyPrice.trim() ? parseFloat(planYearlyPrice) : null,
-          durationDays: parseInt(planDuration) || 30,
+          price: finalPrice,
+          yearlyPrice: finalYearlyPrice,
+          durationDays: finalDuration,
           features: parsedFeatures,
           isPopular,
-          displayOrder: parseInt(displayOrder) || 0,
+          displayOrder: finalDisplayOrder,
           isActive,
           entitlements: parsedEntitlements,
           usageLimits: parsedUsageLimits,

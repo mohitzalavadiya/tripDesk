@@ -12,6 +12,8 @@ import { getErrorMessage } from "@/lib/utils";
 import { useModalScrollLock } from "@/lib/scroll-lock";
 import { X, UserCheck, Car, Calendar, Clock, Loader2 } from "lucide-react";
 
+import { phoneYup } from "@/lib/validation-schemas";
+
 interface AssignDriverModalProps {
   operationId: string;
   dispatch: VehicleDispatchWithDetails | null;
@@ -22,7 +24,7 @@ interface AssignDriverModalProps {
 
 const driverAssignSchema = Yup.object({
   driverName: Yup.string().required("Driver name is required"),
-  driverPhone: Yup.string().required("Driver phone is required"),
+  driverPhone: phoneYup(true, "Driver phone"),
   vehicleNumber: Yup.string().optional(),
   pickupLocation: Yup.string().optional(),
   dropLocation: Yup.string().optional(),

@@ -80,6 +80,7 @@ import {
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
 import { communicationClient, CommunicationLogItem } from "@/lib/api-client/communication-client";
+import { phoneYup } from "@/lib/validation-schemas";
 
 const AVATAR_GRADIENTS = [
   "from-indigo-500 to-violet-600",
@@ -95,12 +96,8 @@ const editCustomerValidationSchema = Yup.object().shape({
     .trim()
     .required("Customer name is required.")
     .max(120, "Customer name must be at most 120 characters."),
-  phone: Yup.string()
-    .trim()
-    .required("Phone number is required.")
-    .min(3, "Phone number must have at least 3 characters.")
-    .max(30, "Phone number must be at most 30 characters."),
-  alternatePhone: Yup.string().trim().max(30, "Alternate phone must be at most 30 characters."),
+  phone: phoneYup(true, "Phone number"),
+  alternatePhone: phoneYup(false, "Alternate phone"),
   email: Yup.string().trim().email("Please provide a valid email address.").max(120, "Email must be at most 120 characters."),
   dateOfBirth: Yup.string(),
   gender: Yup.string().trim().max(30),

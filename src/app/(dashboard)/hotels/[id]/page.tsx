@@ -40,6 +40,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { hotelClient, HotelWithRelations } from "@/lib/api-client";
+import { phoneYup } from "@/lib/validation-schemas";
 import { toast } from "sonner";
 
 const editHotelSchema = Yup.object().shape({
@@ -50,7 +51,7 @@ const editHotelSchema = Yup.object().shape({
   city: Yup.string().trim().max(100),
   state: Yup.string().trim().max(100),
   country: Yup.string().trim().max(100),
-  phone: Yup.string().trim().max(30),
+  phone: phoneYup(false, "Phone number"),
   email: Yup.string().trim().email("Invalid email").max(150),
   website: Yup.string().trim().max(250),
   notes: Yup.string().trim().max(2000),

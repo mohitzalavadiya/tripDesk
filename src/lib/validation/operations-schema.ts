@@ -6,6 +6,7 @@ import {
   IssuePriority,
   IssueStatus,
 } from "@prisma/client";
+import { isValidPhoneNumber } from "./field-validators";
 
 // ---------------------------------------------------------
 // TRIP OPERATION
@@ -93,7 +94,13 @@ export const createVehicleDispatchSchema = z.object({
   tripVehicleId: z.string().min(1, "TripVehicle ID is required"),
   vehicleId: z.string().trim().optional().nullable(),
   driverName: z.string().trim().max(200).optional().nullable(),
-  driverPhone: z.string().trim().max(20).optional().nullable(),
+  driverPhone: z
+    .string()
+    .trim()
+    .max(20)
+    .optional()
+    .nullable()
+    .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid driver phone number."),
   vehicleNumber: z.string().trim().max(50).optional().nullable(),
   pickupDate: z.coerce.date().optional().nullable(),
   pickupTime: z.string().trim().max(10).optional().nullable(),
@@ -109,7 +116,13 @@ export const updateVehicleDispatchSchema = z
   .object({
     vehicleId: z.string().trim().optional().nullable(),
     driverName: z.string().trim().max(200).optional().nullable(),
-    driverPhone: z.string().trim().max(20).optional().nullable(),
+    driverPhone: z
+      .string()
+      .trim()
+      .max(20)
+      .optional()
+      .nullable()
+      .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid driver phone number."),
     vehicleNumber: z.string().trim().max(50).optional().nullable(),
     pickupDate: z.coerce.date().optional().nullable(),
     pickupTime: z.string().trim().max(10).optional().nullable(),
@@ -232,7 +245,13 @@ export type CreateOperationEventInput = z.infer<typeof createOperationEventSchem
 export const logCommunicationSchema = z.object({
   channel: z.enum(["WHATSAPP", "SMS", "EMAIL", "PHONE"]).default("WHATSAPP"),
   recipientName: z.string().trim().min(1, "Recipient name is required").max(200),
-  recipientPhone: z.string().trim().max(50).optional().nullable(),
+  recipientPhone: z
+    .string()
+    .trim()
+    .max(50)
+    .optional()
+    .nullable()
+    .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid recipient phone number."),
   templateType: z.string().trim().min(1, "Template type is required").max(100),
   messageBody: z.string().trim().min(1, "Message body cannot be empty").max(5000),
 });

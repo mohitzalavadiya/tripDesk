@@ -19,6 +19,8 @@ import { toast } from "sonner";
 import { useModalScrollLock } from "@/lib/scroll-lock";
 import { X, CheckCircle2, Hotel, Car, Ticket, Calendar, Hash, Phone, User } from "lucide-react";
 
+import { phoneYup } from "@/lib/validation-schemas";
+
 interface ConfirmItemModalProps {
   bookingId: string;
   item: BookingItem | null;
@@ -31,7 +33,7 @@ const itemConfirmSchema = Yup.object({
   confirmationNumber: Yup.string().optional(),
   confirmationDate: Yup.string().optional(),
   driverName: Yup.string().optional(),
-  driverPhone: Yup.string().optional(),
+  driverPhone: phoneYup(false, "Driver phone"),
   notes: Yup.string().optional(),
 });
 

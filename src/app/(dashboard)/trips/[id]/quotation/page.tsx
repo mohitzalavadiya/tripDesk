@@ -46,6 +46,7 @@ import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
 import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
 import { useSubscription } from "@/context/subscription-context";
 import { getErrorMessage } from "@/lib/utils";
+import { isValidDecimal, isValidInteger } from "@/lib/validation/field-validators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -425,10 +426,19 @@ export default function TripQuotationEditorPage() {
     e.preventDefault();
     if (!activeQuote || !itemName || isReadOnly) return;
 
+    if (!isValidInteger(itemQuantity, { min: 1, max: 9999 })) {
+      toast.error("Quantity must be a valid whole number greater than 0");
+      return;
+    }
+    if (!isValidDecimal(itemUnitPrice, { min: 0 })) {
+      toast.error("RateSheet Rate must be a valid positive amount");
+      return;
+    }
+
     try {
       setItemSaving(true);
-      const qty = Number(itemQuantity) || 1;
-      const rateSheetRate = Number(itemUnitPrice) || 0;
+      const qty = Number(itemQuantity);
+      const rateSheetRate = Number(itemUnitPrice);
       const lineBase = Math.round(rateSheetRate * qty);
 
       const res = await quotationClient.createQuotationItem(activeQuote.id, {
@@ -474,9 +484,14 @@ export default function TripQuotationEditorPage() {
     e.preventDefault();
     if (!activeQuote || !editingItem || !itemName || isReadOnly) return;
 
+    if (!isValidInteger(itemQuantity, { min: 1, max: 9999 })) {
+      toast.error("Quantity must be a valid whole number greater than 0");
+      return;
+    }
+
     try {
       setItemSaving(true);
-      const qty = Number(itemQuantity) || 1;
+      const qty = Number(itemQuantity);
       // RateSheet Rate is fixed and read-only
       const rateSheetRate = Number(
         editingItem.unitPrice && Number(editingItem.unitPrice) > 0
@@ -625,6 +640,15 @@ export default function TripQuotationEditorPage() {
   const handleSaveMilestone = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeQuote || !milestoneTitle || isReadOnly) return;
+
+    if (milestonePct && !isValidDecimal(milestonePct, { min: 0, max: 100 })) {
+      toast.error("Percentage must be a valid number between 0 and 100");
+      return;
+    }
+    if (milestoneAmt && !isValidDecimal(milestoneAmt, { min: 0 })) {
+      toast.error("Fixed amount must be a valid positive amount");
+      return;
+    }
 
     try {
       setMilestoneSaving(true);
@@ -1198,7 +1222,12 @@ export default function TripQuotationEditorPage() {
                         value={markupInput}
                         onChange={(e) => setMarkupInput(e.target.value)}
                         onBlur={() => {
-                          const val = Number(markupInput) || 0;
+                          if (!isValidDecimal(markupInput, { min: 0, max: 500 })) {
+                            toast.error("Markup percentage must be a valid number between 0 and 500");
+                            setMarkupInput(String(activeQuote.markupPercentage || 0));
+                            return;
+                          }
+                          const val = Number(markupInput);
                           if (val !== Number(activeQuote.markupPercentage)) {
                             handleUpdatePricingRules({ markupPercentage: val });
                           }
@@ -1230,7 +1259,12 @@ export default function TripQuotationEditorPage() {
                         value={discountInput}
                         onChange={(e) => setDiscountInput(e.target.value)}
                         onBlur={() => {
-                          const val = Number(discountInput) || 0;
+                          if (!isValidDecimal(discountInput, { min: 0, max: 100 })) {
+                            toast.error("Discount percentage must be a valid number between 0 and 100");
+                            setDiscountInput(String(activeQuote.discountPercentage || 0));
+                            return;
+                          }
+                          const val = Number(discountInput);
                           if (val !== Number(activeQuote.discountPercentage)) {
                             handleUpdatePricingRules({ discountPercentage: val });
                           }

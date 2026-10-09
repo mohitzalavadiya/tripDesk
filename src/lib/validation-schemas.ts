@@ -1,10 +1,175 @@
 import * as Yup from "yup"
+import {
+  isValidPhoneNumber,
+  isValidInteger,
+  isValidDecimal,
+  PHONE_REGEX,
+} from "./validation/field-validators"
+
+// ─── Shared Yup Validation Helpers ─────────────────────────────────────
+export const phoneYup = (required: boolean = false, label: string = "Phone number") => {
+  let schema = Yup.string()
+    .trim()
+    .test(
+      "phone-valid",
+      `${label} must be a valid phone number (7-15 digits, no letters)`,
+      (value) => {
+        if (!value || value.trim() === "") return !required;
+        return isValidPhoneNumber(value);
+      }
+    );
+  if (required) {
+    schema = schema.required(`${label} is required`);
+  }
+  return schema;
+};
+
+export const integerYup = ({
+  min,
+  max,
+  required = false,
+  label = "Value",
+}: {
+  min?: number;
+  max?: number;
+  required?: boolean;
+  label?: string;
+} = {}) => {
+  let schema = Yup.number()
+    .transform((val, orig) => {
+      if (orig === null || orig === undefined) return orig;
+      if (typeof orig === "string") {
+        const s = orig.trim();
+        if (s === "") return undefined;
+        // Reject exponent notation (e/E), alphabetic characters, decimals, multiple signs
+        if (/[eE]/.test(s) || /[a-zA-Z]/.test(s) || s.includes(".") || !/^-?\d+$/.test(s)) {
+          return NaN;
+        }
+        return Number(s);
+      }
+      if (typeof orig === "number") {
+        if (!Number.isFinite(orig) || isNaN(orig) || String(orig).toLowerCase().includes("e")) {
+          return NaN;
+        }
+      }
+      return val;
+    })
+    .typeError(`${label} must be a whole number`)
+    .test(
+      "no-scientific",
+      `${label} cannot use scientific notation`,
+      (val) => val === undefined || val === null || !String(val).toLowerCase().includes("e")
+    )
+    .integer(`${label} must be a whole number`);
+
+  if (min !== undefined) {
+    schema = schema.min(min, `${label} must be at least ${min}`);
+  }
+  if (max !== undefined) {
+    schema = schema.max(max, `${label} cannot exceed ${max}`);
+  }
+  if (required) {
+    schema = schema.required(`${label} is required`);
+  }
+  return schema;
+};
+
+export const moneyYup = ({
+  min = 0,
+  max,
+  required = false,
+  label = "Amount",
+}: {
+  min?: number;
+  max?: number;
+  required?: boolean;
+  label?: string;
+} = {}) => {
+  let schema = Yup.number()
+    .transform((val, orig) => {
+      if (orig === null || orig === undefined) return orig;
+      if (typeof orig === "string") {
+        const s = orig.trim();
+        if (s === "") return undefined;
+        // Reject exponent notation (e/E), alphabetic characters, malformed decimals
+        if (/[eE]/.test(s) || /[a-zA-Z]/.test(s) || !/^-?\d+(\.\d+)?$/.test(s)) {
+          return NaN;
+        }
+        return Number(s);
+      }
+      if (typeof orig === "number") {
+        if (!Number.isFinite(orig) || isNaN(orig) || String(orig).toLowerCase().includes("e")) {
+          return NaN;
+        }
+      }
+      return val;
+    })
+    .typeError(`${label} must be a valid amount`)
+    .test(
+      "no-scientific",
+      `${label} cannot use scientific notation`,
+      (val) => val === undefined || val === null || !String(val).toLowerCase().includes("e")
+    )
+    .min(min, `${label} cannot be less than ${min}`);
+
+  if (max !== undefined) {
+    schema = schema.max(max, `${label} cannot exceed ${max}`);
+  }
+  if (required) {
+    schema = schema.required(`${label} is required`);
+  }
+  return schema;
+};
+
+export const percentageYup = ({
+  min = 0,
+  max = 100,
+  required = false,
+  label = "Percentage",
+}: {
+  min?: number;
+  max?: number;
+  required?: boolean;
+  label?: string;
+} = {}) => {
+  let schema = Yup.number()
+    .transform((val, orig) => {
+      if (orig === null || orig === undefined) return orig;
+      if (typeof orig === "string") {
+        const s = orig.trim();
+        if (s === "") return undefined;
+        // Reject exponent notation (e/E), alphabetic characters, malformed decimals
+        if (/[eE]/.test(s) || /[a-zA-Z]/.test(s) || !/^-?\d+(\.\d+)?$/.test(s)) {
+          return NaN;
+        }
+        return Number(s);
+      }
+      if (typeof orig === "number") {
+        if (!Number.isFinite(orig) || isNaN(orig) || String(orig).toLowerCase().includes("e")) {
+          return NaN;
+        }
+      }
+      return val;
+    })
+    .typeError(`${label} must be a valid number`)
+    .test(
+      "no-scientific",
+      `${label} cannot use scientific notation`,
+      (val) => val === undefined || val === null || !String(val).toLowerCase().includes("e")
+    )
+    .min(min, `${label} cannot be less than ${min}%`)
+    .max(max, `${label} cannot exceed ${max}%`);
+
+  if (required) {
+    schema = schema.required(`${label} is required`);
+  }
+  return schema;
+};
 
 // ─── Shared Regex Patterns ────────────────────────────────────────────
 const NAME_REGEX = /^[a-zA-Z\s.\-]+$/
 const CITY_REGEX = /^[a-zA-Z\s\-]+$/
 const DESTINATION_REGEX = /^[a-zA-Z\s\-,]+$/
-const PHONE_REGEX = /^\+?[0-9]{10,15}$/
 
 // ─── Customer Schema ──────────────────────────────────────────────────
 // Used by /customers/new and /customers/[id] edit form
@@ -16,18 +181,7 @@ export const customerSchema = Yup.object().shape({
     .max(100, "Full Name cannot exceed 100 characters")
     .matches(NAME_REGEX, "Full Name can only contain letters, spaces, dots, and hyphens"),
 
-  phone: Yup.string()
-    .trim()
-    .required("Phone Number is required")
-    .test(
-      "phone-format",
-      "Phone Number must be between 10 and 15 digits (e.g. +919876543210)",
-      (value) => {
-        if (!value) return false
-        const clean = value.replace(/\s+/g, "")
-        return PHONE_REGEX.test(clean)
-      }
-    ),
+  phone: phoneYup(true, "Phone Number"),
 
   email: Yup.string()
     .trim()
@@ -117,30 +271,16 @@ export const tripSchema = Yup.object().shape({
       return end >= start
     }),
 
-  adults: Yup.number()
-    .required("At least 1 adult is required")
-    .min(1, "At least 1 adult is required")
-    .max(100, "Number of adults cannot exceed 100"),
+  adults: integerYup({ min: 1, max: 100, required: true, label: "Number of adults" }),
 
-  children: Yup.number()
-    .min(0, "Number of children must be between 0 and 100")
-    .max(100, "Number of children must be between 0 and 100"),
+  children: integerYup({ min: 0, max: 100, required: false, label: "Number of children" }).default(0),
 
-  infants: Yup.number()
-    .min(0, "Number of infants must be between 0 and 100")
-    .max(100, "Number of infants must be between 0 and 100"),
+  infants: integerYup({ min: 0, max: 100, required: false, label: "Number of infants" }).default(0),
 
   budget: Yup.string()
     .test("budget-valid", "Budget must be a positive number greater than 0", function (value) {
       if (!value || value.trim() === "") return true
-      const num = parseFloat(value)
-      return !isNaN(num) && num > 0
-    })
-    .test("budget-max", "Budget is too large (max budget limit ₹10,00,00,000)", function (value) {
-      if (!value || value.trim() === "") return true
-      const num = parseFloat(value)
-      if (isNaN(num)) return true
-      return num <= 100000000
+      return isValidDecimal(value, { min: 0.01, max: 100000000 })
     }),
 
   status: Yup.string(),
@@ -221,17 +361,7 @@ export const supplierSchema = Yup.object().shape({
     .trim()
     .max(100, "Contact person cannot exceed 100 characters"),
 
-  phone: Yup.string()
-    .trim()
-    .test(
-      "phone-format",
-      "Phone number must be between 10 and 15 digits (e.g. +919876543210)",
-      (value) => {
-        if (!value) return true
-        const clean = value.replace(/\s+/g, "")
-        return PHONE_REGEX.test(clean)
-      }
-    ),
+  phone: phoneYup(false, "Phone number"),
 
   email: Yup.string()
     .trim()
@@ -284,26 +414,13 @@ export const hotelSchema = Yup.object().shape({
     .trim()
     .max(300, "Address cannot exceed 300 characters"),
 
-  starCategory: Yup.number()
-    .min(1, "Star category must be between 1 and 5")
-    .max(5, "Star category must be between 1 and 5")
-    .default(3),
+  starCategory: integerYup({ min: 1, max: 5, required: false, label: "Star category" }).default(3),
 
   contactPerson: Yup.string()
     .trim()
     .max(100, "Contact person cannot exceed 100 characters"),
 
-  phone: Yup.string()
-    .trim()
-    .test(
-      "phone-format",
-      "Phone number must be between 10 and 15 digits",
-      (value) => {
-        if (!value) return true
-        const clean = value.replace(/\s+/g, "")
-        return PHONE_REGEX.test(clean)
-      }
-    ),
+  phone: phoneYup(false, "Phone number"),
 
   email: Yup.string()
     .trim()
@@ -341,15 +458,9 @@ export const hotelRoomSchema = Yup.object().shape({
     .min(2, "Room name must be at least 2 characters long")
     .max(100, "Room name cannot exceed 100 characters"),
 
-  maxAdults: Yup.number()
-    .required("Max adults is required")
-    .min(1, "At least 1 adult capacity required")
-    .max(20, "Maximum adult capacity cannot exceed 20"),
+  maxAdults: integerYup({ min: 1, max: 20, required: true, label: "Max adults" }),
 
-  maxChildren: Yup.number()
-    .min(0, "Max children cannot be negative")
-    .max(10, "Maximum child capacity cannot exceed 10")
-    .default(0),
+  maxChildren: integerYup({ min: 0, max: 10, required: false, label: "Max children" }).default(0),
 
   bedType: Yup.string()
     .trim()
@@ -370,26 +481,15 @@ export const hotelRateSchema = Yup.object().shape({
   mealPlan: Yup.string().required("Meal plan is required"),
   currency: Yup.string().default("INR"),
 
-  baseRate: Yup.number()
-    .required("Base rate is required")
-    .min(0, "Rate must be greater than or equal to 0")
-    .max(10000000, "Rate is too high"),
+  baseRate: moneyYup({ min: 0, max: 10000000, required: true, label: "Base rate" }),
 
-  occupancyAdults: Yup.number()
-    .required("Adult occupancy is required")
-    .min(1, "Must allow at least 1 adult"),
+  occupancyAdults: integerYup({ min: 1, max: 20, required: true, label: "Adult occupancy" }),
 
-  occupancyChildren: Yup.number()
-    .min(0, "Cannot be negative")
-    .default(0),
+  occupancyChildren: integerYup({ min: 0, max: 20, required: false, label: "Child occupancy" }).default(0),
 
-  extraAdultRate: Yup.number()
-    .min(0, "Cannot be negative")
-    .default(0),
+  extraAdultRate: moneyYup({ min: 0, max: 10000000, required: false, label: "Extra adult rate" }).default(0),
 
-  childRate: Yup.number()
-    .min(0, "Cannot be negative")
-    .default(0),
+  childRate: moneyYup({ min: 0, max: 10000000, required: false, label: "Child rate" }).default(0),
 
   validFrom: Yup.string()
     .required("Valid from date is required")
@@ -449,14 +549,9 @@ export const vehicleSchema = Yup.object().shape({
 
   vehicleType: Yup.string().required("Vehicle type is required"),
 
-  seatingCapacity: Yup.number()
-    .required("Seating capacity is required")
-    .min(1, "Must have at least 1 seat")
-    .max(100, "Capacity cannot exceed 100"),
+  seatingCapacity: integerYup({ min: 1, max: 100, required: true, label: "Seating capacity" }),
 
-  luggageCapacity: Yup.number()
-    .min(0, "Cannot be negative")
-    .default(2),
+  luggageCapacity: integerYup({ min: 0, max: 100, required: false, label: "Luggage capacity" }).default(2),
 
   supplierId: Yup.string(),
   baseLocation: Yup.string().trim().max(100, "Location cannot exceed 100 characters"),
@@ -474,14 +569,12 @@ export const vehicleRateSchema = Yup.object().shape({
   pricingType: Yup.string().required("Pricing type is required"),
   currency: Yup.string().default("INR"),
 
-  baseRate: Yup.number()
-    .required("Base rate is required")
-    .min(0, "Rate must be greater than or equal to 0"),
+  baseRate: moneyYup({ min: 0, required: true, label: "Base rate" }),
 
-  includedKm: Yup.number().min(0, "Cannot be negative").default(0),
-  extraKmRate: Yup.number().min(0, "Cannot be negative").default(0),
-  driverAllowance: Yup.number().min(0, "Cannot be negative").default(0),
-  nightHalt: Yup.number().min(0, "Cannot be negative").default(0),
+  includedKm: integerYup({ min: 0, required: false, label: "Included KM" }).default(0),
+  extraKmRate: moneyYup({ min: 0, required: false, label: "Extra KM rate" }).default(0),
+  driverAllowance: moneyYup({ min: 0, required: false, label: "Driver allowance" }).default(0),
+  nightHalt: moneyYup({ min: 0, required: false, label: "Night halt" }).default(0),
   tollIncluded: Yup.boolean().default(false),
   parkingIncluded: Yup.boolean().default(false),
 
@@ -527,11 +620,11 @@ export const activityRateSchema = Yup.object().shape({
   pricingType: Yup.string().required("Pricing type is required"),
   currency: Yup.string().default("INR"),
 
-  adultRate: Yup.number().min(0, "Cannot be negative"),
-  childRate: Yup.number().min(0, "Cannot be negative"),
-  groupRate: Yup.number().min(0, "Cannot be negative"),
-  vehicleRate: Yup.number().min(0, "Cannot be negative"),
-  bookingRate: Yup.number().min(0, "Cannot be negative"),
+  adultRate: moneyYup({ min: 0, required: false, label: "Adult rate" }),
+  childRate: moneyYup({ min: 0, required: false, label: "Child rate" }),
+  groupRate: moneyYup({ min: 0, required: false, label: "Group rate" }),
+  vehicleRate: moneyYup({ min: 0, required: false, label: "Vehicle rate" }),
+  bookingRate: moneyYup({ min: 0, required: false, label: "Booking rate" }),
 
   validFrom: Yup.string().test("valid-from", "Invalid date", (v) => !v || !isNaN(new Date(v).getTime())),
   validTo: Yup.string()
@@ -560,19 +653,10 @@ export const manualCostItemSchema = Yup.object().shape({
     .max(120, "Name cannot exceed 120 characters"),
   supplierId: Yup.string().nullable(),
   supplierName: Yup.string().trim().max(100, "Supplier name cannot exceed 100 characters"),
-  quantity: Yup.number()
-    .typeError("Quantity must be a number")
-    .required("Quantity is required")
-    .min(1, "Quantity must be at least 1"),
+  quantity: integerYup({ min: 1, required: true, label: "Quantity" }),
   unit: Yup.string().trim().max(50, "Unit cannot exceed 50 characters"),
-  duration: Yup.number()
-    .typeError("Duration must be a number")
-    .min(1, "Duration must be at least 1")
-    .default(1),
-  unitCost: Yup.number()
-    .typeError("Unit cost must be a number")
-    .required("Unit cost is required")
-    .min(0, "Unit cost cannot be negative"),
+  duration: integerYup({ min: 1, required: false, label: "Duration" }).default(1),
+  unitCost: moneyYup({ min: 0, required: true, label: "Unit cost" }),
   currency: Yup.string().default("INR"),
   dateFrom: Yup.string().nullable(),
   dateTo: Yup.string().nullable(),
@@ -587,10 +671,7 @@ export const internalExpenseSchema = Yup.object().shape({
     .required("Expense description is required")
     .min(2, "Description must be at least 2 characters long")
     .max(120, "Description cannot exceed 120 characters"),
-  amount: Yup.number()
-    .typeError("Amount must be a number")
-    .required("Amount is required")
-    .min(0.01, "Amount must be greater than 0"),
+  amount: moneyYup({ min: 0.01, required: true, label: "Expense amount" }),
   currency: Yup.string().default("INR"),
   date: Yup.string().nullable(),
   notes: Yup.string().trim().max(1000, "Notes cannot exceed 1000 characters"),
@@ -599,35 +680,15 @@ export const internalExpenseSchema = Yup.object().shape({
 // ─── Pricing Settings Schema ──────────────────────────────────────────
 export const pricingSettingsSchema = Yup.object().shape({
   markupType: Yup.string().oneOf(["percentage", "fixed"]).required(),
-  markupValue: Yup.number()
-    .typeError("Markup value must be a number")
-    .min(0, "Markup cannot be negative")
-    .required("Markup is required"),
+  markupValue: moneyYup({ min: 0, required: true, label: "Markup value" }),
   discountType: Yup.string().oneOf(["percentage", "fixed"]).nullable(),
-  discountValue: Yup.number()
-    .typeError("Discount value must be a number")
-    .min(0, "Discount cannot be negative")
-    .default(0),
+  discountValue: moneyYup({ min: 0, required: false, label: "Discount value" }).default(0),
   pricingMode: Yup.string().oneOf(["automatic", "manual"]).required(),
-  manualSellingPrice: Yup.number()
-    .typeError("Selling price must be a number")
-    .min(0, "Selling price cannot be negative")
-    .nullable(),
+  manualSellingPrice: moneyYup({ min: 0, required: false, label: "Selling price" }).nullable(),
   taxRuleId: Yup.string().nullable(),
-  customTaxRate: Yup.number()
-    .typeError("Custom tax rate must be a number")
-    .min(0, "Tax rate cannot be negative")
-    .max(100, "Tax rate cannot exceed 100%")
-    .nullable(),
-  lowMarginThreshold: Yup.number()
-    .typeError("Threshold must be a number")
-    .min(0, "Threshold cannot be negative")
-    .max(100, "Threshold cannot exceed 100%")
-    .default(10),
-  roundPriceTo: Yup.number()
-    .typeError("Rounding value must be a number")
-    .min(0, "Cannot be negative")
-    .default(0),
+  customTaxRate: percentageYup({ min: 0, max: 100, required: false, label: "Custom tax rate" }).nullable(),
+  lowMarginThreshold: percentageYup({ min: 0, max: 100, required: false, label: "Threshold" }).default(10),
+  roundPriceTo: integerYup({ min: 0, required: false, label: "Rounding value" }).default(0),
 })
 
 

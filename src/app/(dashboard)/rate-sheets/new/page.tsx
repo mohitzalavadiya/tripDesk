@@ -23,6 +23,7 @@ import {
 } from "@/lib/api-client";
 import { Hotel, Supplier } from "@prisma/client";
 import { toast } from "sonner";
+import { isValidDecimal, isValidInteger } from "@/lib/validation/field-validators";
 import {
   Plus,
   Hotel as HotelIcon,
@@ -111,6 +112,31 @@ function NewRateSheetForm() {
 
     if (!hotelId) {
       toast.error("Please select a hotel property.");
+      return;
+    }
+
+    if (!isValidDecimal(hotelCostPrice, { min: 0 })) {
+      toast.error("Room Cost Rate must be a valid non-negative amount.");
+      return;
+    }
+
+    if (extraAdultRate && !isValidDecimal(extraAdultRate, { min: 0 })) {
+      toast.error("Extra Adult Rate must be a valid non-negative amount.");
+      return;
+    }
+
+    if (extraChildRate && !isValidDecimal(extraChildRate, { min: 0 })) {
+      toast.error("Extra Child Rate must be a valid non-negative amount.");
+      return;
+    }
+
+    if (!isValidInteger(priority, { min: 0, max: 1000 })) {
+      toast.error("Priority weight must be a whole number between 0 and 1000.");
+      return;
+    }
+
+    if (!isValidDecimal(taxPercentage, { min: 0, max: 100 })) {
+      toast.error("Supplier Tax percentage must be between 0 and 100.");
       return;
     }
 

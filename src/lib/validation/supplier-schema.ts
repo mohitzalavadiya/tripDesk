@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidPhoneNumber } from "./field-validators";
 
 /**
  * Zod validation schema for creating a new Supplier.
@@ -28,14 +29,16 @@ export const createSupplierSchema = z.object({
     .max(50, "Phone number must be at most 50 characters.")
     .optional()
     .nullable()
-    .or(z.literal("")),
+    .or(z.literal(""))
+    .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid phone number."),
   alternatePhone: z
     .string()
     .trim()
     .max(50, "Alternate phone must be at most 50 characters.")
     .optional()
     .nullable()
-    .or(z.literal("")),
+    .or(z.literal(""))
+    .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid alternate phone number."),
   email: z
     .string()
     .trim()
@@ -155,14 +158,16 @@ export const updateSupplierSchema = z
       .max(50, "Phone number must be at most 50 characters.")
       .optional()
       .nullable()
-      .or(z.literal("")),
+      .or(z.literal(""))
+      .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid phone number."),
     alternatePhone: z
       .string()
       .trim()
       .max(50, "Alternate phone must be at most 50 characters.")
       .optional()
       .nullable()
-      .or(z.literal("")),
+      .or(z.literal(""))
+      .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid alternate phone number."),
     email: z
       .string()
       .trim()

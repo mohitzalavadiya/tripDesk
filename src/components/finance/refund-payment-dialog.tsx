@@ -19,6 +19,7 @@ import { formatCurrency } from "@/lib/costing-engine";
 import { getErrorMessage } from "@/lib/utils";
 import { Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { isValidDecimal } from "@/lib/validation/field-validators";
 
 interface RefundPaymentDialogProps {
   open: boolean;
@@ -56,11 +57,11 @@ export function RefundPaymentDialog({
     e.preventDefault();
     if (!payment) return;
 
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
+    if (!isValidDecimal(amount, { min: 0.01 })) {
       toast.error("Please enter a valid positive refund amount.");
       return;
     }
+    const numAmount = Number(amount);
     if (numAmount > maxRefundable + 0.01) {
       toast.error(`Refund cannot exceed eligible balance of ${formatCurrency(maxRefundable)}.`);
       return;

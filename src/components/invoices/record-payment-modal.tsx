@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import { isValidDecimal } from "@/lib/validation/field-validators";
 
 interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -67,11 +68,11 @@ export function RecordPaymentModal({
     e.preventDefault();
     setError(null);
 
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
+    if (!isValidDecimal(amount, { min: 0.01 })) {
       setError("Please enter a valid payment amount greater than ₹0.");
       return;
     }
+    const numAmount = Number(amount);
 
     if (numAmount > balanceAmount) {
       setError(`Payment amount cannot exceed the remaining balance of ₹${balanceAmount.toLocaleString("en-IN")}.`);

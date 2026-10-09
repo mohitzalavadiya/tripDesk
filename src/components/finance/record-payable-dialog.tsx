@@ -25,6 +25,7 @@ import { financeClient, tripClient, bookingClient } from "@/lib/api-client";
 import { getErrorMessage } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { isValidDecimal } from "@/lib/validation/field-validators";
 
 interface RecordPayableDialogProps {
   open: boolean;
@@ -93,11 +94,11 @@ export function RecordPayableDialog({
       toast.error("Please enter a description for this obligation.");
       return;
     }
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
+    if (!isValidDecimal(amount, { min: 0.01 })) {
       toast.error("Please enter a valid positive payable amount.");
       return;
     }
+    const numAmount = Number(amount);
 
     if (linkType === "TRIP" && !tripId && !defaultTripId) {
       toast.error("Please select an associated Trip.");

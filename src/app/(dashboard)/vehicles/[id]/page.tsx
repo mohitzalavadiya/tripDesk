@@ -38,13 +38,14 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { vehicleClient } from "@/lib/api-client";
+import { integerYup } from "@/lib/validation-schemas";
 import { Vehicle } from "@prisma/client";
 import { toast } from "sonner";
 
 const editVehicleSchema = Yup.object().shape({
   name: Yup.string().trim().required("Vehicle name is required").max(100),
   type: Yup.string().trim().required("Vehicle type is required").max(50),
-  capacity: Yup.number().required("Capacity is required").integer().min(1).max(100),
+  capacity: integerYup({ min: 1, max: 100, required: true, label: "Capacity" }),
   registrationNumber: Yup.string().trim().max(50),
   notes: Yup.string().trim().max(2000),
 });

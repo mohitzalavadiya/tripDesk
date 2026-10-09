@@ -1,6 +1,7 @@
 import "server-only";
 import * as XLSX from "xlsx";
 import prisma from "@/lib/prisma";
+import { isValidPhoneNumber } from "@/lib/validation/field-validators";
 
 export type ImportMode = "SKIP" | "UPDATE" | "REJECT";
 
@@ -355,6 +356,12 @@ export const hotelExcelService = {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
           rowErrors.push(`Invalid email address format: '${email}'`);
+        }
+      }
+
+      if (phone) {
+        if (!isValidPhoneNumber(phone)) {
+          rowErrors.push(`Invalid phone number format: '${phone}'. Must contain 7-15 digits and valid phone format.`);
         }
       }
 

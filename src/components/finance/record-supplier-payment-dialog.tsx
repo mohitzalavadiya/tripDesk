@@ -27,6 +27,7 @@ import { formatCurrency } from "@/lib/costing-engine";
 import { getErrorMessage } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { isValidDecimal } from "@/lib/validation/field-validators";
 
 interface RecordSupplierPaymentDialogProps {
   open: boolean;
@@ -107,11 +108,11 @@ export function RecordSupplierPaymentDialog({
       toast.error("Please select a supplier or enter a payee name.");
       return;
     }
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
+    if (!isValidDecimal(amount, { min: 0.01 })) {
       toast.error("Please enter a valid positive disbursement amount.");
       return;
     }
+    const numAmount = Number(amount);
     if (selectedPayable) {
       const currentOutstanding = Number(selectedPayable.outstandingAmount);
       if (numAmount > currentOutstanding + 0.001) {

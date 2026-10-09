@@ -27,6 +27,7 @@ import { formatCurrency } from "@/lib/costing-engine";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
+import { isValidDecimal } from "@/lib/validation/field-validators";
 
 interface RecordPaymentDialogProps {
   open: boolean;
@@ -92,11 +93,11 @@ export function RecordPaymentDialog({
       toast.error("Please select a booking.");
       return;
     }
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
+    if (!isValidDecimal(amount, { min: 0.01 })) {
       toast.error("Please enter a valid positive payment amount.");
       return;
     }
+    const numAmount = Number(amount);
     if (selectedBooking) {
       const currentBalance = Number(selectedBooking.balanceAmount);
       if (numAmount > currentBalance + 0.001) {

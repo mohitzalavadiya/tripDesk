@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { hotelClient } from "@/lib/api-client";
+import { phoneYup } from "@/lib/validation-schemas";
 import { toast } from "sonner";
 
 const createHotelSchema = Yup.object().shape({
@@ -30,7 +31,7 @@ const createHotelSchema = Yup.object().shape({
   city: Yup.string().trim().max(100, "City cannot exceed 100 characters"),
   state: Yup.string().trim().max(100, "State cannot exceed 100 characters"),
   country: Yup.string().trim().max(100, "Country cannot exceed 100 characters").default("India"),
-  phone: Yup.string().trim().max(30, "Phone cannot exceed 30 characters"),
+  phone: phoneYup(false, "Phone number"),
   email: Yup.string().trim().email("Invalid email format").max(150, "Email cannot exceed 150 characters"),
   website: Yup.string().trim().max(250, "Website URL cannot exceed 250 characters"),
   notes: Yup.string().trim().max(2000, "Notes cannot exceed 2000 characters"),

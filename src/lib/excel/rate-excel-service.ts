@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import prisma from "@/lib/prisma";
 import { ImportMode } from "./hotel-excel-service";
 import { ValidationError } from "@/lib/api";
+import { isValidDecimal } from "@/lib/validation/field-validators";
 
 export interface RatePreviewRow {
   rowNumber: number;
@@ -162,13 +163,10 @@ function parseNumericCell(val: any): { num: number | null; error?: string } {
   const cleaned = String(val).replace(/[₹$,\s]/g, "").trim();
   if (cleaned === "") return { num: null };
 
+  if (!isValidDecimal(cleaned, { min: 0 })) {
+    return { num: null, error: `Invalid numeric value: '${val}'. Must be a valid non-negative number.` };
+  }
   const parsed = Number(cleaned);
-  if (isNaN(parsed)) {
-    return { num: null, error: `Invalid numeric value: '${val}'` };
-  }
-  if (parsed < 0) {
-    return { num: null, error: `Value cannot be negative: '${val}'` };
-  }
   return { num: parsed };
 }
 

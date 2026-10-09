@@ -20,27 +20,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { tripClient, quotationClient, TripWithRelations } from "@/lib/api-client";
+import { percentageYup } from "@/lib/validation-schemas";
 import { toast } from "sonner";
 
 const createQuotationValidationSchema = Yup.object().shape({
   selectedTripId: Yup.string()
     .trim()
     .required("Please select a trip."),
-  markupPct: Yup.number()
-    .typeError("Markup must be a number.")
-    .min(0, "Markup percentage cannot be negative.")
-    .max(500, "Markup percentage cannot exceed 500%.")
-    .required("Markup percentage is required."),
-  discountPct: Yup.number()
-    .typeError("Discount must be a number.")
-    .min(0, "Discount percentage cannot be negative.")
-    .max(100, "Discount percentage cannot exceed 100%.")
-    .required("Discount percentage is required."),
-  taxPct: Yup.number()
-    .typeError("Tax percentage must be a number.")
-    .min(0, "Tax percentage cannot be negative.")
-    .max(100, "Tax percentage cannot exceed 100%.")
-    .required("Tax percentage is required."),
+  markupPct: percentageYup({ min: 0, max: 500, required: true, label: "Markup percentage" }),
+  discountPct: percentageYup({ min: 0, max: 100, required: true, label: "Discount percentage" }),
+  taxPct: percentageYup({ min: 0, max: 100, required: true, label: "Tax percentage" }),
 });
 
 export default function NewQuotationPage() {

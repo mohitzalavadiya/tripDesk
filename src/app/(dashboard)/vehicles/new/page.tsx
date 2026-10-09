@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { vehicleClient } from "@/lib/api-client";
+import { integerYup } from "@/lib/validation-schemas";
 import { toast } from "sonner";
 
 const createVehicleSchema = Yup.object().shape({
@@ -31,12 +32,7 @@ const createVehicleSchema = Yup.object().shape({
     .trim()
     .required("Vehicle type is required")
     .max(50, "Type cannot exceed 50 characters"),
-  capacity: Yup.number()
-    .typeError("Capacity must be a number")
-    .required("Seating capacity is required")
-    .integer("Must be a whole number")
-    .min(1, "Capacity must be at least 1")
-    .max(100, "Capacity cannot exceed 100"),
+  capacity: integerYup({ min: 1, max: 100, required: true, label: "Seating capacity" }),
   registrationNumber: Yup.string().trim().max(50, "Registration number cannot exceed 50 characters"),
   notes: Yup.string().trim().max(2000, "Notes cannot exceed 2000 characters"),
 });

@@ -23,6 +23,7 @@ import {
   EyeOff,
   Loader2,
 } from "lucide-react";
+import { phoneYup } from "@/lib/validation-schemas";
 
 const signupValidationSchema = Yup.object().shape({
   agencyName: Yup.string()
@@ -35,11 +36,7 @@ const signupValidationSchema = Yup.object().shape({
     .required("Official agency email is required.")
     .email("Please enter a valid agency email address.")
     .max(120, "Email cannot exceed 120 characters."),
-  agencyPhone: Yup.string()
-    .trim()
-    .required("Primary phone number is required.")
-    .min(3, "Phone number must be at least 3 characters.")
-    .max(30, "Phone number cannot exceed 30 characters."),
+  agencyPhone: phoneYup(true, "Agency Phone"),
   address: Yup.string().trim().max(255, "Address cannot exceed 255 characters."),
   city: Yup.string()
     .trim()
@@ -57,7 +54,7 @@ const signupValidationSchema = Yup.object().shape({
     .required("Login email address is required.")
     .email("Please enter a valid login email address.")
     .max(120, "Email cannot exceed 120 characters."),
-  phone: Yup.string().trim().max(30, "Phone cannot exceed 30 characters."),
+  phone: phoneYup(false, "Owner Phone"),
   password: Yup.string()
     .required("Password is required.")
     .min(6, "Password must be at least 6 characters."),

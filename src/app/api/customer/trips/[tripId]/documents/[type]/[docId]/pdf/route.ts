@@ -14,12 +14,11 @@ export async function GET(
   { params }: { params: Promise<{ tripId: string; type: string; docId: string }> }
 ) {
   try {
-    const auth = await getAuthenticatedCustomer(request);
+    const { tripId, type, docId } = await params;
+    const auth = await getAuthenticatedCustomer(request, { tripId });
     if (!auth) {
       throw new ApiError(401, "CUSTOMER_UNAUTHORIZED", "Please sign in or provide a valid portal session.");
     }
-
-    const { tripId, type, docId } = await params;
 
     const res = await customerPortalService.downloadCustomerDocument(
       auth.customerId,

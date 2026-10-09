@@ -14,7 +14,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await getAuthenticatedCustomer(request);
+    const auth = await getAuthenticatedCustomer(request, { requireAccountSession: true });
     if (!auth) {
       throw new ApiError(401, "CUSTOMER_UNAUTHORIZED", "Please sign in to update notification status.");
     }

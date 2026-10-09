@@ -14,12 +14,11 @@ export async function POST(
   { params }: { params: Promise<{ tripId: string }> }
 ) {
   try {
-    const auth = await getAuthenticatedCustomer(request);
+    const { tripId } = await params;
+    const auth = await getAuthenticatedCustomer(request, { tripId });
     if (!auth) {
       throw new ApiError(401, "CUSTOMER_UNAUTHORIZED", "Please sign in or provide a valid portal session.");
     }
-
-    const { tripId } = await params;
     const body = await request.json();
 
     if (!body || typeof body.rating !== "number" || body.rating < 1 || body.rating > 5) {

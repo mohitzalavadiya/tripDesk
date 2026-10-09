@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
+import { isValidDecimal, isValidInteger } from "@/lib/validation/field-validators";
 
 export default function RateSheetDetailPage() {
   const router = useRouter();
@@ -118,6 +119,36 @@ export default function RateSheetDetailPage() {
     e.preventDefault();
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
+      return;
+    }
+
+    if (!editName.trim()) {
+      toast.error("Rate sheet name is required.");
+      return;
+    }
+
+    if (!isValidDecimal(editCostPrice, { min: 0 })) {
+      toast.error("Room Cost Rate must be a valid non-negative amount.");
+      return;
+    }
+
+    if (editExtraAdultRate && !isValidDecimal(editExtraAdultRate, { min: 0 })) {
+      toast.error("Extra Adult Rate must be a valid non-negative amount.");
+      return;
+    }
+
+    if (editExtraChildRate && !isValidDecimal(editExtraChildRate, { min: 0 })) {
+      toast.error("Extra Child Rate must be a valid non-negative amount.");
+      return;
+    }
+
+    if (!isValidInteger(editPriority, { min: 0, max: 1000 })) {
+      toast.error("Priority weight must be a whole number between 0 and 1000.");
+      return;
+    }
+
+    if (!isValidDecimal(editTaxPercentage, { min: 0, max: 100 })) {
+      toast.error("Supplier Tax percentage must be between 0 and 100.");
       return;
     }
 
@@ -217,33 +248,32 @@ export default function RateSheetDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+      <div className="max-w-[1550px] mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6">
         {/* Read-Only Banner */}
         {isReadOnly && <ReadOnlyBanner moduleName="Rate Sheet Detail" />}
 
         {/* Top Hero Command Header */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden space-y-5">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden space-y-4 sm:space-y-5">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-purple-50/70 via-purple-50/20 to-transparent pointer-events-none" />
 
           {/* Breadcrumb & Badges */}
-          <div className="flex items-center gap-2.5 z-10">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 z-10">
             <Link
               href="/rate-sheets"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shrink-0"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
             </Link>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-purple-50 text-purple-700 border border-purple-100">
-              <Sparkles className="h-3 w-3 text-purple-500" />
+            <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide uppercase bg-purple-50 text-purple-700 border border-purple-100 whitespace-nowrap">
+              <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-purple-500" />
               Hotel Tariff
             </span>
-            <span className="text-slate-300">•</span>
-            <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+            <span className="text-[11px] sm:text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded whitespace-nowrap">
               {rateSheet.rateSheetNumber || "RAT-LEGACY"}
             </span>
             <Badge
               variant="outline"
-              className={`text-[10px] font-bold ${
+              className={`text-[9px] sm:text-[10px] font-bold whitespace-nowrap px-1.5 sm:px-2.5 ${
                 isExpired
                   ? "bg-amber-50 text-amber-700 border-amber-200"
                   : rateSheet.status === "ACTIVE"
@@ -257,42 +287,40 @@ export default function RateSheetDetailPage() {
 
           {/* Main Info Row */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 z-10">
-            <div className="flex items-start gap-4">
-              <div className="h-16 w-16 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold border border-purple-100 shadow-2xs shrink-0">
-                <HotelIcon className="h-8 w-8" />
+            <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+              <div className="h-11 w-11 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold border border-purple-100 shadow-2xs shrink-0">
+                <HotelIcon className="h-5 w-5 sm:h-8 sm:w-8" />
               </div>
 
-              <div className="space-y-1">
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight">{rateSheet.name}</h1>
+              <div className="space-y-1.5 min-w-0 flex-1">
+                <h1 className="text-base sm:text-xl lg:text-2xl font-black text-slate-900 tracking-tight leading-snug sm:leading-tight break-words">
+                  {rateSheet.name}
+                </h1>
 
-                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-600">
                   <span className="flex items-center gap-1 font-semibold text-slate-800">
-                    <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                    <span>{formatDateDisplay(rateSheet.validFrom)} → {formatDateDisplay(rateSheet.validTo)}</span>
+                    <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <span className="break-words">{formatDateDisplay(rateSheet.validFrom)} → {formatDateDisplay(rateSheet.validTo)}</span>
                   </span>
 
                   {rateSheet.seasonName && (
-                    <>
-                      <span>•</span>
-                      <span className="font-medium text-slate-700">{rateSheet.seasonName}</span>
-                    </>
+                    <span className="inline-flex items-center gap-1 text-slate-700 font-medium before:content-['•'] before:mr-1 before:text-slate-300">
+                      {rateSheet.seasonName}
+                    </span>
                   )}
 
                   {rateSheet.supplier && (
-                    <>
-                      <span>•</span>
-                      <span className="flex items-center gap-1 font-semibold text-slate-700">
-                        <Truck className="h-3.5 w-3.5 text-slate-500" />
-                        <span>{rateSheet.supplier.name}</span>
-                      </span>
-                    </>
+                    <span className="inline-flex items-center gap-1 font-semibold text-slate-700 before:content-['•'] before:mr-1 before:text-slate-300">
+                      <Truck className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                      <span className="break-words">{rateSheet.supplier.name}</span>
+                    </span>
                   )}
                 </div>
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2 pt-1 lg:pt-0 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -334,26 +362,26 @@ export default function RateSheetDetailPage() {
         </div>
 
         {/* Pricing Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
             <span className="text-[11px] uppercase font-bold text-slate-400">Primary Purchase Rate</span>
-            <h3 className="text-2xl font-black text-emerald-700">
+            <h3 className="text-xl sm:text-2xl font-black text-emerald-700">
               {formatCurrency(Number(rateSheet.costPrice))}
               <span className="text-xs text-slate-500 font-normal"> / room / night</span>
             </h3>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
             <span className="text-[11px] uppercase font-bold text-slate-400">Resolution Priority</span>
-            <h3 className="text-2xl font-black text-slate-900 font-mono">
+            <h3 className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
               Priority: {rateSheet.priority}
             </h3>
             <p className="text-[11px] text-slate-500">Higher priority overrides generic dates</p>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
             <span className="text-[11px] uppercase font-bold text-slate-400">Supplier Tax (%)</span>
-            <h3 className="text-2xl font-black text-slate-900">
+            <h3 className="text-xl sm:text-2xl font-black text-slate-900">
               {Number(rateSheet.taxPercentage || 0)}%
             </h3>
             <p className="text-[11px] text-slate-500">Inclusive supplier-side tax</p>

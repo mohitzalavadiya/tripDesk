@@ -4,6 +4,8 @@ import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useFormik } from "formik";
+import * as Yup from "yup";
+import { isValidPhoneNumber } from "@/lib/validation/field-validators";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import {
   tripClient,
@@ -442,6 +444,30 @@ export default function TripDetailPage() {
     }
   };
 
+  // Edit Trip Validation Schema
+  const editTripValidationSchema = Yup.object().shape({
+    title: Yup.string()
+      .trim()
+      .required("Trip title is required")
+      .min(3, "Trip title must be at least 3 characters")
+      .max(150, "Trip title cannot exceed 150 characters"),
+    startDate: Yup.string()
+      .required("Start date is required")
+      .test("valid-start", "Please enter a valid Start Date", (v) => !v || !isNaN(new Date(v).getTime())),
+    endDate: Yup.string()
+      .required("End date is required")
+      .test("valid-end", "Please enter a valid End Date", (v) => !v || !isNaN(new Date(v).getTime()))
+      .test("end-after-start", "End date cannot be before start date", function (value) {
+        const { startDate } = this.parent;
+        if (!value || !startDate) return true;
+        const start = new Date(startDate);
+        const end = new Date(value);
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) return true;
+        return end >= start;
+      }),
+    notes: Yup.string().max(2000, "Notes cannot exceed 2000 characters"),
+  });
+
   // Edit Trip Formik
   const editTripFormik = useFormik({
     initialValues: {
@@ -452,6 +478,7 @@ export default function TripDetailPage() {
       destinationIds: tripDestinations.map((td) => td.destinationId),
       notes: trip?.notes || "",
     },
+    validationSchema: editTripValidationSchema,
     enableReinitialize: true,
     onSubmit: async (values) => {
       try {
@@ -513,7 +540,14 @@ export default function TripDetailPage() {
 
   const handleSaveAddTraveler = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!travelerName.trim()) return;
+    if (!travelerName.trim()) {
+      toast.error("Traveler name is required.");
+      return;
+    }
+    if (travelerPhone.trim() && !isValidPhoneNumber(travelerPhone.trim())) {
+      toast.error("Please enter a valid phone number (7-15 digits, no letters).");
+      return;
+    }
 
     try {
       setTravelerSaving(true);
@@ -547,7 +581,14 @@ export default function TripDetailPage() {
 
   const handleSaveEditTraveler = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTravelerId || !travelerName.trim()) return;
+    if (!selectedTravelerId || !travelerName.trim()) {
+      toast.error("Traveler name is required.");
+      return;
+    }
+    if (travelerPhone.trim() && !isValidPhoneNumber(travelerPhone.trim())) {
+      toast.error("Please enter a valid phone number (7-15 digits, no letters).");
+      return;
+    }
 
     try {
       setTravelerSaving(true);

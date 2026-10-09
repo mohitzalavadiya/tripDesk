@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { VehiclePricingType } from "@prisma/client";
+import { isValidPhoneNumber } from "./field-validators";
 
 /**
  * Zod validation schema for creating a Trip-Vehicle assignment.
@@ -53,7 +54,8 @@ export const createTripVehicleSchema = z
       .max(30, "Driver phone must be at most 30 characters.")
       .optional()
       .nullable()
-      .or(z.literal("")),
+      .or(z.literal(""))
+      .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid driver phone number."),
     pricingType: z
       .nativeEnum(VehiclePricingType)
       .optional()
@@ -154,7 +156,8 @@ export const updateTripVehicleSchema = z
       .max(30, "Driver phone must be at most 30 characters.")
       .optional()
       .nullable()
-      .or(z.literal("")),
+      .or(z.literal(""))
+      .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid driver phone number."),
     pricingType: z.nativeEnum(VehiclePricingType).optional(),
     ratePerKm: z.coerce
       .number()

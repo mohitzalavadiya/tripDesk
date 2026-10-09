@@ -4,6 +4,8 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useFormik } from "formik";
 import * as Yup from "yup";
+import { integerYup, phoneYup } from "@/lib/validation-schemas";
+import { isValidDecimal, isValidPhoneNumber } from "@/lib/validation/field-validators";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
@@ -60,8 +62,9 @@ const createEnquiryValidationSchema = Yup.object().shape({
       schema
         .trim()
         .required("Customer phone number is required.")
-        .min(3, "Phone number must have at least 3 characters.")
-        .max(30, "Phone number must be at most 30 characters."),
+        .test("phone-valid", "Phone number must contain 7-15 digits and no letters", (val) =>
+          isValidPhoneNumber(val)
+        ),
     otherwise: (schema) => schema.notRequired(),
   }),
   newCustomerEmail: Yup.string()
@@ -87,26 +90,15 @@ const createEnquiryValidationSchema = Yup.object().shape({
       return end >= start;
     }
   ),
-  adults: Yup.number()
-    .typeError("Adults count must be a number.")
-    .integer("Adults must be an integer.")
-    .min(1, "At least 1 adult is required.")
-    .required("At least 1 adult is required."),
-  children: Yup.number()
-    .typeError("Children count must be a number.")
-    .integer("Children must be an integer.")
-    .min(0, "Children count cannot be negative."),
-  infants: Yup.number()
-    .typeError("Infants count must be a number.")
-    .integer("Infants must be an integer.")
-    .min(0, "Infants count cannot be negative."),
+  adults: integerYup({ min: 1, required: true, label: "Adults count" }),
+  children: integerYup({ min: 0, required: false, label: "Children count" }).default(0),
+  infants: integerYup({ min: 0, required: false, label: "Infants count" }).default(0),
   budget: Yup.string().test(
     "valid-budget",
     "Budget must be a valid positive number.",
     (val) => {
       if (!val || val.trim() === "") return true;
-      const num = Number(val);
-      return !isNaN(num) && num >= 0;
+      return isValidDecimal(val, { min: 0.01 });
     }
   ),
   budgetType: Yup.string().oneOf(["total", "per_person"]),

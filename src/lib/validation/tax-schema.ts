@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TaxMode, GstTreatment } from "@prisma/client";
+import { isLockedGstRate } from "./field-validators";
 
 export const updateAgencyTaxProfileSchema = z.object({
   isGstRegistered: z.boolean().default(false),
@@ -39,7 +40,13 @@ export const updateAgencyTaxProfileSchema = z.object({
     .nullable()
     .transform((val) => (val === "" ? null : val)),
   defaultTaxMode: z.nativeEnum(TaxMode).default(TaxMode.EXCLUSIVE),
-  defaultGstRate: z.coerce.number().min(0, "Tax rate cannot be negative").max(100, "Tax rate cannot exceed 100%").default(0),
+  defaultGstRate: z.coerce
+    .number()
+    .refine(
+      (rate) => isLockedGstRate(rate),
+      "Tax rate must be one of the locked GST slabs: 0%, 5%, 12%, 18%, or 28%"
+    )
+    .default(0),
   defaultGstTreatment: z.nativeEnum(GstTreatment).default(GstTreatment.INTRA_STATE),
 });
 

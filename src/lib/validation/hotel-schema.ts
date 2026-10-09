@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidPhoneNumber } from "./field-validators";
 
 /**
  * Zod validation schema for creating a new Hotel master record.
@@ -54,7 +55,8 @@ export const createHotelSchema = z.object({
     .max(30, "Phone number must be at most 30 characters.")
     .optional()
     .nullable()
-    .or(z.literal("")),
+    .or(z.literal(""))
+    .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid contact phone number."),
   email: z
     .string()
     .trim()
@@ -140,7 +142,8 @@ export const updateHotelSchema = z
       .max(30, "Phone number must be at most 30 characters.")
       .optional()
       .nullable()
-      .or(z.literal("")),
+      .or(z.literal(""))
+      .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid contact phone number."),
     email: z
       .string()
       .trim()
