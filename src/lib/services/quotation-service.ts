@@ -2777,7 +2777,7 @@ export const quotationService = {
       type: "QUOTATION_ACCEPTED",
       title: "Quotation Accepted",
       message: `Quotation #${quotation.quotationNumber} (${quotation.title}) was accepted by the client.`,
-      linkUrl: `/quotations/${quotation.id}`,
+      linkUrl: `/trips/${quotation.tripId}/quotation`,
       metadata: {
         quotationId: quotation.id,
         quotationNumber: quotation.quotationNumber,
@@ -2832,7 +2832,7 @@ export const quotationService = {
       type: "QUOTATION_CHANGE_REQUESTED",
       title: "Quotation Revision Requested",
       message: `Client requested changes for Quotation #${quotation.quotationNumber}: "${feedbackMsg.slice(0, 100)}"`,
-      linkUrl: `/quotations/${quotation.id}`,
+      linkUrl: `/trips/${quotation.tripId}/quotation`,
       metadata: {
         quotationId: quotation.id,
         quotationNumber: quotation.quotationNumber,

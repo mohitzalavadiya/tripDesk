@@ -106,7 +106,7 @@ export function AddOtherCostModal({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base font-bold">
             <Receipt className="h-4 w-4 text-indigo-600" />
@@ -146,7 +146,7 @@ export function AddOtherCostModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="amount" className="text-xs font-semibold">
                 Amount (₹) <span className="text-rose-500">*</span>
@@ -191,12 +191,12 @@ export function AddOtherCostModal({
             />
           </div>
 
-          <DialogFooter className="pt-2">
+          <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="text-xs cursor-pointer"
+              className="text-xs cursor-pointer w-full sm:w-auto"
               onClick={() => onOpenChange(false)}
             >
               Cancel
@@ -205,7 +205,7 @@ export function AddOtherCostModal({
               type="submit"
               size="sm"
               disabled={loading}
-              className="text-xs bg-slate-900 hover:bg-slate-800 text-white font-bold cursor-pointer"
+              className="text-xs bg-slate-900 hover:bg-slate-800 text-white font-bold cursor-pointer w-full sm:w-auto"
             >
               {loading ? (
                 <>

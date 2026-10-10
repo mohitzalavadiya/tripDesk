@@ -1661,8 +1661,15 @@ export default function TripOperationsDetailPage() {
       {isRecordPaymentOpen && selectedPayableForPayment && (
         <RecordSupplierPaymentDialog
           open={isRecordPaymentOpen}
-          onOpenChange={setIsRecordPaymentOpen}
+          onOpenChange={(open) => {
+            setIsRecordPaymentOpen(open);
+            if (!open) {
+              setSelectedPayableForPayment(null);
+            }
+          }}
           defaultPayableId={selectedPayableForPayment.id}
+          payable={selectedPayableForPayment}
+          isPayableLocked={true}
           onSuccess={() => {
             fetchOperationData();
           }}

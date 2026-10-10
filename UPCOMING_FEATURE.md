@@ -84,20 +84,17 @@ responsive 320 screen
 favicon icon
 email verification for login
 seperate database for prod and local
+forgot password
+RLS disabled in public error in staging
+in numnber field we can not add alphabetic value
 
 **TODO**
 
-RLS disabled in public error in staging
-
-forgot password
+Test hotel payable case in opration page
 
 scroll
 
 404 error
-
-
-
-in numnber field we can not add alphabetic value
 
 
 email and whatsapp send

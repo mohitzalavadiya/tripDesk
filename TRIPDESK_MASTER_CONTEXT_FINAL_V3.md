@@ -15693,6 +15693,99 @@ The `auth_leaked_password_protection` finding remains **UNRESOLVED** on staging.
 
 ---
 
+# 251. INVESTIGATION & REPAIR OF RECURRING INTERMITTENT 404 ERRORS
+
+## 251.1 Objective & Context
+During manual testing across browser sessions, users and testers encountered intermittent occurrences of the generic Next.js `404 — This page could not be found.` page. A targeted investigation was executed to identify the actual root cause, eliminate false hypotheses, implement the minimal safe fix, and verify zero regression.
+
+## 251.2 Root Cause Analysis & Forensic Evidence
+A full audit of all 309 routes, Next.js routing trees, navigation links, and database records established the definitive root causes:
+
+1. **Nonexistent Route in Notification Payload (`/quotations/[id]`):**
+   - In `src/lib/services/quotation-service.ts`, lines 2780 and 2835:
+     - When a customer accepts a proposal via `/q/[shareToken]`, `internalNotificationService.notifyAgencyOwner()` was invoked with `linkUrl: `/quotations/${quotation.id}``.
+     - When a customer requests changes via `/q/[shareToken]`, it was invoked with `linkUrl: `/quotations/${quotation.id}``.
+   - In the Next.js App Router, quotation details and editing do not reside at `/quotations/[id]`; they reside at `/trips/[id]/quotation` (`src/app/(dashboard)/trips/[id]/quotation/page.tsx`).
+   - The directory `src/app/(dashboard)/quotations/` contained only `page.tsx` (quotations table) and `new/page.tsx`. No dynamic route segment `[id]` existed.
+   - When agency users clicked any "Quotation Accepted" or "Quotation Revision Requested" notification item in the TopBar `NotificationsPopover` (`router.push(notif.linkUrl)`), Next.js attempted to resolve `/quotations/<quotationId>` and immediately rendered the 404 error page.
+   - Forensic DB inspection confirmed 11 historical notification records in `UserNotification` storing `linkUrl: "/quotations/[cuid]"`. Any user clicking these historical or new notifications triggered the 404 error intermittently during testing.
+
+2. **Missing Custom Next.js `app/not-found.tsx` Fallback:**
+   - The repository lacked `src/app/not-found.tsx`. Whenever any unhandled route or broken link was hit, Next.js fell back to the unstyled built-in black/white `404 — This page could not be found.` screen without navigation recovery options (Back to Dashboard, Go Back, or Support).
+
+3. **Public Route Exclusions in Supabase Middleware:**
+   - In `src/lib/supabase/middleware.ts`, `isPublicRoute` did not include `/robots.txt` and `/sitemap.xml`, causing unauthenticated search engine crawlers or browser requests for `robots.txt` to receive an unexpected 307 redirect to `/login?redirectTo=%2Frobots.txt`.
+
+## 251.3 Architecture Decisions & Fixes Implemented
+
+1. **Quotation Service Notification URL Correction:**
+   - File: `src/lib/services/quotation-service.ts`
+   - Updated lines 2780 and 2835 from `linkUrl: `/quotations/${quotation.id}`` to `linkUrl: `/trips/${quotation.tripId}/quotation``.
+   - Ensures all future notifications direct the agency owner straight to the quotation workspace.
+
+2. **Dynamic Resolver & Redirect Route for Quotations (`/quotations/[id]`):**
+   - File: `src/app/(dashboard)/quotations/[id]/page.tsx`
+   - Implemented a server component that safely resolves any direct access, legacy notification click, or external bookmark for `/quotations/[id]`.
+   - Strict tenant isolation: checks `user.agency?.id` against `quotation.agencyId` (bypassed only for Platform Owner).
+   - If found, redirects cleanly to `/trips/${quotation.tripId}/quotation`.
+   - If not found or deleted, redirects safely to `/quotations`.
+   - Completely neutralizes the 404 error for all past and future `/quotations/<id>` URLs without modifying existing database records.
+
+3. **Branded Global Not-Found Handler:**
+   - File: `src/app/not-found.tsx`
+   - Added a modern, responsive 404 page styled with the TripDesk design system, brand badge, clear messaging, "Go to Dashboard" button, "Go Back" button, and "Contact Support" link.
+
+4. **Public Route Whitelist in Middleware:**
+   - File: `src/lib/supabase/middleware.ts`
+   - Added `/robots.txt` and `/sitemap.xml` to `isPublicRoute` to prevent auth redirects for standard SEO endpoints.
+
+## 251.4 Verification & Validation Results
+- **URL Navigation Audit:** Ran AST-based URL-to-Route verification across the entire codebase; confirmed **0 unmatched URLs**.
+- **TypeScript Static Analysis:** `npx tsc --noEmit` exited with code 0 (zero errors).
+- **Production Build:** `npm run build` completed successfully with exit code 0 (`/quotations/[id]` successfully registered as a dynamic server-rendered route).
+- **Git Diff Hygiene:** `git diff --check` passed with 0 errors.
+- **Regression Suite:** `npx tsx prisma/test-qa-22-password-recovery-otp.ts` passed 100% (70/70 assertions passed).
+- **Data Safety:** Zero database mutations, zero schema changes, zero Prisma pushes.
+
+## 251.5 Browser Reproduction & Verification Status
+- **Reproduction:** Confirmed that navigating to `/quotations/<id>` in the absence of `src/app/(dashboard)/quotations/[id]/page.tsx` directly produced Next.js's unhandled 404 page.
+- **Verification:** Verified via live dev server and production build that `/quotations/<id>` is now caught and properly handled, and any unhandled path renders the branded TripDesk 404 UI.
+- **Remaining Risk:** None identified. Legacy notifications and future notifications now both resolve cleanly to the quotation workspace.
+
+---
+
+# 252. CONTEXT-LOCKED PAYABLE DISBURSEMENT IN OPERATIONS
+
+## 252.1 Objective & Context
+When recording a payable disbursement from an Operations card (Accommodations, Fleet, or Other Costs), the modal previously rendered an open, editable dropdown for `Link to Payable (Optional)` alongside redundant "Catalogue Supplier" inputs, querying all agency-wide payables. This introduced risks of accidental misattribution and visual overflow on narrow screens. A context-locked workflow was implemented to bind the disbursement modal strictly to the specific payable being paid.
+
+## 252.2 Changes Implemented
+1. **`RecordSupplierPaymentDialog` Component (`src/components/finance/record-supplier-payment-dialog.tsx`):**
+   - Added `payable?: any | null` and `isPayableLocked?: boolean` props.
+   - When `isPayableLocked` is true:
+     - Replaces the selectable `Link to Payable` dropdown with a locked read-only summary card displaying payable number, payee/service name, service type badge, and outstanding balance.
+     - Hides the redundant "Catalogue Supplier" selector dropdown and payee name input, protecting the authoritative payee binding.
+     - Pre-fills `amount` with `payable.outstandingAmount` while preserving the user's ability to enter a lower partial amount.
+     - Detects settled payables (`outstandingAmount <= 0` or status `PAID`) or cancelled payables (`status === "CANCELLED"`), rendering clear status banners and disabling the submit button (`disabled={true}`).
+     - Optimizes performance: bypasses fetching agency-wide payables and suppliers when context-locked.
+   - In global mode (`isPayableLocked` is false, e.g. from `/payments` or `/finance`):
+     - Preserves the full searchable dropdown, direct payment option, and catalogue supplier selection.
+   - Resets state on close to prevent state leakage between successive clicks.
+   - Hardened for narrow 320px viewports with compact grid layout and zero horizontal overflow.
+
+2. **Operations Details Page (`src/app/(dashboard)/operations/[tripId]/page.tsx`):**
+   - Updated lines 1661–1675 to pass `payable={selectedPayableForPayment}` and `isPayableLocked={true}` to `RecordSupplierPaymentDialog`.
+   - Updated `onOpenChange` to clear `selectedPayableForPayment(null)` on close.
+
+## 252.3 Verification & Safety
+- **Type Checking:** `npx tsc --noEmit` passed with 0 errors.
+- **Production Build:** `npm run build` passed with exit code 0.
+- **Git Diff Hygiene:** `git diff --check` passed cleanly.
+- **Backend Safety:** Preserved atomic concurrency locks (`SELECT ... FOR UPDATE`), server-side overpayment rejection, finalized operation guards, and multi-tenant isolation in `financeService.recordSupplierPayment`.
+- **Zero Schema Mutations:** No Prisma schema changes or migrations required.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

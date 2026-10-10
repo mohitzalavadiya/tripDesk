@@ -125,7 +125,7 @@ export function EditPayableDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">
             Edit Payable Obligation
@@ -148,7 +148,7 @@ export function EditPayableDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Payee Name */}
             <div className="space-y-1.5">
               <Label htmlFor="editPayeeName" className="text-xs">
@@ -196,7 +196,7 @@ export function EditPayableDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Current Payable Amount */}
             <div className="space-y-1.5">
               <Label htmlFor="editAmount" className="text-xs">
@@ -249,12 +249,12 @@ export function EditPayableDialog({
             />
           </div>
 
-          <DialogFooter className="pt-2">
+          <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="text-xs"
+              className="text-xs w-full sm:w-auto"
               onClick={() => onOpenChange(false)}
             >
               Cancel
@@ -263,7 +263,7 @@ export function EditPayableDialog({
               type="submit"
               size="sm"
               disabled={loading}
-              className="bg-indigo-600 hover:bg-indigo-700 text-xs"
+              className="bg-indigo-600 hover:bg-indigo-700 text-xs w-full sm:w-auto"
             >
               {loading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
               Save Changes

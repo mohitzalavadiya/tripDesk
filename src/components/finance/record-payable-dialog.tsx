@@ -149,26 +149,26 @@ export function RecordPayableDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-base font-semibold">
+      <DialogContent className="w-[calc(100%-1rem)] max-w-lg p-3 sm:p-5 gap-2.5 sm:gap-4 max-h-[calc(100dvh-1.5rem)] overflow-y-auto">
+        <DialogHeader className="gap-0.5 pb-0">
+          <DialogTitle className="text-sm sm:text-base font-semibold">
             Create Manual Payable
           </DialogTitle>
-          <DialogDescription className="text-xs">
-            Log an operational financial obligation owed to a hotel, vendor, guide, or service provider.
+          <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground line-clamp-1 sm:line-clamp-none">
+            Log an operational financial obligation owed to a vendor or provider.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+        <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-3 pt-1">
           {/* Link Type Selector */}
           {!defaultTripId && !defaultBookingId && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Attach To *</Label>
-              <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-[11px] font-medium leading-none">Attach To *</Label>
+              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => setLinkType("TRIP")}
-                  className={`py-2 px-3 text-xs font-semibold rounded-lg border text-center transition-all ${
+                  className={`py-1.5 px-1.5 sm:px-2 text-[11px] sm:text-xs font-semibold rounded-lg border text-center truncate transition-all ${
                     linkType === "TRIP"
                       ? "bg-indigo-50 border-indigo-300 text-indigo-700 ring-2 ring-indigo-500/10"
                       : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -179,7 +179,7 @@ export function RecordPayableDialog({
                 <button
                   type="button"
                   onClick={() => setLinkType("BOOKING")}
-                  className={`py-2 px-3 text-xs font-semibold rounded-lg border text-center transition-all ${
+                  className={`py-1.5 px-1.5 sm:px-2 text-[11px] sm:text-xs font-semibold rounded-lg border text-center truncate transition-all ${
                     linkType === "BOOKING"
                       ? "bg-indigo-50 border-indigo-300 text-indigo-700 ring-2 ring-indigo-500/10"
                       : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -193,11 +193,19 @@ export function RecordPayableDialog({
 
           {/* Context Selector */}
           {linkType === "TRIP" && !defaultTripId && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Select Trip *</Label>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-medium leading-none">Select Trip *</Label>
               <Select value={tripId} onValueChange={(val) => setTripId(val || "")}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Choose a trip..." />
+                <SelectTrigger className="h-8 text-xs px-2.5">
+                  <SelectValue placeholder="Choose a trip...">
+                    {(val: string | null) => {
+                      if (!val) return "Choose a trip...";
+                      const t = trips.find((item) => item.id === val);
+                      return t
+                        ? `${t.tripNumber || "TRIP"} — ${t.title || "Untitled"} (${t.customer?.name || "Client"})`
+                        : "Choose a trip...";
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="max-h-56">
                   {trips.map((t) => (
@@ -211,11 +219,19 @@ export function RecordPayableDialog({
           )}
 
           {linkType === "BOOKING" && !defaultBookingId && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Select Booking *</Label>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-medium leading-none">Select Booking *</Label>
               <Select value={bookingId} onValueChange={(val) => setBookingId(val || "")}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Choose a confirmed booking..." />
+                <SelectTrigger className="h-8 text-xs px-2.5">
+                  <SelectValue placeholder="Choose a confirmed booking...">
+                    {(val: string | null) => {
+                      if (!val) return "Choose a confirmed booking...";
+                      const b = bookings.find((item) => item.id === val);
+                      return b
+                        ? `#${b.bookingNumber} — ${b.customer?.name || "Client"} (${b.trip?.title || "Trip"})`
+                        : "Choose a confirmed booking...";
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="max-h-56">
                   {bookings.map((b) => (
@@ -228,30 +244,47 @@ export function RecordPayableDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
             {/* Payee Name */}
-            <div className="space-y-1.5">
-              <Label htmlFor="payeeName" className="text-xs">
-                Payee / Vendor Name *
+            <div className="space-y-1 min-w-0">
+              <Label htmlFor="payeeName" className="text-[11px] font-medium leading-none truncate block">
+                Payee / Vendor *
               </Label>
               <Input
                 id="payeeName"
-                placeholder="e.g. Rajesh Kumar, Heritage Hotel"
+                placeholder="e.g. Heritage Hotel"
                 value={payeeName}
                 onChange={(e) => setPayeeName(e.target.value)}
-                className="h-9 text-xs"
+                className="h-8 text-xs px-2 min-w-0"
                 required
               />
             </div>
 
             {/* Service Type */}
-            <div className="space-y-1.5">
-              <Label htmlFor="serviceType" className="text-xs">
-                Service Category
+            <div className="space-y-1 min-w-0">
+              <Label htmlFor="serviceType" className="text-[11px] font-medium leading-none truncate block">
+                Category
               </Label>
               <Select value={serviceType} onValueChange={(val) => setServiceType(val || "MANUAL")}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue />
+                <SelectTrigger className="h-8 text-xs px-2 min-w-0">
+                  <SelectValue>
+                    {(val: string | null) => {
+                      switch (val) {
+                        case "MANUAL":
+                          return "General Provider";
+                        case "HOTEL":
+                          return "Hotel / Stay";
+                        case "VEHICLE":
+                          return "Vehicle / Fleet";
+                        case "GUIDE":
+                          return "Local Guide";
+                        case "OTHER":
+                          return "Other Operational";
+                        default:
+                          return val || "General Provider";
+                      }
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="MANUAL" className="text-xs">General Provider</SelectItem>
@@ -265,8 +298,8 @@ export function RecordPayableDialog({
           </div>
 
           {/* Description */}
-          <div className="space-y-1.5">
-            <Label htmlFor="description" className="text-xs">
+          <div className="space-y-1 min-w-0">
+            <Label htmlFor="description" className="text-[11px] font-medium leading-none truncate block">
               Obligation Description *
             </Label>
             <Input
@@ -274,16 +307,16 @@ export function RecordPayableDialog({
               placeholder="e.g. 2 Days local sightseeing guide in Udaipur"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="h-9 text-xs"
+              className="h-8 text-xs px-2 min-w-0"
               required
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
             {/* Amount */}
-            <div className="space-y-1.5">
-              <Label htmlFor="amount" className="text-xs">
-                Payable Amount (₹) *
+            <div className="space-y-1 min-w-0">
+              <Label htmlFor="amount" className="text-[11px] font-medium leading-none truncate block">
+                Amount (₹) *
               </Label>
               <Input
                 id="amount"
@@ -293,47 +326,46 @@ export function RecordPayableDialog({
                 placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="h-9 text-xs font-medium"
+                className="h-8 text-xs px-2 min-w-0 font-medium"
                 required
               />
             </div>
 
             {/* Due Date */}
-            <div className="space-y-1.5">
-              <Label htmlFor="dueDate" className="text-xs">
-                Payment Due Date
+            <div className="space-y-1 min-w-0">
+              <Label htmlFor="dueDate" className="text-[11px] font-medium leading-none truncate block">
+                Due Date
               </Label>
               <Input
                 id="dueDate"
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="h-9 text-xs"
+                className="h-8 text-xs px-2 min-w-0"
               />
             </div>
           </div>
 
           {/* Notes */}
-          <div className="space-y-1.5">
-            <Label htmlFor="notes" className="text-xs">
+          <div className="space-y-1 min-w-0">
+            <Label htmlFor="notes" className="text-[11px] font-medium leading-none truncate block">
               Internal Remarks (Optional)
             </Label>
-            <Textarea
+            <Input
               id="notes"
-              placeholder="Bank details, payment terms, or contact person details..."
+              placeholder="Bank details, terms, or contact person..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="text-xs resize-none"
-              rows={2}
+              className="h-8 text-xs px-2 min-w-0"
             />
           </div>
 
-          <DialogFooter className="pt-2">
+          <DialogFooter className="pt-2 flex flex-row gap-2 border-t mt-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="text-xs"
+              className="text-xs h-8 flex-1"
               onClick={() => onOpenChange(false)}
             >
               Cancel
@@ -342,10 +374,10 @@ export function RecordPayableDialog({
               type="submit"
               size="sm"
               disabled={loading || loadingContext}
-              className="bg-indigo-600 hover:bg-indigo-700 text-xs"
+              className="bg-indigo-600 hover:bg-indigo-700 text-xs h-8 flex-1"
             >
               {loading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-              Create Payable
+              Create
             </Button>
           </DialogFooter>
         </form>

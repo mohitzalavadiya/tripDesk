@@ -132,20 +132,20 @@ export function RecordPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-base font-semibold">
+      <DialogContent className="w-[calc(100%-1rem)] max-w-lg p-3.5 sm:p-5 gap-2.5 sm:gap-4 max-h-[calc(100dvh-1.5rem)] overflow-y-auto">
+        <DialogHeader className="gap-0.5 pb-0">
+          <DialogTitle className="text-sm sm:text-base font-semibold">
             Record Customer Payment
           </DialogTitle>
-          <DialogDescription className="text-xs">
+          <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground line-clamp-1 sm:line-clamp-none">
             Log an incoming traveler payment with automated booking balance calculation.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+        <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-3 pt-1">
           {/* Select Booking */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Select Booking *</Label>
+          <div className="space-y-1">
+            <Label className="text-[11px] sm:text-xs font-semibold">Select Booking *</Label>
             <Select
               value={bookingId}
               onValueChange={(val) => {
@@ -153,7 +153,7 @@ export function RecordPaymentDialog({
               }}
               disabled={loadingBookings}
             >
-              <SelectTrigger className="text-xs h-9">
+              <SelectTrigger className="text-xs h-8.5 px-2.5">
                 <SelectValue placeholder={loadingBookings ? "Loading bookings..." : "Choose Booking"}>
                   {(val: string | null) => {
                     if (!val) return undefined;
@@ -174,26 +174,26 @@ export function RecordPaymentDialog({
 
           {/* Selected Booking Info Box */}
           {selectedBooking && (
-            <div className="p-3 rounded-lg bg-muted/40 border border-border text-xs space-y-1">
+            <div className="p-2.5 rounded-lg bg-muted/40 border border-border text-xs space-y-1">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Value:</span>
-                <span className="font-semibold">{formatCurrency(Number(selectedBooking.totalAmount))}</span>
+                <span className="text-muted-foreground text-[11px]">Total Value:</span>
+                <span className="font-semibold text-[11px]">{formatCurrency(Number(selectedBooking.totalAmount))}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Already Paid:</span>
-                <span className="text-emerald-600 font-semibold">{formatCurrency(Number(selectedBooking.paidAmount))}</span>
+                <span className="text-muted-foreground text-[11px]">Already Paid:</span>
+                <span className="text-emerald-600 font-semibold text-[11px]">{formatCurrency(Number(selectedBooking.paidAmount))}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Remaining Balance:</span>
-                <span className="text-amber-600 font-bold">{formatCurrency(Number(selectedBooking.balanceAmount))}</span>
+                <span className="text-muted-foreground text-[11px]">Remaining Balance:</span>
+                <span className="text-amber-600 font-bold text-[11px]">{formatCurrency(Number(selectedBooking.balanceAmount))}</span>
               </div>
             </div>
           )}
 
           {/* Amount & Payment Type */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Amount (₹) *</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+            <div className="space-y-1">
+              <Label className="text-[11px] sm:text-xs font-semibold">Amount (₹) *</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -201,20 +201,20 @@ export function RecordPaymentDialog({
                 placeholder="e.g. 25000"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="text-xs h-9"
+                className="text-xs h-8.5"
                 required
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Payment Type *</Label>
+            <div className="space-y-1">
+              <Label className="text-[11px] sm:text-xs font-semibold">Payment Type *</Label>
               <Select
                 value={paymentType}
                 onValueChange={(val) => {
                   if (val) setPaymentType(val as PaymentType);
                 }}
               >
-                <SelectTrigger className="text-xs h-9">
+                <SelectTrigger className="text-xs h-8.5 px-2.5">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -228,16 +228,16 @@ export function RecordPaymentDialog({
           </div>
 
           {/* Payment Method & Date */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Payment Method *</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+            <div className="space-y-1">
+              <Label className="text-[11px] sm:text-xs font-semibold">Payment Method *</Label>
               <Select
                 value={paymentMethod}
                 onValueChange={(val) => {
                   if (val) setPaymentMethod(val as PaymentMethod);
                 }}
               >
-                <SelectTrigger className="text-xs h-9">
+                <SelectTrigger className="text-xs h-8.5 px-2.5">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -251,63 +251,63 @@ export function RecordPaymentDialog({
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Payment Date *</Label>
+            <div className="space-y-1">
+              <Label className="text-[11px] sm:text-xs font-semibold">Payment Date *</Label>
               <Input
                 type="date"
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
-                className="text-xs h-9"
+                className="text-xs h-8.5"
                 required
               />
             </div>
           </div>
 
           {/* Reference & Received By */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Reference / UTR #</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+            <div className="space-y-1">
+              <Label className="text-[11px] sm:text-xs font-semibold">Reference / UTR #</Label>
               <Input
                 placeholder="e.g. UPI/1234567890"
                 value={referenceNumber}
                 onChange={(e) => setReferenceNumber(e.target.value)}
-                className="text-xs h-9"
+                className="text-xs h-8.5"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Received By (Staff)</Label>
+            <div className="space-y-1">
+              <Label className="text-[11px] sm:text-xs font-semibold">Received By (Staff)</Label>
               <Input
                 placeholder="e.g. Mohit Zalavadiya"
                 value={receivedBy}
                 onChange={(e) => setReceivedBy(e.target.value)}
-                className="text-xs h-9"
+                className="text-xs h-8.5"
               />
             </div>
           </div>
 
           {/* Notes */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Notes / Remarks</Label>
+          <div className="space-y-1">
+            <Label className="text-[11px] sm:text-xs font-semibold">Notes / Remarks</Label>
             <Textarea
               placeholder="Add payment notes or receipts comments..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="text-xs min-h-[60px]"
+              className="text-xs min-h-[50px] py-1.5"
             />
           </div>
 
-          <DialogFooter className="pt-2">
+          <DialogFooter className="pt-2 flex flex-row gap-2 border-t mt-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="text-xs"
+              className="text-xs h-8.5 flex-1"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button type="submit" size="sm" className="text-xs" disabled={loading}>
+            <Button type="submit" size="sm" className="text-xs h-8.5 flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={loading}>
               {loading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
               Save Payment
             </Button>

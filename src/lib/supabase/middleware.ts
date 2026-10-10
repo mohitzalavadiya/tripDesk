@@ -45,6 +45,8 @@ export async function updateSession(request: NextRequest) {
   // Define public routes that unauthenticated users can access
   const isPublicRoute =
     pathname === "/" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
     pathname === "/api/health" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/signup") ||
