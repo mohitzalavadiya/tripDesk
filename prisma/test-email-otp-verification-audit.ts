@@ -6,9 +6,12 @@ import {
   verifyEmailOtpAction,
   resendVerificationEmailAction,
   classifyLoginError,
-  classifyResendError,
   classifyOtpVerifyError,
 } from "../src/actions/auth-actions";
+import {
+  classifyResendError,
+  sendVerificationEmail,
+} from "../src/lib/services/verification-service";
 import { provisionOnboardedAgencyOwner } from "../src/lib/services/onboarding-service";
 import { KNOWN_PLATFORM_OWNER_EMAILS } from "../src/lib/auth/platform-owner-guard";
 
@@ -439,14 +442,33 @@ async function runEmailOtpVerificationAudit() {
     assert(!!reLinkedUserInDb, "Database user ID successfully updated to active Supabase Auth user ID");
     assert(reLinkedUserInDb?.agencyId === recoveredUser?.agency?.id, "Original agency preserved across UUID re-linking");
 
-    // Resend for already verified email: must return alreadyVerified guard and NOT falsely promise delivery
-    const fdAlreadyVerified = new FormData();
-    fdAlreadyVerified.append("email", recoveryEmail);
-    const resendAlreadyVerifiedRes = await resendVerificationEmailAction({}, fdAlreadyVerified);
-    assert(resendAlreadyVerifiedRes.alreadyVerified === true, "resendVerificationEmailAction flags already verified account");
+    // Resend for already verified email: internal service must return alreadyVerified guard and NOT falsely promise delivery
+    const mockAdminClientForVerifiedResend = {
+      auth: {
+        admin: {
+          listUsers: async () => ({
+            data: {
+              users: [
+                {
+                  id: reCreatedUserId,
+                  email: recoveryEmail,
+                  email_confirmed_at: new Date().toISOString(),
+                },
+              ],
+              nextPage: null,
+            },
+            error: null,
+          }),
+        },
+      },
+    };
+    const resendAlreadyVerifiedRes = await sendVerificationEmail(recoveryEmail, {
+      adminClient: mockAdminClientForVerifiedResend,
+    });
+    assert(resendAlreadyVerifiedRes.alreadyVerified === true, "sendVerificationEmail flags already verified account");
     assert(
       resendAlreadyVerifiedRes.error?.includes("already verified") ?? false,
-      "resendVerificationEmailAction returns actionable already verified guidance"
+      "sendVerificationEmail returns actionable already verified guidance"
     );
 
     // -------------------------------------------------------------------------

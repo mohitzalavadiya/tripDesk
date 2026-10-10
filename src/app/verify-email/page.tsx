@@ -9,6 +9,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ShieldCheck, CheckCircle2, AlertCircle, ArrowLeft, RefreshCw, Send, ShieldAlert, KeyRound } from "lucide-react";
 
+const VERIFY_COOLDOWN_PREFIX = "tripdesk_verify_cooldown_";
+
+function getStoredVerifyCooldown(email: string): number {
+  if (typeof window === "undefined" || !email) return 0;
+  try {
+    const stored = sessionStorage.getItem(`${VERIFY_COOLDOWN_PREFIX}${email.trim().toLowerCase()}`);
+    if (!stored) return 0;
+    const timestamp = parseInt(stored, 10);
+    if (isNaN(timestamp)) return 0;
+    const elapsed = Math.floor((Date.now() - timestamp) / 1000);
+    const remaining = 60 - elapsed;
+    return remaining > 0 ? remaining : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function setStoredVerifyCooldown(email: string): void {
+  if (typeof window === "undefined" || !email) return;
+  try {
+    sessionStorage.setItem(`${VERIFY_COOLDOWN_PREFIX}${email.trim().toLowerCase()}`, Date.now().toString());
+  } catch {
+    // Non-blocking in storage-disabled contexts
+  }
+}
+
 function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,12 +50,25 @@ function VerifyEmailContent() {
   const [resendState, resendFormAction, isResendPending] = useActionState(resendVerificationEmailAction, {});
   const [cooldown, setCooldown] = React.useState(0);
 
-  // Sync state if query param changes
+  // Sync state and stored cooldown if query param changes
   React.useEffect(() => {
     if (emailParam) {
       setEmail(emailParam);
+      const remaining = getStoredVerifyCooldown(emailParam);
+      if (remaining > 0) {
+        setCooldown(remaining);
+      }
     }
   }, [emailParam]);
+
+  React.useEffect(() => {
+    if (email) {
+      const remaining = getStoredVerifyCooldown(email);
+      if (remaining > 0) {
+        setCooldown(remaining);
+      }
+    }
+  }, [email]);
 
   // Navigate to login with verified flag upon successful OTP verification
   React.useEffect(() => {
@@ -38,12 +77,20 @@ function VerifyEmailContent() {
     }
   }, [otpState?.success, router]);
 
-  // Start 60-second cooldown on successful resend only if not already verified
+  // Start 60-second cooldown on successful resend or rate limit (if not already verified)
   React.useEffect(() => {
-    if (resendState?.success && !resendState?.alreadyVerified) {
+    if (resendState?.rateLimited) {
       setCooldown(60);
+      if (email) {
+        setStoredVerifyCooldown(email);
+      }
+    } else if (resendState?.success && !resendState?.alreadyVerified) {
+      setCooldown(60);
+      if (email) {
+        setStoredVerifyCooldown(email);
+      }
     }
-  }, [resendState?.success, resendState?.alreadyVerified]);
+  }, [resendState?.success, resendState?.rateLimited, resendState?.alreadyVerified, email]);
 
   // Handle countdown interval
   React.useEffect(() => {

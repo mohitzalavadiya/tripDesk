@@ -82,17 +82,23 @@ subscription model changes
 When any model openthat time main page scroll should not work. 
 responsive 320 screen
 favicon icon
+email verification for login
+seperate database for prod and local
 
 **TODO**
 
+RLS disabled in public error in staging
+
+forgot password
+
 scroll
 
+404 error
 
-need to add option for Hotel in trip
+
 
 in numnber field we can not add alphabetic value
 
-email verification for login
 
 email and whatsapp send
 
@@ -144,15 +150,10 @@ Production smoke test -->
 
 **ONHOLD**
 
-email and verification and OTP
+
+need to add option for Hotel in trip
 add scroll in table : when lots of data in table in this case add scroll in table not in whole page
 in database i can show password : in database table i want to show password every angency : 
-seperate database for prod and local
 what is change is for producation
 create a wireframe for understand flow of project
-after sign up don't redirect direact on dashboard. redireact on login page
 error msg change
-
-
-
-Enquiry page responsive UI need to check properly and manage.

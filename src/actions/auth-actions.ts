@@ -3,8 +3,14 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { provisionOnboardedAgencyOwner } from "@/lib/services/onboarding-service";
-import { getAdminClient } from "@/lib/supabase/admin";
 import prisma from "@/lib/prisma";
+
+import {
+  setRecoveryProofCookie,
+  getVerifiedRecoveryProof,
+  clearRecoveryProofCookie,
+} from "@/lib/auth/recovery-proof";
+import { sendVerificationEmail } from "@/lib/services/verification-service";
 
 export interface AuthActionResult {
   success?: boolean;
@@ -12,6 +18,8 @@ export interface AuthActionResult {
   unverified?: boolean;
   alreadyVerified?: boolean;
   email?: string;
+  verified?: boolean;
+  rateLimited?: boolean;
 }
 
 function getAuthCallbackUrl(): string {
@@ -253,7 +261,8 @@ export async function logoutAction() {
 }
 
 /**
- * Request password reset link via Supabase Auth.
+ * Request password reset 6-digit OTP via Supabase Auth.
+ * Returns a neutral success response to prevent account enumeration.
  */
 export async function requestPasswordResetAction(
   prevState: any,
@@ -265,18 +274,177 @@ export async function requestPasswordResetAction(
     return { error: "Please enter your registered email address." };
   }
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return { error: "Please enter a valid email address." };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email);
 
   if (error) {
-    return { error: error.message };
+    const isRateLimit =
+      (error as any)?.code === "over_request_rate_limit" ||
+      (error as any)?.code === "over_email_send_rate_limit" ||
+      error?.status === 429 ||
+      error?.message?.toLowerCase().includes("rate limit") ||
+      error?.message?.toLowerCase().includes("security purposes");
+
+    if (isRateLimit) {
+      return {
+        error:
+          "A recovery code was recently requested for this email. Please check your inbox or wait 60 seconds before requesting another code.",
+        rateLimited: true,
+        email,
+      };
+    }
+
+    // Operational logging for non-rate-limit errors without leaking account existence
+    console.warn("[requestPasswordResetAction] Supabase reset request notice:", error.message);
   }
 
-  return { success: true };
+  // Provide neutral response preventing email enumeration
+  return { success: true, email };
 }
 
 /**
- * Update user password after navigating from reset link.
+ * Verifies the 6-digit recovery OTP with Supabase Auth (type: 'recovery').
+ * Upon successful verification, writes a cryptographic recovery proof cookie
+ * to bind authorization to the active session and intended email.
+ */
+export async function verifyRecoveryOtpAction(
+  prevState: any,
+  formData: FormData
+): Promise<AuthActionResult> {
+  const email = (formData.get("email") as string)?.trim()?.toLowerCase();
+  const token = (formData.get("token") as string)?.trim();
+
+  if (!email) {
+    return { error: "Please enter your registered email address." };
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return { error: "Please enter a valid email address." };
+  }
+
+  if (!token) {
+    return { error: "Please enter the 6-digit verification code sent to your email." };
+  }
+
+  if (!/^\d{6}$/.test(token)) {
+    return { error: "Verification code must be exactly 6 numeric digits." };
+  }
+
+  const supabase = await createClient();
+  const { data, error: verifyError } = await supabase.auth.verifyOtp({
+    email,
+    token,
+    type: "recovery",
+  });
+
+  if (verifyError) {
+    return classifyOtpVerifyError(verifyError);
+  }
+
+  if (!data?.user || !data.user.email) {
+    return { error: "Unable to establish recovery session. Please request a new code." };
+  }
+
+  // Bind server-side recovery authorization proof to user ID and email
+  try {
+    await setRecoveryProofCookie(data.user.id, data.user.email);
+  } catch (proofErr: any) {
+    console.error("[verifyRecoveryOtpAction] Failed to establish recovery authorization proof.");
+    await supabase.auth.signOut();
+    return { error: "Unable to establish recovery authorization. Please try again." };
+  }
+
+  return { success: true, verified: true, email: data.user.email };
+}
+
+/**
+ * Resend password recovery 6-digit OTP code.
+ * Invokes resetPasswordForEmail with rate-limit and enumeration protection.
+ */
+export async function resendRecoveryOtpAction(
+  prevState: any,
+  formData: FormData
+): Promise<AuthActionResult> {
+  const email = (formData.get("email") as string)?.trim()?.toLowerCase();
+
+  if (!email) {
+    return { error: "Please enter your registered email address." };
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return { error: "Please enter a valid email address." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+
+  if (error) {
+    const isRateLimit =
+      (error as any)?.code === "over_request_rate_limit" ||
+      (error as any)?.code === "over_email_send_rate_limit" ||
+      error?.status === 429 ||
+      error?.message?.toLowerCase().includes("rate limit") ||
+      error?.message?.toLowerCase().includes("security purposes");
+
+    if (isRateLimit) {
+      return {
+        error:
+          "A recovery code was recently requested for this email. Please check your inbox or wait 60 seconds before requesting another code.",
+        rateLimited: true,
+        email,
+      };
+    }
+
+    console.warn("[resendRecoveryOtpAction] Supabase resend notice:", error.message);
+  }
+
+  return { success: true, email };
+}
+
+/**
+ * Inspects whether the active request has a verified recovery authorization session.
+ */
+export async function checkRecoveryStateAction(): Promise<AuthActionResult> {
+  try {
+    const recoveryProof = await getVerifiedRecoveryProof();
+    if (!recoveryProof) {
+      return { success: false, verified: false };
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error || !user || !user.email) {
+      return { success: false, verified: false };
+    }
+
+    if (
+      user.id !== recoveryProof.userId ||
+      user.email.toLowerCase() !== recoveryProof.email.toLowerCase()
+    ) {
+      return { success: false, verified: false };
+    }
+
+    return { success: true, verified: true, email: recoveryProof.email };
+  } catch {
+    return { success: false, verified: false };
+  }
+}
+
+/**
+ * Updates the user password after verifying that the active session
+ * holds a valid, cryptographic recovery authorization proof.
+ * Destroys the recovery session and cookies before redirecting to login.
  */
 export async function resetPasswordAction(
   prevState: any,
@@ -294,19 +462,107 @@ export async function resetPasswordAction(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.updateUser({
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user || !user.email) {
+    return {
+      error: "No active recovery session found. Please enter your verification code again.",
+    };
+  }
+
+  // Strict Server-Side Recovery Authorization Gate
+  const recoveryProof = await getVerifiedRecoveryProof();
+  if (
+    !recoveryProof ||
+    recoveryProof.userId !== user.id ||
+    recoveryProof.email.toLowerCase() !== user.email.toLowerCase()
+  ) {
+    return {
+      error:
+        "Password reset authorization is invalid or has expired. Please verify your recovery code again.",
+    };
+  }
+
+  const { error: updateError } = await supabase.auth.updateUser({
     password: newPassword,
   });
 
-  if (error) {
-    return { error: error.message };
+  if (updateError) {
+    console.error(
+      "[resetPasswordAction] Supabase updateUser failed: status",
+      updateError.status,
+      "code",
+      (updateError as any).code
+    );
+    return await classifyPasswordUpdateError(updateError);
   }
+
+  // Cleanly clear recovery authorization proof cookie and sign out of recovery session
+  await clearRecoveryProofCookie();
+  await supabase.auth.signOut();
 
   redirect("/login?reset=success");
 }
 
 /**
+ * Classifies Supabase Auth password update errors and maps them to safe, actionable messages
+ * without leaking raw provider errors or stack traces.
+ */
+export async function classifyPasswordUpdateError(
+  updateError: any
+): Promise<AuthActionResult> {
+  const msg = updateError?.message?.toLowerCase() || "";
+  const code = (updateError as any)?.code?.toLowerCase() || "";
+
+  if (
+    code === "over_request_rate_limit" ||
+    updateError?.status === 429 ||
+    msg.includes("rate limit") ||
+    msg.includes("security purposes")
+  ) {
+    return { error: "Too many password update attempts. Please wait a moment before trying again." };
+  }
+
+  if (
+    code === "same_password" ||
+    msg.includes("same_password") ||
+    msg.includes("should be different") ||
+    msg.includes("must be different")
+  ) {
+    return { error: "New password must be different from your current password." };
+  }
+
+  if (
+    code === "weak_password" ||
+    msg.includes("weak") ||
+    msg.includes("pwned") ||
+    msg.includes("leaked") ||
+    msg.includes("complexity")
+  ) {
+    return { error: "Password does not meet security requirements. Please choose a stronger password." };
+  }
+
+  if (
+    code === "bad_jwt" ||
+    code === "session_not_found" ||
+    updateError?.status === 401 ||
+    msg.includes("expired") ||
+    msg.includes("session")
+  ) {
+    return { error: "Your recovery session has expired. Please verify your recovery code again." };
+  }
+
+  return { error: "Unable to update password at this time. Please try again." };
+}
+
+/**
  * Resend email verification link for an unconfirmed Agency Owner account.
+ * Next.js Server Action called by useActionState in verify-email/page.tsx.
+ * Strictly maintains standard Server Action signature: (prevState, formData).
+ * Delegates to internal verification service with real production clients.
  */
 export async function resendVerificationEmailAction(
   prevState: any,
@@ -318,91 +574,11 @@ export async function resendVerificationEmailAction(
     return { error: "Please enter your registered email address to resend verification." };
   }
 
-  // 1. Guard against resending for already-confirmed accounts.
-  // Supabase GoTrue silently drops resend({ type: 'signup' }) requests for already-confirmed accounts
-  // (returning 200 OK without dispatching an email). If confirmed, return alreadyVerified to guide user to login.
-  let isAlreadyConfirmed = false;
-
-  const dbUser = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, emailVerified: true },
-  });
-  if (dbUser?.emailVerified) {
-    isAlreadyConfirmed = true;
-  }
-
-  if (!isAlreadyConfirmed) {
-    try {
-      const adminClient = getAdminClient();
-      if (adminClient) {
-        const { data } = await adminClient.auth.admin.listUsers();
-        const authUser = data?.users?.find((u) => u.email?.toLowerCase() === email);
-        if (authUser?.email_confirmed_at) {
-          isAlreadyConfirmed = true;
-        }
-      }
-    } catch (adminErr) {
-      console.warn("[resendVerificationEmailAction] Admin check non-blocking warning:", adminErr);
-    }
-  }
-
-  if (isAlreadyConfirmed) {
-    return {
-      error: "This email address is already verified. Please sign in to access your workspace.",
-      alreadyVerified: true,
-      email,
-    };
-  }
-
   const supabase = await createClient();
-  const { error } = await supabase.auth.resend({
-    type: "signup",
-    email,
-    options: {
-      emailRedirectTo: getAuthCallbackUrl(),
-    },
+  return sendVerificationEmail(email, {
+    supabaseClient: supabase,
+    redirectUrl: getAuthCallbackUrl(),
   });
-
-  if (error) {
-    return classifyResendError(error);
-  }
-
-  return { success: true };
-}
-
-/**
- * Classifies Supabase Auth resend errors and maps them to safe, friendly feedback.
- */
-export async function classifyResendError(error: any): Promise<AuthActionResult> {
-  const isRateLimit =
-    (error as any)?.code === "over_request_rate_limit" ||
-    (error as any)?.code === "over_email_send_rate_limit" ||
-    error?.status === 429 ||
-    error?.message?.toLowerCase().includes("rate limit") ||
-    error?.message?.toLowerCase().includes("security purposes");
-
-  if (isRateLimit) {
-    return { error: "Please wait a moment before requesting another verification code." };
-  }
-
-  const isAlreadyConfirmed =
-    (error as any)?.code === "email_already_confirmed" ||
-    error?.message?.toLowerCase().includes("already confirmed") ||
-    error?.message?.toLowerCase().includes("already verified");
-
-  if (isAlreadyConfirmed) {
-    return { error: "This email address is already verified. Please sign in." };
-  }
-
-  const isUserNotFound =
-    (error as any)?.code === "user_not_found" ||
-    error?.message?.toLowerCase().includes("user not found");
-
-  if (isUserNotFound) {
-    return { error: "No registration found for this email address. Please sign up first." };
-  }
-
-  return { error: "Unable to resend verification code right now. Please try again." };
 }
 
 /**
