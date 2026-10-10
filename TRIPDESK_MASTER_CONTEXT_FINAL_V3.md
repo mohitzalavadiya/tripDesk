@@ -15628,6 +15628,71 @@ Following architectural review of Section 248, the Server Action boundary was ha
 
 ---
 
+# 250. TRIPDESK — STAGING SUPABASE RLS SECURITY REMEDIATION DEPLOYMENT & VERIFICATION
+
+## 250.1 Target Environment & Confirmed Initial Findings
+On 2026-10-10, Supabase Security Advisor reported two security findings on the staging environment:
+- **Canonical Staging Application:** `https://staging.yourtraveldesk.in`
+- **Staging Supabase Project Reference:** `qypkowejgqrmilckemcr`
+- **Target Host:** `aws-0-ap-northeast-2.pooler.supabase.com:5432` / port `6543`
+- **Initial Advisor Findings:**
+  1. `rls_disabled_in_public`: 58 tables in schema `public` had Row Level Security disabled.
+  2. `auth_leaked_password_protection`: HaveIBeenPwned compromised credential checking disabled in Supabase Auth.
+
+## 250.2 Architecture Inspection & Defense-in-Depth Rationale
+1. **Prisma Connection Role:** Prisma connects via transaction pooler as role `postgres` (`rolsuper = false`, `rolbypassrls = true`). Tables in `public` are owned by `postgres`.
+2. **Access Patterns:** 100% of application database CRUD operations run through Prisma (`@prisma/adapter-pg`). Zero direct PostgREST calls (`supabase.from('table')` or `.rpc()`) exist in the application code. Supabase client is used strictly for Auth SSR and Storage buckets.
+3. **Public Sharing:** Public quote (`/q/[token]`) and customer portal access are handled exclusively through Next.js server-side routes querying Prisma, not direct client-side PostgREST.
+4. **PostgREST Lockdown Rationale:** Enabling RLS (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`) without `FORCE ROW LEVEL SECURITY` activates default-deny for PostgREST roles (`anon`, `authenticated`) while allowing Prisma (`postgres`) to bypass RLS seamlessly via `rolbypassrls`.
+5. **CRITICAL INVARIANT — NO FORCE RLS:** `FORCE ROW LEVEL SECURITY` was strictly avoided. Enabling `FORCE RLS` would subject the table owner (`postgres`) to RLS policies. Because Prisma connects directly over SQL without Supabase JWT context, `FORCE RLS` would break the application.
+6. **No RLS Policies Added:** Access remains completely mediated through the existing server-side Prisma architecture. No permissive policies (`USING true`) or artificial JWT-based policies were created.
+
+## 250.3 Applied Migration Specification
+The reviewed, non-destructive migration at `prisma/migrations/20261010153000_remediate_public_rls_and_privileges/migration.sql` was prepared and deployed:
+1. **RLS Activation:** `ALTER TABLE public.<table_name> ENABLE ROW LEVEL SECURITY;` across all 58 tables.
+2. **Revocation of Existing Privileges:** `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated, PUBLIC;`, explicit revocation on `_prisma_migrations`, `REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated, PUBLIC;`, and `REVOKE CREATE ON SCHEMA public FROM anon, authenticated, PUBLIC;`.
+3. **No Blanket Routine Revocation:** Routine/function revocation was omitted; live staging inventory confirmed zero custom functions in `public`, preventing any interference with extension objects.
+4. **No Unnecessary `service_role` Expansion:** Avoided redundant `GRANT ALL ... TO service_role` statements to preserve least-privilege principles.
+5. **Default Privileges for Future Prisma Migrations:** `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated, PUBLIC;` and `REVOKE ALL ON SEQUENCES ...`.
+6. **`supabase_admin` Role Boundary:** Handled cleanly; role `postgres` altered its own defaults in `public`, protecting all future Prisma migrations.
+
+## 250.4 Pre-Deployment Gate & Staging Execution
+1. **Pre-Deployment Gate:** Target verified as staging project `qypkowejgqrmilckemcr` on `aws-0-ap-northeast-2.pooler.supabase.com:5432`.
+2. **Pending Migration Check:** Ran `npx prisma migrate status` with staging configuration; confirmed exactly 1 pending migration (`20261010153000_remediate_public_rls_and_privileges`). Gate passed.
+3. **Deployment Execution:** Executed `npx prisma migrate deploy` using staging environment profile on 2026-10-10.
+4. **Deployment Result:** `All migrations have been successfully applied.` Migration recorded in `public._prisma_migrations` (`finished_at = 2026-10-10T09:58:00.227Z`, `applied_steps_count = 1`, `rolled_back_at = null`). Staging data was preserved; no local or production database was targeted.
+
+## 250.5 Reported Post-Deployment Verification Results
+*(Note: These verification checks were executed and reported during the remediation task on 2026-10-10; no new live database queries were executed during subsequent documentation-only tasks).*
+1. **Prisma Migrate Status:** `Database schema is up to date!` (exit code 0).
+2. **RLS & FORCE RLS Live Status:**
+   - Total tables in schema `public`: **58**
+   - Tables with RLS disabled: **0** (All 58 enabled)
+   - Tables with FORCE RLS enabled: **0** (None forced)
+3. **Table Privilege Revocation:**
+   - Querying `information_schema.role_table_grants` for `anon`, `authenticated`, and `PUBLIC` in schema `public` returned **0 rows**.
+4. **PostgREST Direct API Denial (HTTP Verification):**
+   - Direct HTTP GET to `https://qypkowejgqrmilckemcr.supabase.co/rest/v1/customers?select=*` with anon key: **HTTP 401 Unauthorized** (`code: 42501, message: permission denied for table customers`).
+   - Direct HTTP GET to `/rest/v1/_prisma_migrations`: **HTTP 401 Unauthorized** (`code: 42501`).
+   - Direct HTTP GET to `/rest/v1/users`: **HTTP 401 Unauthorized** (`code: 42501`).
+5. **Prisma Connection Health & Staging Smoke Tests:**
+   - Direct queries via Prisma (`postgres` role) succeeded 100% across users, agencies, trips, quotations, bookings, customers, and invoice sequences.
+   - Server-side public share token resolution verified working (`/q/[token]`).
+   - Offline test suites passed: QA-22 (70/70), Email OTP Audit (62/62), Customer Auth Security (26/26).
+
+## 250.6 Remaining Security Advisor Finding: Leaked-Password Protection (Acknowledged Limitation)
+The `auth_leaked_password_protection` finding remains **UNRESOLVED** on staging.
+1. **Root Cause / Tier Constraint:** In the Supabase Dashboard for project `qypkowejgqrmilckemcr`, the feature **"Prevent use of leaked passwords"** (HaveIBeenPwned check) is restricted to the Supabase Pro plan tier.
+2. **User Decision:** The user has explicitly decided not to upgrade the staging Supabase project plan solely to satisfy this Security Advisor advisory.
+3. **Current Security Status:**
+   - Leaked-password protection is **currently disabled** on staging.
+   - This finding is an **acknowledged operational limitation**, not a resolved issue.
+   - It should be reconsidered if the project plan is upgraded or an eligible alternative becomes available.
+4. **CAPTCHA Status:** CAPTCHA protection is a separate Auth setting and was **not enabled** as part of this remediation.
+5. **Overall Security Advisor Posture:** Not all Security Advisor findings are resolved; `rls_disabled_in_public` is resolved, while `auth_leaked_password_protection` remains open as an acknowledged plan constraint.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
