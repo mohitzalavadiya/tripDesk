@@ -582,7 +582,7 @@ export class TravelDocumentService {
 
     // Optional dispatch via Phase 15 communication service
     if (input.notifyCustomer && document.customer) {
-      const channel = input.channel || NotificationChannel.EMAIL;
+      const channel = input.channel || NotificationChannel.WHATSAPP;
       const downloadUrl = `/customer/trips/${document.tripId}/documents`;
 
       communicationService.sendCommunication(agencyId, {
@@ -723,8 +723,8 @@ export class TravelDocumentService {
       throw new ValidationError("Document must be officially issued before sending to traveler.");
     }
 
-    const channel = input.channel || NotificationChannel.EMAIL;
-    const recipient = input.customRecipient || (channel === NotificationChannel.EMAIL ? document.customer.email : document.customer.phone);
+    const channel = input.channel || NotificationChannel.WHATSAPP;
+    const recipient = input.customRecipient || (channel === NotificationChannel.WHATSAPP ? document.customer.phone : document.customer.email);
 
     if (!recipient) {
       throw new ValidationError(`Customer does not have a valid recipient address for ${channel}.`);

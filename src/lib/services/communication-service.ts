@@ -333,34 +333,16 @@ export class CommunicationService {
         text: rendered.text,
       });
     } else if (channel === NotificationChannel.WHATSAPP) {
-      const whatsappProvider = whatsappDispatcher.getProvider(settings.whatsappProvider);
-      const waVars: WhatsAppTemplateVariables = {
-        customerName: payload.recipient?.name || customer.name,
-        agencyName: agency.name,
-        agencyPhone: agency.phone,
-        destination: metadata?.destination || null,
-        quotationNumber: metadata?.quotationNumber || null,
-        quotationUrl: linkUrl || metadata?.quotationUrl || null,
-        bookingNumber: metadata?.bookingNumber || null,
-        travelDates: metadata?.travelDates || null,
-        amountDue: metadata?.amountDue ? Number(metadata.amountDue).toLocaleString("en-IN") : null,
-        dueDate: metadata?.dueDate || null,
-        currency: metadata?.currency || "₹",
-        receiptRef: metadata?.receiptNumber || null,
-        departureDate: metadata?.travelStartDate || null,
-        feedbackUrl: linkUrl || metadata?.feedbackUrl || null,
-        customMessage: message,
+      // For WhatsApp Click-to-Chat delivery mode: dispatch is initiated via wa.me link opening.
+      // Delivery is not confirmed by an automated provider webhook.
+      // Record truthful PENDING status with click_to_chat provider ID without invoking mock provider.
+      sendResult = {
+        success: true,
+        status: NotificationDeliveryStatus.PENDING,
+        providerMessageId: "click_to_chat",
+        deliveredAt: undefined,
+        timestamp: new Date(),
       };
-
-      const rendered = WhatsAppTemplateEngine.render(type, waVars);
-
-      sendResult = await whatsappProvider.sendWhatsApp({
-        toPhone: recipientContact || "",
-        toName: payload.recipient?.name || customer.name,
-        templateName: rendered.templateName,
-        text: rendered.text,
-        parameters: rendered.parameters,
-      });
     } else {
       // In-App or other channel
       sendResult = {
@@ -395,7 +377,18 @@ export class CommunicationService {
         sentAt: new Date(),
         deliveredAt: sendResult.deliveredAt || null,
         failedAt: sendResult.failedAt || null,
-        metadata: metadata ? (metadata as Prisma.InputJsonValue) : Prisma.JsonNull,
+        metadata:
+          channel === NotificationChannel.WHATSAPP
+            ? ({
+                ...(typeof metadata === "object" && metadata !== null
+                  ? (metadata as Record<string, unknown>)
+                  : {}),
+                deliveryMode: "CLICK_TO_CHAT",
+                action: "LINK_OPENED",
+              } as Prisma.InputJsonValue)
+            : metadata
+            ? (metadata as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
       },
     });
 
@@ -449,23 +442,12 @@ export class CommunicationService {
         text: rendered.text,
       });
     } else if (existing.channel === NotificationChannel.WHATSAPP) {
-      const whatsappProvider = whatsappDispatcher.getProvider(settings.whatsappProvider);
-      const waVars: WhatsAppTemplateVariables = {
-        customerName: existing.customer.name,
-        agencyName: existing.agency.name,
-        agencyPhone: existing.agency.phone,
-        customMessage: existing.message,
+      sendResult = {
+        success: true,
+        status: NotificationDeliveryStatus.PENDING,
+        providerMessageId: "click_to_chat",
+        timestamp: new Date(),
       };
-
-      const rendered = WhatsAppTemplateEngine.render(existing.type, waVars);
-
-      sendResult = await whatsappProvider.sendWhatsApp({
-        toPhone: recipientContact || "",
-        toName: existing.customer.name,
-        templateName: rendered.templateName,
-        text: rendered.text,
-        parameters: rendered.parameters,
-      });
     } else {
       sendResult = {
         success: true,
@@ -514,6 +496,45 @@ export class CommunicationService {
       enquiryId,
       linkUrl,
     } = input;
+
+    // For manual WhatsApp messages, accurately record the Click-to-Chat link opening as PENDING.
+    // Do not route to mock provider which simulates fake successful delivery.
+    if (channel === NotificationChannel.WHATSAPP) {
+      const customer = await prisma.customer.findFirst({
+        where: { id: customerId, agencyId },
+      });
+      if (!customer) return null;
+
+      const recipientPhone = recipient || customer.phone;
+
+      return prisma.customerNotification.create({
+        data: {
+          agencyId,
+          customerId,
+          tripId: tripId || null,
+          bookingId: bookingId || null,
+          quotationId: quotationId || null,
+          enquiryId: enquiryId || null,
+          type: type || CustomerNotificationType.OPERATIONS_ALERT,
+          title,
+          message,
+          channel: NotificationChannel.WHATSAPP,
+          status: NotificationDeliveryStatus.PENDING,
+          recipient: recipientPhone || null,
+          subject: null,
+          providerMessageId: "click_to_chat",
+          failureReason: null,
+          idempotencyKey: `manual-c2c-${agencyId}-${customerId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          linkUrl: linkUrl || null,
+          sentAt: new Date(),
+          deliveredAt: null,
+          metadata: {
+            deliveryMode: "CLICK_TO_CHAT",
+            action: "LINK_OPENED",
+          },
+        },
+      });
+    }
 
     return this.sendCommunication(agencyId, {
       agencyId,

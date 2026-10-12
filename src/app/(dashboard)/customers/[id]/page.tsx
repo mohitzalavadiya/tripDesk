@@ -81,6 +81,7 @@ import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
 import { communicationClient, CommunicationLogItem } from "@/lib/api-client/communication-client";
 import { phoneYup } from "@/lib/validation-schemas";
+import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
 
 const AVATAR_GRADIENTS = [
   "from-indigo-500 to-violet-600",
@@ -154,7 +155,6 @@ export default function CustomerDetailPage() {
   const [communications, setCommunications] = React.useState<CommunicationLogItem[]>([]);
   const [loadingComms, setLoadingComms] = React.useState(false);
   const [isMsgModalOpen, setIsMsgModalOpen] = React.useState(false);
-  const [msgChannel, setMsgChannel] = React.useState<"EMAIL" | "WHATSAPP">("WHATSAPP");
   const [msgTitle, setMsgTitle] = React.useState("");
   const [msgBody, setMsgBody] = React.useState("");
   const [sendingMsg, setSendingMsg] = React.useState(false);
@@ -269,23 +269,30 @@ export default function CustomerDetailPage() {
       return;
     }
 
+    const fullMessage = `*${msgTitle.trim()}*\n\n${msgBody.trim()}`;
+    const res = openWhatsAppChat(customer?.phone, fullMessage);
+    if (!res.success) {
+      toast.error(res.error || "Customer does not have a valid WhatsApp phone number.");
+      return;
+    }
+
     try {
       setSendingMsg(true);
       await communicationClient.sendManual({
         customerId: id,
-        channel: msgChannel,
+        channel: "WHATSAPP",
         title: msgTitle.trim(),
         message: msgBody.trim(),
       });
-      toast.success("Message dispatched successfully", {
-        description: `Sent via ${msgChannel} to customer.`,
+      toast.success("WhatsApp chat opened with customer", {
+        description: "Action recorded in customer communication history.",
       });
       setIsMsgModalOpen(false);
       setMsgTitle("");
       setMsgBody("");
       loadCommunications();
     } catch (err: any) {
-      toast.error("Failed to send message", {
+      toast.error("Failed to record communication event", {
         description: err?.message || "Please check recipient details and retry.",
       });
     } finally {
@@ -1169,41 +1176,25 @@ export default function CustomerDetailPage() {
             <form onSubmit={handleSendCustomMessage}>
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
-                  <Send className="h-4 w-4 text-indigo-600" />
-                  <span>Send Direct Message to {customer.name}</span>
+                  <MessageSquare className="h-4 w-4 text-emerald-600" />
+                  <span>Send Direct WhatsApp Message to {customer.name}</span>
                 </DialogTitle>
                 <DialogDescription className="text-slate-500 text-xs mt-1">
-                  Dispatch an ad-hoc WhatsApp message or Email directly to the customer.
+                  Compose an ad-hoc message to open directly in WhatsApp with the customer.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-3.5 mt-4 text-xs">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Channel *</label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setMsgChannel("WHATSAPP")}
-                      className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        msgChannel === "WHATSAPP"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-300 shadow-2xs"
-                          : "bg-slate-50 text-slate-600 border-slate-200"
-                      }`}
-                    >
-                      WhatsApp ({customer.phone})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMsgChannel("EMAIL")}
-                      className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        msgChannel === "EMAIL"
-                          ? "bg-indigo-50 text-indigo-700 border-indigo-300 shadow-2xs"
-                          : "bg-slate-50 text-slate-600 border-slate-200"
-                      }`}
-                    >
-                      Email ({customer.email || "No email on file"})
-                    </button>
+                <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200/80 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-emerald-950">
+                      WhatsApp Click-to-Chat
+                    </span>
                   </div>
+                  <span className="text-[11px] font-mono text-emerald-800 font-bold">
+                    {customer.phone || "No phone on file"}
+                  </span>
                 </div>
 
                 <div className="space-y-1">
@@ -1240,12 +1231,12 @@ export default function CustomerDetailPage() {
                 />
                 <Button
                   type="submit"
-                  disabled={sendingMsg || isReadOnly}
+                  disabled={sendingMsg || isReadOnly || !customer.phone}
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl gap-1.5"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 rounded-xl gap-1.5 cursor-pointer shadow-xs"
                 >
-                  <Send className="h-3.5 w-3.5" />
-                  {sendingMsg ? "Sending..." : "Dispatch Message"}
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  {sendingMsg ? "Opening..." : "Open in WhatsApp"}
                 </Button>
               </DialogFooter>
             </form>

@@ -64,6 +64,7 @@ import { customerClient } from "@/lib/api-client/customer-client";
 import { tripClient } from "@/lib/api-client/trip-client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
 
 const CHANNEL_FILTER_LABELS: Record<string, string> = {
   ALL: "All",
@@ -98,8 +99,7 @@ const STATUS_FILTER_LABELS: Record<string, string> = {
 
 const MODAL_CHANNEL_LABELS: Record<string, string> = {
   [NotificationChannel.IN_APP]: "In-App Portal",
-  [NotificationChannel.EMAIL]: "Email",
-  [NotificationChannel.WHATSAPP]: "WhatsApp",
+  [NotificationChannel.WHATSAPP]: "WhatsApp (Click-to-Chat)",
 };
 
 const MODAL_CATEGORY_LABELS: Record<string, string> = {
@@ -378,6 +378,16 @@ export default function CommunicationsPage() {
       return;
     }
 
+    if (formData.channel === NotificationChannel.WHATSAPP) {
+      const targetCustomer = customers.find((c) => c.id === formData.customerId);
+      const fullMessage = `*${formData.title.trim()}*\n\n${formData.message.trim()}`;
+      const res = openWhatsAppChat(targetCustomer?.phone, fullMessage);
+      if (!res.success) {
+        toast.error(res.error || "Recipient does not have a valid WhatsApp phone number.");
+        return;
+      }
+    }
+
     try {
       setIsSubmitting(true);
       await communicationClient.sendManual({
@@ -390,7 +400,11 @@ export default function CommunicationsPage() {
         message: formData.message,
       });
 
-      toast.success("Communication dispatched successfully.");
+      if (formData.channel === NotificationChannel.WHATSAPP) {
+        toast.success("WhatsApp chat opened with recipient. Action recorded.");
+      } else {
+        toast.success("Communication dispatched successfully.");
+      }
       setIsSendModalOpen(false);
       setFormData({
         customerId: "",
@@ -1217,8 +1231,7 @@ export default function CommunicationsPage() {
                       </SelectTrigger>
                       <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
                         <SelectItem value={NotificationChannel.IN_APP}>In-App Portal</SelectItem>
-                        <SelectItem value={NotificationChannel.EMAIL}>Email</SelectItem>
-                        <SelectItem value={NotificationChannel.WHATSAPP}>WhatsApp</SelectItem>
+                        <SelectItem value={NotificationChannel.WHATSAPP}>WhatsApp (Click-to-Chat)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1303,12 +1316,21 @@ export default function CommunicationsPage() {
                     type="submit"
                     disabled={isSubmitting}
                     size="sm"
-                    className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4"
+                    className={`rounded-xl font-bold text-xs px-4 cursor-pointer shadow-xs ${
+                      formData.channel === NotificationChannel.WHATSAPP
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                        : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                    }`}
                   >
                     {isSubmitting ? (
                       <div className="flex items-center gap-1.5">
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Dispatching...</span>
+                        <span>{formData.channel === NotificationChannel.WHATSAPP ? "Opening..." : "Dispatching..."}</span>
+                      </div>
+                    ) : formData.channel === NotificationChannel.WHATSAPP ? (
+                      <div className="flex items-center gap-1.5">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Open in WhatsApp</span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5">

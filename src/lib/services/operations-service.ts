@@ -698,16 +698,22 @@ export const operationsService = {
 
     await this.checkNotFinalized(agencyId, tripOperationId);
 
+    const actionText =
+      input.channel === "WHATSAPP"
+        ? "WhatsApp chat opened for"
+        : `${input.channel} communication initiated for`;
+
     return prisma.operationEvent.create({
       data: {
         agencyId,
         tripOperationId,
         eventType: "COMMUNICATION_DISPATCHED",
-        description: `[${input.channel}] ${input.templateType} sent to ${input.recipientName}${
+        description: `[${input.channel}] ${actionText} ${input.templateType} to ${input.recipientName}${
           input.recipientPhone ? ` (${input.recipientPhone})` : ""
         }`,
         metadata: {
           channel: input.channel,
+          deliveryMode: input.channel === "WHATSAPP" ? "CLICK_TO_CHAT" : "MANUAL",
           recipientName: input.recipientName,
           recipientPhone: input.recipientPhone || null,
           templateType: input.templateType,

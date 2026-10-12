@@ -106,7 +106,9 @@ import {
   PaymentStatus,
   Payment,
   TravelDocumentType,
+  NotificationChannel,
 } from "@prisma/client";
+import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
 import { formatCurrency } from "@/lib/costing-engine";
 import { toast } from "sonner";
 
@@ -397,8 +399,17 @@ export default function BookingDetailPage() {
   // Resend Document
   const handleResendDoc = async (docId: string, docNum: string) => {
     try {
-      await documentClient.resend(docId);
-      toast.success(`Document ${docNum} sent to traveler.`);
+      const doc = bookingDocs.find((d) => d.id === docId);
+      const docTitle = doc?.title || docNum;
+      const portalUrl = typeof window !== "undefined" && booking?.tripId ? `${window.location.origin}/customer/trips/${booking.tripId}/documents` : (typeof window !== "undefined" ? `${window.location.origin}/customer` : "");
+      const message = `*Travel Document: ${docTitle}*\n\nHello ${booking?.customer?.name || "Traveler"},\nYour travel document (${docNum}) for booking #${booking?.bookingNumber} is available in your traveler portal:\n${portalUrl}`;
+      const res = openWhatsAppChat(booking?.customer?.phone, message);
+      if (!res.success) {
+        toast.error(res.error || "Customer does not have a valid WhatsApp phone number.");
+        return;
+      }
+      await documentClient.resend(docId, { channel: NotificationChannel.WHATSAPP });
+      toast.success(`WhatsApp chat opened for document ${docNum}. Action recorded.`);
     } catch (err: any) {
       toast.error(err?.message || "Failed to send document.");
     }
@@ -1154,7 +1165,7 @@ export default function BookingDetailPage() {
                                     onClick={() => handleResendDoc(doc.id, doc.documentNumber)}
                                     className="h-7 px-2 text-[10px] text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-bold cursor-pointer gap-1"
                                   >
-                                    <Send className="h-3 w-3" /> Send
+                                    <Send className="h-3 w-3" /> WhatsApp
                                   </Button>
                                 )}
                               </div>
