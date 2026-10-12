@@ -468,40 +468,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Email Toggle */}
-                      <div
-                        onClick={() => setEmailEnabled(!emailEnabled)}
-                        className={`p-3 sm:p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
-                          emailEnabled
-                            ? "bg-indigo-50/40 border-indigo-200 shadow-2xs"
-                            : "bg-slate-50 border-slate-200 opacity-60"
-                        }`}
-                      >
-                        <div
-                          className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center font-bold shrink-0 mt-0.5 ${
-                            emailEnabled ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-500"
-                          }`}
-                        >
-                          <Mail className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                            <span className="text-xs font-bold text-slate-900">Email Delivery</span>
-                            <span
-                              className={`text-[9px] sm:text-[10px] font-extrabold uppercase px-1.5 sm:px-2 py-0.5 rounded-md shrink-0 ${
-                                emailEnabled ? "bg-indigo-100 text-indigo-800" : "bg-slate-200 text-slate-600"
-                              }`}
-                            >
-                              {emailEnabled ? "ACTIVE" : "DISABLED"}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                            Sends responsive HTML proposals, confirmations, and milestone invoices.
-                          </p>
-                        </div>
-                      </div>
-
+                    <div className="grid grid-cols-1 gap-4">
                       {/* WhatsApp Toggle */}
                       <div
                         onClick={() => setWhatsappEnabled(!whatsappEnabled)}

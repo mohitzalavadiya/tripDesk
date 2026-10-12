@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
 import {
   X,
   MessageSquare,
@@ -187,11 +188,13 @@ export function CommunicationModal({
   };
 
   const handleOpenWhatsApp = async () => {
-    const cleanPhone = customerPhone.replace(/[^0-9]/g, "");
-    const encoded = encodeURIComponent(messageBody);
+    const result = openWhatsAppChat(customerPhone, messageBody);
+    if (!result.success) {
+      toast.error(result.error || "Invalid customer phone number.");
+      return;
+    }
     await logDispatch("WHATSAPP");
-    window.open(`https://wa.me/${cleanPhone}?text=${encoded}`, "_blank");
-    toast.success("Opening WhatsApp & logged communication event.");
+    toast.success("Opening WhatsApp chat with guest.");
     onClose();
   };
 

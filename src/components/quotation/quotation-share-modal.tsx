@@ -19,6 +19,7 @@ import {
   copyQuotationLink,
   shareQuotationNative,
 } from "@/lib/quotation/share-helpers"
+import { toast } from "sonner"
 import {
   Share2,
   Copy,
@@ -60,18 +61,17 @@ export function QuotationShareModal({
   }
 
   const handleWhatsApp = () => {
-    openWhatsAppShare(quotation, targetPhone || initialPhone, customerName)
-    if (onMarkSent && "id" in quotation) {
-      onMarkSent(quotation.id)
+    const res = openWhatsAppShare(quotation, targetPhone || initialPhone, customerName)
+    if (!res.success) {
+      toast.error(res.error || "Failed to open WhatsApp")
+      return
     }
+    toast.success("Opening WhatsApp chat with quotation link.")
     onOpenChange(false)
   }
 
   const handleNativeShare = async () => {
     await shareQuotationNative(quotation)
-    if (onMarkSent && "id" in quotation) {
-      onMarkSent(quotation.id)
-    }
     onOpenChange(false)
   }
 
@@ -88,7 +88,7 @@ export function QuotationShareModal({
                 Share Quotation with Customer
               </DialogTitle>
               <DialogDescription className="text-slate-500 text-xs mt-0.5">
-                Generate a secure, customer-safe public link to share directly via WhatsApp, Email, or Web.
+                Generate a secure, customer-safe public link to share directly via WhatsApp or Web.
               </DialogDescription>
             </div>
           </div>
@@ -156,22 +156,39 @@ export function QuotationShareModal({
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 rounded-xl shadow-xs cursor-pointer"
             >
               <Send className="h-3.5 w-3.5 mr-1.5" />
-              Open in WhatsApp & Mark as Sent
+              Open in WhatsApp
             </Button>
           </div>
         </div>
 
         <DialogFooter className="mt-4 flex justify-between sm:justify-between items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleNativeShare}
-            className="bg-white border-slate-200 text-xs font-semibold"
-          >
-            <Share2 className="h-3.5 w-3.5 mr-1" />
-            Native Share
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleNativeShare}
+              className="bg-white border-slate-200 text-xs font-semibold"
+            >
+              <Share2 className="h-3.5 w-3.5 mr-1" />
+              Native Share
+            </Button>
+
+            {onMarkSent && "id" in quotation && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onMarkSent(quotation.id)
+                  onOpenChange(false)
+                }}
+                className="bg-white border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Mark as Sent
+              </Button>
+            )}
+          </div>
 
           <Button
             type="button"

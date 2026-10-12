@@ -67,6 +67,7 @@ import {
   NotificationChannel,
 } from "@prisma/client";
 import { toast } from "sonner";
+import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   ALL: "All",
@@ -107,13 +108,13 @@ export default function DocumentCenterPage() {
   // Form states
   const [issuing, setIssuing] = React.useState(false);
   const [notifyCustomerOnIssue, setNotifyCustomerOnIssue] = React.useState(true);
-  const [issueChannel, setIssueChannel] = React.useState<NotificationChannel>(NotificationChannel.EMAIL);
+  const [issueChannel, setIssueChannel] = React.useState<NotificationChannel>(NotificationChannel.WHATSAPP);
 
   const [revoking, setRevoking] = React.useState(false);
   const [revokeReason, setRevokeReason] = React.useState("");
 
   const [resending, setResending] = React.useState(false);
-  const [resendChannel, setResendChannel] = React.useState<NotificationChannel>(NotificationChannel.EMAIL);
+  const [resendChannel, setResendChannel] = React.useState<NotificationChannel>(NotificationChannel.WHATSAPP);
   const [customRecipient, setCustomRecipient] = React.useState("");
 
   const fetchDocuments = React.useCallback(async () => {
@@ -147,11 +148,27 @@ export default function DocumentCenterPage() {
     if (!issueDoc) return;
     setIssuing(true);
     try {
+      if (notifyCustomerOnIssue && issueChannel === NotificationChannel.WHATSAPP) {
+        const portalUrl = typeof window !== "undefined" && issueDoc.tripId ? `${window.location.origin}/customer/trips/${issueDoc.tripId}/documents` : (typeof window !== "undefined" ? `${window.location.origin}/customer` : "");
+        const message = `*Travel Document Issued: ${issueDoc.title}*\n\nHello ${issueDoc.customerName || "Traveler"},\nYour travel document (${issueDoc.documentNumber}) has been issued and is available in your traveler portal:\n${portalUrl}`;
+        const res = openWhatsAppChat(issueDoc.customerPhone, message);
+        if (!res.success) {
+          toast.error(res.error || "Customer does not have a valid WhatsApp phone number.");
+          setIssuing(false);
+          return;
+        }
+      }
+
       await documentClient.issue(issueDoc.id, {
         notifyCustomer: notifyCustomerOnIssue,
         channel: issueChannel,
       });
-      toast.success(`Document ${issueDoc.documentNumber} issued successfully!`);
+
+      if (notifyCustomerOnIssue && issueChannel === NotificationChannel.WHATSAPP) {
+        toast.success(`Document ${issueDoc.documentNumber} issued. WhatsApp chat opened.`);
+      } else {
+        toast.success(`Document ${issueDoc.documentNumber} issued successfully!`);
+      }
       setIssueDoc(null);
       await fetchDocuments();
     } catch (err: any) {
@@ -185,11 +202,28 @@ export default function DocumentCenterPage() {
     if (!resendDoc) return;
     setResending(true);
     try {
+      if (resendChannel === NotificationChannel.WHATSAPP) {
+        const targetPhone = customRecipient.trim() || resendDoc.customerPhone;
+        const portalUrl = typeof window !== "undefined" && resendDoc.tripId ? `${window.location.origin}/customer/trips/${resendDoc.tripId}/documents` : (typeof window !== "undefined" ? `${window.location.origin}/customer` : "");
+        const message = `*Travel Document: ${resendDoc.title}*\n\nHello ${resendDoc.customerName || "Traveler"},\nYour travel document (${resendDoc.documentNumber}) is available in your traveler portal:\n${portalUrl}`;
+        const res = openWhatsAppChat(targetPhone, message);
+        if (!res.success) {
+          toast.error(res.error || "Recipient does not have a valid WhatsApp phone number.");
+          setResending(false);
+          return;
+        }
+      }
+
       await documentClient.resend(resendDoc.id, {
         channel: resendChannel,
         customRecipient: customRecipient.trim() || undefined,
       });
-      toast.success(`Document ${resendDoc.documentNumber} sent via ${resendChannel}!`);
+
+      if (resendChannel === NotificationChannel.WHATSAPP) {
+        toast.success(`WhatsApp chat opened for document ${resendDoc.documentNumber}. Action recorded.`);
+      } else {
+        toast.success(`Document ${resendDoc.documentNumber} resent successfully.`);
+      }
       setResendDoc(null);
       setCustomRecipient("");
       await fetchDocuments();
@@ -623,7 +657,6 @@ export default function DocumentCenterPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NotificationChannel.EMAIL}>Email ({issueDoc?.customerEmail || "Customer Email"})</SelectItem>
                     <SelectItem value={NotificationChannel.WHATSAPP}>WhatsApp ({issueDoc?.customerPhone || "Customer Phone"})</SelectItem>
                   </SelectContent>
                 </Select>
@@ -671,18 +704,15 @@ export default function DocumentCenterPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NotificationChannel.EMAIL}>Email</SelectItem>
                   <SelectItem value={NotificationChannel.WHATSAPP}>WhatsApp</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <label className="font-bold text-slate-700">
-                {resendChannel === NotificationChannel.EMAIL ? "Recipient Email" : "Recipient Phone Number"}
-              </label>
+              <label className="font-bold text-slate-700">Recipient Phone Number</label>
               <Input
-                placeholder={resendChannel === NotificationChannel.EMAIL ? "traveler@example.com" : "+91 9876543210"}
+                placeholder="+91 9876543210"
                 value={customRecipient}
                 onChange={(e) => setCustomRecipient(e.target.value)}
                 className="h-9 text-xs"

@@ -15784,6 +15784,86 @@ When recording a payable disbursement from an Operations card (Accommodations, F
 - **Backend Safety:** Preserved atomic concurrency locks (`SELECT ... FOR UPDATE`), server-side overpayment rejection, finalized operation guards, and multi-tenant isolation in `financeService.recordSupplierPayment`.
 - **Zero Schema Mutations:** No Prisma schema changes or migrations required.
 
+
+---
+
+# 253. WHATSAPP CLICK-TO-CHAT INTEGRATION & APPLICATION-WIDE EMAIL-SENDING UI REMOVAL
+
+## 253.1 Architecture & Core Design Decisions
+- **Implementation Model:** Realized a lightweight, reliable, zero-cost WhatsApp communication layer leveraging the official WhatsApp Click-to-Chat protocol (`https://wa.me/<phone>?text=<encoded_text>`).
+- **Strict Anti-Mock & Truthful Tracking Semantics:**
+  - Strictly avoided implementing any Meta WhatsApp Cloud API credentials, mock delivery webhooks, or false claims of delivery.
+  - Opening a WhatsApp chat via `window.open` does not constitute guaranteed message transmission.
+  - The backend (`communicationService.sendManualMessage`, `communicationService.sendCommunication`, and `resendCommunication`) records notifications dispatched via Click-to-Chat with `status: NotificationDeliveryStatus.PENDING`, `providerMessageId: "click_to_chat"`, and metadata `{ deliveryMode: "CLICK_TO_CHAT", action: "LINK_OPENED" }` without calling mock delivery providers.
+  - Operations guest communications log truthful dispatch notes: `"WhatsApp chat opened for <Guest> (<phone>)"`.
+  - Quotations: Decoupled opening WhatsApp chat from marking quotation as sent. A user can click `"Open in WhatsApp"` without falsely marking the quotation as sent, with an explicit optional `"Mark as Sent"` action retained for agency operators.
+- **Shared Click-to-Chat Helper (`src/lib/communication/whatsapp/click-to-chat.ts`):**
+  - `validateAndNormalizeWhatsAppPhone(rawPhone)`: Validates and normalizes phone numbers.
+    - Strips all non-digit characters except leading `+`.
+    - Automatically normalizes standard 10-digit Indian mobile numbers (starting with 6–9) to E.164 without `+` (`91XXXXXXXXXX`).
+    - Eliminates the Iranian country code (+98) misrouting bug that previously affected 10-digit numbers starting with 9.
+    - Strips leading domestic trunk zero (`0XXXXXXXXXX` -> `91XXXXXXXXXX`).
+    - Handles explicit `+91` and `91` prefixes cleanly without double-prefixing.
+    - Preserves valid international numbers (8–15 digits) starting with `+`.
+    - Returns `{ isValid: false, error: "..." }` for blank, short (<8 digits), overlong (>15 digits), or ambiguous numbers.
+  - `buildWhatsAppChatUrl(phone, messageText)`: Produces safe `https://wa.me/<normalizedPhone>[?text=<encoded>]` using `encodeURIComponent`.
+  - `openWhatsAppChat(options)`: Safe browser execution via `window.open(url, "_blank", "noopener,noreferrer")` with popup blocked fallback warnings.
+
+## 253.2 Workflows Integrated
+1. **Operations Guest Communication Modal (`src/components/operations/communication-modal.tsx`):**
+   - Replaced fragile ad-hoc regex with `openWhatsAppChat`.
+   - Updated dispatch logger (`operationsService.logCommunicationDispatch`) to record `{ deliveryMode: "CLICK_TO_CHAT", action: "LINK_OPENED" }`.
+2. **Quotation Sharing (`src/lib/quotation/share-helpers.ts` & `src/components/quotation/quotation-share-modal.tsx`):**
+   - Integrated `openWhatsAppChat` in `openWhatsAppShare`.
+   - Removed email option from dialog copy.
+   - Decoupled `onMarkSent` from the link opening action, providing an explicit, non-destructive operator control.
+3. **Customer Details Page (`src/app/(dashboard)/customers/[id]/page.tsx`):**
+   - Direct messaging dialog updated: removed email channel selector, verified phone input, launches `openWhatsAppChat` and records manual dispatch in customer notification history with `status: PENDING`.
+4. **Communications Hub (`src/app/(dashboard)/communications/page.tsx`):**
+   - Removed `NotificationChannel.EMAIL` from channel selection dropdown and modal labels.
+   - Compose modal button dynamically labels `"Open in WhatsApp"` when WhatsApp channel is active, validating the recipient phone number before opening `wa.me` and recording dispatch.
+5. **Documents Hub (`src/app/(dashboard)/documents/page.tsx`):**
+   - Removed email channel from Issue Document and Resend Document modals; defaulted channel state strictly to `NotificationChannel.WHATSAPP`.
+   - Swapped "Recipient Email" input for "Recipient Phone Number" with Indian formatting placeholder.
+   - `handleIssue`: When issuing with customer notification on WhatsApp, validates phone number and actively opens `openWhatsAppChat` with document details and customer traveler portal link (`/customer/trips/[tripId]/documents`) before recording issuance.
+   - `handleResend`: Actively invokes `openWhatsAppChat` with the customer's phone (or custom recipient phone) and pre-filled message with customer portal documents link, then calls `documentClient.resend` to record the dispatch.
+6. **Booking Details Page (`src/app/(dashboard)/bookings/[id]/page.tsx`):**
+   - Document table action button updated to `"WhatsApp"` and `handleResendDoc` actively opens `openWhatsAppChat` with traveler's phone, booking number, document title, and customer portal documents link before recording resend.
+7. **Travel Document Service Backend (`src/lib/services/travel-document-service.ts`):**
+   - Updated `issueDocument` and `resendDocument` to default channel parameter to `NotificationChannel.WHATSAPP` instead of `EMAIL`.
+
+## 253.3 Application-Wide Email-Sending UI Removal
+- **UI Send Options Removed:**
+  - Removed email channel buttons, tabs, toggles, and dropdown choices across Operations, Quotations, Customers, Communications Hub, Documents Hub, and Bookings.
+  - Removed misleading "Email Delivery (ACTIVE / DISABLED)" toggle card from Agency Settings Notifications tab (`src/app/(dashboard)/settings/page.tsx`).
+- **Strictly Preserved Non-Sending Email Features:**
+  - Preserved transactional auth email delivery (signup, signin OTP, password recovery, verification).
+  - Preserved customer, vendor, and agency contact email profile fields (`customer.email`, `agency.defaultSenderEmail`).
+  - Preserved historical `NotificationChannel.EMAIL` records in communication logs and activity timelines.
+  - Preserved CRM internal follow-up task types (`CALL`, `WHATSAPP`, `EMAIL`, `MEETING` in `follow-ups` and `enquiries` calendar reminders).
+
+## 253.4 Verification & Quality Gates
+- **Comprehensive Unit Tests (`prisma/test-click-to-chat.ts`):** 30 automated tests executed via `tsx` covering Indian mobile normalization, prefix sanitization, leading trunk zeros, international formats, empty/invalid strings, URL building, and percent-encoding. Passed: 30/30 (100%).
+- **TypeScript Typecheck:** `npx tsc --noEmit` passed with 0 errors.
+- **Production Build:** `npm run build` completed successfully (Next.js 16.3.2 Turbopack, exit code 0).
+- **Git Diff Check:** `git diff --check` passed cleanly with 0 whitespace or formatting issues.
+- **Database Schema Integrity:** Zero schema modifications; zero Prisma migrations; zero data mutations.
+
+## 253.5 Technical Limitations & Remaining Manual Staging Checks
+- **Verified Implementation Facts:**
+  - WhatsApp Click-to-Chat URLs follow official `https://wa.me/<phone>?text=<encoded>` specifications.
+  - No Meta WhatsApp Cloud API credentials or webhooks are configured or called.
+  - Database status is strictly recorded as `PENDING` with `deliveryMode: "CLICK_TO_CHAT"`.
+  - Email sending UI options are completely removed from all operational and customer-facing compose surfaces.
+- **Remaining Technical Limitations:**
+  - `wa.me` links cannot confirm recipient receipt or delivery state on device. Status remains `PENDING` indefinitely unless an external webhook provider is integrated in a future phase.
+  - Browser popup blockers may prevent `window.open` if triggered asynchronously outside of direct user event loops (mitigated by opening synchronously prior to async dispatch logs).
+- **Manual Staging Checks Required:**
+  1. Verify browser tab opening behavior across Safari, Chrome, and Firefox on desktop and mobile devices.
+  2. Verify that clicking "Open in WhatsApp" on an operations trip item pre-fills the guest briefing accurately.
+  3. Verify quotation share link resolution in a live staging browser session.
+  4. Verify customer portal document download flow when following the link from WhatsApp.
+
 ---
 
 # END OF MASTER HANDOVER V3
