@@ -7,7 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -203,42 +202,45 @@ export function RecordSupplierPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-1rem)] max-w-lg p-3 sm:p-5 gap-2.5 sm:gap-4 max-h-[calc(100dvh-1.5rem)] overflow-y-auto">
-        <DialogHeader className="gap-0.5 pb-0">
-          <DialogTitle className="text-sm sm:text-base font-semibold">
+      <DialogContent className="w-[calc(100%-1rem)] max-w-lg p-3 sm:p-5 gap-2.5 sm:gap-4 max-h-[calc(100dvh-1.5rem)] overflow-y-auto overflow-x-hidden">
+        <DialogHeader className="gap-0.5 pb-0 pr-6">
+          <DialogTitle className="text-sm sm:text-base font-semibold pr-6">
             Record Payable Disbursement
           </DialogTitle>
-          <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground line-clamp-1 sm:line-clamp-none">
+          <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground line-clamp-1 sm:line-clamp-none pr-4">
             {isLocked
               ? `Log payment against ${activePayable?.payableNumber || "selected payable"}.`
               : "Log outgoing payment to hotel, fleet operator, or vendor."}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-3 pt-1">
+        <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-3 pt-1 min-w-0 w-full">
           {/* Context-Locked Payable Summary */}
           {isLocked && activePayable ? (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-[11px] font-medium leading-none">
-                <span className="text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1">
-                  <Lock className="h-3 w-3 text-slate-500" />
-                  Linked Payable
+            <div className="space-y-1 min-w-0 w-full">
+              <div className="flex items-center justify-between text-[11px] font-medium leading-none min-w-0 w-full gap-2">
+                <span className="text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1 min-w-0 truncate">
+                  <Lock className="h-3 w-3 text-slate-500 shrink-0" />
+                  <span className="truncate">Linked Payable</span>
                 </span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase shrink-0">
                   {activePayable.serviceType || "SERVICE"}
                 </span>
               </div>
-              <div className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200/90 text-xs space-y-1">
-                <div className="flex flex-wrap sm:flex-nowrap items-baseline justify-between gap-1 sm:gap-2">
-                  <span className="font-bold text-slate-900 truncate">
+              <div className="px-2.5 sm:px-3 py-2 rounded-lg bg-slate-50 border border-slate-200/90 text-xs space-y-1 overflow-hidden min-w-0 w-full">
+                <div className="flex flex-col gap-0.5 min-w-0 w-full">
+                  <div
+                    className="font-bold text-slate-900 truncate min-w-0 w-full text-xs"
+                    title={`${activePayable.payableNumber || "PAYABLE"} • ${activePayable.payeeName || (activePayable as any).supplier?.name || "Vendor"}`}
+                  >
                     {activePayable.payableNumber || "PAYABLE"} • {activePayable.payeeName || (activePayable as any).supplier?.name || "Vendor"}
-                  </span>
-                  <span className="shrink-0 font-bold text-emerald-700 dark:text-emerald-400">
+                  </div>
+                  <div className="font-bold text-emerald-700 dark:text-emerald-400 text-xs shrink-0">
                     Due: {formatCurrency(Number(activePayable.outstandingAmount || 0))}
-                  </span>
+                  </div>
                 </div>
                 {activePayable.description && (
-                  <p className="text-[11px] text-slate-500 truncate">
+                  <p className="text-[11px] text-slate-500 truncate min-w-0 w-full" title={activePayable.description}>
                     {activePayable.description}
                   </p>
                 )}
@@ -452,12 +454,12 @@ export function RecordSupplierPaymentDialog({
             </div>
           </div>
 
-          <DialogFooter className="pt-2 flex flex-row gap-2 border-t mt-2">
+          <div className="pt-2 flex flex-row gap-2 border-t mt-2 w-full min-w-0">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="text-xs h-8 flex-1"
+              className="text-xs h-8 flex-1 min-w-0"
               onClick={() => onOpenChange(false)}
             >
               Cancel
@@ -465,13 +467,13 @@ export function RecordSupplierPaymentDialog({
             <Button
               type="submit"
               size="sm"
-              className="text-xs h-8 flex-1"
+              className="text-xs h-8 flex-1 min-w-0 bg-indigo-600 hover:bg-indigo-700 text-white"
               disabled={loading || isSettled || isCancelled}
             >
               {loading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
               {isSettled ? "Settled" : isCancelled ? "Cancelled" : "Save"}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

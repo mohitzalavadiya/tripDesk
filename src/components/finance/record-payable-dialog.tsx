@@ -149,12 +149,12 @@ export function RecordPayableDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-1rem)] max-w-lg p-3 sm:p-5 gap-2.5 sm:gap-4 max-h-[calc(100dvh-1.5rem)] overflow-y-auto">
-        <DialogHeader className="gap-0.5 pb-0">
-          <DialogTitle className="text-sm sm:text-base font-semibold">
+      <DialogContent className="w-[calc(100%-1rem)] max-w-lg p-3 sm:p-5 gap-2.5 sm:gap-4 max-h-[calc(100dvh-1.5rem)] overflow-y-auto overflow-x-hidden">
+        <DialogHeader className="gap-0.5 pb-0 pr-6">
+          <DialogTitle className="text-sm sm:text-base font-semibold pr-6">
             Create Manual Payable
           </DialogTitle>
-          <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground line-clamp-1 sm:line-clamp-none">
+          <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground line-clamp-1 sm:line-clamp-none pr-4">
             Log an operational financial obligation owed to a vendor or provider.
           </DialogDescription>
         </DialogHeader>
@@ -360,7 +360,7 @@ export function RecordPayableDialog({
             />
           </div>
 
-          <DialogFooter className="pt-2 flex flex-row gap-2 border-t mt-2">
+          <DialogFooter className="mx-0 mb-0 px-0 pb-0 pt-2.5 flex flex-row gap-2 border-t mt-2 bg-transparent rounded-none">
             <Button
               type="button"
               variant="outline"
