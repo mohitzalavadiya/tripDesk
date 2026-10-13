@@ -1,61 +1,50 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import {
-  Truck,
-  Plus,
-  Search,
-  Hotel,
-  Car,
-  Ticket,
-  MoreVertical,
-  Mail,
-  Phone,
-  Building2,
-  ExternalLink,
-  RotateCcw,
-  Sparkles,
-  CheckCircle2,
-  X,
-  Eye,
-  ArrowUpRight,
-  ShieldCheck,
-  Archive,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  AlertCircle,
-  Users,
-} from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuLabel,
+DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { supplierClient, SupplierWithCounts } from "@/lib/api-client";
+import { Input } from "@/components/ui/input";
+import {
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
+} from "@/components/ui/table";
+import { supplierClient,SupplierWithCounts } from "@/lib/api-client";
+import { getErrorMessage } from "@/lib/utils";
+import {
+Archive,
+Building2,
+CheckCircle2,
+ChevronLeft,
+ChevronRight,
+Eye,
+Hotel,
+MoreVertical,
+Phone,
+Plus,
+RotateCcw,
+Search,
+Sparkles,
+Truck,
+X
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
 
 const AVATAR_GRADIENTS = [

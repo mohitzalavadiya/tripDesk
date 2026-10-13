@@ -1,17 +1,16 @@
 "use client";
 
-import * as React from "react";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import { Booking } from "@/types";
-import { useBooking } from "@/context/booking-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useBooking } from "@/context/booking-context";
 import { formatCurrency } from "@/lib/costing-engine";
-import { toast } from "sonner";
 import { useModalScrollLock } from "@/lib/scroll-lock";
-import { X, AlertOctagon, IndianRupee, RotateCcw } from "lucide-react";
+import { Booking } from "@/types";
+import { useFormik } from "formik";
+import { AlertOctagon,IndianRupee,RotateCcw,X } from "lucide-react";
+import { toast } from "sonner";
+import * as Yup from "yup";
 
 interface CancelBookingModalProps {
   booking: Booking;

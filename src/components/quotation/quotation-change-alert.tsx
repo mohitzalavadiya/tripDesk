@@ -1,9 +1,8 @@
 "use client"
 
-import * as React from "react"
-import { QuotationDifference } from "@/lib/quotation/compare-quotation"
-import { AlertTriangle, RotateCcw, Plus, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { QuotationDifference } from "@/lib/quotation/compare-quotation"
+import { AlertTriangle,Plus } from "lucide-react"
 
 interface QuotationChangeAlertProps {
   difference: QuotationDifference

@@ -1,5 +1,5 @@
-import { PublicTripPayload } from "@/lib/services/trip-public-service";
 import { PublicBookingPayload } from "@/lib/services/booking-public-service";
+import { PublicTripPayload } from "@/lib/services/trip-public-service";
 
 export const tripPublicClient = {
   async getByToken(token: string): Promise<PublicTripPayload> {

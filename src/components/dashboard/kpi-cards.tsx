@@ -1,24 +1,19 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import {
-  Inbox,
-  FileText,
-  Compass,
-  IndianRupee,
-  ArrowUpRight,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Send,
-  ShieldCheck,
-  CreditCard,
-  Building,
-} from "lucide-react";
-import { DashboardExecutiveSummary } from "@/lib/services/dashboard-service";
 import { Badge } from "@/components/ui/badge";
+import { DashboardExecutiveSummary } from "@/lib/services/dashboard-service";
+import {
+AlertTriangle,
+ArrowUpRight,
+CheckCircle2,
+Clock,
+Compass,
+CreditCard,
+IndianRupee,
+ShieldCheck,
+TrendingUp
+} from "lucide-react";
+import Link from "next/link";
 
 interface KpiCardsProps {
   summary?: DashboardExecutiveSummary | null;

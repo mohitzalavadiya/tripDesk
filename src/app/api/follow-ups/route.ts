@@ -1,18 +1,18 @@
-import { NextRequest } from "next/server";
 import {
-  requireReadAccess,
-  requireWriteAccess,
-  apiSuccess,
-  apiCreated,
-  handleApiError,
-  validateJson,
-  validateQueryParams,
+apiCreated,
+apiSuccess,
+handleApiError,
+requireReadAccess,
+requireWriteAccess,
+validateJson,
+validateQueryParams,
 } from "@/lib/api";
-import {
-  globalFollowUpQuerySchema,
-  createGlobalFollowUpSchema,
-} from "@/lib/validation/follow-up-schema";
 import { followUpService } from "@/lib/services/follow-up-service";
+import {
+createGlobalFollowUpSchema,
+globalFollowUpQuerySchema,
+} from "@/lib/validation/follow-up-schema";
+import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 

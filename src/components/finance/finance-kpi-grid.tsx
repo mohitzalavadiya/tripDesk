@@ -1,20 +1,19 @@
 "use client";
 
-import * as React from "react";
-import {
-  TrendingUp,
-  CreditCard,
-  ArrowDownLeft,
-  ArrowUpRight,
-  Receipt,
-  Wallet,
-  Coins,
-  Percent,
-  Layers,
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FinanceKPIOverview } from "@/lib/services/finance-service";
+import { Card,CardContent,CardHeader,CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/costing-engine";
+import { FinanceKPIOverview } from "@/lib/services/finance-service";
+import {
+ArrowDownLeft,
+ArrowUpRight,
+Coins,
+CreditCard,
+Layers,
+Percent,
+Receipt,
+TrendingUp,
+Wallet,
+} from "lucide-react";
 
 interface FinanceKpiGridProps {
   kpis: FinanceKPIOverview;

@@ -1,7 +1,7 @@
 import {
-  TravelDocumentType,
-  TravelDocumentStatus,
-  NotificationChannel,
+NotificationChannel,
+TravelDocumentStatus,
+TravelDocumentType,
 } from "@prisma/client";
 
 export interface DocumentItem {

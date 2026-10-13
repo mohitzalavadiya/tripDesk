@@ -1,34 +1,31 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { OperationsAnalyticsKpiGrid } from "@/components/operations/analytics/operations-analytics-kpi-grid";
+import { OperationsFinancialAnalyticsCard } from "@/components/operations/analytics/operations-financial-analytics-card";
+import { OperationsIssuesAnalyticsCard } from "@/components/operations/analytics/operations-issues-analytics-card";
+import { OperationsReadinessChart } from "@/components/operations/analytics/operations-readiness-chart";
+import { OperationsRiskCard } from "@/components/operations/analytics/operations-risk-card";
+import { OperationsSatisfactionCard } from "@/components/operations/analytics/operations-satisfaction-card";
+import { OperationsSupplierScorecard } from "@/components/operations/analytics/operations-supplier-scorecard";
+import { OperationsTrendChart } from "@/components/operations/analytics/operations-trend-chart";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  operationsClient,
-  OperationsAnalyticsDashboard,
-  AnalyticsPreset,
+AnalyticsPreset,
+OperationsAnalyticsDashboard,
+operationsClient,
 } from "@/lib/api-client/operations-client";
-import { OperationsAnalyticsKpiGrid } from "@/components/operations/analytics/operations-analytics-kpi-grid";
-import { OperationsRiskCard } from "@/components/operations/analytics/operations-risk-card";
-import { OperationsReadinessChart } from "@/components/operations/analytics/operations-readiness-chart";
-import { OperationsIssuesAnalyticsCard } from "@/components/operations/analytics/operations-issues-analytics-card";
-import { OperationsSupplierScorecard } from "@/components/operations/analytics/operations-supplier-scorecard";
-import { OperationsFinancialAnalyticsCard } from "@/components/operations/analytics/operations-financial-analytics-card";
-import { OperationsSatisfactionCard } from "@/components/operations/analytics/operations-satisfaction-card";
-import { OperationsTrendChart } from "@/components/operations/analytics/operations-trend-chart";
 import {
-  BarChart3,
-  RefreshCw,
-  Download,
-  Calendar,
-  Compass,
-  AlertCircle,
-  ArrowLeft,
-  Filter,
+AlertCircle,
+Calendar,
+Compass,
+Download,
+RefreshCw
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter,useSearchParams } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
 
 const PRESET_LABELS: { label: string; value: AnalyticsPreset }[] = [

@@ -1,6 +1,6 @@
-import { CustomerNotificationType, NotificationChannel, NotificationDeliveryStatus } from "@prisma/client";
+import { CustomerNotificationType,NotificationChannel,NotificationDeliveryStatus } from "@prisma/client";
 
-export { CustomerNotificationType, NotificationChannel, NotificationDeliveryStatus };
+export { CustomerNotificationType,NotificationChannel,NotificationDeliveryStatus };
 
 export interface NotificationPayload {
   agencyId: string;

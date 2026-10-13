@@ -1,5 +1,5 @@
 import { NotificationDeliveryStatus } from "@prisma/client";
-import { WhatsAppProviderAdapter, SendResult } from "../types";
+import { SendResult,WhatsAppProviderAdapter } from "../types";
 
 export class MockWhatsAppProvider implements WhatsAppProviderAdapter {
   name = "MOCK";

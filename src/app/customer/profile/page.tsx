@@ -1,29 +1,25 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { customerPortalClient } from "@/lib/api-client";
-import { CustomerProfileView } from "@/lib/services/customer-portal-service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import { customerPortalClient } from "@/lib/api-client";
+import { CustomerProfileView } from "@/lib/services/customer-portal-service";
 import {
-  User,
-  Phone,
-  Mail,
-  MapPin,
-  Save,
-  Loader2,
-  ArrowLeft,
-  ShieldCheck,
-  CheckCircle2,
-  AlertCircle,
-  Bell,
-  MessageSquare,
-  Sparkles,
-  Smartphone,
+ArrowLeft,
+Bell,
+Loader2,
+Mail,
+MessageSquare,
+Phone,
+Save,
+ShieldCheck,
+Smartphone,
+User
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function CustomerProfilePage() {
   const router = useRouter();

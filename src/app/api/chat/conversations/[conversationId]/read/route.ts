@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "@/lib/api/context";
-import { platformChatService } from "@/lib/services/platform-chat-service";
-import { handleApiError, ForbiddenError, NotFoundError } from "@/lib/api/errors";
+import { ForbiddenError,handleApiError,NotFoundError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { platformChatService } from "@/lib/services/platform-chat-service";
 import { UserRole } from "@prisma/client";
+import { NextRequest,NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export async function POST(
     const userAgencyId = context.agency?.id || context.dbUser?.agencyId;
 
     // Handle virtual conversation id
-    let realId = conversationId;
+    const realId = conversationId;
     if (conversationId.startsWith("new_")) {
       const targetAgencyId = conversationId.replace("new_", "");
       if (!context.isPlatformOwner && userAgencyId !== targetAgencyId) {

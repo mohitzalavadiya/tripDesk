@@ -1,8 +1,8 @@
-import { NextRequest } from "next/server";
+import { ApiError,apiSuccess,handleApiError } from "@/lib/api";
 import { getAuthenticatedCustomer } from "@/lib/auth/customer-auth";
 import { customerNotificationService } from "@/lib/services/customer-notification-service";
-import { apiSuccess, handleApiError, ApiError } from "@/lib/api";
 import { CustomerNotificationType } from "@prisma/client";
+import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 

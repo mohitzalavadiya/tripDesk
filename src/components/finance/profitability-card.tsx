@@ -1,16 +1,11 @@
 "use client";
 
-import * as React from "react";
-import {
-  TrendingUp,
-  Percent,
-  Wallet,
-  ArrowRight,
-  ShieldCheck,
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Card,CardContent,CardDescription,CardHeader,CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/costing-engine";
+import {
+TrendingUp
+} from "lucide-react";
 
 interface ProfitabilityCardProps {
   profitability: {

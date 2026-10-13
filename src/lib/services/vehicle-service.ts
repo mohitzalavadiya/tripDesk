@@ -1,12 +1,12 @@
-import "server-only";
-import prisma from "@/lib/prisma";
 import { NotFoundError } from "@/lib/api";
+import prisma from "@/lib/prisma";
 import {
-  CreateVehicleInput,
-  UpdateVehicleInput,
-  VehicleListQueryInput,
+CreateVehicleInput,
+UpdateVehicleInput,
+VehicleListQueryInput,
 } from "@/lib/validation/vehicle-schema";
 import { Vehicle } from "@prisma/client";
+import "server-only";
 
 export interface PaginatedVehiclesResult {
   items: Vehicle[];

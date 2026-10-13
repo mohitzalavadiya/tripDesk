@@ -1,6 +1,5 @@
-import * as React from "react"
-import { LucideIcon, Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
+import { LucideIcon,Plus } from "lucide-react";
 
 interface EmptyStateProps {
   icon: LucideIcon

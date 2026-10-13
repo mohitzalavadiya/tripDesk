@@ -1,30 +1,29 @@
 "use client";
 
-import * as React from "react";
-import { useFormik } from "formik";
-import { ConfirmationStatus } from "@prisma/client";
-import { operationsClient, ActivityConfirmationWithDetails } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { getErrorMessage } from "@/lib/utils";
+import { ActivityConfirmationWithDetails,operationsClient } from "@/lib/api-client";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import { getErrorMessage } from "@/lib/utils";
+import { ConfirmationStatus } from "@prisma/client";
+import { useFormik } from "formik";
 import {
-  X,
-  Compass,
-  CheckCircle2,
-  AlertTriangle,
-  CalendarClock,
-  Send,
-  Loader2,
-  Calendar,
-  Clock,
-  MapPin,
-  Tag,
-  Ticket,
-  FileText,
+AlertTriangle,
+Calendar,
+CalendarClock,
+CheckCircle2,
+Clock,
+FileText,
+Loader2,
+MapPin,
+Send,
+Tag,
+Ticket,
+X
 } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 export type ActivityDialogMode = "REQUEST" | "CONFIRM" | "AMEND" | "CANCEL";
 

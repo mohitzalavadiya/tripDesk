@@ -1,43 +1,36 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
-import { formatCurrency } from "@/lib/costing-engine";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
-import {
-  Gift,
-  Users,
-  CheckCircle2,
-  TrendingUp,
-  CreditCard,
-  Search,
-  Settings,
-  Plus,
-  Share2,
-  Phone,
-  RotateCcw,
-  Sparkles,
-  ChevronRight,
-  X,
-  RefreshCw,
-} from "lucide-react";
-import { StatusBadge } from "@/components/shared/status-badge";
-import { experienceClient } from "@/lib/api-client/experience-client";
+import { Textarea } from "@/components/ui/textarea";
 import { customerClient } from "@/lib/api-client/customer-client";
-import { AgencyReferralItem, ReferralSummaryStats } from "@/lib/services/referral-service";
+import { experienceClient } from "@/lib/api-client/experience-client";
+import { formatCurrency } from "@/lib/costing-engine";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import { AgencyReferralItem,ReferralSummaryStats } from "@/lib/services/referral-service";
+import {
+CheckCircle2,
+Gift,
+Plus,
+RefreshCw,
+Search,
+Settings,
+Share2,
+TrendingUp,
+X
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 const REFERRAL_STATUS_FILTER_LABELS: Record<string, string> = {
   ALL: "All",

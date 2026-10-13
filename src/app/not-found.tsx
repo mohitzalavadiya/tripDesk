@@ -1,10 +1,9 @@
 "use client";
 
-import * as React from "react";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft,Compass,LayoutDashboard,LifeBuoy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Compass, ArrowLeft, LayoutDashboard, LifeBuoy } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
   const router = useRouter();

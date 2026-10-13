@@ -1,11 +1,11 @@
-import "server-only";
-import prisma from "@/lib/prisma";
 import { NotFoundError } from "@/lib/api";
+import prisma from "@/lib/prisma";
 import {
-  CreateTripVehicleInput,
-  UpdateTripVehicleInput,
+CreateTripVehicleInput,
+UpdateTripVehicleInput,
 } from "@/lib/validation/trip-vehicle-schema";
-import { TripVehicle, Vehicle, Prisma } from "@prisma/client";
+import { Prisma,TripVehicle,Vehicle } from "@prisma/client";
+import "server-only";
 
 export interface TripVehicleWithVehicle extends TripVehicle {
   vehicle: Vehicle | null;

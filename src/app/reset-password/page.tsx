@@ -1,33 +1,33 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useFormik } from "formik";
-import * as Yup from "yup";
 import {
-  verifyRecoveryOtpAction,
-  resendRecoveryOtpAction,
-  checkRecoveryStateAction,
-  resetPasswordAction,
-  AuthActionResult,
+AuthActionResult,
+checkRecoveryStateAction,
+resendRecoveryOtpAction,
+resetPasswordAction,
+verifyRecoveryOtpAction,
 } from "@/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useFormik } from "formik";
 import {
-  Compass,
-  Lock,
-  Mail,
-  KeyRound,
-  AlertCircle,
-  CheckCircle2,
-  ArrowLeft,
-  Eye,
-  EyeOff,
-  Loader2,
-  ShieldCheck,
-  RefreshCw,
+AlertCircle,
+ArrowLeft,
+CheckCircle2,
+Compass,
+Eye,
+EyeOff,
+KeyRound,
+Loader2,
+Lock,
+Mail,
+RefreshCw,
+ShieldCheck,
 } from "lucide-react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import * as React from "react";
+import * as Yup from "yup";
 
 const resetPasswordValidationSchema = Yup.object().shape({
   password: Yup.string()

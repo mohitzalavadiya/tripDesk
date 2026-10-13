@@ -1,9 +1,9 @@
-import { z } from "zod";
 import {
-  TravelDocumentType,
-  TravelDocumentStatus,
-  NotificationChannel,
+NotificationChannel,
+TravelDocumentStatus,
+TravelDocumentType,
 } from "@prisma/client";
+import { z } from "zod";
 
 export const listDocumentsSchema = z.object({
   type: z.nativeEnum(TravelDocumentType).optional(),

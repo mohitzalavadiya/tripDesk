@@ -1,7 +1,6 @@
-import * as React from "react"
-import { LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Breadcrumbs, BreadcrumbItem } from "./breadcrumbs"
+import { LucideIcon } from "lucide-react"
+import { BreadcrumbItem,Breadcrumbs } from "./breadcrumbs"
 
 interface ActionConfig {
   label: string

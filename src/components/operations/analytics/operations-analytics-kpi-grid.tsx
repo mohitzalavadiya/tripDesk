@@ -1,20 +1,15 @@
 "use client";
 
-import * as React from "react";
 import {
-  OperationsOverviewKPIs,
+OperationsOverviewKPIs,
 } from "@/lib/api-client/operations-client";
 import {
-  Compass,
-  CheckCircle2,
-  AlertTriangle,
-  AlertCircle,
-  Building,
-  Car,
-  Ticket,
-  IndianRupee,
-  Star,
-  Clock,
+AlertTriangle,
+Building,
+CheckCircle2,
+Compass,
+IndianRupee,
+Star
 } from "lucide-react";
 
 interface KpiGridProps {

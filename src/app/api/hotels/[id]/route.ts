@@ -1,14 +1,14 @@
-import { NextRequest } from "next/server";
 import {
-  requireReadAccess,
-  requireWriteAccess,
-  apiSuccess,
-  handleApiError,
-  validateJson,
-  NotFoundError,
+apiSuccess,
+handleApiError,
+NotFoundError,
+requireReadAccess,
+requireWriteAccess,
+validateJson,
 } from "@/lib/api";
-import { updateHotelSchema } from "@/lib/validation/hotel-schema";
 import { hotelService } from "@/lib/services/hotel-service";
+import { updateHotelSchema } from "@/lib/validation/hotel-schema";
+import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 

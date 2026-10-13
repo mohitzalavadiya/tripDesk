@@ -1,4 +1,4 @@
-import { NotificationProvider, NotificationPayload, SendNotificationResult, NotificationChannel, NotificationDeliveryStatus } from "../types";
+import { NotificationChannel,NotificationDeliveryStatus,NotificationPayload,NotificationProvider,SendNotificationResult } from "../types";
 
 export class WhatsAppNotificationProvider implements NotificationProvider {
   channel: NotificationChannel = NotificationChannel.WHATSAPP;

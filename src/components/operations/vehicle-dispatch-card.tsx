@@ -1,30 +1,28 @@
 "use client";
 
-import * as React from "react";
-import { DispatchStatus } from "@prisma/client";
-import { VehicleDispatchWithDetails } from "@/lib/api-client";
 import { TransportStatusBadge } from "@/components/operations/operations-status-badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import {
-  Car,
-  Calendar,
-  Clock,
-  MapPin,
-  Phone,
-  UserCheck,
-  CheckCircle2,
-  AlertTriangle,
-  PlayCircle,
-  Check,
-  Copy,
-  ExternalLink,
-  ShieldAlert,
-  Download,
-  CreditCard,
-  Edit,
-} from "lucide-react";
+import { VehicleDispatchWithDetails } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
+import { DispatchStatus } from "@prisma/client";
+import {
+AlertTriangle,
+Calendar,
+Car,
+Check,
+CheckCircle2,
+Clock,
+Copy,
+CreditCard,
+Download,
+Edit,
+MapPin,
+Phone,
+PlayCircle,
+UserCheck
+} from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 interface VehicleDispatchCardProps {
   dispatch: VehicleDispatchWithDetails;

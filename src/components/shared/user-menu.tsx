@@ -1,19 +1,18 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import { Settings, LogOut, CreditCard, Building } from "lucide-react";
-import { useAuth } from "@/context/auth-context";
+import { Avatar,AvatarFallback } from "@/components/ui/avatar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuLabel,
+DropdownMenuSeparator,
+DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/context/auth-context";
+import { Building,CreditCard,LogOut,Settings } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function UserMenu() {
   const router = useRouter();

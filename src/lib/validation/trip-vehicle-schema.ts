@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { VehiclePricingType } from "@prisma/client";
+import { z } from "zod";
 import { isValidPhoneNumber } from "./field-validators";
 
 /**

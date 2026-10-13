@@ -1,106 +1,102 @@
 "use client";
 
-import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import { isValidPhoneNumber } from "@/lib/validation/field-validators";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
-import {
-  tripClient,
-  travelerClient,
-  itineraryClient,
-  hotelClient,
-  vehicleClient,
-  activityClient,
-  tripHotelClient,
-  tripVehicleClient,
-  tripActivityClient,
-  tripDestinationClient,
-  rateSheetClient,
-  TripHotelWithHotel,
-  TripVehicleWithVehicle,
-  TripActivityWithActivity,
-  TripDestinationWithDestination,
-  RateSheetWithRelations,
-  HotelWithRelations,
-  ActivityWithRelations,
-} from "@/lib/api-client";
-import {
-  TripStatus,
-  Traveler,
-  ItineraryItem,
-  TravelerType,
-  Hotel,
-  Vehicle,
-  Activity,
-  ActivityType,
-  VehiclePricingType,
-} from "@prisma/client";
-import { TripWithRelations } from "@/lib/services/trip-service";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { formatEnumLabel, GENDER_OPTIONS } from "@/lib/utils/enum-formatters";
-import { EmptyState } from "@/components/shared/empty-state";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { getErrorMessage } from "@/lib/utils";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { DestinationMultiSelect } from "@/components/shared/destination-multi-select";
-import {
-  ArrowLeft,
-  Compass,
-  Calendar,
-  Info,
-  Plus,
-  Edit2,
-  Trash2,
-  CheckCircle2,
-  Hotel as HotelIcon,
-  Car,
-  Ticket,
-  DollarSign,
-  Users,
-  Archive,
-  Loader2,
-  UserPlus,
-  Mail,
-  Phone,
-  Building2,
-  Calculator,
-  FileText,
-  ExternalLink,
-  Share2,
-  Eye,
-  Sparkles,
-  MapPin,
-  ArrowUp,
-  ArrowDown,
-  ArrowRight,
-  Copy,
-  Check,
-  MessageSquare,
-} from "lucide-react";
-import { toast } from "sonner";
-import { formatTripStatus, TripStatusBadge } from "../page";
 import { QuotationStatusBadge } from "@/app/(dashboard)/quotations/page";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { DestinationMultiSelect } from "@/components/shared/destination-multi-select";
+import { EmptyState } from "@/components/shared/empty-state";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { Button } from "@/components/ui/button";
+import {
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+activityClient,
+ActivityWithRelations,
+hotelClient,
+HotelWithRelations,
+itineraryClient,
+rateSheetClient,
+RateSheetWithRelations,
+travelerClient,
+tripActivityClient,
+TripActivityWithActivity,
+tripClient,
+tripDestinationClient,
+TripDestinationWithDestination,
+tripHotelClient,
+TripHotelWithHotel,
+tripVehicleClient,
+TripVehicleWithVehicle,
+vehicleClient,
+} from "@/lib/api-client";
+import { TripWithRelations } from "@/lib/services/trip-service";
+import { getErrorMessage } from "@/lib/utils";
+import { formatEnumLabel,GENDER_OPTIONS } from "@/lib/utils/enum-formatters";
+import { isValidPhoneNumber } from "@/lib/validation/field-validators";
+import {
+Activity,
+ActivityType,
+Hotel,
+ItineraryItem,
+Traveler,
+TravelerType,
+TripStatus,
+Vehicle,
+VehiclePricingType,
+} from "@prisma/client";
+import { useFormik } from "formik";
+import {
+Archive,
+ArrowLeft,
+Building2,
+Calculator,
+Calendar,
+Car,
+Check,
+CheckCircle2,
+Compass,
+Copy,
+DollarSign,
+Edit2,
+ExternalLink,
+Eye,
+FileText,
+Hotel as HotelIcon,
+Info,
+Loader2,
+Mail,
+MapPin,
+MessageSquare,
+Phone,
+Plus,
+Share2,
+Sparkles,
+Ticket,
+Trash2,
+UserPlus,
+Users
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
+import * as Yup from "yup";
+import { TripStatusBadge } from "../page";
 
 export default function TripDetailPage() {
   const params = useParams();

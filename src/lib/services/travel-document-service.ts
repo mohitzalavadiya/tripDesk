@@ -1,24 +1,24 @@
 import "server-only";
 
+import { NotFoundError,ValidationError } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
-import { NotFoundError, ValidationError } from "@/lib/api";
 import {
-  TravelDocument,
-  TravelDocumentType,
-  TravelDocumentStatus,
-  NotificationChannel,
-  CustomerNotificationType,
-  Prisma,
-} from "@prisma/client";
-import {
-  ListDocumentsInput,
-  GenerateBookingDocumentsInput,
-  IssueDocumentInput,
-  RevokeDocumentInput,
-  ResendDocumentInput,
+GenerateBookingDocumentsInput,
+IssueDocumentInput,
+ListDocumentsInput,
+ResendDocumentInput,
+RevokeDocumentInput,
 } from "@/lib/validation/document-schema";
-import { documentPdfService } from "./document-pdf-service";
+import {
+CustomerNotificationType,
+NotificationChannel,
+Prisma,
+TravelDocument,
+TravelDocumentStatus,
+TravelDocumentType,
+} from "@prisma/client";
 import { communicationService } from "./communication-service";
+import { documentPdfService } from "./document-pdf-service";
 
 export interface DocumentListItemView {
   id: string;
@@ -787,7 +787,7 @@ export class TravelDocumentService {
     };
 
     let buffer: Buffer;
-    let filename = `${document.documentType}-${document.documentNumber}-v${document.version}.pdf`;
+    const filename = `${document.documentType}-${document.documentNumber}-v${document.version}.pdf`;
 
     switch (document.documentType) {
       case TravelDocumentType.HOTEL_VOUCHER: {

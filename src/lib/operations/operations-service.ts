@@ -1,11 +1,11 @@
-import {
-  Booking,
-  TripOperation,
-  TripReadiness,
-  ReadinessCheck,
-  TransportOperation,
-} from "@/types";
 import { formatCurrency } from "@/lib/costing-engine";
+import {
+Booking,
+ReadinessCheck,
+TransportOperation,
+TripOperation,
+TripReadiness,
+} from "@/types";
 
 /**
  * Evaluates all operational criteria and calculates the 0-100% readiness score.

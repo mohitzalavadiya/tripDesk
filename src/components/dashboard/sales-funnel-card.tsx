@@ -1,20 +1,11 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import {
-  TrendingDown,
-  TrendingUp,
-  ArrowRight,
-  ShieldCheck,
-  Inbox,
-  Eye,
-  CheckCircle2,
-  CalendarCheck,
-  Filter,
-} from "lucide-react";
-import { SalesFunnelAnalytics, FunnelStageItem } from "@/lib/services/dashboard-service";
 import { Badge } from "@/components/ui/badge";
+import { SalesFunnelAnalytics } from "@/lib/services/dashboard-service";
+import {
+Filter,
+TrendingUp
+} from "lucide-react";
 
 interface SalesFunnelCardProps {
   funnel?: SalesFunnelAnalytics | null;

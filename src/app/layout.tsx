@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { ScrollReset } from "@/components/layout/scroll-reset";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/auth-context";
 import { SaaSProvider } from "@/context/saas-context";
-import { ScrollReset } from "@/components/layout/scroll-reset";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({

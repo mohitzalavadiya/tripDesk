@@ -1,33 +1,33 @@
 "use client"
 
-import * as React from "react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import {
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Quotation, PublicQuotation } from "@/types"
 import {
-  getPublicQuotationUrl,
-  openWhatsAppShare,
-  copyQuotationLink,
-  shareQuotationNative,
+copyQuotationLink,
+getPublicQuotationUrl,
+openWhatsAppShare,
+shareQuotationNative,
 } from "@/lib/quotation/share-helpers"
-import { toast } from "sonner"
+import { PublicQuotation,Quotation } from "@/types"
 import {
-  Share2,
-  Copy,
-  Check,
-  Send,
-  MessageSquare,
-  ShieldCheck,
+Check,
+Copy,
+MessageSquare,
+Send,
+Share2,
+ShieldCheck,
 } from "lucide-react"
+import * as React from "react"
+import { toast } from "sonner"
 
 interface QuotationShareModalProps {
   open: boolean

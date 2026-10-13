@@ -1,10 +1,8 @@
-import * as Yup from "yup"
+import * as Yup from "yup";
 import {
-  isValidPhoneNumber,
-  isValidInteger,
-  isValidDecimal,
-  PHONE_REGEX,
-} from "./validation/field-validators"
+isValidDecimal,
+isValidPhoneNumber
+} from "./validation/field-validators";
 
 // ─── Shared Yup Validation Helpers ─────────────────────────────────────
 export const phoneYup = (required: boolean = false, label: string = "Phone number") => {

@@ -1,10 +1,10 @@
-import "server-only";
 import { prisma } from "@/lib/prisma";
 import {
-  Prisma,
-  UserRole,
-  UserNotificationType,
+Prisma,
+UserNotificationType,
+UserRole,
 } from "@prisma/client";
+import "server-only";
 import { internalNotificationService } from "./internal-notification-service";
 
 export interface ConversationView {
@@ -162,7 +162,7 @@ export class PlatformChatService {
     const allViews: ConversationView[] = [];
 
     for (const agency of agencies) {
-      let conv = agency.platformChatConversation;
+      const conv = agency.platformChatConversation;
       if (!conv) {
         // Virtual representation for agencies without messages yet
         const view = this.mapConversation(

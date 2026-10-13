@@ -1,12 +1,12 @@
-import { Activity, ActivityType } from "@prisma/client";
 import {
-  CreateActivityInput,
-  UpdateActivityInput,
+CreateActivityInput,
+UpdateActivityInput,
 } from "@/lib/validation/activity-schema";
+import { Activity,ActivityType } from "@prisma/client";
 import {
-  PaginatedResponse,
-  SingleResponse,
-  ApiClientError,
+ApiClientError,
+PaginatedResponse,
+SingleResponse,
 } from "./customer-client";
 
 export type ActivityWithRelations = Activity & {

@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { ProposalItemType } from "@prisma/client";
+import { z } from "zod";
 
 /**
  * Zod schema for creating a single Quotation Proposal Item (Inclusion / Exclusion / Note)

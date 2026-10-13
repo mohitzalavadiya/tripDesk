@@ -1,18 +1,12 @@
 "use client";
 
-import * as React from "react";
 import { TrendTimePoint } from "@/lib/api-client/operations-client";
 import {
-  Activity,
-  CheckCircle2,
-  Calendar,
-  AlertCircle,
-  TrendingUp,
-  Layers,
-  ShieldCheck,
-  Clock,
-  Compass,
+Activity,
+Calendar,
+ShieldCheck
 } from "lucide-react";
+import * as React from "react";
 
 interface OperationsTrendChartProps {
   trends?: TrendTimePoint[];

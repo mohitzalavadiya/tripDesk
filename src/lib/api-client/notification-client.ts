@@ -1,4 +1,4 @@
-import { UserNotificationType, UserRole } from "@prisma/client";
+import { UserNotificationType,UserRole } from "@prisma/client";
 
 export interface UserNotificationItem {
   id: string;

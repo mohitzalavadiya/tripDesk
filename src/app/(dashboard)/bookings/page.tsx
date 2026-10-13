@@ -1,76 +1,61 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
-  CalendarCheck,
-  Search,
-  Plus,
-  Edit,
-  Trash2,
-  Calendar,
-  Users,
-  CheckCircle2,
-  Clock,
-  Send,
-  Eye,
-  AlertCircle,
-  Sparkles,
-  MoreVertical,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  RotateCcw,
-  X,
-  Compass,
-  CreditCard,
-  Phone,
-  IndianRupee,
-  Layers,
-} from "lucide-react";
+BookingStatusBadge,
+PaymentStatusBadge,
+} from "@/components/booking/booking-status-badge";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
-import { useSubscription } from "@/context/subscription-context";
-import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuLabel,
+DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  BookingStatusBadge,
-  PaymentStatusBadge,
-} from "@/components/booking/booking-status-badge";
-import { bookingClient, BookingWithRelations } from "@/lib/api-client";
-import { BookingStatus, BookingPaymentStatus } from "@prisma/client";
+import { useSubscription } from "@/context/subscription-context";
+import { bookingClient,BookingWithRelations } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
+import { BookingPaymentStatus,BookingStatus } from "@prisma/client";
+import {
+CalendarCheck,
+ChevronLeft,
+ChevronRight,
+Compass,
+Eye,
+Layers,
+MoreVertical,
+Plus,
+Search,
+Trash2,
+X
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
 
 const PAYMENT_FILTER_LABELS: Record<string, string> = {

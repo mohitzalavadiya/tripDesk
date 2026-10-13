@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { getRequestContext } from "@/lib/api/context";
+import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 

@@ -1,12 +1,12 @@
+import {
+CreateVehicleInput,
+UpdateVehicleInput,
+} from "@/lib/validation/vehicle-schema";
 import { Vehicle } from "@prisma/client";
 import {
-  CreateVehicleInput,
-  UpdateVehicleInput,
-} from "@/lib/validation/vehicle-schema";
-import {
-  PaginatedResponse,
-  SingleResponse,
-  ApiClientError,
+ApiClientError,
+PaginatedResponse,
+SingleResponse,
 } from "./customer-client";
 
 async function handleResponse<T>(res: Response): Promise<T> {

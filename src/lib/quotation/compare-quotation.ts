@@ -1,13 +1,13 @@
-import {
-  Quotation,
-  Trip,
-  TripCosting,
-  TripHotel,
-  TripVehicle,
-  TripActivity,
-  ItineraryDay,
-} from "@/types"
 import { formatCurrency } from "@/lib/costing-engine"
+import {
+ItineraryDay,
+Quotation,
+Trip,
+TripActivity,
+TripCosting,
+TripHotel,
+TripVehicle,
+} from "@/types"
 
 export interface QuotationDifference {
   hasChanges: boolean

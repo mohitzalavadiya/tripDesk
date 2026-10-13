@@ -16,7 +16,7 @@
  * 7. Pure calculation service with ZERO database access.
  */
 
-import { Prisma, TaxMode, GstTreatment } from "@prisma/client";
+import { GstTreatment,Prisma,TaxMode } from "@prisma/client";
 
 export interface CalculateTaxInput {
   /**

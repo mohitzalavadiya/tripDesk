@@ -1,21 +1,21 @@
 "use client";
 
-import * as React from "react";
-import {
-  CustomerFeedback,
-  PublicReview,
-  Referral,
-  CustomerReward,
-  CustomerPreference,
-  CustomerLifecycleStatus,
-  CustomerCommunicationRecord,
-  CustomerEvent,
-  AgencyReviewSettings,
-  LoyaltyInfo,
-  LoyaltyTier,
-} from "@/types";
-import { useEnquiry } from "@/context/enquiry-context";
 import { useBooking } from "@/context/booking-context";
+import { useEnquiry } from "@/context/enquiry-context";
+import {
+AgencyReviewSettings,
+CustomerCommunicationRecord,
+CustomerEvent,
+CustomerFeedback,
+CustomerLifecycleStatus,
+CustomerPreference,
+CustomerReward,
+LoyaltyInfo,
+LoyaltyTier,
+PublicReview,
+Referral,
+} from "@/types";
+import * as React from "react";
 
 // Initial Demo Review Settings
 const initialReviewSettings: AgencyReviewSettings = {

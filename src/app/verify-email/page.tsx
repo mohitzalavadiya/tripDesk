@@ -1,13 +1,13 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
-import { useActionState } from "react";
-import { verifyEmailOtpAction, resendVerificationEmailAction } from "@/actions/auth-actions";
+import { resendVerificationEmailAction,verifyEmailOtpAction } from "@/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShieldCheck, CheckCircle2, AlertCircle, ArrowLeft, RefreshCw, Send, ShieldAlert, KeyRound } from "lucide-react";
+import { AlertCircle,ArrowLeft,CheckCircle2,KeyRound,RefreshCw,Send,ShieldAlert,ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { useRouter,useSearchParams } from "next/navigation";
+import * as React from "react";
+import { useActionState } from "react";
 
 const VERIFY_COOLDOWN_PREFIX = "tripdesk_verify_cooldown_";
 

@@ -1,9 +1,8 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { ShieldAlert, Sparkles, ArrowRight, ShieldCheck, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ArrowLeft,ArrowRight,CheckCircle2,ShieldAlert,ShieldCheck,Sparkles } from "lucide-react";
+import Link from "next/link";
 
 export interface QuotaExceededCardProps {
   resourceName: string;

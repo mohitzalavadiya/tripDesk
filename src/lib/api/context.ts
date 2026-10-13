@@ -1,20 +1,20 @@
-import "server-only";
-import { createClient } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
+import { createClient } from "@/lib/supabase/server";
 import {
-  UnauthorizedError,
-  ForbiddenError,
-  ReadOnlyAccessError,
-} from "./errors";
-import {
-  User,
-  Agency,
-  Subscription,
-  SubscriptionPlan,
-  UserRole,
-  SubscriptionStatus,
-  AgencyStatus,
+Agency,
+AgencyStatus,
+Subscription,
+SubscriptionPlan,
+SubscriptionStatus,
+User,
+UserRole,
 } from "@prisma/client";
+import "server-only";
+import {
+ForbiddenError,
+ReadOnlyAccessError,
+UnauthorizedError,
+} from "./errors";
 
 export interface SubscriptionAccessInfo {
   status: SubscriptionStatus;
@@ -108,7 +108,7 @@ export async function getRequestContext(): Promise<RequestContext | null> {
     // Calculate subscription access
     let status: SubscriptionStatus = SubscriptionStatus.TRIAL;
     let canWrite = isPlatformOwner;
-    let canRead = true;
+    const canRead = true;
     let trialDaysRemaining = 0;
 
     if (subscription) {

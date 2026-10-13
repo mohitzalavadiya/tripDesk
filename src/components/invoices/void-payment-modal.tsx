@@ -1,10 +1,10 @@
 "use client";
 
-import * as React from "react";
-import { X, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import { AlertTriangle,Loader2,X } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 interface VoidPaymentModalProps {
   isOpen: boolean;

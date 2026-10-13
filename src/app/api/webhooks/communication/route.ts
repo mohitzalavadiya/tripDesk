@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { NotificationDeliveryStatus } from "@prisma/client";
+import { NextRequest,NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 

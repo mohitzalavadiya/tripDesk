@@ -1,39 +1,29 @@
 "use client";
 
-import * as React from "react";
-import {
-  OperationDetailWithRelations,
-  VehicleDispatchWithDetails,
-  HotelConfirmationWithDetails,
-  ActivityConfirmationWithDetails,
-  operationsClient,
-} from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
-import { useModalScrollLock } from "@/lib/scroll-lock";
+OperationDetailWithRelations,
+operationsClient
+} from "@/lib/api-client";
 import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import {
-  X,
-  MessageSquare,
-  Copy,
-  Check,
-  Send,
-  Car,
-  Hotel,
-  Compass,
-  AlertTriangle,
-  FileText,
-  Loader2,
+Check,
+Copy,
+MessageSquare,
+Send,
+X
 } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 export type CommunicationTemplateType =
   | "DRIVER_PICKUP"

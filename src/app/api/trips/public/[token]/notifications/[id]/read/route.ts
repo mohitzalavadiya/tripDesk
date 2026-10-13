@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
 import { communicationService } from "@/lib/services/communication-service";
+import { NextRequest,NextResponse } from "next/server";
 
 interface RouteParams {
   params: Promise<{ token: string; id: string }>;

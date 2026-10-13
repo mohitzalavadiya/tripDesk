@@ -1,10 +1,10 @@
 "use client";
 
-import * as React from "react";
-import { PhoneCall, ArrowRight, CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import { PendingFollowUpItem } from "@/lib/services/dashboard-service";
+import { ArrowRight,CheckCircle2,PhoneCall } from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 interface FollowUpsListProps {
   followUps?: PendingFollowUpItem[];

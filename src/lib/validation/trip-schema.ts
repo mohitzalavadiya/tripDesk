@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { TripStatus } from "@prisma/client";
+import { z } from "zod";
 
 /**
  * Zod validation schema for creating a new Trip.

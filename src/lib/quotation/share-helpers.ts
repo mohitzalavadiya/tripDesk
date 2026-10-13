@@ -1,10 +1,10 @@
-import { Quotation, PublicQuotation } from "@/types"
-import { formatCurrency } from "@/lib/costing-engine"
-import { toast } from "sonner"
 import {
-  openWhatsAppChat,
-  WhatsAppChatOpenResult,
+openWhatsAppChat,
+WhatsAppChatOpenResult,
 } from "@/lib/communication/whatsapp/click-to-chat"
+import { formatCurrency } from "@/lib/costing-engine"
+import { PublicQuotation,Quotation } from "@/types"
+import { toast } from "sonner"
 
 export function getPublicQuotationUrl(shareToken: string): string {
   if (typeof window !== "undefined") {

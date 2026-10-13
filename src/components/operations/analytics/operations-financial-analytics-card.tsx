@@ -1,8 +1,7 @@
 "use client";
 
-import * as React from "react";
 import { FinancialAnalyticsResult } from "@/lib/api-client/operations-client";
-import { IndianRupee, TrendingUp, TrendingDown, AlertCircle, CheckCircle2 } from "lucide-react";
+import { IndianRupee,TrendingDown,TrendingUp } from "lucide-react";
 
 interface OperationsFinancialAnalyticsCardProps {
   financialData?: FinancialAnalyticsResult;

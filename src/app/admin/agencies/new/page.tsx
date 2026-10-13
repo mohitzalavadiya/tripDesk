@@ -1,35 +1,30 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useSaaS } from "@/context/saas-context";
-import { PageHeader } from "@/components/shared/page-header";
-import { formatCurrency } from "@/lib/costing-engine";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
+import { useSaaS } from "@/context/saas-context";
+import { BillingCycle } from "@/data/saas-data";
+import { formatCurrency } from "@/lib/costing-engine";
 import { isValidPhoneNumber } from "@/lib/validation/field-validators";
 import {
-  ArrowLeft,
-  Building2,
-  User,
-  CreditCard,
-  CheckCircle2,
-  Clock,
-  Sparkles,
-  ShieldCheck,
-  Calendar,
+ArrowLeft,
+Building2,
+Clock,
+CreditCard,
+User
 } from "lucide-react";
-import { BillingCycle, PlanTier } from "@/data/saas-data";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function CreateAgencyPage() {
   const router = useRouter();

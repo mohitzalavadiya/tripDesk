@@ -1,18 +1,17 @@
 "use client";
 
-import * as React from "react";
 import {
-  CheckCircle2,
-  Clock,
-  Send,
-  Eye,
-  XCircle,
-  AlertCircle,
-  RotateCcw,
-  Sparkles,
-  ShieldAlert,
-  FileText,
-  Ban,
+AlertCircle,
+Ban,
+CheckCircle2,
+Clock,
+Eye,
+FileText,
+RotateCcw,
+Send,
+ShieldAlert,
+Sparkles,
+XCircle,
 } from "lucide-react";
 
 export type UniversalStatus =

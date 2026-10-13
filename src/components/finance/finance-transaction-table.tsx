@@ -1,40 +1,38 @@
 "use client";
 
-import * as React from "react";
-import {
-  Search,
-  ArrowDownLeft,
-  ArrowUpRight,
-  RotateCcw,
-  Receipt,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
-  X,
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card,CardContent,CardDescription,CardHeader,CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
+import {
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
+} from "@/components/ui/table";
+import { formatCurrency } from "@/lib/costing-engine";
 import { UnifiedTransactionItem } from "@/lib/services/finance-service";
 import { TransactionType } from "@/lib/validation/finance-schema";
-import { formatCurrency } from "@/lib/costing-engine";
+import {
+ArrowDownLeft,
+ArrowUpRight,
+ChevronLeft,
+ChevronRight,
+FileText,
+Receipt,
+RotateCcw,
+Search,
+X
+} from "lucide-react";
 
 interface FinanceTransactionTableProps {
   transactions: UnifiedTransactionItem[];

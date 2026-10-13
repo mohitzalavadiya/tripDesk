@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { ActivityType } from "@prisma/client";
+import { z } from "zod";
 
 /**
  * Zod validation schema for creating a new Activity master record.

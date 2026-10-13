@@ -1,10 +1,10 @@
-import { z } from "zod";
 import {
-  PaymentMethod,
-  PaymentType,
-  SupplierPayableStatus,
-  ExpenseCategory,
+ExpenseCategory,
+PaymentMethod,
+PaymentType,
+SupplierPayableStatus,
 } from "@prisma/client";
+import { z } from "zod";
 
 export const FINANCE_PRESETS = [
   "TODAY",

@@ -1,35 +1,30 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Button } from "@/components/ui/button";
 import { customerPortalClient } from "@/lib/api-client";
 import { CustomerTripDetailView } from "@/lib/services/customer-portal-service";
-import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/shared/status-badge";
-import { toast } from "sonner";
 import {
-  Compass,
-  Calendar,
-  MapPin,
-  Clock,
-  ChevronRight,
-  FileText,
-  CreditCard,
-  Hotel,
-  Car,
-  Ticket,
-  Users,
-  Phone,
-  MessageSquare,
-  ShieldCheck,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Sparkles,
-  ArrowLeft,
-  Star,
+AlertCircle,
+ArrowLeft,
+Calendar,
+Car,
+CheckCircle2,
+Clock,
+Compass,
+CreditCard,
+FileText,
+Hotel,
+Loader2,
+MapPin,
+Phone,
+Star,
+Ticket,
+Users
 } from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
 
 /**
  * Customer-safe human-readable terminology mappings

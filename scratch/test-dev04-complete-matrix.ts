@@ -586,7 +586,7 @@ async function runDev04CompleteMatrix() {
   assert(t55Pass, 55, "Multi-Tenant Isolation: Agency B cannot void Agency A payment");
 
   // T56: Agency B cannot download Agency A invoice PDF
-  let t56Pass = false;
+  const t56Pass = false;
   const crossPdfInvoice = await invoiceService.getInvoice(agencyB.id, issuedReplacement.id);
   assert(crossPdfInvoice === null, 56, "Multi-Tenant Isolation: Agency B cannot download Agency A invoice PDF");
 

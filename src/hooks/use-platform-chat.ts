@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import {
-  platformChatClient,
+platformChatClient,
 } from "@/lib/api-client/platform-chat-client";
 import { ChatMessageView } from "@/lib/services/platform-chat-service";
+import { createClient } from "@/lib/supabase/client";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { usePathname } from "next/navigation";
+import { useCallback,useEffect,useRef,useState } from "react";
 
 export interface OptimisticChatMessage extends ChatMessageView {
   isOptimistic?: boolean;

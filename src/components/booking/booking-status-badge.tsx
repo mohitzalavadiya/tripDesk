@@ -1,6 +1,5 @@
-import * as React from "react";
-import { BookingStatus, BookingPaymentStatus, PaymentStatus } from "@prisma/client";
 import { cn } from "@/lib/utils";
+import { BookingPaymentStatus,BookingStatus,PaymentStatus } from "@prisma/client";
 
 export function BookingStatusBadge({
   status,

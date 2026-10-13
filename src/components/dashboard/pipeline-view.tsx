@@ -1,9 +1,9 @@
 "use client";
 
-import * as React from "react";
+import { PipelineStageMetric } from "@/lib/services/dashboard-service";
 import { ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { PipelineStageMetric } from "@/lib/services/dashboard-service";
+import * as React from "react";
 
 interface PipelineViewProps {
   pipeline?: PipelineStageMetric[];

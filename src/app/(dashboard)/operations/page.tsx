@@ -1,53 +1,43 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { CreateIssueModal } from "@/components/operations/create-issue-modal";
 import {
-  operationsClient,
-  OperationListItem,
-  ApiClientError,
-} from "@/lib/api-client";
-import { OperationStatus } from "@prisma/client";
-import { PageHeader } from "@/components/shared/page-header";
+TripOperationsStatusBadge
+} from "@/components/operations/operations-status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
-import { TableSkeleton, PageSkeleton, CardSkeleton } from "@/components/shared/loading-skeletons";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import {
-  TripOperationsStatusBadge,
-  TransportStatusBadge,
-} from "@/components/operations/operations-status-badge";
-import { CreateIssueModal } from "@/components/operations/create-issue-modal";
-import { toast } from "sonner";
+OperationListItem,
+operationsClient
+} from "@/lib/api-client";
+import { OperationStatus } from "@prisma/client";
 import {
-  Activity,
-  Car,
-  Compass,
-  Clock,
-  AlertTriangle,
-  AlertCircle,
-  MapPin,
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  RotateCcw,
-  Plus,
-  ArrowRight,
-  ShieldCheck,
-  CheckCircle2,
-  BarChart3,
+Activity,
+AlertCircle,
+AlertTriangle,
+BarChart3,
+Calendar,
+Car,
+ChevronLeft,
+ChevronRight,
+Clock,
+Compass,
+Search
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 
 export default function OperationsDashboardPage() {
   const router = useRouter();

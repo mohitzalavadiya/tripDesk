@@ -1,27 +1,23 @@
 "use client";
 
-import * as React from "react";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
+import {
+formatChatTime,
+usePlatformChat,
+} from "@/hooks/use-platform-chat";
 import { platformChatClient } from "@/lib/api-client/platform-chat-client";
 import { ConversationView } from "@/lib/services/platform-chat-service";
 import {
-  usePlatformChat,
-  formatChatTime,
-} from "@/hooks/use-platform-chat";
-import { Button } from "@/components/ui/button";
-import {
-  MessageSquare,
-  Send,
-  RefreshCw,
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  ShieldCheck,
-  Sparkles,
-  HelpCircle,
-  Wifi,
-  WifiOff,
+AlertCircle,
+Clock,
+MessageSquare,
+RefreshCw,
+Send,
+ShieldCheck,
+WifiOff
 } from "lucide-react";
+import * as React from "react";
 
 export default function SupportPage() {
   const { currentUser } = useAuth();

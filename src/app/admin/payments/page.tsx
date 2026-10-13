@@ -1,49 +1,43 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
-import { formatCurrency } from "@/lib/costing-engine";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
-import {
-  IndianRupee,
-  CheckCircle2,
-  Clock,
-  Building,
-  CreditCard,
-  Search,
-  RotateCcw,
-  Check,
-  X,
-  Eye,
-  AlertTriangle,
-  Plus,
-  RefreshCw,
-  TrendingUp,
-  ShieldCheck,
-  FileText,
-  Calendar,
-} from "lucide-react";
-import { StatusBadge } from "@/components/shared/status-badge";
-import {
-  adminClient,
+adminClient,
 } from "@/lib/api-client/admin-client";
-import {
-  AdminSubscriptionPaymentItem,
-  SubscriptionPaymentSummaryStats,
-} from "@/lib/services/admin-service";
+import { formatCurrency } from "@/lib/costing-engine";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import {
+AdminSubscriptionPaymentItem,
+SubscriptionPaymentSummaryStats,
+} from "@/lib/services/admin-service";
+import {
+AlertTriangle,
+Check,
+CheckCircle2,
+Clock,
+CreditCard,
+Eye,
+Plus,
+RefreshCw,
+Search,
+ShieldCheck,
+TrendingUp,
+X
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   BANK_TRANSFER: "Bank Transfer",

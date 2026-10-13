@@ -1,29 +1,23 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useFormik } from "formik";
-import * as Yup from "yup";
 import { signupAgencyOwnerAction } from "@/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Compass,
-  Building2,
-  User,
-  Clock,
-  Lock,
-  Mail,
-  Phone,
-  MapPin,
-  AlertCircle,
-  Sparkles,
-  ArrowRight,
-  Eye,
-  EyeOff,
-  Loader2,
-} from "lucide-react";
 import { phoneYup } from "@/lib/validation-schemas";
+import { useFormik } from "formik";
+import {
+AlertCircle,
+Building2,
+Clock,
+Compass,
+Eye,
+EyeOff,
+Loader2,
+User
+} from "lucide-react";
+import Link from "next/link";
+import * as React from "react";
+import * as Yup from "yup";
 
 const signupValidationSchema = Yup.object().shape({
   agencyName: Yup.string()

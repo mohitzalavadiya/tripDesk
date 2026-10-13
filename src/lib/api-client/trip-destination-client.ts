@@ -1,9 +1,9 @@
-import { TripDestination, Destination } from "@prisma/client";
 import {
-  AddTripDestinationInput,
-  ReorderTripDestinationsInput,
+AddTripDestinationInput,
+ReorderTripDestinationsInput,
 } from "@/lib/validation/trip-destination-schema";
-import { SingleResponse, ApiClientError } from "./customer-client";
+import { Destination,TripDestination } from "@prisma/client";
+import { ApiClientError,SingleResponse } from "./customer-client";
 
 export interface TripDestinationWithDestination extends TripDestination {
   destination: Destination;

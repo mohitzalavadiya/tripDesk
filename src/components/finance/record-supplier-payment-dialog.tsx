@@ -1,30 +1,30 @@
 "use client";
 
-import * as React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+Dialog,
+DialogContent,
+DialogDescription,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
-import { PaymentMethod, Supplier } from "@prisma/client";
-import { financeClient, supplierClient } from "@/lib/api-client";
+import { financeClient,supplierClient } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { getErrorMessage } from "@/lib/utils";
-import { Loader2, Lock, CheckCircle2, AlertCircle } from "lucide-react";
-import { toast } from "sonner";
 import { isValidDecimal } from "@/lib/validation/field-validators";
+import { PaymentMethod,Supplier } from "@prisma/client";
+import { AlertCircle,CheckCircle2,Loader2,Lock } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 interface RecordSupplierPaymentDialogProps {
   open: boolean;

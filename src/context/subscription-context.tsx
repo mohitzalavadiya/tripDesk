@@ -1,7 +1,7 @@
 "use client";
 
-import * as React from "react";
 import { subscriptionClient } from "@/lib/api-client/subscription-client";
+import * as React from "react";
 
 export interface EntitlementsState {
   CUSTOM_AGENCY_LOGO: boolean;

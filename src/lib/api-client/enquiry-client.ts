@@ -1,22 +1,22 @@
+import {
+CheckDuplicateEnquiryQuery,
+ConvertEnquiryToTripInput,
+CreateEnquiryInput,
+CreateFollowUpInput,
+EnquiryQueryInput,
+MarkEnquiryLostInput,
+TransitionStageInput,
+UpdateEnquiryInput,
+UpdateFollowUpInput,
+} from "@/lib/validation/enquiry-schema";
 import type {
-  Enquiry,
-  EnquiryFollowUp,
+Enquiry,
+EnquiryFollowUp,
 } from "@prisma/client";
 import {
-  CreateEnquiryInput,
-  UpdateEnquiryInput,
-  EnquiryQueryInput,
-  ConvertEnquiryToTripInput,
-  CreateFollowUpInput,
-  UpdateFollowUpInput,
-  TransitionStageInput,
-  MarkEnquiryLostInput,
-  CheckDuplicateEnquiryQuery,
-} from "@/lib/validation/enquiry-schema";
-import {
-  PaginatedResponse,
-  SingleResponse,
-  ApiClientError,
+ApiClientError,
+PaginatedResponse,
+SingleResponse,
 } from "./customer-client";
 
 async function handleResponse<T>(res: Response): Promise<T> {

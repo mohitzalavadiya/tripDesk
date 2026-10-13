@@ -1,38 +1,31 @@
 "use client";
 
-import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import {
-  ArrowLeft,
-  Calculator,
-  DollarSign,
-  Calendar,
-  Users,
-  Building2,
-  Car,
-  Ticket,
-  Plus,
-  FileText,
-  Loader2,
-  AlertCircle,
-  Sparkles,
-} from "lucide-react";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
-import { EmptyState } from "@/components/shared/empty-state";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
-import { quotationClient, TripCostingResult } from "@/lib/api-client";
+import { quotationClient,TripCostingResult } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
-import { toast } from "sonner";
+import {
+AlertCircle,
+ArrowLeft,
+Building2,
+Car,
+FileText,
+Loader2,
+Ticket,
+Users
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
 
 export default function TripCostingDedicatedPage() {
   const params = useParams();

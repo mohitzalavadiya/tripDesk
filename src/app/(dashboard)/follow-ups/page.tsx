@@ -1,71 +1,66 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Clock,
-  Plus,
-  Search,
-  RotateCcw,
-  CheckCircle2,
-  AlertTriangle,
-  Calendar,
-  Phone,
-  Mail,
-  MessageSquare,
-  Video,
-  User,
-  Compass,
-  ArrowRight,
-  Loader2,
-  CalendarDays,
-  Sparkles,
-  Check,
-  X,
-  AlertCircle,
-  MoreVertical,
-  ChevronLeft,
-  ChevronRight,
-  PhoneCall,
-} from "lucide-react";
-import {
-  followUpClient,
-  FollowUpWithRelations,
-  FollowUpSummaryStats,
-  enquiryClient,
-  EnquiryWithRelations,
+enquiryClient,
+EnquiryWithRelations,
+followUpClient,
+FollowUpSummaryStats,
+FollowUpWithRelations,
 } from "@/lib/api-client";
-import { FollowUpType, FollowUpStatus, EnquiryPriority } from "@prisma/client";
+import { EnquiryPriority,FollowUpType } from "@prisma/client";
+import {
+AlertCircle,
+AlertTriangle,
+ArrowRight,
+CalendarDays,
+Check,
+CheckCircle2,
+ChevronLeft,
+ChevronRight,
+Clock,
+Loader2,
+Mail,
+MessageSquare,
+Phone,
+PhoneCall,
+Plus,
+RotateCcw,
+Search,
+Sparkles,
+Video,
+X
+} from "lucide-react";
+import Link from "next/link";
+import * as React from "react";
 import { toast } from "sonner";
 const TYPE_FILTER_LABELS: Record<string, string> = {
   all: "All",

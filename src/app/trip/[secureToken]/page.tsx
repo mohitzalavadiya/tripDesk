@@ -1,32 +1,32 @@
 "use client";
 
-import * as React from "react";
-import { useParams } from "next/navigation";
-import { tripPublicClient, bookingPublicClient } from "@/lib/api-client";
-import { PublicTripPayload } from "@/lib/services/trip-public-service";
-import { PublicBookingPayload } from "@/lib/services/booking-public-service";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { bookingPublicClient,tripPublicClient } from "@/lib/api-client";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import { PublicBookingPayload } from "@/lib/services/booking-public-service";
+import { PublicTripPayload } from "@/lib/services/trip-public-service";
 import {
-  Compass,
-  CheckCircle2,
-  Clock,
-  Hotel,
-  Car,
-  Ticket,
-  MessageSquare,
-  Sparkles,
-  AlertTriangle,
-  X,
-  Star,
-  ThumbsUp,
-  Loader2,
-  ChevronDown,
-  ChevronUp,
-  Edit3,
-  ExternalLink,
+AlertTriangle,
+Car,
+CheckCircle2,
+ChevronDown,
+ChevronUp,
+Clock,
+Compass,
+Edit3,
+ExternalLink,
+Hotel,
+Loader2,
+MessageSquare,
+Sparkles,
+Star,
+ThumbsUp,
+Ticket,
+X,
 } from "lucide-react";
+import { useParams } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function CustomerTripPortalPage() {
   const params = useParams();

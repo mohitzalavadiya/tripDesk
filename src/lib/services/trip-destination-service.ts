@@ -1,11 +1,11 @@
-import "server-only";
+import { NotFoundError,ValidationError } from "@/lib/api";
 import prisma from "@/lib/prisma";
-import { NotFoundError, ValidationError } from "@/lib/api";
 import {
-  AddTripDestinationInput,
-  ReorderTripDestinationsInput,
+AddTripDestinationInput,
+ReorderTripDestinationsInput,
 } from "@/lib/validation/trip-destination-schema";
-import { TripDestination, Destination } from "@prisma/client";
+import { Destination,TripDestination } from "@prisma/client";
+import "server-only";
 
 export interface TripDestinationWithDestination extends TripDestination {
   destination: Destination;

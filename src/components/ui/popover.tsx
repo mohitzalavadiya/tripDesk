@@ -1,7 +1,7 @@
 "use client"
 
-import * as React from "react"
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
+import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -81,10 +81,10 @@ function PopoverDescription({
 }
 
 export {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
+Popover,
+PopoverContent,
+PopoverDescription,
+PopoverHeader,
+PopoverTitle,
+PopoverTrigger
 }

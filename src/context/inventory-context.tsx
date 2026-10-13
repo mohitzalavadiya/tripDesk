@@ -1,20 +1,20 @@
 "use client"
 
-import * as React from "react"
 import {
-  Supplier,
-  Hotel,
-  HotelRoom,
-  HotelRate,
-  RateSheet,
-  Vehicle,
-  VehicleRate,
-  Activity,
-  ActivityRate,
-  TripHotel,
-  TripVehicle,
-  TripActivity,
+Activity,
+ActivityRate,
+Hotel,
+HotelRate,
+HotelRoom,
+RateSheet,
+Supplier,
+TripActivity,
+TripHotel,
+TripVehicle,
+Vehicle,
+VehicleRate,
 } from "@/types"
+import * as React from "react"
 
 // ═════════════════════════════════════════════════════════════════════
 // INITIAL DEMO DATA (Rich Indian Travel Inventory)

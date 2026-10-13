@@ -1,10 +1,9 @@
 "use client";
 
-import * as React from "react";
 import {
-  ReadinessAnalyticsResult,
+ReadinessAnalyticsResult,
 } from "@/lib/api-client/operations-client";
-import { CheckCircle2, ShieldAlert, Building, Car, Ticket, AlertCircle } from "lucide-react";
+import { AlertCircle,Building,Car,CheckCircle2,Ticket } from "lucide-react";
 
 interface OperationsReadinessChartProps {
   readinessData?: ReadinessAnalyticsResult;

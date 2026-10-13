@@ -1,31 +1,31 @@
-import "server-only";
 import { prisma } from "@/lib/prisma";
 import {
-  Enquiry,
-  EnquiryStatus,
-  EnquiryPriority,
-  EnquirySource,
-  EnquiryFollowUp,
-  FollowUpStatus,
-  FollowUpType,
-  Prisma,
-} from "@prisma/client";
-import {
-  CreateEnquiryInput,
-  UpdateEnquiryInput,
-  EnquiryQueryInput,
-  ConvertEnquiryToTripInput,
-  CreateFollowUpInput,
-  UpdateFollowUpInput,
-  TransitionStageInput,
-  MarkEnquiryLostInput,
-  MarkEnquiryWonInput,
-  CheckDuplicateEnquiryQuery,
+CheckDuplicateEnquiryQuery,
+ConvertEnquiryToTripInput,
+CreateEnquiryInput,
+CreateFollowUpInput,
+EnquiryQueryInput,
+MarkEnquiryLostInput,
+MarkEnquiryWonInput,
+TransitionStageInput,
+UpdateEnquiryInput,
+UpdateFollowUpInput,
 } from "@/lib/validation/enquiry-schema";
-import { tripService } from "./trip-service";
-import { followUpService } from "./follow-up-service";
+import {
+Enquiry,
+EnquiryFollowUp,
+EnquiryPriority,
+EnquirySource,
+EnquiryStatus,
+FollowUpStatus,
+FollowUpType,
+Prisma,
+} from "@prisma/client";
+import "server-only";
 import { communicationService } from "./communication-service";
+import { followUpService } from "./follow-up-service";
 import { internalNotificationService } from "./internal-notification-service";
+import { tripService } from "./trip-service";
 
 export type EnquiryWithRelations = Enquiry & {
   customer: {

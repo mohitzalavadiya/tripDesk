@@ -1,73 +1,64 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import {
-  FileText,
-  Search,
-  Plus,
-  ExternalLink,
-  Edit,
-  Trash2,
-  Share2,
-  Download,
-  Calendar,
-  Users,
-  CheckCircle2,
-  Clock,
-  Send,
-  Eye,
-  AlertCircle,
-  Sparkles,
-  MoreVertical,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  RotateCcw,
-  X,
-  Compass,
-} from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
-import { useSubscription } from "@/context/subscription-context";
-import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from "@/components/ui/dialog";
-import { quotationClient, QuotationWithRelations } from "@/lib/api-client";
-import { QuotationStatus } from "@prisma/client";
+import {
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuLabel,
+DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
+} from "@/components/ui/table";
+import { useSubscription } from "@/context/subscription-context";
+import { quotationClient,QuotationWithRelations } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
+import { QuotationStatus } from "@prisma/client";
+import {
+CheckCircle2,
+ChevronLeft,
+ChevronRight,
+Clock,
+Download,
+Edit,
+ExternalLink,
+Eye,
+FileText,
+MoreVertical,
+Plus,
+Search,
+Send,
+Share2,
+Trash2,
+X
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
 
 export function QuotationStatusBadge({ status }: { status: QuotationStatus | string }) {

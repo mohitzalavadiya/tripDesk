@@ -1,12 +1,12 @@
 import "server-only";
 
-import PDFDocument from "pdfkit";
 import { prisma } from "@/lib/prisma";
 import { pdfBrandingHelper } from "@/lib/services/pdf-branding-helper";
 import {
-  ConfirmationStatus,
-  DispatchStatus,
+ConfirmationStatus,
+DispatchStatus,
 } from "@prisma/client";
+import PDFDocument from "pdfkit";
 
 export interface DocumentSummaryItem {
   id: string;

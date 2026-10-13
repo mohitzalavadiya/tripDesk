@@ -1,4 +1,4 @@
-import { ConversationView, ChatMessageView } from "@/lib/services/platform-chat-service";
+import { ChatMessageView,ConversationView } from "@/lib/services/platform-chat-service";
 
 export interface ApiResponse<T> {
   success: boolean;

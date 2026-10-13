@@ -1,57 +1,55 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuLabel,
+DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
+} from "@/components/ui/table";
 import { useSubscription } from "@/context/subscription-context";
 import { tripClient } from "@/lib/api-client";
-import { TripStatus } from "@prisma/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Compass,
-  Search,
-  Plus,
-  MoreVertical,
-  Eye,
-  Calendar,
-  Users,
-  RotateCcw,
-  Plane,
-  Luggage,
-  CheckCircle2,
-  X,
-  ArrowUpRight,
-  Archive,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  AlertCircle,
-  Clock,
-} from "lucide-react";
-import { toast } from "sonner";
 import { TripWithRelations } from "@/lib/services/trip-service";
+import { TripStatus } from "@prisma/client";
+import {
+AlertCircle,
+Archive,
+ArrowUpRight,
+Calendar,
+CheckCircle2,
+ChevronLeft,
+ChevronRight,
+Clock,
+Compass,
+Eye,
+Luggage,
+MoreVertical,
+Plane,
+Plus,
+Search,
+Users,
+X
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 const AVATAR_GRADIENTS = [
   "from-indigo-500 to-purple-600",

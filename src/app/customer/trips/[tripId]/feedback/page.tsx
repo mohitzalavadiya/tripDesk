@@ -1,23 +1,23 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { customerPortalClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
+import { customerPortalClient } from "@/lib/api-client";
 import {
-  Star,
-  Sparkles,
-  CheckCircle2,
-  ArrowLeft,
-  Loader2,
-  Hotel,
-  Car,
-  Compass,
-  ExternalLink,
+ArrowLeft,
+Car,
+CheckCircle2,
+Compass,
+ExternalLink,
+Hotel,
+Loader2,
+Sparkles,
+Star,
 } from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function CustomerFeedbackPage() {
   const params = useParams();

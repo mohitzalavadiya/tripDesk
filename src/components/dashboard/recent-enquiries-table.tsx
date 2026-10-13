@@ -1,19 +1,18 @@
 "use client";
 
-import * as React from "react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
-import { Eye, ArrowRight, User } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { StatusBadge } from "../enquiries/status-badge";
 import { RecentEnquiryItem } from "@/lib/services/dashboard-service";
 import { formatEnumLabel } from "@/lib/utils/enum-formatters";
+import { ArrowRight,Eye,User } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { StatusBadge } from "../enquiries/status-badge";
 
 interface RecentEnquiriesTableProps {
   enquiries?: RecentEnquiryItem[];

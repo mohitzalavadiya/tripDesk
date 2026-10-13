@@ -1,47 +1,47 @@
 "use client";
 
-import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { rateSheetClient, RateSheetWithRelations } from "@/lib/api-client";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { getErrorMessage } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  ArrowLeft,
-  Calendar,
-  Sparkles,
-  Hotel as HotelIcon,
-  Truck,
-  Edit2,
-  Trash2,
-  MoreVertical,
-  Loader2,
-  AlertTriangle,
-} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { rateSheetClient,RateSheetWithRelations } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
+import { isValidDecimal,isValidInteger } from "@/lib/validation/field-validators";
+import {
+AlertTriangle,
+ArrowLeft,
+Calendar,
+Edit2,
+Hotel as HotelIcon,
+Loader2,
+MoreVertical,
+Sparkles,
+Trash2,
+Truck,
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
-import { isValidDecimal, isValidInteger } from "@/lib/validation/field-validators";
 
 export default function RateSheetDetailPage() {
   const router = useRouter();

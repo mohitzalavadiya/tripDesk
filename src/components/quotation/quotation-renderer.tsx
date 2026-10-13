@@ -1,29 +1,28 @@
 "use client"
 
-import * as React from "react"
-import {
-  Quotation,
-  PublicQuotation,
-  QuotationSection,
-} from "@/types"
 import { formatCurrency } from "@/lib/costing-engine"
 import {
-  Calendar,
-  Clock,
-  MapPin,
-  Users,
-  Hotel,
-  Car,
-  Ticket,
-  Check,
-  X,
-  Phone,
-  Mail,
-  Globe,
-  Sparkles,
-  FileText,
-  Compass,
+PublicQuotation,
+Quotation
+} from "@/types"
+import {
+Calendar,
+Car,
+Check,
+Clock,
+Compass,
+FileText,
+Globe,
+Hotel,
+Mail,
+MapPin,
+Phone,
+Sparkles,
+Ticket,
+Users,
+X,
 } from "lucide-react"
+import * as React from "react"
 
 interface QuotationRendererProps {
   quotation: Quotation | PublicQuotation

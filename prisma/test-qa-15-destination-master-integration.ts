@@ -31,8 +31,8 @@ async function runTests() {
   let agency2: any = null;
   let destA1: any = null;
   let destA2: any = null;
-  let createdHotelIds: string[] = [];
-  let createdActivityIds: string[] = [];
+  const createdHotelIds: string[] = [];
+  const createdActivityIds: string[] = [];
 
   let passed = 0;
   let failed = 0;

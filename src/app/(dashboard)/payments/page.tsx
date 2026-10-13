@@ -1,67 +1,66 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import {
-  Search,
-  Plus,
-  Trash2,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  CreditCard,
-  Building2,
-  ArrowDownLeft,
-  ArrowUpRight,
-  ArrowUpDown,
-} from "lucide-react";
+import { PaymentStatusBadge } from "@/components/booking/booking-status-badge";
+import { RecordSupplierPaymentDialog } from "@/components/finance/record-supplier-payment-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
-import { getErrorMessage } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { PaymentStatusBadge } from "@/components/booking/booking-status-badge";
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  paymentClient,
-  bookingClient,
-  financeClient,
-  PaymentWithRelations,
-  BookingWithRelations,
+bookingClient,
+BookingWithRelations,
+financeClient,
+paymentClient,
+PaymentWithRelations,
 } from "@/lib/api-client";
-import { PaymentMethod } from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
+import { PaymentMethod } from "@prisma/client";
+import {
+ArrowDownLeft,
+ArrowUpDown,
+ArrowUpRight,
+ChevronLeft,
+ChevronRight,
+CreditCard,
+Loader2,
+Plus,
+Search,
+Trash2,
+X
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
-import { RecordSupplierPaymentDialog } from "@/components/finance/record-supplier-payment-dialog";
 
 const METHOD_FILTER_LABELS: Record<string, string> = {
   all: "All",

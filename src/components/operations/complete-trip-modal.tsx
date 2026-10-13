@@ -1,24 +1,23 @@
 "use client";
 
-import * as React from "react";
-import { OperationStatus, IssueStatus } from "@prisma/client";
-import { operationsClient, OperationDetailWithRelations } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { getErrorMessage } from "@/lib/utils";
+import { OperationDetailWithRelations,operationsClient } from "@/lib/api-client";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import { getErrorMessage } from "@/lib/utils";
+import { IssueStatus,OperationStatus } from "@prisma/client";
 import {
-  X,
-  CheckCircle2,
-  AlertTriangle,
-  Loader2,
-  Star,
-  Hotel,
-  Car,
-  Compass,
-  FileCheck2,
+AlertTriangle,
+Car,
+CheckCircle2,
+FileCheck2,
+Hotel,
+Loader2,
+Star,
+X
 } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 interface CompleteTripModalProps {
   operation: OperationDetailWithRelations;

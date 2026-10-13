@@ -1,60 +1,54 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
-import { useSubscription } from "@/context/subscription-context";
-import {
-  customerClient,
-  CustomerWithCounts,
-} from "@/lib/api-client";
-import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuLabel,
+DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
+import { useSubscription } from "@/context/subscription-context";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+customerClient,
+CustomerWithCounts,
+} from "@/lib/api-client";
+import { getErrorMessage } from "@/lib/utils";
 import {
-  Users,
-  Search,
-  Plus,
-  MoreVertical,
-  Eye,
-  Phone,
-  Mail,
-  MapPin,
-  RotateCcw,
-  X,
-  Compass,
-  Archive,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  AlertCircle,
-  Inbox,
-  CheckCircle2,
-  IndianRupee,
-  Building,
+Archive,
+CheckCircle2,
+ChevronLeft,
+ChevronRight,
+Compass,
+Eye,
+Inbox,
+Mail,
+MapPin,
+MoreVertical,
+Phone,
+Plus,
+Search,
+Users,
+X
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
 
 const AVATAR_GRADIENTS = [

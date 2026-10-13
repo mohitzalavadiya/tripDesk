@@ -1,32 +1,26 @@
 "use client"
 
-import * as React from "react"
-import {
-  PricingSettings,
-  CostingSummary,
-  TaxRule,
-} from "@/types"
-import {
-  formatCurrency,
-  evaluateMarginHealth,
-} from "@/lib/costing-engine"
-import {
-  Percent,
-  DollarSign,
-  Tag,
-  Receipt,
-  Settings2,
-  Lock,
-  Unlock,
-  AlertTriangle,
-  CheckCircle2,
-  Sparkles,
-  Calculator,
-  RotateCcw,
-} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+evaluateMarginHealth,
+formatCurrency,
+} from "@/lib/costing-engine"
+import {
+CostingSummary,
+PricingSettings,
+TaxRule,
+} from "@/types"
+import {
+Calculator,
+DollarSign,
+Lock,
+Percent,
+RotateCcw,
+Tag,
+Unlock
+} from "lucide-react"
 
 interface PricingControlPanelProps {
   settings: PricingSettings

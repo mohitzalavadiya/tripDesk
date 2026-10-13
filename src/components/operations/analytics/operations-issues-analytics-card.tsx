@@ -1,8 +1,7 @@
 "use client";
 
-import * as React from "react";
 import { IssueAnalyticsResult } from "@/lib/api-client/operations-client";
-import { AlertTriangle, Clock, RefreshCw, Layers } from "lucide-react";
+import { AlertTriangle,Clock,RefreshCw } from "lucide-react";
 
 interface OperationsIssuesAnalyticsCardProps {
   issueData?: IssueAnalyticsResult;

@@ -1,115 +1,101 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
 import {
-  CalendarCheck,
-  ArrowLeft,
-  Share2,
-  Download,
-  IndianRupee,
-  Hotel,
-  Car,
-  Ticket,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  FileText,
-  MessageSquare,
-  Copy,
-  Printer,
-  RotateCcw,
-  ExternalLink,
-  ChevronRight,
-  User,
-  Phone,
-  Mail,
-  MapPin,
-  Calendar,
-  Users,
-  Building,
-  CreditCard,
-  History,
-  Lock,
-  Compass,
-  Plus,
-  Trash2,
-  Loader2,
-  AlertCircle,
-  Edit2,
-  ShieldCheck,
-  Layers,
-  Sparkles,
-  Send,
-  Receipt,
-  ChevronDown,
-  RefreshCw,
-} from "lucide-react";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+BookingStatusBadge,
+PaymentStatusBadge,
+} from "@/components/booking/booking-status-badge";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { getErrorMessage } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuLabel,
+DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import {
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  BookingStatusBadge,
-  PaymentStatusBadge,
-} from "@/components/booking/booking-status-badge";
-import {
-  bookingClient,
-  paymentClient,
-  financeClient,
-  documentClient,
-  DocumentItem,
-  BookingWithRelations,
-  BookingPaymentScheduleResult,
+bookingClient,
+BookingPaymentScheduleResult,
+BookingWithRelations,
+documentClient,
+DocumentItem,
+financeClient,
+paymentClient,
 } from "@/lib/api-client";
-import {
-  BookingStatus,
-  BookingPaymentStatus,
-  PaymentMethod,
-  PaymentStatus,
-  Payment,
-  TravelDocumentType,
-  NotificationChannel,
-} from "@prisma/client";
 import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
 import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
+import {
+BookingStatus,
+NotificationChannel,
+PaymentMethod
+} from "@prisma/client";
+import {
+AlertCircle,
+AlertTriangle,
+ArrowLeft,
+Calendar,
+CalendarCheck,
+Car,
+CheckCircle2,
+ChevronDown,
+ChevronRight,
+Clock,
+Compass,
+CreditCard,
+Download,
+ExternalLink,
+FileText,
+History,
+Hotel,
+IndianRupee,
+Layers,
+Loader2,
+Lock,
+Mail,
+Phone,
+Plus,
+Receipt,
+RefreshCw,
+Send,
+ShieldCheck,
+Sparkles,
+Ticket,
+Trash2,
+User
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {

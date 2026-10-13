@@ -1,40 +1,37 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import { EnquiryWithRelations } from "@/lib/api-client";
-import { StatusBadge, PriorityBadge } from "./status-badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
-  MoreVertical,
-  Eye,
-  Phone,
-  MapPin,
-  Calendar,
-  Users,
-  Compass,
-  Trash2,
-  Clock,
-  IndianRupee,
-} from "lucide-react";
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuLabel,
+DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
+} from "@/components/ui/table";
+import { EnquiryWithRelations } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
 import type { EnquiryStatus } from "@prisma/client";
+import {
+Calendar,
+Clock,
+Compass,
+Eye,
+MapPin,
+MoreVertical,
+Trash2,
+Users
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { PriorityBadge,StatusBadge } from "./status-badge";
 
 interface EnquiryTableProps {
   enquiries: EnquiryWithRelations[];

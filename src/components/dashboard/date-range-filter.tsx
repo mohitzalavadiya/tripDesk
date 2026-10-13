@@ -1,17 +1,17 @@
 "use client";
 
-import * as React from "react";
-import { Calendar as CalendarIcon, Clock, Filter, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import { DashboardPreset } from "@/lib/validation/dashboard-schema";
+import { Clock } from "lucide-react";
+import * as React from "react";
 
 interface DateRangeFilterProps {
   preset: DashboardPreset;

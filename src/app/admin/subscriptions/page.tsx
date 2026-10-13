@@ -1,43 +1,36 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
-import { toast } from "sonner";
-import { formatEnumLabel } from "@/lib/utils/enum-formatters";
-import {
-  CreditCard,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
-  Search,
-  RefreshCw,
-  Eye,
-  Calendar,
-  IndianRupee,
-  Layers,
-  Ban,
-} from "lucide-react";
 import { adminClient } from "@/lib/api-client/admin-client";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import { formatEnumLabel } from "@/lib/utils/enum-formatters";
+import {
+AlertTriangle,
+CheckCircle2,
+Clock,
+RefreshCw,
+Search
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function AdminSubscriptionsPage() {
   const router = useRouter();

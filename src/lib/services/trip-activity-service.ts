@@ -1,11 +1,11 @@
-import "server-only";
+import { NotFoundError,ValidationError } from "@/lib/api";
 import prisma from "@/lib/prisma";
-import { NotFoundError, ValidationError } from "@/lib/api";
 import {
-  CreateTripActivityInput,
-  UpdateTripActivityInput,
+CreateTripActivityInput,
+UpdateTripActivityInput,
 } from "@/lib/validation/trip-activity-schema";
-import { TripActivity, Activity, TripDestination, Destination } from "@prisma/client";
+import { Activity,Destination,TripActivity,TripDestination } from "@prisma/client";
+import "server-only";
 
 export interface TripActivityWithActivity extends TripActivity {
   activity: Activity | null;

@@ -1,13 +1,13 @@
+import {
+CreatePaymentInput,
+PaymentQueryInput,
+UpdatePaymentInput,
+} from "@/lib/validation/payment-schema";
 import { Payment } from "@prisma/client";
 import {
-  CreatePaymentInput,
-  UpdatePaymentInput,
-  PaymentQueryInput,
-} from "@/lib/validation/payment-schema";
-import {
-  PaginatedResponse,
-  SingleResponse,
-  ApiClientError,
+ApiClientError,
+PaginatedResponse,
+SingleResponse,
 } from "./customer-client";
 
 async function handleResponse<T>(res: Response): Promise<T> {

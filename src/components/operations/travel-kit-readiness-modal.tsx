@@ -1,18 +1,16 @@
 "use client";
 
-import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { useModalScrollLock } from "@/lib/scroll-lock";
 import {
-  FileText,
-  CheckCircle2,
-  AlertTriangle,
-  Download,
-  Hotel,
-  Car,
-  Ticket,
-  AlertCircle,
-  X,
+AlertCircle,
+AlertTriangle,
+Car,
+CheckCircle2,
+Download,
+FileText,
+Hotel,
+X
 } from "lucide-react";
 
 interface TravelKitReadinessModalProps {

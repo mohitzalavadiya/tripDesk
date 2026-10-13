@@ -1,5 +1,5 @@
 import { NotificationDeliveryStatus } from "@prisma/client";
-import { EmailProviderAdapter, SendResult } from "../types";
+import { EmailProviderAdapter,SendResult } from "../types";
 
 export class MockEmailProvider implements EmailProviderAdapter {
   name = "MOCK";

@@ -1,57 +1,44 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import {
-  operationsClient,
-  OperationListItem,
-} from "@/lib/api-client";
-import {
-  IssuePriority,
-  IssueStatus,
-  OperationalIssue,
-} from "@prisma/client";
-import { PageHeader } from "@/components/shared/page-header";
+import { CreateIssueModal } from "@/components/operations/create-issue-modal";
+import { OperationalIssueCard } from "@/components/operations/operational-issue-card";
+import { ResolveIssueDialog } from "@/components/operations/resolve-issue-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import {
-  IssuePriorityBadge,
-  IssueStatusBadge,
-} from "@/components/operations/operations-status-badge";
-import { CreateIssueModal } from "@/components/operations/create-issue-modal";
-import { ResolveIssueDialog } from "@/components/operations/resolve-issue-dialog";
-import { OperationalIssueCard } from "@/components/operations/operational-issue-card";
-import { toast } from "sonner";
+operationsClient
+} from "@/lib/api-client";
 import {
-  AlertCircle,
-  AlertTriangle,
-  ArrowLeft,
-  CheckCircle2,
-  Clock,
-  Search,
-  RotateCcw,
-  Plus,
-  Compass,
-  Building,
-  Car,
-  Ticket,
-  Check,
-  Loader2,
-  ExternalLink,
-  ShieldCheck,
+IssuePriority,
+IssueStatus,
+OperationalIssue,
+} from "@prisma/client";
+import {
+AlertCircle,
+AlertTriangle,
+ArrowLeft,
+CheckCircle2,
+Clock,
+Compass,
+ExternalLink,
+Plus,
+Search
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 type AgencyIssueItem = OperationalIssue & {
   tripOperation: {

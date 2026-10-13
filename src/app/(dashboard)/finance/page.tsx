@@ -1,44 +1,39 @@
 "use client";
 
-import * as React from "react";
-import {
-  TrendingUp,
-  Download,
-  RefreshCw,
-  Plus,
-  ArrowDownLeft,
-  ArrowUpRight,
-  Receipt,
-  Calendar,
-  Layers,
-  Sparkles,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { PageHeader } from "@/components/shared/page-header";
+import { CreateExpenseDialog } from "@/components/finance/create-expense-dialog";
+import { EditPayableDialog } from "@/components/finance/edit-payable-dialog";
 import { FinanceKpiGrid } from "@/components/finance/finance-kpi-grid";
-import { ProfitabilityCard } from "@/components/finance/profitability-card";
-import { OutstandingBalancesCard } from "@/components/finance/outstanding-balances-card";
 import { FinanceTransactionTable } from "@/components/finance/finance-transaction-table";
+import { OutstandingBalancesCard } from "@/components/finance/outstanding-balances-card";
+import { ProfitabilityCard } from "@/components/finance/profitability-card";
+import { RecordPayableDialog } from "@/components/finance/record-payable-dialog";
 import { RecordPaymentDialog } from "@/components/finance/record-payment-dialog";
 import { RecordSupplierPaymentDialog } from "@/components/finance/record-supplier-payment-dialog";
-import { RecordPayableDialog } from "@/components/finance/record-payable-dialog";
-import { EditPayableDialog } from "@/components/finance/edit-payable-dialog";
-import { CreateExpenseDialog } from "@/components/finance/create-expense-dialog";
+import { PageHeader } from "@/components/shared/page-header";
 import {
-  financeClient,
-  FinanceDashboardResult,
-  FinancePreset,
-  TransactionType,
-  UnifiedTransactionItem,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import {
+financeClient,
+FinanceDashboardResult,
+FinancePreset,
+TransactionType,
+UnifiedTransactionItem,
 } from "@/lib/api-client";
+import {
+ArrowDownLeft,
+ArrowUpRight,
+Calendar,
+Download,
+Plus,
+Receipt,
+RefreshCw
+} from "lucide-react";
+import * as React from "react";
 import { toast } from "sonner";
 
 export default function FinanceDashboardPage() {

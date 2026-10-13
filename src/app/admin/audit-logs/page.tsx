@@ -1,35 +1,32 @@
 "use client";
 
-import * as React from "react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
-import { toast } from "sonner";
-import {
-  Activity,
-  Search,
-  RefreshCw,
-  Clock,
-  ShieldCheck,
-  Code,
-} from "lucide-react";
 import { adminClient } from "@/lib/api-client/admin-client";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import {
+Code,
+RefreshCw,
+Search
+} from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function AdminAuditLogsPage() {
   const [logs, setLogs] = React.useState<any[]>([]);

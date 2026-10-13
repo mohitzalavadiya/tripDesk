@@ -1,6 +1,6 @@
-import "server-only";
 import { prisma } from "@/lib/prisma";
 import { entitlementService } from "@/lib/services/entitlement-service";
+import "server-only";
 
 export interface CustomerInsightsData {
   overview: {

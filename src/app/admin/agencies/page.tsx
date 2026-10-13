@@ -1,50 +1,38 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
-import { toast } from "sonner";
-import {
-  Building2,
-  Search,
-  CheckCircle2,
-  AlertTriangle,
-  Clock,
-  RotateCcw,
-  Eye,
-  Phone,
-  Mail,
-  Calendar,
-  Layers,
-  ChevronLeft,
-  ChevronRight,
-  RefreshCw,
-  Ban,
-  ShieldCheck,
-  Plus,
-} from "lucide-react";
-import { StatusBadge } from "@/components/shared/status-badge";
 import { adminClient } from "@/lib/api-client/admin-client";
-import { AdminAgencyListItem } from "@/lib/services/admin-service";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import { AdminAgencyListItem } from "@/lib/services/admin-service";
+import {
+Ban,
+ChevronLeft,
+ChevronRight,
+Clock,
+RefreshCw,
+Search
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function AdminAgenciesPage() {
   const router = useRouter();

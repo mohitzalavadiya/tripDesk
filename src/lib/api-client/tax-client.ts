@@ -1,4 +1,4 @@
-import { TaxMode, GstTreatment } from "@prisma/client";
+import { GstTreatment,TaxMode } from "@prisma/client";
 
 export interface TaxRateItem {
   id: string;

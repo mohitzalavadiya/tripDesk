@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
 import { requireAgencyOwnerContext } from "@/lib/api/context";
 import { customerInsightsService } from "@/lib/services/customer-insights-service";
+import { NextRequest,NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 

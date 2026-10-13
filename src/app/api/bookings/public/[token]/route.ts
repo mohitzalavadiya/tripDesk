@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
 import { bookingPublicService } from "@/lib/services/booking-public-service";
+import { NextRequest,NextResponse } from "next/server";
 
 interface RouteParams {
   params: Promise<{ token: string }>;

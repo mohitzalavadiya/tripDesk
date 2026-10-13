@@ -1,7 +1,7 @@
-import "server-only";
+import type { AuthActionResult } from "@/actions/auth-actions";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import type { AuthActionResult } from "@/actions/auth-actions";
+import "server-only";
 
 export type AuthLookupResult =
   | { status: "confirmed"; user: any }

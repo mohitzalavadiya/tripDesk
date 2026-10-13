@@ -1,37 +1,31 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
-import {
-  Building2,
-  Users,
-  CreditCard,
-  TrendingUp,
-  AlertTriangle,
-  ShieldCheck,
-  Plus,
-  ArrowRight,
-  Clock,
-  CheckCircle2,
-  Layers,
-  IndianRupee,
-  Activity,
-  Search,
-  RefreshCw,
-  ExternalLink,
-  Compass,
-  CalendarCheck,
-  FileText,
-  Sparkles,
-} from "lucide-react";
 import { adminClient } from "@/lib/api-client/admin-client";
-import { PlatformOverviewStats, GlobalSearchResult } from "@/lib/services/admin-service";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import { GlobalSearchResult,PlatformOverviewStats } from "@/lib/services/admin-service";
+import {
+Activity,
+AlertTriangle,
+ArrowRight,
+Building2,
+CalendarCheck,
+Clock,
+CreditCard,
+IndianRupee,
+Layers,
+RefreshCw,
+Search,
+Sparkles,
+TrendingUp,
+Users
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function AdminDashboardPage() {
   const router = useRouter();

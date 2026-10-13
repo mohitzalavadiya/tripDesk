@@ -1,7 +1,7 @@
-import "server-only";
+import { ApiError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { getAdminClient } from "@/lib/supabase/admin";
-import { ApiError } from "@/lib/api/errors";
+import "server-only";
 
 const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
 const ALLOWED_MIME_TYPES = new Set([

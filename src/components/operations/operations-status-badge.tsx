@@ -1,12 +1,11 @@
-import * as React from "react";
-import {
-  OperationStatus,
-  ConfirmationStatus,
-  DispatchStatus,
-  IssuePriority,
-  IssueStatus,
-} from "@prisma/client";
 import { cn } from "@/lib/utils";
+import {
+ConfirmationStatus,
+DispatchStatus,
+IssuePriority,
+IssueStatus,
+OperationStatus,
+} from "@prisma/client";
 
 export function TripOperationsStatusBadge({
   status,

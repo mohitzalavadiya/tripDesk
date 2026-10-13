@@ -1,10 +1,10 @@
-import { NextRequest } from "next/server";
 import {
-  requireReadAccess,
-  apiSuccess,
-  handleApiError,
+apiSuccess,
+handleApiError,
+requireReadAccess,
 } from "@/lib/api";
 import { followUpService } from "@/lib/services/follow-up-service";
+import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 

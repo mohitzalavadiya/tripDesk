@@ -1,22 +1,22 @@
-import "server-only";
+import { formatCurrency } from "@/lib/costing-engine";
 import prisma from "@/lib/prisma";
-import PDFDocument from "pdfkit";
 import { entitlementService } from "@/lib/services/entitlement-service";
 import {
-  BookingStatus,
-  BookingPaymentStatus,
-  PaymentStatus,
-  EnquiryStatus,
-  TripStatus,
-  SupplierPayableStatus,
-} from "@prisma/client";
-import {
-  ReportFilterInput,
-  ReportPreset,
-  ReportType,
-  calculateReportDateRange,
+ReportFilterInput,
+ReportPreset,
+ReportType,
+calculateReportDateRange,
 } from "@/lib/validation/reporting-schema";
-import { formatCurrency } from "@/lib/costing-engine";
+import {
+BookingPaymentStatus,
+BookingStatus,
+EnquiryStatus,
+PaymentStatus,
+SupplierPayableStatus,
+TripStatus,
+} from "@prisma/client";
+import PDFDocument from "pdfkit";
+import "server-only";
 
 // ═════════════════════════════════════════════════════════════════════
 // DATA CONTRACTS & INTERFACES
@@ -552,7 +552,7 @@ export class ReportingService {
       }
     } else if (diffDays <= 95) {
       // Weekly intervals
-      let current = new Date(startDate);
+      const current = new Date(startDate);
       let weekNum = 1;
       while (current <= endDate) {
         const weekStart = new Date(current);
@@ -759,8 +759,8 @@ export class ReportingService {
       return `"${str}"`;
     };
 
-    let lines: string[] = [];
-    let filename = `yourtraveldesk-${reportType.toLowerCase()}-report-${dateStamp}.csv`;
+    const lines: string[] = [];
+    const filename = `yourtraveldesk-${reportType.toLowerCase()}-report-${dateStamp}.csv`;
 
     switch (reportType) {
       case "RECEIVABLES": {

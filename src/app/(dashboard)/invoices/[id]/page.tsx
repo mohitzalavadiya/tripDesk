@@ -1,37 +1,35 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import {
-  Receipt,
-  ArrowLeft,
-  Download,
-  Printer,
-  CreditCard,
-  Building,
-  User,
-  Calendar,
-  Layers,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  AlertOctagon,
-  Loader2,
-  ExternalLink,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { toast } from "sonner";
 import { RecordPaymentModal } from "@/components/invoices/record-payment-modal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
+} from "@/components/ui/table";
+import {
+AlertCircle,
+AlertOctagon,
+ArrowLeft,
+Calendar,
+CheckCircle2,
+Clock,
+CreditCard,
+Download,
+ExternalLink,
+Layers,
+Loader2,
+Printer,
+User
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 interface InvoiceItem {
   id?: string;

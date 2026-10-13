@@ -1,36 +1,23 @@
 "use client";
 
-import * as React from "react";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import { ConfirmationStatus } from "@prisma/client";
-import { operationsClient, HotelConfirmationWithDetails } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
-import { getErrorMessage } from "@/lib/utils";
+import { HotelConfirmationWithDetails,operationsClient } from "@/lib/api-client";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import { getErrorMessage } from "@/lib/utils";
+import { ConfirmationStatus } from "@prisma/client";
+import { useFormik } from "formik";
 import {
-  X,
-  Hotel,
-  CheckCircle2,
-  AlertTriangle,
-  CalendarClock,
-  Send,
-  Loader2,
-  Calendar,
-  Building,
-  Tag,
-  FileText,
+AlertTriangle,
+CalendarClock,
+CheckCircle2,
+Loader2,
+Send,
+X
 } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 export type HotelDialogMode = "REQUEST" | "CONFIRM" | "AMEND" | "CANCEL";
 

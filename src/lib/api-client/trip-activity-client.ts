@@ -1,9 +1,9 @@
-import { TripActivity, Activity, TripDestination, Destination } from "@prisma/client";
 import {
-  CreateTripActivityInput,
-  UpdateTripActivityInput,
+CreateTripActivityInput,
+UpdateTripActivityInput,
 } from "@/lib/validation/trip-activity-schema";
-import { SingleResponse, ApiClientError } from "./customer-client";
+import { Activity,Destination,TripActivity,TripDestination } from "@prisma/client";
+import { ApiClientError,SingleResponse } from "./customer-client";
 
 export interface TripActivityWithActivity extends TripActivity {
   activity: Activity | null;

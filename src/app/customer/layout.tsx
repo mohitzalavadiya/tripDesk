@@ -1,7 +1,7 @@
-import * as React from "react";
-import Link from "next/link";
-import { Compass, FileText, CreditCard, User, HelpCircle, ShieldCheck, Phone, MessageSquare, Bell } from "lucide-react";
 import { CustomerNotificationBell } from "@/components/customer/customer-notification-bell";
+import { Bell,Compass,ShieldCheck,User } from "lucide-react";
+import Link from "next/link";
+import * as React from "react";
 
 import type { Metadata } from "next";
 

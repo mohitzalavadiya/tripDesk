@@ -1,8 +1,7 @@
 "use client";
 
-import * as React from "react";
 import { GuestSatisfactionResult } from "@/lib/api-client/operations-client";
-import { Star, MessageSquareQuote, ThumbsUp, Award } from "lucide-react";
+import { Award,Star } from "lucide-react";
 
 interface OperationsSatisfactionCardProps {
   satisfactionData?: GuestSatisfactionResult;

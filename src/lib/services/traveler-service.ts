@@ -1,11 +1,11 @@
-import "server-only";
-import prisma from "@/lib/prisma";
 import { NotFoundError } from "@/lib/api";
+import prisma from "@/lib/prisma";
 import {
-  CreateTravelerInput,
-  UpdateTravelerInput,
+CreateTravelerInput,
+UpdateTravelerInput,
 } from "@/lib/validation/traveler-schema";
 import { Traveler } from "@prisma/client";
+import "server-only";
 
 export const travelerService = {
   /**
