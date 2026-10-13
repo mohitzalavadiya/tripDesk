@@ -1,20 +1,13 @@
 "use client";
 
-import * as React from "react";
-import { SupplierPayable, SupplierPayment } from "@prisma/client";
-import { formatCurrency } from "@/lib/costing-engine";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/costing-engine";
+import { SupplierPayable,SupplierPayment } from "@prisma/client";
 import {
-  Receipt,
-  Plus,
-  Edit,
-  CreditCard,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  Coins,
-  FileText,
+CreditCard,
+Edit,
+Plus,
+Receipt
 } from "lucide-react";
 
 interface OtherCostsCardProps {

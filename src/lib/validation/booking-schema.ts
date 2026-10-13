@@ -1,5 +1,5 @@
+import { BookingPaymentStatus,BookingStatus } from "@prisma/client";
 import { z } from "zod";
-import { BookingStatus, BookingPaymentStatus } from "@prisma/client";
 
 /**
  * Zod schema for creating a new Booking

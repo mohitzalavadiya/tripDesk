@@ -1,5 +1,5 @@
-import "server-only";
 import { entitlementService } from "@/lib/services/entitlement-service";
+import "server-only";
 
 export interface ResolveLogoOptions {
   agencyId?: string | null;

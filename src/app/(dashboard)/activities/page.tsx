@@ -1,54 +1,49 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import {
-  Ticket,
-  Plus,
-  Search,
-  MapPin,
-  Clock,
-  RotateCcw,
-  X,
-  Eye,
-  MoreVertical,
-  Archive,
-  Loader2,
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-} from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
-import { useSubscription } from "@/context/subscription-context";
-import { getErrorMessage } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuLabel,
+DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { activityClient, ActivityWithRelations } from "@/lib/api-client";
+import { Input } from "@/components/ui/input";
+import {
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
+} from "@/components/ui/table";
+import { useSubscription } from "@/context/subscription-context";
+import { activityClient,ActivityWithRelations } from "@/lib/api-client";
+import { getErrorMessage } from "@/lib/utils";
+import {
+Archive,
+ChevronLeft,
+ChevronRight,
+Compass,
+Eye,
+MoreVertical,
+Plus,
+Search,
+Sparkles,
+Ticket,
+X
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
-import { Compass } from "lucide-react";
 
 export default function ActivitiesPage() {
   const router = useRouter();

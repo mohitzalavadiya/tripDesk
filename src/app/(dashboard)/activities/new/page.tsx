@@ -1,28 +1,20 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import { Ticket, ArrowLeft, Loader2, Plus, AlertCircle, Info } from "lucide-react";
+import { DestinationSelect } from "@/components/shared/destination-select";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ReadOnlyModeCard } from "@/components/shared/read-only-mode-card";
-import { useSubscription } from "@/context/subscription-context";
-import { DestinationSelect } from "@/components/shared/destination-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useSubscription } from "@/context/subscription-context";
 import { activityClient } from "@/lib/api-client";
-import { ActivityType } from "@prisma/client";
+import { useFormik } from "formik";
+import { AlertCircle,Loader2,Plus,Ticket } from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
+import * as Yup from "yup";
 
 const createActivitySchema = Yup.object().shape({
   name: Yup.string()

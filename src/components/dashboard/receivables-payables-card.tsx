@@ -1,23 +1,16 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import {
-  CreditCard,
-  Building,
-  AlertTriangle,
-  Clock,
-  ArrowRight,
-  ExternalLink,
-  ChevronRight,
-  CheckCircle2,
-} from "lucide-react";
-import {
-  AccountsReceivableAnalytics,
-  SupplierPayableAnalytics,
-} from "@/lib/services/dashboard-service";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+AccountsReceivableAnalytics,
+SupplierPayableAnalytics,
+} from "@/lib/services/dashboard-service";
+import {
+ArrowRight,
+Building,
+CreditCard
+} from "lucide-react";
+import Link from "next/link";
 
 interface ReceivablesPayablesCardProps {
   receivables?: AccountsReceivableAnalytics | null;

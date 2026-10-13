@@ -1,23 +1,19 @@
 "use client";
 
-import * as React from "react";
-import { IssuePriority, IssueStatus, OperationalIssue } from "@prisma/client";
 import {
-  IssuePriorityBadge,
-  IssueStatusBadge,
+IssuePriorityBadge,
+IssueStatusBadge,
 } from "@/components/operations/operations-status-badge";
 import { Button } from "@/components/ui/button";
+import { IssuePriority,IssueStatus,OperationalIssue } from "@prisma/client";
 import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  RotateCcw,
-  ShieldCheck,
-  User,
-  Calendar,
-  AlertCircle,
-  FileText,
-  Play,
+AlertTriangle,
+Calendar,
+CheckCircle2,
+Play,
+RotateCcw,
+ShieldCheck,
+User
 } from "lucide-react";
 
 interface OperationalIssueCardProps {

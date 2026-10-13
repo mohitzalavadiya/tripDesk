@@ -1,15 +1,13 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import {
-  OperationalRiskAnalyticsResult,
-  OperationalRiskItem,
-  RiskLevel,
-} from "@/lib/api-client/operations-client";
-import { ShieldAlert, ShieldCheck, ArrowUpRight, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+OperationalRiskAnalyticsResult,
+RiskLevel
+} from "@/lib/api-client/operations-client";
 import { formatEnumLabel } from "@/lib/utils/enum-formatters";
+import { ArrowUpRight,ShieldAlert,ShieldCheck } from "lucide-react";
+import Link from "next/link";
 
 interface OperationsRiskCardProps {
   riskData?: OperationalRiskAnalyticsResult;

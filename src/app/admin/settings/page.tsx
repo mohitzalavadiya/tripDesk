@@ -1,28 +1,23 @@
 "use client";
 
-import * as React from "react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import {
-  Settings,
-  RefreshCw,
-  Save,
-  Sparkles,
-  ShieldCheck,
-  QrCode,
-  Landmark,
-  Smartphone,
-  Trash2,
-  UploadCloud,
-  CheckCircle2,
-  AlertCircle,
-  Eye,
-} from "lucide-react";
 import { adminClient } from "@/lib/api-client/admin-client";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import {
+CheckCircle2,
+Landmark,
+QrCode,
+RefreshCw,
+Save,
+Smartphone,
+Trash2,
+UploadCloud
+} from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function AdminSettingsPage() {
   const [loading, setLoading] = React.useState(true);

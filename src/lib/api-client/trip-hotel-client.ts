@@ -1,9 +1,9 @@
-import { TripHotel, Hotel, TripDestination, Destination } from "@prisma/client";
 import {
-  CreateTripHotelInput,
-  UpdateTripHotelInput,
+CreateTripHotelInput,
+UpdateTripHotelInput,
 } from "@/lib/validation/trip-hotel-schema";
-import { SingleResponse, ApiClientError } from "./customer-client";
+import { Destination,Hotel,TripDestination,TripHotel } from "@prisma/client";
+import { ApiClientError,SingleResponse } from "./customer-client";
 
 export interface TripHotelWithHotel extends TripHotel {
   hotel: Hotel;

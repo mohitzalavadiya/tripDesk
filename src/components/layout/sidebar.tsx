@@ -1,20 +1,19 @@
 "use client";
 
-import * as React from "react";
+import {
+Tooltip,
+TooltipContent,
+TooltipProvider,
+TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useAuth } from "@/context/auth-context";
+import { EntitlementsState,useSubscription } from "@/context/subscription-context";
+import { usePlatformChatUnreadCount } from "@/hooks/use-platform-chat";
+import { adminNavigationConfig,agencyNavigationConfig,secondaryNavigation } from "@/lib/navigation";
+import { cn } from "@/lib/utils";
+import { ChevronLeft,ChevronRight,Lock,PlaneTakeoff,ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PlaneTakeoff, ChevronLeft, ChevronRight, ShieldCheck, Lock } from "lucide-react";
-import { agencyNavigationConfig, adminNavigationConfig, secondaryNavigation } from "@/lib/navigation";
-import { useAuth } from "@/context/auth-context";
-import { useSubscription, EntitlementsState } from "@/context/subscription-context";
-import { usePlatformChatUnreadCount } from "@/hooks/use-platform-chat";
-import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
 
 interface SidebarProps {
   collapsed: boolean;

@@ -1,16 +1,16 @@
 "use client";
 
-import * as React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Archive, Trash2, Loader2, LucideIcon } from "lucide-react";
+import {
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
+import { AlertTriangle,Archive,Loader2,LucideIcon,Trash2 } from "lucide-react";
+import * as React from "react";
 
 export interface ConfirmDialogProps {
   open: boolean;

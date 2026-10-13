@@ -1,37 +1,32 @@
 "use client";
 
-import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import {
-  ArrowLeft,
-  Download,
-  ExternalLink,
-  Printer,
-  Loader2,
-  Calendar,
-  Users,
-  Compass,
-  CheckCircle2,
-  Hotel,
-  Car,
-  Ticket,
-  Check,
-  X,
-  CreditCard,
-  ShieldCheck,
-  Info,
-  Clock,
-  MapPin,
-  Sparkles,
-  Phone,
-  Mail,
-  Building,
-} from "lucide-react";
-import { quotationClient, QuotationWithRelations, TripCostingResult } from "@/lib/api-client";
-import { formatCurrency } from "@/lib/costing-engine";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { quotationClient,QuotationWithRelations,TripCostingResult } from "@/lib/api-client";
+import { formatCurrency } from "@/lib/costing-engine";
+import {
+ArrowLeft,
+Building,
+Calendar,
+Car,
+Check,
+CheckCircle2,
+Compass,
+CreditCard,
+Download,
+ExternalLink,
+Hotel,
+Info,
+Loader2,
+Mail,
+MapPin,
+Phone,
+Printer,
+Ticket,
+X
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
 
 export default function TripQuotationPreviewPage() {

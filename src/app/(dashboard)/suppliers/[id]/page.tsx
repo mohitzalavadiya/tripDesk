@@ -1,69 +1,64 @@
 "use client";
 
-import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { supplierClient, SupplierDetails360 } from "@/lib/api-client";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { getErrorMessage } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
-import {
-  ArrowLeft,
-  Truck,
-  Phone,
-  Mail,
-  MapPin,
-  Calendar,
-  CreditCard,
-  FileText,
-  Edit2,
-  Plus,
-  Trash2,
-  Clock,
-  ExternalLink,
-  CheckCircle2,
-  AlertTriangle,
-  Hotel,
-  Car,
-  Ticket,
-  Sparkles,
-  Building2,
-  MoreVertical,
-  Loader2,
-  IndianRupee,
-  RotateCcw,
-} from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { supplierClient,SupplierDetails360 } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
+import {
+AlertTriangle,
+ArrowLeft,
+Car,
+CheckCircle2,
+Clock,
+CreditCard,
+Edit2,
+Hotel,
+IndianRupee,
+Loader2,
+Mail,
+MapPin,
+MoreVertical,
+Phone,
+Plus,
+RotateCcw,
+Sparkles,
+Ticket,
+Trash2,
+Truck
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
 
 const AVATAR_GRADIENTS = [

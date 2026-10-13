@@ -1,6 +1,6 @@
-import "server-only";
 import { prisma } from "@/lib/prisma";
 import { TripStatus } from "@prisma/client";
+import "server-only";
 
 export interface PublicTripPayload {
   id: string;

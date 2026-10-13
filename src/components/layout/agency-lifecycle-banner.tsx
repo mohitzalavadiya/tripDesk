@@ -1,11 +1,9 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/context/auth-context";
-import { Clock, AlertTriangle, ShieldAlert, Lock, Phone, CreditCard, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/auth-context";
+import { AlertTriangle,Clock,CreditCard,Lock,Phone,ShieldAlert } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function AgencyLifecycleBanner() {
   const router = useRouter();

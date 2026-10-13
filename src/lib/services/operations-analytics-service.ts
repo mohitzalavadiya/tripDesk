@@ -1,13 +1,13 @@
-import "server-only";
 import prisma from "@/lib/prisma";
+import { AnalyticsFilterInput,AnalyticsPreset } from "@/lib/validation/operations-schema";
 import {
-  OperationStatus,
-  ConfirmationStatus,
-  DispatchStatus,
-  IssuePriority,
-  IssueStatus,
+ConfirmationStatus,
+DispatchStatus,
+IssuePriority,
+IssueStatus,
+OperationStatus,
 } from "@prisma/client";
-import { AnalyticsFilterInput, AnalyticsPreset } from "@/lib/validation/operations-schema";
+import "server-only";
 
 // ═════════════════════════════════════════════════════════════════════
 // TYPES & INTERFACES
@@ -764,7 +764,7 @@ export const operationsAnalyticsService = {
     let criticalIssuesCount = 0;
     let highIssuesCount = 0;
     let closedIssuesCount = 0;
-    let reopenedIssuesCount = 0;
+    const reopenedIssuesCount = 0;
 
     const issuesByPriority = { low: 0, medium: 0, high: 0, critical: 0 };
     const issuesByStatus = { open: 0, inProgress: 0, resolved: 0, closed: 0 };

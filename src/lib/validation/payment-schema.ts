@@ -1,5 +1,5 @@
+import { PaymentMethod,PaymentStatus } from "@prisma/client";
 import { z } from "zod";
-import { PaymentMethod, PaymentStatus } from "@prisma/client";
 
 /**
  * Zod schema for logging a new Payment

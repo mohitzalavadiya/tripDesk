@@ -1,5 +1,5 @@
+import { EnquiryPriority,FollowUpStatus,FollowUpType } from "@prisma/client";
 import { z } from "zod";
-import { FollowUpType, FollowUpStatus, EnquiryPriority } from "@prisma/client";
 
 /**
  * Zod schema for global follow-up listing and filtering

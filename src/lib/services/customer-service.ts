@@ -1,13 +1,13 @@
-import "server-only";
-import prisma from "@/lib/prisma";
 import { NotFoundError } from "@/lib/api";
+import prisma from "@/lib/prisma";
 import {
-  CreateCustomerInput,
-  UpdateCustomerInput,
-  CustomerQueryParams,
-  CheckDuplicateCustomerInput,
+CheckDuplicateCustomerInput,
+CreateCustomerInput,
+CustomerQueryParams,
+UpdateCustomerInput,
 } from "@/lib/validation/customer-schema";
-import { Customer, Prisma } from "@prisma/client";
+import { Customer,Prisma } from "@prisma/client";
+import "server-only";
 
 export interface CustomerWithCounts extends Customer {
   _count?: {

@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
+import { Toaster } from "sonner";
+import { AgencyLifecycleBanner } from "./agency-lifecycle-banner";
+import { MobileNav } from "./mobile-nav";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
-import { MobileNav } from "./mobile-nav";
-import { AgencyLifecycleBanner } from "./agency-lifecycle-banner";
-import { Toaster } from "sonner";
 
 interface AppShellProps {
   children: React.ReactNode;

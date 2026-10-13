@@ -63,7 +63,7 @@ async function main() {
 
     let status: SubscriptionStatus = SubscriptionStatus.TRIAL;
     let canWrite = isPlatformOwner;
-    let canRead = true;
+    const canRead = true;
     let trialDaysRemaining = 0;
 
     if (mock.subscription) {

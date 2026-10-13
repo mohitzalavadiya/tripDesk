@@ -1,5 +1,5 @@
+import { DiscountType,InvoiceStatus,PaymentMethod } from "@prisma/client";
 import { z } from "zod";
-import { InvoiceStatus, DiscountType, PaymentMethod } from "@prisma/client";
 
 export const invoiceItemInputSchema = z.object({
   id: z.string().optional(),

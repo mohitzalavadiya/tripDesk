@@ -1,25 +1,25 @@
-import "server-only";
 import { prisma } from "@/lib/prisma";
 import {
-  EnquiryStatus,
-  TripStatus,
-  QuotationStatus,
-  BookingStatus,
-  BookingPaymentStatus,
-  PaymentStatus,
-  FollowUpStatus,
-  SupplierPayableStatus,
-  NotificationDeliveryStatus,
-  NotificationChannel,
-  TravelDocumentType,
-  TravelDocumentStatus,
-  IssueStatus,
-} from "@prisma/client";
-import {
-  DashboardPreset,
-  DashboardFilterInput,
-  calculateDashboardDateRange,
+DashboardFilterInput,
+DashboardPreset,
+calculateDashboardDateRange,
 } from "@/lib/validation/dashboard-schema";
+import {
+BookingPaymentStatus,
+BookingStatus,
+EnquiryStatus,
+FollowUpStatus,
+IssueStatus,
+NotificationChannel,
+NotificationDeliveryStatus,
+PaymentStatus,
+QuotationStatus,
+SupplierPayableStatus,
+TravelDocumentStatus,
+TravelDocumentType,
+TripStatus,
+} from "@prisma/client";
+import "server-only";
 
 // ═════════════════════════════════════════════════════════════════════
 // 1. DATA CONTRACTS & INTERFACES (STRICT TYPES)
@@ -1253,7 +1253,7 @@ export const dashboardService = {
       const paymentReceived = booking ? booking.balanceAmount.toNumber() <= 0 || booking.paymentStatus === "PAID" : false;
 
       let checksPassed = 0;
-      let totalChecks = 4;
+      const totalChecks = 4;
       if (hotelConfirmed) checksPassed++;
       if (vehicleAssigned) checksPassed++;
       if (activityConfirmed) checksPassed++;

@@ -1,100 +1,84 @@
 "use client";
 
-import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import {
-  FileText,
-  ArrowLeft,
-  Plus,
-  Sparkles,
-  ExternalLink,
-  Share2,
-  DollarSign,
-  AlertCircle,
-  Copy,
-  Edit2,
-  Trash2,
-  Eye,
-  CheckCircle2,
-  RotateCcw,
-  Loader2,
-  Send,
-  Building2,
-  Car,
-  Ticket,
-  Calendar,
-  CalendarCheck,
-  Users,
-  Check,
-  X,
-  AlertTriangle,
-  Layers,
-  CreditCard,
-  FileCheck,
-  ArrowUpDown,
-  History,
-  MessageSquare,
-  Star,
-  Package,
-  Download,
-} from "lucide-react";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
-import { EmptyState } from "@/components/shared/empty-state";
+import { QuotationStatusBadge } from "@/app/(dashboard)/quotations/page";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
 import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
-import { useSubscription } from "@/context/subscription-context";
-import { getErrorMessage } from "@/lib/utils";
-import { isValidDecimal, isValidInteger } from "@/lib/validation/field-validators";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { useSubscription } from "@/context/subscription-context";
 import {
-  quotationClient,
-  QuotationWithRelations,
-  TripCostingResult,
-  taxClient,
-  TaxRateItem,
+quotationClient,
+QuotationWithRelations,
+taxClient,
+TaxRateItem,
+TripCostingResult,
 } from "@/lib/api-client";
-import {
-  QuotationStatus,
-  QuotationItem,
-  ProposalItemType,
-  QuotationProposalItem,
-  QuotationPaymentMilestone,
-  TaxMode,
-  GstTreatment,
-} from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
 import { formatEnumLabel } from "@/lib/utils/enum-formatters";
+import { isValidDecimal,isValidInteger } from "@/lib/validation/field-validators";
+import {
+GstTreatment,
+ProposalItemType,
+QuotationItem,
+QuotationPaymentMilestone,
+QuotationProposalItem,
+QuotationStatus,
+TaxMode,
+} from "@prisma/client";
+import {
+ArrowLeft,
+CalendarCheck,
+Check,
+CheckCircle2,
+Copy,
+DollarSign,
+Download,
+Edit2,
+Eye,
+FileCheck,
+History,
+Layers,
+Loader2,
+MessageSquare,
+Package,
+Plus,
+Sparkles,
+Ticket,
+Trash2,
+X
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
-import { QuotationStatusBadge } from "@/app/(dashboard)/quotations/page";
 
 type ActiveTabType = "pricing" | "inclusions" | "milestones" | "policies";
 

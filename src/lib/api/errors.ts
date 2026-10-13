@@ -1,6 +1,6 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { logger } from "@/lib/logger";
 
 /**
  * Standard base class for all API domain and HTTP errors.

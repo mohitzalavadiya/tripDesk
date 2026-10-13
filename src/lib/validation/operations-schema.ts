@@ -1,11 +1,11 @@
-import { z } from "zod";
 import {
-  OperationStatus,
-  ConfirmationStatus,
-  DispatchStatus,
-  IssuePriority,
-  IssueStatus,
+ConfirmationStatus,
+DispatchStatus,
+IssuePriority,
+IssueStatus,
+OperationStatus,
 } from "@prisma/client";
+import { z } from "zod";
 import { isValidPhoneNumber } from "./field-validators";
 
 // ---------------------------------------------------------

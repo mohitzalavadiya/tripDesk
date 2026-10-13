@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
 import { requirePlatformOwnerContext } from "@/lib/api/context";
-import { platformChatService } from "@/lib/services/platform-chat-service";
 import { handleApiError } from "@/lib/api/errors";
+import { platformChatService } from "@/lib/services/platform-chat-service";
+import { NextRequest,NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 

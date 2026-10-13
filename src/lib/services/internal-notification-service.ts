@@ -1,12 +1,12 @@
-import "server-only";
 import { prisma } from "@/lib/prisma";
-import {
-  Prisma,
-  UserNotification,
-  UserNotificationType,
-  UserRole,
-} from "@prisma/client";
 import { ListUserNotificationsInput } from "@/lib/validation/user-notification-schema";
+import {
+Prisma,
+UserNotification,
+UserNotificationType,
+UserRole,
+} from "@prisma/client";
+import "server-only";
 
 export interface CreateInternalNotificationInput {
   userId: string;

@@ -1,21 +1,16 @@
 "use client";
 
-import * as React from "react";
 import {
-  OperationsClosureSummary,
-  HotelReconciliationItem,
-  FleetReconciliationItem,
-  ActivityReconciliationItem,
+OperationsClosureSummary
 } from "@/lib/api-client";
 import {
-  Hotel,
-  Car,
-  Compass,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Clock,
-  ShieldAlert,
+AlertTriangle,
+Car,
+CheckCircle2,
+Clock,
+Hotel,
+ShieldAlert,
+XCircle
 } from "lucide-react";
 
 const SERVICE_STATUS_LABELS: Record<string, string> = {

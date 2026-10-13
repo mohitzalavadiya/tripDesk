@@ -1,14 +1,14 @@
-import { Booking, Payment } from "@prisma/client";
 import {
-  CreateBookingInput,
-  UpdateBookingInput,
-  BookingQueryInput,
-  ConvertQuotationToBookingInput,
+BookingQueryInput,
+ConvertQuotationToBookingInput,
+CreateBookingInput,
+UpdateBookingInput,
 } from "@/lib/validation/booking-schema";
+import { Booking,Payment } from "@prisma/client";
 import {
-  PaginatedResponse,
-  SingleResponse,
-  ApiClientError,
+ApiClientError,
+PaginatedResponse,
+SingleResponse,
 } from "./customer-client";
 
 async function handleResponse<T>(res: Response): Promise<T> {

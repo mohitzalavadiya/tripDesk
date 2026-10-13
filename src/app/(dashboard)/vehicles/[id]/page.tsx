@@ -1,46 +1,43 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import {
-  Car,
-  ArrowLeft,
-  Edit,
-  Trash2,
-  Loader2,
-  AlertCircle,
-  Archive,
-} from "lucide-react";
-import { PageHeader } from "@/components/shared/page-header";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { getErrorMessage } from "@/lib/utils";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { vehicleClient } from "@/lib/api-client";
+import { getErrorMessage } from "@/lib/utils";
 import { integerYup } from "@/lib/validation-schemas";
 import { Vehicle } from "@prisma/client";
+import { useFormik } from "formik";
+import {
+Archive,
+ArrowLeft,
+Car,
+Edit,
+Loader2
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
+import * as Yup from "yup";
 
 const editVehicleSchema = Yup.object().shape({
   name: Yup.string().trim().required("Vehicle name is required").max(100),

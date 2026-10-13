@@ -1,19 +1,19 @@
-import "server-only";
 import { prisma } from "@/lib/prisma";
 import {
-  EnquiryFollowUp,
-  FollowUpStatus,
-  FollowUpType,
-  EnquiryPriority,
-  Prisma,
-} from "@prisma/client";
-import {
-  GlobalFollowUpQueryInput,
-  CreateGlobalFollowUpInput,
-  CompleteFollowUpInput,
-  RescheduleFollowUpInput,
-  CancelFollowUpInput,
+CancelFollowUpInput,
+CompleteFollowUpInput,
+CreateGlobalFollowUpInput,
+GlobalFollowUpQueryInput,
+RescheduleFollowUpInput,
 } from "@/lib/validation/follow-up-schema";
+import {
+EnquiryFollowUp,
+EnquiryPriority,
+FollowUpStatus,
+FollowUpType,
+Prisma,
+} from "@prisma/client";
+import "server-only";
 
 export type FollowUpWithRelations = EnquiryFollowUp & {
   enquiry: {

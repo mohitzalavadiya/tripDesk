@@ -1,21 +1,17 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import {
-  Compass,
-  Calendar,
-  ArrowRight,
-  ShieldCheck,
-  FileCheck,
-  AlertTriangle,
-  Hotel,
-  Car,
-  Ticket,
-  ExternalLink,
-} from "lucide-react";
-import { UpcomingDepartureItem } from "@/lib/services/dashboard-service";
 import { Badge } from "@/components/ui/badge";
+import { UpcomingDepartureItem } from "@/lib/services/dashboard-service";
+import {
+ArrowRight,
+Calendar,
+Car,
+Compass,
+FileCheck,
+Hotel,
+Ticket
+} from "lucide-react";
+import Link from "next/link";
 
 interface UpcomingTripsListProps {
   trips?: UpcomingDepartureItem[];

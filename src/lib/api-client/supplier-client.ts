@@ -1,13 +1,13 @@
-import { Supplier } from "@prisma/client";
+import { SupplierDetails360,SupplierWithCounts } from "@/lib/services/supplier-service";
 import {
-  CreateSupplierPayload,
-  UpdateSupplierPayload,
-  SupplierQueryParams,
+CreateSupplierPayload,
+SupplierQueryParams,
+UpdateSupplierPayload,
 } from "@/lib/validation/supplier-schema";
-import { PaginatedResponse, SingleResponse, ApiClientError } from "./customer-client";
-import { SupplierWithCounts, SupplierDetails360 } from "@/lib/services/supplier-service";
+import { Supplier } from "@prisma/client";
+import { ApiClientError,PaginatedResponse,SingleResponse } from "./customer-client";
 
-export type { SupplierWithCounts, SupplierDetails360 };
+export type { SupplierDetails360,SupplierWithCounts };
 
 async function handleResponse<T>(res: Response): Promise<T> {
   const json = await res.json().catch(() => ({}));

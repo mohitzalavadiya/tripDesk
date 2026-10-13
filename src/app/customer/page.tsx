@@ -1,27 +1,21 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { customerPortalClient } from "@/lib/api-client";
 import { CustomerBookingSummaryView } from "@/lib/services/customer-portal-service";
-import { Button } from "@/components/ui/button";
 import {
-  Compass,
-  Calendar,
-  MapPin,
-  Clock,
-  ChevronRight,
-  Sparkles,
-  FileText,
-  CreditCard,
-  Phone,
-  ShieldCheck,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Users,
+AlertCircle,
+Calendar,
+CheckCircle2,
+ChevronRight,
+Compass,
+FileText,
+Loader2,
+Sparkles
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 
 export default function CustomerDashboardPage() {
   const router = useRouter();

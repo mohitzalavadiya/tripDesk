@@ -1,24 +1,24 @@
 "use client";
 
-import * as React from "react";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import { Booking, PaymentMethod } from "@/types";
-import { useBooking } from "@/context/booking-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useBooking } from "@/context/booking-context";
 import { formatCurrency } from "@/lib/costing-engine";
-import { toast } from "sonner";
 import { useModalScrollLock } from "@/lib/scroll-lock";
-import { X, IndianRupee, CreditCard, Calendar, Hash, FileText } from "lucide-react";
+import { Booking,PaymentMethod } from "@/types";
+import { useFormik } from "formik";
+import { Calendar,Hash,IndianRupee,X } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
+import * as Yup from "yup";
 
 interface AddPaymentModalProps {
   booking: Booking;

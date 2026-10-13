@@ -1,5 +1,5 @@
+import { GstTreatment,QuotationStatus,TaxMode } from "@prisma/client";
 import { z } from "zod";
-import { QuotationStatus, TaxMode, GstTreatment } from "@prisma/client";
 
 export const quotationTierSchema = z.enum(["Deluxe", "Ultra Deluxe", "Premium"]);
 export type QuotationTier = z.infer<typeof quotationTierSchema>;

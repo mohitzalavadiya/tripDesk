@@ -1,14 +1,14 @@
-import { NextRequest } from "next/server";
 import {
-  requireReadAccess,
-  requireWriteAccess,
-  apiSuccess,
-  handleApiError,
-  validateJson,
-  NotFoundError,
+apiSuccess,
+handleApiError,
+NotFoundError,
+requireReadAccess,
+requireWriteAccess,
+validateJson,
 } from "@/lib/api";
-import { updateVehicleSchema } from "@/lib/validation/vehicle-schema";
 import { vehicleService } from "@/lib/services/vehicle-service";
+import { updateVehicleSchema } from "@/lib/validation/vehicle-schema";
+import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 

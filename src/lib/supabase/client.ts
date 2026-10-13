@@ -1,6 +1,6 @@
 import { createBrowserClient } from "@supabase/ssr";
-import { normalizeSupabaseUrl } from "./normalize";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeSupabaseUrl } from "./normalize";
 
 let browserClient: SupabaseClient | null = null;
 

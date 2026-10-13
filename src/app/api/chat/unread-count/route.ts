@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "@/lib/api/context";
-import { platformChatService } from "@/lib/services/platform-chat-service";
 import { handleApiError } from "@/lib/api/errors";
+import { platformChatService } from "@/lib/services/platform-chat-service";
 import { UserRole } from "@prisma/client";
+import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 

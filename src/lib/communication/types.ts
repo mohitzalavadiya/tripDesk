@@ -1,7 +1,7 @@
 import {
-  CustomerNotificationType,
-  NotificationChannel,
-  NotificationDeliveryStatus,
+CustomerNotificationType,
+NotificationChannel,
+NotificationDeliveryStatus,
 } from "@prisma/client";
 
 export interface CommunicationRecipient {

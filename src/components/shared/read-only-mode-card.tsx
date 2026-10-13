@@ -1,10 +1,9 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { Lock, ShieldAlert, ArrowRight, ArrowLeft, Phone, CreditCard, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ReadOnlyReason } from "@/context/subscription-context";
+import { ArrowLeft,ArrowRight,CheckCircle2,CreditCard,Lock,Phone,ShieldAlert } from "lucide-react";
+import Link from "next/link";
 
 export interface ReadOnlyModeCardProps {
   resourceName?: string;

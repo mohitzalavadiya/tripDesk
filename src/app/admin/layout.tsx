@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/app-shell";
 import { requirePlatformOwner } from "@/lib/auth";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 

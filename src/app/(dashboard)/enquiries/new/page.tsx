@@ -1,44 +1,38 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import { integerYup, phoneYup } from "@/lib/validation-schemas";
-import { isValidDecimal, isValidPhoneNumber } from "@/lib/validation/field-validators";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  customerClient,
-  enquiryClient,
+customerClient,
+enquiryClient,
 } from "@/lib/api-client";
-import { Customer, EnquirySource, EnquiryPriority, EnquiryStatus } from "@prisma/client";
-import { toast } from "sonner";
+import { integerYup } from "@/lib/validation-schemas";
+import { isValidDecimal,isValidPhoneNumber } from "@/lib/validation/field-validators";
+import { Customer,EnquiryPriority,EnquirySource,EnquiryStatus } from "@prisma/client";
+import { useFormik } from "formik";
 import {
-  User,
-  MapPin,
-  Users,
-  Info,
-  Settings2,
-  ShieldCheck,
-  Calendar,
-  IndianRupee,
-  Clock,
-  Sparkles,
-  Loader2,
-  Plus,
-  AlertTriangle,
+AlertTriangle,
+Loader2,
+MapPin,
+Plus,
+Settings2,
+User,
+Users
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
+import * as Yup from "yup";
 
 const createEnquiryValidationSchema = Yup.object().shape({
   customerMode: Yup.string().oneOf(["existing", "new"]).required(),

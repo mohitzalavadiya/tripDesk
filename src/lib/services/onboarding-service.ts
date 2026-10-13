@@ -1,10 +1,10 @@
+import { isPlatformOwnerTargetSync } from "@/lib/auth/platform-owner-guard";
 import prisma from "@/lib/prisma";
-import { getAdminClient } from "@/lib/supabase/admin";
-import { SupabaseClient, User } from "@supabase/supabase-js";
 import { destinationService } from "@/lib/services/destination-service";
 import { internalNotificationService } from "@/lib/services/internal-notification-service";
+import { getAdminClient } from "@/lib/supabase/admin";
 import { UserNotificationType } from "@prisma/client";
-import { isPlatformOwnerTargetSync } from "@/lib/auth/platform-owner-guard";
+import { SupabaseClient,User } from "@supabase/supabase-js";
 
 export interface OnboardingResult {
   success: boolean;

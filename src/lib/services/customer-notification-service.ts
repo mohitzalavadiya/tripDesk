@@ -1,11 +1,11 @@
+import { notificationDispatcher } from "@/lib/notifications/dispatcher";
 import { prisma } from "@/lib/prisma";
 import {
-  CustomerNotificationType,
-  NotificationChannel,
-  NotificationDeliveryStatus,
-  Prisma,
+CustomerNotificationType,
+NotificationChannel,
+NotificationDeliveryStatus,
+Prisma,
 } from "@prisma/client";
-import { notificationDispatcher } from "@/lib/notifications/dispatcher";
 
 export interface CreateCustomerNotificationInput {
   customerId: string;

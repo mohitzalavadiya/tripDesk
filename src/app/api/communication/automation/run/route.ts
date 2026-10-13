@@ -1,14 +1,14 @@
-import { NextRequest } from "next/server";
 import {
-  requireWriteAccess,
-  apiSuccess,
-  handleApiError,
-  validateJson,
+apiSuccess,
+handleApiError,
+requireWriteAccess,
+validateJson,
 } from "@/lib/api";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { communicationService } from "@/lib/services/communication-service";
 import { runAutomationSchema } from "@/lib/validation/communication-schema";
-import { logger } from "@/lib/logger";
+import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 

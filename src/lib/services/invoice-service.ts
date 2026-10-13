@@ -1,23 +1,23 @@
-import "server-only";
 import { prisma } from "@/lib/prisma";
 import {
-  Invoice,
-  InvoiceItem,
-  InvoiceStatus,
-  DiscountType,
-  BookingStatus,
-  PaymentStatus,
-  TaxMode,
-  GstTreatment,
-  Prisma,
+InvoiceQueryInput,
+IssueInvoiceInput,
+UpdateDraftInvoiceInput,
+} from "@/lib/validation/invoice-schema";
+import {
+BookingStatus,
+DiscountType,
+GstTreatment,
+Invoice,
+InvoiceItem,
+InvoiceStatus,
+PaymentStatus,
+Prisma,
+TaxMode,
 } from "@prisma/client";
+import "server-only";
 import { invoiceSequenceService } from "./invoice-sequence-service";
 import { taxService } from "./tax-service";
-import {
-  UpdateDraftInvoiceInput,
-  IssueInvoiceInput,
-  InvoiceQueryInput,
-} from "@/lib/validation/invoice-schema";
 
 export type InvoiceWithDetails = Invoice & {
   items: InvoiceItem[];
@@ -582,7 +582,7 @@ export const invoiceService = {
           const invoiceNumber = await invoiceSequenceService.getNextInvoiceNumber(agencyId, tx);
 
           const now = new Date();
-          let defaultDueDate = new Date(now);
+          const defaultDueDate = new Date(now);
           defaultDueDate.setDate(defaultDueDate.getDate() + 7);
 
           const created = await tx.invoice.create({

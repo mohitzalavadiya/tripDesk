@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
 import { communicationService } from "@/lib/services/communication-service";
 import { listPublicNotificationsSchema } from "@/lib/validation/communication-schema";
+import { NextRequest,NextResponse } from "next/server";
 
 interface RouteParams {
   params: Promise<{ token: string }>;

@@ -1,8 +1,8 @@
 "use client";
 
-import * as React from "react";
 import { SupplierAnalyticsResult } from "@/lib/api-client/operations-client";
-import { Building2, UserCheck, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Building2,UserCheck } from "lucide-react";
+import * as React from "react";
 
 interface OperationsSupplierScorecardProps {
   supplierData?: SupplierAnalyticsResult;

@@ -1,37 +1,31 @@
 "use client";
 
-import * as React from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/auth-context";
+import {
+formatChatTime,
+formatShortDate,
+usePlatformChat,
+} from "@/hooks/use-platform-chat";
 import { platformChatClient } from "@/lib/api-client/platform-chat-client";
 import { ConversationView } from "@/lib/services/platform-chat-service";
 import {
-  usePlatformChat,
-  formatChatTime,
-  formatShortDate,
-} from "@/hooks/use-platform-chat";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  MessageSquare,
-  Search,
-  Building2,
-  User,
-  Mail,
-  Phone,
-  CreditCard,
-  Send,
-  RefreshCw,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  ArrowLeft,
-  ExternalLink,
-  ShieldCheck,
-  WifiOff,
-  Filter,
+ArrowLeft,
+Clock,
+ExternalLink,
+Filter,
+Mail,
+MessageSquare,
+Phone,
+RefreshCw,
+Search,
+Send,
+User
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter,useSearchParams } from "next/navigation";
+import * as React from "react";
 
 export default function AdminChatPage() {
   const { currentUser } = useAuth();

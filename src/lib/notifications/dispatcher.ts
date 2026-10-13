@@ -1,14 +1,14 @@
-import {
-  NotificationChannel,
-  NotificationPayload,
-  NotificationProvider,
-  SendNotificationResult,
-  NotificationDeliveryStatus,
-} from "./types";
-import { InAppNotificationProvider } from "./providers/in-app-provider";
 import { EmailNotificationProvider } from "./providers/email-provider";
+import { InAppNotificationProvider } from "./providers/in-app-provider";
 import { SmsNotificationProvider } from "./providers/sms-provider";
 import { WhatsAppNotificationProvider } from "./providers/whatsapp-provider";
+import {
+NotificationChannel,
+NotificationDeliveryStatus,
+NotificationPayload,
+NotificationProvider,
+SendNotificationResult,
+} from "./types";
 
 export class NotificationDispatcher {
   private providers: Map<NotificationChannel, NotificationProvider> = new Map();

@@ -1,5 +1,5 @@
+import { CustomerNotificationType,NotificationChannel,NotificationDeliveryStatus } from "@prisma/client";
 import { z } from "zod";
-import { NotificationChannel, CustomerNotificationType, NotificationDeliveryStatus } from "@prisma/client";
 
 export const listCommunicationLogsSchema = z.object({
   channel: z.nativeEnum(NotificationChannel).optional(),

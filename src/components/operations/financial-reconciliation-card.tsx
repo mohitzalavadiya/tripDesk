@@ -1,35 +1,34 @@
 "use client";
 
-import * as React from "react";
-import {
-  OperationsClosureSummary,
-  CostAdjustmentItem,
-  operationsClient,
-} from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
+CostAdjustmentItem,
+operationsClient,
+OperationsClosureSummary,
+} from "@/lib/api-client";
 import { getErrorMessage } from "@/lib/utils";
 import {
-  DollarSign,
-  Plus,
-  Trash2,
-  Save,
-  Loader2,
-  AlertCircle,
-  CheckCircle2,
-  TrendingUp,
-  TrendingDown,
-  Scale,
+CheckCircle2,
+DollarSign,
+Loader2,
+Plus,
+Save,
+Scale,
+Trash2,
+TrendingDown,
+TrendingUp
 } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 interface FinancialReconciliationCardProps {
   summary: OperationsClosureSummary;

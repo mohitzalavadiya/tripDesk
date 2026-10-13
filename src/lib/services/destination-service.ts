@@ -1,12 +1,12 @@
-import "server-only";
+import { ConflictError,NotFoundError,ValidationError } from "@/lib/api";
 import prisma from "@/lib/prisma";
-import { NotFoundError, ConflictError, ValidationError } from "@/lib/api";
 import {
-  CreateDestinationInput,
-  UpdateDestinationInput,
-  DestinationListQueryInput,
+CreateDestinationInput,
+DestinationListQueryInput,
+UpdateDestinationInput,
 } from "@/lib/validation/destination-schema";
-import { Destination, DestinationStatus, Prisma } from "@prisma/client";
+import { Destination,DestinationStatus,Prisma } from "@prisma/client";
+import "server-only";
 
 export interface StarterDestination {
   name: string;

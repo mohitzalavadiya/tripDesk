@@ -1,70 +1,66 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import {
-  MessageSquare,
-  Mail,
-  Phone,
-  Send,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  Search,
-  Filter,
-  RefreshCw,
-  Plus,
-  Eye,
-  ExternalLink,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-  Users,
-  Compass,
-  CalendarCheck,
-  RotateCcw,
-  X,
-  Loader2,
-  FileText,
-  Bell,
-  Building2,
-  IndianRupee,
-  Megaphone,
-  ShieldAlert,
-  Check,
-  Inbox,
-} from "lucide-react";
+import { PageHeader } from "@/components/shared/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/shared/page-header";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
 import {
-  NotificationChannel,
-  CustomerNotificationType,
-  NotificationDeliveryStatus,
-  Customer,
-  UserNotificationType,
+communicationClient,
+CommunicationLogItem,
+} from "@/lib/api-client/communication-client";
+import { customerClient } from "@/lib/api-client/customer-client";
+import {
+notificationClient,
+UserNotificationItem,
+} from "@/lib/api-client/notification-client";
+import { tripClient } from "@/lib/api-client/trip-client";
+import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
+import { cn } from "@/lib/utils";
+import {
+Customer,
+CustomerNotificationType,
+NotificationChannel,
+NotificationDeliveryStatus,
+UserNotificationType,
 } from "@prisma/client";
 import {
-  communicationClient,
-  CommunicationLogItem,
-} from "@/lib/api-client/communication-client";
-import {
-  notificationClient,
-  UserNotificationItem,
-} from "@/lib/api-client/notification-client";
-import { customerClient } from "@/lib/api-client/customer-client";
-import { tripClient } from "@/lib/api-client/trip-client";
+AlertCircle,
+Bell,
+Building2,
+CalendarCheck,
+Check,
+CheckCircle2,
+ChevronLeft,
+ChevronRight,
+Clock,
+Compass,
+Eye,
+FileText,
+Inbox,
+IndianRupee,
+Loader2,
+Mail,
+Megaphone,
+MessageSquare,
+Phone,
+Plus,
+RefreshCw,
+RotateCcw,
+Search,
+Send,
+ShieldAlert,
+X
+} from "lucide-react";
+import { useRouter,useSearchParams } from "next/navigation";
+import React,{ useCallback,useEffect,useState } from "react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
 
 const CHANNEL_FILTER_LABELS: Record<string, string> = {
   ALL: "All",

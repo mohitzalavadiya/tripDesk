@@ -1,14 +1,14 @@
-import { NextRequest } from "next/server";
 import {
-  requireReadAccess,
-  requireWriteAccess,
-  apiSuccess,
-  handleApiError,
-  validateRouteParams,
-  NotFoundError,
+apiSuccess,
+handleApiError,
+NotFoundError,
+requireReadAccess,
+requireWriteAccess,
+validateRouteParams,
 } from "@/lib/api";
-import { tripDestinationRouteParamsSchema } from "@/lib/validation/trip-destination-schema";
 import { tripDestinationService } from "@/lib/services/trip-destination-service";
+import { tripDestinationRouteParamsSchema } from "@/lib/validation/trip-destination-schema";
+import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 

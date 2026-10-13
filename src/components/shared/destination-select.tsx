@@ -1,16 +1,16 @@
 "use client";
 
-import * as React from "react";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
 import { destinationClient } from "@/lib/api-client";
 import { Destination } from "@prisma/client";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { MapPin, Loader2 } from "lucide-react";
+import { Loader2,MapPin } from "lucide-react";
+import * as React from "react";
 
 interface DestinationSelectProps {
   value?: string | null;

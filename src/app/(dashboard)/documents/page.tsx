@@ -1,73 +1,67 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import {
-  FileText,
-  Search,
-  Filter,
-  Eye,
-  Download,
-  Send,
-  RotateCcw,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Clock,
-  Hotel,
-  Car,
-  Ticket,
-  Receipt,
-  MapPin,
-  ExternalLink,
-  Loader2,
-  ShieldCheck,
-  RefreshCw,
-  Zap,
-  X,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import {
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
+} from "@/components/ui/table";
+import {
+documentClient,
+DocumentItem,
+ListDocumentsParams,
+} from "@/lib/api-client/document-client";
+import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
 import { getErrorMessage } from "@/lib/utils";
 import {
-  documentClient,
-  DocumentItem,
-  ListDocumentsParams,
-} from "@/lib/api-client/document-client";
-import {
-  TravelDocumentType,
-  TravelDocumentStatus,
-  NotificationChannel,
+NotificationChannel,
+TravelDocumentStatus,
+TravelDocumentType,
 } from "@prisma/client";
+import {
+AlertTriangle,
+Car,
+CheckCircle2,
+Download,
+Eye,
+FileText,
+Hotel,
+Loader2,
+Receipt,
+RefreshCw,
+Search,
+Send,
+ShieldCheck,
+Ticket,
+X,
+XCircle
+} from "lucide-react";
+import Link from "next/link";
+import * as React from "react";
 import { toast } from "sonner";
-import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   ALL: "All",

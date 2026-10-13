@@ -1,110 +1,88 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { EditPayableDialog } from "@/components/finance/edit-payable-dialog";
+import { RecordSupplierPaymentDialog } from "@/components/finance/record-supplier-payment-dialog";
+import { ActivityDialogMode } from "@/components/operations/activity-confirmation-dialog";
+import { AddOtherCostModal } from "@/components/operations/add-other-cost-modal";
+import { AssignDriverModal } from "@/components/operations/assign-driver-modal";
+import { CommunicationModal } from "@/components/operations/communication-modal";
+import { CompleteTripModal } from "@/components/operations/complete-trip-modal";
+import { CreateIssueModal } from "@/components/operations/create-issue-modal";
+import { FinalizationChecklistCard } from "@/components/operations/finalization-checklist-card";
+import { FinancialReconciliationCard } from "@/components/operations/financial-reconciliation-card";
+import { HotelConfirmationCard } from "@/components/operations/hotel-confirmation-card";
+import { HotelConfirmationDialog,HotelDialogMode } from "@/components/operations/hotel-confirmation-dialog";
+import { OperationalIssueCard } from "@/components/operations/operational-issue-card";
 import {
-  operationsClient,
-  OperationDetailWithRelations,
-  ReadinessSummary,
-  HotelConfirmationWithDetails,
-  VehicleDispatchWithDetails,
-  ActivityConfirmationWithDetails,
+TripOperationsStatusBadge
+} from "@/components/operations/operations-status-badge";
+import { OtherCostsCard } from "@/components/operations/other-costs-card";
+import { PostTourReviewCard } from "@/components/operations/post-tour-review-card";
+import { ReportDelayModal } from "@/components/operations/report-delay-modal";
+import { ResolveIssueDialog } from "@/components/operations/resolve-issue-dialog";
+import { ServiceReconciliationCard } from "@/components/operations/service-reconciliation-card";
+import { TravelKitReadinessModal } from "@/components/operations/travel-kit-readiness-modal";
+import { VehicleDispatchCard } from "@/components/operations/vehicle-dispatch-card";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ErrorState } from "@/components/shared/error-state";
+import { PageSkeleton } from "@/components/shared/loading-skeletons";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import {
+ActivityConfirmationWithDetails,
+HotelConfirmationWithDetails,
+OperationDetailWithRelations,
+operationsClient,
+OperationsClosureSummary,
+ReadinessSummary,
+VehicleDispatchWithDetails,
 } from "@/lib/api-client";
+import { getErrorMessage } from "@/lib/utils";
 import {
-  OperationStatus,
-  ConfirmationStatus,
-  DispatchStatus,
-  IssuePriority,
-  IssueStatus,
-  OperationalIssue,
-  OperationEvent,
+ConfirmationStatus,
+DispatchStatus,
+IssueStatus,
+OperationalIssue,
+OperationEvent,
+OperationStatus
 } from "@prisma/client";
 import {
-  TripOperationsStatusBadge,
-  TransportStatusBadge,
-  HotelConfirmationStatusBadge,
-  ActivityStatusBadge,
-  IssuePriorityBadge,
-  IssueStatusBadge,
-} from "@/components/operations/operations-status-badge";
-import { HotelConfirmationCard } from "@/components/operations/hotel-confirmation-card";
-import { HotelConfirmationDialog, HotelDialogMode } from "@/components/operations/hotel-confirmation-dialog";
-import { VehicleDispatchCard } from "@/components/operations/vehicle-dispatch-card";
-import { AssignDriverModal } from "@/components/operations/assign-driver-modal";
-import { ReportDelayModal } from "@/components/operations/report-delay-modal";
-import { ActivityConfirmationCard } from "@/components/operations/activity-confirmation-card";
-import { ActivityConfirmationDialog, ActivityDialogMode } from "@/components/operations/activity-confirmation-dialog";
-import { RescheduleActivityModal } from "@/components/operations/reschedule-activity-modal";
-import { CreateIssueModal } from "@/components/operations/create-issue-modal";
-import { ResolveIssueDialog } from "@/components/operations/resolve-issue-dialog";
+Activity,
+AlertCircle,
+AlertTriangle,
+ArrowLeft,
+Calendar,
+Car,
+CheckCircle2,
+Download,
+FileText,
+Hotel,
+Loader2,
+MessageSquare,
+Plus,
+Search,
+Send,
+ShieldAlert,
+Users
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 const TRAVELER_TYPE_LABELS: Record<string, string> = {
   ADULT: "Adult",
   CHILD: "Child",
   INFANT: "Infant",
 };
-import { OperationalIssueCard } from "@/components/operations/operational-issue-card";
-import { CompleteTripModal } from "@/components/operations/complete-trip-modal";
-import { CommunicationModal } from "@/components/operations/communication-modal";
-import { TravelKitReadinessModal } from "@/components/operations/travel-kit-readiness-modal";
-import { ServiceReconciliationCard } from "@/components/operations/service-reconciliation-card";
-import { PostTourReviewCard } from "@/components/operations/post-tour-review-card";
-import { FinancialReconciliationCard } from "@/components/operations/financial-reconciliation-card";
-import { FinalizationChecklistCard } from "@/components/operations/finalization-checklist-card";
-import { EditPayableDialog } from "@/components/finance/edit-payable-dialog";
-import { RecordSupplierPaymentDialog } from "@/components/finance/record-supplier-payment-dialog";
-import { AddOtherCostModal } from "@/components/operations/add-other-cost-modal";
-import { OtherCostsCard } from "@/components/operations/other-costs-card";
-import { OperationsClosureSummary } from "@/lib/api-client";
-import { PageHeader } from "@/components/shared/page-header";
-import { PageSkeleton, CardSkeleton, TableSkeleton } from "@/components/shared/loading-skeletons";
-import { ErrorState } from "@/components/shared/error-state";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { getErrorMessage } from "@/lib/utils";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
-import {
-  Activity,
-  ArrowLeft,
-  Calendar,
-  Clock,
-  Car,
-  Hotel,
-  Ticket,
-  UserCheck,
-  CheckCircle2,
-  AlertTriangle,
-  AlertCircle,
-  Share2,
-  Phone,
-  Mail,
-  MapPin,
-  Users,
-  Search,
-  Compass,
-  FileText,
-  Plus,
-  Loader2,
-  ExternalLink,
-  ShieldAlert,
-  History,
-  Check,
-  Download,
-  MessageSquare,
-  Send,
-  Lock,
-  Scale,
-} from "lucide-react";
 
 export default function TripOperationsDetailPage() {
   const params = useParams();

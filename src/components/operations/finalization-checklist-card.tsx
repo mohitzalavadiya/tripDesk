@@ -1,32 +1,32 @@
 "use client";
 
-import * as React from "react";
-import {
-  OperationsClosureSummary,
-  operationsClient,
-} from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
+import {
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { toast } from "sonner";
+OperationsClosureSummary,
+operationsClient,
+} from "@/lib/api-client";
 import { getErrorMessage } from "@/lib/utils";
 import {
-  CheckCircle2,
-  XCircle,
-  Lock,
-  Unlock,
-  FileText,
-  Loader2,
-  ShieldCheck,
-  AlertTriangle,
+AlertTriangle,
+CheckCircle2,
+FileText,
+Loader2,
+Lock,
+ShieldCheck,
+Unlock,
+XCircle,
 } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 const OPERATION_STATUS_LABELS: Record<string, string> = {
   PLANNING: "Planning",

@@ -1,20 +1,20 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import { EnquiryWithRelations } from "@/lib/api-client";
-import { PriorityBadge } from "./status-badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Calendar, Users, MapPin, ArrowRight } from "lucide-react";
+import {
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { EnquiryWithRelations } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
 import type { EnquiryStatus } from "@prisma/client";
+import { Calendar,MapPin,MoreVertical,Users } from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { PriorityBadge } from "./status-badge";
 
 interface EnquiryPipelineProps {
   enquiries: EnquiryWithRelations[];

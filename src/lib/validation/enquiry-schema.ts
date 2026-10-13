@@ -1,11 +1,11 @@
-import { z } from "zod";
 import {
-  EnquiryStatus,
-  EnquiryPriority,
-  EnquirySource,
-  FollowUpType,
-  FollowUpStatus,
+EnquiryPriority,
+EnquirySource,
+EnquiryStatus,
+FollowUpStatus,
+FollowUpType,
 } from "@prisma/client";
+import { z } from "zod";
 
 /**
  * Zod schema for creating a new Enquiry

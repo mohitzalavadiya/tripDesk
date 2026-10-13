@@ -1,36 +1,31 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { supplierClient } from "@/lib/api-client";
-import { toast } from "sonner";
 import {
-  Truck,
-  Building2,
-  Phone,
-  Mail,
-  MapPin,
-  FileText,
-  CreditCard,
-  Plus,
-  Loader2,
-  Globe,
-  AlertTriangle,
-  ExternalLink,
+AlertTriangle,
+CreditCard,
+ExternalLink,
+Loader2,
+MapPin,
+Plus,
+Truck
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function NewSupplierPage() {
   const router = useRouter();

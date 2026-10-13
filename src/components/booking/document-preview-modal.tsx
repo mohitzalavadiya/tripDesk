@@ -1,25 +1,22 @@
 "use client";
 
-import * as React from "react";
-import { Booking, BookingItem, CustomerPayment, BookingDocument } from "@/types";
 import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/costing-engine";
 import { triggerDocumentPrint } from "@/lib/booking/document-templates";
+import { formatCurrency } from "@/lib/costing-engine";
 import { useModalScrollLock } from "@/lib/scroll-lock";
+import { Booking,BookingDocument,BookingItem,CustomerPayment } from "@/types";
 import {
-  X,
-  Printer,
-  FileText,
-  Hotel,
-  Car,
-  Ticket,
-  CheckCircle2,
-  MapPin,
-  Calendar,
-  Users,
-  Compass,
-  Phone,
-  Mail,
+Calendar,
+Car,
+CheckCircle2,
+Compass,
+Hotel,
+Mail,
+Phone,
+Printer,
+Ticket,
+Users,
+X
 } from "lucide-react";
 
 interface DocumentPreviewModalProps {

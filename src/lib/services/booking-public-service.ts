@@ -1,6 +1,6 @@
-import "server-only";
 import { prisma } from "@/lib/prisma";
-import { BookingStatus, BookingPaymentStatus, PaymentMethod } from "@prisma/client";
+import { BookingPaymentStatus,BookingStatus,PaymentMethod } from "@prisma/client";
+import "server-only";
 
 export interface PublicBookingPayload {
   id: string;

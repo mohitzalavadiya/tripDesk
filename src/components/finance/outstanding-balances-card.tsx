@@ -1,26 +1,23 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import {
-  Coins,
-  CreditCard,
-  AlertTriangle,
-  ArrowUpRight,
-  Plus,
-  Clock,
-  Phone,
-  Building2,
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  CustomerOutstandingItem,
-  SupplierOutstandingItem,
-} from "@/lib/services/finance-service";
+import { Button } from "@/components/ui/button";
+import { Card,CardContent,CardDescription,CardHeader,CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/costing-engine";
-import { Pencil } from "lucide-react";
+import {
+CustomerOutstandingItem,
+SupplierOutstandingItem,
+} from "@/lib/services/finance-service";
+import {
+AlertTriangle,
+Building2,
+Clock,
+Coins,
+Pencil,
+Phone,
+Plus
+} from "lucide-react";
+import * as React from "react";
 
 interface OutstandingBalancesCardProps {
   customerReceivables: {

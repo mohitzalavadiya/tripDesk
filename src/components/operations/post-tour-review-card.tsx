@@ -1,30 +1,28 @@
 "use client";
 
-import * as React from "react";
-import {
-  OperationsClosureSummary,
-  PostTourReviewInput,
-  operationsClient,
-} from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
+OperationsClosureSummary,
+operationsClient
+} from "@/lib/api-client";
 import { getErrorMessage } from "@/lib/utils";
 import {
-  Star,
-  Sparkles,
-  Save,
-  Loader2,
-  CheckCircle2,
-  Lock,
+CheckCircle2,
+Loader2,
+Save,
+Sparkles,
+Star
 } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 interface PostTourReviewCardProps {
   summary: OperationsClosureSummary;

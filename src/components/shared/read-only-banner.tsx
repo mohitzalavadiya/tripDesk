@@ -1,9 +1,8 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { AlertTriangle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AlertTriangle,ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 interface ReadOnlyBannerProps {
   moduleName?: string;

@@ -1,5 +1,5 @@
-import "server-only";
 import { Prisma } from "@prisma/client";
+import "server-only";
 
 export const invoiceSequenceService = {
   /**

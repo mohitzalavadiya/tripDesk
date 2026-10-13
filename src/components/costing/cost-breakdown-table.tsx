@@ -1,41 +1,33 @@
 "use client"
 
-import * as React from "react"
-import {
-  CostItem,
-  InternalExpense,
-  CostCategory,
-  RateSnapshot,
-} from "@/types"
-import { formatCurrency } from "@/lib/costing-engine"
-import {
-  Hotel,
-  Car,
-  Ticket,
-  Plus,
-  Edit,
-  Trash2,
-  Search,
-  Building2,
-  Calendar,
-  Layers,
-  ArrowUpDown,
-  FileSpreadsheet,
-  AlertCircle,
-  Clock,
-  RefreshCw,
-  Info,
-} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select"
+import { formatCurrency } from "@/lib/costing-engine"
+import {
+CostItem,
+InternalExpense
+} from "@/types"
+import {
+Building2,
+Calendar,
+Car,
+Edit,
+FileSpreadsheet,
+Hotel,
+Layers,
+Plus,
+Search,
+Ticket,
+Trash2
+} from "lucide-react"
+import * as React from "react"
 
 interface CostBreakdownTableProps {
   costItems: CostItem[]

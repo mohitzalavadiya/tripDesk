@@ -1,5 +1,5 @@
+import { GstTreatment,TaxMode } from "@prisma/client";
 import { z } from "zod";
-import { TaxMode, GstTreatment } from "@prisma/client";
 import { isLockedGstRate } from "./field-validators";
 
 export const updateAgencyTaxProfileSchema = z.object({

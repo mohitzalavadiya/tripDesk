@@ -1,18 +1,18 @@
 "use client";
 
-import * as React from "react";
-import { IssueStatus, IssuePriority, OperationalIssue } from "@prisma/client";
-import { operationsClient } from "@/lib/api-client";
+import {
+IssuePriorityBadge,
+IssueStatusBadge,
+} from "@/components/operations/operations-status-badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { getErrorMessage } from "@/lib/utils";
+import { operationsClient } from "@/lib/api-client";
 import { useModalScrollLock } from "@/lib/scroll-lock";
-import { CheckCircle2, X, Loader2, AlertTriangle, ShieldCheck } from "lucide-react";
-import {
-  IssuePriorityBadge,
-  IssueStatusBadge,
-} from "@/components/operations/operations-status-badge";
+import { getErrorMessage } from "@/lib/utils";
+import { IssueStatus,OperationalIssue } from "@prisma/client";
+import { CheckCircle2,Loader2,ShieldCheck,X } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 interface ResolveIssueDialogProps {
   isOpen: boolean;

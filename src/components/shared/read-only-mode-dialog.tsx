@@ -1,18 +1,17 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Lock, ShieldAlert, Phone, CreditCard, ArrowRight } from "lucide-react";
+import {
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
 import { ReadOnlyReason } from "@/context/subscription-context";
+import { ArrowRight,CreditCard,Lock,Phone,ShieldAlert } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export interface ReadOnlyModeDialogProps {
   open: boolean;

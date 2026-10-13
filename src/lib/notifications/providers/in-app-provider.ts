@@ -1,4 +1,4 @@
-import { NotificationProvider, NotificationPayload, SendNotificationResult, NotificationChannel, NotificationDeliveryStatus } from "../types";
+import { NotificationChannel,NotificationDeliveryStatus,NotificationPayload,NotificationProvider,SendNotificationResult } from "../types";
 
 export class InAppNotificationProvider implements NotificationProvider {
   channel: NotificationChannel = NotificationChannel.IN_APP;

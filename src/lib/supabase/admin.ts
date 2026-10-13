@@ -1,7 +1,7 @@
-import "server-only";
-import { createClient } from "@supabase/supabase-js";
-import { normalizeSupabaseUrl } from "./normalize";
 import { assertNotPlatformOwner } from "@/lib/auth/platform-owner-guard";
+import { createClient } from "@supabase/supabase-js";
+import "server-only";
+import { normalizeSupabaseUrl } from "./normalize";
 
 /**
  * Server-only Supabase Admin client initialized with the SUPABASE_SERVICE_ROLE_KEY.

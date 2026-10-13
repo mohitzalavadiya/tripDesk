@@ -1,47 +1,40 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import {
-  Hotel as HotelIcon,
-  Building2,
-  MapPin,
-  ArrowLeft,
-  Phone,
-  Mail,
-  Globe,
-  Edit,
-  Trash2,
-  Loader2,
-  AlertCircle,
-  Archive,
-  Info,
-  Compass,
-} from "lucide-react";
-import { PageHeader } from "@/components/shared/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DestinationSelect } from "@/components/shared/destination-select";
-import { getErrorMessage } from "@/lib/utils";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
+import {
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { hotelClient, HotelWithRelations } from "@/lib/api-client";
+import { hotelClient,HotelWithRelations } from "@/lib/api-client";
+import { getErrorMessage } from "@/lib/utils";
 import { phoneYup } from "@/lib/validation-schemas";
+import { useFormik } from "formik";
+import {
+Archive,
+ArrowLeft,
+Compass,
+Edit,
+Hotel as HotelIcon,
+Loader2,
+Mail,
+MapPin,
+Phone
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
+import * as Yup from "yup";
 
 const editHotelSchema = Yup.object().shape({
   name: Yup.string().trim().required("Hotel name is required").max(200),

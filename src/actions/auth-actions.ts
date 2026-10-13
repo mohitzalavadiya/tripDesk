@@ -1,14 +1,14 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { provisionOnboardedAgencyOwner } from "@/lib/services/onboarding-service";
 import prisma from "@/lib/prisma";
+import { provisionOnboardedAgencyOwner } from "@/lib/services/onboarding-service";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 import {
-  setRecoveryProofCookie,
-  getVerifiedRecoveryProof,
-  clearRecoveryProofCookie,
+clearRecoveryProofCookie,
+getVerifiedRecoveryProof,
+setRecoveryProofCookie,
 } from "@/lib/auth/recovery-proof";
 import { sendVerificationEmail } from "@/lib/services/verification-service";
 

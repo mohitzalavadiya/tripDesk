@@ -1,9 +1,9 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { Lock, Sparkles, ArrowRight, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ArrowRight,Lock,ShieldCheck,Sparkles } from "lucide-react";
+import Link from "next/link";
+import * as React from "react";
 
 interface LockedFeatureCardProps {
   featureName: string;

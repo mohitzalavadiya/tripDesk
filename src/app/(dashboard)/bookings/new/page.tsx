@@ -1,47 +1,41 @@
 "use client";
 
-import * as React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { QuotaExceededCard } from "@/components/shared/quota-exceeded-card";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ReadOnlyModeCard } from "@/components/shared/read-only-mode-card";
-import { useSubscription } from "@/context/subscription-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useSubscription } from "@/context/subscription-context";
 import {
-  tripClient,
-  customerClient,
-  quotationClient,
-  bookingClient,
-  TripWithRelations,
-  QuotationWithRelations,
+bookingClient,
+customerClient,
+quotationClient,
+QuotationWithRelations,
+tripClient,
+TripWithRelations,
 } from "@/lib/api-client";
-import { Customer, BookingStatus } from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
-import { toast } from "sonner";
+import { Customer } from "@prisma/client";
 import {
-  CalendarCheck,
-  Compass,
-  FileText,
-  User,
-  Calendar,
-  Users,
-  IndianRupee,
-  ArrowLeft,
-  Sparkles,
-  Loader2,
-  AlertCircle,
-  AlertTriangle,
+AlertTriangle,
+CalendarCheck,
+Compass,
+FileText,
+Loader2,
+Sparkles
 } from "lucide-react";
+import { useRouter,useSearchParams } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function NewBookingPage() {
   return (

@@ -1,13 +1,13 @@
-import { NextRequest } from "next/server";
 import {
-  requireAgencyOwnerContext,
-  requireWriteAccess,
-  apiSuccess,
-  handleApiError,
-  validateJson,
+apiSuccess,
+handleApiError,
+requireAgencyOwnerContext,
+requireWriteAccess,
+validateJson,
 } from "@/lib/api";
 import { communicationService } from "@/lib/services/communication-service";
 import { updateCommunicationSettingsSchema } from "@/lib/validation/communication-schema";
+import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 

@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
 import { tripPublicService } from "@/lib/services/trip-public-service";
+import { NextRequest,NextResponse } from "next/server";
 
 interface RouteParams {
   params: Promise<{ token: string }>;

@@ -1,22 +1,18 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { customerPortalClient } from "@/lib/api-client";
 import { CustomerPaymentSummaryView } from "@/lib/services/customer-portal-service";
-import { Button } from "@/components/ui/button";
 import {
-  CreditCard,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  ArrowLeft,
-  Calendar,
-  Receipt,
-  IndianRupee,
-  ShieldCheck,
+AlertCircle,
+ArrowLeft,
+CheckCircle2,
+Loader2,
+Receipt
 } from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   BANK_TRANSFER: "Bank Transfer",

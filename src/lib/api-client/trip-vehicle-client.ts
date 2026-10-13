@@ -1,9 +1,9 @@
-import { TripVehicle, Vehicle } from "@prisma/client";
 import {
-  CreateTripVehicleInput,
-  UpdateTripVehicleInput,
+CreateTripVehicleInput,
+UpdateTripVehicleInput,
 } from "@/lib/validation/trip-vehicle-schema";
-import { SingleResponse, ApiClientError } from "./customer-client";
+import { TripVehicle,Vehicle } from "@prisma/client";
+import { ApiClientError,SingleResponse } from "./customer-client";
 
 export interface TripVehicleWithVehicle extends TripVehicle {
   vehicle: Vehicle | null;

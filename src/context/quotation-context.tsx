@@ -1,31 +1,31 @@
 "use client"
 
-import * as React from "react"
 import {
-  Quotation,
-  PublicQuotation,
-  AgencyBranding,
-  Trip,
-  Customer,
-  ItineraryDay,
-  TripHotel,
-  TripVehicle,
-  TripActivity,
-  TripCosting,
-  Hotel,
-  HotelRoom,
-  Vehicle,
-  Activity,
-} from "@/types"
-import {
-  DEFAULT_AGENCY_BRANDING,
-  DEFAULT_QUOTATION_SECTIONS,
-  DEFAULT_INCLUSIONS,
-  DEFAULT_EXCLUSIONS,
-  createQuotationSnapshot,
-  sanitizeToPublicQuotation,
-  generateShareToken,
+DEFAULT_AGENCY_BRANDING,
+DEFAULT_EXCLUSIONS,
+DEFAULT_INCLUSIONS,
+DEFAULT_QUOTATION_SECTIONS,
+createQuotationSnapshot,
+generateShareToken,
+sanitizeToPublicQuotation,
 } from "@/lib/quotation/quotation-service"
+import {
+Activity,
+AgencyBranding,
+Customer,
+Hotel,
+HotelRoom,
+ItineraryDay,
+PublicQuotation,
+Quotation,
+Trip,
+TripActivity,
+TripCosting,
+TripHotel,
+TripVehicle,
+Vehicle,
+} from "@/types"
+import * as React from "react"
 import { toast } from "sonner"
 
 // ═════════════════════════════════════════════════════════════════════

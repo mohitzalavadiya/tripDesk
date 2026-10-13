@@ -1,49 +1,40 @@
 "use client";
 
-import * as React from "react";
+import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
 import { PageHeader } from "@/components/shared/page-header";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { StatusBadge } from "@/components/shared/status-badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
-import {
-  TrendingUp,
-  CreditCard,
-  AlertCircle,
-  FileSpreadsheet,
-  FileText,
-  Clock,
-  MapPin,
-  Users,
-  CheckCircle2,
-  PieChart,
-  Calendar,
-  Layers,
-  ArrowUpRight,
-  ArrowDownRight,
-  Filter,
-  RefreshCw,
-  Building2,
-  IndianRupee,
-  Phone,
-  Search,
-} from "lucide-react";
-import { formatCurrency } from "@/lib/costing-engine";
-import { reportingClient } from "@/lib/api-client/reporting-client";
 import { useSubscription } from "@/context/subscription-context";
-import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
+import { reportingClient } from "@/lib/api-client/reporting-client";
+import { formatCurrency } from "@/lib/costing-engine";
 import {
-  AgencyBIReportResult,
-  ReportExecutiveKPIs,
+AgencyBIReportResult
 } from "@/lib/services/reporting-service";
-import { ReportPreset, ReportType } from "@/lib/validation/reporting-schema";
+import { ReportPreset,ReportType } from "@/lib/validation/reporting-schema";
+import {
+Building2,
+CheckCircle2,
+Clock,
+CreditCard,
+FileSpreadsheet,
+FileText,
+Layers,
+MapPin,
+PieChart,
+RefreshCw,
+Search,
+TrendingUp,
+Users
+} from "lucide-react";
+import * as React from "react";
 import { toast } from "sonner";
 
 const EXPORT_CSV_LABELS: Record<string, string> = {

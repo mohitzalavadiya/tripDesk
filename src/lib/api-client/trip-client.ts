@@ -1,11 +1,11 @@
-import { Trip } from "@prisma/client";
-import {
-  CreateTripInput,
-  UpdateTripInput,
-  TripQueryParams,
-} from "@/lib/validation/trip-schema";
 import { TripWithRelations } from "@/lib/services/trip-service";
-import { PaginatedResponse, SingleResponse, ApiClientError } from "./customer-client";
+import {
+CreateTripInput,
+TripQueryParams,
+UpdateTripInput,
+} from "@/lib/validation/trip-schema";
+import { Trip } from "@prisma/client";
+import { ApiClientError,PaginatedResponse,SingleResponse } from "./customer-client";
 
 export type { TripWithRelations };
 

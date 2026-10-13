@@ -1,9 +1,9 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { Bell, Sparkles } from "lucide-react";
 import { customerPortalClient } from "@/lib/api-client";
+import { Bell } from "lucide-react";
+import Link from "next/link";
+import * as React from "react";
 
 export function CustomerNotificationBell() {
   const [unreadCount, setUnreadCount] = React.useState(0);

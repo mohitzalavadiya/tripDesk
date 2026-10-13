@@ -1,57 +1,49 @@
 "use client";
 
-import * as React from "react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PageHeader } from "@/components/shared/page-header";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
+import { useSubscription } from "@/context/subscription-context";
 import {
-  communicationClient,
-  CommunicationSettings,
-  CommunicationLogItem,
+communicationClient,
+CommunicationLogItem,
+CommunicationSettings,
 } from "@/lib/api-client/communication-client";
 import {
-  taxClient,
-  TaxRateItem,
-  AgencyTaxProfileData,
+taxClient,
+TaxRateItem
 } from "@/lib/api-client/tax-client";
-import { useSubscription } from "@/context/subscription-context";
-import { TaxMode, GstTreatment } from "@prisma/client";
+import { GstTreatment,TaxMode } from "@prisma/client";
 import {
-  Mail,
-  MessageSquare,
-  Send,
-  RefreshCw,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  Sparkles,
-  Sliders,
-  ShieldCheck,
-  Zap,
-  Check,
-  RotateCw,
-  ExternalLink,
-  Receipt,
-  Building2,
-  Percent,
-  HelpCircle,
-  Lock,
-  Image as ImageIcon,
-  Upload,
-  Trash2,
+Building2,
+Check,
+HelpCircle,
+Image as ImageIcon,
+Lock,
+MessageSquare,
+Percent,
+Receipt,
+RotateCw,
+ShieldCheck,
+Sliders,
+Sparkles,
+Trash2,
+Upload,
+Zap
 } from "lucide-react";
-import { toast } from "sonner";
 import Link from "next/link";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function SettingsPage() {
   const { isFeatureAllowed, overview, isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();

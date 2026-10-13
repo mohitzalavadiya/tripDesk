@@ -1,17 +1,16 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ShieldAlert, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
+import {
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
+import { ArrowRight,CheckCircle2,ShieldAlert,Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export interface QuotaExceededDialogProps {
   open: boolean;

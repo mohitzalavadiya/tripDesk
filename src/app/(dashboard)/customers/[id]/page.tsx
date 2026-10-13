@@ -1,87 +1,79 @@
 "use client";
 
-import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import { customerClient, CustomerDetails360 } from "@/lib/api-client";
-import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { getErrorMessage } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { formatEnumLabel, GENDER_OPTIONS } from "@/lib/utils/enum-formatters";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import {
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
 } from "@/components/ui/table";
-import {
-  ArrowLeft,
-  User,
-  Phone,
-  Mail,
-  MapPin,
-  Calendar,
-  Compass,
-  CreditCard,
-  FileText,
-  Edit2,
-  Plus,
-  Trash2,
-  Clock,
-  ExternalLink,
-  CheckCircle2,
-  AlertTriangle,
-  Inbox,
-  Check,
-  Building,
-  Users,
-  IndianRupee,
-  MoreVertical,
-  Loader2,
-  DollarSign,
-  Cake,
-  Globe,
-  MessageSquare,
-  Send,
-  RotateCw,
-} from "lucide-react";
-import { formatCurrency } from "@/lib/costing-engine";
-import { toast } from "sonner";
-import { communicationClient, CommunicationLogItem } from "@/lib/api-client/communication-client";
-import { phoneYup } from "@/lib/validation-schemas";
+import { Textarea } from "@/components/ui/textarea";
+import { customerClient,CustomerDetails360 } from "@/lib/api-client";
+import { communicationClient,CommunicationLogItem } from "@/lib/api-client/communication-client";
 import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
+import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
+import { formatEnumLabel,GENDER_OPTIONS } from "@/lib/utils/enum-formatters";
+import { phoneYup } from "@/lib/validation-schemas";
+import { useFormik } from "formik";
+import {
+AlertTriangle,
+ArrowLeft,
+CheckCircle2,
+Clock,
+Compass,
+CreditCard,
+Edit2,
+ExternalLink,
+FileText,
+Inbox,
+IndianRupee,
+Loader2,
+Mail,
+MapPin,
+MessageSquare,
+MoreVertical,
+Phone,
+Plus,
+RotateCw,
+Send,
+Trash2,
+Users
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
+import * as Yup from "yup";
 
 const AVATAR_GRADIENTS = [
   "from-indigo-500 to-violet-600",

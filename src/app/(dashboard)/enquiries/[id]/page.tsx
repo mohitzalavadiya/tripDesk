@@ -1,79 +1,73 @@
 "use client";
 
-import * as React from "react";
-import { useRouter, useParams } from "next/navigation";
-import Link from "next/link";
-import { StatusBadge, PriorityBadge } from "@/components/enquiries/status-badge";
+import { PriorityBadge,StatusBadge } from "@/components/enquiries/status-badge";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
-import { formatEnumLabel } from "@/lib/utils/enum-formatters";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
-  ArrowLeft,
-  Calendar,
-  Clock,
-  Plus,
-  Phone,
-  Mail,
-  User,
-  Info,
-  ExternalLink,
-  CheckCircle2,
-  AlertTriangle,
-  Compass,
-  Trash2,
-  Loader2,
-  Sparkles,
-  PhoneCall,
-  Video,
-  MessageSquare,
-  MoreVertical,
-  CalendarDays,
-  Check,
-  X,
-  AlertCircle,
-  TrendingUp,
-  FileText,
-} from "lucide-react";
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  enquiryClient,
-  EnquiryWithRelations,
-  CrmTimelineEvent,
-  followUpClient,
+CrmTimelineEvent,
+enquiryClient,
+EnquiryWithRelations,
+followUpClient,
 } from "@/lib/api-client";
-import {
-  EnquiryStatus,
-  EnquiryPriority,
-  FollowUpType,
-  FollowUpStatus,
-  EnquiryFollowUp,
-} from "@prisma/client";
 import { formatCurrency } from "@/lib/costing-engine";
+import { formatEnumLabel } from "@/lib/utils/enum-formatters";
 import { STANDARD_LOST_REASONS } from "@/lib/validation/enquiry-schema";
+import {
+EnquiryFollowUp,
+EnquiryPriority,
+EnquiryStatus,
+FollowUpStatus,
+FollowUpType,
+} from "@prisma/client";
+import {
+AlertCircle,
+AlertTriangle,
+ArrowLeft,
+Calendar,
+CalendarDays,
+Check,
+CheckCircle2,
+Clock,
+Compass,
+ExternalLink,
+Info,
+Loader2,
+Mail,
+MoreVertical,
+Phone,
+Plus,
+Trash2,
+TrendingUp,
+User
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
 
 export default function EnquiryDetailPage() {

@@ -1,51 +1,42 @@
 "use client";
 
-import * as React from "react";
-import { useParams } from "next/navigation";
-import {
-  Download,
-  Share2,
-  Phone,
-  MessageSquare,
-  AlertTriangle,
-  Compass,
-  CheckCircle2,
-  Clock,
-  Sparkles,
-  Calendar,
-  Users,
-  Printer,
-  Loader2,
-  Check,
-  X,
-  CreditCard,
-  FileCheck,
-  ShieldCheck,
-  Info,
-  Star,
-  Package,
-  Building2,
-  Car,
-  Hotel,
-  Ticket,
-  MapPin,
-  Mail,
-  Building,
-} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { quotationClient, PublicQuotationPayload } from "@/lib/api-client";
+import { PublicQuotationPayload,quotationClient } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
+import {
+AlertTriangle,
+Building,
+Calendar,
+Car,
+Check,
+CheckCircle2,
+Compass,
+Download,
+Hotel,
+Info,
+Loader2,
+Mail,
+MessageSquare,
+Phone,
+Printer,
+ShieldCheck,
+Sparkles,
+Ticket,
+X
+} from "lucide-react";
+import { useParams } from "next/navigation";
+import * as React from "react";
 import { toast } from "sonner";
 
 export default function PublicQuotationPage() {

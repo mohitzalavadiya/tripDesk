@@ -1,5 +1,5 @@
-import "server-only";
 import { prisma } from "@/lib/prisma";
+import "server-only";
 import { rateSheetService } from "./rate-sheet-service";
 
 export interface HotelCostItem {
@@ -207,7 +207,7 @@ export const tripCostingService = {
     });
 
     // 5. Activities (Non-Monetary Descriptive List: Included / Excluded)
-    let activitiesTotal = 0;
+    const activitiesTotal = 0;
     const activities: ActivityCostItem[] = trip.tripActivities.map((ta) => {
       return {
         id: ta.id,

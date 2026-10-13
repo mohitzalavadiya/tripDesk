@@ -1,5 +1,5 @@
-import { Booking, PublicBookingView } from "@/types";
 import { formatCurrency } from "@/lib/costing-engine";
+import { Booking,PublicBookingView } from "@/types";
 
 /**
  * Triggers standard browser print dialog for vouchers and receipts

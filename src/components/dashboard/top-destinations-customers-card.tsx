@@ -1,10 +1,8 @@
 "use client";
 
-import * as React from "react";
+import { TopCustomerItem,TopDestinationItem } from "@/lib/services/dashboard-service";
+import { ArrowRight,MapPin,Trophy } from "lucide-react";
 import Link from "next/link";
-import { MapPin, Users, ArrowRight, Award, Trophy } from "lucide-react";
-import { TopDestinationItem, TopCustomerItem } from "@/lib/services/dashboard-service";
-import { Badge } from "@/components/ui/badge";
 
 interface TopDestinationsCustomersCardProps {
   destinations?: TopDestinationItem[];

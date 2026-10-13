@@ -1,10 +1,10 @@
 "use client";
 
-import * as React from "react";
 import { destinationClient } from "@/lib/api-client";
-import { Destination } from "@prisma/client";
-import { MapPin, ChevronDown, Check, Loader2, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Destination } from "@prisma/client";
+import { Check,ChevronDown,Loader2,MapPin,Search,X } from "lucide-react";
+import * as React from "react";
 
 export interface DestinationMultiSelectProps {
   value: string[];

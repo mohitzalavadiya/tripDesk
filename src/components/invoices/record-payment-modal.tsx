@@ -1,18 +1,18 @@
 "use client";
 
-import * as React from "react";
-import { X, Loader2, IndianRupee, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
 import { useModalScrollLock } from "@/lib/scroll-lock";
 import { isValidDecimal } from "@/lib/validation/field-validators";
+import { AlertCircle,IndianRupee,Loader2,X } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 interface RecordPaymentModalProps {
   isOpen: boolean;

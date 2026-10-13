@@ -1,12 +1,12 @@
-import "server-only";
-import prisma from "@/lib/prisma";
 import { NotFoundError } from "@/lib/api";
+import prisma from "@/lib/prisma";
 import {
-  CreateActivityInput,
-  UpdateActivityInput,
-  ActivityListQueryInput,
+ActivityListQueryInput,
+CreateActivityInput,
+UpdateActivityInput,
 } from "@/lib/validation/activity-schema";
 import { Activity } from "@prisma/client";
+import "server-only";
 
 export type ActivityWithRelations = Activity & {
   destination?: {

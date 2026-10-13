@@ -1,11 +1,10 @@
 "use client";
 
-import * as React from "react";
-import { Menu, PlaneTakeoff, Building2, ShieldCheck } from "lucide-react";
-import { useAuth } from "@/context/auth-context";
 import { GlobalSearch } from "@/components/shared/global-search";
 import { NotificationsPopover } from "@/components/shared/notifications-popover";
 import { UserMenu } from "@/components/shared/user-menu";
+import { useAuth } from "@/context/auth-context";
+import { Building2,Menu,PlaneTakeoff,ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 interface TopbarProps {

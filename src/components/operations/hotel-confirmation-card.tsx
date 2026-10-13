@@ -1,32 +1,27 @@
 "use client";
 
-import * as React from "react";
-import { ConfirmationStatus } from "@prisma/client";
-import { HotelConfirmationWithDetails } from "@/lib/api-client";
 import { HotelConfirmationStatusBadge } from "@/components/operations/operations-status-badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import {
-  Hotel,
-  Calendar,
-  Building,
-  Phone,
-  Mail,
-  Copy,
-  Check,
-  Send,
-  CheckCircle2,
-  CalendarClock,
-  AlertTriangle,
-  FileText,
-  Clock,
-  MapPin,
-  ExternalLink,
-  Download,
-} from "lucide-react";
-import { HotelDialogMode } from "./hotel-confirmation-dialog";
+import { HotelConfirmationWithDetails } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
-import { CreditCard, Edit, DollarSign } from "lucide-react";
+import { ConfirmationStatus } from "@prisma/client";
+import {
+Calendar,
+CalendarClock,
+Check,
+CheckCircle2,
+Copy,
+CreditCard,
+Download,
+Edit,
+Hotel,
+MapPin,
+Phone,
+Send
+} from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
+import { HotelDialogMode } from "./hotel-confirmation-dialog";
 
 interface HotelConfirmationCardProps {
   hotelConfirmation: HotelConfirmationWithDetails;

@@ -1,17 +1,17 @@
 import {
-  EnquiryFollowUp,
-} from "@prisma/client";
-import {
-  GlobalFollowUpQueryInput,
-  CreateGlobalFollowUpInput,
-  CompleteFollowUpInput,
-  RescheduleFollowUpInput,
-  CancelFollowUpInput,
+CancelFollowUpInput,
+CompleteFollowUpInput,
+CreateGlobalFollowUpInput,
+GlobalFollowUpQueryInput,
+RescheduleFollowUpInput,
 } from "@/lib/validation/follow-up-schema";
 import {
-  PaginatedResponse,
-  SingleResponse,
-  ApiClientError,
+EnquiryFollowUp,
+} from "@prisma/client";
+import {
+ApiClientError,
+PaginatedResponse,
+SingleResponse,
 } from "./customer-client";
 
 async function handleResponse<T>(res: Response): Promise<T> {

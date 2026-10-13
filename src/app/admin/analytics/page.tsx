@@ -1,22 +1,20 @@
 "use client";
 
-import * as React from "react";
 import { PageHeader } from "@/components/shared/page-header";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import {
-  TrendingUp,
-  Users,
-  Compass,
-  FileText,
-  CalendarCheck,
-  Building2,
-  RefreshCw,
-  Activity,
-  Layers,
-} from "lucide-react";
 import { adminClient } from "@/lib/api-client/admin-client";
 import { PlatformUsageAnalytics } from "@/lib/services/admin-service";
+import {
+Activity,
+CalendarCheck,
+Compass,
+FileText,
+Layers,
+RefreshCw,
+TrendingUp,
+Users
+} from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function AdminAnalyticsPage() {
   const [analytics, setAnalytics] = React.useState<PlatformUsageAnalytics | null>(null);

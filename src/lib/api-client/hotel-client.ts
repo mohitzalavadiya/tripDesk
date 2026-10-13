@@ -1,12 +1,12 @@
+import {
+CreateHotelInput,
+UpdateHotelInput,
+} from "@/lib/validation/hotel-schema";
 import { Hotel } from "@prisma/client";
 import {
-  CreateHotelInput,
-  UpdateHotelInput,
-} from "@/lib/validation/hotel-schema";
-import {
-  PaginatedResponse,
-  SingleResponse,
-  ApiClientError,
+ApiClientError,
+PaginatedResponse,
+SingleResponse,
 } from "./customer-client";
 
 export type HotelWithRelations = Hotel & {

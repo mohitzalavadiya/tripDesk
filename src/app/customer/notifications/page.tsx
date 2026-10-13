@@ -1,28 +1,25 @@
 "use client";
 
-import * as React from "react";
+import { Button } from "@/components/ui/button";
+import { customerPortalClient } from "@/lib/api-client";
+import {
+AlertTriangle,
+ArrowLeft,
+ArrowRight,
+Bell,
+Car,
+CheckCheck,
+Compass,
+CreditCard,
+FileText,
+Hotel,
+Loader2,
+Ticket
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { customerPortalClient } from "@/lib/api-client";
-import { Button } from "@/components/ui/button";
+import * as React from "react";
 import { toast } from "sonner";
-import {
-  Bell,
-  CheckCheck,
-  CheckCircle2,
-  Hotel,
-  Car,
-  Ticket,
-  FileText,
-  CreditCard,
-  Compass,
-  AlertTriangle,
-  ArrowRight,
-  Loader2,
-  Calendar,
-  Sparkles,
-  ArrowLeft,
-} from "lucide-react";
 
 export default function CustomerNotificationsPage() {
   const router = useRouter();

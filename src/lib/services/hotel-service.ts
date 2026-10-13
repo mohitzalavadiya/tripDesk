@@ -1,12 +1,12 @@
-import "server-only";
+import { NotFoundError,ValidationError } from "@/lib/api";
 import prisma from "@/lib/prisma";
-import { NotFoundError, ValidationError } from "@/lib/api";
 import {
-  CreateHotelPayload,
-  UpdateHotelInput,
-  HotelListQueryInput,
+CreateHotelPayload,
+HotelListQueryInput,
+UpdateHotelInput,
 } from "@/lib/validation/hotel-schema";
-import { Hotel, Prisma } from "@prisma/client";
+import { Hotel,Prisma } from "@prisma/client";
+import "server-only";
 
 export type HotelWithRelations = Hotel & {
   destination?: {

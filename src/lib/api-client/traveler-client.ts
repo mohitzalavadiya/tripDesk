@@ -1,9 +1,9 @@
-import { Traveler } from "@prisma/client";
 import {
-  CreateTravelerInput,
-  UpdateTravelerInput,
+CreateTravelerInput,
+UpdateTravelerInput,
 } from "@/lib/validation/traveler-schema";
-import { SingleResponse, ApiClientError } from "./customer-client";
+import { Traveler } from "@prisma/client";
+import { ApiClientError,SingleResponse } from "./customer-client";
 
 async function handleResponse<T>(res: Response): Promise<T> {
   const json = await res.json().catch(() => ({}));

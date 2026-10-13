@@ -1,23 +1,22 @@
 "use client";
 
-import * as React from "react";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import { BookingItem, BookingItemStatus } from "@/types";
-import { useBooking } from "@/context/booking-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
+import { useBooking } from "@/context/booking-context";
 import { useModalScrollLock } from "@/lib/scroll-lock";
-import { X, CheckCircle2, Hotel, Car, Ticket, Calendar, Hash, Phone, User } from "lucide-react";
+import { BookingItem,BookingItemStatus } from "@/types";
+import { useFormik } from "formik";
+import { Calendar,Car,Hash,Hotel,Phone,Ticket,User,X } from "lucide-react";
+import { toast } from "sonner";
+import * as Yup from "yup";
 
 import { phoneYup } from "@/lib/validation-schemas";
 

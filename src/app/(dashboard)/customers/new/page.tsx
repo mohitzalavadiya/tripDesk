@@ -1,42 +1,36 @@
 "use client";
 
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { useFormik } from "formik";
-import * as Yup from "yup";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { customerClient } from "@/lib/api-client";
 import { GENDER_OPTIONS } from "@/lib/utils/enum-formatters";
-import { toast } from "sonner";
-import {
-  User,
-  Phone,
-  Mail,
-  MapPin,
-  FileText,
-  AlertTriangle,
-  Users,
-  Building,
-  Plus,
-  Loader2,
-  Calendar,
-  Globe,
-  ExternalLink,
-} from "lucide-react";
 import { phoneYup } from "@/lib/validation-schemas";
 import { Customer } from "@prisma/client";
+import { useFormik } from "formik";
+import {
+AlertTriangle,
+ExternalLink,
+FileText,
+Loader2,
+MapPin,
+Plus,
+User
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
+import * as Yup from "yup";
 
 const createCustomerValidationSchema = Yup.object().shape({
   name: Yup.string()

@@ -1,32 +1,28 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/shared/page-header";
-import { formatCurrency } from "@/lib/costing-engine";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import {
-  TrendingUp,
-  Users,
-  Award,
-  CreditCard,
-  Star,
-  Hotel,
-  Car,
-  ShieldCheck,
-  Sparkles,
-  UserCheck,
-  ArrowRight,
-  RefreshCw,
-  MapPin,
-  Ticket,
-} from "lucide-react";
-import { experienceClient } from "@/lib/api-client/experience-client";
-import { useSubscription } from "@/context/subscription-context";
-import { CustomerInsightsData } from "@/lib/services/customer-insights-service";
 import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
+import { PageHeader } from "@/components/shared/page-header";
+import { useSubscription } from "@/context/subscription-context";
+import { experienceClient } from "@/lib/api-client/experience-client";
+import { formatCurrency } from "@/lib/costing-engine";
+import { CustomerInsightsData } from "@/lib/services/customer-insights-service";
+import {
+Award,
+Car,
+CreditCard,
+Hotel,
+MapPin,
+RefreshCw,
+ShieldCheck,
+Star,
+Ticket,
+TrendingUp,
+UserCheck,
+Users
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function CustomerInsightsPage() {
   const router = useRouter();

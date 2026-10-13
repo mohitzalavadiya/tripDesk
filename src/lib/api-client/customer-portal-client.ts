@@ -1,10 +1,10 @@
 import {
-  CustomerBookingSummaryView,
-  CustomerTripDetailView,
-  CustomerDocumentItemView,
-  CustomerPaymentSummaryView,
-  CustomerProfileView,
-  CustomerFeedbackInput,
+CustomerBookingSummaryView,
+CustomerDocumentItemView,
+CustomerFeedbackInput,
+CustomerPaymentSummaryView,
+CustomerProfileView,
+CustomerTripDetailView,
 } from "@/lib/services/customer-portal-service";
 
 export const customerPortalClient = {

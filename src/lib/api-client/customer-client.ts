@@ -1,10 +1,10 @@
-import { Customer } from "@prisma/client";
 import {
-  CreateCustomerInput,
-  UpdateCustomerInput,
-  CustomerQueryParams,
-  CheckDuplicateCustomerInput,
+CheckDuplicateCustomerInput,
+CreateCustomerInput,
+CustomerQueryParams,
+UpdateCustomerInput,
 } from "@/lib/validation/customer-schema";
+import { Customer } from "@prisma/client";
 
 export interface PaginatedResponse<T> {
   success: boolean;

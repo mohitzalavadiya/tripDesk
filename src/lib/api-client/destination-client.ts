@@ -1,13 +1,13 @@
+import {
+CreateDestinationInput,
+DestinationListQueryInput,
+UpdateDestinationInput,
+} from "@/lib/validation/destination-schema";
 import { Destination } from "@prisma/client";
 import {
-  CreateDestinationInput,
-  UpdateDestinationInput,
-  DestinationListQueryInput,
-} from "@/lib/validation/destination-schema";
-import {
-  PaginatedResponse,
-  SingleResponse,
-  ApiClientError,
+ApiClientError,
+PaginatedResponse,
+SingleResponse,
 } from "./customer-client";
 
 async function handleResponse<T>(res: Response): Promise<T> {
