@@ -1,0 +1,32 @@
+import { ApiError,apiSuccess,handleApiError } from "@/lib/api";
+import { getAuthenticatedCustomer } from "@/lib/auth/customer-auth";
+import { customerPortalService } from "@/lib/services/customer-portal-service";
+import { NextRequest } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * GET /api/customer/trips/[tripId]/documents
+ * Returns list of customer travel documents (vouchers, booking confirmation, travel kit).
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ tripId: string }> }
+) {
+  try {
+    const { tripId } = await params;
+    const auth = await getAuthenticatedCustomer(request, { tripId });
+    if (!auth) {
+      throw new ApiError(401, "CUSTOMER_UNAUTHORIZED", "Please sign in or provide a valid portal session.");
+    }
+    const docs = await customerPortalService.getCustomerTripDocuments(
+      auth.customerId,
+      auth.agencyId,
+      tripId
+    );
+
+    return apiSuccess(docs);
+  } catch (error) {
+    return handleApiError(error);
+  }
+}

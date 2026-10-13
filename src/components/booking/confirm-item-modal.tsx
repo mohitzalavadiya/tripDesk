@@ -1,22 +1,24 @@
 "use client";
 
-import * as React from "react";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import { BookingItem, BookingItemStatus } from "@/types";
-import { useBooking } from "@/context/booking-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useBooking } from "@/context/booking-context";
+import { useModalScrollLock } from "@/lib/scroll-lock";
+import { BookingItem,BookingItemStatus } from "@/types";
+import { useFormik } from "formik";
+import { Calendar,Car,Hash,Hotel,Phone,Ticket,User,X } from "lucide-react";
 import { toast } from "sonner";
-import { X, CheckCircle2, Hotel, Car, Ticket, Calendar, Hash, Phone, User } from "lucide-react";
+import * as Yup from "yup";
+
+import { phoneYup } from "@/lib/validation-schemas";
 
 interface ConfirmItemModalProps {
   bookingId: string;
@@ -30,7 +32,7 @@ const itemConfirmSchema = Yup.object({
   confirmationNumber: Yup.string().optional(),
   confirmationDate: Yup.string().optional(),
   driverName: Yup.string().optional(),
-  driverPhone: Yup.string().optional(),
+  driverPhone: phoneYup(false, "Driver phone"),
   notes: Yup.string().optional(),
 });
 
@@ -40,6 +42,7 @@ export function ConfirmItemModal({
   isOpen,
   onClose,
 }: ConfirmItemModalProps) {
+  useModalScrollLock(isOpen);
   const { updateBookingItem } = useBooking();
 
   const formik = useFormik({
@@ -82,6 +85,13 @@ export function ConfirmItemModal({
 
   const IconComponent =
     item.type === "Hotel" ? Hotel : item.type === "Vehicle" ? Car : Ticket;
+
+  const getFieldError = (fieldName: string) => {
+    return formik.touched[fieldName as keyof typeof formik.touched] &&
+      formik.errors[fieldName as keyof typeof formik.errors]
+      ? (formik.errors[fieldName as keyof typeof formik.errors] as string)
+      : null;
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
@@ -137,9 +147,14 @@ export function ConfirmItemModal({
             </label>
             <Select
               value={formik.values.status}
-              onValueChange={(val) => formik.setFieldValue("status", val)}
+              onValueChange={(val) => {
+                if (val) {
+                  formik.setFieldValue("status", val);
+                  formik.setFieldTouched("status", true);
+                }
+              }}
             >
-              <SelectTrigger className="h-9.5 text-xs font-semibold">
+              <SelectTrigger className={`h-9.5 text-xs font-semibold ${getFieldError("status") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-white border-slate-200">
@@ -149,6 +164,11 @@ export function ConfirmItemModal({
                 <SelectItem value="Cancelled">✕ Cancelled / Released</SelectItem>
               </SelectContent>
             </Select>
+            {getFieldError("status") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                {getFieldError("status")}
+              </p>
+            )}
           </div>
 
           {/* Confirmation Number & Date */}
@@ -168,9 +188,14 @@ export function ConfirmItemModal({
                       : "e.g. ACT-2201"
                   }
                   {...formik.getFieldProps("confirmationNumber")}
-                  className="pl-9 h-9.5 text-xs font-mono font-bold uppercase"
+                  className={`pl-9 h-9.5 text-xs font-mono font-bold uppercase ${getFieldError("confirmationNumber") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                 />
               </div>
+              {getFieldError("confirmationNumber") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                  {getFieldError("confirmationNumber")}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -180,9 +205,14 @@ export function ConfirmItemModal({
                 <Input
                   type="date"
                   {...formik.getFieldProps("confirmationDate")}
-                  className="pl-9 h-9.5 text-xs font-medium"
+                  className={`pl-9 h-9.5 text-xs font-medium ${getFieldError("confirmationDate") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                 />
               </div>
+              {getFieldError("confirmationDate") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                  {getFieldError("confirmationDate")}
+                </p>
+              )}
             </div>
           </div>
 
@@ -196,9 +226,14 @@ export function ConfirmItemModal({
                   <Input
                     placeholder="e.g. Rajesh Kumar"
                     {...formik.getFieldProps("driverName")}
-                    className="pl-9 h-9.5 text-xs font-semibold"
+                    className={`pl-9 h-9.5 text-xs font-semibold ${getFieldError("driverName") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
                 </div>
+                {getFieldError("driverName") && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                    {getFieldError("driverName")}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -208,9 +243,14 @@ export function ConfirmItemModal({
                   <Input
                     placeholder="e.g. +91 94471 22334"
                     {...formik.getFieldProps("driverPhone")}
-                    className="pl-9 h-9.5 text-xs font-mono font-medium"
+                    className={`pl-9 h-9.5 text-xs font-mono font-medium ${getFieldError("driverPhone") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
                 </div>
+                {getFieldError("driverPhone") && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                    {getFieldError("driverPhone")}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -222,8 +262,13 @@ export function ConfirmItemModal({
               placeholder="e.g. Interconnecting rooms confirmed on ground floor or driver reporting at terminal 1"
               rows={2}
               {...formik.getFieldProps("notes")}
-              className="text-xs min-h-[60px]"
+              className={`text-xs min-h-[60px] ${getFieldError("notes") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
             />
+            {getFieldError("notes") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                {getFieldError("notes")}
+              </p>
+            )}
           </div>
 
           {/* Action Buttons */}

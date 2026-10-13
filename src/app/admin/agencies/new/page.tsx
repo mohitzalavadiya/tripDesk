@@ -1,34 +1,30 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useSaaS } from "@/context/saas-context";
-import { PageHeader } from "@/components/shared/page-header";
-import { formatCurrency } from "@/lib/costing-engine";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
+import { useSaaS } from "@/context/saas-context";
+import { BillingCycle } from "@/data/saas-data";
+import { formatCurrency } from "@/lib/costing-engine";
+import { isValidPhoneNumber } from "@/lib/validation/field-validators";
 import {
-  ArrowLeft,
-  Building2,
-  User,
-  CreditCard,
-  CheckCircle2,
-  Clock,
-  Sparkles,
-  ShieldCheck,
-  Calendar,
+ArrowLeft,
+Building2,
+Clock,
+CreditCard,
+User
 } from "lucide-react";
-import { BillingCycle, PlanTier } from "@/data/saas-data";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function CreateAgencyPage() {
   const router = useRouter();
@@ -72,8 +68,16 @@ export default function CreateAgencyPage() {
       toast.error("Please fill in Agency Name, Email, Phone, and City.");
       return;
     }
+    if (!isValidPhoneNumber(phone)) {
+      toast.error("Please enter a valid Agency Phone number (digits, country code, 7-15 digits).");
+      return;
+    }
     if (!ownerName.trim() || !ownerEmail.trim() || !ownerPhone.trim()) {
       toast.error("Please fill in Agency Owner Name, Email, and Phone.");
+      return;
+    }
+    if (!isValidPhoneNumber(ownerPhone)) {
+      toast.error("Please enter a valid Owner Phone number (digits, country code, 7-15 digits).");
       return;
     }
 
@@ -324,8 +328,18 @@ export default function CreateAgencyPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-white border-slate-200">
-                    <SelectItem value="starter">Starter Plan (₹1,999/mo)</SelectItem>
-                    <SelectItem value="professional">Professional Plan (₹4,999/mo)</SelectItem>
+                    {plans && plans.length > 0 ? (
+                      plans.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} Plan (₹{p.monthlyPrice.toLocaleString("en-IN")}/mo)
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <>
+                        <SelectItem value="starter">Starter Plan (₹499/mo)</SelectItem>
+                        <SelectItem value="professional">Professional Plan (₹999/mo)</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

@@ -1,0 +1,318 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import {
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { bookingClient,BookingWithRelations,financeClient } from "@/lib/api-client";
+import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
+import { isValidDecimal } from "@/lib/validation/field-validators";
+import { PaymentMethod,PaymentType } from "@prisma/client";
+import { Loader2 } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
+
+interface RecordPaymentDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  defaultBookingId?: string;
+  onSuccess?: () => void;
+}
+
+export function RecordPaymentDialog({
+  open,
+  onOpenChange,
+  defaultBookingId,
+  onSuccess,
+}: RecordPaymentDialogProps) {
+  const [loading, setLoading] = React.useState(false);
+  const [bookings, setBookings] = React.useState<BookingWithRelations[]>([]);
+  const [loadingBookings, setLoadingBookings] = React.useState(false);
+
+  const [bookingId, setBookingId] = React.useState(defaultBookingId || "");
+  const [amount, setAmount] = React.useState("");
+  const [paymentType, setPaymentType] = React.useState<PaymentType>(PaymentType.PARTIAL);
+  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>(PaymentMethod.UPI);
+  const [paymentDate, setPaymentDate] = React.useState(new Date().toISOString().slice(0, 10));
+  const [referenceNumber, setReferenceNumber] = React.useState("");
+  const [receiptNumber, setReceiptNumber] = React.useState("");
+  const [receivedBy, setReceivedBy] = React.useState("");
+  const [notes, setNotes] = React.useState("");
+
+  // Fetch active bookings for dropdown
+  React.useEffect(() => {
+    if (open) {
+      setLoadingBookings(true);
+      bookingClient
+        .getBookings({ limit: 100 })
+        .then((res) => {
+          setBookings(res.data || []);
+          if (defaultBookingId) {
+            setBookingId(defaultBookingId);
+            const found = res.data?.find((b) => b.id === defaultBookingId);
+            if (found && Number(found.balanceAmount) > 0) {
+              setAmount(String(found.balanceAmount));
+            }
+          }
+        })
+        .catch((err) => toast.error("Failed to load bookings"))
+        .finally(() => setLoadingBookings(false));
+    }
+  }, [open, defaultBookingId]);
+
+  const selectedBooking = bookings.find((b) => b.id === bookingId);
+
+  const handleBookingChange = (id: string) => {
+    setBookingId(id);
+    const b = bookings.find((item) => item.id === id);
+    if (b && Number(b.balanceAmount) > 0) {
+      setAmount(String(b.balanceAmount));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bookingId) {
+      toast.error("Please select a booking.");
+      return;
+    }
+    if (!isValidDecimal(amount, { min: 0.01 })) {
+      toast.error("Please enter a valid positive payment amount.");
+      return;
+    }
+    const numAmount = Number(amount);
+    if (selectedBooking) {
+      const currentBalance = Number(selectedBooking.balanceAmount);
+      if (numAmount > currentBalance + 0.001) {
+        toast.error(`Payment amount cannot exceed the outstanding due of ${formatCurrency(currentBalance)}.`);
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      await financeClient.recordCustomerPayment({
+        bookingId,
+        amount: numAmount,
+        paymentType,
+        paymentMethod,
+        paymentDate: new Date(paymentDate).toISOString(),
+        referenceNumber: referenceNumber || null,
+        receiptNumber: receiptNumber || null,
+        receivedBy: receivedBy || null,
+        notes: notes || null,
+      });
+
+      toast.success("Payment recorded successfully!");
+      onOpenChange(false);
+      if (onSuccess) onSuccess();
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, "Failed to record payment. Please try again."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[calc(100%-1rem)] max-w-lg p-3 sm:p-5 gap-2.5 sm:gap-4 max-h-[calc(100dvh-1.5rem)] overflow-y-auto overflow-x-hidden">
+        <DialogHeader className="gap-0.5 pb-0 pr-6">
+          <DialogTitle className="text-sm sm:text-base font-semibold pr-6">
+            Record Customer Payment
+          </DialogTitle>
+          <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground line-clamp-1 sm:line-clamp-none pr-4">
+            Log an incoming traveler payment with automated booking balance calculation.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-3 pt-1">
+          {/* Select Booking */}
+          <div className="space-y-1">
+            <Label className="text-[11px] sm:text-xs font-semibold">Select Booking *</Label>
+            <Select
+              value={bookingId}
+              onValueChange={(val) => {
+                if (val) handleBookingChange(val);
+              }}
+              disabled={loadingBookings}
+            >
+              <SelectTrigger className="text-xs h-8.5 px-2.5">
+                <SelectValue placeholder={loadingBookings ? "Loading bookings..." : "Choose Booking"}>
+                  {(val: string | null) => {
+                    if (!val) return undefined;
+                    const b = bookings.find((item) => item.id === val);
+                    return b ? `${b.bookingNumber} — ${b.customer?.name || "Customer"} (Bal: ${formatCurrency(Number(b.balanceAmount))})` : val;
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {bookings.map((b) => (
+                  <SelectItem key={b.id} value={b.id} className="text-xs">
+                    {b.bookingNumber} — {b.customer?.name || "Customer"} (Bal: {formatCurrency(Number(b.balanceAmount))})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Selected Booking Info Box */}
+          {selectedBooking && (
+            <div className="p-2.5 rounded-lg bg-muted/40 border border-border text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground text-[11px]">Total Value:</span>
+                <span className="font-semibold text-[11px]">{formatCurrency(Number(selectedBooking.totalAmount))}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground text-[11px]">Already Paid:</span>
+                <span className="text-emerald-600 font-semibold text-[11px]">{formatCurrency(Number(selectedBooking.paidAmount))}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground text-[11px]">Remaining Balance:</span>
+                <span className="text-amber-600 font-bold text-[11px]">{formatCurrency(Number(selectedBooking.balanceAmount))}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Amount & Payment Type */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+            <div className="space-y-1">
+              <Label className="text-[11px] sm:text-xs font-semibold">Amount (₹) *</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="1"
+                placeholder="e.g. 25000"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="text-xs h-8.5"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[11px] sm:text-xs font-semibold">Payment Type *</Label>
+              <Select
+                value={paymentType}
+                onValueChange={(val) => {
+                  if (val) setPaymentType(val as PaymentType);
+                }}
+              >
+                <SelectTrigger className="text-xs h-8.5 px-2.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={PaymentType.ADVANCE}>Advance Payment</SelectItem>
+                  <SelectItem value={PaymentType.PARTIAL}>Partial Installment</SelectItem>
+                  <SelectItem value={PaymentType.FINAL}>Final Settlement</SelectItem>
+                  <SelectItem value={PaymentType.ADJUSTMENT}>Adjustment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Payment Method & Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+            <div className="space-y-1">
+              <Label className="text-[11px] sm:text-xs font-semibold">Payment Method *</Label>
+              <Select
+                value={paymentMethod}
+                onValueChange={(val) => {
+                  if (val) setPaymentMethod(val as PaymentMethod);
+                }}
+              >
+                <SelectTrigger className="text-xs h-8.5 px-2.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={PaymentMethod.UPI}>UPI / QR</SelectItem>
+                  <SelectItem value={PaymentMethod.BANK_TRANSFER}>Bank Transfer (NEFT/IMPS)</SelectItem>
+                  <SelectItem value={PaymentMethod.CASH}>Cash</SelectItem>
+                  <SelectItem value={PaymentMethod.CARD}>Credit / Debit Card</SelectItem>
+                  <SelectItem value={PaymentMethod.CHEQUE}>Cheque</SelectItem>
+                  <SelectItem value={PaymentMethod.OTHER}>Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[11px] sm:text-xs font-semibold">Payment Date *</Label>
+              <Input
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                className="text-xs h-8.5"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Reference & Received By */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+            <div className="space-y-1">
+              <Label className="text-[11px] sm:text-xs font-semibold">Reference / UTR #</Label>
+              <Input
+                placeholder="e.g. UPI/1234567890"
+                value={referenceNumber}
+                onChange={(e) => setReferenceNumber(e.target.value)}
+                className="text-xs h-8.5"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[11px] sm:text-xs font-semibold">Received By (Staff)</Label>
+              <Input
+                placeholder="e.g. Mohit Zalavadiya"
+                value={receivedBy}
+                onChange={(e) => setReceivedBy(e.target.value)}
+                className="text-xs h-8.5"
+              />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-1">
+            <Label className="text-[11px] sm:text-xs font-semibold">Notes / Remarks</Label>
+            <Textarea
+              placeholder="Add payment notes or receipts comments..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="text-xs min-h-[50px] py-1.5"
+            />
+          </div>
+
+          <DialogFooter className="mx-0 mb-0 px-0 pb-0 pt-2.5 flex flex-row gap-2 border-t mt-2 bg-transparent rounded-none">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs h-8.5 flex-1"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" className="text-xs h-8.5 flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={loading}>
+              {loading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Save Payment
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

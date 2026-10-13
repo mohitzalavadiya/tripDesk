@@ -1,200 +1,357 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { useRouter } from "next/navigation"
-import { EmptyState } from "@/components/shared/empty-state"
-import { EnquiryTable } from "@/components/enquiries/enquiry-table"
-import { EnquiryPipeline } from "@/components/enquiries/enquiry-pipeline"
-import { useEnquiry } from "@/context/enquiry-context"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { EnquiryPipeline } from "@/components/enquiries/enquiry-pipeline";
+import { EnquiryTable } from "@/components/enquiries/enquiry-table";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  Inbox,
-  Plus,
-  List,
-  KanbanSquare,
-  Search,
-  RotateCcw,
-  Sparkles,
-  TrendingUp,
-  Clock,
-  CheckCircle2,
-  X,
-  Compass,
-  ArrowRight,
-  Filter,
-} from "lucide-react"
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import {
+enquiryClient,
+EnquiryWithRelations,
+} from "@/lib/api-client";
+import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
+import type { EnquiryPriority,EnquirySource,EnquiryStatus } from "@prisma/client";
+import {
+CheckCircle2,
+ChevronLeft,
+ChevronRight,
+Clock,
+Inbox,
+IndianRupee,
+KanbanSquare,
+List,
+Plus,
+Search,
+X
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
+
+const PRIORITY_FILTER_LABELS: Record<string, string> = {
+  all: "All",
+  URGENT: "Urgent",
+  HIGH: "High",
+  MEDIUM: "Medium",
+  LOW: "Low",
+};
+
+const SOURCE_FILTER_LABELS: Record<string, string> = {
+  all: "All",
+  WHATSAPP: "WhatsApp",
+  WEBSITE: "Website",
+  INSTAGRAM: "Instagram",
+  FACEBOOK: "Facebook",
+  PHONE: "Phone",
+  EMAIL: "Email",
+  REFERRAL: "Referral",
+  WALK_IN: "Walk-in",
+};
 
 export default function EnquiriesPage() {
-  const router = useRouter()
-  const { enquiries, customers } = useEnquiry()
-  
-  // View mode
-  const [view, setView] = React.useState<"list" | "pipeline">(() => {
-    if (typeof window !== "undefined") {
-      const savedView = localStorage.getItem("enquiry_view_preference")
-      if (savedView === "list" || savedView === "pipeline") {
-        return savedView
-      }
-    }
-    return "list"
-  })
-  const [search, setSearch] = React.useState("")
-  const [statusFilter, setStatusFilter] = React.useState<string>("ALL")
+  const router = useRouter();
+
+  // Data states
+  const [enquiries, setEnquiries] = React.useState<EnquiryWithRelations[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = React.useState(false);
+
+  // View preference ("list" | "pipeline")
+  const [view, setView] = React.useState<"list" | "pipeline">("list");
+
+  // Search & Filter states
+  const [search, setSearch] = React.useState("");
+  const [debouncedSearch, setDebouncedSearch] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = React.useState<string>("all");
+  const [sourceFilter, setSourceFilter] = React.useState<string>("all");
+  const [page, setPage] = React.useState(1);
+  const [pagination, setPagination] = React.useState({
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 1,
+  });
+
+  // Restore view preference from localStorage
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem("enquiry_view_preference");
+      if (saved === "list" || saved === "pipeline") setView(saved);
+    } catch {}
+  }, []);
 
   const handleViewChange = (newView: "list" | "pipeline") => {
-    setView(newView)
-    localStorage.setItem("enquiry_view_preference", newView)
-  }
+    setView(newView);
+    try {
+      localStorage.setItem("enquiry_view_preference", newView);
+    } catch {}
+  };
+
+  // Debounce search (300ms)
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Fetch real enquiries from PostgreSQL API
+  const fetchEnquiries = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const res = await enquiryClient.getEnquiries({
+        search: debouncedSearch || undefined,
+        status: statusFilter !== "all" ? (statusFilter as EnquiryStatus) : undefined,
+        priority: priorityFilter !== "all" ? (priorityFilter as EnquiryPriority) : undefined,
+        source: sourceFilter !== "all" ? (sourceFilter as EnquirySource) : undefined,
+        page,
+        limit: view === "pipeline" ? 100 : 20,
+        sortBy: "createdAt",
+        sortOrder: "desc",
+      });
+
+      if (res.success && res.data) {
+        setEnquiries(res.data);
+        setPagination(res.meta);
+      }
+    } catch (err: any) {
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setIsReadOnly(true);
+      }
+      setError(getErrorMessage(err, "Unable to load enquiries. Please try again."));
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, statusFilter, priorityFilter, sourceFilter, page, view]);
+
+  React.useEffect(() => {
+    fetchEnquiries();
+  }, [fetchEnquiries]);
+
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleClearFilters = () => {
-    setSearch("")
-    setStatusFilter("ALL")
-  }
+    setSearch("");
+    setDebouncedSearch("");
+    setStatusFilter("all");
+    setPriorityFilter("all");
+    setSourceFilter("all");
+    setPage(1);
+  };
 
-  const isFilterActive = search !== "" || statusFilter !== "ALL"
+  const isFilterActive =
+    search.trim() !== "" ||
+    statusFilter !== "all" ||
+    priorityFilter !== "all" ||
+    sourceFilter !== "all";
 
-  // Status counts
-  const statusCounts = React.useMemo(() => {
-    const counts: Record<string, number> = {
-      ALL: enquiries.length,
-      New: 0,
-      Contacted: 0,
-      Qualified: 0,
-      Quoted: 0,
-      "Follow-up": 0,
-      Confirmed: 0,
-      Lost: 0,
+  // Update Status
+  const handleStatusChange = async (id: string, status: EnquiryStatus) => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Read-only mode active.");
+      return;
     }
-    enquiries.forEach((e) => {
-      if (counts[e.status] !== undefined) {
-        counts[e.status]++
+
+    try {
+      await enquiryClient.updateEnquiry(id, { status });
+      toast.success(`Enquiry status updated to ${status}.`);
+      await fetchEnquiries();
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, "Failed to update status."));
+    }
+  };
+
+  // Convert to Trip
+  const handleConvertTrip = async (id: string) => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Read-only mode active.");
+      return;
+    }
+
+    try {
+      const res = await enquiryClient.convertEnquiry(id);
+      if (res.success && res.data) {
+        toast.success("Enquiry converted to Trip workspace!");
+        router.push(`/trips/${res.data.tripId}`);
       }
-    })
-    return counts
-  }, [enquiries])
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, "Failed to convert enquiry."));
+    }
+  };
 
-  // Key KPI numbers
-  const stats = React.useMemo(() => {
-    const total = enquiries.length
-    const active = enquiries.filter((e) => ["New", "Contacted", "Qualified", "Quoted", "Follow-up"].includes(e.status)).length
-    const confirmed = enquiries.filter((e) => e.status === "Confirmed").length
-    const quotedValue = enquiries
-      .filter((e) => e.budget && ["Quoted", "Confirmed"].includes(e.status))
-      .reduce((acc, e) => acc + (e.budget || 0), 0)
+  // Archive Enquiry
+  const handleArchive = (id: string, enquiryNumber: string) => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Read-only mode active.");
+      return;
+    }
 
-    return { total, active, confirmed, quotedValue }
-  }, [enquiries])
-
-  // Filtered list
-  const filteredEnquiries = React.useMemo(() => {
-    return enquiries.filter((enq) => {
-      const customer = customers.find((c) => c.id === enq.customerId)
-      
-      if (search.trim() !== "") {
-        const q = search.toLowerCase().trim()
-        const matchesName = customer?.name.toLowerCase().includes(q)
-        const matchesPhone = customer?.phone.includes(q)
-        const matchesEmail = customer?.email?.toLowerCase().includes(q)
-        const matchesCity = customer?.city?.toLowerCase().includes(q)
-        const matchesDest = enq.destination.toLowerCase().includes(q)
-        const matchesId = enq.id.toLowerCase().includes(q)
-        const matchesNotes = enq.notes?.toLowerCase().includes(q)
-        const matchesBudget = enq.budget ? String(enq.budget).includes(q) : false
-        
-        if (!matchesName && !matchesPhone && !matchesEmail && !matchesCity && !matchesDest && !matchesId && !matchesNotes && !matchesBudget) {
-          return false
+    setConfirmAction({
+      title: "Archive enquiry?",
+      description: `Archive enquiry ${enquiryNumber}? Converted trips will remain intact.`,
+      confirmText: "Archive Enquiry",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await enquiryClient.archiveEnquiry(id);
+          toast.success(`Enquiry ${enquiryNumber} archived.`);
+          setConfirmAction(null);
+          await fetchEnquiries();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the enquiry. Please try again."));
+        } finally {
+          setActionLoading(false);
         }
-      }
+      },
+    });
+  };
 
-      if (statusFilter !== "ALL" && enq.status !== statusFilter) {
-        return false
-      }
+  // KPI telemetry sums
+  const stats = React.useMemo(() => {
+    const total = pagination.total;
+    const activeStatuses: EnquiryStatus[] = [
+      "NEW",
+      "CONTACTED",
+      "QUALIFIED",
+      "QUOTATION_SENT",
+      "FOLLOW_UP",
+      "NEGOTIATION",
+    ];
+    const active = enquiries.filter((e) => activeStatuses.includes(e.status as EnquiryStatus)).length;
+    const converted = enquiries.filter((e) => e.status === "CONVERTED").length;
+    const quotedStatuses: EnquiryStatus[] = [
+      "QUOTATION_SENT",
+      "NEGOTIATION",
+      "CONVERTED",
+    ];
+    const quotedPipelineValue = enquiries
+      .filter((e) => e.budget && quotedStatuses.includes(e.status as EnquiryStatus))
+      .reduce((sum, e) => sum + (e.budget ? Number(e.budget) : 0), 0);
 
-      return true
-    })
-  }, [enquiries, customers, search, statusFilter])
+    return { total, active, converted, quotedPipelineValue };
+  }, [enquiries, pagination.total]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        
+        {/* Read-Only Banner */}
+        {isReadOnly && <ReadOnlyBanner moduleName="Enquiries & Leads CRM" />}
+
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
-          {/* Subtle Decorative Accent Glow */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
-          {/* Left Title & Telemetry */}
+          {/* Left Title & Status Quick Tabs */}
           <div className="space-y-3 z-10">
             <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
-                <Compass className="h-3 w-3 text-indigo-500" />
-                Lead Management
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-blue-50 text-blue-700 border border-blue-100">
+                <Inbox className="h-3 w-3 text-blue-500" />
+                Leads & CRM
               </span>
               <span className="text-slate-300">•</span>
               <span className="text-xs font-semibold text-slate-500">
-                {enquiries.length} total entries
+                {pagination.total} enquiries captured
               </span>
             </div>
 
             <div className="flex flex-wrap items-baseline gap-3">
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-                Travel Enquiries
+                Enquiries & CRM
               </h1>
               <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
-                Track, qualify, and convert lead inquiries into confirmed trips
+                Inbound customer enquiries, travel requirements, lead stages, and follow-ups
               </span>
             </div>
 
-            {/* Micro-Telemetry Stat Badges */}
-            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100/80 text-slate-700 font-medium">
-                <span className="h-2 w-2 rounded-full bg-blue-500" />
-                <span className="font-bold text-slate-900">{stats.active}</span> Active Leads
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-medium border border-emerald-100/60">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="font-bold text-emerald-950">{stats.confirmed}</span> Confirmed ({stats.total > 0 ? `${Math.round((stats.confirmed / stats.total) * 100)}%` : "0%"})
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-50 text-indigo-800 font-medium border border-indigo-100/60">
-                <TrendingUp className="h-3 w-3 text-indigo-600" />
-                <span className="font-bold text-indigo-950">₹{(stats.quotedValue / 100000).toFixed(1)}L</span> Pipeline Value
-              </div>
+            {/* Quick Status Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scrollbar-none flex-nowrap pt-1 pb-1 -mx-1 px-1 text-xs">
+              {[
+                { label: "All", value: "all" },
+                { label: "New", value: "NEW" },
+                { label: "Contacted", value: "CONTACTED" },
+                { label: "Qualified", value: "QUALIFIED" },
+                { label: "Quotation Sent", value: "QUOTATION_SENT" },
+                { label: "Follow-up", value: "FOLLOW_UP" },
+                { label: "Negotiation", value: "NEGOTIATION" },
+                { label: "Converted", value: "CONVERTED" },
+                { label: "Lost", value: "LOST" },
+                { label: "Cancelled", value: "CANCELLED" },
+              ].map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => {
+                    setStatusFilter(tab.value);
+                    setPage(1);
+                  }}
+                  className={`px-3 py-1 rounded-lg font-semibold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
+                    statusFilter === tab.value
+                      ? "bg-indigo-600 text-white shadow-2xs"
+                      : "bg-slate-100/80 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Right Action Controls */}
-          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
-            {/* View Switcher */}
-            <div className="flex items-center rounded-xl border border-slate-200 bg-slate-100/80 p-1">
+          {/* Right Action Controls (View Switcher + New Enquiry) */}
+          <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2.5 z-10 w-full lg:w-auto">
+            {/* View Mode Toggle */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
               <button
                 onClick={() => handleViewChange("list")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                className={`flex-1 xs:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   view === "list"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-slate-900 shadow-2xs"
+                    : "text-slate-500 hover:text-slate-900"
                 }`}
               >
                 <List className="h-3.5 w-3.5" />
-                List
+                <span>Table</span>
               </button>
               <button
                 onClick={() => handleViewChange("pipeline")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                className={`flex-1 xs:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   view === "pipeline"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-slate-900 shadow-2xs"
+                    : "text-slate-500 hover:text-slate-900"
                 }`}
               >
                 <KanbanSquare className="h-3.5 w-3.5" />
-                Pipeline
+                <span>Pipeline</span>
               </button>
             </div>
 
-            {/* Primary Action Button */}
             <Button
               onClick={() => router.push("/enquiries/new")}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all"
+              disabled={isReadOnly}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50 w-full xs:w-auto justify-center whitespace-nowrap"
             >
               <Plus className="h-4 w-4" />
               New Enquiry
@@ -202,18 +359,58 @@ export default function EnquiriesPage() {
           </div>
         </div>
 
-        {/* Master Workspace Card (Unified Filter Bar + Table) */}
+        {/* KPI Telemetry Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <Inbox className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight">Total Captured</span>
+              <h4 className="text-base sm:text-lg font-black text-slate-900 leading-tight truncate">{stats.total}</h4>
+            </div>
+          </div>
+
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight">Active Leads</span>
+              <h4 className="text-base sm:text-lg font-black text-slate-900 leading-tight truncate">{stats.active}</h4>
+            </div>
+          </div>
+
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight">Converted Trips</span>
+              <h4 className="text-base sm:text-lg font-black text-slate-900 leading-tight truncate">{stats.converted}</h4>
+            </div>
+          </div>
+
+          <div className="bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 shrink-0 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+              <IndianRupee className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-tight block leading-tight">Quoted Value</span>
+              <h4 className="text-base sm:text-lg font-black text-indigo-600 leading-tight truncate">{formatCurrency(stats.quotedPipelineValue)}</h4>
+            </div>
+          </div>
+        </div>
+
+        {/* Master Card (Filter Bar + Table / Pipeline) */}
         <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
-          
-          {/* Master Toolbar Header */}
+          {/* Search Toolbar */}
           <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
-            
-            {/* Search Input and Controls */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="relative flex-1 max-w-2xl">
                 <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search by customer name, destination, phone, email, notes, ID..."
+                  placeholder="Search by enquiry #, customer name, phone, destination..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all"
@@ -228,103 +425,176 @@ export default function EnquiriesPage() {
                 )}
               </div>
 
-              {/* Reset Action */}
-              {isFilterActive && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleClearFilters}
-                  className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 shrink-0 cursor-pointer font-semibold rounded-lg self-start sm:self-auto"
-                >
-                  <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                  Reset Filters
-                </Button>
-              )}
-            </div>
-
-            {/* Segmented Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
-              {(
-                [
-                  { id: "ALL", label: "All Enquiries" },
-                  { id: "New", label: "New" },
-                  { id: "Contacted", label: "Contacted" },
-                  { id: "Qualified", label: "Qualified" },
-                  { id: "Quoted", label: "Quoted" },
-                  { id: "Follow-up", label: "Follow-up" },
-                  { id: "Confirmed", label: "Confirmed" },
-                  { id: "Lost", label: "Lost" },
-                ] as const
-              ).map((tab) => {
-                const isActive = statusFilter === tab.id
-                const count = statusCounts[tab.id] ?? 0
-
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setStatusFilter(tab.id)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer select-none shrink-0 ${
-                      isActive
-                        ? "bg-slate-900 text-white shadow-2xs"
-                        : "bg-slate-100/75 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                    }`}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 flex-1 min-w-[125px]">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Priority:</span>
+                  <Select
+                    value={priorityFilter}
+                    onValueChange={(val) => {
+                      if (val) {
+                        setPriorityFilter(val);
+                        setPage(1);
+                      }
+                    }}
                   >
-                    <span>{tab.label}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                        isActive
-                          ? "bg-white/20 text-white"
-                          : "bg-white text-slate-500 border border-slate-200/60"
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  </button>
-                )
-              })}
+                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-full sm:w-[135px]">
+                      <SelectValue placeholder="All">
+                        {(val) => PRIORITY_FILTER_LABELS[val] ?? "All"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="URGENT">Urgent</SelectItem>
+                      <SelectItem value="HIGH">High</SelectItem>
+                      <SelectItem value="MEDIUM">Medium</SelectItem>
+                      <SelectItem value="LOW">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-1 min-w-[125px]">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase shrink-0">Source:</span>
+                  <Select
+                    value={sourceFilter}
+                    onValueChange={(val) => {
+                      if (val) {
+                        setSourceFilter(val);
+                        setPage(1);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-full sm:w-[135px]">
+                      <SelectValue placeholder="All">
+                        {(val) => SOURCE_FILTER_LABELS[val] ?? "All"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
+                      <SelectItem value="WEBSITE">Website</SelectItem>
+                      <SelectItem value="INSTAGRAM">Instagram</SelectItem>
+                      <SelectItem value="FACEBOOK">Facebook</SelectItem>
+                      <SelectItem value="PHONE">Phone</SelectItem>
+                      <SelectItem value="EMAIL">Email</SelectItem>
+                      <SelectItem value="REFERRAL">Referral</SelectItem>
+                      <SelectItem value="WALK_IN">Walk-in</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Master Content: Table or Pipeline */}
-          {filteredEnquiries.length === 0 ? (
+          {/* Loading State */}
+          {loading && (
+            <div className="p-4">
+              <TableSkeleton rows={6} />
+            </div>
+          )}
+
+          {/* Error State */}
+          {!loading && error && (
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load enquiries"
+                description={error}
+                onRetry={() => fetchEnquiries()}
+              />
+            </div>
+          )}
+
+          {/* Main Content (Table or Pipeline) */}
+          {!loading && !error && enquiries.length === 0 ? (
             <div className="p-12 text-center">
               <EmptyState
                 icon={Inbox}
-                title={isFilterActive ? "No matching enquiries found" : "No enquiries yet"}
+                title={isFilterActive ? "No matching enquiries found" : "No enquiries captured yet"}
                 description={
                   isFilterActive
-                    ? "Try adjusting your search criteria or resetting filters."
-                    : "Create your first enquiry to begin tracking lead lifecycle and holiday itineraries."
+                    ? "Try adjusting your search query, priority, or source filters."
+                    : "Capture customer travel inquiries, schedule follow-ups, and convert leads into trip itineraries."
                 }
-                actionText={isFilterActive ? "Clear Search" : "New Enquiry"}
+                actionText={isFilterActive ? "Clear Filter" : "Create New Enquiry"}
                 onAction={isFilterActive ? handleClearFilters : () => router.push("/enquiries/new")}
               />
             </div>
-          ) : (
+          ) : !loading && !error && (
             <div>
               {view === "list" ? (
-                <EnquiryTable enquiries={filteredEnquiries} />
+                <EnquiryTable
+                  enquiries={enquiries}
+                  isReadOnly={isReadOnly}
+                  onStatusChange={handleStatusChange}
+                  onConvertTrip={handleConvertTrip}
+                  onArchive={handleArchive}
+                />
               ) : (
-                <div className="p-5 bg-slate-50/50">
-                  <EnquiryPipeline enquiries={filteredEnquiries} />
+                <div className="p-4">
+                  <EnquiryPipeline
+                    enquiries={enquiries}
+                    isReadOnly={isReadOnly}
+                    onStatusChange={handleStatusChange}
+                  />
                 </div>
               )}
             </div>
           )}
 
-          {/* Master Card Footer Strip */}
-          <div className="px-5 py-3 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>
-              Showing <strong className="text-slate-800">{filteredEnquiries.length}</strong> of{" "}
-              <strong className="text-slate-800">{enquiries.length}</strong> enquiries
-            </span>
-            <span className="text-[11px] text-slate-400">
-              TripDesk Lead Engine • Auto-synced
-            </span>
-          </div>
-        </div>
+          {/* Master Footer with Pagination */}
+          {view === "list" && (
+            <div className="px-5 py-3.5 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
+              <span>
+                Showing <strong className="text-slate-800">{enquiries.length}</strong> of{" "}
+                <strong className="text-slate-800">{pagination.total}</strong> enquiries
+              </span>
 
+              {pagination.totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1 || loading}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="h-8 px-2.5 text-xs rounded-lg cursor-pointer"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Prev
+                  </Button>
+                  <span className="text-xs font-bold text-slate-700 px-1">
+                    {page} / {pagination.totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= pagination.totalPages || loading}
+                    onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                    className="h-8 px-2.5 text-xs rounded-lg cursor-pointer"
+                  >
+                    Next <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
+      />
     </div>
-  )
+  );
 }

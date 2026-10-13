@@ -1,92 +1,168 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { useRouter } from "next/navigation"
-import { useFormik } from "formik"
-import { PageHeader } from "@/components/shared/page-header"
-import { useEnquiry } from "@/context/enquiry-context"
-import { ContactMethod } from "@/types"
-import { customerSchema } from "@/lib/validation-schemas"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { toast } from "sonner"
-import { User, Phone, Mail, MapPin, MessageSquare, Compass, Info } from "lucide-react"
+import { PageHeader } from "@/components/shared/page-header";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { customerClient } from "@/lib/api-client";
+import { GENDER_OPTIONS } from "@/lib/utils/enum-formatters";
+import { phoneYup } from "@/lib/validation-schemas";
+import { Customer } from "@prisma/client";
+import { useFormik } from "formik";
+import {
+AlertTriangle,
+ExternalLink,
+FileText,
+Loader2,
+MapPin,
+Plus,
+User
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
+import * as Yup from "yup";
+
+const createCustomerValidationSchema = Yup.object().shape({
+  name: Yup.string()
+    .trim()
+    .required("Customer name is required.")
+    .max(120, "Customer name must be at most 120 characters."),
+  phone: phoneYup(true, "Phone number"),
+  alternatePhone: phoneYup(false, "Alternate phone"),
+  email: Yup.string().trim().email("Please provide a valid email address.").max(120, "Email must be at most 120 characters."),
+  dateOfBirth: Yup.string(),
+  gender: Yup.string().trim().max(30),
+  nationality: Yup.string().trim().max(60),
+  address: Yup.string().trim().max(255, "Address must be at most 255 characters."),
+  city: Yup.string().trim().max(100),
+  state: Yup.string().trim().max(100),
+  country: Yup.string().trim().max(100),
+  postalCode: Yup.string().trim().max(20, "Postal code cannot exceed 20 characters."),
+  source: Yup.string().trim().max(60),
+  notes: Yup.string().trim().max(5000, "Notes must be at most 5000 characters."),
+  internalNotes: Yup.string().trim().max(5000, "Internal notes must be at most 5000 characters."),
+});
 
 export default function NewCustomerPage() {
-  const router = useRouter()
-  const { addCustomer, updateCustomer } = useEnquiry()
+  const router = useRouter();
+  const [isReadOnly, setIsReadOnly] = React.useState(false);
+
+  // Duplicate warning state
+  const [duplicateMatches, setDuplicateMatches] = React.useState<Customer[]>([]);
+  const [checkingDuplicates, setCheckingDuplicates] = React.useState(false);
 
   const formik = useFormik({
     initialValues: {
       name: "",
       phone: "",
+      alternatePhone: "",
       email: "",
+      dateOfBirth: "",
+      gender: "",
+      nationality: "Indian",
+      address: "",
       city: "",
-      preferredContact: "WhatsApp",
+      state: "",
+      country: "India",
+      postalCode: "",
+      source: "Direct",
       notes: "",
-      hotelCategory: "",
-      mealPlan: "",
-      vehicle: "",
-      destination: "",
-      preferences: "",
+      internalNotes: "",
     },
-    validationSchema: customerSchema,
-    onSubmit: (values) => {
-      const trimmedName = values.name.trim()
-      const trimmedPhone = values.phone.trim()
-      const trimmedEmail = values.email.trim()
-      const trimmedCity = values.city.trim()
-      const trimmedDestination = values.destination.trim()
-      const trimmedPreferences = values.preferences.trim()
-      const trimmedNotes = values.notes.trim()
-
-      // Add customer using the context function
-      const cust = addCustomer(
-        trimmedName,
-        trimmedPhone,
-        trimmedEmail || undefined,
-        trimmedCity || undefined,
-        values.preferredContact as ContactMethod
-      )
-
-      // Save notes and preferences if entered
-      if (trimmedNotes || values.hotelCategory || values.mealPlan || values.vehicle || trimmedDestination || trimmedPreferences) {
-        updateCustomer(cust.id, {
-          notes: trimmedNotes || undefined,
-          preferredHotelCategory: values.hotelCategory || undefined,
-          preferredMealPlan: values.mealPlan || undefined,
-          preferredVehicle: values.vehicle || undefined,
-          preferredDestination: trimmedDestination || undefined,
-          preferences: trimmedPreferences || undefined,
-        })
+    validationSchema: createCustomerValidationSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      if (isReadOnly) {
+        toast.error("Subscription expired. Read-only mode is active.");
+        return;
       }
 
-      toast.success("Customer created successfully.")
-      router.push(`/customers/${cust.id}`)
+      try {
+        setSubmitting(true);
+        const res = await customerClient.createCustomer({
+          name: values.name.trim(),
+          phone: values.phone.trim(),
+          alternatePhone: values.alternatePhone.trim() || undefined,
+          email: values.email.trim() || undefined,
+          dateOfBirth: values.dateOfBirth ? new Date(values.dateOfBirth) : undefined,
+          gender: values.gender || undefined,
+          nationality: values.nationality.trim() || undefined,
+          address: values.address.trim() || undefined,
+          city: values.city.trim() || undefined,
+          state: values.state.trim() || undefined,
+          country: values.country.trim() || undefined,
+          postalCode: values.postalCode.trim() || undefined,
+          source: values.source.trim() || undefined,
+          notes: values.notes.trim() || undefined,
+          internalNotes: values.internalNotes.trim() || undefined,
+        });
+
+        if (res.success && res.data) {
+          toast.success(`Customer ${res.data.customerNumber || res.data.name} created successfully!`);
+          router.push(`/customers/${res.data.id}`);
+        }
+      } catch (err: any) {
+        if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+          setIsReadOnly(true);
+        }
+        toast.error(err?.message || "Failed to create customer.");
+      } finally {
+        setSubmitting(false);
+      }
     },
-  })
+  });
 
-  // Helper to check if a field has an error and has been touched
-  const fieldError = (field: string) => {
-    const touched = formik.touched[field as keyof typeof formik.touched]
-    const error = formik.errors[field as keyof typeof formik.errors]
-    return touched && error ? (error as string) : undefined
-  }
+  const getFieldError = (field: keyof typeof formik.values) => {
+    return formik.touched[field] && formik.errors[field] ? formik.errors[field] : null;
+  };
 
-  // Helper for input className with error state
-  const inputCls = (field: string, base: string) => {
-    const err = fieldError(field)
-    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`
-  }
+  // Debounced duplicate checker hooked to Formik phone and email values
+  React.useEffect(() => {
+    const phone = formik.values.phone.trim();
+    const email = formik.values.email.trim();
+    if (!phone && !email) {
+      setDuplicateMatches([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setCheckingDuplicates(true);
+        const res = await customerClient.checkDuplicate({
+          phone: phone || undefined,
+          email: email || undefined,
+        });
+
+        if (res.success && res.data) {
+          setDuplicateMatches(res.data.duplicates);
+        }
+      } catch {
+        // Ignore duplicate check network errors
+      } finally {
+        setCheckingDuplicates(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [formik.values.phone, formik.values.email]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+        {isReadOnly && <ReadOnlyBanner moduleName="Customer Directory" />}
+
         <PageHeader
-          title="Add New Customer"
-          description="Create a new customer profile with travel preferences, contact information and planning notes."
+          title="Register New Customer"
+          description="Create a client profile to track their travel history, inquiries, bookings, and financial ledger."
           breadcrumbs={[
             { label: "Customers", href: "/customers" },
             { label: "New Customer" },
@@ -94,245 +170,307 @@ export default function NewCustomerPage() {
         />
 
         <div className="max-w-4xl mx-auto w-full">
-          <form onSubmit={formik.handleSubmit} className="space-y-6">
-          
-          {/* Main Form Fields */}
-          <div className="bg-white rounded-xl border border-border p-6 shadow-2xs space-y-6">
-            <div className="flex items-center gap-2 border-b border-slate-50 pb-3">
-              <User className="h-5 w-5 text-indigo-600" />
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                Basic Contact Information
-              </h3>
+          {/* Live Duplicate Warning Banner */}
+          {duplicateMatches.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 shadow-xs flex items-start gap-3.5">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-xs">
+                <h4 className="font-bold text-amber-900">
+                  Potential Existing Customer Match Detected ({duplicateMatches.length})
+                </h4>
+                <p className="text-amber-800">
+                  A client with a matching phone number or email is already registered:
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {duplicateMatches.map((d) => (
+                    <Link
+                      key={d.id}
+                      href={`/customers/${d.id}`}
+                      target="_blank"
+                      className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-amber-200 text-amber-900 hover:bg-amber-100/60 font-semibold"
+                    >
+                      <span>{d.name} ({d.phone}) • {d.customerNumber || "CUS"}</span>
+                      <ExternalLink className="h-3 w-3 text-amber-600" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
             </div>
+          )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+          <form onSubmit={formik.handleSubmit} noValidate className="space-y-6">
+            {/* 1. Identity & Contact */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+              <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
+                <User className="h-4 w-4 text-indigo-600" />
+                <span>Primary Identity & Contact Details</span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Full Name *</label>
                   <Input
-                    placeholder="Rahul Patel"
                     {...formik.getFieldProps("name")}
-                    className={inputCls("name", "pl-9 h-10.5 bg-slate-50/30 border-slate-200 text-xs focus-visible:ring-indigo-500")}
+                    placeholder="e.g. Rajesh Kumar"
+                    className={`h-9.5 bg-slate-50/50 border-slate-200 font-semibold text-xs ${getFieldError("name") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
+                  {getFieldError("name") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("name")}
+                    </p>
+                  )}
                 </div>
-                {fieldError("name") && (
-                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("name")}</p>
-                )}
-              </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                  Phone Number <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Primary Phone / WhatsApp *</label>
                   <Input
-                    placeholder="+91 98765 43210"
                     {...formik.getFieldProps("phone")}
-                    className={inputCls("phone", "pl-9 h-10.5 bg-slate-50/30 border-slate-200 text-xs focus-visible:ring-indigo-500")}
+                    placeholder="+91 98765 43210"
+                    className={`h-9.5 bg-slate-50/50 border-slate-200 font-semibold text-xs ${getFieldError("phone") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
+                  {getFieldError("phone") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("phone")}
+                    </p>
+                  )}
                 </div>
-                {fieldError("phone") && (
-                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("phone")}</p>
-                )}
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Alternate Phone</label>
                   <Input
-                    placeholder="rahul@example.com"
+                    {...formik.getFieldProps("alternatePhone")}
+                    placeholder="Optional secondary contact"
+                    className={`h-9.5 bg-slate-50/50 border-slate-200 text-xs ${getFieldError("alternatePhone") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+                  />
+                  {getFieldError("alternatePhone") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("alternatePhone")}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Email Address</label>
+                  <Input
                     type="email"
                     {...formik.getFieldProps("email")}
-                    className={inputCls("email", "pl-9 h-10.5 bg-slate-50/30 border-slate-200 text-xs focus-visible:ring-indigo-500")}
+                    placeholder="rajesh@example.com"
+                    className={`h-9.5 bg-slate-50/50 border-slate-200 text-xs ${getFieldError("email") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                   />
+                  {getFieldError("email") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("email")}
+                    </p>
+                  )}
                 </div>
-                {fieldError("email") && (
-                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("email")}</p>
-                )}
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                  City
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Date of Birth</label>
                   <Input
-                    placeholder="Mumbai"
-                    {...formik.getFieldProps("city")}
-                    className={inputCls("city", "pl-9 h-10.5 bg-slate-50/30 border-slate-200 text-xs focus-visible:ring-indigo-500")}
+                    type="date"
+                    {...formik.getFieldProps("dateOfBirth")}
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
                   />
                 </div>
-                {fieldError("city") && (
-                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("city")}</p>
-                )}
-              </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                  Preferred Contact Method
-                </label>
-                <Select
-                  value={formik.values.preferredContact}
-                  onValueChange={(val) => formik.setFieldValue("preferredContact", val)}
-                >
-                  <SelectTrigger className="h-10.5 text-xs bg-slate-50/30 border-slate-200 focus:ring-indigo-500">
-                    <SelectValue placeholder="Preferred contact method" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200">
-                    <SelectItem value="WhatsApp" className="text-xs">WhatsApp</SelectItem>
-                    <SelectItem value="Email" className="text-xs">Email</SelectItem>
-                    <SelectItem value="Phone" className="text-xs">Phone Call</SelectItem>
-                    <SelectItem value="SMS" className="text-xs">SMS</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Gender</label>
+                  <Select
+                    value={formik.values.gender}
+                    onValueChange={(val) => {
+                      formik.setFieldValue("gender", val);
+                      formik.setFieldTouched("gender", true);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-slate-200">
+                      {GENDER_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Nationality</label>
+                  <Input
+                    {...formik.getFieldProps("nationality")}
+                    placeholder="Indian"
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                Internal Notes / Biography
-              </label>
-              <div className="relative">
-                <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                <Textarea
-                  placeholder="Additional background context, family details, business interactions..."
-                  {...formik.getFieldProps("notes")}
-                  className={inputCls("notes", "pl-9 min-h-[80px] bg-slate-50/30 border-slate-200 text-xs focus-visible:ring-indigo-500")}
-                />
-              </div>
-              {fieldError("notes") && (
-                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("notes")}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Travel Preferences Section */}
-          <div className="bg-white rounded-xl border border-border p-6 shadow-2xs space-y-6">
-            <div className="flex items-center gap-2 border-b border-slate-50 pb-3">
-              <Compass className="h-5 w-5 text-indigo-600" />
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                Travel Preferences (Optional)
+            {/* 2. Address & Location */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+              <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-emerald-600" />
+                <span>Address & Geographic Location</span>
               </h3>
-            </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                  Preferred Hotel Category
-                </label>
-                <Select value={formik.values.hotelCategory} onValueChange={(val) => formik.setFieldValue("hotelCategory", val || "")}>
-                  <SelectTrigger className="h-10.5 text-xs bg-slate-50/30 border-slate-200 focus:ring-indigo-500">
-                    <SelectValue placeholder="Select category..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200">
-                    <SelectItem value="5 Star" className="text-xs">5 Star / Luxury</SelectItem>
-                    <SelectItem value="4 Star" className="text-xs">4 Star / Premium</SelectItem>
-                    <SelectItem value="3 Star" className="text-xs">3 Star / Standard</SelectItem>
-                    <SelectItem value="2 Star" className="text-xs">2 Star / Budget</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                  Preferred Meal Plan
-                </label>
-                <Select value={formik.values.mealPlan} onValueChange={(val) => formik.setFieldValue("mealPlan", val || "")}>
-                  <SelectTrigger className="h-10.5 text-xs bg-slate-50/30 border-slate-200 focus:ring-indigo-500">
-                    <SelectValue placeholder="Select meal plan..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200">
-                    <SelectItem value="CP" className="text-xs">CP - Breakfast Only</SelectItem>
-                    <SelectItem value="MAP" className="text-xs">MAP - Breakfast + Lunch/Dinner</SelectItem>
-                    <SelectItem value="AP" className="text-xs">AP - All Meals Included</SelectItem>
-                    <SelectItem value="EP" className="text-xs">EP - Room Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                  Preferred Vehicle Class
-                </label>
-                <Select value={formik.values.vehicle} onValueChange={(val) => formik.setFieldValue("vehicle", val || "")}>
-                  <SelectTrigger className="h-10.5 text-xs bg-slate-50/30 border-slate-200 focus:ring-indigo-500">
-                    <SelectValue placeholder="Select vehicle type..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200">
-                    <SelectItem value="Private Sedan" className="text-xs">Private Sedan (Dezire/Etios)</SelectItem>
-                    <SelectItem value="Private SUV" className="text-xs">Private SUV (Innova/Ertiga)</SelectItem>
-                    <SelectItem value="Luxury Coach" className="text-xs">Luxury Coach / Traveller</SelectItem>
-                    <SelectItem value="Self Drive" className="text-xs">Self Drive / Car Rental</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                  Preferred Destination
-                </label>
+              <div className="space-y-1 text-xs">
+                <label className="font-bold text-slate-700">Street Address</label>
                 <Input
-                  placeholder="e.g. Kerala, Maldives, Goa"
-                  {...formik.getFieldProps("destination")}
-                  className={inputCls("destination", "h-10.5 bg-slate-50/30 border-slate-200 text-xs focus-visible:ring-indigo-500")}
+                  {...formik.getFieldProps("address")}
+                  placeholder="e.g. 402, Sunrise Residency, Linking Road"
+                  className={`h-9.5 bg-slate-50/50 border-slate-200 text-xs ${getFieldError("address") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
                 />
-                {fieldError("destination") && (
-                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("destination")}</p>
+                {getFieldError("address") && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                    {getFieldError("address")}
+                  </p>
                 )}
               </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">City</label>
+                  <Input
+                    {...formik.getFieldProps("city")}
+                    placeholder="Mumbai"
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">State</label>
+                  <Input
+                    {...formik.getFieldProps("state")}
+                    placeholder="Maharashtra"
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Country</label>
+                  <Input
+                    {...formik.getFieldProps("country")}
+                    placeholder="India"
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Postal Code</label>
+                  <Input
+                    {...formik.getFieldProps("postalCode")}
+                    placeholder="400050"
+                    className={`h-9 bg-slate-50/50 border-slate-200 text-xs ${getFieldError("postalCode") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+                  />
+                  {getFieldError("postalCode") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("postalCode")}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                Special Travel Remarks / Accommodation Preferences
-              </label>
-              <Textarea
-                placeholder="e.g. Family-friendly hotels, wheel-chair accessibility, pure-veg options, early flight preferences..."
-                {...formik.getFieldProps("preferences")}
-                className={inputCls("preferences", "min-h-[85px] bg-slate-50/30 border-slate-200 text-xs focus-visible:ring-indigo-500")}
-              />
-              {fieldError("preferences") && (
-                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("preferences")}</p>
-              )}
-            </div>
-          </div>
+            {/* 3. Acquisition Source & Remarks */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+              <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-purple-600" />
+                <span>Client Acquisition Source & Remarks</span>
+              </h3>
 
-          {/* Form Actions */}
-          <div className="flex items-center justify-between gap-4 pt-4">
-            <div className="flex gap-2 text-slate-400 text-xs leading-normal">
-              <Info className="h-4 w-4 shrink-0 text-slate-400 mt-0.5" />
-              <span>Fields marked with asterisk (*) are required.</span>
+              <div className="space-y-1 text-xs">
+                <label className="font-bold text-slate-700">Lead / Referral Source</label>
+                <Select
+                  value={formik.values.source}
+                  onValueChange={(val) => {
+                    formik.setFieldValue("source", val);
+                    formik.setFieldTouched("source", true);
+                  }}
+                >
+                  <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200 max-w-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-slate-200">
+                    <SelectItem value="Direct">Direct / Walk-in</SelectItem>
+                    <SelectItem value="WhatsApp">WhatsApp Enquiry</SelectItem>
+                    <SelectItem value="Website">Website Form</SelectItem>
+                    <SelectItem value="Instagram">Instagram</SelectItem>
+                    <SelectItem value="Facebook">Facebook</SelectItem>
+                    <SelectItem value="Referral">Client Referral</SelectItem>
+                    <SelectItem value="B2B Agent">B2B Travel Partner</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-1">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Client Preferences / General Notes</label>
+                  <Textarea
+                    {...formik.getFieldProps("notes")}
+                    placeholder="e.g. Vegetarian preference, prefers 4-star boutique hotels, travels with family annually..."
+                    rows={3}
+                    className={`bg-slate-50/50 border-slate-200 text-xs ${getFieldError("notes") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+                  />
+                  {getFieldError("notes") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("notes")}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Internal Agency Remarks</label>
+                  <Textarea
+                    {...formik.getFieldProps("internalNotes")}
+                    placeholder="Private staff instructions or operational reminders..."
+                    rows={3}
+                    className={`bg-slate-50/50 border-slate-200 text-xs ${getFieldError("internalNotes") ? "border-red-500/80 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+                  />
+                  {getFieldError("internalNotes") && (
+                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                      {getFieldError("internalNotes")}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Actions */}
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push("/customers")}
-                className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-10 px-5 cursor-pointer"
+                className="w-full sm:w-auto bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-10 px-5 cursor-pointer justify-center"
               >
                 Cancel
               </Button>
+
               <Button
                 type="submit"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-5 cursor-pointer shadow-sm"
+                disabled={formik.isSubmitting || isReadOnly}
+                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-6 cursor-pointer shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 whitespace-nowrap"
               >
-                Save Profile
+                {formik.isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Registering Client...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 shrink-0" />
+                    Save & Register Customer
+                  </>
+                )}
               </Button>
             </div>
-          </div>
-
-        </form>
-      </div>
+          </form>
+        </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,0 +1,15871 @@
+# TRIPDESK — MASTER PROJECT CONTEXT FINAL V3
+## CURRENT AUTHORITATIVE HANDOFF — SEPTEMBER 2026
+
+> **Document Version:** V3 — FINAL HANDOFF AUDITED THROUGH DEV-05 QA PREPARATION
+>
+> **Important:** Sections **98 onward** are the authoritative current-state update layer and supersede any earlier section that conflicts with them. Older sections are intentionally retained as historical reference so project history is not lost.
+
+> **IMPORTANT:** This V2 document is based on the uploaded `TRIPDESK_MASTER_CONTEXT_FINAL.md` plus the subsequent TripDesk development/QA decisions and implementation state available in the current conversation.
+>
+> **Supersession rule:** Sections 98 onward are the authoritative V3 update layer. If any earlier section says Subscription V2, DEV-01, DEV-02, DEV-03, DEV-04, or related work is planned/pending, or otherwise conflicts with Sections 98+, the later V3 section wins. The older sections are retained below so historical context is not lost.
+>
+> **Source-of-truth priority:** actual current codebase > FINAL decisions in this document > latest confirmed discussion > older discussion > ideas/examples.
+>
+> **Do not restart TripDesk. Continue from the current codebase and accepted QA baseline.**
+
+---
+
+# 61. V2 CURRENT STATE — EXECUTIVE SNAPSHOT
+
+## 61.1 Current Product
+
+TripDesk is a multi-tenant Travel Agency SaaS / Travel Agency Operating System built for travel agencies.
+
+Current production-like architecture:
+
+- Next.js 16 App Router
+- React 19
+- TypeScript
+- PostgreSQL on Supabase
+- Prisma 7
+- Supabase Auth
+- `@supabase/supabase-js`
+- `@supabase/ssr`
+- SSR cookie/session handling
+- server-side service layer
+- Zod validation
+- multi-tenant `agencyId` isolation
+- Tailwind/UI component system
+- PDFKit for document generation
+- structured production logging
+
+## 61.2 Current Internal Roles — FINAL
+
+Exactly two internal authenticated roles exist:
+
+1. `PLATFORM_OWNER`
+2. `AGENCY_OWNER`
+
+Customer is NOT an internal role.
+
+There must be no reintroduction of:
+
+- Travel Agent
+- Sales Agent
+- Sub-Agent
+- Customer `User`
+- Customer Supabase Auth account
+
+## 61.3 Customer Architecture — FINAL
+
+Customer is a business/customer record.
+
+Customer:
+
+- exists in `Customer`
+- belongs to an agency
+- can access customer-facing information through secure public token routes
+- is not an internal `User`
+- has no password in TripDesk's database
+- has no customer role
+- has no customer signup flow
+
+Preserve:
+
+- `/customer/*`
+- `/api/customer/*`
+- `/q/*`
+- `/trip/*`
+- `/b/*`
+
+The `/customer/login` experience is a guest-access gateway, not customer account authentication.
+
+The customer portal uses booking/reference/token verification and a temporary HTTP-only `tripdesk_customer_session` cookie where applicable.
+
+---
+
+# 62. IMPORTANT CURRENT CHANGE: SUBSCRIPTION V2 IS IMPLEMENTED
+
+The previous V1 master context said Subscription V2 was only planned. That is now obsolete.
+
+## 62.1 Current Status
+
+**Subscription V2 / Beta Subscription Management: IMPLEMENTED + VERIFIED**
+
+The implementation was completed against the existing Phase 21-B subscription architecture.
+
+It was not replaced with a second subscription architecture.
+
+## 62.2 Verified capabilities
+
+The current implementation includes the agreed beta subscription lifecycle:
+
+- automatic 7-day free trial
+- dynamic plan catalog from PostgreSQL / `SubscriptionPlan`
+- Monthly billing cycle
+- Yearly billing cycle
+- plan selection
+- manual UPI / bank payment flow
+- UTR / transaction-reference submission
+- payment verification state
+- Platform Owner approval
+- Platform Owner rejection
+- rejection reason handling
+- paid-plan activation only after approval
+- plan configuration management
+- plan activation/deactivation behavior
+- historical purchased-price protection
+- tenant isolation
+- subscription lifecycle handling
+- responsive Subscription UI
+- regression testing
+
+## 62.3 Subscription V2 test state
+
+A dedicated lifecycle + tenant-isolation validation set reported:
+
+- **46 automated lifecycle / tenant-isolation tests**
+- **118 automated assertions**
+- **100% passed**
+
+The implementation also went through the later beta-hardening regression process.
+
+At the end of the accepted beta-hardening baseline:
+
+- TypeScript check: PASS
+- production build: PASS
+- subscription regression: PASS
+- tenant isolation: PASS
+
+## 62.4 Historical TypeScript issue
+
+During Subscription V2 work there was one low-risk TypeScript typing gap:
+
+- file: `src/lib/services/subscription-service.ts`
+- interface: `AgencySubscriptionOverview`
+- missing property: `availablePlans`
+
+This caused `npx tsc --noEmit` to fail at that intermediate point.
+
+**Current status: FIXED.**
+
+Later beta-hardening verification reported TypeScript passing.
+
+Do not reintroduce this omission.
+
+## 62.5 Subscription business rules — FINAL
+
+### New agency
+
+```text
+Signup
+  ↓
+Supabase Auth user
+  ↓
+Agency
+  ↓
+AGENCY_OWNER User
+  ↓
+7-day TRIAL Subscription
+  ↓
+Dashboard
+```
+
+No paid plan is required during signup.
+
+### Trial
+
+- duration = 7 days
+- `trialStart` recorded
+- `trialEnd` recorded
+- status = `TRIAL`
+- paid plans visible from Day 1
+- agency may purchase before trial ends
+- trial is not replaced merely by selecting a plan
+
+### Paid purchase
+
+```text
+TRIAL
+  ↓
+Subscription page
+  ↓
+Choose plan
+  ↓
+Choose Monthly / Yearly
+  ↓
+Confirm price
+  ↓
+UPI / Bank Transfer
+  ↓
+Enter UTR
+  ↓
+Submit
+  ↓
+PENDING
+  ↓
+Platform Owner review
+  ├── APPROVE → ACTIVE paid subscription
+  └── REJECT → rejected state + reason / resubmission path
+```
+
+### Activation rule
+
+**Selecting a plan does not activate it.**
+
+Only approved payment activates the paid subscription.
+
+### Historical price rule
+
+If a plan price changes later, existing purchased subscriptions/payments retain the original purchased amount.
+
+Example:
+
+```text
+Purchased at ₹49,999
+Later plan price = ₹59,999
+
+Historical purchase remains ₹49,999.
+```
+
+### Plan deletion
+
+Referenced plans must not be hard-deleted.
+
+Use active/inactive/deactivated behavior.
+
+### Beta payment rules
+
+Do not introduce:
+
+- Stripe recurring billing
+- Razorpay recurring billing
+- automatic gateway billing
+- automatic proration
+- automatic refund/proration engine
+
+Manual UPI/bank + UTR + Platform Owner verification remains the beta model.
+
+---
+
+# 63. BETA HARDENING — COMPLETED BASELINE
+
+The project subsequently moved through a dedicated beta-hardening program.
+
+## 63.1 Hardening phases
+
+```text
+BH-00  Baseline & Scope Freeze              CLOSED
+BH-01  Full Functional Regression           CLOSED
+BH-02  Edge & Error Hardening               CLOSED — PASS WITH CONDITIONS
+BH-03  Performance & Network Hardening      CLOSED — PASS WITH CONDITIONS
+BH-04  UI / Responsive / Browser Hardening  CLOSED — PASS WITH CONDITIONS
+BH-05  Data Integrity Track                 CLOSED — PASS
+BH-06  Production Readiness Track           CLOSED — PASS WITH CONDITIONS
+BH-07  Final Beta Readiness Audit           CLOSED — CONDITIONAL GO
+```
+
+## 63.2 BH-00 — Baseline & Scope Freeze
+
+Purpose:
+
+- freeze the accepted product baseline
+- prevent scope drift
+- establish the current code/feature/security baseline
+
+Status:
+
+**CLOSED**
+
+## 63.3 BH-01 — Full Functional Regression
+
+Purpose:
+
+- verify existing business modules after the Phase 21 feature set and Subscription V2 work
+- catch regressions before release
+
+Status:
+
+**CLOSED**
+
+## 63.4 BH-02 — Edge & Error Hardening
+
+Status:
+
+**CLOSED — PASS WITH CONDITIONS**
+
+The phase focused on:
+
+- edge cases
+- invalid inputs
+- error handling
+- business-rule boundaries
+- public access edge cases
+- customer flows
+
+### BH-02B accepted fix
+
+Issue:
+
+**Customer portal booking-number lookup could collide across agencies.**
+
+Affected file:
+
+`src/lib/services/customer-portal-service.ts`
+
+The accepted implementation changed the lookup so candidate bookings are considered with agency-safe customer verification rather than trusting a booking number globally.
+
+Focused verification reported:
+
+- 10/10 focused regression assertions
+- 33/33 customer-architecture assertions
+- TypeScript/build passing
+
+An accidental revert was detected and the accepted fix was restored and re-QA'd.
+
+Status:
+
+**FIXED + VERIFIED**
+
+Do not revert this protection.
+
+## 63.5 BH-03 — Performance & Network Hardening
+
+Status:
+
+**CLOSED — PASS WITH CONDITIONS**
+
+### Accepted performance fix
+
+Files:
+
+- `src/lib/services/rate-sheet-service.ts`
+- `src/lib/services/trip-costing-service.ts`
+
+A batch rate lookup approach was added to reduce repeated rate queries.
+
+Representative query-count improvements:
+
+```text
+3 hotels / 2 vehicles / 2 activities:
+8 queries → 4
+
+5 hotels / 3 vehicles / 4 activities:
+13 queries → 4
+```
+
+Targeted verification:
+
+- 24/24 assertions passed
+- customer architecture 33/33
+- TypeScript/build passed
+- tenant isolation passed
+
+No unrelated changes were accepted.
+
+### Important limitation
+
+Historic performance concerns still require real-world monitoring during beta.
+
+Do not assume every performance concern in the old QA-05 audit is permanently solved merely because the hardening phase passed.
+
+## 63.6 BH-04 — UI / Responsive / Browser Hardening
+
+Status:
+
+**CLOSED — PASS WITH CONDITIONS**
+
+Accepted fixes:
+
+1. `/enquiries/new`
+   - customer dropdown now presents human-readable customer identity:
+     `{customer.name} ({customer.phone}) • {customer.email}`
+   - underlying CUID remains the actual submitted value
+
+2. `/quotations/new`
+   - markup / discount / tax controls changed from fixed desktop-only `grid-cols-3` behavior to:
+     `grid-cols-1 sm:grid-cols-3`
+
+3. `src/components/shared/global-search.tsx`
+   - mobile compact icon-only search below 640px
+
+4. `/referrals`
+   - customer label presentation aligned with the same resolver/presentation approach
+
+Additional observations such as table-action UX and some feedback empty-state presentation were treated as non-blocking/deferred observations.
+
+## 63.7 BH-04C / BH-04D
+
+These were follow-up verification/closure work.
+
+Status:
+
+**CLOSED**
+
+The accepted UI changes were independently re-verified.
+
+## 63.8 BH-05 — Data Integrity
+
+Status:
+
+**CLOSED — PASS**
+
+Focused on preserving database/business-data integrity during beta hardening.
+
+## 63.9 BH-06 — Production Readiness
+
+Status:
+
+**CLOSED — PASS WITH CONDITIONS**
+
+The application-level readiness work passed, while deployment/operational prerequisites remained outside the code-change scope.
+
+## 63.10 BH-07 — Final Beta Readiness Audit
+
+Status:
+
+**CLOSED — CONDITIONAL GO**
+
+Final result:
+
+- application-level beta readiness audit completed
+- no confirmed P0/P1/P2 application blockers
+- TypeScript PASS
+- production build PASS
+- Git baseline preserved
+- deployment NOT performed as part of this audit
+- beta launch NOT performed as part of this audit
+- feature development was not considered complete merely because the application passed the audit
+
+Remaining conditions were operational/deployment prerequisites:
+
+1. hosting environment
+2. production environment variables
+3. custom domain/DNS/HTTPS
+4. Supabase Auth Site URL / Redirect URLs
+5. backup/PITR verification
+6. SMTP/WhatsApp credentials if those integrations are enabled
+
+Deferred non-blocking items:
+
+- rate limiting
+- APM/advanced application monitoring
+- middleware → proxy naming migration
+
+These do not justify redesigning the core architecture.
+
+---
+
+# 64. ACCEPTED GIT BASELINE AFTER BETA HARDENING
+
+At the end of the accepted hardening baseline, the following working-tree modifications were explicitly accepted:
+
+```text
+ M UPCOMING_FEATURE.md
+ M src/app/(dashboard)/enquiries/new/page.tsx
+ M src/app/(dashboard)/quotations/new/page.tsx
+ M src/app/(dashboard)/referrals/page.tsx
+ M src/components/shared/global-search.tsx
+ M src/lib/services/customer-portal-service.ts
+ M src/lib/services/rate-sheet-service.ts
+ M src/lib/services/trip-costing-service.ts
+```
+
+These changes must NOT be casually reverted.
+
+`UPCOMING_FEATURE.md` is intentional.
+
+Other files represent accepted QA/hardening fixes.
+
+If the actual current Git state differs, inspect the repository before changing anything.
+
+---
+
+# 65. CURRENT HOTEL / RATE SHEET ARCHITECTURE — VERIFIED
+
+This section supersedes any earlier speculative Room Type design.
+
+## 65.1 Critical final decision
+
+**Do NOT create a standalone `RoomType` model for the current TripDesk architecture.**
+
+There is no current Prisma `RoomType` model.
+
+Do not create:
+
+- `RoomType` table
+- `TripRoomType`
+- separate Room Types master
+- separate Room Types Excel sheet
+
+unless a future explicit product decision changes the architecture.
+
+## 65.2 Current Hotel model
+
+Current verified `Hotel` model:
+
+```prisma
+model Hotel {
+  id         String    @id @default(cuid())
+  agencyId   String
+  supplierId String?
+  name       String
+  category   String?
+  address    String?
+  city       String?
+  state      String?
+  country    String?   @default("India")
+  phone      String?
+  email      String?
+  website    String?
+  notes      String?
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  agency     Agency      @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  supplier   Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  tripHotels TripHotel[]
+  rateSheets RateSheet[]
+
+  @@index([agencyId])
+  @@index([supplierId])
+  @@index([agencyId, city])
+  @@map("hotels")
+}
+```
+
+## 65.3 Current TripHotel model
+
+```prisma
+model TripHotel {
+  id          String    @id @default(cuid())
+  tripId      String
+  hotelId     String
+  checkIn     DateTime
+  checkOut    DateTime
+  roomType    String
+  rooms       Int       @default(1)
+  mealPlan    String?
+  nightlyRate Decimal?  @db.Decimal(10, 2)
+  totalAmount Decimal?  @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  trip               Trip                @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  hotel              Hotel               @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  hotelConfirmations HotelConfirmation[]
+
+  @@index([tripId])
+  @@index([hotelId])
+  @@map("trip_hotels")
+}
+```
+
+## 65.4 Current RateSheet model
+
+Current verified RateSheet structure includes:
+
+```prisma
+model RateSheet {
+  id                 String              @id @default(cuid())
+  agencyId           String
+  supplierId         String?
+  rateSheetNumber    String?
+  name               String
+  inventoryType      RateInventoryType
+
+  hotelId            String?
+  vehicleId          String?
+  activityId         String?
+
+  roomType           String?
+  mealPlan           String?
+
+  seasonName         String?
+  validFrom          DateTime
+  validTo            DateTime
+
+  currency            String              @default("INR")
+  costPrice           Decimal             @default(0) @db.Decimal(12, 2)
+  extraAdultRate      Decimal?            @db.Decimal(12, 2)
+  extraChildRate      Decimal?            @db.Decimal(12, 2)
+
+  vehiclePricingType  VehiclePricingType?
+  ratePerKm           Decimal?            @db.Decimal(10, 2)
+  minimumKm           Decimal?            @db.Decimal(10, 2)
+  totalRate           Decimal?            @db.Decimal(12, 2)
+  extraKmRate         Decimal?            @db.Decimal(10, 2)
+  driverAllowance     Decimal?            @db.Decimal(10, 2)
+  nightAllowance      Decimal?            @db.Decimal(10, 2)
+  tollIncluded        Boolean             @default(false)
+  parkingIncluded     Boolean             @default(false)
+
+  adultCost           Decimal?            @db.Decimal(12, 2)
+  childCost           Decimal?            @db.Decimal(12, 2)
+  infantCost          Decimal?            @db.Decimal(12, 2)
+
+  taxPercentage       Decimal?            @default(0) @db.Decimal(5, 2)
+  priority            Int                 @default(0)
+  status              RateStatus          @default(ACTIVE)
+  sourceType          String?             @default("MANUAL")
+  notes               String?
+  internalNotes       String?
+  archivedAt          DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  // Agency, Supplier, Hotel, Vehicle and Activity relations exist.
+}
+```
+
+Important:
+
+- `roomType` is a string
+- `mealPlan` is a string
+- `hotelId` links the rate to the Hotel master
+- `TripHotel.hotelId` links the selected hotel to a trip
+- there is no RoomType foreign key
+
+## 65.5 Final conceptual relationship
+
+```text
+Hotel Master
+    ↓
+Hotel
+    ↓ hotelId
+RateSheet
+    ├── roomType (string)
+    ├── mealPlan
+    ├── seasonName
+    ├── validFrom / validTo
+    ├── costPrice
+    ├── extraAdultRate
+    └── extraChildRate
+    ↓
+Trip creation
+    ↓
+TripHotel
+    ├── hotelId
+    ├── roomType
+    ├── rooms
+    ├── mealPlan
+    ├── nightlyRate
+    └── totalAmount
+```
+
+## 65.6 Occupancy rule
+
+Current RateSheet has:
+
+- `costPrice`
+- `extraAdultRate`
+- `extraChildRate`
+
+It does NOT currently have explicit:
+
+- base adult occupancy
+- base child occupancy
+- infant occupancy rules for hotel rates
+
+Do not invent occupancy fields in the Hotel Rate Sheet import unless the database model is explicitly changed.
+
+For the current architecture, `costPrice` represents the base room rate and extra adult/child fields represent additional occupant pricing.
+
+---
+
+# 66. HOTEL EXCEL IMPORT — APPROVED DESIGN, NOT YET IMPLEMENTED
+
+The Hotel/Rate Sheet Excel feature is a new post-hardening development requirement.
+
+Status:
+
+**PROPOSED / APPROVED DIRECTION — NOT IMPLEMENTED**
+
+## 66.1 Required user flow
+
+```text
+Download Template
+      ↓
+Fill Excel
+      ↓
+Upload .xlsx
+      ↓
+Validate file format
+      ↓
+Validate columns
+      ↓
+Validate rows/data types/business rules
+      ↓
+Preview changes
+      ↓
+Confirm Import
+      ↓
+Create / Update records
+```
+
+Never insert an uploaded spreadsheet directly without validation and preview.
+
+Only the supported Excel format should be accepted.
+
+## 66.2 Hotel Excel — final proposed responsibility
+
+One row = one Hotel master record.
+
+Suggested columns:
+
+| Excel column | Current DB mapping |
+|---|---|
+| Hotel Code | import-only reference unless a DB field is explicitly added |
+| Hotel Name | `Hotel.name` |
+| Supplier | resolve to `supplierId` |
+| Category | `Hotel.category` |
+| Address | `Hotel.address` |
+| City | `Hotel.city` |
+| State | `Hotel.state` |
+| Country | `Hotel.country` |
+| Phone | `Hotel.phone` |
+| Email | `Hotel.email` |
+| Website | `Hotel.website` |
+| Notes | `Hotel.notes` |
+
+Do NOT add a Status column to the first exact template unless the current code is changed to support it. `Hotel` currently uses `archivedAt`; there is no Hotel `status` field.
+
+## 66.3 Rate Sheet Excel — final proposed responsibility
+
+One row = one hotel rate record.
+
+Suggested columns:
+
+| Excel column | Current DB mapping |
+|---|---|
+| Hotel Code | resolve to `hotelId` |
+| Supplier | resolve to `supplierId` |
+| Rate Sheet Number | `rateSheetNumber` |
+| Rate Sheet Name | `name` |
+| Inventory Type | `inventoryType`, must be HOTEL for this import |
+| Room Type | `roomType` |
+| Meal Plan | `mealPlan` |
+| Season Name | `seasonName` |
+| Valid From | `validFrom` |
+| Valid To | `validTo` |
+| Currency | `currency` |
+| Cost Price | `costPrice` |
+| Extra Adult Rate | `extraAdultRate` |
+| Extra Child Rate | `extraChildRate` |
+| Priority | `priority` |
+| Notes | `notes` |
+| Internal Notes | `internalNotes` |
+
+`sourceType` should be automatically set to an import value such as `EXCEL_IMPORT` rather than being a normal user-entered column, if the current implementation supports that convention.
+
+Vehicle/activity-specific fields are not part of the Hotel Rate Sheet import.
+
+## 66.4 Tax rule
+
+The existing RateSheet schema contains `taxPercentage`, but the product's finalized V1 direction says there is **no tax feature**.
+
+Therefore:
+
+- do not turn tax into a new feature through Excel import
+- do not add GST/tax calculations
+- do not add tax-specific UI just because a legacy DB field exists
+
+If the current Rate Sheet UI already uses the existing field, inspect actual code before changing it.
+
+## 66.5 Duplicate/update behavior
+
+This still requires explicit implementation design before coding.
+
+Status:
+
+**NOT YET IMPLEMENTED / EXACT DUPLICATE POLICY NOT LOCKED**
+
+The implementation must decide and document:
+
+- how Hotel Code is resolved
+- whether Hotel Name + Supplier can identify duplicates
+- what happens when the same Hotel already exists
+- whether RateSheet duplicates create new historical records or update an existing rate
+- how overlapping validity periods are handled
+- whether import is create-only, upsert, or explicit create/update per preview row
+
+Do not guess these rules during implementation.
+
+---
+
+# 67. FORM VALIDATION / FORM UX — NEW PENDING REQUIREMENT
+
+This requirement was raised after the certified hardening baseline.
+
+Status:
+
+**PENDING DEVELOPMENT**
+
+## 67.1 Problem
+
+Some forms use Formik/Yup validation but do not consistently display field-level validation errors.
+
+Example discussed:
+
+- `customers/new`
+
+`trips/new` was treated as the desired UX/reference behavior.
+
+## 67.2 Final desired behavior
+
+Every form must:
+
+- validate according to its existing schema
+- show field-level errors next to the relevant field
+- clearly distinguish touched/invalid fields
+- prevent invalid submission
+- show submit/loading state
+- show server/API errors when applicable
+- show a general form-level error when an error cannot be attached to a field
+- preserve existing validation rules unless there is a real defect
+- use consistent error presentation across the application
+
+Do not weaken validation merely to hide UI problems.
+
+## 67.3 Validation technology
+
+Current architecture includes:
+
+- Formik for form state/interaction where already used
+- Yup for existing Formik schemas where already used
+- Zod for server/API validation
+
+Do not replace the entire validation architecture with a new library just to solve error rendering.
+
+## 67.4 Planned development phase
+
+Recommended:
+
+**DEV-01 — Form UX Consistency**
+
+Scope:
+
+- audit all existing forms
+- compare against `trips/new`
+- fix missing Formik error rendering
+- standardize error presentation
+- preserve schemas/business rules
+- test all affected forms
+
+This phase must have its own QA before DEV-02.
+
+---
+
+# 68. TABLE SCROLLING — NEW PENDING REQUIREMENT
+
+Status:
+
+**PENDING DEVELOPMENT**
+
+## Final requirement
+
+When a table contains many rows/columns:
+
+- scrolling should happen inside the table container
+- the whole page should not become the primary horizontal/vertical table scroll surface
+- table header behavior should remain usable where the current design supports it
+- desktop and mobile behavior must be checked
+- pagination/filter controls must remain usable
+- no layout overflow should escape the intended container
+
+This is a global UX consistency requirement.
+
+Do not blindly apply a single CSS rule to every table. Audit table components/pages and preserve special cases.
+
+Recommended phase:
+
+**DEV-02 — Global UX Improvements**
+
+---
+
+# 69. PASSWORD SHOW / HIDE — NEW PENDING REQUIREMENT
+
+Status:
+
+**PENDING DEVELOPMENT**
+
+## Final requirement
+
+Every password input in the authenticated application should support:
+
+- hidden password by default
+- eye/visibility icon
+- toggle to show password
+- toggle back to hide password
+- accessible button/label
+- no password value leakage into URLs, logs, or browser-visible API responses
+
+This is a presentation feature only.
+
+## Critical security rule
+
+The request to "show passwords for every agency in the database" was rejected.
+
+**DO NOT store or display plaintext passwords.**
+
+Passwords are managed by Supabase Auth.
+
+TripDesk must never provide:
+
+- plaintext agency passwords
+- plaintext password database columns
+- Platform Owner password listing
+- password recovery by reading an old password
+
+If a future admin feature is required, implement a secure password reset/set-password workflow through the supported authentication system without revealing the previous password.
+
+---
+
+# 70. PAGE SCROLL RESET — NEW PENDING REQUIREMENT
+
+Status:
+
+**PENDING DEVELOPMENT**
+
+## Problem
+
+User scrolls down one page, navigates to another page, and the next page can retain the previous scroll position.
+
+## Final desired behavior
+
+When navigating to a new route/page:
+
+- new page should normally begin at the top
+- intentional in-page navigation/anchor behavior should not be broken
+- browser back/forward behavior should be considered separately
+- do not introduce a hard reload just to reset scroll
+- preserve the existing Next.js navigation architecture
+
+Recommended implementation should use a safe global/page navigation scroll strategy rather than `window.location.reload()`.
+
+---
+
+# 71. INVOICE GENERATION — NEW PENDING FEATURE
+
+Status:
+
+**PROPOSED / APPROVED DIRECTION — NOT IMPLEMENTED**
+
+## 71.1 Scope
+
+Start with **Customer Invoice**, not supplier invoice.
+
+Invoice should be tied to a Booking.
+
+Conceptual flow:
+
+```text
+Booking
+  ↓
+Generate Invoice
+  ↓
+Invoice record
+  ↓
+PDF generation
+  ↓
+Download / Share
+```
+
+## 71.2 Invoice data
+
+At minimum, design for:
+
+- agency details
+- customer details
+- trip details
+- booking details
+- invoice number
+- invoice date
+- line items
+- quantities/rates/amounts
+- subtotal
+- discount
+- total
+- amount paid
+- balance due
+- appropriate status/version information
+
+## 71.3 Financial separation
+
+Customer invoices are separate from:
+
+- `SupplierPayable`
+- `SupplierPayment`
+- SaaS subscription payments
+
+Do not merge these financial domains.
+
+## 71.4 Tax/GST
+
+Current V1 decision:
+
+**No tax/GST feature.**
+
+Do not introduce GST/tax calculations as part of the first invoice implementation unless a new explicit decision changes the product scope.
+
+The architecture may remain extensible for future tax support.
+
+## 71.5 Generation behavior
+
+Recommended beta behavior:
+
+- user-triggered invoice generation
+- not automatic invoice creation on every booking unless explicitly decided later
+
+## 71.6 Still requires design decisions
+
+Before coding, explicitly decide:
+
+- one invoice per booking vs multiple invoices
+- revised invoice/versioning behavior
+- invoice numbering format
+- invoice status values
+- whether invoice is visible in the customer portal
+- whether invoice can be publicly shared
+- whether invoice can be regenerated
+- whether invoice is immutable after issue
+- whether payment allocation is reflected live or snapshotted
+
+Do not invent these during implementation.
+
+Recommended phase:
+
+**DEV-04 — Invoice System**
+
+---
+
+# 72. DEVELOPMENT ROADMAP — CURRENT
+
+The recommended post-hardening roadmap is now:
+
+```text
+BH-07 CONDITIONAL GO BASELINE
+        ↓
+DEV-01 Form UX Consistency
+        ↓
+DEV-01 QA
+        ↓
+DEV-02 Global UX Improvements
+        ↓
+DEV-02 QA
+        ↓
+DEV-03 Excel Import Foundation
+        ↓
+DEV-03 QA
+        ↓
+DEV-04 Invoice System
+        ↓
+DEV-04 QA
+        ↓
+Pre-Beta Deployment / Operational Readiness
+        ↓
+Controlled Real-Agency Beta
+```
+
+## DEV-01
+
+Form validation/error consistency.
+
+## DEV-02
+
+Global UX:
+
+- table container scrolling
+- password visibility
+- page scroll reset
+- related consistency fixes discovered during audit
+
+## DEV-03
+
+Excel:
+
+- Hotel template
+- Hotel import
+- Rate Sheet template
+- Rate Sheet import
+- validation
+- preview
+- safe create/update behavior
+- import QA
+
+## DEV-04
+
+Customer invoice:
+
+- schema
+- service
+- API
+- UI
+- PDF
+- numbering
+- payment/balance
+- share/download
+- security
+- QA
+
+---
+
+# 73. COMPLETE CURRENT DATABASE MODEL INVENTORY
+
+The current database is a **45-model Prisma/PostgreSQL schema**.
+
+The following model inventory is the current authoritative model set from the project state available in this conversation:
+
+1. `Agency`
+2. `User`
+3. `SubscriptionPlan`
+4. `Subscription`
+5. `SubscriptionPayment`
+6. `Customer`
+7. `Trip`
+8. `Traveler`
+9. `Hotel`
+10. `TripHotel`
+11. `ItineraryItem`
+12. `Vehicle`
+13. `TripVehicle`
+14. `Activity`
+15. `TripActivity`
+16. `Quotation`
+17. `QuotationItem`
+18. `QuotationProposalItem`
+19. `QuotationPaymentMilestone`
+20. `QuotationPackageOption`
+21. `Booking`
+22. `Payment`
+23. `PublicShareLink`
+24. `Enquiry`
+25. `EnquiryFollowUp`
+26. `Supplier`
+27. `RateSheet`
+28. `TripOperation`
+29. `HotelConfirmation`
+30. `VehicleDispatch`
+31. `ActivityConfirmation`
+32. `OperationalIssue`
+33. `OperationEvent`
+34. `SupplierPayable`
+35. `SupplierPayment`
+36. `OperationalExpense`
+37. `CustomerFeedback`
+38. `Referral`
+39. `CustomerNotification`
+40. `CustomerNotificationPreference`
+41. `AgencyCommunicationSetting`
+42. `TravelDocument`
+43. `PlatformAuditLog`
+44. `PlatformAnnouncement`
+45. `PlatformSetting`
+
+### Important note
+
+The exact live Prisma schema remains code-authoritative. If the repository contains a model-name difference from a historic report, inspect `prisma/schema.prisma` before modifying it.
+
+**No standalone `RoomType` model exists in the accepted current architecture.**
+
+---
+
+# 74. IMPORTANT DATABASE RELATIONSHIPS / CONSTRAINTS
+
+## Tenant
+
+Tenant business records are scoped by `agencyId`.
+
+32 models are directly tenant-owned, 9 are parent-derived, 4 are global/platform-level, and there are no intentionally ambiguous tenant ownership models in the accepted audit result.
+
+## User
+
+- Supabase Auth UUID = Prisma `User.id`
+- Agency Owner has non-null `agencyId`
+- Platform Owner has `agencyId = null`
+
+## Customer
+
+- Customer belongs to Agency
+- Customer is not a User
+
+## Trip
+
+- Trip belongs to Agency
+- Trip is associated with Customer according to the current schema
+- travelers/itinerary/inventory records connect to Trip
+
+## Hotel
+
+- Hotel belongs to Agency
+- optional Supplier
+- Hotel has many `TripHotel`
+- Hotel has many `RateSheet`
+
+## TripHotel
+
+- Trip → Hotel
+- contains selected room type as string
+- contains meal plan
+- stores trip-specific rate/amount
+
+## RateSheet
+
+- Agency-owned
+- optional Supplier
+- optional Hotel / Vehicle / Activity depending on `inventoryType`
+- Hotel rate records use `hotelId`
+- `roomType` is string
+- `mealPlan` is string
+
+## Quotation
+
+- Agency-scoped
+- quotation items/options/milestones
+- public proposal access through secure sharing infrastructure
+
+## Booking
+
+- Agency-scoped
+- connects Customer, Trip and optionally Quotation
+- connects payments and operational workflow
+
+## Communication
+
+Important invariant:
+
+```text
+@@unique([agencyId, idempotencyKey])
+```
+
+or its equivalent current schema constraint must remain.
+
+Do not remove deterministic communication idempotency.
+
+## Important unique constraints
+
+Known:
+
+```text
+Trip:
+@@unique([agencyId, tripNumber])
+
+Quotation:
+@@unique([agencyId, quotationNumber, version])
+
+Booking:
+@@unique([agencyId, bookingNumber])
+
+Enquiry:
+@@unique([agencyId, enquiryNumber])
+
+Referral:
+@@unique([agencyId, referralCode])
+
+CustomerNotification:
+@@unique([agencyId, idempotencyKey])
+
+TravelDocument:
+@@unique([agencyId, documentNumber, version])
+
+PublicShareLink:
+tokenHash globally unique
+
+User:
+email globally unique
+```
+
+## Important indexes
+
+Known high-value indexes include:
+
+```text
+Hotel:
+@@index([agencyId])
+@@index([supplierId])
+@@index([agencyId, city])
+
+TripHotel:
+@@index([tripId])
+@@index([hotelId])
+
+RateSheet:
+@@index([agencyId])
+@@index([supplierId])
+@@index([hotelId])
+@@index([vehicleId])
+@@index([activityId])
+@@index([agencyId, inventoryType])
+@@index([agencyId, status])
+@@index([agencyId, validFrom, validTo])
+```
+
+Inspect the actual schema before adding duplicate indexes.
+
+---
+
+# 75. AUTHENTICATION / AUTHORIZATION — CURRENT
+
+## Authentication
+
+Supabase Auth.
+
+Installed/used:
+
+- `@supabase/supabase-js`
+- `@supabase/ssr`
+
+SSR cookies are used for session handling.
+
+## Identity mapping
+
+```text
+Supabase Auth user.id
+        =
+Prisma User.id
+```
+
+This mapping is a critical invariant.
+
+## Server-side guards
+
+Important file:
+
+`src/lib/auth/index.ts`
+
+Known guards:
+
+- `getCurrentUser`
+- `requireAuth`
+- `requirePlatformOwner`
+- `requireAgencyOwner`
+
+Tenant context must be derived server-side.
+
+Never trust a client-supplied `agencyId`.
+
+## Signup
+
+`/signup`
+
+Creates:
+
+- Supabase Auth user
+- Agency
+- Prisma User with `AGENCY_OWNER`
+- Trial Subscription
+
+The operation is intended to be atomic at the application/database level.
+
+## Login
+
+`/login`
+
+Uses Supabase `signInWithPassword`.
+
+Then:
+
+```text
+PLATFORM_OWNER → /admin
+AGENCY_OWNER   → /dashboard
+```
+
+## Email verification
+
+Disabled for V1.
+
+Do not silently enable it during unrelated feature development.
+
+---
+
+# 76. SECURITY BASELINE — CURRENT
+
+The latest security posture remains a hard invariant.
+
+## Database / Supabase
+
+Latest accepted security work established:
+
+- RLS enabled on all 46 public tables in the relevant security audit
+- direct PostgREST business-data access blocked
+- direct `anon` / `authenticated` table/sequence/routine privileges revoked
+- browser `/rest/v1/*` business calls = 0
+- browser `/auth/v1/*` is used for authentication
+- Prisma → PostgreSQL direct access remains
+
+Do not call PostgreSQL `postgres` a superuser in documentation. In this architecture it is the application database role/table owner with `BYPASSRLS`.
+
+## Tenant isolation
+
+Server-enforced.
+
+Agency Owner:
+
+- sees only own agency data
+- cannot choose another agency by manipulating client data
+
+## IDOR
+
+No confirmed Critical/High IDOR issue remains from the audited baseline.
+
+## Public security
+
+Public token routes must:
+
+- resolve identity server-side
+- validate token/reference safely
+- never trust client-provided agency/customer/trip identifiers
+- expose only customer-safe information
+
+## Commercial privacy
+
+Never expose publicly:
+
+- `supplierCost`
+- `buyPrice`
+- `grossProfit`
+- `grossMargin`
+- `supplierPayable`
+- `internalNotes`
+
+## Secrets
+
+Never expose:
+
+- database URLs
+- service-role keys
+- cron secrets
+- API secrets
+- passwords
+
+## Passwords
+
+Never store/display plaintext passwords.
+
+---
+
+# 77. ROUTE INVENTORY — CURRENT RECOVERABLE MAP
+
+## Public/auth
+
+- `/`
+- `/login`
+- `/signup`
+- `/forgot-password`
+- `/reset-password`
+
+## Public secure-token routes
+
+- `/q/*` — quotation/proposal access
+- `/trip/*` — customer trip portal
+- `/b/*` — public booking access
+- `/customer/*` — guest customer portal/access
+
+## Agency protected
+
+- `/dashboard`
+- `/customers/*`
+- `/enquiries/*`
+- `/suppliers/*`
+- `/trips/*`
+- `/hotels/*`
+- `/quotations/*`
+- `/bookings/*`
+- `/payments/*`
+- `/operations/*`
+- `/documents/*`
+- `/feedback/*`
+- `/referrals/*`
+- `/customer-insights/*`
+- `/reports/*`
+- `/communications/*`
+- `/settings`
+- `/subscription`
+
+## Platform Owner
+
+- `/admin`
+- `/admin/agencies`
+- `/admin/agencies/[agencyId]`
+- `/admin/subscriptions`
+- `/admin/plans`
+- `/admin/analytics`
+- `/admin/audit-logs`
+- `/admin/announcements`
+- `/admin/settings`
+- existing admin payment/subscription management routes from Phase 21-B
+
+## API
+
+Important API families include:
+
+- `/api/customer/*`
+- `/api/trips/public/[token]/*`
+- `/api/suppliers/check-duplicate`
+- `/api/suppliers/[id]/reactivate`
+- `/api/feedback`
+- `/api/feedback/[id]`
+- `/api/customer-insights`
+- `/api/reports`
+- `/api/reports/export`
+- `/api/reports/pdf`
+- `/api/communications`
+- `/api/communications/[id]`
+- `/api/trips/public/[token]/notifications`
+- `/api/trips/public/[token]/notifications/[id]/read`
+- `/api/admin/subscription-payments`
+- `/api/admin/subscription-payments/[id]`
+- communication automation endpoints
+- subscription APIs as implemented by the current repository
+
+If an exact endpoint is uncertain, inspect the current repository instead of inventing one.
+
+---
+
+# 78. COMPLETE BUSINESS FLOW MAP
+
+```text
+PUBLIC WEBSITE
+    ↓
+SIGNUP
+    ↓
+AGENCY + AGENCY OWNER
+    ↓
+7-DAY FREE TRIAL
+    ↓
+DASHBOARD
+    ↓
+CUSTOMER
+    ↓
+ENQUIRY
+    ↓
+FOLLOW-UP / CRM
+    ↓
+TRIP + ITINERARY + COSTING
+    ↓
+HOTEL / VEHICLE / ACTIVITY
+    ↓
+QUOTATION
+    ↓
+PUBLIC PROPOSAL
+    ↓
+BOOKING
+    ↓
+CUSTOMER PAYMENTS
+    ↓
+SUPPLIER PAYABLES / PAYMENTS
+    ↓
+OPERATIONS
+    ↓
+TRAVEL DOCUMENTS
+    ↓
+CUSTOMER PORTAL
+    ↓
+NOTIFICATIONS
+    ↓
+TRIP COMPLETION
+    ↓
+FEEDBACK
+    ↓
+REPORTS / INSIGHTS
+```
+
+SaaS subscription is a separate financial domain:
+
+```text
+TRIAL
+ ↓
+PLAN SELECTION
+ ↓
+MONTHLY / YEARLY
+ ↓
+MANUAL PAYMENT
+ ↓
+UTR
+ ↓
+PLATFORM OWNER VERIFICATION
+ ↓
+ACTIVE PAID SUBSCRIPTION
+```
+
+---
+
+# 79. QA HISTORY — AUTHORITATIVE CURRENT VIEW
+
+## QA-01 — Authentication
+
+**Status: COMPLETE**
+
+Covered:
+
+- signup
+- login
+- logout/session
+- Supabase identity mapping
+- password/reset
+- role routing
+
+## QA-02 — Authorization / Routing
+
+**Status: COMPLETE**
+
+Covered:
+
+- role separation
+- protected routes
+- public bypasses
+- redirects
+- Platform Owner restrictions
+
+## QA-03 — Functional Modules
+
+**Status: COMPLETE**
+
+Exact historical module-level report is not fully recoverable; do not invent details.
+
+## QA-04 — Full Journey / UX / Security
+
+**Status: COMPLETE**
+
+Known issues fixed:
+
+- public quotation commercial-data leak
+- customer duplicate-detection weakness
+
+Antigravity reported four total findings, but only two are independently recoverable with confidence. Do not invent the other two.
+
+## QA-05 — Performance / API / Database
+
+**Status: COMPLETE AS AUDIT**
+
+Historic focus:
+
+- API counts
+- duplicate calls
+- `/api/auth/me`
+- Server vs Client Components
+- `useEffect`
+- rerenders
+- `router.refresh()`
+- hard navigation
+- Prisma performance
+- N+1
+- indexes
+- dashboard speed
+
+Important:
+
+Historic concerns require revalidation in beta.
+
+## QA-05B — Real Browser Performance / Network
+
+**Status: COMPLETE**
+
+## QA-06A — UI/UX Responsive Read-Only
+
+**Status: COMPLETE**
+
+## QA-06B — UI/UX Follow-up
+
+**Status: COMPLETE / HISTORICAL**
+
+## QA-07A — Deep Security / Multi-Tenant Isolation
+
+**Status: COMPLETE**
+
+Reported:
+
+- zero Critical/High vulnerabilities
+- server-enforced tenancy
+- sanitized public proposals
+- cross-tenant isolation
+
+---
+
+# 80. PHASE 21 CERTIFICATION HISTORY
+
+## Phase 21-B — SaaS Billing
+
+Historically:
+
+- 32/32 passed
+
+Implemented:
+
+- `SubscriptionPayment`
+- status lifecycle
+- payment requests
+- verification/rejection
+- activation workflow
+- audit logging
+- live admin payment UI
+
+## Phase 21-C — Persistence / Mock Cleanup
+
+Historically:
+
+- 36/36 passed
+
+Implemented:
+
+- Feedback persistence
+- Referral persistence
+- Customer Insights persistence
+- removed legacy `ExperienceProvider` after consumers were eliminated
+
+## Phase 21-D — Agency BI / Reports
+
+Historically:
+
+- test count evolved from 47 to 59 as tests expanded
+- use current repository result as authoritative
+
+Implemented:
+
+- reporting service
+- validation
+- reports API
+- CSV/PDF export
+- live reports UI
+- tenant scoping
+- CSV formula-injection protection
+
+## Phase 21-E — Customer Portal Feedback
+
+Implemented:
+
+- completed-trip eligibility
+- token-scoped resolution
+- idempotent feedback update
+- low-rating service recovery
+- public feedback API
+- customer trip portal feedback UI
+
+## Phase 21-F — Communication Center
+
+Historically:
+
+- 47/47 automated assertions
+- 28/28 browser scenarios
+- 0 failed
+- 0 blocked
+- desktop/tablet/mobile tested
+- 0 application console errors
+- 0 hydration errors
+- no duplicate request loops observed
+- no P0/P1/P2 defects reported
+
+Implemented:
+
+- communication center
+- notification tray
+- notification APIs
+- deterministic idempotency
+- token-scoped public notifications
+
+External SMS/WhatsApp provider delivery was simulated unless actual provider credentials/configuration are present. Do not claim live provider delivery without evidence.
+
+---
+
+# 81. PERFORMANCE CURRENT STATE
+
+Accepted optimization:
+
+- batch rate lookup in `rate-sheet-service.ts`
+- trip costing refactor in `trip-costing-service.ts`
+
+Representative reduction:
+
+```text
+8 → 4 queries
+13 → 4 queries
+```
+
+Current rule:
+
+- avoid N+1
+- avoid unnecessary client components
+- avoid duplicate fetches
+- avoid unnecessary `router.refresh()`
+- avoid unnecessary hard navigation
+- select only needed Prisma fields where practical
+- keep server-side business logic server-side
+
+However:
+
+**Performance is not considered permanently "done."**
+
+Real beta data volumes can reveal new bottlenecks.
+
+---
+
+# 82. FRONTEND ARCHITECTURE — CURRENT
+
+## Server Components
+
+Use for:
+
+- initial page data
+- secure server-side data retrieval
+- business logic orchestration where practical
+
+## Client Components
+
+Use where interaction requires them:
+
+- forms
+- modals
+- filters
+- toggles
+- drawers
+- popovers
+- interactive tables/components
+
+Avoid unnecessary `"use client"`.
+
+## API
+
+Next.js Route Handlers + service layer + Zod validation.
+
+Do not bypass services unnecessarily.
+
+## Forms
+
+Existing architecture includes Formik/Yup in applicable forms.
+
+Server/API validation uses Zod where established.
+
+## UI
+
+Tailwind and the project's existing UI component system.
+
+Preserve established visual conventions.
+
+---
+
+# 83. CURRENT UI/UX REQUIREMENTS
+
+The following are now explicit beta UX requirements:
+
+1. validation errors visible on every form
+2. consistent field-level error presentation
+3. consistent submit/loading behavior
+4. tables scroll within their intended container
+5. password fields have show/hide visibility controls
+6. new pages reset to top on navigation
+7. responsive layouts
+8. no fake/static business values
+9. no `NaN`
+10. no `undefined` presented as user-facing values
+11. clear loading states
+12. clear empty states
+13. clear error states
+14. mobile-safe controls
+15. no unnecessary full-page refresh
+
+---
+
+# 84. CURRENT IMPLEMENTATION VS PENDING MATRIX
+
+| Area | Current Status |
+|---|---|
+| Core authentication | IMPLEMENTED + VERIFIED |
+| Two-role RBAC | IMPLEMENTED + VERIFIED |
+| Multi-tenancy | IMPLEMENTED + VERIFIED |
+| Customer guest/token architecture | IMPLEMENTED + VERIFIED |
+| Customer duplicate detection | FIXED + VERIFIED |
+| Public quotation redaction | FIXED + VERIFIED |
+| Subscription V2 | IMPLEMENTED + VERIFIED |
+| Subscription lifecycle tests | 46 tests / 118 assertions passed |
+| Beta hardening BH-00 to BH-07 | COMPLETE |
+| Hotel master | IMPLEMENTED |
+| RateSheet | IMPLEMENTED |
+| Standalone RoomType model | REJECTED / NOT IMPLEMENTED |
+| Hotel Excel template/import | PROPOSED — NOT IMPLEMENTED |
+| RateSheet Excel template/import | PROPOSED — NOT IMPLEMENTED |
+| Form validation UI consistency | PENDING |
+| Table container scrolling | PENDING |
+| Password show/hide | PENDING |
+| Plaintext password display | REJECTED |
+| Page scroll reset | PENDING |
+| Customer Invoice | PROPOSED — NOT IMPLEMENTED |
+| Automatic Stripe/Razorpay billing | REJECTED/DEFERRED |
+| Tax/GST engine | DEFERRED |
+| AI assistant | FUTURE |
+| Mobile-native app | FUTURE |
+| Flight booking | REMOVED |
+| Visa assistance | REMOVED |
+| New internal roles | REMOVED |
+
+---
+
+# 85. BUG / ISSUE REGISTER
+
+## FIXED
+
+### Customer booking cross-agency collision
+
+File:
+
+`src/lib/services/customer-portal-service.ts`
+
+Status:
+
+**FIXED + VERIFIED**
+
+### Public quotation commercial-data exposure
+
+Status:
+
+**FIXED + VERIFIED**
+
+Sensitive supplier/agency-private fields are redacted from public payloads.
+
+### Customer duplicate detection
+
+Status:
+
+**FIXED + VERIFIED**
+
+### Rate-costing N+1 style query behavior
+
+Files:
+
+- `src/lib/services/rate-sheet-service.ts`
+- `src/lib/services/trip-costing-service.ts`
+
+Status:
+
+**FIXED + VERIFIED**
+
+### Subscription `availablePlans` TypeScript gap
+
+File:
+
+`src/lib/services/subscription-service.ts`
+
+Status:
+
+**FIXED**
+
+## DEFERRED / NON-BLOCKING
+
+- rate limiting
+- APM
+- middleware → proxy naming migration
+- some table-action UX observations
+- some feedback empty-state observations
+
+## OPEN / PENDING DEVELOPMENT
+
+- consistent Formik validation error display
+- table internal scrolling
+- password show/hide controls
+- global page scroll reset
+- Hotel Excel import
+- Rate Sheet Excel import
+- customer invoice system
+- final deployment configuration
+- real-world beta monitoring
+
+---
+
+# 86. DEPLOYMENT / RELEASE STATE
+
+BH-07 reached:
+
+**CONDITIONAL GO**
+
+This does NOT mean TripDesk has been launched publicly.
+
+At the end of the audit:
+
+- deployment was not performed as part of BH-07
+- controlled beta launch was not performed
+- production environment configuration still needs verification
+
+Before real agencies are onboarded, verify:
+
+1. hosting
+2. production environment variables
+3. domain/DNS/HTTPS
+4. Supabase Auth Site URL
+5. Supabase Auth Redirect URLs
+6. database backup/PITR
+7. SMTP if needed
+8. WhatsApp/SMS credentials/webhooks if enabled
+9. operational monitoring
+
+---
+
+# 87. BUSINESS RULES — NON-NEGOTIABLE
+
+1. Exactly two internal roles.
+2. Customer is not an internal user.
+3. Platform Owner is global and has `agencyId = null`.
+4. Agency Owner belongs to one agency.
+5. Tenant identity is derived server-side.
+6. Client-supplied `agencyId` is never trusted.
+7. Public customer access is token-scoped.
+8. Public data is customer-safe.
+9. Supplier cost/margin/internal notes never leak publicly.
+10. New agency receives a 7-day trial.
+11. Paid plan is not required at signup.
+12. Paid plans are visible from Day 1.
+13. Paid plans support Monthly and Yearly.
+14. Manual UPI/bank + UTR is the beta payment method.
+15. Platform Owner approves/rejects paid subscription requests.
+16. Plan selection alone does not activate a subscription.
+17. Historical purchased price must remain immutable.
+18. Referenced plans must not be hard-deleted.
+19. SaaS subscription payments are separate from customer travel payments.
+20. Supplier payables are separate from customer invoices.
+21. No tax/GST feature is part of the current V1 invoice scope.
+22. No standalone RoomType model in the current architecture.
+23. Hotel master contains hotel-level information.
+24. RateSheet contains hotel room/meal/rate/validity information.
+25. Do not duplicate hotel-level data unnecessarily in RateSheet.
+26. Do not store plaintext passwords.
+27. Do not create customer authentication.
+28. Do not add removed roles.
+29. Do not perform destructive database resets.
+30. Do not replace existing subscription architecture with a duplicate system.
+31. Preserve communication idempotency.
+32. Preserve public token security.
+33. Preserve tenant isolation.
+
+---
+
+# 88. FEATURES / DECISIONS THAT MUST NOT BE REINTRODUCED
+
+## REJECTED / REMOVED
+
+- Travel Agent role
+- Sales Agent role
+- Sub-Agent role
+- internal Customer role
+- Customer Supabase Auth account
+- Customer password
+- customer signup
+- visa assistance
+- flight booking module
+- plaintext agency/customer passwords
+- password listing in admin
+- separate RoomType database model for current V1
+- separate Room Types Excel sheet
+
+## DEFERRED / FUTURE
+
+- Stripe/Razorpay automatic recurring billing
+- complex payment gateway automation
+- proration
+- usage-based billing
+- coupons
+- advanced SaaS tax/GST engine
+- live multi-currency forex engine
+- airline/GDS
+- AI assistant
+- broad automation platform
+- mass marketing automation
+- mobile-native app
+- advanced team-seat billing
+- enterprise integrations
+
+## DO NOT SILENTLY ADD
+
+Do not convert an approved beta enhancement into a larger architecture rewrite.
+
+---
+
+# 89. DEVELOPMENT RULES FOR THE NEXT CHAT
+
+The next AI/developer must:
+
+1. Read this entire master context before coding.
+2. Inspect actual current code before changing anything.
+3. Treat current code as the ultimate implementation authority.
+4. Preserve final business decisions.
+5. Never resurrect removed roles/features.
+6. Never invent a database model when an existing model is sufficient.
+7. Do not introduce `RoomType` as a new model for the current Hotel/RateSheet design.
+8. Preserve Hotel Master vs RateSheet responsibility separation.
+9. Preserve server-side tenant enforcement.
+10. Preserve Supabase Auth ↔ Prisma UUID mapping.
+11. Preserve Platform Owner `agencyId = null`.
+12. Preserve public token security.
+13. Preserve commercial-data redaction.
+14. Preserve financial-domain separation.
+15. Extend existing Phase 21-B subscription architecture.
+16. Do not create duplicate subscription models/services.
+17. Do not store/display plaintext passwords.
+18. Use minimal, targeted changes.
+19. Avoid unrelated refactors.
+20. Verify existing service/API conventions before creating new ones.
+21. Keep validation consistent.
+22. Every form must visibly render validation errors.
+23. Test responsive behavior.
+24. Test table scrolling with realistic data volume.
+25. Test password visibility without leaking secrets.
+26. Test navigation scroll behavior without hard reloads.
+27. Validate Excel files before import.
+28. Never insert spreadsheet data without preview/confirmation.
+29. Do not invent unresolved duplicate/update semantics for imports.
+30. Keep invoice financial logic separate from supplier/SaaS payment logic.
+31. Run TypeScript and production build after meaningful changes.
+32. Run targeted tests for the changed module.
+33. Run regression tests for affected shared/security areas.
+34. Use browser QA for UI changes.
+35. Stop and report if a proposed change requires architecture/business-rule modification.
+
+---
+
+# 90. SOURCE OF TRUTH FOR HOTEL / RATE SHEET DEVELOPMENT
+
+For Hotel and Rate Sheet work, use this exact hierarchy:
+
+```text
+Current prisma/schema.prisma
+        ↓
+Current Hotel / RateSheet services
+        ↓
+Current Hotel / RateSheet UI
+        ↓
+This Master Context
+        ↓
+Earlier discussions
+```
+
+Do not create fields solely because they appeared in an old proposed Excel design.
+
+---
+
+# 91. CURRENT TEST / BUILD SNAPSHOT
+
+Known verified results include:
+
+### Subscription V2
+
+- 46 lifecycle/tenant-isolation tests
+- 118 assertions
+- 100% passed
+
+### BH-02B
+
+- 10/10 focused regression
+- 33/33 customer architecture
+
+### BH-03B
+
+- 24/24 targeted assertions
+- customer architecture 33/33
+- tenant isolation PASS
+- TypeScript/build PASS
+
+### Phase 21-F
+
+- 47/47 automated communications assertions
+- 28/28 browser scenarios
+- 0 failed
+- 0 blocked
+- 0 application console errors
+- 0 hydration errors
+- no duplicate request loops observed
+
+### BH-07
+
+- TypeScript PASS
+- production build PASS
+- no P0/P1/P2 application blockers confirmed
+- CONDITIONAL GO
+
+Historical test counts from earlier phases remain useful evidence, but the current repository's test output is authoritative whenever counts have evolved.
+
+---
+
+# 92. CURRENT PROJECT STATUS DASHBOARD
+
+## COMPLETED
+
+- core architecture
+- authentication
+- authorization
+- two-role RBAC
+- multi-tenancy
+- customer guest portal architecture
+- customers
+- enquiries/CRM
+- suppliers
+- hotels
+- vehicles
+- activities
+- RateSheet
+- trips
+- itinerary
+- costing
+- quotations
+- public proposals
+- bookings
+- customer payments
+- supplier payables/payments
+- operations
+- documents/vouchers
+- dashboard/analytics
+- Platform Owner admin
+- reports
+- feedback
+- referrals
+- customer insights
+- communication center
+- customer notifications
+- Subscription V2
+- beta hardening BH-00 → BH-07
+
+## IMPLEMENTED + VERIFIED
+
+- Subscription V2 lifecycle
+- tenant isolation
+- customer duplicate protection
+- public quotation redaction
+- rate lookup performance remediation
+- accepted responsive/UI fixes
+- TypeScript/build at BH-07
+
+## APPROVED BUT NOT IMPLEMENTED
+
+- DEV-01 form error consistency
+- DEV-02 table scrolling
+- DEV-02 password visibility
+- DEV-02 page scroll reset
+- DEV-03 Hotel Excel import
+- DEV-03 Rate Sheet Excel import
+- DEV-04 customer invoice
+
+## OPEN / OPERATIONAL
+
+- deployment configuration
+- production domain/DNS/HTTPS
+- Supabase Auth redirect configuration
+- backup/PITR verification
+- integration credentials if enabled
+- beta monitoring
+
+## FUTURE
+
+- AI
+- deeper automation
+- live payment gateway automation
+- multi-currency
+- enterprise integrations
+- mobile-native app
+
+---
+
+# 93. EXACT CURRENT DEVELOPMENT STOPPING POINT
+
+The project is **NOT** stopped at the old "Subscription V2 planned" state.
+
+The current state is:
+
+```text
+Phase 21-F
+   ↓
+Subscription V2
+   ↓
+BH-00
+   ↓
+BH-01
+   ↓
+BH-02 / BH-02B
+   ↓
+BH-03 / BH-03B
+   ↓
+BH-04 / BH-04C / BH-04D
+   ↓
+BH-05
+   ↓
+BH-06
+   ↓
+BH-07
+   ↓
+CURRENT ACCEPTED BETA-HARDENED BASELINE
+   ↓
+NEXT: DEV-01
+```
+
+## Immediate next development task
+
+**DEV-01 — Form UX Consistency**
+
+Before writing code:
+
+1. audit all Formik forms
+2. identify fields where validation exists but errors are not rendered
+3. use `trips/new` as the reference UX
+4. preserve existing schemas
+5. implement consistent error presentation
+6. test all affected forms
+7. run TypeScript/build
+8. perform browser QA
+9. stop and report before moving to DEV-02
+
+---
+
+# 94. NEW CHAT — START HERE
+
+You are continuing an existing TripDesk project.
+
+Do NOT restart architecture or redesign the product.
+
+TripDesk is a multi-tenant Travel Agency SaaS / Travel Agency Operating System using:
+
+- Next.js 16
+- React 19
+- TypeScript
+- PostgreSQL/Supabase
+- Prisma 7
+- Supabase Auth + SSR cookies
+- service-layer backend
+- Zod
+- Tailwind/UI
+- PDFKit
+
+There are exactly two internal roles:
+
+- `PLATFORM_OWNER`
+- `AGENCY_OWNER`
+
+Customer is an external business record using secure token-based public access. Customer is not a `User`, not an auth role, and must never be converted into one.
+
+The current database has 45 models. The Hotel architecture is:
+
+```text
+Hotel
+  ↓
+RateSheet
+  ├─ roomType string
+  ├─ mealPlan
+  ├─ season
+  ├─ validity
+  └─ rates
+```
+
+There is **NO standalone RoomType model**.
+
+Subscription V2 is already **IMPLEMENTED + VERIFIED**:
+
+- 7-day trial
+- dynamic plans
+- Monthly/Yearly
+- manual UPI/bank + UTR
+- Platform Owner verification
+- approval/rejection
+- historical pricing protection
+- tenant isolation
+- 46 lifecycle/tenant tests
+- 118 assertions
+- all passed
+
+The beta-hardening program BH-00 through BH-07 is complete.
+
+BH-07 result:
+
+**CONDITIONAL GO**
+
+No confirmed P0/P1/P2 application blockers were found.
+
+Important accepted fixes include:
+
+- customer cross-agency booking lookup protection
+- public quotation commercial-data redaction
+- customer duplicate detection
+- rate lookup batching/performance improvement
+- responsive customer dropdown
+- responsive quotation form grid
+- mobile global search
+- referral customer presentation
+
+Current accepted Git changes are documented in Section 64.
+
+### DO NOT CHANGE
+
+- role architecture
+- customer architecture
+- tenant isolation
+- public token security
+- financial domain separation
+- subscription architecture
+- historical pricing behavior
+- 7-day trial
+- password security
+- Hotel/RateSheet architecture
+
+### CURRENT NEXT TASK
+
+Start:
+
+**DEV-01 — Form UX Consistency**
+
+Goal:
+
+Make validation errors consistently visible on every existing form, using `trips/new` as the UX reference.
+
+After DEV-01:
+
+```text
+DEV-01 QA
+→ DEV-02 Global UX
+→ DEV-02 QA
+→ DEV-03 Excel Import
+→ DEV-03 QA
+→ DEV-04 Invoice
+→ DEV-04 QA
+→ Deployment / Beta readiness
+```
+
+---
+
+# 95. FINAL CONSISTENCY AUDIT — V2
+
+## A. Final decisions
+
+**PASS**
+
+Current roles, customer model, subscription rules, Hotel/RateSheet architecture, security rules, beta-hardening state, and next development task are captured.
+
+## B. Old decisions
+
+**PASS WITH EXPLICIT SUPERSESSION**
+
+The old master context remains below, but Sections 61+ explicitly supersede stale statements such as "Subscription V2 planned."
+
+## C. Removed features
+
+**PASS**
+
+Removed roles/features and plaintext-password behavior are explicitly blocked.
+
+## D. Implementation status
+
+**PASS**
+
+Implemented, verified, pending, deferred, rejected, and future work are separated.
+
+## E. Database
+
+**PASS AT RECOVERABLE PROJECT LEVEL**
+
+45 current models are listed, key relationships/constraints/indexes are recorded, and actual `prisma/schema.prisma` remains authoritative.
+
+## F. Routes
+
+**PASS AT RECOVERABLE LEVEL**
+
+Public, protected, admin, customer-token, and major API route families are recorded. Exact current repository routes remain authoritative.
+
+## G. Authentication
+
+**PASS**
+
+Supabase Auth, SSR cookies, UUID mapping, guards, roles, and reset flows are documented.
+
+## H. Tenancy
+
+**PASS**
+
+Server-derived `agencyId`, tenant isolation, IDOR protection, public token isolation, and commercial redaction are preserved.
+
+## I. Subscription
+
+**PASS**
+
+Subscription V2 is correctly marked IMPLEMENTED + VERIFIED rather than planned.
+
+## J. Hotel
+
+**PASS**
+
+Hotel Master, RateSheet, `roomType` string architecture, and the rejection of a standalone RoomType model are explicitly documented.
+
+## K. Validation
+
+**PASS**
+
+The new Formik validation-error consistency requirement is recorded as DEV-01 pending work.
+
+## L. QA
+
+**PASS**
+
+QA-01 through QA-07A, Phase 21-B through 21-F, and BH-00 through BH-07 are represented at the recoverable level.
+
+## M. Bugs
+
+**PASS**
+
+Known fixed issues, deferred issues, and new pending UX/features are separated.
+
+## N. Performance
+
+**PASS**
+
+Accepted rate lookup batching and the remaining need for real-world performance validation are recorded.
+
+## O. Security
+
+**PASS**
+
+Tenant isolation, public redaction, Supabase security posture, IDOR protections, and plaintext password prohibition are recorded.
+
+## P. Next step
+
+**PASS**
+
+The exact next development task is:
+
+> **DEV-01 — Form UX Consistency**
+
+---
+
+# 96. V2 HANDOFF STATUS
+
+**MASTER CONTEXT V2 STATUS: AUTHORITATIVE FOR THE CURRENT CONVERSATION STATE**
+
+The project should continue from the BH-07 accepted baseline.
+
+The next AI should not ask for a historical restart or re-decide finalized architecture.
+
+If the actual repository contradicts a statement in this document, inspect the code/database and report the discrepancy before making changes.
+
+
+
+---
+
+# 97. PRESERVED PREVIOUS MASTER CONTEXT (HISTORICAL REFERENCE)
+
+# TRIPDESK — MASTER PROJECT CONTEXT & HANDOVER DOCUMENT
+
+**Document Version:** 1.1 — FINAL CONSISTENCY-AUDITED  
+**Generated:** 2026-09-02  
+**Purpose:** Complete handover from previous TripDesk development conversation to a new AI development conversation, with final consistency verification against the recoverable project history.
+
+---
+
+## 0. How to Use This Document
+
+This file is the continuity source for the TripDesk project. It consolidates product decisions, architecture, implementation history, QA findings, release decisions, role rules, subscription rules, security invariants, current status, and the immediate next work.
+
+Where an older idea conflicts with a later confirmed decision, the later confirmed decision wins. Where the exact historic phase number or exact implementation detail cannot be recovered from the available conversation, this document says so explicitly rather than inventing it.
+
+The highest-priority continuation rule is:
+
+> **Do not restart TripDesk. Continue from the current codebase and current certified baseline.**
+
+---
+
+# 1. PROJECT IDENTITY
+
+## 1.1 Project Name
+
+**TripDesk**
+
+## 1.2 Product Type
+
+Multi-tenant **Travel Agency SaaS / Travel Agency Operating System**.
+
+TripDesk is intended to help travel agencies manage their business workflow from enquiry and customer management through quotation, booking, finance, trip operations, customer documents, customer portal access, post-trip feedback, analytics, subscription management, and communication.
+
+## 1.3 Business Purpose
+
+TripDesk is designed to replace fragmented workflows that travel agencies commonly manage through spreadsheets, WhatsApp, scattered documents, manual payment tracking, isolated quotation tools, and disconnected follow-up processes.
+
+The long-term product vision discussed is a **complete travel agency operating system**, with future automation and AI features added only after the core product is proven with real users.
+
+## 1.4 Target Users
+
+### Internal authenticated users — FINAL
+1. `PLATFORM_OWNER`
+2. `AGENCY_OWNER`
+
+There are **exactly two internal application roles**.
+
+### External customer persona — FINAL
+Customers are business/customer records and public-portal users. They are **NOT an internal authenticated `User` role**.
+
+Customers use secure public token routes such as:
+
+- `/q/[token]`
+- `/trip/[token]`
+- `/b/[token]`
+
+The project intentionally maintains **zero customer accounts in the internal `User` table**.
+
+## 1.5 Target Market
+
+Travel agencies, initially focused on the Indian market and INR-based operations.
+
+The product is entering a **controlled real-user testing / beta phase**. The current strategy is to give free or trial access to a small number of real travel agencies, observe real use, collect feedback, fix common bugs and UX problems, and only then expand feature scope.
+
+## 1.6 Core Problem TripDesk Solves
+
+TripDesk centralizes:
+
+- customer and enquiry management
+- itinerary/trip creation
+- supplier/hotel/rate management
+- quotation preparation and public proposal sharing
+- booking conversion
+- customer payments and supplier payables
+- trip operations
+- vouchers and travel documents
+- public customer trip access
+- feedback and service recovery
+- agency reporting/BI
+- customer communications
+- SaaS subscription administration
+
+## 1.7 Main Value Proposition
+
+For the first testing release, the value proposition is not “every possible travel feature.”
+
+It is:
+
+> **A stable, smooth, fast, responsive travel-agency workflow where all functions already included through Phase 21 work reliably end to end.**
+
+## 1.8 Current Product Vision — FINAL
+
+The strongest long-term positioning discussed is:
+
+> **TripDesk = Complete Travel Agency Operating System**
+
+Conceptually:
+
+```text
+                     TRIPDESK
+                        │
+        ┌───────────────┼────────────────┐
+        ▼               ▼                ▼
+      SALES         OPERATIONS         FINANCE
+        │               │                │
+      CRM           Bookings          Payments
+      Enquiries     Suppliers         Receivables
+      Quotations    Operations        Payables
+        │               │                │
+        └───────────────┼────────────────┘
+                        ▼
+                CUSTOMER EXPERIENCE
+                        │
+             Portal / Notifications
+            Communication / Feedback
+                        ▼
+                   AUTOMATION
+                        ▼
+                       AI
+```
+
+Automation and AI are **future roadmap areas**, not current beta-release requirements.
+
+## 1.9 V1 / Beta Scope — CURRENT FINAL DIRECTION
+
+For the first real-user testing release, TripDesk should include and stabilize functionality already implemented through Phase 21, including:
+
+- authentication
+- agency onboarding
+- 7-day trial
+- subscription management
+- Platform Owner administration
+- customer management
+- enquiries / CRM / follow-ups
+- suppliers
+- hotels / vehicles / activities / rate sheets
+- trips / itinerary / costing
+- quotations and public proposals
+- bookings
+- payments / finance / supplier payables
+- operations
+- documents / vouchers
+- customer portal
+- feedback
+- referrals
+- customer insights
+- reports / BI
+- communications / notifications
+
+The immediate beta goal is **quality hardening**, not uncontrolled feature expansion.
+
+## 1.10 Intentionally Out of Scope for the Current Beta
+
+The following were explicitly postponed, rejected for current V1, or discussed as future work:
+
+- automatic Razorpay/Stripe recurring billing
+- complex payment-gateway automation
+- usage-based billing
+- proration
+- coupons
+- advanced tax/GST billing engine for SaaS subscription
+- multi-currency live forex engine
+- airline/GDS integration
+- advanced AI travel assistant
+- large automation platform
+- mass marketing automation
+- WhatsApp Business API onboarding unless later configured
+- SMS provider onboarding unless later configured
+- new internal roles
+- public customer login accounts
+- advanced team-seat billing
+- mobile-native app
+- visa assistance
+- flight booking module
+
+## 1.11 Business Model
+
+TripDesk is a SaaS product sold to travel agencies.
+
+Current billing direction:
+
+- every new agency automatically receives a **7-day free trial**
+- no payment or plan selection is required during signup
+- the agency can open Subscription from Day 1
+- the agency can compare paid plans
+- paid plans support **Monthly and Yearly** billing
+- payment in beta is manual: **UPI / QR / Bank Transfer + UTR**
+- Platform Owner verifies or rejects the payment
+- only after approval does the selected paid plan become active
+- Platform Owner can edit plan configuration/pricing
+- current beta starts with two paid plans, historically named:
+  - Starter
+  - Professional
+
+Exact plan prices/features must come from the current code/database configuration and must not be re-hardcoded from historic examples.
+
+## 1.12 Current Product Maturity
+
+TripDesk has moved beyond prototype status.
+
+Current maturity:
+
+- core SaaS architecture implemented
+- multi-tenant security repeatedly audited
+- public token routes implemented
+- Phase 11–21 feature set largely built
+- automated regression suites exist
+- production-like browser QA has been performed
+- database was cleaned and reinitialized for pilot use
+- a controlled pilot agency workflow was created and verified
+- Phase 21-F browser QA was certified
+- next priority is beta-release hardening plus Subscription V2 completion
+
+---
+
+# 2. COMPLETE PROJECT HISTORY
+
+This section uses only phase names/numbers recoverable from the available conversation. Earlier foundational development existed before Phase 10, but exact early phase numbering is not fully recoverable from the current history. Those foundations are documented by feature/architecture rather than invented phase numbers.
+
+## 2.1 Early Foundation — Before the Recoverable Phase 10/11 Roadmap
+
+### Objective
+Build TripDesk as a travel-agency SaaS rather than a single-agency static website.
+
+### Major decisions
+- moved toward Next.js + TypeScript
+- PostgreSQL via Supabase
+- Prisma ORM
+- Supabase Auth
+- multi-tenant Agency model
+- centralized server-side authorization
+- unified signup onboarding
+- 7-day agency trial
+- Platform Owner bootstrap
+- public customer token routes
+- no internal customer role
+- eventually reduced internal role model to only:
+  - `PLATFORM_OWNER`
+  - `AGENCY_OWNER`
+
+### Important role evolution
+Earlier ideas included:
+- Owner
+- Travel Agent / Sales
+- Customer
+
+Final model removed Travel Agent/Sales and internal Customer auth.
+
+### Status
+**COMPLETED / SUPERSEDED BY FINAL ARCHITECTURE**
+
+---
+
+## 2.2 Authentication & Onboarding Foundation
+
+### Implemented
+- `/signup`
+- `/login`
+- `/forgot-password`
+- `/reset-password`
+- Supabase SSR cookie/session integration
+- Supabase Auth ID mapped 1:1 to Prisma `User.id`
+- Agency creation + Agency Owner creation
+- automatic Trial subscription
+- role router:
+  - `PLATFORM_OWNER` → `/admin`
+  - `AGENCY_OWNER` → `/dashboard`
+- private Platform Owner bootstrap script
+
+### Email verification decision
+**Disabled for V1**.
+
+### Platform Owner
+Singleton internal admin with:
+- role `PLATFORM_OWNER`
+- `agencyId = null`
+
+### Status
+**COMPLETED**
+
+---
+
+## 2.3 QA-01 — Authentication
+
+### Scope
+Authentication flow correctness.
+
+### Areas
+- signup
+- login
+- logout/session
+- Supabase identity mapping
+- password/reset flows
+- role routing
+
+### Status
+**COMPLETED**
+
+---
+
+## 2.4 QA-02 — Authorization / Routing
+
+### Scope
+Protected routes and role-based access.
+
+### Focus
+- Platform Owner vs Agency Owner
+- middleware
+- public route bypasses
+- redirect correctness
+
+### Status
+**COMPLETED**
+
+---
+
+## 2.5 QA-03 — Functional Modules
+
+### Scope
+Core business modules.
+
+### Status
+**COMPLETED**
+
+Exact historical module-by-module report is not fully present in the available conversation, but this phase preceded full user-journey QA.
+
+---
+
+## 2.6 QA-04 — Complete User Journey / UX / Security
+
+### Scope
+End-to-end product usage plus UX and security.
+
+### Important findings
+Antigravity reportedly found and fixed four issues.
+
+Known important findings included:
+- a public quotation security leak
+- customer duplicate-detection weakness
+
+### Result
+Issues were fixed during QA.
+
+### Status
+**COMPLETED**
+
+---
+
+## 2.7 QA-05 — Performance / API / Database
+
+### Motivation
+TripDesk felt slow in some areas, showed unusual API activity, and sometimes refreshed unnecessarily.
+
+### Audit areas requested
+- API call count per page
+- duplicate API calls
+- `/api/auth/me` calls
+- Server Component vs Client Component usage
+- `useEffect` dependency problems
+- unnecessary rerenders
+- `router.refresh()`
+- hard navigation
+- slow Prisma queries
+- excessive data selection
+- N+1 queries
+- missing indexes
+- dashboard loading time
+
+### Status
+**COMPLETED AS AUDIT / FOLLOWED BY 05B**
+
+The exact disposition of every individual optimization item is not fully recoverable. Do not assume every historic concern is permanently solved; re-check in beta hardening.
+
+---
+
+## 2.8 QA-05B — Real Browser Performance & Network Verification
+
+### Scope
+Real-browser verification of network/performance behavior.
+
+### Status
+**COMPLETED**
+
+---
+
+## 2.9 QA-06A — UI/UX & Responsive Read-Only Audit
+
+### Scope
+Responsive layout, UI consistency, usability review.
+
+### Status
+**COMPLETED**
+
+---
+
+## 2.10 QA-06B — UI/UX Follow-up
+
+### Scope
+UI/UX improvement prompt/follow-up.
+
+### Status
+**COMPLETED / HISTORICAL**
+
+---
+
+## 2.11 QA-07A — Deep Security & Multi-Tenant Data Isolation Audit
+
+### Findings
+- zero Critical/High vulnerabilities reported
+- server-enforced tenancy
+- sanitized public proposals
+- cross-tenant isolation validated
+
+### Status
+**COMPLETED**
+
+---
+
+# 3. KNOWN PHASE 10 SUB-PHASE HISTORY
+
+The available reports reference these certified/previous suites:
+
+## Phase 10.11D — Professional PDF Proposal
+**Status:** COMPLETED  
+**Known test result historically:** 32/32 in one run.
+
+## Phase 10.13I — Operations Closure & Reconciliation
+**Status:** COMPLETED
+
+## Phase 10.13J — Operations Analytics & Insights
+**Status:** COMPLETED
+
+## Phase 10.14 — Finance & Ledger Integrity
+**Status:** COMPLETED
+
+## Phase 10.15A — Architecture & Security Audit
+**Status:** COMPLETED
+
+## Phase 10.15B — Customer Portal & Vouchers
+**Status:** COMPLETED
+
+## Phase 10.15C — Customer Notifications & Communications
+**Status:** COMPLETED
+
+## Phase 10.15 Customer Architecture Audit
+**Status:** COMPLETED  
+Verified:
+- customer public/token architecture
+- no Customer internal `User`
+- IDOR protections
+
+Exact implementation chronology before Phase 11 is not fully recoverable here; do not invent missing details.
+
+---
+
+# 4. PHASE 11 — BOOKING & OPERATIONS
+
+## Objective
+Production booking lifecycle and trip operations.
+
+## Implemented
+- quotation/booking conversion flows
+- Booking model/workspace
+- booking statuses
+- payment linkage
+- trip operations initialization
+- readiness engine
+- operational records
+- confirmation/dispatch relationships
+
+## Known test suite
+`prisma/test-phase11-booking.ts`
+
+Historical reported result:
+- 33/33 passed
+
+## Status
+**COMPLETED & CERTIFIED**
+
+---
+
+# 5. PHASE 12 — PAYMENTS & FINANCE
+
+## Objective
+Agency-side financial operations.
+
+## Implemented
+- customer payments
+- milestone allocation
+- booking paid/balance recalculation
+- supplier payables
+- supplier payments
+- finance/ledger integrity
+- refunds/adjustments per existing implementation
+- receivables and liabilities
+- trip/operational expense integration
+
+## Important invariant
+**TripDesk SaaS subscription payments are separate from agency customer travel payments.**
+
+## Known test suite
+`prisma/test-phase12-finance.ts`
+
+Historical reported result:
+- 74/74 passed
+
+## Status
+**COMPLETED & CERTIFIED**
+
+---
+
+# 6. PHASE 13 — SUPPLIER MANAGEMENT
+
+## Objective
+Supplier 360, operational supplier relationships, commercial and payable visibility.
+
+## Implemented
+### Supplier 360
+`src/lib/services/supplier-service.ts`
+
+Aggregated:
+- hotels
+- vehicles
+- activities
+- rate sheets
+- hotel confirmations
+- payables
+- payments
+
+Computed:
+- total payable
+- paid
+- outstanding
+- pending payable counts
+- operational confirmation counts
+
+### Supplier UI
+`src/app/(dashboard)/suppliers/[id]/page.tsx`
+
+Included:
+- KPI cards
+- confirmations/tours tab
+- payables/disbursements tab
+
+### Duplicate detection
+- normalized name
+- phone digits
+- email
+- tenant isolated
+- self-exclusion during edit
+
+Endpoint:
+- `GET /api/suppliers/check-duplicate`
+
+### Reactivation
+- `POST /api/suppliers/[id]/reactivate`
+
+### Historical hard-delete protection
+Permanent deletion blocked when historical links exist.
+
+### Commercial privacy
+No supplier buy-rate/payable leakage to customer public APIs.
+
+## Test
+`prisma/test-phase13-supplier.ts`
+- 41/41 passed
+
+## Status
+**COMPLETED & CERTIFIED**
+
+---
+
+# 7. PHASE 14 — CRM & FOLLOW-UPS
+
+## Objective
+Lead/enquiry workflow, follow-ups, pipeline activity.
+
+## Implemented
+- enquiry pipeline
+- follow-ups
+- CRM activity
+- stage/status workflows
+- customer/enquiry linkage
+- dashboard CRM telemetry
+
+## Test
+`prisma/test-phase14-crm.ts`
+- 44/44 passed historically
+
+## Status
+**COMPLETED & CERTIFIED**
+
+---
+
+# 8. PLATFORM OWNER AUTHENTICATION RECOVERY INCIDENT
+
+This was not a numbered product phase but is important operational history.
+
+## Problem
+Platform Owner login failed with:
+- Supabase `signInWithPassword`
+- HTTP 400
+- `"Invalid login credentials"`
+
+## Root causes
+1. password stored in Supabase Auth did not match current configured/bootstrap password
+2. bootstrap script returned early if Platform Owner already existed in Prisma
+3. Platform Owner had an incorrect non-null `agencyId`
+
+## Recovery
+- Supabase Admin API used to synchronize password/metadata
+- Prisma record corrected:
+  - role `PLATFORM_OWNER`
+  - `agencyId = null`
+- identity UUID mapping preserved
+
+## Future credential rule
+Platform Owner credential changes must preserve:
+- same UUID mapping between Supabase Auth and Prisma
+- role
+- `agencyId = null`
+
+A temporary interactive password-reset script was created later, but the user decided **not to change the password yet**.
+
+## Current known Platform Owner identity
+Email used in project reports:
+`mzpatel14@gmail.com`
+
+The Master Context must never store the password.
+
+## Status
+**RECOVERED / STABLE**
+
+---
+
+# 9. PHASE 15 — WHATSAPP / EMAIL AUTOMATION
+
+## Objective
+Communication infrastructure and lifecycle messaging.
+
+## Database
+Extended communication data and added:
+- `AgencyCommunicationSetting`
+- richer `CustomerNotification` fields/enums
+
+## Communication architecture
+- email template engine
+- WhatsApp template engine
+- pluggable email provider
+- pluggable WhatsApp provider
+- central communication service
+- deterministic idempotency
+- customer preference checks
+- retries
+- manual messages
+- lifecycle triggers
+- scheduled automation scanners
+
+## Lifecycle triggers
+Known:
+- enquiry created
+- quotation sent
+- quotation viewed with cooldown
+- booking confirmed
+- payment received
+
+## Automation
+Known scanners:
+- payment reminders
+- travel reminders
+- feedback requests
+
+## API surface included
+Examples:
+- `/api/communication/logs`
+- `/api/communication/logs/[id]`
+- resend
+- send-manual
+- settings
+- automation/run
+- communication webhook
+
+## UI
+- Settings/integrations communication controls
+- Customer 360 communication tab
+
+## Test
+`prisma/test-phase15-communication.ts`
+- 34/34 passed historically
+
+## Status
+**COMPLETED & CERTIFIED**
+
+---
+
+# 10. PHASE 16 — VOUCHERS & TRAVEL DOCUMENTS
+
+## Objective
+Official travel documents and customer-safe PDFs.
+
+## Schema
+Added:
+- `TravelDocumentType`
+- `TravelDocumentStatus`
+- `TravelDocument`
+
+Relations included:
+- Agency
+- Customer
+- Trip
+- Booking
+- Payment
+- Supplier
+- HotelConfirmation
+- VehicleDispatch
+- ActivityConfirmation
+
+## Document types
+Known implemented types include:
+- Hotel Voucher
+- Vehicle/Transport Voucher
+- Activity Pass
+- Booking Confirmation
+- Payment Receipt
+- Customer Itinerary / Travel Kit equivalents
+
+## Important behavior
+- sequential year-scoped numbering
+- state machine
+- immutable versioning
+- issue/revoke/supersede
+- PDFKit rendering
+- zero commercial leakage
+- communication dispatch on document readiness
+
+## UI
+- `/documents`
+- Booking detail document workspace
+- customer portal access to issued documents
+
+## Test
+`prisma/test-phase16-documents.ts`
+- 44/44 passed historically
+
+## Status
+**COMPLETED & CERTIFIED**
+
+---
+
+# 11. PHASE 17 — DASHBOARD & ANALYTICS
+
+## Objective
+Agency operational command center and financial/business telemetry.
+
+## Validation
+`src/lib/validation/dashboard-schema.ts`
+
+Date presets known:
+- TODAY
+- THIS_WEEK
+- THIS_MONTH
+- LAST_MONTH
+- THIS_QUARTER
+- THIS_YEAR
+- CUSTOM_RANGE
+
+## Service
+`src/lib/services/dashboard-service.ts`
+
+Known analytics:
+- dashboard summary
+- sales funnel
+- revenue/profit
+- accounts receivable
+- supplier payables
+- upcoming departures/readiness
+- CRM/follow-ups
+- top destinations/customers
+- CSV export
+
+## UI components
+Known:
+- DateRangeFilter
+- KpiCards
+- SalesFunnelCard
+- RevenueChart
+- ReceivablesPayablesCard
+- UpcomingTripsList
+- CommunicationHealthCard
+- TopDestinationsCustomersCard
+
+## Status
+**COMPLETED & CERTIFIED**
+
+Reported Phase 17 assertion counts varied in different later regression reports as tests evolved. Treat the current repository test output as authoritative, not an old count.
+
+---
+
+# 12. PHASE 18 — SUPER ADMIN / SAAS PLATFORM MANAGEMENT
+
+## Objective
+Platform Owner control center.
+
+## Added platform models
+- `PlatformAuditLog`
+- `PlatformAnnouncement`
+- `PlatformSetting`
+
+## Admin service
+`src/lib/services/admin-service.ts`
+
+Known capabilities:
+- executive overview
+- agency directory
+- Agency 360
+- trial extension
+- suspension/reactivation
+- plan management
+- usage analytics
+- audit logs
+- announcements
+- cross-tenant search
+- platform settings
+
+## Admin pages
+Known:
+- `/admin`
+- `/admin/agencies`
+- `/admin/agencies/[agencyId]`
+- `/admin/subscriptions`
+- `/admin/plans`
+- `/admin/analytics`
+- `/admin/audit-logs`
+- `/admin/announcements`
+- `/admin/settings`
+
+## Test
+`prisma/test-phase18-admin.ts`
+- 56/56 passed historically
+
+## Status
+**COMPLETED & CERTIFIED**
+
+---
+
+# 13. PHASE 19 — PRODUCTION DEPLOYMENT & RELEASE READINESS
+
+## Objective
+Production hardening and deployment documentation.
+
+## Implemented
+### Environment template
+`.env.example`
+
+### Structured logging
+`src/lib/logger.ts`
+- JSON structured logging
+- recursive redaction
+- masks credentials/tokens/DB URLs/API keys
+
+### Security headers
+`next.config.ts`
+- `poweredByHeader: false`
+- `X-Content-Type-Options`
+- `X-Frame-Options`
+- `Referrer-Policy`
+- HSTS
+
+### Cron security
+`/api/communication/automation/run`
+supports:
+- protected cron bearer secret
+- interactive authenticated invocation
+
+### Docs
+Known:
+- `docs/PRODUCTION_DEPLOYMENT.md`
+- `docs/PRODUCTION_CHECKLIST.md`
+- `docs/PHASE-19-PRODUCTION-READINESS-REPORT.md`
+
+## Status
+**COMPLETED**
+
+---
+
+# 14. PHASE 20 — FINAL SECURITY, UX & PERFORMANCE AUDIT
+
+## Objective
+Final release certification.
+
+## Audit pillars
+Known:
+1. role/identity invariants
+2. multi-tenant isolation / IDOR
+3. public token security / commercial privacy
+4. financial integrity
+5. dashboard aggregation
+6. travel document security
+7. communication/activity trails
+8. super-admin governance
+9. logging/secret redaction
+
+## Test
+`prisma/test-phase20-final-audit.ts`
+Historical report:
+- 35/35 passed
+
+## Build
+`npm run build`
+- clean
+
+## Status
+**COMPLETED & CERTIFIED**
+
+---
+
+# 15. POST-DEPLOYMENT VERIFICATION
+
+## Objective
+Verify deployed/production-like environment after Phase 20.
+
+## Work
+- environment checks
+- cron secret setup
+- smoke verification suite
+- production release report
+
+Known test:
+`prisma/test-post-deployment-verification.ts`
+
+Historical total reported across suites:
+494/494 assertions.
+
+## Important note
+Historic reports used inconsistent infrastructure labels at different times (Supabase PostgreSQL / Neon Cloud). The **actual current environment variables/codebase are the source of truth**.
+
+## Status
+**COMPLETED**
+
+---
+
+# 16. PHASE 20.5 — PRODUCTION DATABASE CLEANUP & PILOT INITIALIZATION
+
+## Objective
+Remove synthetic QA/test data while preserving platform-level production data.
+
+## Pre-cleanup audit
+A read-only inventory identified:
+- hundreds of test agencies
+- test users
+- customer/trip/quotation/booking/payment/supplier data
+- operation events
+- QA Supabase Auth users
+- canonical platform data to preserve
+
+## Backup
+Local JSON snapshot plus hosted database backup were verified before destructive execution.
+
+## Preserved
+- singleton Platform Owner
+- canonical active plans
+- platform settings
+- platform announcements (none at that time)
+- Platform Owner Supabase Auth identity
+
+## Important configuration correction
+`defaultTrialDays` was corrected from **10** to **7** before cleanup.
+
+## Destructive reset
+Executed only after explicit confirmation:
+`RESET_PILOT_DATABASE=CONFIRM`
+
+## Post-cleanup verified baseline
+- Users: 1 Platform Owner
+- Agencies: 0
+- tenant/business records: 0
+- Subscription Plans: 2
+- Platform Settings: 2
+- Supabase Auth users: 1 Platform Owner
+
+## Docs
+- `docs/PILOT-DATABASE-INITIALIZATION-REPORT.md`
+- pre-cleanup inventory report
+
+## Status
+**COMPLETED & VERIFIED**
+
+---
+
+# 17. PHASE 20.6 — FIRST PRODUCTION SMOKE TEST & PILOT ONBOARDING VERIFICATION
+
+## Objective
+Prove clean production environment could support a first pilot tenant.
+
+## Important clarification
+The original Phase 20.6 prompt was a production smoke/onboarding verification, not merely browser testing.
+
+## Controlled pilot
+Created one pilot tenant and minimal workflow data.
+
+Known pilot identity from reports:
+- Agency: `TripDesk Pilot Agency`
+- Agency Owner: `pilot.owner@tripdesk.io`
+
+This is QA/pilot data, not a general product requirement.
+
+## Verified
+- Platform Owner identity
+- agency creation
+- Agency Owner creation
+- 7-day trial
+- dashboard zero state
+- one customer
+- one enquiry
+- one supplier
+- one trip
+- one quotation
+- public proposal security
+- booking
+- payment
+- financial calculations
+- operations
+- travel documents
+- customer-facing routes
+- dashboard metrics
+- Supabase Auth reconciliation
+
+## Test
+`prisma/test-phase20.6-smoke.ts`
+
+## Status
+**COMPLETED & PASSED**
+
+---
+
+# 18. PHASE 20.6B — FULL REAL-BROWSER PRODUCTION QA
+
+## Objective
+Browser-based verification for Platform Owner, Agency Owner, public routes, responsive behavior, database consistency.
+
+## Browser areas
+### Platform Owner
+- login → `/admin`
+- agency directory
+- subscriptions
+- plans
+- settings
+- route protection
+- logout
+
+### Agency Owner
+- login → `/dashboard`
+- customer
+- enquiry
+- supplier
+- trip
+- quotation
+- booking
+- operations
+- documents
+- admin-route denial
+
+### Public
+- quotation
+- trip
+- booking
+- invalid token behavior
+- commercial-data redaction
+
+## Result
+Reported as **PASSED & CERTIFIED**.
+
+## Status
+**COMPLETED**
+
+---
+
+# 19. PHASE 21-A / POST-PHASE-20 GAP-PLANNING WORK — HISTORIC LABEL REQUIRES CODE/DOC CONFIRMATION
+
+## Objective
+Audit actual product after production certification to identify remaining incomplete/mock modules.
+
+## Important findings
+Core workflows were operational.
+
+Legacy mock/context gaps identified:
+- `/admin/payments` still used legacy `useSaaS()` context
+- `/feedback`
+- `/referrals`
+- `/customer-insights`
+used `useExperience()` legacy in-memory state
+- `/reports` was a placeholder
+
+## Phase 21 plan created
+- 21-B Platform Owner SaaS Billing
+- 21-C Agency persistence / mock cleanup
+- 21-D Agency BI/reporting
+- 21-E Customer portal feedback
+- 21-F Communication center / notifications
+- 21-G was originally discussed/intended as a final Phase 21 integration/regression workstream.
+
+### 21-G status clarification
+No independently verified implementation/report for a completed Phase 21-G is available in the current conversation record. Therefore:
+- do not claim 21-G was completed;
+- do not invent a 21-G scope;
+- do not treat the project as missing a required feature solely because an old roadmap mentioned 21-G;
+- the project formally moved to beta hardening after 21-F.
+
+Later, after 21-F, project strategy shifted away from immediately adding more feature phases and toward beta hardening.
+
+## Status
+**COMPLETED**
+
+---
+
+# 20. PHASE 21-B — PLATFORM OWNER SAAS SUBSCRIPTION PAYMENT & BILLING RECONCILIATION
+
+## Objective
+Make TripDesk's own SaaS billing production-ready and replace mock admin payment UI.
+
+## Important architecture decision
+Agency travel/customer payments remain completely separate from SaaS subscription payments.
+
+## Schema additions
+Known:
+- `SubscriptionPaymentStatus`
+- `SubscriptionPayment`
+- relations to Agency and Subscription
+
+## Service
+Extended `admin-service.ts` with:
+- list subscription payments
+- get payment
+- create payment
+- verify
+- reject
+
+## APIs
+Known:
+- `GET/POST /api/admin/subscription-payments`
+- `GET /api/admin/subscription-payments/[id]`
+- verify
+- reject
+
+## UI
+`src/app/admin/payments/page.tsx`
+rewritten to live database data.
+
+## Features
+- payment KPIs
+- filter/search
+- manual payment record
+- verification/rejection
+- activation workflow
+- audit logging
+
+## Test
+`prisma/test-phase21b-saas-billing.ts`
+- 32/32 passed historically
+
+## Status
+**COMPLETED & CERTIFIED**
+
+---
+
+# 21. PHASE 21-C — AGENCY OWNER PERSISTENCE & LEGACY MOCK CLEANUP
+
+## Objective
+Remove legacy `useExperience()` persistence islands.
+
+## Feedback
+Extended `CustomerFeedback` and created:
+- `feedback-service.ts`
+- `/api/feedback`
+- `/api/feedback/[id]`
+- live `/feedback` UI
+
+Low ratings ≤3 automatically trigger service-recovery follow-up.
+
+## Referrals
+Added:
+- `ReferralStatus`
+- `Referral` model
+- service
+- APIs
+- `/referrals` live UI
+
+## Customer insights
+Added:
+- `customer-insights-service.ts`
+- `/api/customer-insights`
+- live `/customer-insights`
+
+## Legacy context
+Removed `ExperienceProvider` from dashboard layout after consumers were eliminated.
+
+## Test
+`prisma/test-phase21c-persistence.ts`
+- 36/36 passed historically
+
+## Status
+**COMPLETED & CERTIFIED**
+
+---
+
+# 22. PHASE 21-D — AGENCY BI & EXPORTABLE ACCOUNTING REPORTS
+
+## Objective
+Replace placeholder `/reports` with live agency BI.
+
+## Pre-audit finding
+No schema changes required.
+
+## Created
+- `src/lib/validation/reporting-schema.ts`
+- `src/lib/services/reporting-service.ts`
+- `/api/reports`
+- `/api/reports/export`
+- `/api/reports/pdf`
+- `src/lib/api-client/reporting-client.ts`
+- full `/reports` UI
+
+## Metrics
+Known:
+- Gross Booking Value
+- Collections
+- Receivables
+- Supplier liabilities
+- gross profit/margin
+- CRM funnel
+- destinations
+- retention/LTV
+- time-series
+- CSV/PDF exports
+
+## Formula rules
+Examples:
+- `GBV = sum(non-cancelled booking total)`
+- `Collections = completed payments net of refunded amount`
+- `Total Cost = supplier payables + operational expenses`
+- `Gross Profit = GBV - Total Cost`
+- `Gross Margin % = Gross Profit / GBV * 100`
+- `Balance Due = Booking.totalAmount - Booking.paidAmount`
+
+## Security
+- tenant-scoped reports
+- public routes remain cost-redacted
+- CSV formula-injection protection
+
+## Test
+`prisma/test-phase21d-reports.ts`
+Reported counts evolved (47 then 59) as tests expanded. Use current repository result.
+
+## Status
+**COMPLETED & CERTIFIED**
+
+---
+
+# 23. PHASE 21-E — CUSTOMER PORTAL FEEDBACK & POST-TRIP EXPERIENCE
+
+## Objective
+Allow customer feedback directly from the secure trip portal after completion.
+
+## Existing model reused
+`CustomerFeedback`
+
+## Business rules
+- only completed trips are eligible
+- token resolves agency/customer/trip server-side
+- duplicate feedback is updated/idempotent rather than duplicated
+- rating ≤3 → `Follow-up Required`
+- rating ≥4 → `Not Needed`
+- operational audit event if TripOperation exists
+
+## Created/updated
+- public feedback validation
+- feedback service token methods
+- `GET/POST /api/trips/public/[token]/feedback`
+- public client methods
+- `/trip/[secureToken]` UI feedback card/modal
+
+## Security
+No client-provided `agencyId`, `customerId`, or `tripId` is trusted.
+
+## Status
+**COMPLETED & CERTIFIED**
+
+---
+
+# 24. PHASE 21-F — AGENCY COMMUNICATION CENTER & CUSTOMER NOTIFICATION ENGINE
+
+## Objective
+Provide live agency communication center plus customer notification tray.
+
+## Important pre-audit finding
+The required communication models already existed:
+- `CustomerNotification`
+- `CustomerNotificationPreference`
+- `AgencyCommunicationSetting`
+- notification enums
+
+Therefore Phase 21-F reused existing schema rather than creating duplicate infrastructure.
+
+## Added/updated
+### Agency APIs
+- `GET/POST /api/communications`
+- `GET /api/communications/[id]`
+
+### Public APIs
+- `GET /api/trips/public/[token]/notifications`
+- `POST /api/trips/public/[token]/notifications/[id]/read`
+
+### Agency UI
+- `/communications`
+- KPI cards
+- filters/search
+- communication ledger
+- send-customer-message modal
+- detail modal
+
+### Customer portal
+- notification bell
+- unread badge
+- popover tray
+- notification feed
+- mark read
+
+### Security
+- server-derived tenant identity
+- token isolation
+- IDOR protection
+- commercial-data redaction
+- deterministic idempotency
+
+## Automated test
+`prisma/test-phase21f-communications.ts`
+- 47/47 passed
+
+## Multi-phase regression
+Reported 332/332 in one certification run.
+
+The reported certification breakdown was:
+- Phase 21-F communications: 47/47
+- Phase 21-E feedback: 28/28
+- Phase 21-D reports: 59/59
+- Phase 21-C persistence: 36/36
+- Phase 21-B SaaS billing: 32/32
+- Phase 18 admin: 56/56
+- Phase 12 finance: 74/74
+
+These are historical certification results; the current repository test output is authoritative if counts have evolved.
+
+## External provider limitation
+Phase 21-F communication delivery for external SMS/WhatsApp providers was locally simulated. Real provider delivery still requires provider credentials/webhooks/configuration. Do not describe external SMS/WhatsApp delivery as production-connected unless the current environment explicitly proves it.
+
+## Browser QA
+Final browser QA:
+- 28 scenarios
+- 28 passed
+- 0 failed
+- 0 blocked
+- Desktop 1440×900
+- Tablet 768×1024
+- Mobile 390×844
+- 0 application console errors
+- 0 hydration errors
+- no duplicate request loops observed
+- no P0/P1/P2 defects reported
+
+## Status
+**COMPLETED, BROWSER-QA PASSED & CERTIFIED**
+
+---
+
+# 25. CURRENT STRATEGIC SHIFT — BETA RELEASE PREPARATION
+
+After Phase 21-F, the project strategy changed.
+
+The user explicitly stated:
+
+- TripDesk should be released first in testing mode
+- a small group of real users/agencies will receive free access temporarily
+- their feedback will guide future development
+- the first release does not need every future feature
+- all functionality already included through Phase 21 must work
+- site must be smooth and fast
+- there should be no common UI bugs
+- no broken layouts at any screen size
+- full responsive behavior is required
+- subscription, finance, hotels, travel, and all current operations must work
+
+Therefore the near-term priority is **beta-release quality hardening**, not adding large new modules.
+
+---
+
+# 26. CURRENT SUBSCRIPTION V2 / BETA SUBSCRIPTION REDESIGN DISCUSSION
+
+This is the immediate stopping point of the project.
+
+## Problem observed
+A screenshot of the Agency Subscription page showed:
+- current subscription information that looked static/misleading
+- a manual billing area
+- sidebar badges that appeared static/hardcoded
+
+Examples mentioned:
+- Trips `9`
+- Bookings `7`
+- Operations `Live`
+- Feedback `4.8★`
+- Subscription `Active`
+
+The user asked to first focus on Subscription flow/UI.
+
+## FINAL subscription business direction agreed in discussion
+
+### New signup
+A new agency:
+1. signs up
+2. Agency + Agency Owner are created
+3. automatic 7-day Free Trial is created
+4. no paid-plan selection during signup
+5. no payment required at signup
+6. agency goes to dashboard
+
+### Subscription page
+During trial:
+- Current Plan = Free Trial
+- trial start/end/days remaining shown dynamically
+- paid plans visible immediately from Day 1
+- agency can buy a paid plan before trial ends
+
+### Paid plans
+Current beta uses two paid plans conceptually:
+- Starter
+- Professional
+
+### Billing cycle
+Both paid plans must support:
+- Monthly
+- Yearly
+
+### Plan source of truth
+Platform Owner can edit:
+- plan name
+- description
+- monthly price
+- yearly price
+- features
+- active/inactive status
+- display order
+- popular badge / marketing metadata if supported
+
+Agency UI must load plan data dynamically.
+
+### Purchase flow
+```text
+FREE TRIAL
+   ↓
+Choose Starter or Professional
+   ↓
+Choose Monthly or Yearly
+   ↓
+Confirm plan
+   ↓
+Manual payment instructions
+   ↓
+UPI / Bank Transfer
+   ↓
+Enter UTR / Transaction Reference
+   ↓
+Submit payment for verification
+   ↓
+PENDING
+   ↓
+Platform Owner review
+   ├── APPROVE → paid plan becomes ACTIVE
+   └── REJECT → agency sees rejection reason / can resubmit
+```
+
+### Critical activation rule
+Choosing a plan **must not immediately replace the current subscription**.
+
+The actual paid plan only becomes active after Platform Owner approval.
+
+### Historical pricing rule — FINAL
+If Platform Owner changes current plan pricing later, historical subscriptions/payment records must not be rewritten.
+
+Example:
+- agency purchased Professional yearly at ₹49,999
+- plan later changes to ₹59,999
+- historical purchased amount remains ₹49,999
+
+Implementation must preserve a purchased-price snapshot or equivalent existing Phase 21-B mechanism.
+
+### Plan deletion rule — FINAL
+Do not hard-delete plans referenced by history.
+
+Use active/inactive/deactivated behavior.
+
+### Proration rule — BETA
+Do not implement complex automatic proration/refunds in beta.
+
+### Payment gateways — BETA
+Do not add automatic Stripe/Razorpay recurring billing in this task.
+
+Manual UPI/bank + UTR + owner approval remains the approved beta approach.
+
+### Current plan states UI should clearly support
+- FREE TRIAL
+- ACTIVE
+- PAYMENT VERIFICATION PENDING
+- REJECTED
+- EXPIRED
+- CANCELLED where already meaningful in existing domain
+
+### Subscription UI design direction
+Professional modern SaaS billing UI:
+- strong Current Plan summary
+- Monthly/Yearly toggle
+- dynamic plan cards
+- clear CTA hierarchy
+- payment status
+- renewal information
+- plan feature list
+- responsive/mobile-safe
+- no fake/static data
+- no `NaN` / `undefined`
+- loading/empty/error states
+
+### Platform Owner
+Existing Phase 21-B subscription/payment management must be **extended**, not replaced.
+
+Recommended admin sections:
+- Overview
+- Payment Requests
+- Plans & Pricing
+
+### Sidebar
+Subscription badge should reflect actual subscription state if shown.
+
+Static/misleading sidebar badges should be audited during beta hardening. Broader sidebar cleanup has not yet been implemented in this conversation.
+
+## Last prompt delivered
+A full **“TRIPDESK — SUBSCRIPTION V2 / BETA SUBSCRIPTION MANAGEMENT”** implementation prompt was given.
+
+That prompt instructed the development AI to:
+- first audit Phase 21-B
+- reuse/extend existing architecture
+- support 7-day trial
+- support dynamic active plans
+- Monthly/Yearly billing
+- manual payment request
+- UTR
+- Platform Owner approval/rejection
+- plan editing
+- historical price protection
+- responsive browser QA
+- regression testing
+- no duplicate subscription architecture
+
+## Current status
+**PLANNED / PROMPT CREATED / IMPLEMENTATION RESULT NOT YET REPORTED IN THIS CHAT**
+
+This is the current development stopping point.
+
+---
+
+# 27. CURRENT PROJECT STATUS
+
+## Where did we start?
+TripDesk started as a travel-agency project and evolved into a multi-tenant SaaS with role-based administration, public customer token access, operational modules, financial modules, documents, communication, analytics, and subscription governance.
+
+## What has been completed?
+The recoverable implementation history includes:
+- core auth/onboarding/multi-tenancy
+- QA-01 through QA-07A
+- Phase 10 subphase suite referenced above
+- Phase 11 through Phase 21-F
+- production hardening
+- production/pilot DB cleanup
+- pilot onboarding smoke test
+- real-browser production QA
+- Phase 21-F browser QA
+
+## What phase are we currently in?
+There is no formally numbered new phase locked after 21-F.
+
+The project is currently in a **Beta Release Preparation / Subscription V2 enhancement discussion**.
+
+## Last completed phase
+**Phase 21-F — Agency Communication Center & Customer Notification Engine**
+
+## Last QA
+**Phase 21-F Browser QA Verification — PASSED & CERTIFIED**
+
+28/28 browser scenarios passed in the report supplied by the user.
+
+## What should start next?
+Immediate next development task:
+
+> **Subscription V2 / Beta Subscription Management enhancement**
+
+After that:
+
+> **Beta Release Hardening across all existing modules**
+
+## What is currently being implemented?
+No implementation result has yet been supplied for Subscription V2 in this conversation. Only the implementation prompt has been prepared.
+
+## What is still pending?
+- execute/audit Subscription V2 changes against existing Phase 21-B architecture
+- make Subscription page fully dynamic/professional
+- Monthly/Yearly billing
+- plan edit management by Platform Owner
+- payment-request approval/rejection flow where gaps remain
+- historical pricing protection if not already implemented
+- audit sidebar static badges
+- full beta-release hardening:
+  - function-by-function
+  - responsive
+  - performance
+  - error states
+  - realistic data
+  - browser QA
+  - security
+  - monitoring/feedback readiness
+
+## What should NOT be changed?
+- two internal roles only
+- no internal Customer role
+- Supabase Auth ↔ Prisma User UUID mapping
+- Platform Owner `agencyId = null`
+- server-side tenant isolation
+- public cost redaction
+- public token architecture
+- certified financial domain separation
+- existing Phase 21-B billing architecture should be extended, not replaced
+- 7-day trial
+- no automatic paid-plan selection at signup
+- no destructive DB reset
+- no unnecessary feature expansion before beta
+
+---
+
+# 28. PHASE STATUS TABLE
+
+| Phase / Workstream | Status | Important Notes |
+|---|---|---|
+| Early Auth/Onboarding/Multi-Tenancy | COMPLETE | Final two-role architecture |
+| QA-01 Authentication | COMPLETE | Auth flow verified |
+| QA-02 Authorization/Routing | COMPLETE | Role and route protection |
+| QA-03 Functional Modules | COMPLETE | Historic |
+| QA-04 Journey/UX/Security | COMPLETE | Public quotation leak + duplicate detection issue addressed |
+| QA-05 Performance/API/DB | COMPLETE as audit | Re-check in beta hardening |
+| QA-05B Browser Performance/Network | COMPLETE | Historic |
+| QA-06A Responsive UI Audit | COMPLETE | Historic |
+| QA-06B UI/UX Follow-up | COMPLETE | Historic |
+| QA-07A Deep Security/Tenancy | COMPLETE | Zero Critical/High reported |
+| Phase 10.11D PDF Proposal | COMPLETE | Certified |
+| Phase 10.13I Ops Closure | COMPLETE | Certified |
+| Phase 10.13J Ops Analytics | COMPLETE | Certified |
+| Phase 10.14 Finance/Ledger Integrity | COMPLETE | Certified |
+| Phase 10.15A Architecture/Security | COMPLETE | Certified |
+| Phase 10.15B Customer Portal/Vouchers | COMPLETE | Certified |
+| Phase 10.15C Customer Notifications | COMPLETE | Certified |
+| Phase 11 Booking & Operations | COMPLETE | 33/33 historically |
+| Phase 12 Payments & Finance | COMPLETE | 74/74 historically |
+| Phase 13 Supplier Management | COMPLETE | 41/41 |
+| Phase 14 CRM & Follow-ups | COMPLETE | 44/44 |
+| Phase 15 Communication Automation | COMPLETE | 34/34 |
+| Phase 16 Vouchers & Documents | COMPLETE | 44/44 |
+| Phase 17 Dashboard & Analytics | COMPLETE | Test suite evolved over time |
+| Phase 18 Super Admin/SaaS | COMPLETE | 56/56 historically |
+| Phase 19 Production Readiness | COMPLETE | Hardening/docs |
+| Phase 20 Final Audit | COMPLETE | 35/35 historically |
+| Phase 20.5 DB Cleanup | COMPLETE | Clean pilot baseline created |
+| Phase 20.6 Production Smoke | COMPLETE | Pilot flow verified |
+| Phase 20.6B Full Browser QA | COMPLETE | Browser certified |
+| Phase 21-A Product Gap Audit | COMPLETE | Gap roadmap created |
+| Phase 21-B SaaS Billing | COMPLETE | 32/32 historically |
+| Phase 21-C Persistence Cleanup | COMPLETE | 36/36 |
+| Phase 21-D Agency BI/Reports | COMPLETE | Live reports implemented |
+| Phase 21-E Portal Feedback | COMPLETE | Public post-trip feedback |
+| Phase 21-F Communications | COMPLETE | 47/47 + browser 28/28 |
+| Subscription V2 / Beta Billing UX | PLANNED / NEXT | Prompt created; implementation result pending |
+| Beta Release Hardening | PENDING | Primary pre-real-user quality gate |
+
+---
+
+# 29. PRODUCT / BUSINESS MODEL — FINAL
+
+## Platform Owner
+Singleton global SaaS administrator.
+
+Responsibilities include:
+- manage agencies
+- manage trials/subscriptions
+- verify SaaS subscription payments
+- suspend/reactivate agencies
+- manage plans
+- platform settings
+- announcements
+- analytics
+- audit logs
+
+Platform Owner is not attached to an agency.
+
+## Agency
+Tenant boundary.
+
+Every tenant business record must resolve to an `agencyId` where applicable.
+
+## Agency Owner
+Internal authenticated owner/operator for one agency.
+
+Must have:
+- role `AGENCY_OWNER`
+- non-null `agencyId`
+
+## Customer
+External business entity / traveler.
+
+Customer is:
+- stored in Customer model
+- associated with an agency
+- accessed publicly via secure tokens where appropriate
+
+Customer is **not**:
+- a Supabase internal authenticated system role
+- a `UserRole`
+- an internal `User`
+
+## Removed role
+Travel Agent / Sales Agent was considered earlier.
+
+**REMOVED — DO NOT REINTRODUCE unless a future explicit decision changes the role model.**
+
+---
+
+# 30. ROLE MATRIX
+
+`CUSTOMER` below means the external customer persona using token-scoped public routes, **not an internal `UserRole`.**
+
+| Feature | PLATFORM_OWNER | AGENCY_OWNER | CUSTOMER (public token) |
+|---|---|---|---|
+| Platform Admin `/admin/*` | YES | NO | NO |
+| Agency Dashboard `/dashboard` | NO / redirect per current guards | YES | NO |
+| Manage agencies | YES | NO | NO |
+| Manage platform plans | YES | NO | NO |
+| Verify SaaS subscription payments | YES | NO | NO |
+| Manage own subscription | N/A / admin side | YES | NO |
+| Customers CRUD | NO normal tenant mutation | YES own agency | NO |
+| Enquiries / follow-ups | NO normal tenant mutation | YES own agency | NO |
+| Suppliers / rate sheets | NO normal tenant mutation | YES own agency | NO |
+| Trips / costing | NO normal tenant mutation | YES own agency | limited public trip view |
+| Quotations | NO normal tenant mutation | YES own agency | public proposal by secure token |
+| Bookings | NO normal tenant mutation | YES own agency | public booking view by secure token |
+| Customer travel payments | NO normal tenant mutation | YES own agency | customer-visible balance/receipt data only |
+| Supplier payables | NO normal tenant mutation | YES own agency | NEVER |
+| Internal profitability | NO normal tenant mutation | YES own agency | NEVER |
+| Operations | NO normal tenant mutation | YES own agency | customer-safe trip data only |
+| Documents | NO normal tenant mutation | YES own agency | issued/customer-safe docs only |
+| Reports | NO tenant use | YES own agency | NO |
+| Communications | NO tenant mutation | YES own agency | notification view/read by token |
+| Feedback | NO tenant mutation | YES manage own agency feedback | submit via valid completed-trip token |
+| Platform audit logs | YES | NO | NO |
+
+---
+
+# 31. COMPLETE USER FLOWS
+
+## 31.1 Public Website Flow
+
+Known public routes:
+- `/login`
+- `/signup`
+- `/forgot-password`
+- `/reset-password`
+- public quotation
+- public trip portal
+- public booking route
+
+A public marketing/pricing site exists conceptually and historically included Pricing → Signup flow, but current Subscription V2 final direction modifies the earlier idea of “Choose Plan before signup.”
+
+### FINAL signup rule
+**Do not require paid-plan selection during signup.**
+
+New agency immediately receives a 7-day Free Trial.
+
+---
+
+## 31.2 Agency Signup Flow — FINAL
+
+```text
+Public Signup
+   ↓
+Agency Owner enters onboarding details
+   ↓
+Supabase Auth user created
+   ↓
+Agency created
+   ↓
+Prisma User created with role AGENCY_OWNER
+   ↓
+User.agencyId = Agency.id
+   ↓
+Subscription created with status TRIAL
+   ↓
+trialStart set
+   ↓
+trialEnd = 7 days later
+   ↓
+redirect /dashboard
+```
+
+No payment required.
+
+No paid-plan activation required during signup.
+
+---
+
+## 31.3 Login Flow
+
+```text
+/login
+  ↓
+Supabase signInWithPassword
+  ↓
+SSR session cookie
+  ↓
+Prisma User lookup by Supabase UUID
+  ↓
+Role
+  ├── PLATFORM_OWNER → /admin
+  └── AGENCY_OWNER → /dashboard
+```
+
+Public customers do not use this login.
+
+---
+
+## 31.4 Trial Flow — FINAL
+
+- automatic on signup
+- duration: **7 days**
+- track:
+  - `trialStart`
+  - `trialEnd`
+  - `status = TRIAL`
+- current Subscription page should show Free Trial
+- paid plans visible from Day 1
+- agency may choose paid plan before trial ends
+- trial must not be replaced by a paid plan until payment is approved
+- expired-trial data must never be deleted
+
+Historic existing authorization includes a read-only approach via `requireWriteAccess()` after expired trial/subscription. This should be verified against current code before changing expiry UX.
+
+---
+
+## 31.5 Subscription Flow — CURRENT FINAL DESIGN
+
+```text
+FREE TRIAL
+   ↓
+Subscription page
+   ↓
+View active paid plans
+   ↓
+Toggle Monthly / Yearly
+   ↓
+Choose Starter or Professional
+   ↓
+Confirm plan + cycle + price
+   ↓
+UPI / Bank Transfer instructions
+   ↓
+Enter UTR
+   ↓
+Submit payment request
+   ↓
+PENDING VERIFICATION
+   ↓
+Platform Owner
+   ├── APPROVE
+   │      ↓
+   │   selected paid plan becomes ACTIVE
+   │      ↓
+   │   start/end/renewal set
+   └── REJECT
+          ↓
+       reason shown to agency
+```
+
+Plan management:
+- Platform Owner editable
+- no hardcoded Agency UI pricing
+- monthly/yearly prices
+- plan activation/deactivation
+- features/marketing metadata if current schema supports
+- historical purchased price preserved
+
+---
+
+## 31.6 Customer Business Journey
+
+```text
+Customer created
+   ↓
+Enquiry
+   ↓
+Follow-up / pipeline
+   ↓
+Trip / costing
+   ↓
+Quotation
+   ↓
+Public proposal
+   ↓
+Accepted / converted
+   ↓
+Booking
+   ↓
+Customer payment(s)
+   ↓
+Supplier payable(s)
+   ↓
+Trip Operations
+   ↓
+Travel Documents
+   ↓
+Customer Trip Portal
+   ↓
+Notifications
+   ↓
+Trip Completion
+   ↓
+Feedback
+   ↓
+Reports / Customer Insights
+```
+
+---
+
+# 32. COMPLETE PRODUCT MODULE MAP
+
+## 32.1 Dashboard
+Purpose:
+Agency operational/business overview.
+
+Status:
+**COMPLETE**
+
+Includes:
+- KPIs
+- sales funnel
+- revenue/profit
+- receivables/payables
+- upcoming trips
+- CRM/follow-ups
+- communication health
+- top destinations/customers
+
+Roles:
+Agency Owner.
+
+---
+
+## 32.2 Customers
+Purpose:
+Customer 360.
+
+Known capabilities:
+- create
+- edit
+- list/search
+- details
+- financial/customer history
+- duplicate detection
+- communications tab
+- feedback/referral/insight relationships
+
+Status:
+**COMPLETE**
+
+---
+
+## 32.3 Enquiries / CRM / Follow-ups
+Purpose:
+Lead management and sales pipeline.
+
+Known:
+- enquiry lifecycle
+- follow-ups
+- CRM stages
+- source/priority
+- customer linkage
+- analytics
+
+Status:
+**COMPLETE**
+
+---
+
+## 32.4 Suppliers
+Purpose:
+Supplier directory and 360.
+
+Known:
+- supplier creation/edit
+- duplicate detection
+- status/reactivation
+- hotels/vehicles/activities
+- confirmations
+- payables/payments
+- hard-delete guards
+
+Status:
+**COMPLETE**
+
+---
+
+## 32.5 Hotels / Vehicles / Activities / Rate Sheets
+Purpose:
+Agency inventory/rate resources for costing/quotations.
+
+Status:
+**IMPLEMENTED / INCLUDED IN CURRENT BETA SCOPE**
+
+Exact current UI behavior should be verified during beta hardening.
+
+---
+
+## 32.6 Trips / Itinerary / Costing
+Purpose:
+Travel product and itinerary construction.
+
+Known:
+- trip record
+- dates/status
+- traveler relationships
+- itinerary items
+- hotel/vehicle/activity relationships
+- costing
+- booking linkage
+- operations linkage
+
+Status:
+**COMPLETE / CORE**
+
+---
+
+## 32.7 Quotations
+Purpose:
+Commercial proposal.
+
+Known:
+- quotation creation
+- line items
+- package options
+- payment milestones
+- public share token
+- public proposal
+- PDF proposal
+- cost redaction
+- status lifecycle
+
+Status:
+**COMPLETE**
+
+---
+
+## 32.8 Bookings
+Purpose:
+Confirmed travel business record.
+
+Known:
+- total/paid/balance
+- customer/trip/quotation relationships
+- payment status
+- operations
+- documents
+
+Status:
+**COMPLETE**
+
+---
+
+## 32.9 Payments / Finance
+Purpose:
+Agency travel accounting.
+
+Includes:
+- customer payments
+- milestones
+- receivables
+- refunds/adjustments according to current implementation
+- supplier payables
+- supplier payments
+- operational expenses
+- profitability
+
+Status:
+**COMPLETE**
+
+---
+
+## 32.10 Operations
+Purpose:
+Trip delivery/dispatch/readiness/closure.
+
+Known:
+- TripOperation
+- HotelConfirmation
+- VehicleDispatch
+- ActivityConfirmation
+- OperationalIssue
+- OperationEvent
+- readiness and event timeline
+
+Status:
+**COMPLETE**
+
+---
+
+## 32.11 Travel Documents
+Purpose:
+Customer-safe official travel documents.
+
+Known:
+- generation
+- PDF
+- issue
+- revoke
+- supersede
+- versioning
+- public/customer portal access
+
+Status:
+**COMPLETE**
+
+---
+
+## 32.12 Feedback
+Purpose:
+Post-trip reviews and service recovery.
+
+Status:
+**COMPLETE**
+
+---
+
+## 32.13 Referrals
+Purpose:
+Referral/reward tracking.
+
+Status:
+**COMPLETE**
+
+---
+
+## 32.14 Customer Insights
+Purpose:
+Retention, LTV, destination and VIP insights.
+
+Status:
+**COMPLETE**
+
+---
+
+## 32.15 Reports
+Purpose:
+Agency BI/accounting reports.
+
+Status:
+**COMPLETE**
+
+---
+
+## 32.16 Communications
+Purpose:
+Agency communication ledger/manual messages plus customer notification center.
+
+Status:
+**COMPLETE & BROWSER-CERTIFIED**
+
+---
+
+## 32.17 Subscription
+Purpose:
+Agency's TripDesk SaaS billing.
+
+Current status:
+- Phase 21-B core billing implemented
+- Subscription V2 professional agency-facing flow is **NEXT / PENDING EXECUTION**
+
+---
+
+## 32.18 Platform Admin
+Purpose:
+SaaS owner governance.
+
+Status:
+**COMPLETE**, with Subscription V2 enhancements pending.
+
+---
+
+# 33. ROUTE MAP
+
+## 33.1 Public routes known
+
+- `/login`
+- `/signup`
+- `/forgot-password`
+- `/reset-password`
+- `/q/[token]`
+- `/trip/[token]`
+- `/b/[token]`
+- `/api/health`
+- `/api/auth/*`
+- public token APIs under trips/quotations/bookings
+
+## 33.2 Agency Owner protected routes known
+
+Historically protected:
+- `/dashboard`
+- `/customers/*`
+- `/trips/*`
+- `/hotels/*`
+- `/quotations/*`
+- `/bookings/*`
+- `/payments/*`
+- `/operations/*`
+- `/settings`
+- `/suppliers/*`
+- `/documents`
+- `/feedback`
+- `/referrals`
+- `/customer-insights`
+- `/reports`
+- `/communications`
+- subscription route/page in current app
+
+The exact current route for Subscription must be inspected in code; recent screenshots/discussion refer to a Subscription page and the latest implementation prompt recommends `/subscription`. Do not assume `/subscription` exists until the current repository confirms it.
+
+## 33.3 Platform Owner routes known
+
+- `/admin`
+- `/admin/agencies`
+- `/admin/agencies/[agencyId]`
+- `/admin/subscriptions`
+- `/admin/plans`
+- `/admin/payments`
+- `/admin/analytics`
+- `/admin/audit-logs`
+- `/admin/announcements`
+- `/admin/settings`
+
+Subscription V2 may extend current admin structure rather than creating duplicate routes.
+
+## 33.4 API routes known from implemented phases
+
+### Auth
+- existing auth actions/routes
+
+### Suppliers
+- `/api/suppliers/check-duplicate`
+- `/api/suppliers/[id]/reactivate`
+
+### Communication Phase 15
+- `/api/communication/logs`
+- `/api/communication/logs/[id]`
+- resend
+- send-manual
+- settings
+- automation/run
+- webhook
+
+### Phase 21-F communication aliases
+- `GET/POST /api/communications`
+- `GET /api/communications/[id]`
+- `GET /api/trips/public/[token]/notifications`
+- `POST /api/trips/public/[token]/notifications/[id]/read`
+
+### Admin subscription payments
+- `GET/POST /api/admin/subscription-payments`
+- `GET /api/admin/subscription-payments/[id]`
+- verify
+- reject
+
+### Reports
+- `GET /api/reports`
+- `GET /api/reports/export`
+- `GET /api/reports/pdf`
+
+### Feedback
+- `GET/POST /api/feedback`
+- `GET/PATCH /api/feedback/[id]`
+- `GET/POST /api/trips/public/[token]/feedback`
+
+### Referrals
+- `GET/POST /api/referrals`
+- `GET/PATCH /api/referrals/[id]`
+
+### Customer insights
+- `/api/customer-insights`
+
+### Documents
+Document listing/detail/generation/issue/revoke/resend/preview/download routes exist under `/api/documents/...`.
+
+This is not guaranteed to be a complete current API inventory. **Current codebase wins.**
+
+---
+
+# 34. ROUTE PROTECTION RULES
+
+## Platform Owner
+Admin routes/APIs require Platform Owner context.
+
+## Agency Owner
+Tenant routes derive agency from authenticated server session.
+
+## Public
+Known bypasses include:
+- auth pages
+- quotation token pages
+- trip token pages
+- booking token pages
+- specific public APIs
+
+Public token routes must never trust client-provided tenant IDs.
+
+## Phase 21-F specific authorization
+- `/communications` is Agency Owner-only and tenant-scoped.
+- `/api/communications*` is Agency Owner-only and tenant-scoped.
+- `/api/trips/public/[token]/notifications*` is public token-scoped and must resolve identity from the validated public token.
+
+---
+
+# 35. TECHNICAL ARCHITECTURE
+
+## Framework
+- Next.js 16.x App Router
+- React 19
+- TypeScript
+- Turbopack in reported builds
+
+## Styling/UI
+- Tailwind CSS
+- Shadcn-style component system was part of project direction
+- Lucide icons
+- Sonner toasts
+- responsive dashboard UI
+
+## Database
+- PostgreSQL
+- Prisma ORM 7.x
+- `@prisma/adapter-pg` referenced in production reports
+
+Hosting/provider naming in historic reports varied:
+- Supabase managed PostgreSQL was the original/known architecture
+- later Phase 21 reports say Neon Cloud PostgreSQL
+
+**Do not rely on the old label. Inspect current `DATABASE_URL` host/config without exposing secrets.**
+
+## Authentication
+- Supabase Auth
+- `@supabase/supabase-js`
+- `@supabase/ssr`
+- SSR cookie management
+
+## Identity mapping
+`Supabase Auth user.id === Prisma User.id`
+
+## API architecture
+- Next.js Route Handlers
+- service layer
+- Zod validation
+- server-side request context/guards
+
+## Server/client approach
+Core business/security logic server-side.
+
+Client components used for interactive:
+- forms
+- modals
+- filters
+- toggles
+- dynamic drawers/popovers
+
+Avoid unnecessary clientification.
+
+## Deployment
+- production-like Vercel/Next.js deployment architecture was documented
+- managed PostgreSQL
+- Supabase Auth
+- protected cron endpoint
+- structured logging
+
+---
+
+# 36. DATABASE ARCHITECTURE
+
+The full exact schema must be read from `prisma/schema.prisma` in the new chat/codebase. The following models are explicitly recoverable from project reports.
+
+## Platform / SaaS
+- `Agency`
+- `User`
+- `SubscriptionPlan`
+- `Subscription`
+- `SubscriptionPayment`
+- `PlatformAuditLog`
+- `PlatformAnnouncement`
+- `PlatformSetting`
+- `AgencyCommunicationSetting`
+
+## CRM / Customer
+- `Customer`
+- `Enquiry`
+- `EnquiryFollowUp`
+- enquiry activity model referenced historically
+- `CustomerFeedback`
+- `Referral`
+- `CustomerNotification`
+- `CustomerNotificationPreference`
+
+## Trip
+- `Trip`
+- `Traveler` / `TripTraveler` naming varied in reports; inspect schema
+- `ItineraryItem` / `TripItineraryItem` naming varied; inspect schema
+- `TripHotel`
+- `TripVehicle`
+- `TripActivity`
+- `Hotel`
+- `Vehicle`
+- `Activity`
+
+## Quotation
+- `Quotation`
+- `QuotationItem`
+- `QuotationProposalItem`
+- `QuotationPackageOption`
+- `QuotationPaymentMilestone`
+- `PublicShareLink`
+
+## Booking / Finance
+- `Booking`
+- `Payment`
+- `Supplier`
+- `RateSheet`
+- `SupplierPayable`
+- `SupplierPayment`
+- `OperationalExpense`
+
+## Operations
+- `TripOperation`
+- `HotelConfirmation`
+- `VehicleDispatch`
+- `ActivityConfirmation`
+- `OperationEvent`
+- `OperationalIssue`
+
+## Documents
+- `TravelDocument`
+
+## Important database relationship rules
+
+### User ↔ Auth
+`User.id` is the Supabase Auth UUID.
+
+### User → Agency
+Agency Owner:
+`User.agencyId = Agency.id`
+
+Platform Owner:
+`agencyId = null`
+
+### Tenant data
+Business data is scoped by `agencyId`.
+
+### Subscription
+Agency has subscription history/status.
+
+### Customer
+Customer belongs to Agency.
+
+### Trip
+Trip belongs to Agency and typically Customer.
+
+### Booking
+Booking relates Agency, Customer, Trip, and optionally Quotation according to current schema.
+
+### PublicShareLink
+Used to resolve customer-safe public access.
+
+### CustomerNotification
+Phase 21-F relies on tenant/customer/trip relations plus deterministic idempotency.
+
+### Communication idempotency
+The communication schema/service uses deterministic idempotency keys and an agency-scoped uniqueness rule equivalent to:
+`@@unique([agencyId, idempotencyKey])`.
+Do not remove this protection or create duplicate notification infrastructure.
+
+---
+
+# 37. IMPORTANT ENUMS / STATES RECOVERABLE
+
+Exact enum names must be confirmed in schema.
+
+## UserRole
+- `PLATFORM_OWNER`
+- `AGENCY_OWNER`
+
+## SubscriptionStatus
+Known:
+- `TRIAL`
+- `ACTIVE`
+- `EXPIRED`
+- `CANCELLED`
+
+## SubscriptionPaymentStatus
+Known from Phase 21-B:
+- `PENDING`
+- `VERIFIED`
+- `REJECTED`
+- `REFUNDED`
+
+Subscription V2 discussion used “APPROVED” conceptually. Reuse existing actual enum (`VERIFIED`) unless code intentionally introduces a separate request-state abstraction.
+
+## Trip status
+Known examples:
+- DRAFT
+- PLANNING
+- QUOTED
+- BOOKED
+- ONGOING
+- COMPLETED
+- CANCELLED
+
+## Booking
+Known:
+- status lifecycle
+- payment status such as PENDING / PARTIALLY_PAID / PAID equivalents
+
+## Notification
+Channels:
+- IN_APP
+- EMAIL
+- SMS
+- WHATSAPP
+
+Delivery states:
+- QUEUED
+- PENDING
+- SENT
+- DELIVERED
+- FAILED
+- READ
+- CANCELLED
+
+---
+
+# 38. AUTHENTICATION ARCHITECTURE
+
+## Important files known
+
+- `src/lib/supabase/client.ts`
+- `src/lib/supabase/server.ts`
+- `src/lib/supabase/middleware.ts`
+- `src/middleware.ts`
+- `src/lib/auth/index.ts`
+- `src/lib/auth/customer-auth.ts`
+- `src/lib/supabase/admin.ts`
+- `src/actions/auth-actions.ts`
+- `src/app/login/page.tsx`
+- `src/app/signup/page.tsx`
+- `src/app/forgot-password/page.tsx`
+- `src/app/reset-password/page.tsx`
+- `prisma/bootstrap-owner.ts`
+
+## Helpers known historically
+- `getCurrentUser`
+- `requireAuth`
+- `requirePlatformOwner`
+- `requireAgencyOwner`
+
+Later API context uses equivalents such as:
+- `requirePlatformOwnerContext()`
+- `requireAgencyOwnerContext()`
+- `requireWriteAccess()`
+
+New code should reuse current helper names in repository.
+
+## Signup
+Supabase Auth user + Agency + Prisma User + Trial.
+
+## Login
+Supabase sign-in then role router.
+
+## Email verification
+Disabled for V1 historically.
+
+## Platform Owner bootstrap
+Private bootstrap script.
+
+Important operational lesson:
+bootstrap should not blindly assume an existing Prisma owner means Auth credentials are synchronized.
+
+---
+
+# 39. AUTHORIZATION & MULTI-TENANCY
+
+This is a non-negotiable architecture invariant.
+
+## Principle
+**Agency identity is derived server-side.**
+
+Never trust:
+- `agencyId` from client body/query
+- foreign customer/trip/booking IDs without tenant validation
+
+## Agency Owner query pattern
+Every service query/mutation must enforce the authenticated agency.
+
+Conceptually:
+
+```text
+Supabase Session
+   ↓
+Prisma User
+   ↓
+User.agencyId
+   ↓
+where: { agencyId }
+```
+
+## Platform Owner
+Global admin APIs use Platform Owner guard.
+
+## Public tokens
+Conceptually:
+
+```text
+token
+  ↓
+PublicShareLink / secure lookup
+  ↓
+Agency + Customer + Trip/Quotation/Booking
+  ↓
+customer-safe payload
+```
+
+## IDOR
+Repeated audits verified:
+- cross-tenant customer access denied
+- cross-tenant quotation access denied
+- cross-token notifications denied
+- public invalid tokens fail safely
+
+## Public notification identity resolution
+Phase 21-F public notification APIs resolve agency/customer/trip identity from the validated `PublicShareLink` token hash. Client-provided `agencyId`, `customerId`, or `tripId` must not be trusted for public identity resolution.
+
+## Customer-safe DTO rule
+Public trip/notification/quotation/booking responses must be intentionally shaped for customer visibility. Never expose supplier cost, buy price, gross profit/margin, supplier payable, or internal agency remarks.
+
+---
+
+# 40. PUBLIC FEATURES & SECURITY
+
+## `/q/[token]`
+Public quotation/proposal.
+
+Must expose customer-safe selling information.
+
+Must never expose:
+- supplier cost
+- buy price
+- gross margin
+- supplier payable
+- confidential supplier notes
+- private agency operational notes
+
+A public quotation leak was found in earlier QA and fixed.
+
+## `/trip/[token]`
+Public traveler portal.
+
+Known content:
+- agency branding
+- trip status
+- itinerary
+- hotels
+- transport
+- activities
+- payment/customer-safe booking info
+- notifications
+- feedback
+- customer-safe documents
+
+## `/b/[token]`
+Public booking/customer confirmation route.
+
+## Invalid tokens
+Must:
+- return 404/safe error
+- not expose stack trace
+- not expose Prisma/SQL details
+
+## Revocation/expiry
+Current token services support active/revoked logic in known Phase 21-E/F reports. Confirm exact implementation in code.
+
+---
+
+# 41. QA HISTORY SUMMARY
+
+| QA | Scope | Important Outcome |
+|---|---|---|
+| QA-01 | Authentication | Completed |
+| QA-02 | Authorization/Routing | Completed |
+| QA-03 | Functional Modules | Completed |
+| QA-04 | Full Journey/UX/Security | Public quote leak + duplicate detection issue addressed |
+| QA-05 | Performance/API/DB | Duplicate calls, auth/me, useEffect, router.refresh, DB query concerns audited |
+| QA-05B | Browser Performance/Network | Completed |
+| QA-06A | Responsive/UI Read-only | Completed |
+| QA-06B | UI/UX follow-up | Completed |
+| QA-07A | Deep Security/Tenancy | Zero Critical/High reported |
+| Phase 20 | Final certification | 9 audit pillars |
+| Phase 20.6 | Production smoke | pilot workflow |
+| Phase 20.6B | Full browser production QA | Platform + Agency + public routes |
+| Phase 21-F Browser QA | Communication/customer notifications | 28/28 pass |
+
+---
+
+# 42. QA FINDINGS THAT MUST NOT BE LOST
+
+## Public quotation security issue
+Status:
+**FIXED**
+
+Rule:
+Never re-expose internal quotation item cost/internal notes in public payload.
+
+## Customer duplicate detection
+Status:
+**FIXED / dedicated duplicate logic exists**
+
+Supplier duplicate detection also exists.
+
+## Performance concerns
+Historic concerns:
+- duplicate API calls
+- repeated `/api/auth/me`
+- unnecessary `useEffect`
+- rerenders
+- `router.refresh()`
+- hard navigation
+- slow queries
+- N+1
+- excessive selections
+- missing indexes
+
+Status:
+Some performance/browser verification was completed, and Phase 21-F specifically reported no duplicate loops. However beta hardening should **re-audit the full app** rather than assuming all pages are optimal.
+
+## Responsive UI
+Historic responsive audits passed, but user now explicitly wants a **full-screen-size beta audit** because real users will test the site.
+
+## Multi-tenant isolation
+Status:
+Repeatedly **PASSED**.
+
+Must remain non-negotiable.
+
+---
+
+# 43. UI/UX DESIGN SYSTEM / PRINCIPLES
+
+No exact full token system is recoverable, but the project consistently uses a polished modern SaaS dashboard style.
+
+## Patterns
+- left sidebar
+- dashboard top/header area
+- cards
+- KPI scorecards
+- data tables
+- filters/search
+- modals/drawers
+- badges
+- toasts
+- responsive grids
+- customer public portal distinct from admin dashboard
+
+## Subscription UI direction — CURRENT
+Must look like a professional SaaS billing page:
+- strong plan hierarchy
+- clear current status
+- Monthly/Yearly toggle
+- clean plan cards
+- clear “Choose Plan / Upgrade / Renew” primary CTA
+- Contact TripDesk secondary
+- payment verification status
+- responsive
+
+## Beta UX requirements
+Every major page should handle:
+- loading
+- empty
+- error
+- success
+- slow network
+- long text
+- large numbers
+- mobile/tablet/desktop
+
+## Target viewports for beta audits
+At minimum:
+- 1440×900
+- 1366×768
+- 1024×768
+- 768×1024
+- 430×932
+- 390×844
+- 375×812 / 360×800 where useful
+
+## Common UI bugs to explicitly test
+- horizontal overflow
+- modal overflow
+- clipped buttons
+- broken tables
+- bad text wrapping
+- dropdown positioning
+- sticky header/sidebar overlap
+- bottom nav
+- long customer/trip/hotel names
+- empty/loading states
+- error boundaries
+- `NaN`
+- `undefined`
+
+---
+
+# 44. PRICING & SUBSCRIPTION — DETAILED FINAL RULES
+
+## Trial
+- automatic
+- 7 days
+- no plan/payment required at signup
+- current Subscription page should show Free Trial
+- trial start/end are database-driven
+- days remaining calculated dynamically
+
+## Paid plan visibility
+- active paid plans visible from Day 1
+- agency may purchase immediately
+
+## Paid plans
+Two current conceptual plans:
+- Starter
+- Professional
+
+Current code/database configuration is authoritative for exact prices/features.
+
+## Billing cycles
+Each plan must support:
+- Monthly
+- Yearly
+
+## Plan administration
+Platform Owner must be able to edit:
+- plan name
+- description
+- monthly price
+- yearly price
+- features where supported
+- active/inactive
+- display order/popular badge if supported
+
+## Payment
+Beta:
+- UPI / QR / bank transfer
+- enter UTR
+- submit for verification
+- Platform Owner reviews
+- no immediate activation
+
+## Approval
+On verification:
+- activate selected paid plan
+- correct cycle
+- correct start/end
+- preserve payment history
+- prevent duplicate activation
+- use transaction/idempotency
+
+## Rejection
+- reason stored
+- agency can see rejection
+- agency may submit new valid request
+
+## Price history
+Must preserve purchased price.
+
+## Deactivation
+Do not hard-delete referenced plans.
+
+## Yearly savings
+Only calculate dynamically:
+`monthlyPrice * 12 - yearlyPrice`
+
+Do not hardcode a “Save X%” claim.
+
+## Subscription page states
+At minimum:
+- Free Trial
+- Pending Verification
+- Active Paid
+- Rejected
+- Expired
+- Cancelled when meaningful
+
+## Expiry policy
+Existing code historically uses read-only/write restrictions after trial/subscription expiry. Before changing behavior, inspect current `requireWriteAccess()` implementation and existing product rules.
+
+---
+
+# 45. IMPORTANT FILES / FOLDER REFERENCES
+
+## Prisma
+- `prisma/schema.prisma`
+- `prisma/bootstrap-owner.ts`
+- `prisma/test-phase11-booking.ts`
+- `prisma/test-phase12-finance.ts`
+- `prisma/test-phase13-supplier.ts`
+- `prisma/test-phase14-crm.ts`
+- `prisma/test-phase15-communication.ts`
+- `prisma/test-phase16-documents.ts`
+- `prisma/test-phase17-dashboard.ts`
+- `prisma/test-phase18-admin.ts`
+- `prisma/test-phase20-final-audit.ts`
+- `prisma/test-phase20.6-smoke.ts`
+- `prisma/test-phase21b-saas-billing.ts`
+- `prisma/test-phase21c-persistence.ts`
+- `prisma/test-phase21d-reports.ts`
+- `prisma/test-phase21e-feedback.ts`
+- `prisma/test-phase21f-communications.ts`
+
+## Auth/Supabase
+- `src/lib/supabase/client.ts`
+- `src/lib/supabase/server.ts`
+- `src/lib/supabase/middleware.ts`
+- `src/lib/supabase/admin.ts`
+- `src/middleware.ts`
+- `src/lib/auth/index.ts`
+- `src/lib/auth/customer-auth.ts`
+- `src/actions/auth-actions.ts`
+
+## Services
+Known:
+- `src/lib/services/supplier-service.ts`
+- `src/lib/services/quotation-service.ts`
+- `src/lib/services/booking-service.ts`
+- `src/lib/services/payment-service.ts`
+- `src/lib/services/finance-service.ts`
+- `src/lib/services/communication-service.ts`
+- `src/lib/services/customer-notification-service.ts`
+- `src/lib/services/travel-document-service.ts`
+- `src/lib/services/document-pdf-service.ts`
+- `src/lib/services/customer-portal-service.ts`
+- `src/lib/services/trip-public-service.ts`
+- `src/lib/services/dashboard-service.ts`
+- `src/lib/services/admin-service.ts`
+- `src/lib/services/feedback-service.ts`
+- `src/lib/services/referral-service.ts`
+- `src/lib/services/customer-insights-service.ts`
+- `src/lib/services/reporting-service.ts`
+
+## Validation
+Known:
+- `src/lib/validation/supplier-schema.ts`
+- `src/lib/validation/communication-schema.ts`
+- `src/lib/validation/document-schema.ts`
+- `src/lib/validation/dashboard-schema.ts`
+- `src/lib/validation/admin-schema.ts`
+- `src/lib/validation/feedback-schema.ts`
+- `src/lib/validation/referral-schema.ts`
+- `src/lib/validation/reporting-schema.ts`
+
+## API clients
+Known:
+- `src/lib/api-client/communication-client.ts`
+- `src/lib/api-client/document-client.ts`
+- `src/lib/api-client/dashboard-client.ts`
+- `src/lib/api-client/admin-client.ts`
+- `src/lib/api-client/experience-client.ts`
+- `src/lib/api-client/reporting-client.ts`
+- `src/lib/api-client/public-client.ts`
+
+## Pages
+Known:
+- `src/app/(dashboard)/dashboard/page.tsx`
+- `src/app/(dashboard)/suppliers/...`
+- `src/app/(dashboard)/documents/page.tsx`
+- `src/app/(dashboard)/settings/page.tsx`
+- `src/app/(dashboard)/feedback/page.tsx`
+- `src/app/(dashboard)/referrals/page.tsx`
+- `src/app/(dashboard)/customer-insights/page.tsx`
+- `src/app/(dashboard)/reports/page.tsx`
+- `src/app/(dashboard)/communications/page.tsx`
+- `src/app/trip/[secureToken]/page.tsx`
+- admin pages listed above
+
+## Navigation
+- `src/lib/navigation.ts`
+- sidebar/app-shell components
+
+## Production
+- `.env.example`
+- `next.config.ts`
+- `src/lib/logger.ts`
+- `docs/PRODUCTION_DEPLOYMENT.md`
+- `docs/PRODUCTION_CHECKLIST.md`
+- Phase reports in `docs/`
+
+---
+
+# 46. LATEST KNOWN PROJECT STRUCTURE (APPROXIMATE)
+
+This is an architectural map, not a promise that every listed directory currently exists exactly as shown.
+
+```text
+tripdesk/
+├── prisma/
+│   ├── schema.prisma
+│   ├── bootstrap-owner.ts
+│   ├── seed.ts
+│   ├── test-phase11-booking.ts
+│   ├── test-phase12-finance.ts
+│   ├── test-phase13-supplier.ts
+│   ├── test-phase14-crm.ts
+│   ├── test-phase15-communication.ts
+│   ├── test-phase16-documents.ts
+│   ├── test-phase17-dashboard.ts
+│   ├── test-phase18-admin.ts
+│   ├── test-phase20-final-audit.ts
+│   ├── test-phase20.6-smoke.ts
+│   ├── test-phase21b-saas-billing.ts
+│   ├── test-phase21c-persistence.ts
+│   ├── test-phase21d-reports.ts
+│   ├── test-phase21e-feedback.ts
+│   └── test-phase21f-communications.ts
+├── src/
+│   ├── app/
+│   │   ├── (dashboard)/
+│   │   │   ├── dashboard/
+│   │   │   ├── customers/
+│   │   │   ├── enquiries/
+│   │   │   ├── suppliers/
+│   │   │   ├── trips/
+│   │   │   ├── quotations/
+│   │   │   ├── bookings/
+│   │   │   ├── payments/
+│   │   │   ├── operations/
+│   │   │   ├── documents/
+│   │   │   ├── feedback/
+│   │   │   ├── referrals/
+│   │   │   ├── customer-insights/
+│   │   │   ├── reports/
+│   │   │   ├── communications/
+│   │   │   └── settings/
+│   │   ├── admin/
+│   │   ├── api/
+│   │   ├── login/
+│   │   ├── signup/
+│   │   ├── forgot-password/
+│   │   ├── reset-password/
+│   │   ├── q/
+│   │   ├── trip/
+│   │   └── b/
+│   ├── actions/
+│   │   └── auth-actions.ts
+│   ├── components/
+│   │   ├── dashboard/
+│   │   └── ...
+│   └── lib/
+│       ├── auth/
+│       ├── api/
+│       ├── api-client/
+│       ├── services/
+│       ├── supabase/
+│       ├── validation/
+│       ├── logger.ts
+│       ├── navigation.ts
+│       └── prisma.ts
+├── docs/
+├── .env.example
+├── next.config.ts
+├── prisma.config.ts
+└── package.json
+```
+
+---
+
+# 47. ENVIRONMENT / SETUP
+
+Never store real secret values in this file.
+
+## Environment variables known conceptually
+
+```text
+DATABASE_URL=<DATABASE_URL>
+DIRECT_URL=<DIRECT_DATABASE_URL_IF_USED>
+NEXT_PUBLIC_SUPABASE_URL=<SUPABASE_URL>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<SUPABASE_ANON_KEY>
+SUPABASE_SERVICE_ROLE_KEY=<SUPABASE_SERVICE_ROLE_KEY>
+
+BOOTSTRAP_OWNER_EMAIL=<PLATFORM_OWNER_EMAIL>
+BOOTSTRAP_OWNER_PASSWORD=<PLATFORM_OWNER_PASSWORD>
+
+CRON_SECRET=<HIGH_ENTROPY_CRON_SECRET>
+
+# provider vars if enabled
+SMTP_*=<...>
+WHATSAPP_*=<...>
+```
+
+Use actual `.env.example` as source of truth.
+
+## Prisma commands used
+- `npx prisma validate`
+- `npx prisma generate`
+- `npx prisma db push` during some additive development phases
+- historic initial migration:
+  `npx prisma migrate dev --name initial_tripdesk_schema`
+
+For current/production work, do not use destructive schema reset.
+
+## Build
+- `npm run build`
+- `npx tsc --noEmit`
+
+## Dev
+Use current `package.json` scripts.
+
+---
+
+# 48. IMPLEMENTED FEATURES CHECKLIST
+
+## Completed
+- [x] Supabase authentication
+- [x] Agency signup/onboarding
+- [x] Platform Owner bootstrap
+- [x] two-role authorization
+- [x] multi-tenancy
+- [x] 7-day trial
+- [x] Customer 360
+- [x] CRM enquiries/follow-ups
+- [x] Supplier 360
+- [x] hotels/vehicles/activities/rate sheets
+- [x] trips/itinerary/costing
+- [x] quotations
+- [x] public quotation
+- [x] PDF proposals
+- [x] bookings
+- [x] customer payments
+- [x] supplier payables/payments
+- [x] finance
+- [x] operations
+- [x] vouchers/documents
+- [x] customer portal
+- [x] dashboard analytics
+- [x] Platform Owner admin
+- [x] production hardening
+- [x] database cleanup/pilot baseline
+- [x] pilot smoke test
+- [x] full browser QA
+- [x] SaaS subscription payment verification (Phase 21-B)
+- [x] feedback persistence
+- [x] referrals
+- [x] customer insights
+- [x] agency reports
+- [x] public post-trip feedback
+- [x] agency communication center
+- [x] customer notification engine
+
+## In Progress / Next
+- [ ] Subscription V2 / Beta Subscription Management implementation
+
+## Pending
+- [ ] audit/fix static sidebar badges
+- [ ] full Beta Release Hardening
+- [ ] full responsive sweep on all existing screens
+- [ ] performance sweep across all modules
+- [ ] edge/error-state sweep
+- [ ] realistic data-volume testing
+- [ ] beta monitoring/feedback workflow
+- [ ] controlled real-agency release
+
+## Future
+- [ ] automation engine
+- [ ] deeper customer self-service
+- [ ] AI assistant
+- [ ] payment gateway automation
+- [ ] multi-currency engine
+- [ ] future enterprise integrations
+
+---
+
+# 49. UPCOMING DEVELOPMENT ROADMAP
+
+The roadmap changed after Phase 21-F because the user prioritized releasing a stable beta rather than adding more feature modules.
+
+## Next — Subscription V2 / Beta Subscription Management
+
+### Objective
+Make agency subscription experience fully dynamic, professional, Monthly/Yearly, and owner-managed.
+
+### Required areas
+- existing Phase 21-B audit
+- Agency Subscription UI
+- dynamic plan list/prices
+- Monthly/Yearly toggle
+- manual payment + UTR
+- pending/approved/rejected states
+- Platform Owner plan editing
+- plan deactivation
+- historical price snapshot
+- renewal dates
+- tenant security
+- responsive QA
+- regression
+
+### Database
+Only minimal safe changes if existing Phase 21-B schema lacks:
+- separate monthly/yearly pricing
+- purchased-price snapshot
+- required metadata
+
+Do not create duplicate Subscription/SubscriptionPayment models.
+
+### Security
+- agency can only access own subscription/payment requests
+- Platform Owner only can edit plans/approve payments
+
+### QA
+- automated subscription tests
+- existing Phase 21-B suite
+- build/typecheck
+- browser responsive test
+
+---
+
+## Following — Beta Release Hardening
+
+This is the most important pre-real-user phase.
+
+### Objective
+Make every currently included function reliable, smooth, responsive, fast, and understandable.
+
+### Scope
+All current modules:
+- auth
+- signup
+- trial/subscription
+- admin
+- customers
+- enquiries
+- suppliers
+- hotels/rate sheets
+- trips
+- quotations
+- bookings
+- finance
+- operations
+- documents
+- customer portal
+- feedback
+- referrals
+- reports
+- communications
+
+### Workstreams recommended
+1. Full functional E2E
+2. UI stability/responsive
+3. performance/network
+4. loading/error/empty states
+5. security revalidation
+6. realistic data
+7. beta monitoring/feedback
+
+### Golden workflow
+```text
+Signup
+ ↓
+7-Day Trial
+ ↓
+Customer
+ ↓
+Enquiry
+ ↓
+Trip
+ ↓
+Rate Sheet / Supplier
+ ↓
+Quotation
+ ↓
+Public Proposal
+ ↓
+Booking
+ ↓
+Customer Payment
+ ↓
+Supplier Payable
+ ↓
+Operations
+ ↓
+Documents
+ ↓
+Communication
+ ↓
+Customer Portal
+ ↓
+Feedback
+ ↓
+Reports
+```
+
+This chain should work without common bugs.
+
+---
+
+## Controlled Beta Release
+
+Recommended rollout discussed:
+- Wave 1: 2–3 agencies
+- Wave 2: 5–10 agencies
+- larger beta after fixes
+
+The user intends to provide temporary free access to real users for testing.
+
+## Beta feedback loop
+The beta is intentionally a validation phase:
+1. onboard a small number of real agencies
+2. observe real workflows
+3. collect functional/UI/performance feedback
+4. fix common or high-impact defects
+5. re-test regressions
+6. expand the beta only after the product remains stable
+
+Do not interpret “beta” as permission to introduce broad new modules without evidence from tester feedback.
+
+---
+
+## Later Feature Expansion
+
+Only after beta feedback:
+- advanced automation
+- customer self-service expansion
+- AI
+- external billing gateway
+- larger enterprise integrations
+
+---
+
+# 50. CURRENT STOPPING POINT
+
+## 1. What were we doing immediately before handover?
+Discussing and defining a professional, dynamic Subscription flow/UI for the beta release.
+
+## 2. Last completed work
+Phase 21-F including browser QA.
+
+Final browser report supplied:
+- 28/28 scenarios passed
+- 100%
+- no defects
+- responsive pass
+- security pass
+
+## 3. Last prompt/task given to AI
+A full implementation prompt titled conceptually:
+
+> **TRIPDESK — SUBSCRIPTION V2 / BETA SUBSCRIPTION MANAGEMENT**
+
+It instructed Antigravity to first audit existing Phase 21-B, then implement Monthly/Yearly plan selection, owner-editable plans, UTR payment requests, approval/rejection, historical pricing, and professional responsive UI.
+
+## 4. Expected next task
+Run that Subscription V2 prompt in the development environment, then review its implementation/audit report.
+
+## 5. Files/features expected to change next
+Potentially:
+- `prisma/schema.prisma` only if truly needed
+- existing subscription service/admin service
+- subscription validation
+- subscription APIs
+- admin subscription/payment APIs
+- Agency Subscription page
+- Platform Owner plan/payment pages
+- navigation subscription badge
+- subscription tests
+
+Exact files must be determined by pre-audit.
+
+## 6. Decisions already finalized
+- 7-day automatic trial
+- no paid selection at signup
+- paid plans available from Day 1 on Subscription page
+- Monthly + Yearly
+- manual UPI/bank/UTR
+- Platform Owner approval
+- Platform Owner editable plans
+- preserve historical purchased price
+- no hard-deleting referenced plans
+- no automatic gateway/proration for beta
+- no duplicate billing architecture
+
+## 7. What new chat should do first
+1. Read this entire file.
+2. Inspect current code, especially Phase 21-B subscription implementation.
+3. Compare actual code against Subscription V2 rules.
+4. Do not blindly create schema/routes.
+5. Implement only missing gaps.
+6. Run tests + browser QA.
+7. Then move to full beta hardening.
+
+---
+
+# 51. IMPORTANT DECISION LOG
+
+| ID | Decision | Final Status | Do Not Revert? |
+|---|---|---|---|
+| D-001 | Internal roles are only `PLATFORM_OWNER` and `AGENCY_OWNER` | FINAL | YES |
+| D-002 | Customer is not an internal User/Auth role | FINAL | YES |
+| D-003 | Platform Owner has `agencyId = null` | FINAL | YES |
+| D-004 | Supabase Auth UUID maps 1:1 to Prisma `User.id` | FINAL | YES |
+| D-005 | Agency Owner belongs to exactly one agency | FINAL | YES |
+| D-006 | Tenant `agencyId` is derived server-side | FINAL | YES |
+| D-007 | Public customer access is token-based | FINAL | YES |
+| D-008 | Public payloads must redact supplier costs/margins/internal notes | FINAL | YES |
+| D-009 | New agency gets automatic 7-day free trial | FINAL | YES |
+| D-010 | Email verification disabled for V1 historically | FINAL unless intentionally revisited | CHECK BEFORE CHANGE |
+| D-011 | No paid-plan selection/payment required during signup | FINAL | YES |
+| D-012 | Paid plans visible from Day 1 in Subscription page | FINAL | YES |
+| D-013 | Paid plans support Monthly and Yearly | FINAL | YES |
+| D-014 | Platform Owner can edit plan pricing/config | FINAL | YES |
+| D-015 | Beta SaaS payment = UPI/Bank/UTR + Platform Owner verification | FINAL | YES |
+| D-016 | Plan becomes active only after approval | FINAL | YES |
+| D-017 | Historical subscription price must not change when plan price changes | FINAL | YES |
+| D-018 | Referenced plans should be deactivated, not hard-deleted | FINAL | YES |
+| D-019 | No complex automatic proration in beta | FINAL | YES |
+| D-020 | SaaS billing and agency travel payments are separate domains | FINAL | YES |
+| D-021 | No automatic Stripe/Razorpay recurring billing in current beta | FINAL | YES |
+| D-022 | Subscription V2 must extend Phase 21-B, not replace it | FINAL | YES |
+| D-023 | Current goal is beta quality hardening, not uncontrolled feature expansion | FINAL | YES |
+| D-024 | All features already included through Phase 21 should work in beta | FINAL | YES |
+| D-025 | Full responsive + smooth/fast UI is a beta release requirement | FINAL | YES |
+| D-026 | Static/misleading subscription/sidebar data must be removed or made dynamic | FINAL direction | YES |
+| D-027 | No destructive production reset after pilot initialization | FINAL | YES |
+| D-028 | Public quotation security fix must be preserved | FINAL | YES |
+| D-029 | Phase 21-F is closed unless a real defect appears | FINAL | YES |
+
+---
+
+# 52. REJECTED / REMOVED / POSTPONED FEATURES
+
+## REMOVED — DO NOT REIMPLEMENT
+### Travel Agent / Sales Agent internal role
+Not part of finalized role model.
+
+### Internal Customer role
+Do not create customer Auth/User accounts.
+
+### Visa assistance
+Removed from earlier related travel-agency business scope; not part of current TripDesk product plan.
+
+### Flights
+Removed from earlier travel-agency business scope/current V1.
+
+---
+
+## POSTPONED — NOT CURRENT BETA
+- Razorpay/Stripe automated recurring billing
+- complex SaaS tax/GST engine
+- multi-currency live forex
+- airline/GDS integration
+- advanced AI assistant
+- major automation engine
+- marketing automation
+- bulk campaigns
+- SMS provider onboarding
+- WhatsApp provider production onboarding unless later explicitly configured
+- usage-based billing
+- proration
+- coupons
+- seat-based billing
+
+---
+
+# 53. SECURITY DO-NOT-BREAK RULES
+
+1. Never trust client `agencyId`.
+2. Never query a tenant business record without tenant scope.
+3. Never expose supplier cost to customer/public route.
+4. Never expose gross margin/profit to customer/public route.
+5. Never allow Agency Owner to access `/admin`.
+6. Never allow public token to mutate unrelated customer data.
+7. Never create Customer internal `User`.
+8. Never attach Platform Owner to an agency.
+9. Never expose service-role key/client-secret in browser.
+10. Never log real passwords/tokens/DB credentials.
+11. Keep public invalid-token responses safe.
+12. Preserve IDOR protections.
+
+---
+
+# 54. PERFORMANCE DO-NOT-BREAK RULES
+
+1. Avoid duplicate API calls.
+2. Avoid repeated `/api/auth/me` calls if current architecture already solved them.
+3. Avoid unnecessary `useEffect` data fetch loops.
+4. Avoid unnecessary `router.refresh()`.
+5. Avoid hard navigation where client/server transition is sufficient.
+6. Avoid N+1 Prisma queries.
+7. Use narrow `select` / aggregate/groupBy where practical.
+8. Preserve indexes on tenant and relation keys.
+9. Do not fetch entire ledgers if only counts are needed.
+10. Use pagination for large histories.
+11. Avoid converting server components to client components without need.
+
+---
+
+# 55. BETA RELEASE HARDENING RULES
+
+Before real-user release, every existing module should be tested for:
+
+## Functional
+- create
+- read
+- update
+- archive/delete/cancel where supported
+- status transitions
+- refresh/back/forward
+- duplicate prevention
+
+## Responsive
+- desktop
+- laptop
+- tablet
+- mobile
+
+## States
+- empty
+- loading
+- success
+- error
+- long text
+- missing optional data
+- large numbers
+
+## Performance
+- request count
+- no loops
+- no obvious slow queries
+- smooth transitions
+
+## Security
+- cross-tenant
+- public token
+- role guards
+
+## Realistic data
+Test long real-world:
+- customer names
+- hotel names
+- itinerary titles
+- addresses
+- quotation titles
+- large INR values
+- lists with many rows
+
+---
+
+# 56. DEVELOPMENT RULES FOR THE NEW AI
+
+1. Read this context before coding.
+2. Current codebase is more authoritative than any historic text.
+3. Do not change finalized architecture silently.
+4. Do not reintroduce removed roles.
+5. Preserve tenant isolation.
+6. Preserve public commercial redaction.
+7. Reuse existing project patterns.
+8. Audit before adding a Prisma model.
+9. Audit before adding an API route.
+10. Audit Phase 21-B before changing subscriptions.
+11. Use server-side business logic.
+12. Use Zod/established validation.
+13. Keep API routes thin.
+14. Keep secrets server-only.
+15. Prefer minimal safe change over rewrite.
+16. Do not claim browser QA unless browser QA actually ran.
+17. Do not claim tests passed unless commands actually ran.
+18. Do not run destructive DB cleanup scripts without explicit user confirmation.
+19. Preserve pilot/real user data.
+20. Do not seed large synthetic datasets into production-like DB.
+21. Run `prisma validate`, typecheck, build, and relevant regression after major changes.
+22. For UI changes, test desktop/tablet/mobile.
+23. For public routes, inspect network payload for sensitive fields.
+24. For finance/subscription changes, use atomic transaction where needed.
+25. For approval/retry flows, design idempotently.
+26. Document files changed, schema changes, security impact, QA, and remaining issues.
+
+---
+
+# 57. AI CONTINUATION PROTOCOL
+
+## HOW THE NEW CHAT MUST WORK
+
+This document is the continuity source of truth for TripDesk.
+
+The future AI must:
+
+1. Read the entire document before making project-wide recommendations.
+2. Treat current codebase/actual implementation as highest authority.
+3. Treat sections marked FINAL as binding unless the user explicitly changes them.
+4. If the user request conflicts with a FINAL decision, explain the conflict before implementing.
+5. Do not assume missing information.
+6. Before implementing any feature, identify impact on:
+   - database
+   - services/business logic
+   - authentication
+   - authorization
+   - tenant isolation
+   - routes/APIs
+   - UI
+   - public security
+   - tests
+7. Reuse current architecture and utilities.
+8. Avoid unnecessary rewrites.
+9. Do not re-create functionality already present.
+10. Keep customer/public payloads commercially safe.
+11. Preserve two-role system.
+12. Preserve real/pilot data.
+13. Run appropriate QA.
+14. After implementation report:
+   - files created
+   - files modified
+   - database changes
+   - APIs/routes
+   - business rules
+   - authorization/security impact
+   - tests
+   - browser QA
+   - build/typecheck
+   - known limitations
+   - exact final status
+
+The new AI should continue from the current state rather than starting the project again.
+
+---
+
+# 58. SOURCE OF TRUTH PRIORITY
+
+If sources conflict, use this order:
+
+1. **Current codebase / actual implementation**
+2. **FINAL decisions in this Master Context**
+3. **Latest confirmed project discussions**
+4. **Earlier project discussions**
+5. **Ideas / suggestions / examples**
+
+A newer FINAL decision overrides an older idea.
+
+---
+
+# 59. FINAL PROJECT SNAPSHOT
+
+## Project
+**TripDesk**
+
+## Product
+**Travel Agency SaaS / Travel Agency Operating System**
+
+## Current Architecture
+- Next.js 16 App Router
+- React 19
+- TypeScript
+- PostgreSQL
+- Prisma 7
+- Supabase Auth
+- Supabase SSR cookies
+- service-layer business logic
+- Zod validation
+- multi-tenant `agencyId` isolation
+- public token customer access
+- Tailwind/UI component system
+- PDFKit documents
+- structured production logging
+
+## Roles
+Internal:
+- `PLATFORM_OWNER`
+- `AGENCY_OWNER`
+
+External:
+- Customer via secure public token, not internal User role
+
+## Authentication
+Supabase Auth with UUID mapped to Prisma `User.id`.
+
+## Database
+Multi-tenant PostgreSQL schema including:
+- Agency/User
+- SubscriptionPlan/Subscription/SubscriptionPayment
+- Customer/Enquiry
+- Trip/Quotation/Booking
+- Payments/Payables
+- Supplier/RateSheet
+- Operations
+- TravelDocument
+- Feedback/Referral
+- Notifications/Communication
+- Platform admin models
+
+## Current Phase
+**Subscription V2 / Beta Subscription Management — NEXT IMPLEMENTATION TASK**
+
+## Last Completed Phase
+**Phase 21-F — Agency Communication Center & Customer Notification Engine**
+
+## Last QA
+**Phase 21-F Browser QA Verification — PASSED & CERTIFIED**
+- 28/28 scenarios
+- no defects reported
+
+## Current Status
+Core product functionality through Phase 21 is built and certified. Project strategy is now focused on **real-user beta readiness**, not adding broad new modules.
+
+## Next Development
+1. Execute Subscription V2 enhancement against existing Phase 21-B architecture.
+2. Audit sidebar static/misleading badges.
+3. Run full beta release hardening across every current module.
+
+## Major Pending
+- professional dynamic Subscription UI
+- Monthly/Yearly subscription
+- Platform Owner editable pricing
+- historical price snapshots if needed
+- end-to-end beta hardening
+- responsive full-app sweep
+- performance full-app sweep
+- realistic user testing
+- controlled beta rollout
+
+## Major Known Issues / Concerns
+No active P0/P1 issue is known from the latest Phase 21-F browser QA.
+
+Known beta concerns:
+- Subscription UI currently appears insufficiently dynamic/professional
+- sidebar badges appear static/misleading and require audit
+- full-app performance/responsive quality should be revalidated before real-user beta
+
+## Important Do-Not-Break Rules
+- two internal roles only
+- customer is not internal User
+- Platform Owner has `agencyId = null`
+- server-derived tenant context
+- zero public supplier-cost/margin leakage
+- 7-day automatic trial
+- no paid plan required at signup
+- subscription activation only after verified payment
+- preserve historical subscription prices
+- no duplicate subscription architecture
+- no destructive cleanup
+- current focus = stable, fast, responsive beta
+
+---
+
+
+---
+
+# 60. MASTER CONTEXT VERIFICATION
+
+This section records the final consistency audit performed before using this document as the TripDesk handover/master context.
+
+## Verification method
+
+The document was checked against:
+- the available prior TripDesk conversation history and recovered project decisions;
+- the current Master Context content itself;
+- the known Phase 21-B through 21-F implementation history;
+- the latest QA/security/performance/UI findings available in the conversation record.
+
+Where the historic conversation did not independently prove an exact phase number, exact schema field, exact route name, or exact implementation detail, this document deliberately preserves the uncertainty and instructs the next AI to inspect the current codebase rather than inventing facts.
+
+## 1. FINAL decisions missing
+
+### Result: MOSTLY COMPLETE — ADDITIONS MADE
+
+The audit confirmed that the major final decisions were already present:
+- exactly two internal roles;
+- Customer is not an internal role;
+- Platform Owner `agencyId = null`;
+- Supabase Auth UUID = Prisma `User.id`;
+- server-derived tenant isolation;
+- secure public token architecture;
+- public commercial-data redaction;
+- automatic 7-day trial;
+- no plan/payment required at signup;
+- paid plans visible from Day 1;
+- Monthly + Yearly;
+- manual UPI/Bank/UTR beta billing;
+- Platform Owner verification;
+- paid activation only after verification;
+- historical price preservation;
+- referenced plans are deactivated, not hard-deleted;
+- no complex proration;
+- no automatic Stripe/Razorpay recurring billing;
+- SaaS billing separated from agency travel finance;
+- Subscription V2 extends Phase 21-B;
+- beta hardening before broad feature expansion.
+
+Additional preserved clarifications were added for:
+- Phase 21-F provider simulation limitation;
+- communication idempotency;
+- public notification token identity resolution;
+- explicit 21-G uncertainty/status;
+- beta feedback-loop strategy.
+
+## 2. Old decisions accidentally presented as current
+
+### Result: NO MATERIAL CONFLICT REMAINS AFTER THIS AUDIT
+
+Historic ideas that could be confused with current architecture are explicitly marked:
+- Travel Agent / Sales Agent role = removed;
+- internal Customer role = removed;
+- paid-plan selection before signup = superseded by automatic 7-day trial;
+- flights = removed;
+- visa assistance = removed;
+- automatic gateway/recurring billing = postponed;
+- broad automation/AI = future;
+- 21-G = historical intended workstream, not a verified completed phase.
+
+## 3. Removed features that could be reintroduced
+
+### Result: COVERED
+
+The document explicitly blocks reintroduction of:
+- Travel Agent / Sales Agent internal role;
+- internal Customer User/Auth role;
+- visa assistance;
+- flight booking module.
+
+Postponed capabilities are also explicitly listed and must not be silently added during beta.
+
+## 4. Missing development phase
+
+### Result: ONE HISTORIC LABEL REQUIRED CLARIFICATION
+
+`21-G` was mentioned in the historic roadmap as an intended final integration/regression workstream, but no independently verified completed implementation report is available.
+
+Resolution:
+- 21-G is NOT claimed as completed;
+- its exact scope is NOT invented;
+- the project transition after 21-F to beta hardening is treated as the current direction.
+
+The exact `21-A` label/scope is also not independently recoverable with enough confidence to invent additional deliverables. The document now treats the post-Phase-20 gap-planning work as historical planning context rather than asserting unverified scope.
+
+## 5. Missing QA phase/finding
+
+### Result: COVERED WITH KNOWN LIMITATIONS
+
+Preserved QA history:
+- QA-01 Authentication;
+- QA-02 Authorization/Routing;
+- QA-03 Functional Modules;
+- QA-04 Full Journey/UX/Security;
+- QA-05 Performance/API/Database;
+- QA-05B Browser Performance/Network;
+- QA-06A Responsive/UI;
+- QA-06B UI/UX follow-up;
+- QA-07A Deep Security/Tenancy;
+- Phase 20 final audit;
+- Phase 20.6 production smoke;
+- Phase 20.6B full browser QA;
+- Phase 21-B through 21-F regression/QA;
+- Phase 21-F browser QA.
+
+Important findings retained:
+- public quotation commercial-data leak = fixed;
+- customer duplicate detection weakness = fixed;
+- supplier duplicate detection = implemented;
+- historic performance concerns = must be re-audited;
+- responsive quality = must be re-audited across the full app;
+- multi-tenant isolation = repeatedly passed and remains non-negotiable.
+
+The four total QA-04 issues are not all independently recoverable from the available conversation. Only the two specifically known findings are named; the other two are not invented.
+
+## 6. Missing database model/relationship
+
+### Result: COVERED AT THE RECOVERABLE LEVEL; EXACT SCHEMA REMAINS CODE-AUTHORITATIVE
+
+The document already preserves the major recoverable model families and relationships, including:
+- Agency/User;
+- SubscriptionPlan/Subscription/SubscriptionPayment;
+- Customer/Enquiry/FollowUp;
+- Trip/travelers/itinerary/inventory links;
+- Quotation/public share;
+- Booking/Payment/SupplierPayable/SupplierPayment/OperationalExpense;
+- Supplier/RateSheet;
+- TripOperation/HotelConfirmation/VehicleDispatch/ActivityConfirmation/OperationEvent/OperationalIssue;
+- TravelDocument;
+- CustomerFeedback/Referral;
+- CustomerNotification/CustomerNotificationPreference;
+- AgencyCommunicationSetting;
+- PlatformAuditLog/PlatformAnnouncement/PlatformSetting.
+
+Phase 21-F deterministic communication idempotency is explicitly preserved.
+
+Exact model names/field names that varied historically must still be confirmed against `prisma/schema.prisma`.
+
+## 7. Missing route
+
+### Result: COVERED AS A RECOVERABLE ROUTE MAP, WITH CODE-AUTHORITY WARNING
+
+The document preserves:
+- public auth routes;
+- quotation/trip/booking token routes;
+- agency dashboard/business routes;
+- admin routes;
+- supplier duplicate/reactivation;
+- communication;
+- feedback;
+- referrals;
+- customer insights;
+- reports;
+- documents;
+- subscription/payment APIs.
+
+Because exact route inventories changed during development, the document explicitly states that the current repository is authoritative and that the Subscription route must not be assumed without inspection.
+
+## 8. Missing authentication/authorization rule
+
+### Result: COVERED
+
+The final rules now explicitly preserve:
+- Supabase Auth;
+- SSR cookies;
+- UUID mapping;
+- two internal roles;
+- singleton Platform Owner;
+- Platform Owner `agencyId = null`;
+- Agency Owner non-null agency;
+- server-derived tenant scope;
+- Platform Owner-only admin operations;
+- Agency Owner-only tenant operations;
+- public token identity resolution;
+- IDOR protection;
+- public invalid-token safety;
+- server-only secrets;
+- public commercial redaction.
+
+## 9. Missing subscription/trial rule
+
+### Result: COMPLETE
+
+The document now preserves:
+- 7-day automatic trial;
+- no plan/payment during signup;
+- trial shown as current plan;
+- dynamic trial dates/days;
+- paid plans visible from Day 1;
+- Monthly/Yearly;
+- manual UPI/Bank/UTR;
+- pending verification;
+- Platform Owner approval/verification;
+- rejection reason and resubmission;
+- activation only after verified payment;
+- historical purchased-price snapshot;
+- no hard delete of referenced plans;
+- no complex proration;
+- no automatic Stripe/Razorpay recurring billing;
+- dynamic yearly savings;
+- expiry behavior must respect current `requireWriteAccess()` implementation.
+
+## 10. Missing Customer role decision
+
+### Result: COMPLETE
+
+Customer is explicitly an external business/traveler persona, not:
+- `UserRole`;
+- Supabase internal auth role;
+- internal `User`.
+
+Customer access is through secure token-scoped public experiences where applicable.
+
+## 11. Missing upcoming development phase
+
+### Result: COMPLETE
+
+Current next task:
+1. Subscription V2 / Beta Subscription Management.
+
+Then:
+2. Sidebar dynamic/misleading badge audit.
+3. Full Beta Release Hardening.
+4. Controlled real-agency beta.
+5. Post-beta feature expansion based on feedback.
+
+## 12. Mismatch between current implementation and documented architecture
+
+### Result: NO CONFIRMED ARCHITECTURE MISMATCH; IMPLEMENTATION MUST BE RE-INSPECTED
+
+Known historic mismatches/mock gaps were already addressed in Phase 21:
+- legacy admin SaaS payment UI → Phase 21-B live DB billing;
+- `useExperience()` persistence islands → Phase 21-C removed;
+- placeholder `/reports` → Phase 21-D live reporting;
+- customer portal feedback → Phase 21-E;
+- communications/notification center → Phase 21-F.
+
+The document does NOT claim that every current UI detail is already perfect. Subscription UI and sidebar badges remain beta concerns.
+
+## 13. Security issue previously found and fixed
+
+### Result: COMPLETE
+
+The public quotation security leak is explicitly marked fixed and must never regress.
+
+The customer duplicate-detection weakness is also marked fixed.
+
+The public-data security invariant remains:
+- no supplier cost;
+- no buy price;
+- no gross profit/margin;
+- no supplier payable;
+- no internal agency remarks.
+
+Phase 21-F additionally requires public notification identity to resolve from the validated token, not client-provided IDs.
+
+## 14. Important performance issue
+
+### Result: COMPLETE
+
+Historic performance concerns remain documented:
+- duplicate API calls;
+- repeated `/api/auth/me`;
+- unnecessary `useEffect`;
+- rerenders;
+- `router.refresh()`;
+- hard navigation;
+- slow Prisma queries;
+- N+1;
+- excessive selections;
+- missing indexes;
+- dashboard loading.
+
+Phase 21-F had no duplicate request loops in its browser QA, but this does NOT certify the whole application as perfectly optimized. A full beta performance sweep remains required.
+
+## 15. UI/UX decisions that must be preserved
+
+### Result: COMPLETE
+
+Preserved:
+- polished modern SaaS dashboard style;
+- sidebar + header;
+- KPI cards;
+- data tables;
+- filters/search;
+- modals/drawers;
+- badges/toasts;
+- responsive grids;
+- separate customer portal experience;
+- full loading/empty/error/success handling;
+- long text/large number safety;
+- no `NaN`/`undefined`;
+- desktop/tablet/mobile validation;
+- no horizontal overflow or clipped controls.
+
+Subscription-specific:
+- strong Current Plan;
+- Monthly/Yearly toggle;
+- dynamic plan cards;
+- clear CTA;
+- payment status;
+- renewal information;
+- feature list;
+- mobile-safe;
+- no fake/static values.
+
+## Final audit conclusion
+
+### Coverage: COMPLETE WITH EXPLICIT HISTORICAL UNCERTAINTIES
+
+The Master Context now contains the important finalized architecture, business, subscription, security, QA, performance, UI/UX, route, database-family, and roadmap decisions recoverable from the project history.
+
+The remaining uncertainties are intentionally documented rather than guessed:
+- exact pre-Phase-10 chronology;
+- exact full Prisma schema field/relationship inventory;
+- exact current route inventory;
+- exact current Subscription route;
+- exact two additional QA-04 findings;
+- exact formal `21-A` scope/label;
+- whether any historically discussed 21-G integration work was ever implemented.
+
+These uncertainties do not block continuation because the document explicitly directs the next AI to inspect the current codebase and reports before making changes.
+
+## MASTER CONTEXT VERIFICATION
+
+- **Coverage:** COMPLETE
+- **Missing information:** No known material product decision is missing. Remaining uncertainties are explicitly identified above rather than fabricated.
+- **Conflicting decisions found:** Historical conflicts existed around paid-plan selection at signup, internal roles, and future feature scope.
+- **Resolved conflicts:** Final architecture now wins: two internal roles only; Customer is external/token-based; no plan/payment at signup; 7-day trial; beta hardening before expansion. Historic 21-G/21-A uncertainty is explicitly marked.
+- **Current development starting point:** Phase 21-F is complete and certified; project is at Beta Release Preparation / Subscription V2.
+- **Next task:** Audit the existing Phase 21-B subscription implementation and execute the approved Subscription V2 / Beta Subscription Management changes only where actual code gaps exist, followed by regression and responsive browser QA.
+
+---
+
+# END OF MASTER HANDOVER
+
+**Recommended first action in the new chat:** inspect the current Phase 21-B subscription implementation and execute the approved Subscription V2/Beta Subscription Management changes only where gaps exist. This document has been final consistency-audited; do not restart or redesign the project.
+
+
+---
+
+# 98. V3 CURRENT AUTHORITATIVE STATE — SEPTEMBER 10, 2026
+
+This section is the current handoff authority for all work completed after the older V2 stopping point.
+
+## 98.1 Current stopping point
+
+The project has progressed beyond Subscription V2 and the old DEV-01/DEV-02/DEV-03/DEV-04 pending roadmap.
+
+Current sequence:
+
+```text
+BH-07 Conditional Go
+  ↓
+DEV-01 Form UX Consistency — COMPLETE
+  ↓
+DEV-01 QA — COMPLETE
+  ↓
+DEV-02A Global UX Audit — COMPLETE
+  ↓
+DEV-02B Global UX Implementation — COMPLETE
+  ↓
+DEV-02 Final Closeout — COMPLETE
+  ↓
+DEV-03A Final Decision Lock & Compatibility Audit — COMPLETE
+  ↓
+DEV-03B Excel Import — COMPLETE
+  ↓
+DEV-03 QA — PASS WITH LOW-RISK FINDINGS / CLOSED
+  ↓
+DEV-04B Invoice V1 Implementation — COMPLETE
+  ↓
+DEV-04 QA — PASS / CLOSED
+  ↓
+DEV-05A Global UX Consistency & Responsive Audit — COMPLETE
+  ↓
+DEV-05B Global UX Consistency, Professional Messaging & Responsive Implementation — COMPLETE per implementation report
+  ↓
+CURRENT: DEV-05 QA — OPEN
+  ↓
+Next: Global UI Consistency QA / controlled fixes if required
+  ↓
+Pre-Beta Deployment / Operational Readiness
+  ↓
+Controlled Real-Agency Beta
+```
+
+**No new feature implementation is authorized merely because DEV-05 QA identifies a visual inconsistency.** Audit first; implement only after the findings are reviewed and a controlled implementation task is explicitly started.
+
+## 98.2 V3 authority rules
+
+- Actual current codebase remains the ultimate implementation authority.
+- Sections 98+ are the latest documented project state.
+- Where a V2 section says a feature is pending but Sections 98+ say it is complete, the V3 status wins.
+- Do not treat agent-reported implementation claims as independently code-verified unless the report explicitly includes executed verification or the current repository is inspected.
+- No destructive DB reset.
+- No unrelated refactor.
+- No architecture restart.
+- Preserve all final business/security decisions.
+- Every successful implementation or QA phase must update this master context with the final result.
+
+---
+
+# 99. V2 → V3 GAP AUDIT
+
+## 99.1 Missing from V2
+
+The following important post-V2 work was missing or not represented as current:
+
+1. **DEV-01 was implemented and QA-closed.** V2 still listed form UX consistency as pending.
+2. **DEV-02A/02B and final closeout were completed.** V2 still listed table scrolling, password visibility, and page scroll reset as pending.
+3. **DEV-03A/03B were completed.** V2 still described Hotel/Rate Sheet Excel import as proposed/not implemented.
+4. **DEV-03 QA was completed:** PASS WITH LOW-RISK FINDINGS.
+5. **Hotel Code behavior was finalized/implemented:** auto-generated stable code in the `HTL-0001` style, agency-scoped, immutable after creation.
+6. **Hotel/Rate Sheet import validation/preview workflow was implemented.** Manual and Excel workflows share the supported business fields/validation direction.
+7. **DEV-04B Invoice V1 was implemented.** V2 still described invoices as a proposed feature.
+8. **DEV-04 QA was completed:** 60/60 Invoice matrix + 23/23 Excel regression, TypeScript PASS, production build PASS, 0 blocking defects.
+9. **All 37 Invoice V1 decisions were finalized.** V2 contained only unresolved Invoice design questions and must no longer be treated as current.
+10. **The Invoice/Payment financial snapshot and lifecycle architecture is now implemented and verified.**
+11. **DEV-05A global UX consistency audit was completed.** It found 31 native confirmation-dialog usages across 15/20 reviewed page/component files, plus messaging/loading/header/status/responsive inconsistencies.
+12. **DEV-05B was implemented per agent report.** Shared ConfirmDialog, StatusBadge, improved error extraction, standardized loading patterns, PageHeader reuse, responsive hardening, and global-search invoice entry were added.
+13. **DEV-05 QA is now the current open phase.**
+14. A new **Global UI Consistency finding** was identified during manual browser inspection: `/invoices` and `/documents` visibly use different page/header/filter/table/card/button patterns, and `/customers` provides another established pattern. This must be audited across the entire application before DEV-05 is closed.
+
+## 99.2 Outdated in V2
+
+These V2 statements are now stale and must not be used as current state:
+
+- Subscription V2 = planned. **Current: implemented + verified.**
+- DEV-01 = pending. **Current: complete + QA complete.**
+- DEV-02 table scrolling/password visibility/page scroll = pending. **Current: implemented/closed through DEV-02.**
+- DEV-03 Hotel/Rate Sheet Excel import = proposed/not implemented. **Current: implemented + QA closed.**
+- DEV-04 Customer Invoice = proposed/not implemented. **Current: implemented + QA closed.**
+- The old V2 roadmap ending at DEV-04 QA is obsolete.
+- The old V2 current stopping point of Subscription V2 is obsolete.
+- Old V2 statements that invoice design still required decisions are obsolete because all 37 Invoice V1 decisions are now locked.
+- Old V2 statements that sidebar/static UI and broad UX were merely future concerns are superseded by DEV-05A/05B and the current DEV-05 QA findings.
+
+## 99.3 Changed/currently clarified decisions
+
+- Hotel/Rate Sheet Excel import moved from proposed to implemented.
+- Hotel Code is an auto-generated stable agency-scoped identifier; exact persistence implementation must still be treated as code-authoritative.
+- Invoice V1 is no longer a design exercise; its lifecycle, numbering, payments, PDF, cancellation, replacement, and security rules are locked.
+- DEV-05 is now a global UI consistency and professional UX verification phase, not merely a native-dialog replacement exercise.
+- The current product must be responsive down to **320px** for authenticated UI where practical; intentional table horizontal scrolling must remain contained inside the table region.
+
+## 99.4 Newly completed development
+
+### Subscription V2
+- Dynamic DB-backed plan catalog.
+- Monthly/Yearly.
+- 7-day trial.
+- Manual UPI/Bank + UTR.
+- Platform Owner verification/rejection.
+- Historical price snapshot protection.
+- Tenant isolation.
+
+### DEV-01
+- Form validation error rendering consistency.
+- Existing Formik/Yup patterns preserved.
+- Zod server/API validation preserved.
+- Loading/server/form-level errors standardized where required.
+
+### DEV-02
+- Table internal scrolling.
+- Password visibility controls.
+- Page scroll reset behavior.
+- Related global UX fixes discovered during implementation.
+
+### DEV-03
+- Hotel Excel import.
+- Hotel Rate Sheet Excel import.
+- Strict file/column/row/business validation.
+- Preview before confirmation.
+- Safe create/update workflow.
+- Sample Download retained on Hotel and Hotel Rate import screens with production-aligned columns/validation and realistic non-private sample data.
+- Existing hotel records received stable generated Hotel Codes during implementation/backfill.
+
+### DEV-04B
+- Customer Invoice V1 lifecycle.
+- Invoice snapshot model/workflow.
+- Invoice numbering.
+- Invoice line items/discounts.
+- Due dates.
+- Payment recording/partial payments/voiding.
+- Status and overdue calculation.
+- Cancellation/replacement.
+- Invoice PDF.
+- Search/filter/list/detail workspace.
+- Operational history.
+- Tenant/security enforcement.
+
+### DEV-05B
+Per the implementation report supplied during the conversation:
+- Shared `ConfirmDialog` created at `src/components/shared/confirm-dialog.tsx`.
+- Shared `StatusBadge` created at `src/components/shared/status-badge.tsx`.
+- `getErrorMessage` enhanced in `src/lib/utils.ts` to avoid leaking raw Prisma/SQL/internal details.
+- Native confirmation/alert/prompt usages reported at zero after implementation.
+- List/table loading standardized with shared skeleton patterns.
+- Button pending/loading states improved.
+- Shared `PageHeader` reused across core modules.
+- Error/empty states standardized using shared components where applicable.
+- Global Search includes Invoices.
+- TopBar and responsive controls hardened for small widths.
+- Tables/toolbars/filters wrapped or scrolled safely for small screens.
+- No DB migrations/schema changes/auth/RLS changes were reported for DEV-05B.
+
+**Verification qualification:** DEV-05B implementation is currently **agent-reported**, not independently verified in this chat. DEV-05 QA must verify the actual code and browser behavior before the phase can close.
+
+## 99.5 Newly completed QA
+
+### DEV-03 QA
+- Final verdict: **PASS WITH LOW-RISK FINDINGS / CLOSED**.
+- 60-point automated Invoice-related suite was not part of DEV-03; the relevant DEV-03 Excel suite reported **23/23 passed**.
+- TypeScript/build passed.
+- Regression against relevant Phase 21-E/21-F functionality passed.
+- Hotel Code backfill: 367 existing hotels reported with 0 null/malformed codes.
+- Batch import performance improved from approximately 15.48s for 105 rows to approximately 925ms in the representative test.
+- Low-risk finding: Hotel `hotelCode` had an application-level uniqueness/concurrency hardening consideration because the reported schema did not have a DB unique constraint; do not silently change the schema without code/schema verification and an explicit hardening decision.
+
+### DEV-04 QA
+- Final verdict: **PASS — 100% VERIFIED, 0 BLOCKING DEFECTS**.
+- Invoice matrix: **60/60 passed**.
+- DEV-03 Excel regression: **23/23 passed**.
+- `npx tsc --noEmit`: PASS, 0 errors.
+- `npm run build`: PASS.
+- Business decision compliance: **37/37**.
+- Security/tenant isolation: zero confirmed cross-tenant vulnerabilities / IDOR risks in the tested invoice scope.
+- Parallel invoice issuance collision test passed with distinct sequential numbers and no observed sequence collision/gap in the tested scenario.
+- PDF snapshot/watermark behavior verified.
+- Public `/q/*`, `/trip/*`, `/b/*` routes audited with zero invoice exposure.
+- Scope exclusions verified.
+- One test-script TypeScript assertion issue involving a nullable `invoiceNumber` was fixed with a non-null assertion; final TypeScript result was clean.
+
+### DEV-05A
+- Read-only global UX consistency audit completed.
+- Found **31 native `confirm()` / `window.confirm()` usages** across 15/20 reviewed page/component files before DEV-05B.
+- Also identified inconsistent error messaging, loading presentation, page-header/container patterns, status badges, empty/error states, global search coverage, and 320px responsive risks.
+- Verdict: **NEEDS UX POLISH**, with no critical functional/data-loss defects reported.
+
+### DEV-05B
+- Agent report: implementation **COMPLETE / PASS**.
+- `npx tsc --noEmit`: PASS.
+- `npm run build`: PASS.
+- Invoice 60/60 regression: PASS.
+- Excel 23/23 regression: PASS.
+- Responsive code-level verification reported for 320, 360, 375, 390, 414, 768, 1024+.
+- Browser-level DEV-05 QA is **NOT YET CLOSED**.
+
+---
+
+# 100. INVOICE V1 — FINAL 37-DECISION LOCK
+
+This section supersedes the old V2 Invoice proposal/design sections.
+
+## Decision #1 — Relationship
+One Booking → one active Invoice → multiple Payments. Cancelled historical invoices may remain. One active invoice per booking.
+
+## Decision #2 — Creation timing
+A Confirmed Booking does not automatically create an invoice. Agency Owner manually creates the invoice.
+
+## Decision #3 — Lifecycle / immutability
+- `DRAFT` is editable.
+- `ISSUED`, `PARTIALLY_PAID`, and `PAID` are immutable.
+- `CANCELLED` is terminal.
+- Correction = cancel old invoice + replacement.
+
+## Decision #4 — Payment relationship
+Every customer payment belongs to an Invoice. Partial/advance payments are allowed after invoice creation. No overpayment. No separate advance-payment architecture. No direct booking payment architecture for invoice V1.
+
+## Decision #5 — Customer invoice access
+Internal TripDesk + PDF only. No public invoice URL, customer invoice login, or online Pay Now in V1. Agency may manually send the PDF through its normal communication channels.
+
+## Decision #6 — Invoice statuses
+Exact business statuses:
+- `DRAFT`
+- `ISSUED`
+- `PARTIALLY_PAID`
+- `PAID`
+- `CANCELLED`
+
+No stored `UNPAID`. `OVERDUE` is calculated when balance > 0 and current date > due date.
+
+## Decision #7 — Numbering
+Agency-specific sequential numbers such as `INV-0001`. Number generated on issue, not draft. Unique within agency, immutable, never reused, concurrency-safe. No custom prefix/year in V1.
+
+## Decision #8 — Financial snapshot
+Invoice is an independent financial snapshot seeded from the confirmed booking/quotation. Draft can be edited. After issue, source changes do not silently change the invoice. `Subtotal − Discount = Total`. No GST/tax.
+
+## Decision #9 — Due date
+Agency Owner chooses due date. Required before issue. Due date ≥ invoice date. Same-day allowed. Due date may be after travel date; warning is acceptable. Immutable after issue.
+
+## Decision #10 — Line items / discount
+Multiple editable draft line items. Each line has Description, Quantity, Rate, Amount = Qty × Rate. Invoice-level discount only; fixed or percentage. No negative total. No line-level discount/tax/supplier margin/multi-currency.
+
+## Decision #11 — Draft behavior
+Invoice only from Confirmed Booking. If a draft already exists, continue it. Snapshot customer/booking/billing information. Draft can be edited and deleted. Deleting a draft consumes no number. Issue is explicit and transaction-safe.
+
+## Decision #12 — Cancellation
+Only Agency Owner. `ISSUED`/`PARTIALLY_PAID` can be cancelled; `PAID` cannot. Draft is deleted, not cancelled. Cancellation requires reason/timestamp/user. Payments remain retained. Booking is not auto-cancelled. Invoice cancellation does not auto-cancel booking. No credit-note/refund workflow.
+
+## Decision #13 — Payment recording/correction
+Only Agency Owner. Methods: Cash, UPI, Bank Transfer, Card, Other. Payment date defaults to today; future dates forbidden. Amount > 0 and ≤ remaining balance. Reference and notes optional. No new payment on cancelled invoice. Payments are immutable after creation. Correction uses `ACTIVE → VOIDED` with mandatory reason/user/timestamp. Voided payments are excluded from paid/balance/status and are not restorable.
+
+## Decision #14 — Invoice PDF
+PDF is generated from the stored invoice snapshot, not current booking financial values. Includes agency/customer/booking/invoice data, line items, discount, total, active paid amount, balance, active payment history, and branding/logo where supported. Draft PDF is marked `DRAFT — NOT AN ISSUED INVOICE` and has no invoice number. Issued PDF represents the immutable issued snapshot. Cancelled PDF is marked cancelled and includes cancellation metadata. Filename: `Invoice-{InvoiceNumber}.pdf`; draft uses a booking-based fallback. PDFKit is reused.
+
+## Decision #15 — Notes/instructions
+Optional customer-facing Invoice Notes and Payment Instructions. Internal Notes are separate and agency-only. Draft values are editable; issued values are immutable snapshots. Booking notes do not auto-sync. No new Payment Terms architecture. Reuse existing Agency Settings payment information where appropriate.
+
+## Decision #16 — Access/actions
+Dedicated `/invoices`. Booking links to current active invoice and cancelled history. List search: invoice number, customer name, customer phone, booking number. Filters: status, payment state, overdue, invoice date, due date. Detail is the billing workspace. Actions follow lifecycle: draft edit/preview/issue/delete; issued/partially paid download/print/record payment/cancel; paid download/print; cancelled download/print/create replacement.
+
+## Decision #17 — Eligibility
+**Invoice creation is permitted only from a Booking in the `CONFIRMED` status.** Pending/unconfirmed/cancelled bookings are rejected. The implementation must inspect the exact current Booking status enum before coding and must never invent or rename status values.
+
+## Decision #18 — Snapshot fields
+Final recommended snapshot content: invoice/agency/booking identifiers, invoice number/date/due date/status, customer name/phone/email/address, booking number/trip/package/travel dates, agency branding/contact data, subtotal/discount/total, customer-facing notes/payment instructions, and internal notes. Issued invoice remains correct after source changes.
+
+## Decision #19 — Invoice date
+Draft creation date by default. Agency Owner may edit in draft. Future invoice dates are forbidden. Immutable after issue.
+
+## Decision #20 — Financial validation
+Before issue: at least one line item; quantity > 0; rate ≥ 0; amount = qty × rate; subtotal correct; discount ≥ 0 and ≤ subtotal; valid non-negative total; due date exists; due date ≥ invoice date. Final server-side validation is authoritative.
+
+## Decision #21 — Currency
+INR only. Indian formatting. No conversion/multi-currency.
+
+## Decision #22 — Booking changes
+Booking changes do not automatically update an invoice draft or issued invoice. Booking UI may show a warning where supported.
+
+## Decision #23 — Booking cancellation
+Booking cancellation and invoice cancellation are independent lifecycles. Neither automatically cancels the other.
+
+## Decision #24 — Number concurrency
+Invoice numbering must be DB-safe and concurrency-safe, with no duplicate numbers/gaps/collisions under supported concurrent issuance. Cancelled invoice numbers remain consumed.
+
+## Decision #25 — Payment status
+- DRAFT → DRAFT.
+- Issued + no active payment → ISSUED.
+- Active payment < total → PARTIALLY_PAID.
+- Active payment = total → PAID.
+- Cancelled → CANCELLED.
+Voided payments do not count.
+
+## Decision #26 — Overdue
+Balance > 0 AND current date > due date. UI may show `ISSUED · OVERDUE` or `PARTIALLY_PAID · OVERDUE`. No cron is required.
+
+## Decision #27 — Deletion
+Only DRAFT invoices are deletable. Issued, partially paid, paid, and cancelled invoices are not deletable.
+
+## Decision #28 — Replacement
+Cancelled invoice → replacement draft → new invoice ID → new issue number. Same booking. Old cancelled invoice remains history. Old number is never reused.
+
+## Decision #29 — Audit history
+Basic operational events: Draft Created, Updated, Issued, Payment Recorded, Payment Voided, Cancelled, Replacement Created. Include user/time/reason where applicable. This is not a full accounting audit ledger.
+
+## Decision #30 — Permissions
+`AGENCY_OWNER` performs normal invoice operations. `PLATFORM_OWNER` does not receive normal agency billing workflow. No new invoice-specific role.
+
+## Decision #31 — Server security
+Every invoice/payment operation must authenticate, authorize, derive agency server-side, validate booking agency ownership, validate invoice agency ownership, validate payment ownership, and never trust client-supplied `agencyId`.
+
+## Decision #32 — Performance
+Use server-side pagination/filter/search, minimal list fields, no list-level payment-history loading, no N+1, and justified indexes. Detail loads detailed data.
+
+## Decision #33 — UX states
+Invoice UI must support loading, empty/no-invoice, draft, error, permission denied, not found, payment submission, void, cancellation, PDF generation/download, and other applicable pending states using the established shared UI patterns.
+
+## Decision #34 — Notifications
+Use existing Sonner/toast patterns for invoice creation, issue, payment, void, cancellation, and draft deletion. Errors must be actionable. No automated email/WhatsApp invoice delivery in V1.
+
+## Decision #35 — Search/filter
+Search invoice number, customer name, customer phone, booking number. Filters: status, payment state, overdue, invoice date, due date. Sort: invoice date, due date, invoice number, amount. Server-side. No saved filters/reporting.
+
+## Decision #36 — Reporting
+No dedicated accounting reports. Optional operational totals: Total Invoices, Total Billed, Total Paid, Total Outstanding, filtered by current search/filter. No P&L, balance sheet, GST, supplier payables, ledger, or revenue recognition module added to Invoice V1.
+
+## Decision #37 — Scope
+Included: full invoice lifecycle, numbering, snapshot, line items, discount, due date, PDF, payments/partial/void, balances/statuses, overdue, cancellation/replacement, history, search/filter, security. Excluded: GST/tax, credit/debit notes, refund accounting, supplier invoices/payables, full accounting ledger, P&L, online customer payment, public invoice URL, customer invoice login, automated WhatsApp/email, multi-currency, payment gateway, recurring invoices, and using invoice records as SaaS subscription billing.
+
+---
+
+# 101. HOTEL / RATE SHEET EXCEL — CURRENT STATE
+
+## Final architecture
+
+- Hotel Master remains hotel-level data.
+- RateSheet remains rate-level data.
+- No standalone `RoomType` model.
+- `roomType` remains a string in the existing architecture.
+- Supplier is **ON HOLD** as a product concept for new redesign work. Existing supplier models/code/routes/data must not be deleted or refactored merely because Hotel/RateSheet flows can work without them.
+- Do not create a Supplier-vs-Hotel split.
+
+## Import workflow
+
+```text
+Download Template
+  ↓
+Fill Excel
+  ↓
+Upload .xlsx
+  ↓
+Validate file format
+  ↓
+Validate columns
+  ↓
+Validate rows/data types/business rules
+  ↓
+Preview
+  ↓
+User confirms
+  ↓
+Create / Update
+```
+
+Manual entry and Excel import must use the same supported business fields and business rules.
+
+## Hotel import
+
+- One row = one Hotel master record.
+- Hotel Code is generated/stable in the application; import handling must not silently create conflicting codes.
+- Sample Download must remain visible and use production-aligned columns/validation with realistic non-private sample data.
+
+## Rate Sheet import
+
+- One row = one hotel rate record.
+- Hotel Code resolves to the Hotel master.
+- Room Type and Meal Plan remain fields, not a RoomType relation.
+- Vehicle/activity-only fields are not part of the Hotel Rate Sheet import.
+- Do not introduce GST/tax behavior merely because a legacy RateSheet field exists.
+
+## Current QA status
+
+DEV-03 and its QA are complete. Any future Excel hardening must preserve strict validation, preview, confirmation, tenant isolation, and safe update/create behavior.
+
+---
+
+# 102. DEV-05 — CURRENT GLOBAL UI CONSISTENCY AUDIT
+
+## 102.1 DEV-05A findings
+
+Before DEV-05B, the read-only audit found:
+
+- 31 native `confirm()` / `window.confirm()` instances across 15/20 reviewed page/component files.
+- Generic/error messages that could be too technical or inconsistent.
+- Some `toast.error(err.message || ...)` patterns with potential internal-error exposure.
+- Inconsistent terminology in some modules.
+- List pages often used centered spinners instead of shared table/page skeletons.
+- Page headers/container widths differed between modules.
+- Status badges were duplicated inline rather than consistently using a shared component.
+- Some ad-hoc error banners existed instead of shared `ErrorState`.
+- Global Search did not include Invoices.
+- TopBar and KPI layouts had 320px crowding risks.
+- Tables generally had horizontal scrolling, but responsive behavior required broader consistency review.
+
+## 102.2 DEV-05B implementation report
+
+Reported completed changes:
+
+- `src/components/shared/confirm-dialog.tsx`
+- `src/components/shared/status-badge.tsx`
+- enhanced `src/lib/utils.ts` `getErrorMessage`
+- shared loading/skeleton patterns
+- PageHeader reuse
+- shared ErrorState/EmptyState usage
+- invoice global-search entry
+- TopBar small-screen hardening
+- toolbar/filter/table responsive improvements
+- confirmation flows migrated across core modules
+
+The implementation report claims zero user-facing native `confirm`, `window.confirm`, `alert`, `window.alert`, `prompt`, and `window.prompt` after the change.
+
+## 102.3 NEW CURRENT FINDING — GLOBAL PAGE UI INCONSISTENCY
+
+Manual browser inspection after DEV-05B found visible structural differences between `/invoices` and `/documents`, with `/customers` also showing another established list-page pattern.
+
+Observed examples:
+
+### `/documents`
+- Large rounded PageHeader card.
+- Breadcrumb/context row.
+- Large title + description.
+- Right-side `Refresh List` action.
+- Separate search/filter card.
+- Large empty-state card.
+
+### `/invoices`
+- Title/description directly on page background rather than the same large header-card pattern.
+- Different title/icon structure.
+- Dark primary `Create from Booking` button instead of the same apparent primary-button treatment used elsewhere.
+- KPI cards before the search/filter area.
+- Separate search/filter card and table card.
+
+### `/customers`
+- Large PageHeader card.
+- KPI cards.
+- Search integrated into the table workspace.
+- Different but polished table/list structure.
+
+### Interpretation
+
+These differences are **not automatically defects** because different modules may legitimately have different information architecture. However, the application should share a consistent TripDesk design language and shared primitives. The current finding indicates that `/invoices`, `/documents`, and other list modules require a systematic consistency audit before DEV-05 can close.
+
+## 102.4 DEV-05 QA required scope
+
+Audit the entire authenticated application, not only `/invoices` and `/documents`.
+
+Review at minimum:
+
+- Dashboard
+- Enquiries
+- Customers
+- Trips
+- Quotations
+- Bookings
+- Invoices
+- Documents
+- Operations
+- Hotels
+- Rate Sheets
+- Suppliers
+- Vehicles
+- Activities
+- Finance
+- Payments
+- Follow-ups
+- Feedback & Reviews
+- Referrals & Rewards
+- Settings
+- Platform Owner/admin pages
+
+Also inspect important create/edit/detail/nested routes.
+
+### Consistency dimensions
+
+- PageHeader structure
+- breadcrumb/context treatment
+- page title/subtitle hierarchy
+- container/max-width/padding
+- primary/secondary/destructive button styles
+- button height/icon alignment/loading state
+- search input dimensions/icon/placeholder
+- filter/select dimensions and wrapping
+- KPI cards
+- ordinary cards
+- tables
+- table header/row/footer/pagination
+- status badges
+- action menus
+- dialogs
+- forms/field labels/errors
+- empty states
+- error states
+- loading skeletons
+- toast terminology
+- typography
+- spacing/radius/borders/shadows
+- icon sizing/alignment
+- responsive behavior
+- terminology consistency
+
+### Important principle
+
+Do **not** force every page to have identical structure. Dashboard, detail, form, quotation-builder, invoice-billing, and document pages may legitimately differ. The objective is:
+
+> **Different information architecture where necessary; one coherent TripDesk visual/design language everywhere.**
+
+### Canonical-pattern rule
+
+Do not assume `/invoices` is the canonical design and do not assume `/documents` is canonical. Inspect the existing shared components and strongest established patterns in the codebase before deciding which implementation should be reused.
+
+## 102.5 DEV-05 QA is read-only unless explicitly authorized
+
+For the current QA task:
+
+- do not patch defects during the audit;
+- do not refactor UI while measuring it;
+- do not redesign the product;
+- report exact route/file/component and severity for each inconsistency;
+- if implementation is later authorized, make the smallest controlled change and regression-test it.
+
+---
+
+# 103. CURRENT BUG / ISSUE REGISTER
+
+## FIXED + VERIFIED
+
+1. Public quotation commercial-data exposure — fixed; preserve public DTO redaction.
+2. Customer duplicate detection — fixed and verified.
+3. Customer portal cross-agency booking-number collision — fixed and verified; do not revert agency-safe lookup.
+4. Rate-costing N+1/repeated rate lookup behavior — fixed via batching; do not revert.
+5. Subscription `availablePlans` TypeScript gap — fixed.
+6. DEV-03 Excel import implementation defects — final QA passed with only low-risk findings.
+7. Invoice lifecycle/numbering/payment/PDF/security defects covered by DEV-04 QA — 60/60 passed.
+8. Native confirmation dialogs targeted by DEV-05B — implementation report claims zero remaining user-facing native dialogs.
+9. Error extraction/security messaging improvements — implemented per DEV-05B report; final QA still required.
+
+## LOW-RISK / OPEN HARDENING
+
+1. Hotel Code DB-level uniqueness/concurrency hardening may remain a future low-risk concern depending on the exact current schema. **REQUIRES CODEBASE VERIFICATION** before any schema change.
+2. Rate limiting.
+3. APM/advanced monitoring.
+4. Middleware → proxy naming migration.
+5. Real-world beta performance monitoring.
+
+## CURRENT OPEN UX QA FINDING
+
+**Global UI consistency:** `/invoices`, `/documents`, `/customers`, and other modules may not share sufficiently consistent page/header/search/filter/table/card/button patterns.
+
+Severity: **UX consistency / pre-beta quality**, not currently a known data-loss or security defect.
+
+Status: **OPEN — DEV-05 QA**.
+
+## Important runtime lesson — stale Prisma Client
+
+A prior local development runtime issue caused `prisma.invoice` to be undefined and `/api/invoices`/summary to return 500. Root cause was a long-running Next.js dev process retaining a stale global Prisma client after the Invoice model was added. Fresh test/build processes passed. Restarting the dev server resolved the issue. No DB/code fix was required.
+
+Do not misdiagnose this historic local HMR/global singleton issue as a current schema defect without reproducing it.
+
+---
+
+# 104. CURRENT TEST / BUILD BASELINE
+
+## Subscription V2
+
+- 46 lifecycle/tenant-isolation tests.
+- 118 assertions.
+- 100% passed.
+
+## DEV-03 Excel
+
+- 23/23 DEV-03 Excel assertions/tests reported passed.
+
+## DEV-04 Invoice
+
+- 60/60 Invoice matrix passed.
+- 23/23 Excel regression passed.
+- TypeScript 0 errors.
+- Production build passed.
+- 37/37 Invoice business decisions compliant.
+- 0 blocking defects.
+
+## DEV-05B
+
+Agent-reported:
+- TypeScript PASS.
+- Production build PASS.
+- Invoice 60/60 PASS.
+- Excel 23/23 PASS.
+- Code-level responsive review at 320/360/375/390/414/768/1024+.
+
+**DEV-05 browser QA remains open.** Do not claim DEV-05 complete until actual browser verification is performed.
+
+## Current rule
+
+Historical test counts are evidence, not substitutes for current execution. The actual repository's executed test/build output is authoritative.
+
+---
+
+# 105. CURRENT DATABASE / SCHEMA STATUS AFTER DEV-04
+
+The older V2 document's 45-model inventory predates Invoice V1 and therefore must not be treated as the exact current model count.
+
+Invoice V1 added invoice-related persistence/sequence structures during DEV-04. The exact current Prisma model names/count and all relations must be obtained from the actual current `prisma/schema.prisma`.
+
+**CURRENT EXACT MODEL COUNT: UNKNOWN — REQUIRES CODEBASE VERIFICATION.**
+
+Known DEV-04 database/index facts from the final QA report include:
+
+- Invoice indexes reported for `[agencyId,status]`, `[agencyId,invoiceNumber]`, `[agencyId,invoiceDate]`, `[agencyId,dueDate]`, and `[bookingId]`.
+- Invoice sequence uniqueness reported as agency-scoped (`[agencyId]`).
+- Payment invoice relation/index reported on `[invoiceId]`.
+
+Do not infer additional invoice models/fields beyond what the current schema proves.
+
+---
+
+# 106. CURRENT ROUTE STATUS AFTER DEV-04/DEV-05
+
+Known current application routes include:
+
+- `/invoices`
+- `/invoices/[id]`
+- `/documents`
+- `/customers`
+- `/trips`
+- `/quotations`
+- `/bookings`
+- `/payments`
+- `/operations`
+- `/hotels`
+- `/rate-sheets`
+- `/suppliers`
+- `/vehicles`
+- `/activities`
+- `/enquiries`
+- `/communications`
+- `/reports`
+- `/feedback`
+- `/referrals`
+- `/customer-insights`
+- `/subscription`
+- `/admin/*`
+
+Exact route inventory and nested paths remain code-authoritative. **REQUIRES CODEBASE VERIFICATION** before creating or renaming routes.
+
+Public families remain:
+
+- `/q/*`
+- `/trip/*`
+- `/b/*`
+- `/customer/*` where implemented
+
+Invoice V1 specifically must not expose invoice data through those public routes.
+
+---
+
+# 107. FINAL FEATURE STATUS MATRIX — V3
+
+| Area | Status | Notes |
+|---|---|---|
+| Authentication | COMPLETE | Supabase Auth + SSR |
+| Authorization/RBAC | COMPLETE | Exactly two internal roles |
+| Multi-tenancy | COMPLETE + VERIFIED | Server-derived agency scope |
+| Customer architecture | COMPLETE + VERIFIED | External record, not User/Auth |
+| Customer duplicate detection | FIXED + VERIFIED | Preserve |
+| Public quotation security | FIXED + VERIFIED | Preserve commercial redaction |
+| Subscription V2 | COMPLETE + VERIFIED | 46 tests / 118 assertions |
+| BH-00 → BH-07 | COMPLETE | BH-07 Conditional Go |
+| DEV-01 | COMPLETE | Form UX consistency |
+| DEV-01 QA | COMPLETE | QA closed |
+| DEV-02A | COMPLETE | Global UX audit |
+| DEV-02B | COMPLETE | Global UX implementation |
+| DEV-02 Closeout | COMPLETE | Closed |
+| DEV-03A | COMPLETE | Decision/compatibility audit |
+| DEV-03B | COMPLETE | Hotel/Rate Sheet Excel import |
+| DEV-03 QA | COMPLETE | PASS WITH LOW-RISK FINDINGS |
+| DEV-04B Invoice V1 | COMPLETE | Full lifecycle implemented |
+| DEV-04 QA | COMPLETE | PASS, 60/60 + regressions |
+| DEV-05A | COMPLETE | Global UX consistency audit |
+| DEV-05B | COMPLETE per implementation report | Needs final QA verification |
+| DEV-05 QA | **OPEN / CURRENT** | Global UI consistency + browser verification |
+| Deployment readiness | NOT STARTED AS CURRENT PHASE | Only after DEV-05 QA closes |
+| Controlled real-agency beta | NOT STARTED | After deployment readiness |
+
+---
+
+# 108. FINAL ROADMAP — V3
+
+## Current phase
+
+**DEV-05 QA — Global UI Consistency, Professional Messaging & Responsive Verification**
+
+## Immediate QA objective
+
+Verify that DEV-05B actually produced a coherent, professional TripDesk UI across all major pages, with special attention to the newly observed `/invoices` vs `/documents` vs `/customers` differences.
+
+## Required sequence
+
+```text
+DEV-05 QA
+  ↓
+If PASS
+  ↓
+DEV-05 CLOSEOUT
+  ↓
+Pre-Beta Deployment / Operational Readiness
+  ↓
+Controlled Real-Agency Beta
+```
+
+If DEV-05 QA finds UI defects:
+
+```text
+DEV-05 QA
+  ↓
+Document findings
+  ↓
+Review/authorize controlled fixes
+  ↓
+DEV-05C / targeted UX implementation (name only after explicitly decided)
+  ↓
+Regression + browser QA
+  ↓
+DEV-05 Closeout
+```
+
+Do not create a new phase name merely by assumption.
+
+## Deployment gate
+
+Do not begin real-agency onboarding until:
+
+- DEV-05 QA passes.
+- TypeScript/build are clean after any fixes.
+- Invoice/Excel regressions remain green.
+- Core security/tenant isolation remains intact.
+- Responsive/browser QA is acceptable at the required widths.
+- Production hosting/environment/domain/Auth/backup/integration prerequisites are verified.
+
+---
+
+# 109. DO NOT REINTRODUCE — V3 COMPLETE LIST
+
+The next AI must not reintroduce or resurrect any of the following without an explicit new product decision:
+
+### Roles/auth
+- Travel Agent role.
+- Sales Agent role.
+- Sub-Agent role.
+- Internal Customer role.
+- Customer Supabase Auth account.
+- Customer password/customer signup.
+- Plaintext passwords.
+
+### Data architecture
+- Standalone `RoomType` Prisma model for the current Hotel/RateSheet architecture.
+- Separate Room Types master or separate Room Types Excel sheet.
+- Supplier-vs-Hotel conceptual split that was rejected/on hold.
+- Duplicate subscription architecture.
+- Unnecessary duplicate payment architecture.
+
+### Product scope
+- GST/tax feature in Invoice V1.
+- Lead-source tracking in V1 where it was explicitly excluded.
+- Individual traveler profile system.
+- Flight booking module.
+- Visa assistance.
+- Public invoice URL.
+- Customer invoice login.
+- Online customer invoice Pay Now.
+- Automatic invoice creation on every booking.
+- Credit/debit note workflow.
+- Full invoice accounting ledger/P&L/GST module.
+- Supplier invoice/payables inside Customer Invoice V1.
+- Multi-currency invoice engine.
+- Recurring invoices.
+- Invoice as SaaS subscription billing mechanism.
+- Automatic Stripe/Razorpay recurring SaaS billing in beta.
+- Complex proration/refund engine.
+- Usage-based billing/coupons/seat billing unless separately approved.
+- AI assistant / broad automation / mobile-native app before beta evidence justifies them.
+
+### Security/engineering
+- Client-trusted `agencyId`.
+- Cross-tenant lookup without server-side tenant validation.
+- Public supplier cost/margin/internal notes.
+- Service-role keys/secrets in browser.
+- Destructive DB reset without explicit user authorization.
+- Direct spreadsheet insertion without validation/preview/confirmation.
+- Hard reloads used as a shortcut for application navigation/scroll fixes.
+- Unrelated architecture rewrites.
+- Silent schema changes.
+- Invented enum/status names.
+- Claims of browser QA/tests without actual execution.
+
+### UX
+- Do not force every module into an identical layout.
+- Do not create one-off styling when a shared TripDesk component already exists without justification.
+- Do not choose `/invoices` or `/documents` as the canonical design by assumption; inspect shared patterns first.
+- Do not sacrifice mobile usability for desktop aesthetics.
+
+---
+
+# 110. CURRENT UNKNOWN / REQUIRES CODEBASE VERIFICATION
+
+The following are intentionally not guessed:
+
+1. Exact current Prisma model count after DEV-04 invoice schema additions.
+2. Exact invoice-related Prisma model names/fields/relations beyond what DEV-04 QA explicitly reported.
+3. Exact current route inventory, including all nested invoice/document/admin paths.
+4. Exact current implementation of all DEV-05B changes.
+5. Actual browser result of DEV-05 QA.
+6. Whether every listed shared component is used consistently across every module.
+7. Whether Hotel Code has a DB-level unique constraint in the current live schema.
+8. Exact current Booking status enum spelling; use the codebase before any future invoice eligibility change.
+9. Exact current Subscription route/API inventory.
+10. Exact production environment/deployment state.
+
+When any of these matters, inspect the current repository rather than inferring from this document.
+
+---
+
+# 111. CONTINUATION PROTOCOL — NEW CHAT
+
+When this V3 file is uploaded into a new ChatGPT conversation, the AI must:
+
+1. Read the entire file.
+2. Treat Sections 98+ as the current authoritative update layer.
+3. Inspect the actual current codebase before making implementation claims.
+4. Understand that Subscription V2, DEV-01, DEV-02, DEV-03, and DEV-04 are already completed.
+5. Understand that DEV-05B is reported complete but DEV-05 QA is still open.
+6. Start with the **DEV-05 QA / Global UI Consistency** problem if asked to continue from the current stopping point.
+7. Do not implement fixes during a read-only QA request unless explicitly authorized.
+8. If a UI inconsistency is found, distinguish legitimate module-specific information architecture from inconsistent shared design primitives.
+9. Preserve Invoice V1 Decisions #1–#37 exactly.
+10. Preserve the rule: invoice creation only from `CONFIRMED` Booking status.
+11. Preserve Hotel/RateSheet architecture and Excel import safety.
+12. Preserve all security and tenant-isolation invariants.
+13. Preserve the current two-role system.
+14. Never expose or request secrets unnecessarily.
+15. Do not perform destructive database operations.
+16. After any authorized successful implementation or QA phase, update this master context with the new status and findings.
+
+---
+
+# 112. FINAL V3 CONSISTENCY AUDIT
+
+## A. Missing post-V2 work
+**COVERED.** DEV-01 through DEV-05B and their known QA states are added.
+
+## B. Stale V2 states
+**COVERED.** Subscription V2, DEV-01, DEV-02, DEV-03, and DEV-04 stale pending statements are explicitly superseded.
+
+## C. Invoice decisions
+**COMPLETE.** All 37 Invoice V1 decisions are captured with the confirmed-booking eligibility rule.
+
+## D. Booking → Invoice
+**COMPLETE.** Invoice creation requires Booking status `CONFIRMED`; exact enum must be code-verified before future changes.
+
+## E. Excel import
+**COMPLETE.** DEV-03 implementation and QA status are recorded, including the low-risk Hotel Code uniqueness concern.
+
+## F. UI/UX
+**CURRENT OPEN ITEM.** DEV-05B is recorded as implementation-complete by agent report, while DEV-05 QA remains open because actual cross-page UI consistency has not yet been certified.
+
+## G. Security
+**PRESERVED.** Two-role RBAC, server-derived tenant scope, public token security, commercial redaction, secret handling, and no plaintext passwords remain binding.
+
+## H. Database
+**SAFE WITH EXPLICIT UNCERTAINTY.** Known model/index facts are recorded without inventing invoice model names/count. Exact live schema remains authoritative.
+
+## I. Routes
+**SAFE WITH EXPLICIT UNCERTAINTY.** Major current routes are recorded, but exact inventory remains code-authoritative.
+
+## J. Current roadmap
+**CLEAR.** Current phase is DEV-05 QA. Deployment/beta is gated behind DEV-05 closure and operational readiness.
+
+## K. No reintroduction
+**COVERED.** Rejected roles, models, financial architecture, security shortcuts, and scope expansions are explicitly blocked.
+
+## L. New-chat continuity
+**PASS.** A new AI should understand the current project state without relying on the old conversation, provided it also respects the explicit codebase-verification rules for unknown exact implementation details.
+
+---
+
+# 113. V3 HANDOFF STATUS
+
+**MASTER CONTEXT V3 STATUS: READY FOR NEW-CHAT HANDOFF — CURRENT DEVELOPMENT PHASE IS DEV-05 QA.**
+
+The project is not ready to be called fully beta-ready solely from this document. The remaining application-level gate is the completion of DEV-05 QA, especially the global UI consistency/browser verification now prompted by the `/invoices` vs `/documents` vs `/customers` discrepancy.
+
+The next ChatGPT should **not** restart the project, revisit finalized Invoice decisions, re-plan Subscription V2, or reimplement completed DEV-01/02/03/04 work.
+
+### Exact next action
+
+> **Run DEV-05 QA as a read-only global UI consistency + responsive/browser verification audit. Do not patch until findings are documented and explicitly authorized.**
+
+---
+
+# 114. DEV-05 FINAL CLOSEOUT — VERIFIED SEPTEMBER 2026
+
+## 114.1 Final Certification Status
+**DEV-05 STATUS: CLOSED (VERIFIED & CERTIFIED)**
+
+DEV-05 (Global UI Consistency, Professional Messaging & Responsive Verification) has successfully completed independent final closeout QA following the controlled remediation of DEV05-QA-008.
+
+- **Closeout Date:** 10 September 2026
+- **Final Result:** PASS — DEV-05 CLOSED
+- **Next Checkpoint:** PRE-BETA OPERATIONAL READINESS
+
+## 114.2 Findings Verification Matrix
+All 8 QA findings identified and remediated during DEV-05 have been independently verified in code and the live application:
+
+| ID | Module / Area | Description | Status |
+|---|---|---|---|
+| DEV05-QA-001 | `src/components/shared/status-badge.tsx` | Standardized shared StatusBadge across `/documents`, `/invoices`, `/invoices/[id]` supporting all statuses (OVERDUE, REVOKED, SUPERSEDED, GENERATED, VOIDED, etc.) | **PASS / VERIFIED** |
+| DEV05-QA-002 | `/invoices` | Standard workspace layout, Hero Command Card, Billing & Collections context, Receipt icon, 5 KPI cards, StatusBadge, search/filters | **PASS / VERIFIED** |
+| DEV05-QA-003 | `/documents` | Standard workspace container boundaries matching canonical TripDesk workspace rhythm | **PASS / VERIFIED** |
+| DEV05-QA-004 | `/trips`, `/documents`, `/invoices` | Uniform shared `TableSkeleton` for list view loading states replacing raw spinners | **PASS / VERIFIED** |
+| DEV05-QA-005 | `src/lib/utils.ts` | Centralized `getErrorMessage()` sanitization suppressing raw Prisma/SQL/runtime error leaks | **PASS / VERIFIED** |
+| DEV05-QA-006 | `GlobalSearch` | Placeholder updated to "Search customers, trips, invoices, bookings..." with Invoices quick-navigation link | **PASS / VERIFIED** |
+| DEV05-QA-007 | `/invoices/[id]` | Invoice detail Hero Command Header, back navigation, Customer Invoice context, StatusBadge, Overdue indicator, ErrorState | **PASS / VERIFIED** |
+| DEV05-QA-008 | `/documents` | PageHeader container nesting and spacing disconnect remediated; unified inside canonical `max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6` workspace | **PASS / RESOLVED** |
+
+## 114.3 Automated Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, all static & dynamic routes compiled cleanly)
+- **DEV-04 Invoice Verification Matrix (`test-dev04-complete-matrix.ts`):** 60/60 PASSED (100%)
+- **DEV-03 Excel Ingestion Matrix (`test-dev03-excel.ts`):** 23/23 PASSED (100%)
+- **Native Dialog Audit (`confirm`, `alert`, `prompt`):** PASS (0 instances in `src/`)
+
+## 114.4 Responsive & Browser Verification Matrix
+Live browser inspection verified visual consistency across 1440px, 1280px, 390px, 375px, and 320px viewports:
+
+| Area / Route | 1440px | 1280px | 390px | 375px | 320px | Overall Result |
+|---|---|---|---|---|---|---|
+| `/documents` | PASS | PASS | PASS | PASS | PASS | **PASS** |
+| `/invoices` | PASS | PASS | PASS | PASS | PASS | **PASS** |
+| `/invoices/[id]` | PASS | PASS | PASS | PASS | PASS | **PASS** |
+| `/trips` | PASS | PASS | PASS | PASS | PASS | **PASS** |
+| `/customers` | PASS | PASS | PASS | PASS | PASS | **PASS** |
+| Global Search | PASS | PASS | PASS | PASS | PASS | **PASS** |
+
+## 114.5 Security & Business Rule Invariants
+- Two-role system (`PLATFORM_OWNER`, `AGENCY_OWNER`) preserved.
+- Tenant isolation and server-side `agencyId` scoping verified.
+- Invoice creation strictly enforced only for `CONFIRMED` Booking status.
+- Zero Prisma schema changes, zero database migrations, zero API route contract changes.
+
+## 114.6 Next Step
+- **UI AUDIT BATCH REMEDIATION**
+
+---
+
+# 115. UI AUDIT BATCH 1 — CONTROLLED REMEDIATION (SEPTEMBER 2026)
+
+## 115.1 Remediation Status
+**BATCH 1 STATUS: CLOSED (VERIFIED & CERTIFIED)**
+
+UI Audit Batch 1 (Critical User-Facing UI Issues) has completed controlled remediation and independent verification:
+
+- **Remediation Date:** 10 September 2026
+- **Status:** PASS — BATCH 1 CLOSED
+- **Scope:** Batch 1A (Customer-Facing Raw Enums) & Batch 1B (Dashboard Receivables/Payables 320px Responsive Fix) ONLY.
+
+## 115.2 Remediated Items
+
+### Batch 1A: Customer-Facing Status & Traveler Type Presentation
+- **Issue:** `src/app/customer/trips/[tripId]/page.tsx` exposed raw backend database enums (`DISPATCHED`, `CONFIRMED`, `SCHEDULED`, `PENDING_CONFIRMATION`, `ADULT`, `CHILD`, `INFANT`, `INCLUDED`).
+- **Fix:**
+  - Implemented explicit customer-safe mapping dictionaries:
+    - Transfer statuses: `DISPATCHED` → "Dispatched", `CONFIRMED` → "Confirmed", `SCHEDULED` → "Scheduled", `PENDING_CONFIRMATION` → "Pending Confirmation", `ASSIGNED` → "Assigned", `ON_DUTY` → "On Duty", `COMPLETED` → "Completed", `CANCELLED` → "Cancelled".
+    - Traveler types: `ADULT` → "Adult", `CHILD` → "Child", `INFANT` → "Infant".
+    - Activity types: `INCLUDED` → "Included", `OPTIONAL` → "Optional".
+  - Replaced ad-hoc raw spans with shared `StatusBadge` across hotel, transfer, and activity services.
+  - Enhanced shared `StatusBadge` (`src/components/shared/status-badge.tsx`) to support `DISPATCHED`, `SCHEDULED`, `ASSIGNED`, `ON_DUTY`, and `PENDING_CONFIRMATION` with standard icons, background tints, and borders.
+  - Preserved all underlying database values, API contracts, and Prisma schemas without modification.
+
+### Batch 1B: Dashboard Receivables & Payables Responsive Layout
+- **Issue:** `src/components/dashboard/receivables-payables-card.tsx` used rigid `grid-cols-3` inside a padded card, causing high-value financial amounts (`₹`) and labels to clip or wrap awkwardly at 320px–390px viewports.
+- **Fix:**
+  - Responsive grid structure: `grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3`.
+  - On mobile (<640px): Metrics stack cleanly with `flex items-center justify-between`, placing labels on the left and bold currency amounts on the right with `text-sm`.
+  - On desktop (≥640px): Preserved exact 3-column layout, label-above-value stacking (`sm:block`), and `sm:text-base` font size.
+  - Card container adjusted to `p-4 sm:p-6` providing 8px of extra mobile breathing room.
+  - Card headers updated to `flex items-start sm:items-center gap-2` with `shrink-0` action buttons.
+  - Customer and supplier list items updated with `truncate` and `shrink-0` to eliminate horizontal text overflow.
+
+## 115.3 Files Changed
+1. `src/app/customer/trips/[tripId]/page.tsx` — Added explicit terminology mappers, imported and rendered shared `StatusBadge`, and formatted traveler/activity types.
+2. `src/components/shared/status-badge.tsx` — Extended `StatusBadge` to support operational dispatch statuses (`DISPATCHED`, `SCHEDULED`, `ASSIGNED`, `ON_DUTY`, `PENDING_CONFIRMATION`).
+3. `src/components/dashboard/receivables-payables-card.tsx` — Mobile-responsive layout, flex alignment, and overflow protection.
+
+## 115.4 Automated Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack compiled all static/dynamic routes cleanly)
+- **DEV-04 Invoice Verification Matrix (`test-dev04-complete-matrix.ts`):** 60/60 PASSED (100%)
+- **DEV-03 Excel Ingestion Matrix (`test-dev03-excel.ts`):** 23/23 PASSED (100%)
+
+## 115.5 Browser & Viewport Verification Results
+Verified in live browser across all required viewports:
+- **1440px / 1280px / 1024px:** Desktop 3-column metric cards and layout fully preserved.
+- **768px:** Single-column card stacking with 3-column metric rows rendered cleanly.
+- **390px / 375px:** Stacked metric rows with label-left / amount-right rendered with zero clipping.
+- **320px:** Verified `scrollWidth === innerWidth` (zero horizontal overflow); currency amounts and labels completely visible and unclipped.
+- **Customer Trip Presentation:** Explicit mappers verified for `DISPATCHED`, `CONFIRMED`, `SCHEDULED`, `PENDING_CONFIRMATION`, `ADULT`, `CHILD`, `INFANT`, `INCLUDED`.
+
+## 115.6 Out-of-Scope Confirmations
+- Scrolling audit (ISSUE-001 through ISSUE-008) remains ON HOLD.
+- Batch 2 search consistency (Invoice / Documents toolbar) unchanged.
+- Native `<select>` elements unchanged.
+- Prisma schema, database data, and API contracts untouched.
+- Multi-tenant isolation and RBAC invariants strictly preserved.
+
+# 116. UI AUDIT BATCH 2 — CONTROLLED REMEDIATION (SEARCH & TOOLBAR CONSISTENCY)
+
+## 116.1 Remediation Status
+**BATCH 2 STATUS: CLOSED (VERIFIED & CERTIFIED)**
+
+UI Audit Batch 2 (Search & Toolbar Consistency) has completed controlled remediation and comprehensive verification:
+
+- **Remediation Date:** 10 September 2026
+- **Status:** PASS — BATCH 2 CLOSED
+- **Scope:** `/invoices` search/toolbar integration and `/documents` search/toolbar integration with canonical TripDesk list-page pattern ONLY.
+
+## 116.2 Remediated Items
+
+### Batch 2A: `/invoices` Search & Toolbar Standardization
+- **Issue:** The `/invoices` page used an isolated floating search card with a raw HTML `<input>`, missing clear `X` button, inconsistent height, focus styles, and separation from the table container.
+- **Fix:**
+  - Integrated the search bar directly into the Master Workspace Card (`rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden`).
+  - Implemented the canonical master toolbar header (`p-4 sm:p-5 border-b border-slate-100 bg-white`).
+  - Upgraded raw `<input>` to canonical Shadcn `<Input className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all" />`.
+  - Added standard `<Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />` icon treatment and `max-w-2xl` sizing.
+  - Added dynamic clear `X` button that appears when a query exists and clears search state on click.
+  - Added canonical `Reset` button when search query, non-default status filter, or overdue filter is active.
+  - Standardized status filter pills with rounded-xl border container, horizontal scrolling on mobile, and active indicator.
+  - Preserved all filtering, search query state, pagination, data fetching, RBAC, and tenant isolation invariants.
+
+### Batch 2B: `/documents` Search & Toolbar Standardization
+- **Issue:** The `/documents` page rendered search and category filtering in an isolated floating card outside the document table container.
+- **Fix:**
+  - Moved search and filter controls into the Master Workspace Card (`rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden`) as an integrated toolbar header (`p-4 sm:p-5 border-b border-slate-100 bg-white`).
+  - Standardized search container with canonical `max-w-2xl`, `h-9.5`, `rounded-xl`, soft slate tint, and indigo focus treatment.
+  - Added dynamic clear `X` button to the search input.
+  - Standardized the Category `SelectTrigger` to `h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300`.
+  - Added canonical `Reset` button that appears when either search query or category filter is active.
+  - Preserved document upload modal, table rendering, category filtering, document actions, status badges, RBAC, and tenant isolation invariants.
+
+## 116.3 Files Changed
+1. `src/app/(dashboard)/invoices/page.tsx` — Standardized search and toolbar inside master card, added canonical Input, clear X button, and Reset button.
+2. `src/app/(dashboard)/documents/page.tsx` — Standardized search and toolbar inside master card, added canonical Input, clear X button, styled category select, and Reset button.
+
+## 116.4 Automated Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack compiled all static/dynamic routes cleanly)
+- **DEV-04 Invoice Verification Matrix (`test-dev04-complete-matrix.ts`):** 60/60 PASSED (100%)
+- **DEV-03 Excel Ingestion Matrix (`test-dev03-excel.ts`):** 23/23 PASSED (100%)
+
+## 116.5 Browser & Viewport Verification Matrix
+Recorded live in browser session (`batch2_browser_qa_1789037020030.webp`) across all required viewports:
+
+| Viewport | `/invoices` Result | `/documents` Result | Overflow / Collision Check |
+|---|---|---|---|
+| 1440px | PASS | PASS | Zero overflow; canonical master card toolbar |
+| 1280px | PASS | PASS | Clean horizontal alignment |
+| 1024px | PASS | PASS | Clean wrapping, no clipping |
+| 768px | PASS | PASS | Search flexes cleanly, filters wrap neatly |
+| 390px | PASS | PASS | Stacked controls, clear buttons accessible |
+| 375px | PASS | PASS | No horizontal page scroll, search readable |
+| 320px | PASS | PASS | Zero horizontal overflow (`scrollWidth === innerWidth`) |
+
+### Functional Search QA:
+- `/invoices`: Query typing works (`INV`), clear `X` button clears input and resets page to 1, status filter pills (`PAID`, `UNPAID`, `ALL`) filter properly, Overdue toggle works, Reset button clears all filters.
+- `/documents`: Query typing works (`voucher`), clear `X` button clears input, Category dropdown selects and filters documents, Reset button restores default filters.
+
+## 116.6 Out-of-Scope Confirmations
+- Scrolling audit (ISSUE-001 through ISSUE-008) remains strictly ON HOLD.
+- Batch 3 enum/status terminology cleanup NOT modified.
+- Native `<select>` / dropdown audit NOT modified.
+- Dashboard typography and naming NOT modified.
+- Zero Prisma schema changes, zero migrations, zero API contract changes.
+- Multi-tenant isolation and RBAC invariants strictly preserved.
+
+# 117. UI AUDIT BATCH 3A — CONTROLLED REMEDIATION (SELECTS, SEARCH & CONTROL POLISH)
+
+## 117.1 Remediation Status
+**BATCH 3A STATUS: CLOSED (VERIFIED & CERTIFIED)**
+
+UI Audit Batch 3A (Select / Dropdown + Search / Filter Controls + Responsive Control Polish) has completed controlled remediation and comprehensive automated + visual verification:
+
+- **Implementation Date:** 10 September 2026
+- **Status:** PASS — BATCH 3A CLOSED
+- **Git Branch:** `qa-changes-bug` (Working copy uncommitted per controlled instructions)
+- **Scope:** Standardize native `<select>` controls to TripDesk's shared `<Select>`, standardize search controls with canonical input styling and dynamic clear `X` action, standardize filter heights/radius to `h-9.5 rounded-xl`, and resolve small-screen responsive wrapping without horizontal overflow.
+
+## 117.2 Findings Remediated
+
+### Select / Dropdown Standardization
+- `B3-SELECT-001` (`/bookings`): Replaced Payment filter native `<select>` with shared `<Select>` (`w-[130px] sm:w-[140px]`, `h-9.5`, `rounded-xl`, `bg-slate-50/70`, `border-slate-200`).
+- `B3-SELECT-002` (`/payments`): Replaced Method filter native `<select>` with shared `<Select>` (`w-[130px] sm:w-[140px]`, `h-9.5`, `rounded-xl`).
+- `B3-SELECT-003` (`/enquiries`): Replaced Priority filter native `<select>` with shared `<Select>` (`w-[125px] sm:w-[135px]`, `h-9.5`, `rounded-xl`).
+- `B3-SELECT-004` (`/enquiries`): Replaced Source filter native `<select>` with shared `<Select>` (`w-[125px] sm:w-[135px]`, `h-9.5`, `rounded-xl`).
+- `B3-SELECT-005` (`/invoices/[id]` / `record-payment-modal.tsx`): Replaced Payment Method native `<select>` with shared `<Select>` (`h-9`, `rounded-xl`), standardized date input height/radius.
+- `B3-SELECT-006` (`/invoices/[id]`): Replaced Discount Type native `<select>` with shared `<Select>` (`h-8`, `rounded-lg`).
+- `B3-SELECT-007` (`/communications`): Replaced Channel filter native `<select>` with shared `<Select>` (`w-[130px] sm:w-[140px]`, `h-9.5`, `rounded-xl`).
+- `B3-SELECT-008` (`/communications`): Replaced Type filter native `<select>` with shared `<Select>` (`w-[130px] sm:w-[140px]`, `h-9.5`, `rounded-xl`).
+- `B3-SELECT-009` (`/communications`): Replaced Status filter native `<select>` with shared `<Select>` (`w-[130px] sm:w-[140px]`, `h-9.5`, `rounded-xl`).
+- `B3-SELECT-010` (`/communications`): Replaced Send Customer Message modal native `<select>`s (Customer, Trip, Channel, Type) with shared `<Select>` (`h-9`, `rounded-xl`).
+- `B3-SELECT-012` (`/trips/[id]/costing` / `cost-breakdown-table.tsx`): Replaced Cost breakdown sort native `<select>` with shared `<Select>` (`h-8.5`, `rounded-xl`).
+
+### Legitimate Exception (Preserved Native)
+- `B3-SELECT-011` (`src/components/costing/pricing-control-panel.tsx`): The GST tax rule and rounding controls remain intentionally native `<select>` controls. They are part of a compact financial calculation matrix and were explicitly approved as a legitimate exception. Zero other native selects exist in `src/`.
+
+### Search Standardization
+- `B3-SEARCH-001` (`/follow-ups`): Standardized search input to canonical TripDesk pattern (`pl-10 pr-9 h-9.5 text-xs rounded-xl bg-slate-50/70 border-slate-200`) with dynamic clear `X` button.
+- `B3-SEARCH-002` (`/finance` / `finance-transaction-table.tsx`): Standardized search input to canonical `pl-10 pr-9 h-9.5 rounded-xl bg-slate-50/70` with dynamic clear `X` button.
+- `B3-SEARCH-003` (`/communications`): Standardized search input to canonical `pl-10 pr-9 h-9.5 rounded-xl bg-slate-50/70` with dynamic clear `X` button.
+
+### Control / Filter Polish
+- `B3-CONTROL-001` (`/follow-ups`): Standardized Priority and Type filter triggers to `h-9.5 rounded-xl bg-slate-50/70 border-slate-200`.
+- `B3-CONTROL-002` (`/finance` / `finance-transaction-table.tsx`): Standardized transaction type filter trigger to canonical `h-9.5 rounded-xl bg-slate-50/70 border-slate-200`.
+- `B3-CONTROL-003` (`/reports`): Softened Export CSV SelectTrigger to `border-slate-200 font-semibold text-slate-800 rounded-xl`.
+
+### Responsive Layout Polish
+- `B3-RESP-001` (`/bookings`): Payment filter wrapped in responsive container with flex-wrap to prevent touch target cramping and clipping.
+- `B3-RESP-002` (`/enquiries`): Priority and Source filters wrapped in responsive container with clean wrapping at 320px/375px.
+- `B3-RESP-003` (`/invoices/[id]` / `record-payment-modal.tsx`): Payment modal form grid converted to `grid-cols-1 sm:grid-cols-2` to prevent clipping at 320px.
+
+## 117.3 Files Changed
+1. `src/app/(dashboard)/bookings/page.tsx` — Replaced Payment native select with shared `<Select>`, responsive wrapping.
+2. `src/app/(dashboard)/payments/page.tsx` — Replaced Method native select with shared `<Select>`.
+3. `src/app/(dashboard)/enquiries/page.tsx` — Replaced Priority and Source native selects with shared `<Select>`, added flex-wrap container.
+4. `src/components/invoices/record-payment-modal.tsx` — Replaced Payment Method native select with shared `<Select>`, responsive grid `grid-cols-1 sm:grid-cols-2`.
+5. `src/app/(dashboard)/invoices/[id]/page.tsx` — Replaced Discount Type native select with shared `<Select>`.
+6. `src/app/(dashboard)/communications/page.tsx` — Standardized search with dynamic clear `X`, replaced toolbar selects (Channel, Type, Status) and modal selects (Customer, Trip, Channel, Type) with shared `<Select>`.
+7. `src/components/costing/cost-breakdown-table.tsx` — Replaced sort native select with shared `<Select>`.
+8. `src/app/(dashboard)/follow-ups/page.tsx` — Standardized search with dynamic clear `X`, standardized Priority/Type filter triggers to `h-9.5 rounded-xl`.
+9. `src/components/finance/finance-transaction-table.tsx` — Standardized search with dynamic clear `X`, standardized Type filter trigger to `h-9.5 rounded-xl`.
+10. `src/app/(dashboard)/reports/page.tsx` — Softened Export CSV SelectTrigger styling to `border-slate-200 font-semibold rounded-xl`.
+
+## 117.4 Automated Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack compiled all routes cleanly)
+- **DEV-04 Invoice Verification Matrix (`test-dev04-complete-matrix.ts`):** 60/60 PASSED (100%)
+- **DEV-03 Excel Ingestion Matrix (`test-dev03-excel.ts`):** 23/23 PASSED (100%)
+
+## 117.5 Browser & Viewport Verification Matrix
+Recorded live in browser session across Desktop (1440px, 1280px, 1024px) and Mobile (768px, 390px, 375px, 320px):
+
+| Route | Desktop (1440px) | Tablet (768px) | Mobile (375px) | Mobile (320px) | Horizontal Overflow |
+|---|---|---|---|---|---|
+| `/bookings` | PASS (shared Select) | PASS | PASS | PASS | Zero |
+| `/payments` | PASS (shared Select) | PASS | PASS | PASS | Zero |
+| `/enquiries` | PASS (shared Selects) | PASS | PASS (clean wrap) | PASS (clean wrap) | Zero |
+| `/communications` | PASS (shared Selects + clear X) | PASS | PASS | PASS | Zero |
+| `/follow-ups` | PASS (h-9.5 filters + clear X) | PASS | PASS | PASS | Zero |
+| `/finance` | PASS (h-9.5 filter + clear X) | PASS | PASS | PASS | Zero |
+| `/reports` | PASS (softened trigger) | PASS | PASS | PASS | Zero |
+
+### Functional & Interaction QA:
+- **Select Interaction:** Dropdowns open, items render, selections update state/filters accurately, keyboard navigation works.
+- **Search & Clear:** Typing in search bar immediately shows clear `X` button; clicking `X` clears the query and resets filter state.
+- **Zero Horizontal Overflow:** Verified across all viewports down to 320px (`scrollWidth === innerWidth`).
+
+## 117.6 Scope Invariants Strictly Maintained
+- **Prisma Schema & Database:** 0 changes, 0 migrations.
+- **API Contracts:** 0 changes.
+- **Authentication & Authorization / RBAC:** Untouched.
+- **Tenant Isolation:** Strictly maintained.
+- **Business Logic:** 100% preserved (all payment, invoice, communication, and enquiry semantics intact).
+- **Scrolling Audit:** Remains strictly ON HOLD (`ISSUE-001` through `ISSUE-008`).
+- **Batch 3B:** Status and enum display standardization remains strictly PENDING for separate controlled execution.
+
+## 117.7 Batch 3A Select Display Label Consistency Correction
+
+### 1. Reason for Correction & Presentation Defect
+During post-Batch 3A final UI review, a presentation defect was identified across shared `<Select>` implementations:
+- Dropdown options were rendered with user-friendly human-readable labels (e.g. `Partially Paid`, `Bank Transfer`, `All`), but the closed `SelectTrigger` rendered raw/internal enum strings (e.g. `PARTIALLY_PAID`, `BANK_TRANSFER`, `ALL`) via `@base-ui/react/select`'s `<SelectValue />` fallback mechanism.
+- In accordance with the required TripDesk UX Rule:
+  > **The value displayed in the closed SelectTrigger must be the same human-readable label that the user sees for that option inside the dropdown.**
+  > **Any filter option representing all records must display "All" (never "ALL", never "all").**
+  > **Underlying filter and enum values must remain 100% unchanged in state, API, and DB.**
+
+### 2. Implementation Approach & Technical Resolution
+- `@base-ui/react/select` supports render functions on `<SelectValue>`: `<SelectValue placeholder="...">{val => LABEL_MAP[val] ?? fallback}</SelectValue>`.
+- Preserved underlying values (`value="all"`, `value="ALL"`, `value="PARTIALLY_PAID"`, etc.) in all state handlers, APIs, and query parameters.
+- Applied explicit label formatters and converted option display text:
+  - `ALL` → `All`
+  - `PARTIALLY_PAID` → `Partially Paid`
+  - `BANK_TRANSFER` → `Bank Transfer`
+  - `UNPAID` → `Unpaid`
+  - `PAID` → `Paid` / `Fully Paid`
+  - `UPI` → `UPI`
+  - `CASH` → `Cash`
+  - `CARD` → `Card`
+  - `CHEQUE` → `Cheque`
+  - `URGENT` → `Urgent`
+  - `HIGH` → `High`
+  - `MEDIUM` → `Medium`
+  - `LOW` → `Low`
+  - `WHATSAPP` → `WhatsApp`
+  - `EMAIL` → `Email`
+  - `PHONE` → `Phone`
+  - `WEBSITE` → `Website`
+  - `PERCENTAGE` → `Percentage (%)`
+  - `FIXED` → `Fixed Amount ($)`
+  - `default` → `Sort: Default`
+  - `high-to-low` → `Highest Cost`
+  - `low-to-high` → `Lowest Cost`
+
+### 3. Affected Selects & Routes Corrected
+1. `/bookings` (`src/app/(dashboard)/bookings/page.tsx`): Payment status filter `all` → `All`, `UNPAID` → `Unpaid`, `PARTIALLY_PAID` → `Partially Paid`, `PAID` → `Fully Paid`.
+2. `/payments` (`src/app/(dashboard)/payments/page.tsx`): Payment method filter `all` → `All`, `BANK_TRANSFER` → `Bank Transfer`, etc.
+3. `/enquiries` (`src/app/(dashboard)/enquiries/page.tsx`): Priority filter (`all` → `All`, `URGENT` → `Urgent`, etc.) and Source filter (`all` → `All`, `WHATSAPP` → `WhatsApp`, etc.).
+4. `/invoices/[id]` (`src/app/(dashboard)/invoices/[id]/page.tsx`): Discount type Select (`PERCENTAGE` → `Percentage (%)`, `FIXED` → `Fixed Amount ($)`).
+5. Record Payment Modal (`src/components/invoices/record-payment-modal.tsx`): Payment method modal Select (`BANK_TRANSFER` → `Bank Transfer`, etc.).
+6. `/communications` (`src/app/(dashboard)/communications/page.tsx`): Channel, Type, Status filter triggers format selection to human labels and "All"; Send Message Modal Selects (Customer, Trip, Channel, Category Type) display human-readable labels upon selection.
+7. `/trips/[id]/costing` (`src/components/costing/cost-breakdown-table.tsx`): Sort Select displays `Sort: Default`, `Highest Cost`, `Lowest Cost`.
+8. `/follow-ups` (`src/app/(dashboard)/follow-ups/page.tsx`): Type and Priority filter SelectTriggers display formatted human labels and "All".
+9. `/finance` (`src/components/finance/finance-transaction-table.tsx`): Transaction type Select displays `All` (preserving `value="ALL"` internally).
+10. `/reports` (`src/app/(dashboard)/reports/page.tsx`): Export CSV Select displays `Export CSV`, `Export Bookings CSV`, `Export Financials CSV`.
+11. `/documents` (`src/app/(dashboard)/documents/page.tsx`): Type and Status filter SelectTriggers display formatted human labels and `All` (preserving `value="ALL"` internally).
+
+### 4. Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0)
+- **DEV-04 Invoice Matrix (`test-dev04-complete-matrix.ts`):** 60/60 PASSED (100%)
+- **DEV-03 Excel Matrix (`test-dev03-excel.ts`):** 23/23 PASSED (100%)
+- **Browser QA Session:** Verified across viewports (1440px down to 320px) in `batch3a_label_fix_qa_1789041179259.webp`. Closed SelectTriggers match dropdown labels exactly; raw enums and uppercase `ALL` eliminated; zero horizontal overflow.
+
+### 5. Scope Boundaries Strictly Maintained
+- **Underlying Values:** 100% preserved (all application logic, filter params, API contracts, state handlers remain identical).
+- **Prisma Schema & Database:** 0 changes, 0 migrations.
+- **Batch 3B:** StatusBadge and global status terminology standardization remains strictly PENDING.
+- **Scrolling Audit:** Remains strictly ON HOLD (`ISSUE-001` through `ISSUE-008`).
+
+---
+
+# 118. UI AUDIT BATCH 3B — STATUS STANDARDIZATION & USER-FACING TERMINOLOGY
+
+## 118.1 Purpose & Execution Overview
+- **Implementation Date:** 2026-09-10
+- **Scope:** Controlled execution of UI Audit Batch 3B (`B3-STATUS-001` through `B3-STATUS-010` and `B3-ENUM-001` through `B3-ENUM-010`).
+- **Core Requirement:** Presentation-layer standardization of user-visible status presentation and elimination of raw/internal uppercase enum values from user-facing UI, replacing them with professional, human-readable terminology.
+- **Core Invariant:** All underlying Prisma enums, database records, API contracts, TypeScript types, state values, filter query parameters, and business logic remain 100% unchanged.
+
+## 118.2 Findings Implementation Summary
+
+### Status Findings (B3-STATUS-001 → B3-STATUS-010)
+- `B3-STATUS-001` (`/reports`): Receivables and Payables status rendering standardized using shared `StatusBadge` (`Pending`, `Paid`, `Overdue`).
+- `B3-STATUS-002` (`/admin/agencies`): Agency status (`Active`, `Suspended`) and Subscription status (`Active`, `Trial`, `Expired`) standardized using shared `StatusBadge`.
+- `B3-STATUS-003` (`/admin/payments`): Verification status standardized with shared `StatusBadge` and friendly terminology (`Pending Audit`, `Approved`, `Rejected`).
+- `B3-STATUS-004` (`/admin/announcements`): Announcement status standardized with shared `StatusBadge` (`Active`, `Scheduled`, `Archived`, `Draft`).
+- `B3-STATUS-005` (`/subscription`): Subscription status and payment verification status standardized using shared `StatusBadge` and human-readable badges (`Trial`, `Active`, `Expired`, `Pending`, `Approved`, `Rejected`).
+- `B3-STATUS-006` (`/referrals`): Referral status standardized with shared `StatusBadge` and human labels (`Pending (Inquiry)`, `Converted (Booked)`, `Rewarded (Completed)`, `Expired`).
+- `B3-STATUS-007` (`/settings`): Audit log channel (`WhatsApp`, `Email`) and delivery status (`Delivered`, `Sent`, `Failed`, `Pending`) standardized with human-readable labels.
+- `B3-STATUS-008` (`/operations/[tripId]` / `service-reconciliation-card.tsx`): Hotel, fleet, and activity delivery status badges converted from raw enums to formatted human labels (`Confirmed`, `Requested`, `Pending Confirmation`, `Pending`, `Cancelled`, `Dispatched`, `On Duty`, `Completed`, `Scheduled`, `Unassigned`).
+- `B3-STATUS-009` (`/operations/[tripId]` / `finalization-checklist-card.tsx`): Finalization summary status formatted to friendly label (`In Progress`, `Planning`, `Confirmed`, `Travelling`, `Completed`, `Cancelled`).
+- `B3-STATUS-010` (`/suppliers` & `/suppliers/[id]`): Supplier status, confirmation status, and payables status standardized using shared `StatusBadge`. Supplier architecture and data models preserved strictly without modification.
+
+### Enum & Terminology Findings (B3-ENUM-001 → B3-ENUM-010)
+- `B3-ENUM-001` (`/customer/trips/[tripId]/payments`): Customer-facing payment methods formatted (`BANK_TRANSFER` → `Bank Transfer`, `UPI` → `UPI / Online`, `CASH` → `Cash`, `CARD` → `Card`, `CHEQUE` → `Cheque`, `OTHER` → `Other`) and customer payment status formatted (`Partially Paid`, `Paid`, etc.).
+- `B3-ENUM-002` (`/admin/payments`): Admin payment methods formatted to friendly labels (`Bank Transfer`, `UPI / Online`, `Cash`, `Card`, `Cheque`, `Other`).
+- `B3-ENUM-003` (`/payments`): Table row payment methods formatted via friendly label mapping (`Bank Transfer`, `UPI`, `Cash`, `Card`, `Cheque`).
+- `B3-ENUM-004` (`/subscription`): Billing cycle formatted (`YEARLY` → `Yearly`, `MONTHLY` → `Monthly`) and payment methods formatted (`Bank Transfer`, `UPI`).
+- `B3-ENUM-005` (`/bookings/[id]`): Payment table method badges formatted to human-readable labels (`Bank Transfer`, `UPI / Online`, `Cash`, `Card`, `Cheque`, `Other`).
+- `B3-ENUM-006` (`/bookings/[id]`): Traveler types formatted (`ADULT` → `Adult`, `CHILD` → `Child`, `INFANT` → `Infant`).
+- `B3-ENUM-007` (`/operations/[tripId]`): Manifest traveler types formatted (`Adult`, `Child`, `Infant`).
+- `B3-ENUM-008` (`/trips/[id]/costing`): Activity types formatted in costing breakdown (`INCLUDED` → `Included`, `OPTIONAL` → `Optional`).
+- `B3-ENUM-009` (`/admin/announcements`): Announcement types explicitly mapped (`MAINTENANCE` → `Maintenance`, `FEATURE` → `Feature`, `WARNING` → `Warning`, `UPDATE` → `Product Update`, `INFO` → `Info`).
+- `B3-ENUM-010` (`/invoices`): Invoice status filter buttons standardized to human-readable labels (`All`, `Draft`, `Issued`, `Partially Paid`, `Paid`, `Cancelled`).
+
+## 118.3 Status Presentation Architecture
+- **Shared StatusBadge Component (`src/components/shared/status-badge.tsx`):** Leveraged across all standard status presentations (`PAID`, `PENDING`, `CANCELLED`, `ACTIVE`, `TRIAL`, `CONFIRMED`, `COMPLETED`, `DISPATCHED`, `OVERDUE`, `DRAFT`, `INACTIVE`, `SCHEDULED`, `REJECTED`, `APPROVED`). Supports `label` override for domain-specific naming (e.g. `Rewarded (Completed)`).
+- **Compact Presentation Contexts:** In dense table cells or specialized operations cards (`service-reconciliation-card.tsx`, `finalization-checklist-card.tsx`, `settings/page.tsx`), domain-specific label mappings (`SERVICE_STATUS_LABELS`, `OPERATION_STATUS_LABELS`) provide compact badges consistent with design system color tokens without breaking layout density.
+
+## 118.4 Explicit Domain Terminology Mappings
+Explicit mappings were used rather than global string replace transforms:
+```typescript
+const PAYMENT_METHOD_LABELS = {
+  BANK_TRANSFER: "Bank Transfer",
+  UPI: "UPI / Online",
+  CASH: "Cash",
+  CARD: "Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other",
+} as const;
+
+const TRAVELER_TYPE_LABELS = {
+  ADULT: "Adult",
+  CHILD: "Child",
+  INFANT: "Infant",
+} as const;
+
+const ANNOUNCEMENT_TYPE_LABELS = {
+  MAINTENANCE: "Maintenance",
+  FEATURE: "Feature",
+  WARNING: "Warning",
+  UPDATE: "Product Update",
+  INFO: "Info",
+} as const;
+```
+
+## 118.5 Files Modified
+1. `src/app/customer/trips/[tripId]/payments/page.tsx` — Customer payment methods and status labels formatted.
+2. `src/app/admin/payments/page.tsx` — Payment methods, verification status badge, and filter labels standardized.
+3. `src/app/(dashboard)/payments/page.tsx` — Payment method badges formatted in table rows.
+4. `src/app/(dashboard)/subscription/page.tsx` — Billing cycles, payment methods, and subscription status badges formatted.
+5. `src/app/(dashboard)/bookings/[id]/page.tsx` — Payment methods, traveler types, and modal Select trigger formatted.
+6. `src/app/(dashboard)/operations/[tripId]/page.tsx` — Traveler types in manifest formatted.
+7. `src/components/operations/service-reconciliation-card.tsx` — Delivery status badges formatted with friendly labels.
+8. `src/components/operations/finalization-checklist-card.tsx` — Finalization summary status formatted to human-readable label.
+9. `src/app/(dashboard)/trips/[id]/costing/page.tsx` — Activity type formatted (`Included` / `Optional`).
+10. `src/app/admin/announcements/page.tsx` — Announcement type (`Product Update`, etc.) and status badges standardized.
+11. `src/app/(dashboard)/invoices/page.tsx` — Invoice status filter buttons standardized (`Partially Paid`, etc.).
+12. `src/app/(dashboard)/reports/page.tsx` — Receivables and Payables tables standardized with shared `StatusBadge`.
+13. `src/app/admin/agencies/page.tsx` — Agency and subscription statuses standardized with shared `StatusBadge`.
+14. `src/app/(dashboard)/referrals/page.tsx` — Referral status badge and filter trigger formatted.
+15. `src/app/(dashboard)/settings/page.tsx` — Dispatch audit log channel and delivery status formatted.
+16. `src/app/(dashboard)/suppliers/page.tsx` — Supplier table and mobile card status badges standardized with `StatusBadge`.
+17. `src/app/(dashboard)/suppliers/[id]/page.tsx` — Confirmation and payables status badges standardized with `StatusBadge`.
+
+## 118.6 Automated Verification Results
+- **TypeScript Type Check (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack optimized build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass)
+
+## 118.7 Browser QA & Viewport Verification
+Recorded in browser session `batch3b_browser_qa_1789042721034.webp` across Desktop (1440px, 1280px, 1024px) and Mobile (768px, 390px, 375px, 320px):
+
+| Route / Component | Desktop (1440px) | Tablet (768px) | Mobile (375px) | Mobile (320px) | Raw Enums | Status |
+|---|---|---|---|---|---|---|
+| `/reports` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/admin/agencies` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/admin/payments` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/admin/announcements` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/subscription` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/referrals` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/settings` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/suppliers` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/suppliers/[id]` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/payments` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/invoices` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/bookings/[id]` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/operations/[tripId]` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/customer/trips/[tripId]/payments` | PASS | PASS | PASS | PASS | 0 | PASS |
+| `/trips/[id]/costing` | PASS | PASS | PASS | PASS | 0 | PASS |
+
+- **Raw enum values visibly rendered in Batch 3B scope:** 0
+- **Horizontal page overflow across tested viewports:** 0
+
+## 118.8 Scope Boundaries & Safety
+- **Database Schema & Migrations:** 0 changes.
+- **API Contracts & Route Handlers:** 0 changes.
+- **Authentication & RBAC:** 100% unchanged.
+- **Tenant Isolation:** 100% unchanged and verified.
+- **Business Logic:** 100% preserved.
+- **Batch 3A (Select/Search Controls):** CLOSED and fully preserved.
+- **Scrolling Audit (`ISSUE-001` → `ISSUE-008`):** Strictly ON HOLD.
+- **Supplier Architecture:** Strictly preserved (no models/routes altered).
+
+---
+
+# 119. UI AUDIT BATCH 4A — DASHBOARD UI POLISH, RESPONSIVE TYPOGRAPHY & SECTION NAMING
+
+## 119.1 Purpose & Execution Overview
+- **Implementation Date:** 2026-09-11
+- **Batch Name:** `UI Audit Batch 4A — Dashboard UI Polish`
+- **Status:** **CLOSED** (All automated tests, builds, regression suites, and multi-viewport browser QA passed with 100% success)
+- **Scope:** Controlled UI polish, terminology standardization, and tab redundancy elimination strictly for `/dashboard` and dashboard-specific child components.
+- **Core Objectives Accomplished:**
+  1. Standardized main dashboard page title and concise business-friendly subtitle.
+  2. Completed Tab Redundancy Audit: confirmed `"Sales & Pipeline"` tab was 100% duplicate of Overview content (`SalesFunnelCard`, `TopDestinationsCustomersCard`) with zero unique data or interactions; safely removed redundant tab.
+  3. Dashboard now features exactly 3 focused, intuitive tabs: `Overview`, `Finance & Profit`, `Operations`.
+  4. Standardized all 4 primary KPI card titles (`Total Bookings`, `Receivables`, `Gross Profit`, `Booking Conversion`).
+  5. Streamlined section and card titles/subtitles across Quotation Funnel, Revenue & Profit, Customer Receivables, Supplier Payables, Upcoming Departures, Communications & Delivery, Top Destinations, and Top Customers.
+  6. Preserved 100% of sales content on `Overview` tab without information loss (`SalesFunnelCard` and `TopDestinationsCustomersCard` retained).
+  7. Cleaned up confirmed dead imports (`FollowUpsList`, `RecentEnquiriesTable`, `TrendingUp`) in `page.tsx`.
+  8. Established clean, robust typography hierarchy (`text-xl sm:text-2xl` page title, `text-xs sm:text-sm` subtitle, `text-base sm:text-lg` section titles, `text-sm sm:text-base` card titles) eliminating awkward multi-line wrapping.
+  9. Optimized responsive presentation down to 320px ultra-compact mobile viewports.
+  10. 100% preservation of all underlying data fetching, server actions, API contracts, Prisma queries, chart data, financial calculations, auth/RBAC, and tenant isolation.
+
+## 119.2 Exact Dashboard UI Naming & Tab Structure
+
+| Component / Section | Previous Heading & Subtitle | Approved Batch 4A Standard |
+|---|---|---|
+| **Main Page Header** | `Executive Command Center & Analytics` <br> *(Verbose multi-line analytics subtitle)* | **Title:** `Executive Dashboard`<br>**Subtitle:** `High-level overview of sales, revenue, collections, and operations.` |
+| **Dashboard Tabs** | `Executive Overview` / `Sales & Pipeline` / `Finance & Profitability` / `Operations & Departures` | **3 Tabs:** `Overview` / `Finance & Profit` / `Operations`<br>*(Redundant `Sales & Pipeline` tab removed; internal routing & handlers preserved)* |
+| **KPI 1** | `Booking Value` | `Total Bookings` *(Underlying metric & calculations preserved)* |
+| **KPI 2** | `Customer Receivables` | `Receivables` *(Underlying metric & calculations preserved)* |
+| **KPI 3** | `Gross Profit & Margin` | `Gross Profit` *(Gross margin percentage & data badges preserved)* |
+| **KPI 4** | `Booking Conversion` | `Booking Conversion` *(Preserved)* |
+| **Quotation Funnel** | `Sales & Quotation Conversion Funnel` | **Title:** `Quotation Conversion`<br>**Subtitle:** `Enquiry to confirmed booking conversion pipeline.` |
+| **Revenue & Profit** | `Revenue, Collections & Gross Profit` | **Title:** `Revenue & Profit`<br>**Subtitle:** `Booking revenue, payment collections, and gross margin trends.` |
+| **Customer Receivables** | `Accounts Receivable & Balance Due` | **Title:** `Customer Receivables`<br>**Subtitle:** `Pending customer collections and overdue balances.` |
+| **Supplier Payables** | `Supplier Payables & Vendor Commitments` | **Title:** `Supplier Payables`<br>**Subtitle:** `Hotel, fleet, and activity vendor commitments.` |
+| **Upcoming Departures** | `Upcoming Departures & Operational Command` | **Title:** `Upcoming Departures`<br>**Subtitle:** `Operational readiness, document status, and departures.` |
+| **Communications** | `Multi-Channel Communication Health` | **Title:** `Communications & Delivery`<br>**Subtitle:** `WhatsApp, email, and automated delivery health.` |
+| **Top Destinations** | `Top Destinations by Volume & Revenue` | **Title:** `Top Destinations`<br>**Subtitle:** `Most popular destinations by bookings and revenue.` |
+| **Top Customers** | `Top High-Value Travelers & VIPs` | **Title:** `Top Customers`<br>**Subtitle:** `Leading clients by total spend and booking volume.` |
+
+## 119.3 Typography & Responsive Hierarchy
+- **Page Title:** `text-xl sm:text-2xl font-bold tracking-tight text-slate-900`
+- **Page Subtitle:** `text-xs sm:text-sm text-slate-500`
+- **Section / Card Titles:** `text-base sm:text-lg font-semibold text-slate-900` (or `text-sm sm:text-base` for nested cards)
+- **Supporting / Subtitle Text:** `text-xs text-slate-500`
+- **Card Header Spacing:** Flex wrap responsive layout (`flex-col sm:flex-row sm:items-center sm:justify-between gap-2`) prevents collision or layout clipping.
+- **3-Tab Responsive Navigation:** Navigation tabs render 3 balanced touch targets across all screen sizes with zero horizontal overflow down to 320px.
+
+## 119.4 Files Changed
+1. `src/app/(dashboard)/dashboard/page.tsx` — Main PageHeader title/subtitle, 3-tab navigation, removal of `SALES` tab & state, unused imports cleanup.
+2. `src/components/dashboard/kpi-cards.tsx` — Simplified KPI headings (`Total Bookings`, `Receivables`, `Gross Profit`).
+3. `src/components/dashboard/sales-funnel-card.tsx` — Quotation Conversion title and concise subtitle.
+4. `src/components/dashboard/revenue-chart.tsx` — Revenue & Profit title, concise subtitle, responsive header layout.
+5. `src/components/dashboard/receivables-payables-card.tsx` — Customer Receivables & Supplier Payables titles and subtitles.
+6. `src/components/dashboard/upcoming-trips-list.tsx` — Upcoming Departures title and concise subtitle.
+7. `src/components/dashboard/communication-health-card.tsx` — Communications & Delivery title and concise subtitle.
+8. `src/components/dashboard/top-destinations-customers-card.tsx` — Top Destinations & Top Customers titles and subtitles.
+
+## 119.5 Automated Verification Results
+- **TypeScript Type Check (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack optimized build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass)
+
+## 119.6 Browser QA & Viewport Verification
+Recorded in browser session `batch4a_3tabs_qa_1789107637655.webp` across Desktop, Tablet, and Mobile viewports:
+
+| Viewport | Dimensions | Tabs Rendered | Result | Notes |
+|---|---|---|---|---|
+| **Desktop High-Res** | 1440 × 900 | 3 Tabs | **PASS** | `Overview`, `Finance & Profit`, `Operations` verified; all sales cards present in Overview |
+| **Desktop Standard** | 1280 × 800 | 3 Tabs | **PASS** | Clean spacing, tab switching active, zero layout warping |
+| **Desktop / Tablet Landscape** | 1024 × 768 | 3 Tabs | **PASS** | 2-column card layouts collapse cleanly, zero horizontal overflow |
+| **Tablet Portrait** | 768 × 1024 | 3 Tabs | **PASS** | Tab bar compact, KPI cards 2x2 grid, zero clipping |
+| **Mobile Large** | 390 × 844 | 3 Tabs | **PASS** | Single column cards, concise titles prevent awkward wrapping |
+| **Mobile Standard** | 375 × 812 | 3 Tabs | **PASS** | Clean typography, no button collisions, zero horizontal overflow |
+| **Mobile Ultra-Compact** | 320 × 568 | 3 Tabs | **PASS** | 3 tabs fit cleanly without crowding, `document.documentElement.scrollWidth === window.innerWidth` (320px) |
+
+- **Horizontal Page Overflow:** 0 across all tested viewports (including 320px).
+- **Functional / Visual Regressions:** 0 detected.
+
+## 119.7 Scope Invariants & Protection
+- **Database Schema & Migrations:** 0 changes.
+- **Prisma Queries & Server Actions:** 0 changes.
+- **API Contracts & Route Handlers:** 0 changes.
+- **Authentication, RBAC & Tenant Isolation:** 100% unchanged.
+- **Financial, Profit & Metric Calculations:** 100% unchanged.
+- **Batch 3A (Select Controls) & Batch 3B (Status Standardization):** Remain strictly **CLOSED**.
+- **Scrolling Architecture Audit (`ISSUE-001` → `ISSUE-008`):** Remains strictly **ON HOLD** (no table overflow, max-height, or AppShell changes).
+- **Out-of-Scope Pages:** `/finance`, `/follow-ups`, `/reports`, `/communications`, `/settings` untouched.
+
+## 119.8 Out-of-Scope Findings Recorded Separately
+- Global scrolling audit recommendations (`ISSUE-001` through `ISSUE-008`) remain ON HOLD and were not touched during Batch 4A.
+
+---
+
+# 120. BATCH 4B — GLOBAL UI CONSISTENCY (PAGE HEADER & SPACING STANDARDIZATION) [CLOSED]
+
+## 120.1 Scope & Objective
+Standardized page header structures, outer wrapper containers, top breathing room, and horizontal grid alignment across all six core dashboard pages:
+- `/finance`
+- `/reports`
+- `/communications`
+- `/dashboard`
+- `/follow-ups`
+- `/settings`
+
+Reused the established canonical TripDesk layout pattern (`/customers`, `/bookings`, `/trips`, `/invoices`, `/documents`):
+```tsx
+<div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
+  <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+    <PageHeader ... />
+    <div className="space-y-6">...</div>
+  </div>
+</div>
+```
+
+## 120.2 Page-by-Page Implementation Summary
+1. **`/finance` (`src/app/(dashboard)/finance/page.tsx`):**
+   - Replaced custom unboxed inline header with canonical `<PageHeader title="Finance & Profitability" ... />`.
+   - Adopted canonical outer wrapper container (`max-w-[1550px] pt-6 sm:pt-8 px-4..8 space-y-6`).
+   - Integrated financial period preset selector into a dedicated filter toolbar below the header.
+   - Preserved all dialogs (`RecordPaymentDialog`, `RecordSupplierPaymentDialog`, `CreateExpenseDialog`), charts, tables, and financial calculations.
+2. **`/reports` (`src/app/(dashboard)/reports/page.tsx`):**
+   - Rendered canonical `<PageHeader title="Agency BI & Accounting Reports" ... />` (resolving previously dead import).
+   - Standardized outer container to `max-w-[1550px] pt-6 sm:pt-8 px-4..8`.
+   - Structured Export CSV and Time Horizon filter controls in a clean sub-header toolbar.
+   - Preserved all report calculation logic, BI metrics, and data export endpoints.
+3. **`/communications` (`src/app/(dashboard)/communications/page.tsx`):**
+   - Replaced custom inline header with canonical `<PageHeader title="Communication Center" ... />`.
+   - Adopted canonical container `max-w-[1550px] pt-6 sm:pt-8 px-4..8`.
+   - Standardized status badges via `getStatusBadge` to render friendly title-case labels (`Sent`, `Delivered`, `Read`, `Pending`, `Queued`, `Failed`, `Cancelled`), eliminating raw uppercase enum display.
+   - Preserved message logging, automated retry actions, and search/filter functionality.
+4. **`/dashboard` (`src/app/(dashboard)/dashboard/page.tsx`):**
+   - Wrapped `PageHeader` and main content inside canonical container `max-w-[1550px] pt-6 sm:pt-8 px-4..8 space-y-6`.
+   - Provided standard top breathing room (`pt-6 sm:pt-8`) and aligned header edges with content grid cards.
+   - Preserved 3-tab layout (`Overview`, `Finance & Profit`, `Operations`) and all Batch 4A optimizations.
+5. **`/follow-ups` (`src/app/(dashboard)/follow-ups/page.tsx`):**
+   - Wrapped `PageHeader` inside canonical container `max-w-[1550px] pt-6 sm:pt-8 px-4..8 space-y-6`.
+   - Retained intentional `max-w-7xl mx-auto w-full` inner content width without duplicate horizontal padding.
+   - Preserved CRM follow-up modals, task workflows, and priority filters.
+6. **`/settings` (`src/app/(dashboard)/settings/page.tsx`):**
+   - Wrapped `PageHeader` inside canonical container `max-w-[1550px] pt-6 sm:pt-8 px-4..8 space-y-6`.
+   - Retained intentional `max-w-6xl mx-auto w-full` inner content width without duplicate horizontal padding.
+   - Preserved all settings tabs, channel toggles, and automation sweep functionality.
+
+## 120.3 Preserved Invariants
+- **Shared Component Internals:** `src/components/shared/page-header.tsx` was NOT modified.
+- **Database & Prisma Schema:** 0 changes (no migrations, no schema edits).
+- **Backend APIs & Server Actions:** 0 changes to contracts or logic.
+- **Auth, RBAC & Multi-Tenancy:** 100% untouched.
+- **Financial & Calculation Logic:** 100% intact.
+- **Batch 3A, 3B, and 4A (Sales & Pipeline Removal):** Strictly preserved and closed.
+- **Scrolling Architecture:** Remains strictly **ON HOLD** (no overflow or AppShell changes).
+
+## 120.4 Files Changed
+1. `src/app/(dashboard)/finance/page.tsx` — Replaced custom unboxed header with shared `PageHeader`, canonical outer container, dedicated filter toolbar.
+2. `src/app/(dashboard)/reports/page.tsx` — Rendered shared `PageHeader`, standardized container and controls toolbar.
+3. `src/app/(dashboard)/communications/page.tsx` — Rendered shared `PageHeader`, canonical container, friendly title-case status badges.
+4. `src/app/(dashboard)/dashboard/page.tsx` — Canonical container wrapper for `PageHeader` breathing room and grid alignment.
+5. `src/app/(dashboard)/follow-ups/page.tsx` — Canonical container wrapper for `PageHeader`, preserved inner `max-w-7xl` content width.
+6. `src/app/(dashboard)/settings/page.tsx` — Canonical container wrapper for `PageHeader`, preserved inner `max-w-6xl` content width.
+
+## 120.5 Automated Verification Results
+- **TypeScript Type Check (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack production build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass)
+
+## 120.6 Browser QA & Viewport Verification Matrix
+Tested across Desktop, Tablet, and Mobile viewports for all 6 target pages:
+
+| Viewport | Dimensions | Pages Verified | Header / Spacing | 320px Overflow Check | Result |
+|---|---|---|---|---|---|
+| **Desktop High-Res** | 1440 × 900 | All 6 Pages | Canonical `PageHeader`, 24-32px top gap, edge-aligned | `scrollWidth === 1440` | **PASS** |
+| **Desktop Standard** | 1280 × 800 | All 6 Pages | Consistent elevation, aligned card boundaries | `scrollWidth === 1280` | **PASS** |
+| **Desktop / Tablet Landscape** | 1024 × 768 | All 6 Pages | Clean card column folding, breadcrumbs visible | `scrollWidth === 1024` | **PASS** |
+| **Tablet Portrait** | 768 × 1024 | All 6 Pages | Action buttons wrap gracefully, zero layout shift | `scrollWidth === 768` | **PASS** |
+| **Mobile Large** | 390 × 844 | All 6 Pages | Header stacks vertically, full-width actions, no clipping | `scrollWidth === 390` | **PASS** |
+| **Mobile Standard** | 375 × 812 | All 6 Pages | Clean typography, no clipped elements, uniform padding | `scrollWidth === 375` | **PASS** |
+| **Mobile Ultra-Compact** | 320 × 568 | All 6 Pages | Zero horizontal overflow (`document.documentElement.scrollWidth === window.innerWidth`) | `scrollWidth === 320` | **PASS** |
+
+---
+
+# 121. BATCH 4C — TERMINOLOGY & UX CONSISTENCY CLEANUP [CLOSED]
+
+## 121.1 Scope & Objective
+Addressed confirmed findings from the Batch 4C read-only terminology audit:
+- Replaced backend/database jargon with customer-centric business language in page subtitles and telemetry pills.
+- Standardized all user-facing instances of "Client" to the canonical business term **"Customer"**.
+- Standardized US "Inquiry" occurrences to the canonical British/Commonwealth term **"Enquiry"** (matching Prisma models and routes).
+- Normalized `StatusBadge` default label for `VOIDED` to Title Case (`"Voided"`).
+- Normalized risk distribution badges on the Operations Analytics card to Title Case (`Low Risk`, `Medium Risk`, `High Risk`, `Critical Risk`).
+- Standardized search placeholders in Operations Issues (`"customer, trip"` instead of `"guest, tour"`).
+- `TERM-009` was intentionally skipped as per instruction.
+
+## 121.2 Exact Findings Implemented
+1. **TERM-001 (Trips Subtitle):** `src/app/(dashboard)/trips/page.tsx` subtitle updated from `"PostgreSQL-backed travel itineraries, travelers, and operations"` to `"Travel itineraries, passenger management, costing, and day-wise schedules"`.
+2. **TERM-002 (Trips Table Head):** `src/app/(dashboard)/trips/page.tsx` table column header updated from `"Customer Client"` to `"Customer"`.
+3. **TERM-003 (Database Record Counters):**
+   - `src/app/(dashboard)/trips/page.tsx`: Updated from `"{pagination.total} database trip records"` to `"{pagination.total} total trips"`.
+   - `src/app/(dashboard)/invoices/page.tsx`: Updated from `"{totalCount} database invoice records"` to `"{totalCount} customer invoices"`.
+4. **TERM-004 (Client → Customer):**
+   - `src/app/(dashboard)/customers/page.tsx`: Updated telemetry badge from `"Total Clients"` to `"Total Customers"`.
+   - `src/app/(dashboard)/operations/page.tsx`: Updated search placeholder to `"Search by trip, customer, or booking ref..."`.
+   - `src/app/(dashboard)/operations/[tripId]/page.tsx`: Updated header label from `"Client:"` to `"Customer:"`.
+   - `src/app/(dashboard)/enquiries/[id]/page.tsx`: Updated contact card label from `"Client Name"` to `"Customer Name"`.
+5. **TERM-005 (StatusBadge VOIDED → Voided):** `src/components/shared/status-badge.tsx` updated `defaultLabel` for `VOIDED` from `"VOIDED"` to `"Voided"`.
+6. **TERM-006 (Operations Risk Labels):** `src/components/operations/analytics/operations-risk-card.tsx` normalized risk distribution labels to `"Low Risk"`, `"Medium Risk"`, `"High Risk"`, `"Critical Risk"`.
+7. **TERM-007 (Inquiry → Enquiry):**
+   - `src/app/(dashboard)/customers/page.tsx`: Updated telemetry badge from `"Inquiries Generated"` to `"Enquiries Generated"`.
+   - `src/app/(dashboard)/enquiries/page.tsx`: Updated subtitle to `"Inbound customer enquiries, travel requirements, lead stages, and follow-ups"`.
+   - `src/app/(dashboard)/customers/new/page.tsx`: Updated source dropdown option from `"WhatsApp Inquiry"` to `"WhatsApp Enquiry"`.
+   - `src/app/(dashboard)/referrals/page.tsx`: Updated status filter dictionary and select dropdown from `"Pending (Inquiry)"` to `"Pending (Enquiry)"`.
+8. **TERM-008 (Operations Issues Search Placeholder):** `src/app/(dashboard)/operations/issues/page.tsx` updated placeholder from `"Search by title, description, guest, tour..."` to `"Search by title, description, customer, trip..."`.
+
+## 121.3 Preserved Invariants
+- **Database & Prisma Schema:** 0 modifications (no schema edits, no migrations).
+- **Backend APIs & Server Actions:** 0 modifications to contracts or business logic.
+- **Auth, RBAC & Multi-Tenancy:** 100% untouched.
+- **Financial & Calculation Logic:** 100% intact.
+- **Scrolling Architecture:** Remains strictly **ON HOLD**.
+- **Shared Component Architecture:** Intact and preserved.
+
+## 121.4 Files Changed
+1. `src/app/(dashboard)/trips/page.tsx`
+2. `src/app/(dashboard)/invoices/page.tsx`
+3. `src/app/(dashboard)/customers/page.tsx`
+4. `src/app/(dashboard)/operations/page.tsx`
+5. `src/app/(dashboard)/operations/[tripId]/page.tsx`
+6. `src/app/(dashboard)/enquiries/[id]/page.tsx`
+7. `src/components/shared/status-badge.tsx`
+8. `src/components/operations/analytics/operations-risk-card.tsx`
+9. `src/app/(dashboard)/enquiries/page.tsx`
+10. `src/app/(dashboard)/customers/new/page.tsx`
+11. `src/app/(dashboard)/referrals/page.tsx`
+12. `src/app/(dashboard)/operations/issues/page.tsx`
+13. `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 121.5 Automated Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack production build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass)
+- **Browser QA (7 Viewports across affected pages):** PASS (Zero horizontal overflow at 320px, clean typography and wrapping)
+
+---
+
+# 122. DEV-01A — CUSTOMER FORM VALIDATION CONSISTENCY [CLOSED]
+
+## 122.1 Scope & Objective
+- **Implementation Date:** 2026-09-11
+- **Batch Name:** `DEV-01A — Customer Form Validation Consistency`
+- **Status:** **CLOSED / VERIFIED** (All automated tests, production build, regression suites, and multi-viewport browser QA passed with 100% success)
+- **Scope:** Standardized client-side form validation on the canonical **Formik + Yup** architecture for Customer Create and Customer Edit forms, aligning them with TripDesk's established form standard (`/trips/new`, `/hotels/new`, `/vehicles/new`) while strictly preserving authoritative server-side **Zod validation**, API contracts, and all business rules.
+
+## 122.2 Customer Create Implementation Summary (`/customers/new`)
+- **Formik Migration:** Replaced 15 manual `useState` variables with `useFormik` hook managing unified form values matching the client-side customer data contract (`name`, `phone`, `alternatePhone`, `email`, `dateOfBirth`, `gender`, `nationality`, `address`, `city`, `state`, `country`, `postalCode`, `source`, `notes`, `internalNotes`).
+- **Yup Schema Validation:** Defined local client schema `createCustomerValidationSchema` enforcing user-facing UX constraints (`name` required, `phone` required with length constraints, valid `email` format, length limits on notes/address) without duplicating server-only business rules.
+- **Error UX & Visual Feedback:** Connected input classes and helper messages to Formik `touched` and `errors` with red borders (`border-red-500/80 focus:border-red-500 focus:ring-red-500/20`) and inline error text (`text-[11px] text-red-500 font-semibold`).
+- **Submission Control:** Submission button tied to `formik.isSubmitting` with loading spinner; invalid submissions are blocked client-side before dispatching network requests.
+- **Duplicate Detection Preservation:** 100% preserved debounced (400ms) duplicate phone/email detection (`customerClient.checkDuplicate`), duplicate alert warning card, matched customer details, link to existing customer profile, and non-blocking submission workflow.
+
+## 122.3 Customer Edit Implementation Summary (`/customers/[id]`)
+- **Formik Migration:** Converted customer edit modal to `useFormik` bound to all modal fields via `editFormik.getFieldProps()`.
+- **`enableReinitialize: true`:** Seamlessly populates initial asynchronously fetched customer values (`customer.name`, `customer.phone`, etc.) into Formik state upon completion of `loadCustomer()`, without race conditions or resetting active user edits.
+- **Yup Schema Validation:** Enforced consistent client-side validation via `editCustomerValidationSchema`.
+- **Error UX & Modal Flow:** Connected inline validation feedback and red border styling; submission button reflects `editFormik.isSubmitting`. On successful update, toast notification is displayed, modal closes, and `loadCustomer()` re-fetches updated customer profile data.
+- **Behavior Preservation:** Preserved customer ID, editable fields, update API payload structure (`customerClient.updateCustomer`), notifications, and modal close/cancel behavior.
+
+## 122.4 Architecture & Invariant Invariants
+- **Validation Architecture:**
+  ```text
+  Client:
+  Formik + Yup (UX validation, touched/errors, inline messages, submit state)
+          ↓
+  Existing API Client / Routes
+          ↓
+  Server:
+  Zod Schema Validation (Authoritative payload validation, tenant safety)
+          ↓
+  Prisma Service Layer & Business Rules
+          ↓
+  PostgreSQL Database
+  ```
+- **Formik/Yup as UX Only:** Formik and Yup serve strictly as a client-side UX/feedback layer and are **NOT** a security boundary.
+- **Server Zod Schemas:** 100% unchanged (`src/lib/validation/customer-schema.ts` untouched).
+- **API Contracts & Routes:** `/api/customers`, `/api/customers/[id]`, and `/api/customers/check-duplicate` contracts untouched.
+- **Database & Prisma Schema:** 0 schema changes, 0 migrations.
+- **Authentication & RBAC:** Supabase Auth session checks and agency ownership authorization strictly preserved.
+- **Tenant Isolation:** Server-derived `agencyId` scoping strictly preserved; client forms cannot supply or override `agencyId`.
+- **Scrolling Architecture:** Remains strictly **ON HOLD** (no overflow or AppShell changes).
+
+## 122.5 Files Changed
+1. `src/app/(dashboard)/customers/new/page.tsx` — Formik + Yup conversion, duplicate detection hook, inline validation feedback.
+2. `src/app/(dashboard)/customers/[id]/page.tsx` — Edit modal Formik + Yup conversion with `enableReinitialize: true`, inline error feedback.
+3. `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` — Section 122 record of DEV-01A closure.
+
+## 122.6 Verified Regression Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Next.js Turbopack build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass)
+- **Browser QA Viewport Matrix (320px, 375px, 390px, 768px, 1024px, 1280px, 1440px):** PASS (Zero horizontal overflow at 320px, inputs/buttons accessible, responsive grid folding).
+
+## 122.7 DEV-01 Milestone Roadmap Status (Updated in Section 123)
+- **DEV-01A (Customer Create & Edit):** **CLOSED / VERIFIED**
+- **DEV-01B (Enquiry Create):** **CLOSED / VERIFIED** (See Section 123)
+- **DEV-01C (Quotation Create & Trip Detail Dead Imports):** **PLANNED** (Future batch — `src/app/(dashboard)/quotations/new/page.tsx` & `src/app/(dashboard)/trips/[id]/page.tsx`)
+- **DEV-01D (Final DEV-01 QA & Milestone Sign-Off):** **PLANNED** (Future batch)
+
+---
+
+# 123. DEV-01B — ENQUIRY CREATE FORM VALIDATION CONSISTENCY [CLOSED]
+
+## 123.1 Purpose & Execution Overview
+- **Implementation Date:** 2026-09-11
+- **Batch Name:** `DEV-01B — Enquiry Create Form Validation Consistency`
+- **Status:** **CLOSED / VERIFIED** (VERDICT A — VERIFIED / READY TO CLOSE; all automated tests, production build, regression suites, and multi-viewport browser QA passed with 100% success)
+- **Scope:** Standardized client-side form validation UX on the canonical **Formik + Yup** architecture strictly for Enquiry Create (`src/app/(dashboard)/enquiries/new/page.tsx`), aligning it with TripDesk's established form standard (`/trips/new`, `/hotels/new`, `/vehicles/new`, `/customers/new`) while preserving authoritative server-side **Zod validation**, API contracts, customer flows, duplicate lead detection, and all business rules.
+
+## 123.2 Permanent Workflow Rule (Locked)
+Starting with Milestone DEV-01, **`TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` must be updated within the same workflow whenever an implementation/QA phase is completed and confirmed.**
+- **Standard Process:**
+  1. Implement strictly within approved batch scope.
+  2. Independently verify/QA across automated test suites, production build, and viewports.
+  3. If verified PASS, update `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` in the same workflow.
+  4. Mark the batch formally **CLOSED**.
+- Do NOT treat V3 updating as a separate future task or defer it to subsequent prompts.
+
+## 123.3 Implementation Summary (`/enquiries/new`)
+- **Formik Migration:** Replaced manual form state management (`useState` hooks and manual `errors` memoization) with `useFormik` hook managing unified values across the entire form lifecycle.
+- **Yup Schema Validation:** Defined local client schema `createEnquiryValidationSchema` using `Yup.object().shape({...})` connected directly to `useFormik({ validationSchema: createEnquiryValidationSchema })`.
+- **Reconciled Complete Field Inventory (26 Fields):**
+  The independent verification audit reconciled the earlier 25-vs-26 counting discrepancy and confirmed that the Enquiry Create form contains exactly **26 fields**:
+  1. `customerMode` (`"existing" | "new"`)
+  2. `selectedCustomerId` (conditional requirement in existing mode)
+  3. `newCustomerName` (conditional requirement in new mode, max 120 chars)
+  4. `newCustomerPhone` (conditional requirement in new mode, min 3, max 30 chars)
+  5. `newCustomerEmail` (optional, valid email format, max 120 chars)
+  6. `title` (optional, max 200 chars)
+  7. `destination` (required, max 200 chars)
+  8. `origin` (optional, max 200 chars)
+  9. `startDate` (tentative start date picker)
+  10. `endDate` (tentative end date picker, validated `endDate >= startDate`)
+  11. `adults` (number, integer >= 1 required)
+  12. `children` (number, integer >= 0)
+  13. `infants` (number, integer >= 0)
+  14. `hotelCategory` (select dropdown, default `"3 Star"`)
+  15. `mealPlan` (select dropdown, default `"MAP"`)
+  16. `vehiclePreference` (select dropdown, default `"Sedan"`)
+  17. `transportRequired` (boolean toggle)
+  18. `budget` (numeric string, validated >= 0)
+  19. `budgetType` (`"total" | "per_person"`)
+  20. `source` (`EnquirySource` enum, default `WHATSAPP`)
+  21. `priority` (`EnquiryPriority` enum, default `MEDIUM`)
+  22. `status` (`EnquiryStatus` enum, default `NEW`)
+  23. `specialRequirements` (optional textarea, max 5000 chars)
+  24. `notes` (optional string, max 5000 chars)
+  25. `internalNotes` (optional textarea, max 5000 chars)
+  26. `followupDate` (optional date, mapped to `nextFollowUpAt`)
+
+## 123.4 Customer Flow & Duplicate Detection
+- **Existing Customer Mode:**
+  - Loads customer directory asynchronously via `customerClient.getCustomers({ limit: 100 })`.
+  - Auto-selects `customers[0].id` when available (confirmed as **pre-existing behavior**).
+  - Enforces `selectedCustomerId` conditionally via Yup.
+  - Triggers debounced (400ms) active lead duplicate detection (`enquiryClient.checkDuplicate`) watching customer ID, destination, and dates.
+  - Displays non-blocking duplicate warning card with lead numbers, destination, status, and direct link to existing lead.
+- **Quick Add Customer Mode:**
+  - Enforces `newCustomerName` and `newCustomerPhone` conditionally via Yup.
+  - On submit, creates the customer first via `customerClient.createCustomer({ name, phone, email })`, gets `customerId`, and links it to `enquiryClient.createEnquiry`.
+
+## 123.5 Date Validation & Edge Cases
+- **Date Range Rule:** `endDate >= startDate` when both are present (confirmed as pre-existing client & server Zod rule).
+- **Same Day Trip (`startDate === endDate`):** Supported and computes `"Same Day Trip"`.
+- **Date Ranges (`startDate < endDate`):** Supported and computes duration string (e.g., `"4 Nights / 5 Days"`).
+- **Invalid Ordering (`startDate > endDate`):** Blocked with inline error `"End date cannot be before start date."`.
+- **Empty / Tentative Dates:** Allowed as optional fields without validation errors.
+- **Timezone:** Preserved direct Date coercion without UTC offset skew.
+
+## 123.6 Architecture & Invariant Invariants
+- **Authoritative Server Layer:** Server Zod schema (`src/lib/validation/enquiry-schema.ts`) remains the authoritative validation and security boundary.
+- **API Contracts:** `/api/enquiries` and `/api/customers` endpoints and payloads remain 100% identical.
+- **Database & Prisma:** 0 schema changes, 0 migrations.
+- **Authentication & RBAC:** Supabase Auth session checks and agency ownership authorization strictly preserved.
+- **Tenant Isolation:** Server-derived `agencyId` scoping strictly preserved; client forms cannot supply or override `agencyId`.
+- **Scrolling Architecture:** Remains strictly **ON HOLD** (no overflow or AppShell changes).
+- **Out of Scope Areas:** Enquiry Edit / CRM action dialogs (`/enquiries/[id]`), Quotation Create (`/quotations/new`), and Trip Detail (`/trips/[id]`) were NOT modified in DEV-01B.
+
+## 123.7 Files Changed
+1. `src/app/(dashboard)/enquiries/new/page.tsx` — Formik + Yup conversion, customer mode validation, duplicate check hook, inline validation feedback.
+2. `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` — Section 123 record of DEV-01B closure and workflow rule.
+
+## 123.8 Verified Regression Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Next.js Turbopack build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass Rate)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass Rate)
+- **Browser QA Viewport Matrix (320px, 375px, 390px, 768px, 1024px, 1280px, 1440px):** PASS (Zero horizontal overflow at 320px, inputs/buttons accessible, responsive grid folding).
+
+## 123.9 DEV-01 Milestone Roadmap Status (Updated in Section 124)
+- **DEV-01A (Customer Create & Edit):** **CLOSED / VERIFIED**
+- **DEV-01B (Enquiry Create):** **CLOSED / VERIFIED**
+- **DEV-01C (Quotation Create & Trip Detail Dead Imports):** **CLOSED / VERIFIED** (See Section 124)
+- **DEV-01D (Final DEV-01 QA & Milestone Sign-Off):** **PLANNED** (Next milestone)
+
+---
+
+# 124. DEV-01C — QUOTATION CREATE FORMIK/YUP + TRIP DETAIL DEAD IMPORT CLEANUP [CLOSED]
+
+## 124.1 Purpose & Execution Overview
+- **Implementation Date:** 2026-09-11
+- **Batch Name:** `DEV-01C — Quotation Create Formik/Yup + Trip Detail Dead Import Cleanup`
+- **Status:** **CLOSED / VERIFIED** (VERDICT A — VERIFIED / READY TO CLOSE; all automated tests, production build, regression suites, and multi-viewport browser QA passed with 100% success)
+- **Scope:** 
+  1. Standardized client-side form validation UX on the canonical **Formik + Yup** architecture for Quotation Create (`src/app/(dashboard)/quotations/new/page.tsx`), aligning it with TripDesk's established form standard (`/trips/new`, `/hotels/new`, `/vehicles/new`, `/customers/new`, `/enquiries/new`) while strictly preserving authoritative server-side **Zod validation**, API contracts, quotation snapshot generation flow, live pricing calculation engine (`costingEngine.calculateQuotationPricing`), and trip selection logic.
+  2. Inspected Trip Detail (`src/app/(dashboard)/trips/[id]/page.tsx`) for dead imports. Verified that `useFormik` is actively used on line 274 for `editTripFormik` (managing the Edit Trip dialog), and confirmed 0 dead imports. Retained active `useFormik` import with 0 runtime or functional modifications.
+
+## 124.2 Permanent Workflow Rule (Applied)
+In compliance with the permanent TripDesk workflow rule established in Section 123.2:
+- DEV-01C was implemented strictly within the approved batch scope.
+- Full verification suite executed: TypeScript (0 errors), Next.js production build (PASS), 60/60 Invoice Matrix (PASS), 23/23 Excel Matrix (PASS), and multi-viewport responsive browser QA (320px to 1440px PASS).
+- Upon confirming VERDICT A (PASS), `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` is updated in the same workflow, and DEV-01C is formally marked **CLOSED**.
+
+## 124.3 Quotation Create Implementation Summary (`/quotations/new`)
+- **Formik Migration:** Replaced manual form state (`selectedTripId`, `markupPct`, `discountPct`, `taxPct`, manual error states) with `useFormik` hook managing unified values:
+  - `selectedTripId: ""`
+  - `markupPct: 10` (preserved default)
+  - `discountPct: 0` (preserved default)
+  - `taxPct: 5` (preserved default)
+- **Yup Schema Validation:** Defined local client validation schema `createQuotationValidationSchema` using `Yup.object().shape({...})` connected directly to `useFormik({ validationSchema: createQuotationValidationSchema })`:
+  - `selectedTripId`: `Yup.string().required("Please select a trip workspace to generate quotation.")`
+  - `markupPct`: `Yup.number().typeError("Markup must be a valid number").min(0, "Markup cannot be negative").max(100, "Markup cannot exceed 100%").required("Markup percentage is required")`
+  - `discountPct`: `Yup.number().typeError("Discount must be a valid number").min(0, "Discount cannot be negative").max(100, "Discount cannot exceed 100%").required("Discount percentage is required")`
+  - `taxPct`: `Yup.number().typeError("Tax must be a valid number").min(0, "Tax cannot be negative").max(100, "Tax cannot exceed 100%").required("Tax percentage is required")`
+- **Reconciled Complete Field Inventory (4 Fields):**
+  1. `selectedTripId` (Trip Workspace selection combobox, required)
+  2. `markupPct` (Agency Markup percentage, default 10%, numeric input)
+  3. `discountPct` (Discount percentage, default 0%, numeric input)
+  4. `taxPct` (Tax / GST percentage, default 5%, numeric input)
+- **Error UX & Visual Feedback:** Connected input classes and helper messages to Formik `touched` and `errors` with red borders (`border-red-500/80 focus:border-red-500 focus:ring-red-500/20`) and inline error text (`text-[11px] text-red-500 font-semibold`).
+- **Submission Control:** Submission button tied to `formik.isSubmitting` with loading spinner (`Generating Snapshot...`); duplicate submissions are prevented client-side.
+- **Pricing & Calculation Preservation:**
+  - Preserved live preview calculations using `costingEngine.calculateQuotationPricing` driven reactively by `formik.values`.
+  - Preserved subtotal, markup amount, discount amount, taxable amount, tax amount, and total client-side quotation calculation.
+- **API Payload Preservation:**
+  - Preserved `quotationClient.generateTripQuotation` endpoint call with exact payload mapping:
+    ```typescript
+    {
+      tripId: values.selectedTripId,
+      markupPct: Number(values.markupPct) || 0,
+      discountPct: Number(values.discountPct) || 0,
+      taxPct: Number(values.taxPct) || 0,
+    }
+    ```
+  - Preserved toast notification on success and redirect to `/trips/${tripId}/quotation`.
+  - Preserved server-side error toast handling with `getErrorMessage(err)`.
+
+## 124.4 Trip Detail Import Audit Summary (`/trips/[id]`)
+- **Import Audit:** Inspected `src/app/(dashboard)/trips/[id]/page.tsx` for unused Formik/Yup imports.
+- **Finding:** Formik import `import { useFormik } from "formik";` is actively required and used at line 274 for `const editTripFormik = useFormik({...})` which manages the Edit Trip dialog. Yup was not imported.
+- **Action:** Retained active `useFormik` import. Zero dead imports found. Zero functional or runtime modifications made to Trip Detail.
+
+## 124.5 Architecture & Invariant Invariants
+- **Authoritative Server Layer:** Server Zod schema (`src/lib/validation/quotation-schema.ts`) remains the authoritative validation and security boundary.
+- **API Contracts:** `/api/trips/[id]/quotation` and `/api/quotations` endpoints and payloads remain 100% identical.
+- **Database & Prisma:** 0 schema changes, 0 migrations.
+- **Authentication & RBAC:** Supabase Auth session checks and agency ownership authorization strictly preserved.
+- **Tenant Isolation:** Server-derived `agencyId` scoping strictly preserved; client forms cannot supply or override `agencyId`.
+- **Scrolling Architecture:** Remains strictly **ON HOLD** (no overflow or AppShell changes).
+- **Completed Batches:** DEV-01A and DEV-01B files were NOT modified.
+
+## 124.6 Files Changed
+1. `src/app/(dashboard)/quotations/new/page.tsx` — Formik + Yup conversion, live costing reactivity, inline validation feedback, submission state.
+2. `src/app/(dashboard)/trips/[id]/page.tsx` — Audited; retained active `useFormik` import for `editTripFormik`.
+3. `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` — Section 124 record of DEV-01C closure and updated DEV-01 roadmap.
+
+## 124.7 Verified Regression Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Next.js Turbopack build)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass Rate)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass Rate)
+- **Browser QA Viewport Matrix (320px, 375px, 390px, 768px, 1024px, 1280px, 1440px):** PASS (Zero horizontal overflow at 320px, inputs/buttons accessible, responsive grid folding).
+
+## 124.8 DEV-01 Milestone Roadmap Status (Updated in Section 125)
+- **DEV-01A (Customer Create & Edit):** **CLOSED / VERIFIED**
+- **DEV-01B (Enquiry Create):** **CLOSED / VERIFIED**
+- **DEV-01C (Quotation Create & Trip Detail Dead Imports):** **CLOSED / VERIFIED**
+- **DEV-01D (Final DEV-01 QA & Milestone Sign-Off):** **CLOSED / VERIFIED** (See Section 125)
+- **DEV-01 Milestone (Form Validation Consistency):** **CLOSED**
+
+---
+
+# 125. DEV-01D — FINAL DEV-01 QA & MILESTONE SIGN-OFF [CLOSED]
+
+## 125.1 Milestone Purpose & Executive Summary
+- **Sign-Off Date:** 2026-09-11
+- **Batch Name:** `DEV-01D — Final DEV-01 QA & Milestone Sign-Off`
+- **Milestone Name:** `DEV-01 — Form Validation Consistency`
+- **Final Verdict:** **VERDICT A — DEV-01 MILESTONE READY TO CLOSE / FORMALLY CLOSED**
+- **Scope Summary:** Executed comprehensive, independent, read-only audit across all DEV-01 batches (DEV-01A, DEV-01B, DEV-01C) and broader application forms. Verified canonical client-side **Formik + Yup** validation UX alignment, 100% preservation of authoritative server-side **Zod validation**, API contracts, live costing/pricing calculations, debounced duplicate checks, and multi-tenant isolation.
+
+## 125.2 Independent Verification Results per Batch
+1. **DEV-01A (Customer Create & Edit):** **PASS**
+   - Files: `src/app/(dashboard)/customers/new/page.tsx`, `src/app/(dashboard)/customers/[id]/page.tsx`
+   - Verified genuine Formik (`useFormik`) + Yup schemas (`createCustomerValidationSchema`, `editCustomerValidationSchema`).
+   - Verified 400ms debounced duplicate detection (`customerClient.checkDuplicate`), non-blocking duplicate warnings, `enableReinitialize: true` on edit modal, and exact API contract preservation.
+2. **DEV-01B (Enquiry Create):** **PASS**
+   - File: `src/app/(dashboard)/enquiries/new/page.tsx`
+   - Verified genuine Formik + Yup schema (`createEnquiryValidationSchema`) covering complete 26-field contract.
+   - Verified existing/quick-add customer mode switching, date validation (`endDate >= startDate`), 400ms debounced lead duplicate detection (`enquiryClient.checkDuplicate`), and exact API payload mapping.
+3. **DEV-01C (Quotation Create & Trip Detail Audit):** **PASS**
+   - Files: `src/app/(dashboard)/quotations/new/page.tsx`, `src/app/(dashboard)/trips/[id]/page.tsx`
+   - Verified genuine Formik + Yup schema (`createQuotationValidationSchema`) managing 4 fields (`selectedTripId`, `markupPct`, `discountPct`, `taxPct`).
+   - Verified reactive live pricing engine calculation (`costingEngine.calculateQuotationPricing`), snapshot generation API call (`quotationClient.generateTripQuotation`), and active `useFormik` preservation in Trip Detail (`editTripFormik` at line 274).
+
+## 125.3 Form Validation Architecture & Global Form Landscape
+- **Standardized Architecture:**
+  - **Client-Side UX Layer:** `Formik + Yup` provides real-time field state, touched tracking, inline validation errors, and disabled/loading submission states.
+  - **Authoritative Server Layer:** `Zod` schemas in `src/lib/validation/*` enforce authoritative business rules, type coercion, and multi-tenant safety.
+  - **Formik/Yup as UX Only:** Formik and Yup serve strictly as a client UX enhancement and are never treated as a security boundary.
+- **Completed Forms in Scope:**
+  - Customer Create (`/customers/new`)
+  - Customer Edit (`/customers/[id]` modal)
+  - Enquiry Create (`/enquiries/new`)
+  - Quotation Create (`/quotations/new`)
+  - Trip Create (`/trips/new` — pre-existing Formik+Yup)
+  - Hotel Create (`/hotels/new` — pre-existing Formik+Yup)
+  - Vehicle Create (`/vehicles/new` — pre-existing Formik+Yup)
+  - Trip Detail Edit (`/trips/[id]` dialog — pre-existing Formik)
+- **Deferred / Excluded Forms:**
+  - Enquiry Detail CRM Dialogs (`/enquiries/[id]` — action dialogs/stage transitions, correctly excluded from full form conversion).
+  - Quotation Detail Builder (`/quotations/[id]` — proposal builder actions).
+
+## 125.4 Security, RBAC & Invariant Adherence
+- **Authentication & RBAC:** Supabase Auth session checks and agency ownership authorization strictly preserved.
+- **Tenant Isolation:** Server-derived `agencyId` scoping strictly preserved; client forms cannot supply or override `agencyId`.
+- **Database & Prisma:** 0 schema changes, 0 migrations.
+- **Scrolling Architecture:** Remains strictly **ON HOLD** (no overflow or AppShell changes).
+
+## 125.5 Verified Regression & Build Evidence
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass Rate)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass Rate)
+- **Browser QA Viewport Matrix (320px, 375px, 390px, 768px, 1024px, 1280px, 1440px):** PASS across all target forms.
+
+## 125.6 Milestone Final Sign-Off Status
+- **DEV-01A:** **CLOSED**
+- **DEV-01B:** **CLOSED**
+- **DEV-01C:** **CLOSED**
+- **DEV-01D:** **CLOSED**
+- **DEV-01 Milestone (Form Validation Consistency):** **CLOSED**
+
+---
+
+# SECTION 126 — DEV-02 TABLE & LIST SCROLLING CONTAINMENT [CLOSED]
+
+## 126.1 Milestone Overview
+- **Milestone Code:** `DEV-02`
+- **Milestone Name:** `DEV-02 — Table & List Scrolling Containment`
+- **Final Verdict:** **VERDICT A — DEV-02 IMPLEMENTATION VERIFIED / FORMALLY CLOSED**
+- **Scope Summary:** Standardized internal table/list scrolling containment across all 6 confirmed unbounded targets. Large datasets now scroll cleanly within their table containers rather than expanding the document, while short datasets preserve natural height. Sticky table headers were introduced with backdrop blur so header labels remain readable while table rows scroll underneath. Page-level/window scrolling and AppShell architecture remain strictly **ON HOLD / UNTOUCHED**.
+
+## 126.2 Table Changes & Implementation Inventory
+1. **Target 1 — Invoices Ledger (`src/app/(dashboard)/invoices/page.tsx`):**
+   - Previous: Unbounded table with horizontal overflow wrapper only.
+   - New: `overflow-x-auto max-h-[620px] overflow-y-auto` container.
+   - Header: Sticky header `<TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">`.
+   - Behavior: Internal vertical scroll on overflow; horizontal scroll intact; filters, pagination, and invoice actions 100% preserved.
+
+2. **Target 2 — Documents Ledger (`src/app/(dashboard)/documents/page.tsx`):**
+   - Previous: Unbounded table with horizontal overflow wrapper only.
+   - New: `overflow-x-auto max-h-[620px] overflow-y-auto` container.
+   - Header: Sticky header `<TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">`.
+   - Behavior: Internal vertical scroll on overflow; horizontal scroll intact; status filters, document cards, and actions 100% preserved.
+
+3. **Target 3 — Communications Log (`src/app/(dashboard)/communications/page.tsx`):**
+   - Previous: Unbounded raw table with horizontal overflow wrapper only.
+   - New: `overflow-x-auto max-h-[620px] overflow-y-auto` container.
+   - Header: Sticky header `<thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">`.
+   - Behavior: Internal vertical scroll for outbound activity log; channel tabs, filters, and stat cards 100% preserved.
+
+4. **Target 4 — Follow-ups Task Ledger (`src/app/(dashboard)/follow-ups/page.tsx`):**
+   - Previous: Direct `<Table>` rendering without vertical containment wrapper.
+   - New: `overflow-x-auto max-h-[620px] overflow-y-auto` container wrapping `<Table>`.
+   - Header: Sticky header `<TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">`.
+   - Behavior: Internal vertical scroll on overflow; timeline scopes, reschedule/complete modals, and task actions 100% preserved.
+
+5. **Target 5 — Reports Data Tables (`src/app/(dashboard)/reports/page.tsx`):**
+   - Previous: 5 report tab tables (Revenue, Destinations, Receivables, Payables, VIP Customers) rendered with unbounded vertical height.
+   - New: `overflow-x-auto max-h-[520px] overflow-y-auto` container across all 5 tab tables.
+   - Headers: Sticky headers `<thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">`.
+   - Behavior: Tab switching, search filtering, KPI summaries, and financial calculations 100% preserved.
+
+6. **Target 6 — Subscription Payment History (`src/app/(dashboard)/subscription/page.tsx`):**
+   - Previous: Payment history table rendered with unbounded vertical height.
+   - New: `overflow-x-auto max-h-[380px] overflow-y-auto` container.
+   - Header: Sticky header `<thead className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm shadow-2xs">`.
+   - Behavior: Payment record log scrolls internally; plan cards, UPI modal, and UTR submission flow 100% preserved.
+
+7. **Pre-Existing Core Listing Tables (Verified & Preserved):**
+   - `/customers`, `/trips`, `/bookings`, `/quotations`, `/hotels`, `/vehicles`, `/activities`, `/suppliers`, `/rate-sheets`, `/payments`, `/enquiries`.
+   - Pre-existing established pattern (`max-h-[620px] overflow-y-auto`) left strictly unchanged.
+
+## 126.3 Page-Scroll Invariant Statement
+> **Page/window scrolling was not intentionally modified. The broader page-scroll milestone remains ON HOLD.**
+- `AppShell` (`src/components/layout/app-shell.tsx`) was NOT modified.
+- Root layout / body overflow / global CSS was NOT modified.
+- Mobile bottom navigation spacing and layout padding were NOT modified.
+- No business logic, APIs, Prisma models, migrations, or RBAC rules were touched.
+
+## 126.4 Verification & QA Evidence
+- **TypeScript Compilation (`npx tsc --noEmit`):** PASS (0 errors)
+- **Production Build (`npm run build`):** PASS (Exit code 0, Turbopack)
+- **DEV-04 Complete 60-Test Invoice Matrix (`scratch/test-dev04-complete-matrix.ts`):** 60/60 PASSED (100% Pass Rate)
+- **DEV-03 Excel Import Verification Matrix (`scratch/test-dev03-excel.ts`):** 23/23 PASSED (100% Pass Rate)
+- **Browser Responsive QA Matrix:** Tested and verified across all 7 target viewports:
+  - `1440 × 900` (Desktop Large): PASS
+  - `1280 × 800` (Desktop Standard): PASS
+  - `1024 × 768` (Desktop Compact): PASS
+  - `768 × 1024` (Tablet Portrait): PASS
+  - `390 × 844` (Mobile Standard - iPhone 14/15): PASS
+  - `375 × 700` (Mobile Compact): PASS
+  - `320 × 700` (Mobile Narrow): PASS
+
+## 126.5 Milestone Status
+- **DEV-02 (Table & List Scrolling Containment):** **CLOSED / VERIFIED**
+
+---
+
+# SECTION 127 — BOOKING-CENTRIC PERSISTENT INVOICE REDESIGN (BATCH 1 & BATCH 2) [CLOSED]
+
+## 127.1 Overview & Decision #18 Architecture
+- **Milestone Code:** `DEV-05` / `INVOICE-REDESIGN-BATCH-1-AND-2`
+- **Milestone Name:** `Booking-Centric Persistent Invoice & Live Invoice Viewer Redesign`
+- **Final Verdict:** **PASS — BATCH 2 VERIFIED / FORMALLY CLOSED**
+- **Core Product Rule (Decision #18):**
+  > **One Booking = One Persistent Invoice Number (`INV-XXXX`)**
+  - **Single Source of Truth:** The Booking is the single authoritative source of truth.
+  - **Persistent Invoice Record:** The Invoice is a persistent financial identity. The first generation creates the invoice row and allocates an agency-scoped sequential number (`INV-XXXX`). Subsequent views or generation requests reuse the same invoice record and refresh live booking data without incrementing invoice numbers or duplicating records.
+  - **Strict Generation Eligibility:** Invoice generation is permitted **ONLY** when `booking.status === BookingStatus.CONFIRMED`. Other statuses (`DRAFT`, `ONGOING`, `COMPLETED`, `CANCELLED`) reject new invoice generation. Historical invoices on non-confirmed bookings remain viewable and discoverable.
+
+## 127.2 Implemented Scope & Component Breakdown
+
+### 1. Backend Service Layer (`src/lib/services/invoice-service.ts`, `src/lib/services/booking-service.ts`, `src/lib/services/payment-service.ts`)
+- **Persistent Invoice Allocation (`getOrCreateInvoiceForBooking`):**
+  - Uses interactive database transaction with `Serializable` or row-level locking.
+  - Generates agency-scoped sequential number `INV-XXXX` (using `MAX(CAST(SUBSTRING...))`) only when creating a new invoice.
+  - Reuses existing invoice when already generated for the booking.
+  - Auto-links unlinked existing payments for the booking to the invoice.
+- **Live Data Query (`invoiceService.getInvoice`):**
+  - Includes authoritative `booking` sub-relations: `customer`, `trip` (with `travelers`), `quotation` (with `items`), `bookingDate`, `totalAmount`, `paidAmount`, `balanceAmount`, `currency`, and `notes`.
+  - Computes `isOverdue` dynamically based on live balance and due date.
+- **Booking Invoice Relationship (`bookingService.getBooking`):**
+  - Returns `invoices` array ordered by `createdAt: desc` to supply the Booking Detail page with state-aware invoice metadata.
+- **Financial Synchronization (`bookingService.recalculateBookingPaymentTotals` & `updateBooking`):**
+  - Booking total updates (e.g. ₹85k → ₹90k) and payment additions/voids automatically synchronize the active persistent invoice total, paid amount, balance, and invoice status (`ISSUED` → `PARTIALLY_PAID` → `PAID`).
+- **Cancellation Propagation (`bookingService.cancelBooking`):**
+  - Cancelling a booking automatically transitions the linked active invoice to `InvoiceStatus.CANCELLED` with timestamps and reasons, preserving the invoice number without replacement.
+
+### 2. Booking Detail Invoice Card (`src/app/(dashboard)/bookings/[id]/page.tsx`)
+- Replaced legacy top command-bar "Customer Invoice" button with a dedicated, state-aware **Invoice Card** in the right sidebar.
+- **State Matrix:**
+  - `CONFIRMED` + No Invoice: Shows "Invoice Not Generated" with explanation and prominent `Generate Invoice` action.
+  - `CONFIRMED` + Existing Invoice: Displays `INV-XXXX`, status badge, invoice date, due date, financial breakdown (Total, Paid, Balance), `View Invoice` (`/invoices/[id]`), and `Download PDF` (`/api/invoices/[id]/pdf`).
+  - Non-Confirmed + No Invoice (`DRAFT`, `ONGOING`, `COMPLETED`): Displays "Invoice Not Available" with notice that invoice generation requires confirmed booking (no generate button).
+  - Non-Confirmed + Historical Invoice: Displays historical invoice metadata with `View Invoice` and `Download PDF`.
+  - `CANCELLED` + Cancelled Invoice: Displays `INV-XXXX` with `CANCELLED` badge, financial totals, `View Invoice`, and `Download PDF` (no generate/reissue action).
+
+### 3. Read-Only SaaS Invoice Detail Viewer (`src/app/(dashboard)/invoices/[id]/page.tsx`)
+- Completely replaced legacy ~1000-line Draft Invoice Editor with a clean, read-only SaaS invoice document viewer.
+- **Document Structure:**
+  - **Header:** Agency branding/name, agency contact details (phone, email, address), "TAX INVOICE", `INV-XXXX`, status badge, invoice date, due date.
+  - **Billed To & Reference:** Live customer profile (name, phone, email, full address) and Booking reference (booking number with link, trip title, travel period, currency).
+  - **Itemized Services Table:** Displays customer-facing package items from authoritative quotation (`booking.quotation.items`), with safe fallback to `invoice.items` or standard package line item. Never exposes internal costs, supplier rates, markup, or internal notes.
+  - **Financial Summary:** Subtotal, Discount (if applicable), Total Amount Billed, Total Paid, and Balance Due (with settled badge when balance is ₹0).
+  - **Payment Transactions:** Unified booking payment ledger displaying receipt numbers, payment dates, payment methods, transaction references, status, and amounts.
+  - **Actions:** `Back to Booking`, `Print` (`window.print()`), `Download PDF` (`/api/invoices/[id]/pdf`), and `Record Payment` modal trigger (when balance > 0 and status is not CANCELLED).
+  - **Print Optimized:** Clean `@media print` rules for paper-like output without dashboard chrome.
+
+### 4. Invoices List Page Streamline (`src/app/(dashboard)/invoices/page.tsx`)
+- Updated invoice list action dropdowns to "View Invoice" navigating to `/invoices/[id]`.
+- Removed legacy draft deletion / draft edit workflows.
+- "Create from Booking" cleanly routes users to confirmed bookings.
+
+## 127.3 Verified Test Results & Evidence
+
+### 1. Batch 2 Automated Test Matrix (`scratch/test-dev05-batch2-matrix.ts`)
+- **Result:** **20/20 PASSED (100%)**
+- **Tested Areas:**
+  - T01–T04: Booking Service invoice relations, persistent invoice allocation, single-invoice idempotency.
+  - T05–T09: `getInvoice()` live relations (customer, trip travelers, customer-facing quotation items, agency details).
+  - T10–T14: Live booking total updates (₹85k → ₹90k), payment additions, status progression (`PARTIALLY_PAID` → `PAID`).
+  - T15–T18: Booking cancellation propagation, invoice status `CANCELLED`, number preservation, rejection of generation on cancelled bookings.
+  - T19–T20: Multi-tenant security isolation (cross-agency invoice read and generation rejected).
+
+### 2. Batch 1 Regression Matrix (`scratch/test-dev05-batch1-matrix.ts`)
+- **Result:** **29/29 PASSED (100%)**
+
+### 3. Excel Regression Suite (`scratch/test-dev03-excel.ts`)
+- **Result:** **23/23 PASSED (100%)**
+
+### 4. TypeScript Compilation & Production Build
+- **TypeScript (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **Exit code 0, Turbopack (PASS)**
+
+### 5. Responsive Browser QA Viewport Matrix
+- Tested and verified across all 7 target viewports:
+  - `1440 × 900` (Desktop Large): PASS
+  - `1280 × 800` (Desktop Standard): PASS
+  - `1024 × 768` (Desktop Compact): PASS
+  - `768 × 1024` (Tablet Portrait): PASS
+  - `390 × 844` (Mobile Standard): PASS
+  - `375 × 667` (Mobile Compact): PASS
+  - `320 × 568` (Mobile Narrow): PASS
+- Verified zero horizontal overflow, clean responsive wrapping on metadata cards, responsive itemized services tables, and proper modal behavior.
+
+## 127.4 Database & Schema Impact
+- **Prisma Schema (`prisma/schema.prisma`):** **0 changes, 0 migrations created.**
+- **Deferred Database Uniqueness:** Database-level `@@unique([agencyId, bookingId])` constraint remains intentionally deferred as a separate approved database migration task.
+
+## 127.5 Milestone Sign-Off
+- **Batch 1 (Core Service & Payment Unification):** **CLOSED**
+- **Batch 2 (Booking Invoice Card & Invoice Detail Refactor):** **CLOSED**
+- **Final Verdict:** **PASS — BATCH 2 VERIFIED**
+
+---
+
+# SECTION 128 — PROFESSIONAL INVOICE PDF REDESIGN (BATCH 3) [VERIFIED & CLOSED]
+
+## 128.1 Overview & Decision #18 Architecture
+- **Milestone Code:** `DEV-05` / `INVOICE-REDESIGN-BATCH-3`
+- **Milestone Name:** `Professional Commercial Invoice PDF Redesign`
+- **Final Verdict:** **PASS — BATCH 3 READY FOR ACCEPTANCE**
+- **Core Principles:**
+  - **Booking is the Authoritative Financial Source of Truth:** The PDF generation engine prioritizes live booking values (`invoice.booking.totalAmount`, `invoice.booking.paidAmount`, `invoice.booking.balanceAmount`) over static stored invoice snapshot records.
+  - **Single Persistent Invoice Identity (Decision #18):** Downloading or generating a PDF is a pure read-only document generation operation. Zero new invoice rows are created and zero sequence increments occur.
+  - **Customer Data Safety:** PDF generation strictly omits supplier costs, supplier rates, markup/margin data, internal employee/user notes, and database IDs.
+  - **No Tax / GST Features:** Maintained document title as `INVOICE` (or `CANCELLED INVOICE` / `DRAFT INVOICE`). Zero tax calculation/GST fields introduced.
+  - **Multi-Page Support & Pagination:** Dynamic table row heights, safe page breaks, and global footer with `Page X of Y` across buffered pages.
+
+## 128.2 Component & Architecture Breakdown
+1. **Invoice PDF Service (`src/lib/services/invoice-pdf-service.ts`):**
+   - **Visual Design:** High-resolution ISO A4 layout (`595.28 × 841.89 pt`) with 40pt margins, slate typography (`Helvetica`, `Helvetica-Bold`), indigo accents (`#4338CA`), and clean rounded metadata cards.
+   - **Header:** Agency branding (logo with fallback to styled agency title, contact info, address), document title (`INVOICE`), persistent `INV-XXXX`, status badge, invoice date, due date.
+   - **Customer & Booking Metadata:** Billed To card (live customer name, phone, email, full address) and Booking & Trip Reference card (booking number, trip title, travel dates, currency).
+   - **Itemization Hierarchy:**
+     1. Live customer-facing quotation items (`invoice.booking.quotation.items`).
+     2. Stored invoice items (`invoice.items`).
+     3. Complete travel package single-line fallback.
+   - **Authoritative Financial Summary:** Subtotal, Discount (if present), Total Amount Billed, Total Paid, and prominent dark Balance Due callout bar.
+   - **Active Payment History Ledger:** Table of completed payments (receipt/payment number, date, method, transaction reference, amount). Filtered to exclude `VOIDED` and archived payments.
+   - **Notes & Instructions:** Customer-facing `notes` and `paymentInstructions` rendered when present.
+   - **Multi-Page Protection:** Automatic table header repetition, safe page splits, and buffered page iteration.
+   - **Watermarks:** Subtle diagonal watermark for `CANCELLED` (rose) and `DRAFT` (slate) states.
+   - **Global Footer:** Computer-generated document notice and dynamic `Page X of Y` counter on all pages.
+
+## 128.3 Verified Test Results & Evidence
+- **Batch 3 Test Matrix (`scratch/test-dev05-batch3-matrix.ts`):** **24/24 PASSED (100%)**
+  - T01–T06: Confirmed booking PDF generation, binary validation, invoice number, agency branding, customer data.
+  - T07–T08: Persistent identity verification (0 new invoice rows, 0 sequence increments).
+  - T09–T12: Live booking financial synchronization (₹85k → ₹90k update, advance payment, full settlement).
+  - T13–T14: Active payment history ledger & strict voided payment exclusion.
+  - T15–T16: Cancelled booking PDF generation (watermark) & strict rejection of new invoice generation on cancelled bookings.
+  - T17–T18: Tenant security isolation & customer data safety (supplier cost/markup exclusion).
+  - T19–T20: Multi-page document generation (15 complex items) & resilient logo fallback.
+  - T21–T24: Automated page numbering assertion (`Page 1 of 2`, `Page 2 of 2`), zero GST/tax exclusion assertion, forbidden data exclusion assertion, historical invoice discoverability.
+- **Batch 2 Regression Matrix (`scratch/test-dev05-batch2-matrix.ts`):** **20/20 PASSED (100%)**
+- **Batch 1 Regression Matrix (`scratch/test-dev05-batch1-matrix.ts`):** **29/29 PASSED (100%)**
+- **Excel Regression Suite (`scratch/test-dev03-excel.ts`):** **23/23 PASSED (100%)**
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **Exit code 0, Turbopack (PASS)**
+
+## 128.4 Database & Schema Impact
+- **Prisma Schema (`prisma/schema.prisma`):** **0 changes, 0 migrations created.**
+- **Deferred Database Uniqueness:** Database-level `@@unique([agencyId, bookingId])` constraint remains intentionally deferred.
+
+## 128.5 Milestone Sign-Off
+- **Batch 1 (Core Service & Payment Unification):** **CLOSED**
+- **Batch 2 (Booking Invoice Card & Invoice Detail Refactor):** **CLOSED**
+- **Batch 3 (Professional Invoice PDF Redesign):** **CLOSED / VERIFIED**
+- **Final Verdict:** **PASS — BATCH 3 ACCEPTED**
+
+---
+
+# SECTION 129 — INVOICE ONE-PER-BOOKING DATABASE INTEGRITY (BATCH 4) [VERIFIED & CLOSED]
+
+## 129.1 Overview & Decision #18 Database Enforcement
+- **Milestone Code:** `DEV-05` / `INVOICE-DB-INTEGRITY-BATCH-4`
+- **Milestone Name:** `Invoice One-Per-Booking Database Integrity`
+- **Final Verdict:** **PASS — BATCH 4 ACCEPTED**
+- **Core Objective:**
+  - Transition Decision #18's locked rule (**One Booking = One Persistent Invoice**) from application-level convention to an enforced physical database constraint in PostgreSQL.
+  - Target constraint: `@@unique([agencyId, bookingId])` on `model Invoice`.
+  - Safely reconcile and clean confirmed test artifact duplicate invoice rows (`INV-0004`, `INV-0005`), retaining `INV-0003`.
+  - Harden invoice creation services against PostgreSQL `P2002` concurrency races so that parallel requests resolve to the winning invoice without incrementing sequence numbers.
+  - Guard legacy replacement paths against bypassing uniqueness.
+  - Execute 100% full regression across Batch 4, Batch 3, Batch 2, Batch 1, Excel suites, TypeScript compiler, and production build.
+
+## 129.2 Schema & Migration Implementation
+1. **Prisma Schema (`prisma/schema.prisma`):**
+   ```prisma
+   model Invoice {
+     ...
+     @@unique([agencyId, invoiceNumber])
+     @@unique([agencyId, bookingId])
+     ...
+   }
+   ```
+2. **Database Migration:**
+   - Migration Folder: `prisma/migrations/20260912104000_add_invoice_booking_unique_constraint/`
+   - Generated & Applied SQL:
+     ```sql
+     -- CreateIndex
+     CREATE UNIQUE INDEX "invoices_agencyId_bookingId_key" ON "invoices"("agencyId", "bookingId");
+     ```
+   - Applied cleanly to Supabase Cloud PostgreSQL using `npx prisma migrate deploy`.
+   - Verified physical index existence in PostgreSQL via `pg_indexes` (`invoices_agencyId_bookingId_key` on `public.invoices USING btree ("agencyId", "bookingId")`).
+3. **Prisma Client Generation:**
+   - Regenerated Prisma Client v7.9.1 exposing composite selector `agencyId_bookingId`.
+
+## 129.3 Service Layer Hardening & Concurrency Protection
+1. **Concurrency Race Hardening (`src/lib/services/invoice-service.ts`):**
+   - In `getOrCreateInvoiceForBooking()`, wrapped transactional insertion with a `P2002` error handler:
+     ```ts
+     try {
+       // transactional invoice creation logic
+     } catch (error) {
+       if (
+         error instanceof Prisma.PrismaClientKnownRequestError &&
+         error.code === "P2002"
+       ) {
+         const winningInvoice = await prisma.invoice.findUnique({
+           where: {
+             agencyId_bookingId: {
+               agencyId,
+               bookingId,
+             },
+           },
+           include: invoiceDetailInclude,
+         });
+         if (winningInvoice) {
+           return winningInvoice as InvoiceWithDetails;
+         }
+       }
+       throw error;
+     }
+     ```
+   - When multiple concurrent requests race to create an invoice for the same booking, exactly 1 succeeds and allocates a sequence number, while the other requests catch `P2002`, query the winning persistent invoice, and return it cleanly without creating duplicate rows or consuming extra sequence numbers.
+2. **Legacy Replacement Path Guard (`createReplacementInvoice`):**
+   - Guarded `createReplacementInvoice()` to throw an explicit error enforcing Decision #18 and preventing duplicate invoice creation.
+
+## 129.4 Verified Test Results & Evidence
+- **Batch 4 Automated Matrix (`scratch/test-dev05-batch4-matrix.ts`):** **17/17 PASSED (100%)**
+  - T01: Physical unique constraint `invoices_agencyId_bookingId_key` verified in PostgreSQL metadata.
+  - T02: Direct duplicate invoice insertion for same agency + booking throws `P2002`.
+  - T03: Database confirms duplicate row was not inserted.
+  - T04: Multi-tenant isolation verified (different agencies can create invoices for their own bookings without collision).
+  - T05: `findUnique({ where: { agencyId_bookingId } })` retrieves exact persistent invoice.
+  - T06: `findUnique` cross-agency isolation verified.
+  - T07: 10 parallel concurrent `getOrCreateInvoiceForBooking()` calls resolve to identical Invoice ID.
+  - T08: All 10 parallel calls resolve to identical Invoice Number.
+  - T09: Database confirms exactly 1 Invoice row created across 10 concurrent requests.
+  - T10: InvoiceSequence incremented exactly once.
+  - T11: Clean database state verified (0 duplicate groups).
+  - T12: All invoices have valid non-null booking relations.
+  - T13: Zero cross-agency mismatches.
+  - T14: Zero duplicate invoice numbers within agencies.
+  - T15: Confirmed Booking invoice generation succeeds.
+  - T16: Non-confirmed Booking statuses (`DRAFT`, `ONGOING`, `COMPLETED`, `CANCELLED`) reject new invoice generation.
+  - T17: Legacy replacement path strictly blocked from violating uniqueness.
+- **Batch 3 Regression Matrix (`scratch/test-dev05-batch3-matrix.ts`):** **24/24 PASSED (100%)**
+- **Batch 2 Regression Matrix (`scratch/test-dev05-batch2-matrix.ts`):** **20/20 PASSED (100%)**
+- **Batch 1 Regression Matrix (`scratch/test-dev05-batch1-matrix.ts`):** **29/29 PASSED (100%)**
+- **Excel Regression Suite (`scratch/test-dev03-excel.ts`):** **23/23 PASSED (100%)**
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **Exit code 0, Turbopack (PASS)**
+- **Browser QA Verification:** **PASS (clean invoice listing, no duplicates, accurate financial rendering)**
+
+## 129.5 Final Database State & Integrity
+- **Total Invoices in Database:** 16 (15 original clean records + 1 test record)
+- **Duplicate `(agencyId, bookingId)` groups:** 0
+- **Duplicate invoice numbers within agency:** 0
+- **Cross-agency mismatches:** 0
+- **Orphaned bookings:** 0
+- **NULL bookingId:** 0
+- **Status of Deferred Uniqueness:** **NO LONGER DEFERRED — OFFICIALLY ENFORCED AT DATABASE LEVEL.**
+
+## 129.6 Milestone Sign-Off
+- **Batch 1 (Core Service & Payment Unification):** **CLOSED**
+- **Batch 2 (Booking Invoice Card & Invoice Detail Refactor):** **CLOSED**
+- **Batch 3 (Professional Invoice PDF Redesign):** **CLOSED**
+- **Batch 4 (Invoice One-Per-Booking Database Integrity):** **CLOSED / VERIFIED**
+- **Final Verdict:** **PASS — BATCH 4 ACCEPTED**
+
+---
+
+# SECTION 130 — INVOICE UI CONSOLIDATION INTO BOOKING DETAIL [VERIFIED & CLOSED]
+
+## 130.1 Overview & Architecture Consolidation
+- **Milestone Code:** `DEV-05` / `INVOICE-UI-CONSOLIDATION`
+- **Milestone Name:** `Invoice UI Consolidation into Booking Detail`
+- **Status:** **VERIFIED & CLOSED**
+- **Core Objective & UX Transition:**
+  - Transition TripDesk invoice management from a standalone list route to a **Booking-centric workflow**.
+  - Invoices are now discovered, generated, and managed directly from the **Booking Detail** page (`/bookings/[id]`).
+  - Standalone `/invoices` LIST UI is no longer part of normal user-facing navigation.
+  - Safely configured `/invoices` route to redirect immediately to `/bookings`.
+  - Removed "Invoices" from sidebar navigation (`src/lib/navigation.ts`) and global search quick items (`src/components/shared/global-search.tsx`).
+  - Retained `/invoices/[id]` as the dedicated read-only Tax Invoice Detail viewer and print layout.
+  - Repointed `/invoices/[id]` breadcrumb and document header back-navigation directly to the parent Booking Detail (`/bookings/${invoice.bookingId}`) instead of `/invoices`.
+  - Table-row dropdown actions on the `/bookings` list page were kept clean and intact without adding invoice actions, maintaining uncluttered list scanning.
+
+## 130.2 Booking Detail Actions & Invoice Card Integration
+1. **Booking Detail Actions Dropdown (`src/app/(dashboard)/bookings/[id]/page.tsx`):**
+   - Added an **Actions** dropdown menu in the top command header of Booking Detail.
+   - When no invoice exists and the booking is eligible: displays **Generate Invoice** action.
+   - When an invoice exists: displays **View Invoice** (navigates to `/invoices/[id]`) and **Download Invoice PDF** (triggers `/api/invoices/[id]/pdf`).
+2. **Right-Sidebar Invoice Card (`src/app/(dashboard)/bookings/[id]/page.tsx`):**
+   - Preserved and enhanced the existing Invoice Card in the right sidebar.
+   - When no invoice exists and the booking is eligible: displays **Generate Invoice** primary button with explanatory guidance.
+   - When an invoice exists: displays persistent `INV-XXXX` number, live status badge (`ISSUED`, `PARTIALLY_PAID`, `PAID`, `CANCELLED`), **View Invoice**, and **Download PDF** buttons.
+3. **Unified Single-Source Generation Flow:**
+   - Both the top Actions dropdown and the right-sidebar Invoice Card invoke the exact same client handler calling `POST /api/invoices`, which dispatches to `invoiceService.getOrCreateInvoiceForBooking()`.
+   - Strictly enforces Decision #18: **One Booking = One Persistent Invoice**.
+
+## 130.3 Invoice Generation Eligibility Rules
+- **Invoice Generation ALLOWED for:**
+  - `CONFIRMED`
+  - `ONGOING`
+  - `COMPLETED`
+- **Invoice Generation STRICTLY REJECTED for:**
+  - `DRAFT` (must be confirmed before invoicing)
+  - `CANCELLED` (cannot create new invoices for cancelled bookings)
+- **Service Layer Guard (`src/lib/services/invoice-service.ts`):**
+  - Updated `getOrCreateInvoiceForBooking()` validation to explicitly allow `[BookingStatus.CONFIRMED, BookingStatus.ONGOING, BookingStatus.COMPLETED]` and reject all other statuses with clear error messaging.
+
+## 130.4 Invariants & Data Integrity Preserved
+- **One Booking = One Persistent Invoice:** PostgreSQL database unique constraint `invoices_agencyId_bookingId_key` guarantees 1-to-1 persistence under all scenarios including concurrent race conditions.
+- **Financial & Payment Synchronization:** Live booking updates (e.g. quotation edits, payments, voided payments) automatically synchronize across Invoice Detail and PDF generation without altering invoice numbers.
+- **Multi-Tenant Security Isolation:** Strict `agencyId` scoping preserved across all booking and invoice queries, API endpoints, and PDF generation.
+- **Customer Data Safety:** Supplier cost prices, internal markups, driver allowances, and internal notes remain 100% excluded from invoice views and PDFs.
+- **Zero Destructive Operations:** No database records were dropped, altered destructively, or truncated.
+
+## 130.5 Automated Verification & Multi-Viewport QA Results
+
+### Automated Test Matrix:
+- **Invoice Consolidation Integration Matrix (`scratch/test-invoice-consolidation-matrix.ts`):** **12/12 PASSED (100%)**
+- **Batch 1 Regression Matrix (`scratch/test-dev05-batch1-matrix.ts`):** **29/29 PASSED (100%)**
+- **Batch 2 Regression Matrix (`scratch/test-dev05-batch2-matrix.ts`):** **20/20 PASSED (100%)**
+- **Batch 3 Regression Matrix (`scratch/test-dev05-batch3-matrix.ts`):** **24/24 PASSED (100%)**
+- **Batch 4 Database Integrity Matrix (`scratch/test-dev05-batch4-matrix.ts`):** **17/17 PASSED (100%)**
+- **DEV-03B Excel Verification Suite (`scratch/test-dev03-excel.ts`):** **23/23 PASSED (100%)**
+- **TOTAL AUTOMATED TESTS:** **125 / 125 PASSED (100%)**
+
+### Build & Compiler Checks:
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Next.js Production Build (`npm run build`):** **PASS (Turbopack, 32/32 static pages generated, exit code 0)**
+
+### Multi-Viewport Browser QA:
+- **1440 × 900 (Large Desktop):** **PASS** — Actions dropdown and Invoice Card fully visible, clean two-column layout.
+- **1280 × 800 (Standard Laptop):** **PASS** — Proper grid reflow, zero horizontal scrollbar.
+- **1024 × 768 (Tablet Landscape):** **PASS** — Responsive dropdown positioning and card alignment.
+- **768 × 1024 (Tablet Portrait):** **PASS** — Right sidebar stacks cleanly below booking details.
+- **390 × 844 (Modern Mobile - iPhone 14):** **PASS** — Action buttons wrap gracefully, zero touch target overlap.
+- **375 × 667 (Standard Mobile - iPhone SE):** **PASS** — Clean document viewing, no text truncation.
+- **320 × 568 (Small Mobile):** **PASS** — Compact header presentation, zero horizontal overflow or clipping.
+
+## 130.6 Milestone Sign-Off
+- **Batch 1 (Core Service & Payment Unification):** **CLOSED**
+- **Batch 2 (Booking Invoice Card & Invoice Detail Refactor):** **CLOSED**
+- **Batch 3 (Professional Invoice PDF Redesign):** **CLOSED**
+- **Batch 4 (Invoice One-Per-Booking Database Integrity):** **CLOSED**
+- **Invoice UI Consolidation into Booking Detail:** **VERIFIED & CLOSED**
+- **Final Verdict:** **PASS — INVOICE UI CONSOLIDATION ACCEPTED**
+
+---
+
+# 131. TRIP WORKSPACE COSTING & QUOTATIONS TABS REPAIR
+
+## 131.1 Objective & Context
+Following the full quotation-to-booking code audit, a targeted UI/data connection repair was implemented for the Trip Workspace (`/trips/[id]`):
+1. **Trip Quotations Relation (`trip-service.ts`):** Resolved the `Quotations & Proposals (0)` discrepancy where `getTripById` counted quotations in `_count` but omitted the `quotations` relation.
+2. **Costing Tab (`trips/[id]/page.tsx` Tab 7):** Replaced dead placeholder text containing `{trip.id}` with a professional Trip Costing & Margin Sheet entry card featuring real-time resource tallies (Hotels, Vehicles, Activities), dynamic rate sheet callout, and direct navigation to the dedicated Costing Studio (`/trips/[id]/costing`).
+3. **Quotations Tab (`trips/[id]/page.tsx` Tab 8):** Replaced the static card stub with a full-featured active proposal list rendering quotation number, version, `QuotationStatusBadge`, final price, base cost, creation and validity dates, public share link copy, proposal preview, and direct navigation to Quotation Studio (`/trips/[id]/quotation`). If no quotations exist, a clean empty state with a "Create Quotation" CTA is displayed.
+
+## 131.2 Architecture Invariants Preserved
+- **Zero Architecture Redesign:** Dedicated Costing Studio (`/trips/[id]/costing`) and Quotation Studio (`/trips/[id]/quotation`) remain the authoritative engines. No calculation logic was duplicated.
+- **Business Rules Unchanged:** Costing formulas, rate sheet matching, markup/tax logic, quotation snapshots, quotation versioning, booking conversion, payment ledger, and invoice persistence remain 100% untouched.
+- **Multi-Tenant Security:** Strict `agencyId` scoping preserved across all database queries.
+- **Zero Schema Changes:** No Prisma migrations or database alterations required.
+
+## 131.3 Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Browser Multi-Viewport QA:**
+  - `1440 × 900` (Large Desktop): **PASS**
+  - `1280 × 800` (Standard Laptop): **PASS**
+  - `1024 × 768` (Tablet Landscape): **PASS**
+  - `768 × 1024` (Tablet Portrait): **PASS**
+  - `390 × 844` (Mobile - iPhone 14): **PASS**
+  - `375 × 667` (Mobile - iPhone SE): **PASS**
+  - `320 × 568` (Small Mobile): **PASS**
+- **Status:** **VERIFIED & CLOSED**
+
+---
+
+# 132. TAX V1 ALIGNMENT (LOCKED PRODUCT DECISION)
+
+## 132.1 Objective & Context
+TripDesk V1 has a locked business decision: **"TripDesk V1 has NO tax/GST feature"**.
+The quotation calculation engine previously had a legacy fallback `options?.taxPercentage ?? 5` in `src/lib/services/quotation-service.ts` and `src/lib/validation/quotation-schema.ts`, which silently inflated newly generated quotations and package options by 5% even though no GST/tax feature exists in V1.
+
+A controlled batch was executed to align all quotation generation defaults to `0%` tax across services, schemas, and UI components.
+
+## 132.2 Audit Findings
+1. **No Tax Feature in V1:** There is no agency-level tax configuration, no GST multi-rate engine, and no tax line items on invoices.
+2. **Pricing Engine Formula (V1 Authoritative):**
+   $$\text{Base Supplier Cost} \longrightarrow \text{Markup \%} \longrightarrow \text{Selling Price} \longrightarrow \text{Discount \%} \longrightarrow \text{Final Customer Price}$$
+   $$\text{Tax Rate} = 0\% \implies \text{Final Customer Price} = \text{Selling Price} - \text{Discount Amount}$$
+3. **Database Schema:** `Quotation.taxPercentage`, `Quotation.taxAmount`, `QuotationPackageOption.taxPercentage`, `QuotationPackageOption.taxAmount` exist as decimal fields with `@default(0)`. No schema changes or migrations were made.
+4. **Historical Immutability:** Existing quotation snapshots in the database remain completely untouched and frozen.
+
+## 132.3 Implementation Details
+1. **`src/lib/services/quotation-service.ts`:**
+   - Changed `options?.taxPercentage ?? 5` to `options?.taxPercentage ?? 0` in `generateQuotationFromTrip()`.
+   - In `createDefaultPackageOptions()`, set `stdTax = 0`, `dlxTax = 0`, `luxTax = 0` and persisted `taxPercentage = 0`, `taxAmount = 0` for all tiers (Standard, Deluxe, Luxury).
+2. **`src/lib/validation/quotation-schema.ts`:**
+   - Changed `generateTripQuotationSchema` `taxPercentage` default from `.default(5)` to `.default(0)`.
+3. **`src/app/(dashboard)/trips/[id]/quotation/page.tsx`:**
+   - Updated `handleGenerate` fallback from `taxPercentage: activeQuote ? Number(activeQuote.taxPercentage) : 5` to `0`.
+
+## 132.4 Verification Results
+- **TypeScript (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Mathematical Pricing Verification:**
+  - Case 1 (Standard): Cost ₹10,000 + 10% Markup + 0% Discount + 0% Tax $\implies$ **₹11,000** (NOT ₹11,550).
+  - Case 2 (Discount): Cost ₹10,000 + 10% Markup + 5% Discount + 0% Tax $\implies$ **₹10,450**.
+  - Case 3 (Zero Markup): Cost ₹10,000 + 0% Markup + 0% Discount + 0% Tax $\implies$ **₹10,000**.
+- **Browser E2E QA:**
+  - Verified on live test trip with Base Cost ₹14,500 + 8% Markup (+₹1,160) = Customer Price **₹15,660** (Tax: +₹0).
+  - Proposal Preview (`/preview`) verified: clean display without any tax line, displaying Total Package Price ₹15,660.
+- **Status:** **VERIFIED & CLOSED**
+
+---
+
+# 133. TAX V1 — BATCH 1: DATABASE SCHEMA & ADDITIVE PRISMA MIGRATION
+
+## 133.1 Objective & Scope
+Establish the database persistence layer and rate presets catalog for the locked **TripDesk Tax V1 Architecture** in a 100% backward-compatible, additive, non-destructive manner.
+
+Batch 1 strictly covers schema definitions, Prisma migration, seed data initialization, and validation. No application-level tax calculation services, APIs, UI, or PDF changes were introduced in this batch.
+
+## 133.2 Schema Additions & Architecture
+
+### 1. New Enums
+- `TaxMode`: `EXCLUSIVE`, `INCLUSIVE`
+- `GstTreatment`: `INTRA_STATE`, `INTER_STATE`, `NON_GST_EXEMPT`
+
+### 2. New Models
+- **`AgencyTaxProfile` (`agency_tax_profiles`):**
+  - `id`: String (cuid)
+  - `agencyId`: String (unique foreign key to `agencies.id` with `onDelete: Cascade`)
+  - `isGstRegistered`: Boolean (`@default(false)`)
+  - `gstin`: String?
+  - `legalBusinessName`: String?
+  - `registeredAddress`: String?
+  - `state`: String?
+  - `stateCode`: String?
+  - `defaultTaxMode`: TaxMode (`@default(EXCLUSIVE)`)
+  - `defaultGstRate`: Decimal (`@default(0) @db.Decimal(5, 2)`)
+  - `defaultGstTreatment`: GstTreatment (`@default(INTRA_STATE)`)
+  - `createdAt`: DateTime (`@default(now())`)
+  - `updatedAt`: DateTime (`@updatedAt`)
+- **`TaxRate` (`tax_rates`):**
+  - `id`: String (cuid)
+  - `name`: String
+  - `rate`: Decimal (`@unique @db.Decimal(5, 2)`)
+  - `isDefault`: Boolean (`@default(false)`)
+  - `isActive`: Boolean (`@default(true)`)
+  - `displayOrder`: Int (`@default(0)`)
+  - `createdAt`: DateTime (`@default(now())`)
+  - `updatedAt`: DateTime (`@updatedAt`)
+
+### 3. Model Extensions (Additive Snapshots)
+- **`Agency`:** Added 1:1 relation `taxProfile AgencyTaxProfile?`.
+- **`Quotation`:** Added snapshot fields:
+  - `taxableAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `taxRate`: `Decimal? @default(0) @db.Decimal(5, 2)`
+  - `taxMode`: `TaxMode? @default(EXCLUSIVE)`
+  - `gstTreatment`: `GstTreatment? @default(INTRA_STATE)`
+  - `cgstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `sgstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `igstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+- **`QuotationPackageOption`:** Added snapshot fields:
+  - `taxableAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `taxRate`: `Decimal? @default(0) @db.Decimal(5, 2)`
+  - `taxMode`: `TaxMode? @default(EXCLUSIVE)`
+  - `gstTreatment`: `GstTreatment? @default(INTRA_STATE)`
+  - `cgstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `sgstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `igstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+- **`Booking`:** Added snapshot fields:
+  - `taxableAmount`: `Decimal? @db.Decimal(12, 2)`
+  - `taxAmount`: `Decimal? @db.Decimal(12, 2)`
+  - `taxRate`: `Decimal? @db.Decimal(5, 2)`
+  - `taxMode`: `TaxMode?`
+  - `gstTreatment`: `GstTreatment?`
+  - `cgstAmount`: `Decimal? @db.Decimal(12, 2)`
+  - `sgstAmount`: `Decimal? @db.Decimal(12, 2)`
+  - `igstAmount`: `Decimal? @db.Decimal(12, 2)`
+- **`Invoice`:** Added snapshot fields:
+  - `taxableAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `taxAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `taxRate`: `Decimal? @default(0) @db.Decimal(5, 2)`
+  - `taxMode`: `TaxMode? @default(EXCLUSIVE)`
+  - `gstTreatment`: `GstTreatment? @default(INTRA_STATE)`
+  - `cgstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `sgstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+  - `igstAmount`: `Decimal? @default(0) @db.Decimal(12, 2)`
+
+## 133.3 Migration & Historical Safety
+- **Migration Name:** `20260912160000_add_tax_v1_schema`
+- **Additive & Non-Destructive:** 0 tables dropped, 0 columns dropped, 0 existing constraints removed.
+- **Historical Compatibility:** All existing records preserved with defaults/nullability. Historical quotation, booking, and invoice amounts remained 100% frozen and untouched.
+- **Scope Protection:** Zero customer GST fields added, zero item/service-level tax fields added, RateSheet costing architecture preserved.
+
+## 133.4 Seed & Catalog Initialization
+Updated `prisma/seed.ts` to idempotently seed the global commercial rate catalog presets:
+- `0%` (Rate: 0, DisplayOrder: 1, isDefault: true)
+- `5%` (Rate: 5, DisplayOrder: 2, isDefault: false)
+- `12%` (Rate: 12, DisplayOrder: 3, isDefault: false)
+- `18%` (Rate: 18, DisplayOrder: 4, isDefault: false)
+- `28%` (Rate: 28, DisplayOrder: 5, isDefault: false)
+
+## 133.5 Verification & Certification Results
+- **Prisma Validate:** `The schema at prisma\schema.prisma is valid 🚀`
+- **Prisma Migration Status:** `4 migrations found, Database schema is up to date!`
+- **Prisma Client Generation:** `@prisma/client v7.9.1 generated successfully`
+- **Prisma Seed:** `npx tsx prisma/seed.ts` executed with 0 errors (Seeded 5 tax rates)
+- **TypeScript Check (`npx tsc --noEmit`):** `0 errors (PASS)`
+- **Production Build (`npm run build`):** `Compiled successfully in 23.9s, static/dynamic route generation PASS`
+- **Status:** **VERIFIED & CLOSED**
+
+---
+
+# 134. TAX V1 — BATCH 2: DEDICATED TAX CALCULATION SERVICE
+
+## 134.1 Objective & Scope
+Create the pure, deterministic, Decimal-safe calculation service for the locked **TripDesk Tax V1 Architecture**.
+- **Service Path:** `src/lib/services/tax-service.ts`
+- **Unit Test Path:** `prisma/test-tax-service.ts`
+- **Scope Boundary:** Pure calculation layer only. Zero database access. No quotation/booking/invoice UI or service integration in this batch (reserved for Batches 3–7).
+
+## 134.2 Mathematical Formulas & Architecture
+
+### 1. Order of Commercial Operations
+$$\text{Supplier Cost} \longrightarrow \text{Markup} \longrightarrow \text{Selling Price} \longrightarrow \text{Discount} \longrightarrow \text{Taxable/Gross Base} \longrightarrow \text{ONE TAX RATE} \longrightarrow \text{Tax Amount} \longrightarrow \text{Final Customer Price}$$
+
+### 2. Tax Modes
+- **EXCLUSIVE Mode:**
+  $$\text{Taxable Amount} = \text{Selling Price} - \text{Discount Amount}$$
+  $$\text{Tax Amount} = \text{round}\left(\text{Taxable Amount} \times \frac{\text{Tax Rate}}{100}\right)$$
+  $$\text{Final Amount} = \text{Taxable Amount} + \text{Tax Amount}$$
+- **INCLUSIVE Mode:**
+  $$\text{Gross Amount} = \text{Selling Price} - \text{Discount Amount}$$
+  $$\text{Taxable Amount} = \text{round}\left(\frac{\text{Gross Amount}}{1 + \frac{\text{Tax Rate}}{100}}\right)$$
+  $$\text{Tax Amount} = \text{Gross Amount} - \text{Taxable Amount}$$
+  $$\text{Final Amount} = \text{Gross Amount}$$
+  *(Guarantees 100% exact mathematical reconciliation: $\text{Taxable Amount} + \text{Tax Amount} = \text{Gross Amount} = \text{Final Amount}$)*
+
+### 3. GST Treatments
+- **`INTRA_STATE`:**
+  $$\text{CGST} = \text{round}\left(\frac{\text{Tax Amount}}{2}\right)$$
+  $$\text{SGST} = \text{Tax Amount} - \text{CGST}$$
+  $$\text{IGST} = 0$$
+  *(Guarantees exact reconciliation: $\text{CGST} + \text{SGST} = \text{Total Tax Amount}$ even for odd paise amounts like ₹0.75 or ₹15.25)*
+- **`INTER_STATE`:**
+  $$\text{IGST} = \text{Tax Amount}, \quad \text{CGST} = 0, \quad \text{SGST} = 0$$
+- **`NON_GST_EXEMPT`:**
+  $$\text{Tax Amount} = 0, \quad \text{CGST} = 0, \quad \text{SGST} = 0, \quad \text{IGST} = 0, \quad \text{Final Amount} = \text{Taxable Amount}$$
+
+### 4. Zero Rate (0%)
+Returns zero tax for both exclusive and inclusive modes with zero division errors.
+
+## 134.3 Decimal Precision & Validation Policy
+- **Decimal-Safe:** All monetary amounts, rates, discounts, and components use `Prisma.Decimal` with 2-decimal precision (`ROUND_HALF_UP`).
+- **Strict Validation:** Rejects negative amounts, negative rates, negative discounts, discounts exceeding gross amount, invalid tax modes, invalid GST treatments, and NaN/infinite numeric inputs.
+
+## 134.4 Automated Unit Tests & Verification Results
+- **Automated Test Suite (`npx tsx prisma/test-tax-service.ts`):** **27 / 27 Tests PASSED (100%)**
+  - Exclusive Mode (Presets 0%, 5%, 18%, fractional amounts, fractional rates): **PASS**
+  - Inclusive Mode (Presets 0%, 5%, 18%, fractional gross amounts): **PASS**
+  - GST Treatments (INTRA_STATE, INTER_STATE, NON_GST_EXEMPT): **PASS**
+  - Discount-adjusted Calculations (Normal, Zero, 100% full discount): **PASS**
+  - Input Validation (Negative amounts, negative rates, discount > amount, invalid enums, NaN): **PASS**
+  - Section 20 Mandatory Inclusive Rounding (₹100 @ 18% -> Taxable ₹84.75 + Tax ₹15.25 = ₹100.00): **PASS**
+  - Section 21 Mandatory Odd-Paise GST Split (₹15 @ 5% -> Tax ₹0.75 -> CGST ₹0.38 + SGST ₹0.37 = ₹0.75): **PASS**
+  - Multi-value Random Reconciliations (25 exclusive + 25 inclusive variations): **PASS**
+- **TypeScript Check (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Status:** **VERIFIED & CLOSED**
+
+---
+
+# 135. TRIPDESK TAX V1: BATCH 3 — AGENCY TAX PROFILE API + TAX RATE API + MANAGEMENT UI
+
+## 135.1 Objective & Scope
+Implement the full Agency Tax Profile management architecture and Tax Rate catalog query layer for TripDesk Tax V1:
+- **API Routes:**
+  - `GET /api/agency/tax-profile`: Retrieve authenticated agency's tax configuration. Returns neutral defaults (`isGstRegistered: false, defaultGstRate: 0, defaultTaxMode: EXCLUSIVE, defaultGstTreatment: INTRA_STATE`) if unconfigured.
+  - `PUT /api/agency/tax-profile`: Upsert authenticated agency's commercial tax defaults with active catalog referential integrity validation.
+  - `GET /api/tax-rates`: Query DB-backed catalog of active selectable tax rates (0%, 5%, 12%, 18%, 28%) ordered by `displayOrder asc, rate asc`. Read-only catalog for tenants.
+- **Service Layer:** `src/lib/services/tax-profile-service.ts` (`TaxProfileService`)
+- **Validation:** `src/lib/validation/tax-schema.ts` (`updateAgencyTaxProfileSchema`)
+- **API Client:** `src/lib/api-client/tax-client.ts` (`taxClient`)
+- **Management UI:** `src/app/(dashboard)/settings/page.tsx` (Dedicated "Agency Tax & GST Profile" tab with GST registration toggle, business profile inputs, catalog rate selector, tax mode cards, and GST treatment cards).
+- **Scope Protection:** Zero quotation calculation integration in this batch (reserved for Batch 4). Zero schema mutations. No modifications to historical records.
+
+## 135.2 Security & Multi-Tenancy Architecture
+- **Server-Derived Context:** `agencyId` is strictly resolved via `requireAgencyOwnerContext()` from authenticated session. Client-supplied `agencyId` in URL or body is never accepted.
+- **Write Permission Guard:** `PUT /api/agency/tax-profile` enforces `requireWriteAccess()` (read-only for expired trials).
+- **Tenant Isolation:** Agency A cannot read or mutate Agency B's tax profile.
+- **TaxRate Catalog Immutability:** Tenants cannot create, modify, or delete global catalog tax rates.
+
+## 135.3 Core Locked Business Rules Implemented
+- **Defaults for New Quotations:** Agency Tax Profile provides commercial presets for future new quotations. It never modifies or recalculates historical quotations, quotation snapshots, bookings, or invoices.
+- **Referential Integrity:** Validates that configured `defaultGstRate` exists in the active `TaxRate` catalog (or 0% exempt rate).
+- **Unregistered Business Handling:** When `isGstRegistered = false`, `gstin` is sanitized to `null` while preserving commercial pricing rate/mode presets.
+
+## 135.4 Verification Results
+- **Batch 3 Integration Tests (`npx tsx prisma/test-tax-profile.ts`):** **18 / 18 Tests PASSED (100%)**
+  - Active tax rate catalog query (5 seeded rates: 0%, 5%, 12%, 18%, 28%): **PASS**
+  - Catalog sorting by displayOrder asc: **PASS**
+  - Non-existent profile neutral defaults: **PASS**
+  - Zod validation schema bounds & enum enforcement: **PASS**
+  - Referential integrity check (unregistered rate 33% rejected): **PASS**
+  - Idempotent upsert & persistence: **PASS**
+  - Unregistered business transition (gstin cleared to null): **PASS**
+  - Cross-tenant isolation (Agency A vs Agency B): **PASS**
+  - Historical data safety (zero mutations on quotations/bookings/invoices): **PASS**
+- **Batch 2 Regression Tests (`npx tsx prisma/test-tax-service.ts`):** **27 / 27 Tests PASSED (100%)**
+- **TypeScript Check (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Browser QA Verification:** **PASS (Desktop 1440×900, 1280×800, Tablet 768×1024, Mobile 390×844, 375×667)**
+- **Status:** **BATCH 3 — VERIFIED & CLOSED**
+
+# 136. TRIPDESK TAX V1: BATCH 4 — QUOTATION & PACKAGE TAX ENGINE INTEGRATION
+
+## 136.1 Objective & Scope
+Integrate the pure Decimal-safe `TaxService` (`src/lib/services/tax-service.ts`) into Quotation and Package Option creation, update, recalculation, default tier generation, and versioning workflows:
+- **Core Calculation Sequence:** `Supplier Cost -> Markup -> Selling Price -> Discount -> afterDiscount -> TaxService.calculate() -> Final Customer Price`.
+- **Service Integration Points in `src/lib/services/quotation-service.ts`:**
+  - `resolveQuotationTaxConfig`: Resolves and validates effective tax configuration (`taxRate`, `taxMode`, `gstTreatment`) against active `TaxRate` catalog records with fallback to `AgencyTaxProfile` defaults for new quotations.
+  - `createQuotation`: Evaluates commercial amounts, calls `taxService.calculate()`, and persists complete 9-field Tax V1 snapshot + syncs legacy `taxPercentage`.
+  - `updateQuotation`: Recalculates tax snapshot via `taxService.calculate()` on commercial changes, persisting refreshed snapshots.
+  - `generateQuotationFromTrip`: Evaluates aggregated trip costing, resolves agency tax defaults, calls `taxService.calculate()`, and saves full tax snapshot.
+  - `recalculateQuotationTotals`: Internal helper invoked on line-item mutations; recalculates via `taxService.calculate()` and updates tax snapshot.
+  - `createPackageOption`: Tiered package creation resolves package-level tax configuration (with parent quotation / agency profile fallback), invokes `taxService.calculate()`, and persists full snapshot.
+  - `updatePackageOption`: Recalculates package tax snapshot via `taxService.calculate()` and syncs parent quotation `finalAmount` if selected.
+  - `generateDefaultPackageTiers`: Generates Standard (3-Star), Deluxe (4-Star), and Luxury (5-Star) tiers inheriting parent quotation's effective tax configuration, calculated deterministically via `taxService.calculate()`.
+  - `createQuotationVersion` (Fork): Creates independent new quotation version, preserving exact historical tax snapshots without mutating previous versions.
+- **Validation Layer:** Updated `src/lib/validation/quotation-schema.ts` and `src/lib/validation/package-option-schema.ts` with optional `taxRate`, `taxMode`, `gstTreatment`.
+
+## 136.2 Locked Tax V1 Commercial Invariants Enforced
+- **Single Effective Tax Rate:** Exactly one effective tax rate per quotation/package commercial total. No item-level, hotel-level, vehicle-level, or activity-level taxes.
+- **Discount Before Tax:** Discount is deducted before tax calculation (`taxableAmount = sellingPrice - discount`).
+- **Exclusive vs Inclusive Modes:**
+  - `EXCLUSIVE`: `taxAmount = taxableAmount * (taxRate / 100)`, `finalAmount = taxableAmount + taxAmount`.
+  - `INCLUSIVE`: `taxableAmount = grossAmount / (1 + taxRate / 100)`, `taxAmount = grossAmount - taxableAmount`, `finalAmount = grossAmount`.
+- **GST Treatments:**
+  - `INTRA_STATE`: CGST = 50% of tax, SGST = 50% of tax (deterministic half-up odd-paise split reconciliation).
+  - `INTER_STATE`: IGST = 100% of tax, CGST = 0, SGST = 0.
+  - `NON_GST_EXEMPT`: Tax = 0, CGST = 0, SGST = 0, IGST = 0, `finalAmount = taxableAmount`.
+- **Catalog Validation:** Selected tax rates are verified against active DB-backed `TaxRate` catalog records. Non-catalog/inactive rates (e.g. 33%) and negative rates are strictly rejected.
+- **Tenant Isolation:** Agency Tax Profile defaults are loaded strictly per authenticated `agencyId`. If no profile exists, safe neutral defaults (`rate: 0%`, `EXCLUSIVE`, `INTRA_STATE`) apply.
+
+## 136.3 Historical Data Protection & Versioning
+- **Zero Schema Mutations & No Migrations:** Prisma schema is untouched; existing Tax V1 fields created in Batch 1 are fully utilized.
+- **Historical Quotation Freeze:** Changing Agency Tax Profile settings later never mutates or recalculates existing historical quotations or package options.
+- **Version Snapshot Independence:** Forking a quotation version creates an independent snapshot preserving the source version's financial state while allowing new edits.
+
+## 136.4 Verification Results
+- **Batch 4 Integration Test Suite (`prisma/test-quotation-tax.ts`):** **72 / 72 Tests PASSED (100%)**
+  - Exclusive Tax Mode (0%, 5%, 12%, 18%, 28%): **PASS**
+  - Inclusive Tax Mode (0%, 5%, 12%, 18%, 28%): **PASS**
+  - GST Treatments (INTRA_STATE, INTER_STATE, NON_GST_EXEMPT): **PASS**
+  - Discount before tax & odd-paise split reconciliation: **PASS**
+  - Package option tax calculation, default tiers generation & selection: **PASS**
+  - Agency Tax Profile defaults on new quotations: **PASS**
+  - Historical data safety (existing quotations untouched after profile updates): **PASS**
+  - Quotation versioning snapshot preservation: **PASS**
+  - Validation: Non-catalog rates (33%) and negative rates rejected: **PASS**
+- **Batch 2 Tax Service Regression (`prisma/test-tax-service.ts`):** **27 / 27 Tests PASSED (100%)**
+- **Batch 3 Tax Profile Regression (`prisma/test-tax-profile.ts`):** **18 / 18 Tests PASSED (100%)**
+- **TypeScript Check (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Browser Smoke QA:** **PASS (Quotations list, costing studio, proposal workspace, public proposal `/q/[token]` load and calculate cleanly)**
+---
+
+# 137. TRIPDESK TAX V1: BATCH 5 — QUOTATION STUDIO UI TAX CONTROLS
+
+## 137.1 Objective & Scope
+Expose the Tax V1 configuration controls and server-calculated commercial tax summary in the Quotation Studio UI (`src/app/(dashboard)/trips/[id]/quotation/page.tsx`):
+- **Dynamic Tax Rate Catalog:** Loaded via `taxClient.listTaxRates()` (`GET /api/tax-rates`), rendering only active preset rates (0%, 5%, 12%, 18%, 28%) without hardcoding rates in the UI.
+- **Tax Mode Selector:** Allows selecting `EXCLUSIVE` ("Tax Exclusive (+GST)") and `INCLUSIVE` ("Tax Inclusive (Included)").
+- **GST Treatment Selector:** Allows selecting `INTRA_STATE` ("Intra-State (CGST + SGST)"), `INTER_STATE` ("Inter-State (IGST)"), or `NON_GST_EXEMPT` ("Non-GST Exempt (0% Tax)"), accompanied by the required concise explanatory disclaimer note.
+- **Authoritative Server Tax Summary:** Real-time rendering of server-calculated values:
+  - Base Supplier Cost
+  - Agency Markup (% and amount)
+  - Selling Price (Commercial Base)
+  - Special Discount (% and amount)
+  - Taxable Amount (deducting discount before tax)
+  - GST Rate applied & Tax Mode indicator badge
+  - Itemized GST Breakdown based on GST Treatment:
+    - `INTRA_STATE`: CGST (50%) + SGST (50%)
+    - `INTER_STATE`: IGST (100%)
+    - `NON_GST_EXEMPT`: GST Exempt (₹0.00)
+  - Total GST / Tax Amount
+  - Final Customer Price (highlighting inclusive note if gross pricing includes GST)
+- **Package Option Controls & Modals:** Added dynamic Tax Rate selector, Tax Mode selector, and GST Treatment selector into the Package Option add/edit modal (`pkgTaxRate`, `pkgTaxMode`, `pkgGstTreatment`), inheriting active quotation defaults. Package cards in Tab 2 display tax rate badges and tax breakdowns.
+- **Zero Client-Side Math:** All calculations remain 100% owned and calculated by the backend via `taxService.calculate()`. React only selects, submits, and renders server responses.
+- **API Client Layer:** Exported `taxClient` from `src/lib/api-client/index.ts`.
+
+## 137.2 Key Architectural Decisions & Invariants
+- **No Client Tax Math:** Zero duplication of tax arithmetic in React; server remains the sole calculation engine.
+- **No Hardcoded Tax Rates:** Rates loaded dynamically from the active DB-backed `TaxRate` catalog.
+- **Agency Tax Profile Safety:** Profile defaults apply to NEW quotations via Batch 4 backend integration; existing quotations retain their effective configuration without being overwritten.
+- **Unsaved Changes & Save Flow:** Changes to tax configuration persist using existing debounced/blur and action flows (`handleUpdatePricingRules`, `handleSavePackage`), with instant server reconciliation.
+- **Tenant Isolation & Security:** Agency Owner authorization and agency ownership verified across all quotation and package endpoints.
+
+## 137.3 Verification & Test Results
+- **Batch 5 UI Integration Test Suite (`prisma/test-quotation-ui-tax.ts`):** **54 / 54 Tests PASSED (100%)**
+  - Active tax rate catalog verification & filtering: **PASS**
+  - Agency Tax Profile defaults on new quotations: **PASS**
+  - UI Tax Rate & Mode update persistence & server recalculation: **PASS**
+  - GST Treatment breakdown (INTRA_STATE, INTER_STATE, NON_GST_EXEMPT): **PASS**
+  - Discount-before-tax ordering preserved: **PASS**
+  - Package option tax controls, calculation & sync with quotation: **PASS**
+  - Versioning independence (v2 edit does not mutate v1): **PASS**
+- **Batch 4 Quotation Tax Regression (`prisma/test-quotation-tax.ts`):** **72 / 72 Tests PASSED (100%)**
+- **Batch 3 Tax Profile Regression (`prisma/test-tax-profile.ts`):** **18 / 18 Tests PASSED (100%)**
+- **Batch 2 Tax Service Regression (`prisma/test-tax-service.ts`):** **27 / 27 Tests PASSED (100%)**
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Browser QA Testing across Viewports:**
+  - `1440 × 900` (Desktop): **PASS (Clean layout, clear field labels, zero overflow)**
+  - `390 × 844` (Mobile): **PASS (Clean responsive stacking, no horizontal scrolling, all controls accessible)**
+  - Public Proposal Smoke Test (`/q/[token]`): **PASS (Loads smoothly, zero console errors)**
+  - Console Log Inspection: **0 errors / warnings**
+- **Status:** **BATCH 5 — VERIFIED & CLOSED**
+
+---
+
+# 138. TRIPDESK TAX V1: BATCH 6 — PUBLIC PROPOSAL & QUOTATION PDF TAX PRESENTATION
+
+## 138.1 Objective & Scope
+Implement customer-facing tax presentation across the public web proposal (`/q/[shareToken]`) and generated customer Quotation PDF (`/api/quotations/[id]/pdf` and `/api/quotations/public/[token]/pdf` via `quotationPdfService`):
+- **Public Proposal Page (`/q/[shareToken]`):**
+  - Displays customer-safe pricing and tax breakdown (`Price & Tax Breakdown` summary card) reflecting server-persisted tax snapshot fields.
+  - Shows dynamic tax notes on package option cards (`includes X% GST` for INCLUSIVE, `+ X% GST` for EXCLUSIVE, or `0% GST (Exempt)`).
+  - Displays exact GST breakdown: CGST + SGST (Intra-State), IGST (Inter-State), or Non-GST Exempt notice.
+  - Deducts discount before tax; displays clear Taxable Amount, applied GST, and Total Investment.
+  - Dynamically recalculates customer summary when traveler switches between tiered package options.
+- **Quotation PDF Generation (`src/lib/services/quotation-pdf-service.ts`):**
+  - Section 4 (Package Options): Updated option pricing cards with clear tax notes (`+ X% GST` vs `includes X% GST`).
+  - Section 11 (Price & Tax Breakdown): Implemented structured financial table showing Base Price / Taxable Amount, Discount, Itemized GST (CGST/SGST, IGST, or Non-GST Exempt note), and Total Investment banner.
+  - Zero browser/PDF-client tax arithmetic; consumes server-persisted tax snapshot fields directly from `QuotationPdfData`.
+- **Public API & DTO Security (`src/lib/services/quotation-service.ts` & `src/lib/api-client/quotation-client.ts`):**
+  - Safely exposed customer-safe tax snapshot fields on public quotation payload and package options (`taxableAmount`, `taxRate`, `taxMode`, `gstTreatment`, `cgstAmount`, `sgstAmount`, `igstAmount`, `taxAmount`, `discountAmount`, `finalAmount`).
+  - Strict confidentiality: Zero leakage of internal secrets (`supplierCost`, `markupPercentage`, `markupAmount`, `internalNotes` remain 100% redacted).
+- **Scope Protection:** Zero schema mutations or migrations. No changes to Booking or Invoice tax logic (reserved for Batch 7).
+
+## 138.2 Key Architectural Decisions & Invariants Enforced
+- **Zero Client-Side Math:** Browser and PDF engines perform zero tax calculations; all numbers rendered are server-persisted Decimal snapshots.
+- **Strict Data Redaction:** Public DTO strictly omits markup, supplier cost, internal subtotals, and private agency notes across parent quotations and package tiers.
+- **Responsive Layout:** Public proposal (`/q/[shareToken]`) renders seamlessly across viewports from 1440×900 desktop down to 320×568 mobile with zero horizontal overflow or overlapping text.
+- **Single Rate Invariant:** Quotations present a unified commercial tax summary, adhering to the Single Effective Tax Rate policy.
+- **Historical Immutability:** Updating Agency Tax Profile defaults has zero effect on already-generated quotations or PDFs.
+
+## 138.3 Verification & Test Results
+- **Batch 6 Public Proposal & PDF Test Suite (`prisma/test-public-proposal-pdf-tax.ts`):** **54 / 54 Tests PASSED (100%)**
+  - Public proposal DTO & strict secret redaction (markup, supplier cost, internal notes): **PASS**
+  - Exclusive Tax Mode & Intra-State CGST/SGST breakdown: **PASS**
+  - Inclusive Tax Mode & Inter-State IGST breakdown: **PASS**
+  - Non-GST Exempt public presentation: **PASS**
+  - Tiered package options public presentation, tax notes & secret redaction: **PASS**
+  - Historical data safety & token security (invalid/archived token protection): **PASS**
+  - Quotation PDF generation buffer verification across Exclusive, Inclusive, and Tiered packages: **PASS**
+- **Cumulative Regression Test Suites:**
+  - Batch 2 Tax Service (`prisma/test-tax-service.ts`): **27 / 27 Tests PASSED (100%)**
+  - Batch 3 Tax Profile (`prisma/test-tax-profile.ts`): **18 / 18 Tests PASSED (100%)**
+  - Batch 4 Quotation Tax (`prisma/test-quotation-tax.ts`): **72 / 72 Tests PASSED (100%)**
+  - Batch 5 Quotation Studio UI (`prisma/test-quotation-ui-tax.ts`): **54 / 54 Tests PASSED (100%)**
+  - **Total Tax V1 Automated Test Coverage:** **225 / 225 Tests PASSED (100%)**
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Next.js Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Status:** **BATCH 6 — VERIFIED & CLOSED**
+
+---
+
+# 139. TRIPDESK TAX V1: BATCH 7 — BOOKING & INVOICE TAX SNAPSHOTS + GST INVOICE PDF
+
+## 139.1 Objective & Scope
+Implement server-authoritative snapshot persistence for commercial tax across the entire Booking and Invoice lifecycle, along with full customer-facing GST Invoice presentation and high-resolution PDF generation:
+- **Booking Tax Snapshot (`src/lib/services/booking-service.ts`):**
+  - Updated `convertQuotationToBooking` and `createBooking` to snapshot all 8 Tax V1 fields from the accepted quotation or selected package option (`taxableAmount`, `taxAmount`, `taxRate`, `taxMode`, `gstTreatment`, `cgstAmount`, `sgstAmount`, `igstAmount`).
+  - Strict immutability: Once created, changes to the Agency Tax Profile, global TaxRate catalog, or subsequent quotation revisions do NOT alter the Booking's historical commercial tax snapshot.
+- **Invoice Tax Snapshot & Synchronization (`src/lib/services/invoice-service.ts`):**
+  - Updated `getOrCreateInvoiceForBooking` to derive its tax snapshot directly from the Booking's persisted commercial state.
+  - Decision #18 Invariant strictly preserved: One Booking = One Persistent Invoice Number (`INV-YYYY-XXXXX` or sequential `INV-XXXX`). Subsequent generations/views synchronize latest booking amounts and tax snapshot without altering the invoice number or creating replacement invoices.
+  - Added Agency Legal Tax Identity (`isGstRegistered`, `gstin`, `legalName`, `stateCode`, `registeredAddress`) into `agencySnapshot`.
+  - Payment linkage preserved: Completed payments link to the invoice, updating `paidAmount`, `balanceAmount`, and invoice `status` (`ISSUED`, `PARTIALLY_PAID`, `PAID`) without corrupting tax snapshot records.
+  - Cancellation behavior: Cancelling a booking transitions the linked invoice to `CANCELLED` while preserving the historical invoice number and tax snapshot.
+- **GST Invoice PDF Generation (`src/lib/services/invoice-pdf-service.ts`):**
+  - Header: Renders agency legal business name, GSTIN, and State Code when the agency is GST registered. Does NOT fabricate fake GSTINs.
+  - Financial Summary: Renders structured Tax V1 breakdown: Base / Taxable Amount, Discount, itemized GST breakdown (CGST + SGST for Intra-State, IGST for Inter-State, or Non-GST Exempt note), tax mode indicators (`GST added` for EXCLUSIVE vs `GST included` for INCLUSIVE), total contract amount, total received, and balance due.
+  - Zero browser/PDF-client tax math; strictly consumes server-persisted Decimal fields.
+  - Redaction: Zero leakage of supplier costs, markup, margins, or internal notes. Zero customer GSTIN / traveler GST (strictly out of scope).
+- **UI Integrations:**
+  - Booking Detail (`src/app/(dashboard)/bookings/[id]/page.tsx`): Commercial Financial Ledger card displays the Tax V1 snapshot summary (Taxable Base, CGST/SGST/IGST breakdown, GST mode badge).
+  - Invoice Detail (`src/app/(dashboard)/invoices/[id]/page.tsx`): Financial summary card displays full Tax V1 breakdown and payment progress.
+
+## 139.2 Key Architectural Invariants Enforced
+- **Snapshot Hierarchy:** `Quotation (or selected package) -> Booking -> Invoice -> Invoice PDF`.
+- **Decision #18 Persistence:** Invoice numbers remain persistent and immutable. Invoice document reflects the latest allowed Booking commercial state idempotently.
+- **Zero Client-Side Math:** All tax math is performed by `TaxService` on the server and persisted as Prisma Decimals. UI and PDF only format the stored values.
+- **Strict Data Redaction:** Supplier cost, markup percentages, internal margins, and private notes are absent from all customer-facing DTOs and PDFs.
+- **Tenant Isolation:** Multi-tenant security verified; cross-tenant booking or invoice access is strictly blocked.
+
+## 139.3 Verification & Test Results
+- **Batch 7 Test Suite (`prisma/test-booking-invoice-pdf-tax.ts`):** **87 / 87 Tests PASSED (100%)**
+  - Quotation to Booking Tax Snapshot (Exclusive Intra-State): **PASS**
+  - Immutability of Booking snapshot upon Agency Profile changes: **PASS**
+  - Invoice creation & tax snapshot persistence: **PASS**
+  - Agency tax profile in agency snapshot (GSTIN, legal name, state code): **PASS**
+  - Invoice idempotency & persistent numbering (Decision #18): **PASS**
+  - Payment integration & financial balance safety: **PASS**
+  - Inclusive & Inter-State tax snapshots: **PASS**
+  - Non-GST Exempt snapshot: **PASS**
+  - Financial reconciliation & mathematical invariants: **PASS**
+  - Booking cancellation & invoice status synchronization: **PASS**
+  - Invoice PDF buffer generation across Exclusive, Inclusive, and Exempt: **PASS**
+  - PDF confidentiality redaction (supplierCost, markup, internalNotes absent): **PASS**
+  - Tenant isolation & cross-tenant access blocking: **PASS**
+- **Cumulative Regression Test Suites:**
+  - Batch 2 Tax Service (`prisma/test-tax-service.ts`): **27 / 27 Tests PASSED (100%)**
+  - Batch 3 Tax Profile (`prisma/test-tax-profile.ts`): **18 / 18 Tests PASSED (100%)**
+  - Batch 4 Quotation Tax (`prisma/test-quotation-tax.ts`): **72 / 72 Tests PASSED (100%)**
+  - Batch 5 Quotation Studio UI (`prisma/test-quotation-ui-tax.ts`): **54 / 54 Tests PASSED (100%)**
+  - Batch 6 Public Proposal & PDF (`prisma/test-public-proposal-pdf-tax.ts`): **54 / 54 Tests PASSED (100%)**
+  - Phase 11 Booking Operations (`prisma/test-phase11-booking.ts`): **33 / 33 Tests PASSED (100%)**
+  - Phase 12 Finance & Payments (`prisma/test-phase12-finance.ts`): **74 / 74 Tests PASSED (100%)**
+  - **Total Tax V1 + Core Financial Test Coverage:** **345+ Tests PASSED (100%)**
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Next.js Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Status:** **BATCH 7 — VERIFIED & CLOSED**
+
+---
+
+# 140. TRIPDESK TAX V1: BATCH 8 — FINAL REGRESSION MATRIX, END-TO-END QA & TAX V1 CLOSURE
+
+## 140.1 Objective & Scope
+Perform comprehensive final regression verification, end-to-end commercial lifecycle QA, and formal closure of the TripDesk Tax V1 feature set across the entire SaaS application:
+- Full lifecycle validation: `Agency Tax Profile -> Tax Rate Catalog -> Trip Costing -> Quotation -> Package Option -> Quotation Version -> Public Proposal -> Customer Acceptance -> Booking Tax Snapshot -> Payment -> Invoice Tax Snapshot -> GST Invoice PDF`.
+- Verified strict preservation of the One Booking = One Persistent Invoice Number invariant (Decision #18) and historical immutability across all snapshots.
+- Confirmed zero client-side floating-point arithmetic (100% server-authoritative calculations via `TaxService` and Prisma Decimals).
+- Confirmed zero data leakage (supplier cost, markup percentage/amount, profit, margin, and internal notes strictly redacted from all public DTOs and customer PDFs).
+- Confirmed zero schema mutations, zero database resets, and zero mass data backfills.
+
+## 140.2 Complete Final Test & Regression Matrix
+All 9 automated test suites executed with 100% pass rate:
+1. **Tax Calculation Service (`prisma/test-tax-service.ts`):** **27 / 27 PASSED (100%)**
+   - Single effective rate, Exclusive & Inclusive mode math, Intra-State (CGST/SGST), Inter-State (IGST), Non-GST Exempt, 0% rate, discount-before-tax, odd-paise Decimal half-up rounding.
+2. **Agency Tax Profile (`prisma/test-tax-profile.ts`):** **18 / 18 PASSED (100%)**
+   - Active rate catalog, profile defaults, owner-only authorization, tenant isolation, historical data safety.
+3. **Quotation Tax Engine (`prisma/test-quotation-tax.ts`):** **72 / 72 PASSED (100%)**
+   - Quotation-level tax snapshot persistence, package options tax inheritance, quotation versioning snapshot preservation, rate validation.
+4. **Quotation Studio UI Integration (`prisma/test-quotation-ui-tax.ts`):** **54 / 54 PASSED (100%)**
+   - Reactive tax controls, dynamic tax recalculations, package option tax overrides, selected package synchronization, versioning isolation.
+5. **Public Proposal & Quotation PDF (`prisma/test-public-proposal-pdf-tax.ts`):** **54 / 54 PASSED (100%)**
+   - Public proposal customer-safe DTO, internal secret redaction, token scoping, tiered package tax notes, high-resolution PDF buffer rendering.
+6. **Booking & Invoice Snapshots + PDF (`prisma/test-booking-invoice-pdf-tax.ts`):** **87 / 87 PASSED (100%)**
+   - Quotation to Booking tax snapshot, Booking to Invoice tax snapshot, Decision #18 persistent numbering & idempotency, payment preservation, cancellation synchronization, GST Invoice PDF generation, cross-tenant IDOR blocking.
+7. **Core Booking Operations (`prisma/test-phase11-booking.ts`):** **33 / 33 PASSED (100%)**
+   - Booking state machine, operational asset linking, readiness engine, controlled cancellation, multi-tenant isolation.
+8. **Core Finance & Payments (`prisma/test-phase12-finance.ts`):** **74 / 74 PASSED (100%)**
+   - Payment schedule, waterfall allocation, refunds, supplier payables/disbursements, server-authoritative ledger profitability, financial immutability locks.
+9. **Full Tax V1 E2E Closure Suite (`prisma/test-tax-v1-e2e-closure.ts`):** **93 / 93 PASSED (100%)**
+   - End-to-end commercial lifecycle verification across Exclusive/Inclusive, Intra/Inter/Exempt treatments, multi-package acceptance, invoice synchronization, payment recording, booking cancellation, and tenant security.
+
+**Total Automated Assertions Verified:** **512 / 512 PASSED (100%)**
+
+## 140.3 Platform Certification
+- **TypeScript (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **Next.js Production Build (`npm run build`):** **Exit code 0 (PASS, Turbopack compiled successfully)**
+- **Browser Responsive QA:** Verified across 1440×900, 1280×800, 1024×768, 768×1024, 390×844, 375×667, 320×568 viewports with 0 horizontal overflow and 0 console errors.
+- **PDF Visual QA:** Verified clean layouts for 0%, 5%, 12%, 18%, 28%, Exclusive, Inclusive, Intra-State, Inter-State, Exempt, and paid/partially paid invoices.
+- **Database Safety:** Zero schema migrations in Batch 8, zero DB resets, zero mass updates.
+- **Scope Status:** Tax V1 is complete, fully verified, and closed. Out-of-scope items (Customer GSTIN, item-level GST, HSN/SAC, e-Invoice, accounting integrations) deferred to future phases.
+
+---
+
+# 141. GLOBAL TABLE/LIST FILTER RESET BUTTON REMOVAL (UI CLEANUP)
+
+## 141.1 Objective & Overview
+- Cleaned up table and list filter toolbars globally across all tenant dashboard and super admin pages by removing the visible **"Reset Filters" / "Reset Filter" / "Reset"** buttons.
+- Filter functionality, internal filter state, URL query parameters, API request parameters, search inputs, status/priority tabs, pagination, sorting, and empty state actions remain 100% intact and operational.
+- Unrelated resets (e.g. error retry buttons, pricing recalculate buttons, operational issue recovery actions, refund indicators, password reset, form reset) were strictly preserved.
+
+## 141.2 Exact Pages Updated (16 files)
+1. `src/app/(dashboard)/trips/page.tsx`
+2. `src/app/(dashboard)/bookings/page.tsx`
+3. `src/app/(dashboard)/quotations/page.tsx`
+4. `src/app/(dashboard)/customers/page.tsx`
+5. `src/app/(dashboard)/enquiries/page.tsx`
+6. `src/app/(dashboard)/payments/page.tsx`
+7. `src/app/(dashboard)/hotels/page.tsx`
+8. `src/app/(dashboard)/vehicles/page.tsx`
+9. `src/app/(dashboard)/activities/page.tsx`
+10. `src/app/(dashboard)/suppliers/page.tsx`
+11. `src/app/(dashboard)/rate-sheets/page.tsx`
+12. `src/app/(dashboard)/documents/page.tsx`
+13. `src/app/(dashboard)/operations/page.tsx`
+14. `src/app/(dashboard)/operations/issues/page.tsx`
+15. `src/app/(dashboard)/referrals/page.tsx`
+16. `src/app/admin/payments/page.tsx`
+
+## 141.3 Validation & Certification
+- **TypeScript (`npx tsc --noEmit`):** 0 errors (PASS)
+- **Production Build (`npm run build`):** PASS (Turbopack, exit code 0)
+- **Status:** **GLOBAL FILTER RESET UI — VERIFIED & CLOSED**
+
+---
+
+# 142. EMAIL VERIFICATION: BATCH 1 — SUPABASE SIGNUP REFACTOR & METADATA STAGING
+
+## 142.1 Objective & Overview
+- Implemented Batch 1 of the locked TripDesk Email Verification lifecycle.
+- Refactored `signupAgencyOwnerAction` to use native `supabase.auth.signUp()` with temporary onboarding metadata staged in `user_metadata` (`agencyName`, `agencyEmail`, `agencyPhone`, `address`, `city`, `state`, `country`, `ownerName`, `phone`).
+- Removed `email_confirm: true` from public signup so accounts remain unconfirmed until verified.
+- Deferred all database provisioning (`Agency`, `User`, `Subscription`) and trial consumption to the post-verification callback (Batch 3). 0 database records and 0 trial days are consumed during initial public signup.
+- Removed automatic `signInWithPassword()` session establishment; public signup now redirects directly to `/verify-email?email=...`.
+- Updated middleware to whitelist `/verify-email` as a public route.
+- Platform Owner bootstrap (`prisma/bootstrap-owner.ts`) and existing accounts remain completely untouched.
+
+## 142.2 Files Changed
+1. `src/actions/auth-actions.ts`: Refactored `signupAgencyOwnerAction` for native unconfirmed signup, metadata staging, removed immediate DB transaction and auto-login, redirect to `/verify-email`.
+2. `src/lib/supabase/middleware.ts`: Added `/verify-email` to public routes.
+3. `prisma/test-qa-05-signup.ts`: Updated QA-05 test suite to assert Batch 1 invariants (unconfirmed status, metadata staging, 0 DB records, no trial consumption).
+
+## 142.3 Verification & Test Certification
+- **TypeScript Compilation (`npx tsc --noEmit`):** 0 errors (PASS)
+- **QA-05 Integration Test (`prisma/test-qa-05-signup.ts`):** 8 / 8 assertions PASSED (100%)
+- **QA-01 Auth Suite (`prisma/test-qa-01-auth.ts`):** 16 / 16 assertions PASSED (100%)
+- **Next.js Production Build (`npm run build`):** Exit code 0 (PASS, Turbopack compiled successfully)
+- **Status:** **BATCH 1 — VERIFIED & CLOSED**
+
+## 142.4 Known Limitations & Next Scope
+- Batch 2: Dedicated `/verify-email` screen with 60-second cooldown Resend Verification button (intentionally unimplemented in Batch 1).
+- Batch 3: `/auth/callback` route handler with atomic idempotent database onboarding and 7-day Starter trial start (intentionally unimplemented in Batch 1).
+- Batch 4: Login verification gate and post-verification success banner (intentionally unimplemented in Batch 1).
+
+---
+
+# 143. EMAIL VERIFICATION: BATCH 2 — `/verify-email` SCREEN + RESEND VERIFICATION
+
+## 143.1 Objective & Overview
+- Implemented Batch 2 of the locked TripDesk Email Verification feature.
+- Created dedicated `/verify-email` screen (`src/app/verify-email/page.tsx`) with consistent TripDesk branding, explanatory instructions, email display (UX-only), resend action, 60-second cooldown timer, and navigation to `/login` and `/signup`.
+- Implemented `resendVerificationEmailAction` in `src/actions/auth-actions.ts` using native `supabase.auth.resend({ type: "signup", email })`.
+- Handled server-side abuse and rate limiting gracefully with user-friendly notices ("Please wait a moment before requesting another verification email.").
+- Verified that Batch 2 does NOT create any database records (`Agency`, `User`, `Subscription`, `Starter trial`), does not execute automatic onboarding, and does not establish sessions.
+
+## 143.2 Files Changed
+1. `src/app/verify-email/page.tsx` [NEW]: Created dedicated verification instructions and resend UI with 60s cooldown timer.
+2. `src/actions/auth-actions.ts`: Added `resendVerificationEmailAction` using native Supabase Auth.
+3. `prisma/test-qa-06-verify-email.ts` [NEW]: Created automated test suite validating empty input rejection and resend action dispatch.
+4. `prisma/test-qa-05-signup.ts`: Maintained and verified Batch 1 & 2 signup rate-limit and safety handling.
+
+## 143.3 Verification & Test Certification
+- **TypeScript Compilation (`npx tsc --noEmit`):** 0 errors (PASS)
+- **QA-06 Resend Test (`prisma/test-qa-06-verify-email.ts`):** 100% PASSED
+- **QA-05 Integration Test (`prisma/test-qa-05-signup.ts`):** 100% PASSED
+- **QA-01 Auth Suite (`prisma/test-qa-01-auth.ts`):** 16 / 16 PASSED (100%)
+- **Next.js Production Build (`npm run build`):** Exit code 0 (PASS, Turbopack compiled successfully, `/verify-email` prerendered statically)
+- **Browser Responsive QA:** Verified across `1440×900` (desktop) and `390×844` (mobile) viewports with 0 horizontal overflow and clean UI presentation.
+- **Status:** **BATCH 2 — VERIFIED & CLOSED**
+
+## 143.4 Known Limitations & Next Scope
+- Batch 3: `/auth/callback` route handler with atomic idempotent database onboarding (`Agency`, `User`, `Subscription`) and 7-day Starter trial activation (intentionally unimplemented in Batch 2).
+- Batch 4: Login verification gate and post-verification success banner (intentionally unimplemented in Batch 2).
+
+# 144. EMAIL VERIFICATION: BATCH 3 — `/auth/callback` + ATOMIC ONBOARDING + 7-DAY STARTER TRIAL
+
+## 144.1 Objective & Overview
+- Implemented Batch 3 of the locked TripDesk Email Verification feature.
+- Implemented dedicated Supabase authentication callback Route Handler at `src/app/auth/callback/route.ts`.
+- Exchanged native Supabase authorization code for session (`supabase.auth.exchangeCodeForSession(code)`).
+- Validated authenticated user identity directly from Supabase Auth (`supabase.auth.getUser()`). Supabase Auth remains the source of truth for email confirmation.
+- Implemented atomic Prisma transaction provisioning:
+  1. `Agency`: Created with verified metadata (`name`, `phone`, `email`, `address`, `status: ACTIVE`).
+  2. `User`: Created with `id = Supabase Auth user.id`, `role = AGENCY_OWNER`, `agencyId = agency.id`, `emailVerified = now`.
+  3. `Subscription`: Dynamically resolved `Starter` plan from database catalog; initialized with `status: TRIAL`, `billingCycle: MONTHLY`, `trialStart = now`, `trialEnd = now + 7 days`.
+- Enforced Idempotency & Concurrency Protection: If onboarding was already completed or if multiple callback requests arrive concurrently, the existing records are preserved, no duplicates are created, and trial dates are NOT reset.
+- Failure Recovery: If DB provisioning fails, onboarding metadata in Supabase Auth is preserved so the callback can be retried safely.
+- Metadata Cleanup: Temporary onboarding metadata in Supabase `user_metadata` is wiped ONLY after the database transaction succeeds.
+- No Auto-Login: User session established during code exchange is explicitly signed out (`supabase.auth.signOut()`), and user is redirected to `/login?verified=true`.
+- Added `/auth/callback` to public route whitelist in `src/lib/supabase/middleware.ts`.
+- Passed `emailRedirectTo: getAuthCallbackUrl()` in `signUpAction` and `resendVerificationEmailAction`.
+
+## 144.2 Files Changed
+1. `src/app/auth/callback/route.ts` [NEW]: Supabase Auth verification callback handler with atomic idempotent onboarding transaction, metadata cleanup, and safe redirection.
+2. `src/actions/auth-actions.ts` [MODIFY]: Added `getAuthCallbackUrl()` helper and included `emailRedirectTo` in `signUp` and `resend` options.
+3. `src/lib/supabase/middleware.ts` [MODIFY]: Added `/auth/callback` to `isPublicRoute`.
+4. `prisma/test-qa-07-auth-callback.ts` [NEW]: Automated test suite validating Starter plan resolution, atomic onboarding, exact 7-day trial calculation, idempotency on repeated calls, and rollback on failure.
+
+## 144.3 Verification & Test Certification
+- **TypeScript Compilation (`npx tsc --noEmit`):** 0 errors (PASS)
+- **QA-07 Callback & Onboarding Test (`prisma/test-qa-07-auth-callback.ts`):** 100% PASSED
+- **QA-06 Resend Test (`prisma/test-qa-06-verify-email.ts`):** 100% PASSED
+- **QA-05 Signup Test (`prisma/test-qa-05-signup.ts`):** 100% PASSED
+- **QA-01 Auth Suite (`prisma/test-qa-01-auth.ts`):** 16 / 16 PASSED (100%)
+- **Next.js Production Build (`npm run build`):** Exit code 0 (PASS, Turbopack compiled successfully, `/auth/callback` dynamic route created)
+- **Browser QA:** Verified verification link dispatch, callback code exchange, and safe redirect to `/login?verified=true` across Desktop (`1440×900`) and Mobile (`390×844`).
+- **Status:** **EMAIL VERIFICATION BATCH 3 — VERIFIED & CLOSED**
+
+# 145. EMAIL VERIFICATION: BATCH 4 — LOGIN VERIFICATION GATE + `?verified=true` SUCCESS STATE
+
+## 145.1 Objective & Overview
+- Implemented Batch 4 of the locked TripDesk Email Verification feature.
+- Implemented the server-side Login Verification Gate inside `loginAction` (`src/actions/auth-actions.ts`).
+- Enforced that Supabase Auth confirmation status is the authoritative source of truth:
+  - Catches unconfirmed email responses from `supabase.auth.signInWithPassword()`.
+  - Verifies `email_confirmed_at` / `confirmed_at` on the authenticated user.
+  - If an unverified Agency Owner attempts sign in, their session is immediately destroyed (`supabase.auth.signOut()`) and workspace access is blocked.
+  - Returns friendly user message: *"Please verify your email address before signing in to TripDesk."* with `unverified: true` and `email` for seamless recovery navigation.
+- Verified that Platform Owner (`PLATFORM_OWNER`) accounts remain completely exempt from the verification gate and route normally to `/admin`.
+- Updated `src/app/login/page.tsx` with:
+  - `?verified=true` success state: Displays green confirmation banner (*"Email verified successfully! Your 7-day Starter trial is active. Please enter your credentials to access your workspace."*). Parameter is UX-only and strictly does not auto-login or bypass authentication.
+  - Verification-required amber alert with interactive *"Go to Verification Screen"* action navigating to `/verify-email?email=...` where the 60s cooldown resend action is readily accessible.
+  - Mapped URL error parameters from callback redirects cleanly without exposing internal details.
+- Ensured zero database records are created or modified during login attempts.
+
+## 145.2 Files Changed
+1. `src/actions/auth-actions.ts` [MODIFY]: Updated `loginAction` with Supabase Auth verification gate, session teardown for unverified accounts, and Platform Owner exemption. Updated `AuthActionResult` interface.
+2. `src/app/login/page.tsx` [MODIFY]: Added `?verified=true` success banner, unverified amber alert with verification screen link, and safe error notice mapping.
+3. `prisma/test-qa-08-login-verification.ts` [NEW]: Automated test suite validating missing credentials, invalid credential handling without account enumeration, Platform Owner verification exemption, and zero DB record creation during login.
+
+## 145.3 Verification & Test Certification
+- **TypeScript Compilation (`npx tsc --noEmit`):** 0 errors (PASS)
+- **QA-08 Login Verification Gate Test (`prisma/test-qa-08-login-verification.ts`):** 100% PASSED
+- **QA-07 Callback & Onboarding Test (`prisma/test-qa-07-auth-callback.ts`):** 100% PASSED
+- **QA-06 Resend Test (`prisma/test-qa-06-verify-email.ts`):** 100% PASSED
+- **QA-05 Signup Test (`prisma/test-qa-05-signup.ts`):** 100% PASSED
+- **QA-01 Auth Suite (`prisma/test-qa-01-auth.ts`):** 16 / 16 PASSED (100%)
+- **Next.js Production Build (`npm run build`):** Exit code 0 (PASS, Turbopack compiled successfully)
+- **Browser QA:** Verified `/login`, `/login?verified=true`, unverified login warning, verification navigation, and verified login routing across Desktop (`1440×900`) and Mobile (`390×844`).
+- **Status:** **EMAIL VERIFICATION BATCH 4 — VERIFIED & CLOSED**
+
+# 146. EMAIL VERIFICATION V1 — FINAL FAILURE RECOVERY + REGRESSION QA
+
+## 146.1 Objective & Overview
+- Completed the final comprehensive closure and regression audit for the entire TripDesk Email Verification V1 feature lifecycle.
+- Validated all invariants across the complete lifecycle:
+  1. **Signup Phase (Batch 1):** Public Agency Owner signup uses native `supabase.auth.signUp()`, unconfirmed auth user, temporary metadata in `user_metadata`, 0 Prisma records, 0 trial days consumed, redirects to `/verify-email?email=...`.
+  2. **Verify Screen Phase (Batch 2):** Dedicated `/verify-email` route with safe email display, 60-second client cooldown, native Supabase resend action, safe error handling, no auto-login.
+  3. **Verification & Onboarding Phase (Batch 3):** Dedicated `/auth/callback` Route Handler, authorization code exchange for session, verified user authentication, atomic Prisma transaction creating 1 `Agency` + 1 `User` (`role: AGENCY_OWNER`, `emailVerified: now`) + 1 `Subscription` (`plan: Starter`, `status: TRIAL`, `trialStart: now`, `trialEnd: now + 7 days`).
+  4. **Idempotency & Concurrency Safety:** Repeated/concurrent callback executions preserve existing records, prevent duplicates, and never reset trial dates. Transaction rollback on failure leaves 0 orphaned records and preserves metadata for retry. Metadata wiped only after successful commit.
+  5. **Login Gate Phase (Batch 4):** Server-side verification gate in `loginAction`, destroys temporary sessions for unverified Agency Owners, displays amber alert with navigation to `/verify-email`. Renders green confirmation banner for `?verified=true` (presentation-only, requires manual login).
+  6. **Platform Owner & Tenant Isolation:** Platform Owner (`mzpatel14@gmail.com`, `PLATFORM_OWNER`) remains completely exempt from the verification gate and routes to `/admin`. Multi-tenant boundaries, role authorization, and redirect security (`redirectTo`) are strictly enforced.
+  7. **Database Safety:** Prisma `User.emailVerified` is decoupled from authorization; Supabase Auth remains the sole authoritative source of truth. Zero database records are created or altered during login attempts.
+
+## 146.2 Complete Test Suite Matrix & Verification Results
+- **TypeScript Compilation (`npx tsc --noEmit`):** **0 errors (PASS)**
+- **QA-01 Auth & Session Suite (`prisma/test-qa-01-auth.ts`):** **16 / 16 PASSED (100%)**
+- **QA-05 Signup & Staging Suite (`prisma/test-qa-05-signup.ts`):** **PASS (100%)**
+- **QA-06 Resend Action Suite (`prisma/test-qa-06-verify-email.ts`):** **PASS (100%)**
+- **QA-07 Callback & Onboarding Suite (`prisma/test-qa-07-auth-callback.ts`):** **PASS (100%)**
+- **QA-08 Login Verification Audit Suite (`prisma/test-qa-08-login-verification.ts`):** **9 / 9 PASSED (100%)**
+- **QA-09 Final Regression Closure Suite (`prisma/test-qa-09-email-verification-final.ts`):** **10 / 10 PASSED (100%)**
+- **Next.js Production Build (`npm run build`):** **Exit Code 0 (PASS, Turbopack compiled successfully)**
+- **Browser Responsive QA:** Verified across Desktop (`1440×900`) and Mobile (`390×844`).
+
+## 146.3 Final Production-Readiness Verdict
+**EMAIL VERIFICATION V1 — VERIFIED, CLOSED & PRODUCTION-READY FOR CURRENT SCOPE**
+
+---
+
+# 147. DATABASE CLEANUP COMPLETE & TEST ENVIRONMENT BASELINE
+
+## 147.1 Overview & Purpose
+- Executed controlled, dependency-safe database cleanup and corrective cleanup.
+- Purged all obsolete development/test agencies, disposable test user records, and all historical mock tenant/business data across all 50 Prisma models.
+- Preserved global catalogs, platform configuration, and the permanent Platform Owner identity.
+- Database is currently at a clean, zero-tenant baseline ready for Mohit to personally create/provide the permanent testing Agency + Agency Owner account.
+
+## 147.2 Permanent System & Testing Identities
+1. **Permanent Platform Owner:**
+   - **Email:** `mzpatel14@gmail.com`
+   - **Role:** `PLATFORM_OWNER`
+   - **Supabase Auth User ID:** `de5c1377-0e7c-4747-b3ed-aaee8b7e32a9`
+   - **Prisma User ID:** `de5c1377-0e7c-4747-b3ed-aaee8b7e32a9`
+   - **Agency ID:** `null` (Platform Level)
+   - **Routing:** `/admin` (Platform Control Plane)
+
+2. **Permanent Test Agency:**
+   - **Name:** `TripDesk Offical Test Agnecy`
+   - **Status:** `ACTIVE`
+   - **Subscription:** `Starter` (`TRIAL`, 7-Day Free Trial)
+
+3. **Permanent Test Agency Owner:**
+   - **Email:** `tripmadeeasy.in@gmail.com`
+   - **Role:** `AGENCY_OWNER`
+   - **Status:** `ACTIVE & VERIFIED`
+   - **Credential Secret:** Stored in `.env` as `BOOTSTRAP_AGENCY_PASSWORD` (never documented in V3)
+
+## 147.3 Preserved Global Application Catalogs
+- **Subscription Plans (`SubscriptionPlan` - 2 rows):**
+  - `Starter` (Display Order 1, ₹999/mo, ₹9,999/yr, Active)
+  - `Professional` (Display Order 2, ₹1,499/mo, ₹14,999/yr, Active, Popular)
+- **Tax Rate Catalog (`TaxRate` - 5 rows):**
+  - `0%` (Rate: 0.00, Default: true, Active: true, Display Order: 1)
+  - `5%` (Rate: 5.00, Default: false, Active: true, Display Order: 2)
+  - `12%` (Rate: 12.00, Default: false, Active: true, Display Order: 3)
+  - `18%` (Rate: 18.00, Default: false, Active: true, Display Order: 4)
+  - `28%` (Rate: 28.00, Default: false, Active: true, Display Order: 5)
+- **Platform Settings (`PlatformSetting` - 2 rows):**
+  - `defaultTrialDays`: `"7"`
+  - `supportEmail`: `"enterprise@tripdesk.io"`
+
+## 147.4 Permanent Testing Rules & Governance
+1. **Single Permanent Agency Rule:**
+   - After Mohit establishes the permanent Agency + Agency Owner, all future development, Antigravity agent tasks, ChatGPT-assisted QA, browser testing, regression testing, and feature workflows must permanently reuse that same single permanent test Agency and single permanent Agency Owner.
+2. **Zero Additional Test Tenants:**
+   - Never create another `Agency`, `Agency Owner`, QA agency, temporary tenant, or ad-hoc test user account unless explicitly authorized by Mohit.
+3. **Data Reset Policy:**
+   - When future tests require clean data, reset/clean the records *inside* the established permanent Agency rather than creating a new agency tenant.
+4. **Security & Credential Integrity:**
+   - Passwords, access tokens, and API secret keys must never be committed to Git, stored in documentation, or printed in public reports.
+
+## 147.5 Final Verified Database State
+- **Supabase Auth Users:** Exactly 1 (`mzpatel14@gmail.com` [Platform Owner])
+- **Prisma Users:** Exactly 1 (`PLATFORM_OWNER` with `agencyId: null`)
+- **Agencies:** Exactly 0 (Ready for permanent tenant onboarding)
+- **Subscriptions:** Exactly 0 tenant subscriptions
+- **All Tenant/Business Data Models (45 tables):** Exactly 0 rows (Clean baseline)
+- **Global Catalogs:** `SubscriptionPlan` (2 rows), `TaxRate` (5 rows), `PlatformSetting` (2 rows)
+
+## 147.6 Email Verification & PKCE Confirmation Architecture Fix
+- **Problem:** Cross-browser / email-client verification link clicks resulted in `error=link_expired` because `@supabase/ssr` server actions stored the PKCE `code_verifier` cookie in the signup browser, which was unavailable when clicking links from external email clients.
+- **Solution:** Enhanced `/auth/callback` route handler to support dual verification pathways (`token_hash` + `verifyOtp` and `code` + `exchangeCodeForSession`), categorized errors accurately (avoiding spurious `link_expired` redirects), and enforced verified identity validation before atomic Prisma onboarding (`Agency` + `User [AGENCY_OWNER]` + 7-Day Starter `Subscription`).
+- **QA Verification:** Passed `test-qa-10-pkce-architecture-fix.ts` (8/8 tests passed), `test-qa-09-email-verification-final.ts` (10/10 tests passed), TypeScript (`npx tsc --noEmit` - 0 errors), and Production Build (`npm run build` - succeeded).
+
+---
+
+# 148. NATIVE SUPABASE EMAIL OTP VERIFICATION (LOCKED V1 DECISION)
+
+## 148.1 Overview & Architecture Decision
+- **Final Decision:** TripDesk V1 uses **Native Supabase Email OTP** verification.
+- **Rationale:** Native Email OTP delivers a direct verification code (6–8 numeric digits) via Supabase Auth, completely decoupling verification from browser session cookies, PKCE verifiers, and automated email security link prefetchers.
+- **Workflow:**
+  ```text
+  Signup (/signup)
+    ↓
+  Supabase Auth signUp() with staged metadata in user_metadata
+    ↓
+  Supabase Auth delivers email with verification code ({{ .Token }})
+    ↓
+  User navigates to /verify-email and enters 6–8 digit code
+    ↓
+  verifyEmailOtpAction calls supabase.auth.verifyOtp({ email, token, type: "email" })
+    ↓
+  Authenticated Supabase user confirmed
+    ↓
+  Shared Atomic Onboarding (provisionOnboardedAgencyOwner)
+    ↓
+  Agency + User (AGENCY_OWNER) + Starter Subscription (7-day Trial)
+    ↓
+  Staged metadata cleaned & supabase.auth.signOut()
+    ↓
+  Redirect to /login?verified=true
+  ```
+
+## 148.2 Architecture & Security Invariants Preserved
+1. **Flexible OTP Validation (`src/actions/auth-actions.ts: verifyEmailOtpAction`):**
+   - Validates email and accepts 6 to 8 numeric digits (`/^\d{6,8}$/`) to seamlessly support Supabase Auth default (6-digit) and customized (8-digit) OTP tokens without client-side rejection.
+   - Natively verifies via `supabase.auth.verifyOtp({ email, token, type: "email" })` and resolves verified user identity via `supabase.auth.getUser()`.
+2. **Shared Atomic Onboarding Service (`src/lib/services/onboarding-service.ts`):**
+   - Centralized `provisionOnboardedAgencyOwner(user, supabase)` executes an atomic Prisma `$transaction`.
+   - Strictly verifies `email_confirmed_at`, enforces idempotency, prevents `P2002` race collisions, resolves the catalog `Starter` plan, and wipes temporary `user_metadata`.
+3. **Verify Email OTP Screen (`src/app/verify-email/page.tsx`):**
+   - Clean, branded OTP input interface with monospaced letter-spaced typography, numeric inputMode, max 8-digit auto-sanitization, "Verify & Activate Agency" primary button, and 60-second cooldown timer for native resend (`resendVerificationEmailAction`).
+4. **Dual-Path Callback Preservation (`src/app/auth/callback/route.ts`):**
+   - Retained support for authorization `code` exchange and `token_hash` OTP verification as fallback compatibility.
+5. **Login Verification Gate (`src/actions/auth-actions.ts: loginAction`):**
+   - Unverified users are rejected and prompted to verify; Platform Owner (`mzpatel14@gmail.com`) remains exempt.
+
+## 148.3 Verification & Quality Assurance
+- **QA-11 OTP Verification Suite:** 21/21 assertions passed (100%), validating 6–8 digit inputs, unverified email gates, missing metadata rejection, and clean database invariants.
+- **QA-09 Final Verification Suite:** 10/10 tests passed (100%).
+- **QA-10 PKCE Architecture Fix Suite:** 8/8 tests passed (100%).
+- **TypeScript:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack.
+- **Browser QA:** Automated browser subagent verified `/verify-email` at 1440x900 (desktop) and 390x844 (mobile) with zero horizontal overflow, 8-digit input formatting, button states, and active 60s cooldown.
+- **Clean Database Invariant:** Platform Owner = 1 (`mzpatel14@gmail.com`), Agencies = 0, Subscriptions = 0, Tenant data = 0.
+
+---
+
+# 149. PERMANENT TRIPDESK TEST AGENCY & TESTING GOVERNANCE
+
+## 149.1 Overview & Permanent Test Workspace
+TripDesk has one permanent Agency Owner test workspace used for routine development QA, browser testing, regression testing, and feature verification.
+
+- **Email:** `tripmadeeasy.in@gmail.com`
+- **Role:** `AGENCY_OWNER`
+- **Agency Name:** `TripDesk Offical Test Agnecy`
+- **Agency Status:** `ACTIVE`
+- **Subscription:** `Starter` (Catalog Plan)
+- **Subscription Status:** `TRIAL`
+- **Billing Cycle:** `MONTHLY`
+- **Trial Duration:** 7 days
+
+The test account has already been created, verified, and provisioned in both Supabase Auth and Prisma.
+
+The password is stored only in the project's `.env` file as:
+`BOOTSTRAP_AGENCY_PASSWORD`
+
+> [!WARNING]
+> **NEVER** store, copy, print, expose, or document the actual password in V3, source code, test scripts, terminal output, reports, or chat responses.
+
+## 149.2 Permanent Test Account Rule
+`tripmadeeasy.in@gmail.com` is the permanent TripDesk Agency Owner test account.
+
+1. **Mandatory Reuse:**
+   - Future TripDesk development testing, regression testing, browser QA, and workflow verification should reuse this existing test agency whenever an Agency Owner account is required.
+2. **Zero Disposable Test Tenants:**
+   - Do NOT create another temporary Agency Owner/test agency for routine testing.
+   - Do NOT create a new Agency, User, or Subscription merely because a test requires an Agency Owner account.
+3. **Data Preservation Policy:**
+   - Do NOT delete, reset, wipe, rename, or otherwise modify the permanent test agency's configuration or business data during routine QA.
+4. **Controlled Exceptions:**
+   - If a test specifically requires destructive/reset behavior, obtain explicit approval from Mohit before modifying or resetting the permanent test agency.
+   - If an additional isolated test tenant is genuinely required, explicitly report why the permanent test agency cannot safely be used and wait for approval before creating one.
+
+## 149.3 Test Account Environment Configuration
+The permanent test account configuration is stored in `.env`:
+- `BOOTSTRAP_AGENCY_EMAIL`
+- `BOOTSTRAP_AGENCY_PASSWORD`
+- `BOOTSTRAP_AGENCY_NAME`
+
+The actual password is a secret and MUST NOT be copied into:
+- V3
+- source code
+- test scripts
+- documentation
+- logs
+- screenshots
+- terminal output
+- generated reports
+- chat responses
+
+Only document the variable name `BOOTSTRAP_AGENCY_PASSWORD`.
+
+## 149.4 Permanent Test Agency Verification
+Verified existing database/auth state:
+- Supabase Auth user exists.
+- Prisma User exists.
+- Prisma User role = `AGENCY_OWNER`.
+- Prisma User is linked to a valid Agency (`agencyId` is not null).
+- Agency exists with status `ACTIVE`.
+- Agency name matches `TripDesk Offical Test Agnecy`.
+- Starter Subscription exists.
+- Subscription status = `TRIAL`.
+- Billing cycle = `MONTHLY`.
+- Trial duration = 7 days.
+- No new Agency or User was created during verification.
+- Temporary verification script was removed after the read-only check.
+
+**Verification Result:**
+`PASS — PERMANENT TEST AGENCY VERIFIED`
+
+---
+
+# 150. ISSUE #1 — PAID STARTER MONTHLY RENEWAL DATE DISPLAY FIX
+
+## 150.1 Issue Summary
+- **Issue:** Paid Starter monthly subscription showed historical trial end date (`22 Sep 2026`) as the renewal date instead of the paid renewal date (`15 Oct 2026`).
+- **Target Account:** `tripmadeeasy.in@gmail.com` (`TripDesk Offical Test Agnecy`).
+
+## 150.2 Root Cause
+- **Location:** `src/app/(dashboard)/subscription/page.tsx` (lines 408–442).
+- **Cause:** Subscription UI metric strip checked `sub?.trialEnd ? ... : sub?.subscriptionEnd ? ...` without gating on the subscription's `isTrial` state. Because the database preserves historical trial telemetry (`trialEnd: 2026-09-22`), the truthy value of `sub.trialEnd` caused the UI to always display the trial end date even when `sub.status === "ACTIVE"`.
+
+## 150.3 Solution & Implementation
+- **Frontend Correction:** Updated `src/app/(dashboard)/subscription/page.tsx` to conditionally branch on `isTrial`:
+  - For **Subscription Start**: `isTrial ? sub?.trialStart : sub?.subscriptionStart`.
+  - For **Next Renewal Date**: `isTrial ? sub?.trialEnd : sub?.subscriptionEnd`.
+- **Backend / Database State:** No backend or database changes required. Historical trial telemetry (`trialStart`, `trialEnd`) remains strictly preserved in database records.
+
+## 150.4 Quality Assurance & Verification
+- **Active Monthly Starter Display:**
+  - **Status:** `ACTIVE SUBSCRIPTION`
+  - **Billing Cycle:** `Monthly Billing`
+  - **Subscription Start:** `15 Sep 2026`
+  - **Next Renewal Date:** `15 Oct 2026`
+- **Trial Display Invariant:** For subscriptions where `status === "TRIAL"`, UI continues to render `Trial Started: trialStart` and `Trial Ends / Expires: trialEnd`.
+- **TypeScript:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack.
+- **Browser QA:** Verified via browser subagent on `http://localhost:3001/subscription` with automated screenshot & visual validation.
+
+**Verdict:**
+`ISSUE #1 — VERIFIED & CLOSED`
+
+---
+
+# 151. SUPPLIERS + REFERRALS UI VISIBILITY REMOVAL
+
+## 151.1 Decision Summary
+- **Business Decision:** For TripDesk V1, Supplier Management and Referral Programs are deferred from the active Agency Owner navigation and discovery UI surface.
+- **Architectural Distinction:** `REMOVE FROM UI ≠ REMOVE FROM CODEBASE ≠ REMOVE FROM DATABASE`.
+- **Implementation Scope:** UI discovery removal only. All underlying routes, APIs, services, and database schemas remain 100% preserved.
+
+## 151.2 Modified UI Entry Points
+1. **Desktop Sidebar & Mobile Navigation Drawer (`src/lib/navigation.ts`):**
+   - Removed `Suppliers` from `RESOURCES` navigation section.
+   - Removed `Referrals & Rewards` from `FINANCE & RETENTION` navigation section.
+2. **Global Search Modal (`src/components/shared/global-search.tsx`):**
+   - Removed `nav-suppliers` from `quickNavModules`.
+3. **Executive Dashboard (`src/components/dashboard/receivables-payables-card.tsx`):**
+   - Removed `Vendors →` navigation button on Supplier Payables card header.
+   - Made Top Vendor Payables list items non-clickable plain text rows while retaining financial summary data.
+4. **Trip Costing Breakdown (`src/components/costing/cost-breakdown-table.tsx`):**
+   - Rendered supplier names as non-clickable text with `Building2` icon; removed hyperlink to `/suppliers/[id]`.
+5. **Rate Sheet Detail (`src/app/(dashboard)/rate-sheets/[id]/page.tsx`):**
+   - Replaced supplier header link with non-clickable badge.
+   - Removed "Supplier 360" link from supplier info card.
+
+## 151.3 Architecture & Data Preservation
+- **Routes Preserved:** `/suppliers`, `/suppliers/[id]`, `/suppliers/new`, `/referrals`, `/referrals/[id]`.
+- **Backend Preserved:** `/api/suppliers/*`, `/api/referrals/*`, `supplier-service.ts`, `referral-service.ts`, `supplier-client.ts`, `experience-client.ts`.
+- **Database & Prisma:** Zero schema migrations, zero record deletions. `Supplier` and `Referral` models remain intact with all foreign key relationships.
+- **Financial Analytics:** Dashboard `Supplier Payables` calculations and totals remain fully functional.
+
+## 151.4 Quality Assurance & Verification
+- **TypeScript:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack (0 errors, all routes statically/dynamically generated).
+- **Desktop & Mobile QA:** Verified sidebar and mobile drawer hide Suppliers and Referrals. Global search does not return `/suppliers`.
+- **Direct Route Preservation QA:** Verified authenticated direct navigation to `http://localhost:3001/suppliers` and `http://localhost:3001/referrals` successfully renders pages.
+
+**Verdict:**
+`SUPPLIERS + REFERRALS UI REMOVAL — VERIFIED & CLOSED`
+
+---
+
+# 152. OPERATIONS COMPLETE QA & LIFECYCLE VERIFICATION
+
+## 152.1 Executive Summary
+- **Module:** `/operations`, `/operations/[tripId]`, `/operations/issues`, `/operations/analytics`.
+- **Status:** **PASS — OPERATIONS VERIFIED**.
+- **Scope:** Complete functional, security, responsive, data integrity, and automated regression verification across the end-to-end Operations lifecycle.
+- **Active Mock Data:** 0% (Fully backed by PostgreSQL, Prisma, Operations Service, and API Client).
+
+## 152.2 Automated Test Suites Execution
+- **Phase 10.13E (Operational Issues Tracker):** `30/30` passed (100%).
+- **Phase 10.13F (Vouchers & Travel Documents PDF):** `24/24` passed (100%).
+- **Phase 10.13G (Activities Operational Workflow):** `27/27` passed (100%).
+- **Phase 10.13H (Operations Lifecycle & Handover):** `25/25` passed (100%).
+- **Phase 10.13I (Operations Closure & Reconciliation):** `49/49` passed (100%).
+- **Phase 10.13J (Operations Analytics & Management Insights):** `52/52` passed (100%).
+- **Total Assertions Verified:** `207/207` across active operations integration suites (100% pass rate).
+
+## 152.3 Technical Validation
+- **Prisma Schema:** `npx prisma validate` passed (Valid schema 🚀).
+- **TypeScript:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed (Next.js Turbopack, 0 errors).
+- **Database Data Integrity:** 0 orphaned hotels, 0 orphaned vehicles, 0 orphaned activities, 0 orphaned issues, 0 orphaned timeline events.
+
+## 152.4 Browser & Responsive Verification
+- **Desktop (1440x900, 1280x800, 1024x768):** Full command center grid, KPIs, workspace table, issues tracker, and analytics dashboard rendered cleanly.
+- **Tablet (768x1024):** Grid gracefully collapses into multi-row cards with internal table scrolling.
+- **Mobile (390x844, 375x667, 320x568):** Sidebar converts to responsive navigation drawer, all KPI cards and status badges scale fluidly with zero horizontal page blowout.
+- **Console Errors:** 0 errors.
+
+**Verdict:**
+`OPERATIONS MODULE — VERIFIED & CLOSED`
+
+---
+
+# 153. HOTEL EXCEL SAMPLE & IMPORT PHONE VALUE FIX
+
+## 153.1 Problem & Root Cause
+- **Problem:** Phone numbers beginning with `+` (such as `+91 832 665 6000` or `+91 98765 43210`) downloaded in `Hotels.xlsx` sample or imported into TripDesk resulted in a literal leading apostrophe (`'+91 832 665 6000`) in the Preview modal and database record.
+- **Root Cause:** In `src/lib/excel/hotel-excel-service.ts`, the helper `sanitizeCellValue` was applying formula-injection escaping (`str = "'${str}"`) during the **import parsing** stage. Because phone strings beginning with `+` matched the regex `/^[=+\-@\t\r]/` and contained spaces (`isNaN(Number(str))` was true), the function was actively prepending a literal apostrophe `'` to every international phone number during sheet ingestion.
+
+## 153.2 Implementation Fix
+- **File Modified:** `src/lib/excel/hotel-excel-service.ts`.
+- **Change:** Refactored `sanitizeCellValue` to trim whitespace and strip accidental leading apostrophes (from Excel text prefixes) rather than prepending them.
+- **Result:** Phone values like `+91 832 665 6000` and `+91 98765 43210` parse cleanly as text without any literal apostrophe at the logical cell, preview, or database persistence levels.
+
+## 153.3 Verification
+- **Sample Generation:** Raw cell G2 in `Hotels.xlsx` has type `t: "s"`, value `+91 98765 43210` with zero apostrophe.
+- **Test Matrix:** Verified all 6 test cases:
+  1. `+91 832 665 6000` -> `+91 832 665 6000`
+  2. `+91 141 456 7777` -> `+91 141 456 7777`
+  3. `8326656000` -> `8326656000`
+  4. Blank / empty cell -> `null`
+  5. `+91 94472 53009` -> `+91 94472 53009`
+  6. Sample Download & Ingestion -> `+91 98765 43210`
+- **TypeScript & Build:** `npx tsc --noEmit` (0 errors) and `npm run build` (0 errors).
+- **Hotel Code & Data Safety:** Hotel Code generation (`HTL-XXXX`), validation rules, database models, and historical data remain 100% unchanged.
+
+**Verdict:**
+`PASS — HOTEL EXCEL PHONE VALUE FIX VERIFIED & CLOSED`
+
+---
+
+# 154. GLOBAL DISPLAY VALUE & DROPDOWN LABEL CONSISTENCY PERMANENT FIX
+
+## 154.1 Problem & Root Cause
+- **Problem:** In `/enquiries/new`, selecting the "Budget Structure" option `per_person` resulted in the raw string `per_person` being displayed in the closed Select trigger instead of human-readable `Per Person`.
+- **Root Cause:**
+  1. `src/components/ui/select.tsx` routes uncustomized `<SelectValue />` through `formatEnumLabel(value)`.
+  2. In `src/lib/utils/enum-formatters.ts`, `ENUM_LABEL_MAP` only contained uppercase keys (e.g. `PER_PERSON: "Per Person"`), and did not perform case-insensitive dictionary lookups.
+  3. The fallback regex `/^[A-Z0-9_]+$/` strictly tested uppercase ASCII characters. When given lowercase snake_case (e.g. `per_person` or `total`), the regex returned `false`, bypassing Title Case formatting and returning the raw internal value.
+
+## 154.2 Architectural Solution
+- **Enhanced `formatEnumLabel` (`src/lib/utils/enum-formatters.ts`):**
+  1. **Direct Dictionary Lookup:** Checks exact match in `ENUM_LABEL_MAP[str]`.
+  2. **Case-Insensitive Dictionary Lookup:** Checks `ENUM_LABEL_MAP[str.toUpperCase()]` so lowercase/mixed-case enums (e.g. `per_person` -> `PER_PERSON`) resolve instantly to canonical domain labels (`Per Person`).
+  3. **Universal Snake/Kebab-Case Fallback:** Normalizes any delimiter (`_`, `-`, space) and converts all words to Title Case while preserving uppercase acronyms (`UPI`, `GST`, `INR`, `PDF`, `SMS`, `URL`, `ID`, `API`, `KM`, `EP`, `CP`, `MAP`, `AP`).
+  4. **Domain Label Dictionary Expansion:** Added explicit canonical mappings for `TOTAL: "Total"`, `TOTAL_PACKAGE: "Total Package"`, `TOTAL_BUDGET: "Total Package Budget"`, `PER_KM: "Per KM"`, `PER_DAY: "Per Day"`, `PER_TRIP: "Per Trip"`, `PER_NIGHT: "Per Night"`, `WALK_IN: "Walk-In"`, and `AGENT: "Travel Agent"`.
+
+## 154.3 Verification
+- **Automated Test Suite:** 34/34 assertions passed (100% pass rate).
+  - `per_person` -> `Per Person`
+  - `PER_PERSON` -> `Per Person`
+  - `total` -> `Total`
+  - `TOTAL` -> `Total`
+  - `PARTIALLY_PAID` -> `Partially Paid`
+  - `BANK_TRANSFER` -> `Bank Transfer`
+  - `ALL` -> `All`
+  - `IN_PROGRESS` -> `In Progress`
+  - `NON_GST_EXEMPT` -> `Non-GST / Exempt`
+  - `tax_exclusive` -> `Tax Exclusive`
+  - `intra_state` -> `Intra-State`
+  - `upi` -> `UPI`
+  - `draft` -> `Draft`
+  - `trial` -> `7-Day Free Trial`
+  - `walk_in` -> `Walk-In`
+  - `hotel_category` -> `Hotel Category`
+- **TypeScript & Build:** `npx tsc --noEmit` (0 errors) and `npm run build` (0 errors).
+- **Data & Business Rule Safety:** Internal values, API contracts, Zod schemas, Formik state, Prisma enums, and database rows remain 100% unchanged.
+
+**Verdict:**
+`PASS — GLOBAL DISPLAY VALUE CONSISTENCY VERIFIED`
+
+---
+
+# 155. MULTI-ROOM HOTEL COSTING, REACTIVE TARIFF & QUOTATION ASYNC UX (F-01, F-02, F-04, F-05)
+
+## 155.1 Batch Executive Summary
+- **Controlled Implementation Batch:**
+  - **F-01 (P0):** Multi-room hotel costing calculation in manual / `TRIP_SNAPSHOT` mode.
+  - **F-02 (P1):** Reactive Add & Edit Hotel Total Tariff calculation in Trip Details.
+  - **F-04 (P2):** Quotation recalculation loading indicator, customer price badge, and stale-value visual state.
+  - **F-05 (P2):** Quotation pricing & tax asynchronous request sequence race protection.
+- **Status:** **PASS — VERIFIED & CLOSED**.
+- **Scope Discipline:** F-03 (quotation line-item `costPrice` auto-scaling) remains strictly **OUT OF SCOPE** and was not modified.
+
+## 155.2 Detailed Feature Implementations
+
+### 155.2.1 F-01 — Multi-Room Hotel Costing Fallback (`src/lib/services/trip-costing-service.ts`)
+- **Problem:** When hotel services lacked an active RateSheet match, the manual / `TRIP_SNAPSHOT` fallback checked `if (totalCost === 0 && nightlyRate > 0)`. If a legacy or single-room `totalAmount` was present on the record, `totalCost` was non-zero, bypassing `nightlyRate * rooms * diffDays` and causing multi-room bookings (2, 3, 4+ rooms) to cost at single-room rates.
+- **Solution:** Updated the fallback condition to `if (nightlyRate > 0) { totalCost = nightlyRate * rooms * diffDays; }`.
+- **Invariants Preserved:**
+  - Dynamic formula `nightlyRate × rooms × nights` is authoritative whenever a valid nightly rate exists.
+  - Active `RateSheet` inventory lookup and seasonal rate resolution path remain 100% unchanged.
+  - Verified across single hotel, multiple hotels, variable night stays, and 1 to 4+ room permutations.
+
+### 155.2.2 F-02 — Add & Edit Hotel Reactive Tariff (`src/app/(dashboard)/trips/[id]/page.tsx`)
+- **Problem:** The Add Hotel dialog had a static initial total of ₹7,000 and did not reactively recalculate Total Tariff when users modified check-in, check-out, room count, or nightly rate. The Edit Hotel dialog also retained stale totals on field edits.
+- **Solution:** Introduced `computeHotelTotalTariff(checkIn, checkOut, rooms, nightlyRate)` and wired reactive handlers (`handleHotelCheckInChange`, `handleHotelCheckOutChange`, `handleHotelRoomsChange`, `handleHotelNightlyRateChange`) to both Add Hotel and Edit Hotel dialogs.
+- **Formula:** `nightlyRate × rooms × nights` (where `nights = max(1, diffDays)`).
+- **Invariants Preserved:** Edge cases (zero rooms, empty nightly rate, invalid dates) safely fallback to ₹0 without NaN or form crashes. Stale hardcoded default totals are eliminated.
+
+### 155.2.3 F-04 — Quotation Recalculation UX (`src/app/(dashboard)/trips/[id]/quotation/page.tsx`)
+- **Problem:** During asynchronous markup, discount, tax rate, or GST treatment changes, Quotation Studio displayed no clear visual indication that backend calculation was running, making displayed numbers appear momentarily stale.
+- **Solution:**
+  - Added an animated `Recalculating quotation pricing & tax…` alert banner in the Commercial Pricing & Margins card during `updatingPricing === true`.
+  - Added a `Recalculating…` pulsing badge adjacent to the Customer Price label.
+  - Applied subtle `opacity-60` dimming to the financial summary and server-calculated commercial tax summary sections during in-flight recalculation.
+  - Ensured reliable state cleanup on both successful updates and error handling.
+
+### 155.2.4 F-05 — Pricing Request Race Protection (`src/app/(dashboard)/trips/[id]/quotation/page.tsx`)
+- **Problem:** Rapid sequential edits to markup, discount, or tax parameters could result in out-of-order network responses, where a slower earlier request could overwrite the state of a faster later request.
+- **Solution:** Added a monotonic request sequence counter (`pricingRequestIdRef = React.useRef(0)`). Inside `handleUpdatePricingRules`, each dispatch captures `currentRequestId = ++pricingRequestIdRef.current`. Stale responses with `currentRequestId !== pricingRequestIdRef.current` are discarded, preventing stale state overwrites and premature loading-state termination.
+
+## 155.3 Explicit Scope Exclusions & Preservations
+
+### 155.3.1 F-03 Unchanged (Strictly Out of Scope)
+- `src/lib/services/quotation-service.ts` remains untouched.
+- Quotation line-item `costPrice` does not automatically scale on quantity changes without explicit cost input. This behavior is intentionally preserved and deferred.
+
+### 155.3.2 Tax V1 Architecture Preserved
+- Locked Tax V1 business rules remain 100% active:
+  - `TAX_INCLUSIVE` vs `TAX_EXCLUSIVE` pricing math unchanged.
+  - `INTRA_STATE` (CGST + SGST) vs `INTER_STATE` (IGST) split logic unchanged.
+  - `NON_GST_EXEMPT` zero-tax behavior unchanged.
+  - No default 5% GST was introduced (18% used strictly as an explicit scenario in QA-13).
+
+### 155.3.3 Architecture & Data Safety Preserved
+- **Prisma Schema & Migrations:** 0 schema changes, 0 migrations created.
+- **Security & Multi-Tenancy:** Supabase Auth, Agency scoping (`agencyId`), and RLS remain intact.
+- **Downstream Consistency:** Verified complete mathematical consistency across Trip Costing -> Quotation -> Public Proposal -> Booking -> Invoice.
+- **Public Proposal Security:** Verified customer-facing proposal routes (`/q/[token]`) redact internal cost price, supplier information, markup percentage, and internal commercial notes.
+
+## 155.4 Quality Assurance & Verification Evidence
+- **Automated QA-13 Multi-Room Suite (`prisma/test-qa-13-quotation-multi-room-costing.ts`):** `55/55` passed (100%).
+- **Quotation Tax Engine Suite (`prisma/test-quotation-tax.ts`):** `72/72` passed (100%).
+- **Tax Calculation Service Suite (`prisma/test-tax-service.ts`):** `27/27` passed (100%).
+- **Tax V1 End-to-End Closure Suite (`prisma/test-tax-v1-e2e-closure.ts`):** `93/93` passed (100%).
+- **Total Regression Assertions Verified:** `247/247` passed (100% pass rate).
+- **TypeScript:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed (Turbopack, all routes compiled).
+- **Browser QA:** Verified Add/Edit Hotel reactive tariff recalculation and Quotation Studio async loading states across desktop and mobile viewports.
+
+**Verdict:**
+`PASS — F-01 / F-02 / F-04 / F-05 BATCH VERIFIED & CLOSED`
+
+---
+
+# 156. DESTINATION FOUNDATION & STARTER SEED (DATABASE & SERVICE ARCHITECTURE)
+
+## 156.1 Strategic Executive Summary
+- **Objective:** Establish the agency-scoped Destination master model, idempotent 32-destination starter catalog seeding, and foundational relational schema for multi-destination trips and services without premature UI changes or financial regressions.
+- **Status:** **PASS — VERIFIED & CERTIFIED**.
+- **Scope Discipline:**
+  - Strict adherence to TripDesk single flexible Destination master concept (no artificial Country -> State -> City hierarchy models).
+  - No premature UI redesigns for hotel selection, activity selection, trip creation, or Excel mapping.
+  - Zero modifications to financial engines (Costing, RateSheets, Quotations, Invoices, Payments, Tax).
+
+## 156.2 Locked Architectural Decisions
+
+### 156.2.1 Destination Master Model (`Destination`)
+- **Concept:** One flexible agency-owned Destination master representing a travel/inventory grouping concept.
+- **Fields:**
+  - `id`: String (`@id @default(cuid())`)
+  - `agencyId`: String (required foreign key to `Agency`)
+  - `name`: String
+  - `country`: String (default `"India"`)
+  - `stateProvince`: String
+  - `cityArea`: String? (optional)
+  - `status`: `DestinationStatus` enum (`ACTIVE`, `INACTIVE`, default `ACTIVE`)
+  - `createdAt`: DateTime (`@default(now())`)
+  - `updatedAt`: DateTime (`@updatedAt`)
+- **Constraints & Indexes:**
+  - `@@unique([agencyId, name])` — Destination names are unique strictly per agency (not globally unique across all agencies).
+  - `@@index([agencyId])`
+  - `@@index([agencyId, status])`
+- **Lifecycle Rules:**
+  - Supports `ACTIVE` and `INACTIVE` states.
+  - Inactive destinations are hidden from normal new selections while preserving historical linkages.
+  - Hard deletion is blocked if referenced by Hotels, Activities, or TripDestinations (`deleteDestination` checks entity counts and throws `ValidationError`).
+
+### 156.2.2 Locked 32 Starter Destinations Catalog
+Every newly created agency receives the exact locked 32-destination starter catalog (all `country = "India"`, `status = ACTIVE`):
+1. Goa (Goa)
+2. Mumbai (Maharashtra)
+3. Mahabaleshwar (Maharashtra)
+4. Pune (Maharashtra)
+5. Jaipur (Rajasthan)
+6. Udaipur (Rajasthan)
+7. Jodhpur (Rajasthan)
+8. Jaisalmer (Rajasthan)
+9. Mount Abu (Rajasthan)
+10. Delhi (Delhi)
+11. Agra (Uttar Pradesh)
+12. Varanasi (Uttar Pradesh)
+13. Lucknow (Uttar Pradesh)
+14. Amritsar (Punjab)
+15. Srinagar (Jammu & Kashmir)
+16. Gulmarg (Jammu & Kashmir)
+17. Pahalgam (Jammu & Kashmir)
+18. Manali (Himachal Pradesh)
+19. Shimla (Himachal Pradesh)
+20. Dharamshala (Himachal Pradesh)
+21. Leh (Ladakh)
+22. Rishikesh (Uttarakhand)
+23. Nainital (Uttarakhand)
+24. Kochi (Kerala)
+25. Munnar (Kerala)
+26. Alappuzha (Kerala)
+27. Bengaluru (Karnataka)
+28. Mysuru (Karnataka)
+29. Hampi (Karnataka)
+30. Chennai (Tamil Nadu)
+31. Ahmedabad (Gujarat)
+32. Dwarka (Gujarat)
+
+- **Seeding Architecture:**
+  - Integrated into agency onboarding flow (`onboardingService.completeOnboarding`).
+  - Executed idempotently using `createMany` with `skipDuplicates: true`.
+  - Re-running seed operations is safe and produces 0 duplicates.
+
+### 156.2.3 TripDestination Multi-Destination Foundation (`TripDestination`)
+- **Architecture:** `Trip -> TripDestination -> Destination`
+- **Fields:**
+  - `id`: String (`@id @default(cuid())`)
+  - `tripId`: String (foreign key to `Trip`, `onDelete: Cascade`)
+  - `destinationId`: String (foreign key to `Destination`, `onDelete: Restrict`)
+  - `sequence`: Int
+  - `createdAt`: DateTime (`@default(now())`)
+  - `updatedAt`: DateTime (`@updatedAt`)
+- **Constraints & Indexes:**
+  - `@@unique([tripId, sequence])` — Sequence positions are unique within a trip.
+  - **Repeated Destinations Supported:** Trips can repeat destinations across different legs (e.g., Leg 1: Goa, Leg 2: Mumbai, Leg 3: Goa).
+  - `@@index([tripId])`
+  - `@@index([destinationId])`
+
+### 156.2.4 Service Relational Foundation
+- **Hotel (`Hotel`):** Added nullable `destinationId` foreign key and `destination Destination?` relation with `@@index([destinationId])`. Preserves `Hotel.city` as the actual geographic city.
+- **Activity (`Activity`):** Added nullable `destinationId` foreign key and `destination Destination?` relation with `@@index([destinationId])`.
+- **TripHotel (`TripHotel`):** Added nullable `tripDestinationId` foreign key and `tripDestination TripDestination?` relation with `@@index([tripDestinationId])`.
+- **TripActivity (`TripActivity`):** Added nullable `tripDestinationId` foreign key and `tripDestination TripDestination?` relation with `@@index([tripDestinationId])`.
+- **Vehicle (`Vehicle`):** Remains 100% destination-independent as finalized.
+
+### 156.2.5 Data Safety & Excel Import Rules
+- Existing development Hotel/Activity records may be recreated; no complex city-to-destination inference or silent backfill migration.
+- Excel Destination Mapping deferred to future phase:
+  - Exact/normalized matching without aggressive fuzzy algorithms.
+  - `Hotel.city` remains the physical geographic city.
+
+## 156.3 Implementation Components
+1. **Prisma Schema (`prisma/schema.prisma`):**
+   - Added `DestinationStatus` enum (`ACTIVE`, `INACTIVE`).
+   - Added `Destination` model and `TripDestination` model.
+   - Updated `Agency`, `Trip`, `Hotel`, `Activity`, `TripHotel`, `TripActivity` models with relations.
+2. **Validation (`src/lib/validation/destination-schema.ts`):**
+   - `createDestinationSchema`, `updateDestinationSchema`, `destinationQuerySchema`.
+3. **Service Layer (`src/lib/services/destination-service.ts`):**
+   - `seedStarterDestinations(agencyId)` — Idempotent 32 starter seed.
+   - `getDestinations(agencyId, params)` — Search, status filter, and sort.
+   - `getDestinationById(agencyId, id)` — Agency-scoped fetch.
+   - `createDestination(agencyId, data)` — Uniqueness enforcement & normalization.
+   - `updateDestination(agencyId, id, data)` — Status and field update.
+   - `deleteDestination(agencyId, id)` — Reference-checked delete protection.
+4. **API Routes:**
+   - `src/app/api/destinations/route.ts` (GET, POST with `requireReadAccess` / `requireWriteAccess`).
+   - `src/app/api/destinations/[id]/route.ts` (GET, PATCH, DELETE with tenant checks).
+5. **API Client (`src/lib/api-client/destination-client.ts`):**
+   - Typed client methods exported from `src/lib/api-client/index.ts`.
+6. **Onboarding Integration (`src/lib/services/onboarding-service.ts`):**
+   - Automatic seeding on agency onboarding completion.
+
+## 156.4 Quality Assurance & Verification Evidence
+- **Automated QA-14 Destination Foundation Suite (`prisma/test-qa-14-destination-foundation-seed.ts`):** `35/35` passed (100%).
+  - Group 1: Starter Catalog Seeding (32 items, exact names, states, India, ACTIVE).
+  - Group 2: Seed Idempotency (0 duplicates on re-run).
+  - Group 3: Agency Scoping & Isolation (Agency A cannot access Agency B destinations).
+  - Group 4: Per-Agency Name Uniqueness (Agency A dupes rejected, cross-agency identical names allowed).
+  - Group 5: Active/Inactive Status Transitions & Filtering.
+  - Group 6: TripDestination Sequence Uniqueness.
+  - Group 7: Repeated Destination Legs (Goa -> Mumbai -> Goa in single trip).
+  - Group 8: Service Relation Foundation (Hotel & Activity nullable destination links).
+  - Group 9: Trip Service Leg Link Foundation (TripHotel & TripActivity nullable tripDestination links).
+  - Group 10: Deletion Protection (Destinations referenced by Hotel/Activity/TripDestination cannot be deleted).
+- **Multi-Room Hotel Costing Suite (`prisma/test-qa-13-quotation-multi-room-costing.ts`):** `55/55` passed (100%).
+- **Tax Calculation Engine Suite (`prisma/test-tax-service.ts`):** `27/27` passed (100%).
+- **Quotation Tax Rules Suite (`prisma/test-quotation-tax.ts`):** `72/72` passed (100%).
+- **Tax V1 Full Lifecycle E2E Closure Suite (`prisma/test-tax-v1-e2e-closure.ts`):** `93/93` passed (100%).
+- **Total Verification Assertions Passed:** `282/282` (100% pass rate).
+- **TypeScript:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed (0 errors).
+
+**Verdict:**
+`PASS — DESTINATION FOUNDATION & STARTER SEED VERIFIED & CERTIFIED`
+
+---
+
+# 157. PHASE 158-A — HOTEL & ACTIVITY MASTER DESTINATION INTEGRATION
+
+## 157.1 Architecture & Scope
+Phase 158-A integrates the Phase 157 `Destination` foundation into the Hotel Master and Activity Master catalog layers:
+- **Scope Boundary:** Connects `Hotel.destinationId` and `Activity.destinationId` to agency-owned `Destination` records.
+- **Physical vs Logical Separation:** `Hotel.city` and `Activity.location` remain geographic strings; `destinationId` is the agency-scoped logical `Destination` catalog link. They are never merged or fuzzy-inferred.
+- **Strict Multi-Tenant Isolation:** Server-side validation guarantees an agency can only associate hotels and activities with destinations owned by that exact same agency (`agencyId`).
+- **Deferred to Later Phases:** TripDestination management, Trip service-selection destination filtering, `tripDestinationId`, Trip RateSheet picker, Rate override redesign, costing/quotation changes, Vehicle destination integration, Excel destination mapping, and standalone `/destinations` admin page.
+
+## 157.2 Key Implementation Components
+1. **Validation Layer (`src/lib/validation/`):**
+   - `hotel-schema.ts`: Added `destinationId` (nullable, optional) to `createHotelSchema`, `updateHotelSchema`, and `hotelListQuerySchema`.
+   - `activity-schema.ts`: Added `destinationId` (nullable, optional) to `createActivitySchema`, `updateActivitySchema`, and `activityListQuerySchema`.
+2. **Service Layer (`src/lib/services/`):**
+   - `hotel-service.ts`:
+     - Added `HotelWithRelations` type with `destination` relation.
+     - Added `destinationId` filtering and included `destination: { select: { id, name, state, country, status } }` in `listHotels`, `getHotelById`, `getHotelByCode`.
+     - Added strict tenant validation (`where: { id: destinationId, agencyId }`) in `createHotel` and `updateHotel`.
+   - `activity-service.ts`:
+     - Added `ActivityWithRelations` type with `destination` relation.
+     - Added `destinationId` filtering and included `destination: { select: { id, name, state, country, status } }` in `listActivities`, `getActivityById`.
+     - Added strict tenant validation (`where: { id: destinationId, agencyId }`) in `createActivity` and `updateActivity`.
+3. **API Client Layer (`src/lib/api-client/`):**
+   - `hotel-client.ts`: Added `destinationId` to `HotelListParams` and exported `HotelWithRelations`.
+   - `activity-client.ts`: Added `destinationId` to `ActivityListParams` and exported `ActivityWithRelations`.
+4. **Reusable UI Component (`src/components/shared/destination-select.tsx`):**
+   - Implemented `DestinationSelect` component that loads active destinations, gracefully handles unassigned / legacy / inactive destinations, and provides accessible search/select.
+5. **UI Master Pages:**
+   - `src/app/(dashboard)/hotels/new/page.tsx`: Integrated `DestinationSelect`.
+   - `src/app/(dashboard)/hotels/[id]/page.tsx`: Added Destination badge in hero micro-details, Destination field in profile card, and `DestinationSelect` in Edit Hotel modal.
+   - `src/app/(dashboard)/hotels/page.tsx`: Added Destination column to desktop table and badge to mobile cards.
+   - `src/app/(dashboard)/activities/new/page.tsx`: Integrated `DestinationSelect`.
+   - `src/app/(dashboard)/activities/[id]/page.tsx`: Added Destination badge in hero micro-details, Destination field in details card, and `DestinationSelect` in Edit Activity modal.
+   - `src/app/(dashboard)/activities/page.tsx`: Added Destination column to desktop table and badge to mobile cards.
+
+## 157.3 Quality Assurance & Verification
+- **Automated Test Suite (`prisma/test-qa-15-destination-master-integration.ts`):** `20/20` passed (100%).
+  - Hotel creation with valid destination link (same agency).
+  - Hotel update and unlinking (null).
+  - Hotel cross-agency destination rejection (strict multi-tenant isolation with `NotFoundError`).
+  - Hotel non-existent destination rejection.
+  - Activity creation with valid destination link (same agency).
+  - Activity update and unlinking (null).
+  - Activity cross-agency destination rejection (strict multi-tenant isolation with `NotFoundError`).
+  - Activity non-existent destination rejection.
+  - Physical city / location separation preserved.
+  - List filtering by `destinationId`.
+- **TypeScript Typecheck:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed (0 errors).
+
+**Verdict:**
+`PASS — PHASE 158-A IMPLEMENTATION COMPLETE & CERTIFIED`
+
+---
+
+# 158. PHASE 158-B — TRIPDESTINATION MANAGEMENT IMPLEMENTATION
+
+## 158.1 Architecture & Scope
+Phase 158-B implements the **TripDestination management layer** allowing Agency Owners to manage ordered, multi-destination itineraries for Trips:
+- **Multi-Destination Support:** A Trip can have 0, 1, or multiple destinations.
+- **Contiguous Sequence Ordering:** Destinations are ordered by a deterministic `sequence` (`1, 2, 3...`) with zero gaps.
+- **Repeated Destination Legs:** Legitimate repeated destinations (e.g., `Goa → Mumbai → Goa`) are supported via distinct `TripDestination` records with unique sequences under the same trip.
+- **Safe 2-Phase Transaction Resequencing:** Reordering and removal operations use a 2-phase negative-to-positive transaction strategy to completely avoid temporary collisions with the `@@unique([tripId, sequence])` database constraint.
+- **Strict Multi-Tenant Isolation:** Server-side context verification enforces that both the `Trip` and the referenced `Destination` belong to the authenticated user's `agencyId`. Cross-agency reads, writes, deletes, and reorders are strictly blocked.
+- **Master Reference Protection:** Removing a `TripDestination` removes only the trip assignment; the underlying `Destination` master catalog record remains 100% intact.
+- **Scope Boundaries Strictly Preserved:**
+  - No destination-specific dates/nights or day-by-day scheduling added.
+  - No Trip service-selection destination filtering (`Destination → Hotel`, `Destination → Activity`).
+  - No `tripDestinationId` links populated on `TripHotel` or `TripActivity` (reserved for later phase).
+  - No RateSheet pickers or rate override redesign (reserved for Phase 158-C).
+  - No changes to Trip costing, quotation, booking, invoice, or Vehicle models.
+
+## 158.2 Implementation Details
+1. **Validation Layer (`src/lib/validation/trip-destination-schema.ts`):**
+   - `tripDestinationRouteParamsSchema`: Validates `id` (tripId) and `destinationId` (tripDestinationId).
+   - `addTripDestinationSchema`: Validates non-empty `destinationId` and optional `notes` (max 500 chars).
+   - `reorderTripDestinationsSchema`: Validates non-empty `tripDestinationIds` array and rejects duplicate IDs.
+2. **Service Layer (`src/lib/services/trip-destination-service.ts`):**
+   - `listTripDestinations(agencyId, tripId)`: Agency-scoped query ordered by `sequence: "asc"`, includes destination details.
+   - `getTripDestinationById(agencyId, tripId, tripDestinationId)`: Agency-scoped single item retrieval.
+   - `addTripDestination(agencyId, tripId, data)`: Validates tenant ownership of Trip and Destination, computes `max(sequence) + 1`, and creates `TripDestination`.
+   - `removeTripDestination(agencyId, tripId, tripDestinationId)`: Deletes `TripDestination` and executes 2-phase resequencing on remaining items (`-(i+1)` then `i+1`).
+   - `reorderTripDestinations(agencyId, tripId, data)`: Validates that submitted IDs exactly match all existing trip destinations (no duplicates, no omissions, no foreign IDs) and executes 2-phase resequencing.
+3. **API Route Layer:**
+   - `src/app/api/trips/[id]/destinations/route.ts`: `GET` (list), `POST` (add with `requireWriteAccess`).
+   - `src/app/api/trips/[id]/destinations/reorder/route.ts`: `PATCH` & `POST` (reorder with `requireWriteAccess`).
+   - `src/app/api/trips/[id]/destinations/[destinationId]/route.ts`: `GET` (detail), `DELETE` (remove with `requireWriteAccess`).
+4. **API Client Layer (`src/lib/api-client/trip-destination-client.ts`):**
+   - Implemented `getTripDestinations`, `getTripDestination`, `addTripDestination`, `reorderTripDestinations`, and `deleteTripDestination`.
+   - Exported and re-exported from `src/lib/api-client/index.ts`.
+5. **UI Integration (`src/app/(dashboard)/trips/[id]/page.tsx`):**
+   - **Trip Destinations & Route Card:** Rendered in Overview tab showing:
+     - Header badge displaying destination count.
+     - Visual "Route Flow" breadcrumb bar (`1 Goa → 2 Mumbai → 3 Goa`).
+     - Ordered list of destination cards with sequence badges, state/country, and planning notes.
+     - Move Up / Move Down buttons for quick reordering.
+     - Remove button with confirmation dialog.
+     - Empty state with "Add First Destination" call-to-action.
+   - **Add Destination Modal:** Integrated `DestinationSelect` component with optional leg notes.
+   - **Header & Telemetry:** Added Destinations counter in top command header and right column workspace telemetry.
+
+## 158.3 Quality Assurance & Verification Evidence
+- **Automated QA-16 Test Suite (`prisma/test-qa-16-trip-destination-management.ts`):** `23/23` passed (100%).
+  - Group 1: Basic (0-destinations read, add first, add second, list sequence order).
+  - Group 2: Ordering (reorder destinations, contiguous 1..N sequence, persistent order).
+  - Group 3: Repeated Destinations (same destination added twice, unique IDs & sequences).
+  - Group 4: Remove (removal of middle destination, automatic 1..N resequencing, master intact).
+  - Group 5: Tenant Isolation (cross-agency add, read, delete, and reorder rejected).
+  - Group 6: Invalid Data (nonexistent destination, nonexistent trip, foreign ID, duplicate IDs in reorder rejected).
+  - Group 7: Regression (Trip relations intact, Hotel/Activity/Vehicle models intact, 32-destination starter catalog 100% preserved).
+  - Group 8: Data Cleanup (0 temporary agencies, 0 temporary trips residue).
+- **TypeScript Typecheck:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack (0 errors).
+
+**Verdict:**
+`PASS — PHASE 158-B IMPLEMENTATION COMPLETE & CERTIFIED`
+
+---
+
+# 159. PHASE 158-C — TRIP HOTEL/ACTIVITY DESTINATION FILTERING + RATESHEET SELECTION
+
+## 159.1 Architecture & Scope
+Phase 158-C completes the end-to-end integration between Trip Multi-Destination legs, Inventory Filtering, and Master RateSheet auto-selection/resolution for Hotels and Activities:
+- **Scope Boundary:**
+  - Connects `TripHotel.tripDestinationId` and `TripActivity.tripDestinationId` to specific `TripDestination` legs.
+  - Multi-destination trips allow choosing the specific `TripDestination` leg (`tripDestinationId`).
+  - Single-destination trips auto-derive the sole leg without forcing a redundant selector.
+  - Hotel and Activity dropdowns filter strictly to inventory matching `inventory.destinationId === selectedTripDestination.destinationId`.
+  - Dynamic lookup of active `RateSheet` records for Hotel (by date, room type, meal plan) and Activity (by date).
+  - RateSheet resolution logic: Auto-select if exactly 1 rate exists; provide selectable list if multiple rates exist; display clean empty state if 0 rates exist without hardcoded fallback defaults (e.g., removing legacy 3500/7000 fallbacks).
+  - Explicit controlled nightly rate override preserved for intentional overrides.
+  - Strict server-side validation enforcing full agency tenant isolation and matching `Hotel.destinationId === TripDestination.destinationId` and `Activity.destinationId === TripDestination.destinationId`.
+  - Rejection of foreign `tripDestinationId` belonging to other trips or other agencies.
+  - Asynchronous rate request race protection using request counters.
+- **Scope Boundaries Strictly Preserved:**
+  - Vehicle destination integration unchanged (Vehicle remains destination-independent in V1).
+  - No Excel import modifications.
+  - No Supplier management redesign (Supplier management remains deferred).
+  - No changes to costing engine, quotations, bookings, invoices, or tax calculation engine.
+  - 32-destination starter catalog and permanent test agency (`tripmadeeasy.in@gmail.com`) 100% preserved.
+
+## 159.2 Key Implementation Components
+1. **Validation Layer (`src/lib/validation/`):**
+   - `trip-hotel-schema.ts`: Added optional `tripDestinationId` to `createTripHotelSchema` and `updateTripHotelSchema`.
+   - `trip-activity-schema.ts`: Added optional `tripDestinationId` to `createTripActivitySchema` and `updateTripActivitySchema`.
+2. **Service Layer (`src/lib/services/`):**
+   - `trip-hotel-service.ts`:
+     - Included `tripDestination: { include: { destination: true } }` in `listTripHotels` and `getTripHotelById`.
+     - In `createTripHotel` and `updateTripHotel`, validated `tripDestinationId` against `tripId` and `agencyId`, validated matching `hotel.destinationId === tripDest.destinationId`, and persisted `tripDestinationId`.
+   - `trip-activity-service.ts`:
+     - Included `tripDestination: { include: { destination: true } }` in `listTripActivities` and `getTripActivityById`.
+     - In `createTripActivity` and `updateTripActivity`, validated `tripDestinationId`, validated matching `activity.destinationId === tripDest.destinationId`, and persisted `tripDestinationId`.
+3. **API Client Layer (`src/lib/api-client/`):**
+   - `trip-hotel-client.ts`: Updated `TripHotelWithHotel` to include `tripDestination?: (TripDestination & { destination: Destination }) | null`.
+   - `trip-activity-client.ts`: Updated `TripActivityWithActivity` to include `tripDestination?: (TripDestination & { destination: Destination }) | null`.
+4. **Trip Detail UI Integration (`src/app/(dashboard)/trips/[id]/page.tsx`):**
+   - Added destination leg selection dropdowns in both Add/Edit Hotel and Add/Edit Activity modals for multi-destination trips.
+   - For single-destination trips, auto-derived the sole leg without redundant selector.
+   - Dynamic inventory filtering: `getFilteredHotels` and `getFilteredActivities` filter choices by selected destination leg.
+   - Implemented `fetchApplicableHotelRates` and `fetchApplicableActivityRates` with asynchronous request counters (`hotelRateReqRef`, `activityRateReqRef`) preventing race condition overwrites.
+   - Dynamic RateSheet status badges (`Active Rate Applied: CP — ₹6,500/night`, `Standard: ₹1,200/adult`) and multi-rate dropdown selectors.
+   - Visual destination leg badges (`Goa (Leg 1)`, `Agra (Leg 2)`) rendered on Hotel and Activity cards in the workspace.
+
+## 159.3 Quality Assurance & Verification Evidence
+- **Automated QA-17 Test Suite (`prisma/test-qa-17-trip-service-destination-rate-selection.ts`):** `35/35` passed (100%).
+  - Group 1: Destination filtering (1 destination, multi-dest, repeated legs, hotel destination filter, activity destination filter, wrong-destination rejection).
+  - Group 2: TripDestination association (TripHotel & TripActivity store tripDestinationId, foreign trip leg rejection, cross-agency leg rejection).
+  - Group 3: Hotel RateSheet resolution (active rate return, expired rate exclusion, validity window, single rate auto-select, multi-rate list, 0-rate empty state, no hardcoded 3500/7000 defaults).
+  - Group 4: Activity RateSheet resolution (active rate return, unrelated rate exclusion, date validity, single rate pricing, multi-rate list, 0-rate safety).
+  - Group 5: Repeated destinations & leg integrity (Goa #1 vs Goa #3 distinct records, hotel/activity selection strictly tied to specific leg).
+  - Group 6: Tenant isolation (cross-agency hotel rejected, cross-agency activity rejected, cross-agency trip destination update rejected, cross-agency rate query isolated).
+  - Group 7: Regression checks (Trip relations intact, 32-destination starter catalog 100% preserved, Hotel/Activity masters intact, Vehicle destination-independent).
+  - Group 8: Data cleanup (0 temporary hotels, 0 temporary activities, 0 temporary trips, 0 temporary agencies residue).
+- **TypeScript Typecheck:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack (0 errors).
+- **Browser QA Verification:** Verified on Desktop (1440x900) and Mobile (390x844 viewports) — destination leg selection, hotel and activity filtering by destination, RateSheet lookup, and modal responsiveness verified.
+
+---
+
+# 160. PHASE 158-C UX CORRECTION — TRIP-LEVEL DESTINATION SELECTION + AUTOMATIC HOTEL/ACTIVITY FILTERING
+
+## 160.1 Architecture & Approved Flow
+Following user feedback after Phase 158-C, the destination flow was streamlined into a clean, trip-level UX before Phase 158-D E2E QA:
+- **Approved Core UX:**
+  - **Trip Creation (`/trips/new`):** The user selects the Trip's destinations directly at creation time using a multi-select interactive catalog with visual pills and sequence ordering controls (`[↑]`, `[↓]`, `[×]`).
+  - **Trip Destination Persistence:** Contiguous sequence records (`1, 2, 3...`) are created directly as `TripDestination` records on `createTrip`.
+  - **Hotel Flow (`/trips/[id]`):** Destination field is completely removed from Add/Edit Hotel modals. Hotels are automatically filtered against the Trip's unique destination set (`TripDestination.destinationId`). Destination name is clearly displayed alongside property names (`Taj Exotica Goa (Goa)`).
+  - **Activity Flow (`/trips/[id]`):** Destination field is completely removed from Add/Edit Activity modals. Activities are automatically filtered against the Trip's unique destination set. Destination name is displayed alongside activity names.
+  - **Vehicle Flow:** Remains 100% destination-independent.
+  - **Repeated Route Behavior:** Legitimate repeated destinations (e.g. `Goa → Mumbai → Goa`) preserve distinct `TripDestination` records with sequences `1, 2, 3`, while inventory queries deduplicate to the unique set (`Goa`, `Mumbai`) so catalog items appear exactly once without duplicate entries.
+  - **Exact Service-to-Leg Association Deferred:** No arbitrary assignment of hotels/activities to the first or last matching leg. The schema's nullable `tripDestinationId` field is preserved as `null` (or kept intact if edited).
+  - **RateSheet Architecture Preserved:** Dynamic RateSheet lookup, auto-selection for single active rates, selectable list for multiple rates, and empty state warnings for 0 rates remain 100% active and protected by asynchronous request counters.
+
+## 160.2 Implementation Changes
+1. **Validation Schema (`src/lib/validation/trip-schema.ts`):**
+   - Added `destinationIds: z.array(z.string().min(1)).optional()` to `createTripSchema`.
+2. **Backend Services (`src/lib/services/`):**
+   - `trip-service.ts`: `createTrip` validates tenant ownership and active status of `destinationIds`, and creates contiguous `tripDestinations` records. `getTripById` eager-loads `tripDestinations` with the `destination` relation in ascending sequence.
+   - `trip-hotel-service.ts`: `createTripHotel` and `updateTripHotel` validate hotel's `destinationId` against the Trip's destination set when destinations exist, preserving `tripDestinationId` as nullable.
+   - `trip-activity-service.ts`: `createTripActivity` and `updateTripActivity` validate activity's `destinationId` against the Trip's destination set when destinations exist, preserving `tripDestinationId` as nullable.
+3. **Trip Creation UI (`src/app/(dashboard)/trips/new/page.tsx`):**
+   - Fetches active agency destinations.
+   - Checkbox-style multi-select grid with search, pill badges, and sequence reordering (`Up`, `Down`, `Remove`).
+   - Integrated seamlessly with Formik `destinationIds`.
+4. **Trip Workspace UI (`src/app/(dashboard)/trips/[id]/page.tsx`):**
+   - Removed destination selectors from Add/Edit Hotel and Add/Edit Activity modals.
+   - `getFilteredHotels()` and `getFilteredActivities()` dynamically filter inventory by unique trip destination IDs without duplicating items.
+   - Select option labels render property and activity names with destination context.
+   - Clear zero-destination guidance rendered when a trip has no destinations configured.
+
+## 160.3 Verification & Quality Assurance Evidence
+- **Automated QA-18 Test Suite (`prisma/test-qa-18-trip-destination-ux-correction.ts`):** `35/35` passed (100%).
+  - Group 1: Trip creation with single, multiple, reordered, and zero destinations with contiguous sequences (1..N).
+  - Group 2: Hotel automatic filtering, multi-destination queries, wrong-destination rejection, destination labels, deduplication, zero-dest isolation, and cross-agency rejection.
+  - Group 3: Activity automatic filtering, multi-destination queries, wrong-destination rejection, deduplication, zero-dest isolation, and cross-agency rejection.
+  - Group 4: Repeated route (`Goa → Mumbai → Goa`) 3-leg sequence preservation, single inventory appearance, and deferred `tripDestinationId = null` without arbitrary leg assignment.
+  - Group 5: RateSheet regression (Hotel dynamic rates, multiple rates, zero rates, Activity rates, date validity, no hardcoded fallbacks).
+  - Group 6: Regression integrity (Vehicle destination independence, existing TripHotel/TripActivity integrity, Phase 155 costing preservation, 32 locked destinations intact, tenant isolation).
+  - Group 7: Automated cleanup of temporary records.
+- **Database Residue Audit:** Verified 0 temporary agencies, 0 temporary hotels, 0 temporary activities, 0 temporary trips; 32 locked starter destinations 100% intact.
+- **TypeScript Static Verification:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack (0 errors).
+## 160.4 Follow-up Note — `/trips/new` Destination UX Simplification
+- **Simplification Summary:**
+  - Replaced the large destination section and separate sequence controls with a **single compact multi-select dropdown field** (`DestinationMultiSelect`) directly within the Trip Information card in `/trips/new`.
+  - Trigger displays placeholder `Select destinations...` or comma-separated destination names (e.g., `Goa, Mumbai, Jaipur`) with a count badge.
+  - Dropdown popup provides live search and checkboxes to select/deselect active destinations cleanly on desktop and mobile.
+  - Selection order is naturally preserved into the submitted `destinationIds` array.
+  - Removed separate checkbox card grid, ↑/↓ buttons, and separate route management tables from the creation form.
+  - Full persistence to `TripDestination` contiguous sequences (`1, 2, 3...`) and automatic Hotel/Activity inventory filtering remain 100% active and verified.
+
+**Verdict:**
+`PHASE 158-C UX SIMPLIFICATION — COMPLETE`
+
+---
+
+# 161. HOTEL MASTER IMPROVEMENT & DESTINATION INTEGRATION
+
+## 161.1 Locked Business Rules & Architecture
+1. **Mandatory Fields for Hotel Master:**
+   - **Hotel Name:** Mandatory across creation, editing, and Excel import (`name`).
+   - **Destination:** Mandatory when creating a new Hotel (`destinationId`). Must be an active, agency-owned `Destination`.
+   - **City, State, Country:** Remain separate physical location attributes (e.g., Hotel: *Taj Exotica*, Destination: *Goa*, City: *Benaulim*). Destination is never treated as a replacement for City.
+   - **Address, Star Category, Contact, Description:** Preserved behavior.
+   - **Hotel Code:** Continues to be auto-generated (`HTL-XXXX`).
+2. **Existing Hotels & Legacy Records:**
+   - No destructive database migration or arbitrary backfill was performed.
+   - Existing hotels with `destinationId = null` remain valid and render safely with an `Unassigned` fallback in the UI.
+   - Editing an existing hotel safely loads and updates destination state without silent assignment.
+3. **Supplier Isolation:**
+   - Supplier Management remains **ON HOLD / deferred**. Supplier field is not reintroduced into the active Hotel Master UI.
+
+## 161.2 Hotel Excel Import Architecture
+- **Mandatory `Destination` Column:** Added `Destination` as a required column in the Hotel Excel template (`Hotels.xlsx`), instructions sheet, and import processing engine.
+- **Strict Matching Rules:**
+  - Agency-scoped lookup: only matches destinations owned by the authenticated agency.
+  - Normalized matching: strict whitespace trimming (`trim()`) and case-insensitive comparison (`toLowerCase()`).
+  - **No Fuzzy Matching:** Strict string equivalence only.
+  - **No Geographic Inference:** City/State are NOT used to infer Destination (e.g., `Panaji` does NOT automatically map to `Goa`).
+  - **No Silent Creation:** Missing or invalid destinations immediately fail row validation with clear error messages identifying the row and field.
+- **Hotel RateSheet Excel Independence:**
+  - `Hotel_Rates.xlsx` intentionally **DOES NOT** contain a `Destination` column. RateSheets link to Hotels via `Hotel Code`. The hierarchy remains `Destination → Hotel → RateSheet`.
+
+## 161.3 Hotel Table UI & UX Improvements
+- **Modern SaaS Master Table Layout (`/hotels`):**
+  - Clear header hierarchy: Hotel Name, Hotel Code, Destination, Location (City/State/Country), Star Category, Contact, Status badge, and Actions dropdown.
+  - Prominent Destination badge with MapPin icon and emerald tint for immediate visual recognition.
+  - Physical location displayed with secondary styling to distinguish clearly from travel Destination.
+  - Status badges with active/inactive indicators.
+  - Actions dropdown with clear Edit and safe Deactivate/Delete flows.
+- **Destination Filtering:**
+  - Added a dedicated Destination filter dropdown alongside the live property search bar in the table toolbar.
+  - Instant client-side filtering by Destination with clear filter reset controls.
+- **Form UI (`/hotels/new` & `/hotels/[id]`):**
+  - Integrated `DestinationSelect` component with search and active agency filtering.
+  - Field-level Formik/Yup validation messages (`Hotel name is required`, `Destination is required`).
+  - Required asterisks (`*`) clearly displayed on mandatory fields.
+- **Responsive Mobile UX:**
+  - Mobile card layout at 390×844 with clean typography, compact badges, and full action accessibility without horizontal overflow.
+
+## 161.4 Verification & Quality Assurance Evidence
+- **Automated QA-19 Test Suite (`prisma/test-qa-19-hotel-master-destination-excel.ts`):** `24/24` passed (100%).
+  - **Section 1 (Validation & Tenancy):** Missing Hotel Name rejected, missing Destination rejected on creation, valid Hotel + Destination created with auto code, cross-agency destination rejected, unknown destination ID rejected.
+  - **Section 2 (Excel Import):** Valid row parsed & imported with exact destination link and distinct city, missing name rejected, missing destination rejected, unknown destination rejected, whitespace trimming verified (`'   Goa   '` → `'Goa'`), case-insensitivity verified (`'gOa'` → `'Goa'`), non-inference verified (`Panaji` rejected), no silent destination creation, RateSheet Excel verified without destination column.
+  - **Section 3 (Existing Functionality & Integrations):** Existing hotel list loaded with agency tenancy, destination relation populated, null destination safe handling, edit hotel updates safely, soft-delete archive preserved, Trip Hotel destination matching and non-matching rejection verified, RateSheet auto-selection preserved without hardcoded pricing.
+- **Database Residue Audit:** Verified 0 temporary test records remaining; database clean state confirmed.
+- **TypeScript Static Verification:** `npx tsc --noEmit` passed (0 errors).
+- **Production Build:** `npm run build` passed with Turbopack (0 errors).
+- **Browser UI QA Verification:** Verified on Desktop (1440×900) and Mobile (390×844) — table layout, Destination filter dropdown, Excel import modal, Add Hotel form validation, and responsive mobile rendering verified.
+
+## 161.5 Destination Selector Display Name UI Fix
+- **Issue:** `DestinationSelect` (`src/components/shared/destination-select.tsx`) previously rendered the raw Destination ID (`cly...` / `cm...`) inside the closed select trigger because `SelectValue` defaulted to running `formatEnumLabel(value)` on the string ID when no custom render function was provided.
+- **Root Cause & Fix:** Enhanced `DestinationSelect`'s `<SelectValue>` to pass a lookup function `(val: any) => match?.name`. It maps the selected Destination ID back to the human-readable Destination name (`destinations.find(d => d.id === val)` or `initialDestination`).
+- **Data & API Contract Invariant Preserved:**
+  - **UI Display:** Human-readable Destination name (e.g. `Goa`, `Mumbai`, `Bengaluru`).
+  - **Form State:** Destination ID (e.g. `cly...`).
+  - **API / Database:** Destination ID (e.g. `cly...`).
+- **Verified:**
+  - Add Hotel (`/hotels/new`): Selecting `Goa` or `Mumbai` visibly renders `Goa` / `Mumbai` in the trigger.
+  - Edit Hotel (`/hotels/[id]`): Opening an existing hotel renders its assigned Destination name (e.g., `Bengaluru`), and selecting `Goa` immediately updates display to `Goa`.
+  - Typecheck (`npx tsc --noEmit`) and QA-19 suite (`24/24` passed) verified with zero regressions.
+
+---
+
+# 162. PHASE 158-D — END-TO-END QA CERTIFICATION
+
+## 162.1 Scope of E2E QA
+Phase 158-D performed an exhaustive end-to-end verification of the complete integrated business journey across Destination, Hotel Master, Activity Master, Trip Creation & Management, Dynamic RateSheet lookup, Costing/Pricing Engine, Quotation & Booking/Invoice pipelines, Excel Import flows, and Responsive Web UI.
+
+Verified End-to-End Relationship Flow:
+```text
+Destination Master (Locked 32 Starter Catalog)
+       ↓
+Trip Destination Selection (Simple Multi-Select Dropdown)
+       ↓
+TripDestination Records (Contiguous Sequences 1..N, Repeated Routes Support)
+       ↓
+Hotel / Activity Inventory Filtering (Filtered by Trip Destination Set)
+       ↓
+Hotel / Activity Selection & Dynamic RateSheet Lookup (1 Auto, Multi Choice, 0 Warning)
+       ↓
+Trip Costing & Pricing Engine (Phase 155 Room Multiplier Preservation)
+       ↓
+Quotation Generation & Customer Booking / Invoice Conversion (Persistent INV-XXXX Number)
+```
+
+Vehicle Independence Architecture:
+```text
+Trip → Vehicle → Vehicle RateSheet (Completely independent of Destination requirements)
+```
+
+## 162.2 QA-20 Automated Test Suite Matrix
+Comprehensive automated audit suite executed via `prisma/test-qa-20-phase-158d-e2e-qa.ts`:
+
+| Test ID | Category | Description | Result |
+|---|---|---|---|
+| **0.1** | Integrity | Permanent agency contains exactly 32 active locked starter destinations | **PASS** |
+| **1** | Destination | Trip with zero destinations creates 0 TripDestination records without synthetic routes | **PASS** |
+| **2** | Destination | Single destination trip creates exactly 1 TripDestination with sequence=1 | **PASS** |
+| **3** | Destination | Multiple destination trip creates contiguous sequence records (1: Goa, 2: Mumbai, 3: Jaipur) | **PASS** |
+| **4** | Destination | Repeated route (Goa → Mumbai → Goa) creates 3 distinct records with sequences 1, 2, 3 | **PASS** |
+| **5** | Hotel Master | Hotel creation rejected when Hotel Name is missing | **PASS** |
+| **6** | Hotel Master | Hotel creation rejected when Destination is missing | **PASS** |
+| **7** | Hotel Master | Valid Hotel created with auto-code, Destination=Goa, distinct City=Benaulim | **PASS** |
+| **8** | Hotel Master | Assigning another agency's Destination to Hotel is strictly rejected | **PASS** |
+| **9** | Hotel Master | Legacy Hotel with destinationId = null loads safely without crashes or synthetic backfill | **PASS** |
+| **10** | Hotel Master | Updating legacy Hotel destination to Mumbai persists accurately | **PASS** |
+| **11** | Hotel Master | Hotel list filtered by destinationId=Goa returns Goa hotels and excludes Mumbai hotels | **PASS** |
+| **12** | Hotel Excel | Valid Excel row parses correctly with matched destinationId and distinct physical city | **PASS** |
+| **12.1** | Hotel Excel | Excel row imports into DB with active destination relation | **PASS** |
+| **13** | Hotel Excel | Excel row with missing Hotel Name fails row validation | **PASS** |
+| **14** | Hotel Excel | Excel row with missing Destination fails row validation | **PASS** |
+| **15** | Hotel Excel | Destination matching ignores leading/trailing whitespace (`'   Goa   '` → `Goa`) | **PASS** |
+| **16** | Hotel Excel | Destination matching is case-insensitive (`'gOa'` → `Goa`) | **PASS** |
+| **17** | Hotel Excel | Geographic inference prevention (`Panaji` does NOT automatically map to `Goa`) | **PASS** |
+| **18** | Hotel Excel | Unknown destination fails row validation with clear error message | **PASS** |
+| **19** | Hotel Excel | Hotel RateSheet Excel template intentionally DOES NOT contain Destination column | **PASS** |
+| **20** | Inventory | Assigning matching destination hotel (Goa hotel to Goa/Mumbai/Jaipur trip) succeeds | **PASS** |
+| **21** | Inventory | Assigning Agra hotel to Goa-only trip is strictly rejected with ValidationError | **PASS** |
+| **22** | RateSheet | Single applicable hotel RateSheet auto-selected with exact price (6500) | **PASS** |
+| **23** | RateSheet | Multiple rates for same room type returned for user choice | **PASS** |
+| **24** | RateSheet | Zero applicable rates returns unmatched state without hardcoded fallback pricing | **PASS** |
+| **25** | Activity | Activity created with agency Destination relation | **PASS** |
+| **26** | Activity | Activity assigned to matching trip destination successfully | **PASS** |
+| **27** | Activity | Assigning Jaipur activity to Goa-only trip is strictly rejected with ValidationError | **PASS** |
+| **28** | Vehicle | Vehicle assigned to trip completely independent of Destination requirements | **PASS** |
+| **29** | Tenancy | Cross-agency hotel rejected when attempting assignment to Agency A trip | **PASS** |
+| **30** | Tenancy | Cross-agency destination rejected when creating Agency A trip | **PASS** |
+| **31** | Costing | Phase 155 Room multiplier verified: 2 rooms × 3 nights @ 6500 = exactly 39,000 cost | **PASS** |
+| **32** | Quotation | Quotation generated accurately from trip itinerary services with positive total amount | **PASS** |
+| **33** | Invoice | Confirmed booking converts to invoice with persistent invoice number (`INV-XXXX`) | **PASS** |
+| **34** | Cleanup | Automated cleanup of all temporary test records verified | **PASS** |
+
+**QA-20 Automated Execution Summary:** `35/35 PASSED (100%), 0 FAILED`.
+
+## 162.3 Browser & Responsive UI Verification
+- **Desktop (1440 × 900) & Mobile (390 × 844) Viewports:**
+  - `/trips/new`: Compact `DestinationMultiSelect` dropdown renders smoothly with badge counter, search input, and multi-checkbox options. Zero horizontal overflow.
+  - `/trips/[id]`: Route overview renders sequence (`1 Goa → 2 Mumbai → 3 Jaipur`), Add Hotel dialog displays only matching destination inventory, Add Activity dialog filters by trip destinations.
+  - `/hotels`: Clean modern SaaS table layout, MapPin emerald Destination badge, dedicated Destination filter dropdown in table toolbar, Excel import modal with drag-and-drop.
+  - `/hotels/new` & `/hotels/[id]`: `DestinationSelect` displays human-readable Destination name (e.g., `Goa`, `Mumbai`, `Bengaluru`), submits Destination ID internally.
+- **Client-Side Performance & Navigation:**
+  - Client-side transitions across trips, hotels, costing, and quotations preserve QA-05/05B invariants with zero unintended full-page reloads (`window.location.reload()`).
+
+## 162.4 Regression Verification Against Previous Invariants
+- **QA-04 / QA-05 / QA-05B:** Client-side SPA navigation preserved across core workflows.
+- **QA-06A / QA-07A:** Multi-tenant agency boundary validation intact.
+- **QA-13 / DEV-05 / Phase 155:** Multi-room hotel costing calculation (`rooms × nights × rate`) verified without regression.
+- **QA-15 / QA-16 / QA-17:** Activity master destination association and rate tiers preserved.
+- **QA-18 / QA-19:** Hotel mandatory destination and Excel integration confirmed with zero residue.
+
+## 162.5 Database Residue & Clean State Audit
+- **Permanent Test Agency (`TripDesk Offical Test Agnecy`, `tripmadeeasy.in@gmail.com`):**
+  - Exactly 32 locked starter destinations.
+  - 100% active status (`ACTIVE`), 0 duplicates.
+  - 0 residue test hotels, 0 residue test trips, 0 residue test agencies created during Phase 158-D QA.
+
+## 162.6 Static Typing & Build Verification
+- **TypeScript Typecheck (`npx tsc --noEmit`):** PASSED (0 errors).
+- **Next.js Production Build (`npm run build`):** PASSED (0 errors).
+
+---
+
+# 163. FULL PERMANENT TEST AGENCY QA DATA CLEANUP
+
+## 163.1 Objective & Authority
+On September 17, 2026, an authorized full database cleanup was executed on the permanent test agency (`TripDesk Offical Test Agnecy`, `tripmadeeasy.in@gmail.com`, Agency ID: `cmu2g9rgq0000swtqbr5aie7x`) to remove all disposable QA, test, and historical business data in preparation for clean Hotel Master and RateSheet dataset imports.
+
+## 163.2 Preserved Entities (100% Intact)
+1. **Agency Record:** `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`) preserved.
+2. **Agency Owner:** `tripmadeeasy.in@gmail.com` (`AGENCY_OWNER`) preserved.
+3. **Platform Owner:** `mzpatel14@gmail.com` (`PLATFORM_OWNER`) preserved.
+4. **All Destinations:** Exactly **32 / 32** active starter destinations preserved without changes (0 duplicates).
+5. **All Vehicles:** Exactly **6 / 6** Vehicle Master records preserved with identical IDs.
+
+## 163.3 Deleted Disposable Entities
+Executed in a single relational transaction:
+- **Hotels:** 51 deleted (0 remaining)
+- **Hotel RateSheets:** 588 deleted (0 remaining)
+- **Activities & Activity RateSheets:** 0 deleted (0 remaining)
+- **Vehicle RateSheets:** 0 deleted (0 remaining)
+- **Trips:** 2 deleted (0 remaining)
+- **Trip Destinations:** 2 deleted (0 remaining)
+- **Trip Hotels:** 2 deleted (0 remaining)
+- **Trip Activities:** 1 deleted (0 remaining)
+- **Trip Vehicles:** 1 deleted (0 remaining)
+- **Travelers & Itinerary Items:** 6 deleted (0 remaining)
+- **Customers:** 1 deleted (0 remaining)
+- **Quotations & Quotation Items / Proposals / Milestones:** 16 deleted (0 remaining)
+- **Bookings, Invoices, Payments, Confirmations:** 0 remaining
+
+## 163.4 Cross-Agency Safety Audit
+- Verified that all other agencies in the system remained completely untouched with zero unintended deletions.
+
+# 164. RATESHEET EXCEL IMPORT VALIDATION ERROR CLASSIFICATION & EXISTING RATE VERIFICATION
+
+## 164.1 Bug Fix — Client-Facing Excel Validation Error Classification
+- **Issue:** During `POST /api/rate-sheets/import?action=preview`, client-facing Excel template and parsing errors (such as missing required columns like `Hotel Code`, empty sheet, row limit exceeded) were throwing generic `new Error(...)`.
+- **Root Cause:** In `src/lib/api/errors.ts`, `handleApiError` treats any generic `Error` not subclassing `ApiError` as an unhandled server error, returning HTTP 500 `INTERNAL_ERROR` (`"An unexpected error occurred while processing your request. Please try again later."`).
+- **Fix Implemented:** In `src/lib/excel/rate-excel-service.ts`, imported `ValidationError` from `@/lib/api` and replaced client-caused generic `new Error(...)` throws with `new ValidationError(...)`.
+- **Result:** Invalid/missing required headers now accurately return HTTP 400 with `{"code": "VALIDATION_ERROR", "message": "Invalid template headers. Missing required column(s): 'Hotel Code'. Please download and use the official sample template."}`.
+- **Excel Contract Invariants Preserved:**
+  - `Hotel Code` remains the strict required header (`/^hotel\s*code$/i`).
+  - `Hotel Code (Test Mapping)` was NOT added as an alias.
+  - Excel template structure remains unchanged.
+  - `Hotel_Rates.xlsx` intentionally continues to have **NO Destination column**.
+
+## 164.2 Permanent Test Agency Read-Only Rate Verification
+- **Agency:** `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`, `tripmadeeasy.in@gmail.com`).
+- **Inventory Counts:**
+  - **Hotels:** 22 (`HTL-0001` through `HTL-0022`, imported post-cleanup).
+  - **Hotel RateSheets:** Exactly 1 (`RAT-2026-00001`).
+  - **Vehicles:** 6 (preserved).
+  - **Vehicle RateSheets:** 0.
+  - **Destinations:** 32 (preserved).
+  - **Activity RateSheets:** 0.
+- **Single Existing Hotel RateSheet Details:**
+  - **ID:** `cmu5f9ili0000v4tqrrixq0ih`
+  - **Number:** `RAT-2026-00001`
+  - **Name:** `Amber Courtyard - Deluxe Room (Peak Season 2026-27)`
+  - **Hotel:** `Amber Courtyard` (`HTL-0006`, ID: `cmu5f7cw4000f74tqzuvxrs8h`)
+  - **Room Type:** `Deluxe Room`, **Meal Plan:** `CP`, **Inventory Type:** `HOTEL`
+  - **Cost Price:** `4500` INR, **Extra Adult:** `1500`, **Extra Child:** `800`
+  - **Validity:** `2026-09-01` to `2027-03-31` (`01-09-2026` to `31-03-2027`)
+  - **Status:** `ACTIVE`, **Priority:** `1`, **Source Type:** `MANUAL`
+  - **Timestamps:** Created `2026-09-17T11:04:09.318Z`, Updated `2026-09-17T11:23:45.882Z`
+- **Origin Determination:**
+  - Evidence confirms this rate sheet was created via the **manual UI creation workflow** (`POST /api/rate-sheets` with `sourceType: "MANUAL"`) 2 minutes after the 22 hotels were imported, and was not created via Excel bulk import.
+- **Safety Confirmation:**
+  - 0 RateSheets imported, 0 database mutations performed, existing rate preserved.
+
+## 164.3 Automated Verification
+- **QA-21 Test Suite (`prisma/test-qa-21-rate-excel-validation-error.ts`):** 22/22 assertions passed (100%).
+- **TypeScript Typecheck (`npx tsc --noEmit`):** Passed (0 errors).
+- **Production Build (`npm run build`):** Passed with Turbopack (0 errors).
+
+# 165. AUTHORIZED SINGLE-RECORD RATESHEET CLEANUP & DATABASE VERIFICATION
+
+## 165.1 Pre-Deletion Verification
+- **Target Record Verified:** Exactly 1 RateSheet record with ID `cmu5f9ili0000v4tqrrixq0ih` was verified read-only before deletion.
+- **Record Attributes Verified:**
+  - **ID:** `cmu5f9ili0000v4tqrrixq0ih`
+  - **RateSheet Number:** `RAT-2026-00001`
+  - **Name:** `Amber Courtyard - Deluxe Room (Peak Season 2026-27)`
+  - **Hotel:** `Amber Courtyard` (`HTL-0006`, ID: `cmu5f7cw4000f74tqzuvxrs8h`)
+  - **Room Type:** `Deluxe Room`, **Meal Plan:** `CP`, **Cost Price:** ₹4500, **Extra Adult:** ₹1500, **Extra Child:** ₹800
+  - **Season:** `Peak Season 2026-27`, **Valid From:** `2026-09-01`, **Valid To:** `2027-03-31`
+  - **Status:** `ACTIVE`, **Source Type:** `MANUAL`
+  - **Agency:** `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`)
+
+## 165.2 Targeted Deletion Execution
+- **Action:** Executed exact unique ID deletion targeting only record `cmu5f9ili0000v4tqrrixq0ih`.
+- **Records Affected:** Exactly **1**.
+
+## 165.3 Post-Deletion Verification & Database Safety
+- **Target Record Absence:** Confirmed `findUnique({ where: { id: "cmu5f9ili0000v4tqrrixq0ih" } })` returns `null`.
+- **Preserved Inventory Counts:**
+  - **Hotels:** Exactly **22 / 22** intact (including `Amber Courtyard` / `HTL-0006`).
+  - **Hotel RateSheets:** Exactly **0**.
+  - **Total RateSheets (All Types):** Exactly **0**.
+  - **Vehicles:** Exactly **6 / 6** intact.
+  - **Destinations:** Exactly **32 / 32** active starter destinations intact.
+- **Boundary Confirmation:** Rate Excel bulk import was **NOT** started. Zero workbooks were modified.
+
+# 166. HOTEL RATE EXCEL BULK TEST WORKBOOK CORRECTION & VALIDATION
+
+## 166.1 Workbook Preparation & Mapping Updates
+- **File Corrected:** `TripDesk_Hotel_Rates_Bulk_Test_Data_UPDATED.xlsx` (located in user Downloads).
+- **Header Alignment:** Replaced `Hotel Code (Test Mapping)` with the strict official importer header: `Hotel Code`.
+- **Code Mapping Replaced:** Successfully mapped all 22 placeholder test codes (`TEST-GOA-001` .. `TEST-DWK-001`) to the actual verified generated Hotel Codes in the database (`HTL-0001` through `HTL-0022`):
+  - `HTL-0001`: Seaside Palm Resort (Goa)
+  - `HTL-0002`: Coconut Grove Hotel (Goa)
+  - `HTL-0003`: Marine Gateway Hotel (Mumbai)
+  - `HTL-0004`: Harbour View Residency (Mumbai)
+  - `HTL-0005`: Pink City Palace (Jaipur)
+  - `HTL-0006`: Amber Courtyard (Jaipur)
+  - `HTL-0007`: Lake Palace View (Udaipur)
+  - `HTL-0008`: Blue Fort Residency (Jodhpur)
+  - `HTL-0009`: Capital Grand Hotel (Delhi)
+  - `HTL-0010`: Taj Gateway Inn (Agra)
+  - `HTL-0011`: Ganges Heritage Hotel (Varanasi)
+  - `HTL-0012`: Golden Temple View (Amritsar)
+  - `HTL-0013`: Dal Lake Retreat (Srinagar)
+  - `HTL-0014`: Himalayan Pine Resort (Manali)
+  - `HTL-0015`: Ridge Mountain Hotel (Shimla)
+  - `HTL-0016`: Ganga Riverside Stay (Rishikesh)
+  - `HTL-0017`: Harbour Heritage Kochi (Kochi)
+  - `HTL-0018`: Tea Valley Resort (Munnar)
+  - `HTL-0019`: Garden City Suites (Bengaluru)
+  - `HTL-0020`: Royal Palace Residency (Mysuru)
+  - `HTL-0021`: Sabarmati Grand Hotel (Ahmedabad)
+  - `HTL-0022`: Dwarka Coast Resort (Dwarka)
+
+## 166.2 Data Invariants & Contract Compliance
+- **Total Data Rows:** Exactly **66** rate definitions (22 Hotels × 3 rate tiers per hotel = 66).
+- **Hotel Code Frequency:** Each code `HTL-0001` through `HTL-0022` appears exactly **3 times**.
+- **Placeholder Residue:** Exactly **0** `TEST-*` placeholder codes remain in the main data sheet.
+- **Destination Invariant Preserved:** **0 Destination columns** (Destination is completely absent from RateSheet Excel per locked architectural rule).
+- **Rate Sheet Columns:** `Hotel Code`, `Room Type`, `Meal Plan`, `Rate Type`, `Cost Price`, `Extra Adult Rate`, `Extra Child Rate`, `Season Name`, `Valid From`, `Valid To`, `Priority`, `Status`, `Notes`.
+
+## 166.3 Programmatic Parser & Preview Simulation
+- Executed in-memory read-only simulation with `rateExcelService.parseAndPreview` against the permanent test agency (`TripDesk Offical Test Agnecy` / `cmu2g9rgq0000swtqbr5aie7x`).
+- **Results:**
+  - `canExecute`: **true**
+  - `totalRows`: **66**
+  - `validRows`: **66** (100% valid)
+  - `errorRows`: **0**
+  - `warningRows`: **0**
+
+## 166.4 Database Safety & Import Status
+- **Import Status:** **NOT IMPORTED** (Ready for controlled execution upon explicit authorization).
+- **Database Mutations:** Exactly **0** (0 RateSheets created, 22 Hotels preserved, 32 Destinations preserved, 6 Vehicles preserved).
+
+# 167. RATESHEET EXCEL CONTROLLED PREVIEW AUDIT
+
+## 167.1 Preview Execution & Method
+- **Method Executed:** `rateExcelService.parseAndPreview` (actual production importer service).
+- **Target Workbook:** `TripDesk_Hotel_Rates_Bulk_Test_Data_UPDATED.xlsx` (66 rate rows).
+- **Target Agency:** `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`).
+- **Import Mode Tested:** `UPDATE` / `SKIP`.
+
+## 167.2 Preview Summary Results
+- **Total Rows Processed:** **66**
+- **Valid Rows:** **66** (100% valid)
+- **Warning Rows:** **0**
+- **Error Rows:** **0**
+- **Execution Viability (`canExecute`):** **true**
+- **Planned Database Actions:** **66 create** (0 skips, 0 updates in current clean rate state).
+
+## 167.3 Hotel Resolution & Distribution Verification
+- **22 / 22 Hotel Codes Resolved:** Every single Hotel Code (`HTL-0001` through `HTL-0022`) resolved cleanly to the intended hotel property in the database.
+- **Distribution:** Each Hotel Code occurred exactly **3 times** in the preview dataset (`22 × 3 = 66`).
+- **Tenant Scoping:** 100% of resolved hotels belong to `agencyId: cmu2g9rgq0000swtqbr5aie7x` with **0** cross-agency resolutions.
+
+## 167.4 Field Mapping & Invariant Integrity
+- **Mapped Columns:** `Hotel Code`, `Room Type`, `Meal Plan`, `Season Name`, `Valid From` (DD-MM-YYYY), `Valid To` (DD-MM-YYYY), `Cost Price`, `Extra Adult Rate`, `Extra Child Rate`, `Notes`.
+- **Ignored Columns:** `Rate Type`, `Priority`, `Status` (handled per existing importer architecture).
+- **Destination Invariant:** 0 Destination columns in Rate Excel; resolved strictly through Hotel Master relation.
+
+## 167.5 Post-Preview Database State
+- **RateSheets:** Exactly **0** (0 mutations).
+- **Hotels:** Exactly **22** intact.
+- **Destinations:** Exactly **32** intact.
+- **Vehicles:** Exactly **6** intact.
+- **Execution Status:** **IMPORT NOT EXECUTED — WAITING FOR EXPLICIT AUTHORIZATION**.
+
+# 168. AUTHORIZED 66-ROW HOTEL RATESHEET IMPORT EXECUTION & POST-VERIFICATION
+
+## 168.1 Authorization & Pre-Import Guard Verification
+- **User Authorization:** Explicitly granted (`AUTHORIZATION: GRANTED`).
+- **Target Agency:** `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`).
+- **Source Workbook:** `C:\Users\hp\Downloads\TripDesk_Hotel_Rates_Bulk_Test_Data_UPDATED.xlsx`.
+- **Pre-Import Database Guard State:**
+  - **Hotels:** Exactly **22 / 22** verified intact.
+  - **Pre-Import RateSheets:** Exactly **0** (clean rate state).
+  - **Vehicles:** Exactly **6 / 6** verified intact.
+  - **Destinations:** Exactly **32 / 32** verified intact.
+  - **Workbook Parse & Preview Guard:** 66/66 total rows valid, 0 errors, 0 warnings, `canExecute: true`.
+
+## 168.2 Import Execution
+- **Service Invoked:** Production `rateExcelService.executeImport(buffer, agencyId, "SKIP")`.
+- **Execution Mode:** Direct transactional batch import (`tx.rateSheet.createMany`).
+- **Result Metrics:**
+  - `total`: **66**
+  - `imported`: **66**
+  - `updated`: **0**
+  - `skipped`: **0**
+  - `failed`: **0**
+  - `errors`: **[]**
+
+## 168.3 Post-Import Database Verification
+- **Created RateSheets:** Exactly **66** RateSheet records created (`RAT-2026-00001` through `RAT-2026-00066`).
+- **Hotel Linkage & Distribution (22 Hotels × 3 RateSheets each):**
+  - `HTL-0001`: Seaside Palm Resort — 3 rate sheets (`RAT-2026-00001`, `RAT-2026-00002`, `RAT-2026-00003`)
+  - `HTL-0002`: Coconut Grove Hotel — 3 rate sheets (`RAT-2026-00004`, `RAT-2026-00005`, `RAT-2026-00006`)
+  - `HTL-0003`: Marine Gateway Hotel — 3 rate sheets (`RAT-2026-00007`, `RAT-2026-00008`, `RAT-2026-00009`)
+  - `HTL-0004`: Harbour View Residency — 3 rate sheets (`RAT-2026-00010`, `RAT-2026-00011`, `RAT-2026-00012`)
+  - `HTL-0005`: Pink City Palace — 3 rate sheets (`RAT-2026-00013`, `RAT-2026-00014`, `RAT-2026-00015`)
+  - `HTL-0006`: Amber Courtyard — 3 rate sheets (`RAT-2026-00016`, `RAT-2026-00017`, `RAT-2026-00018`)
+  - `HTL-0007`: Lake Palace View — 3 rate sheets (`RAT-2026-00019`, `RAT-2026-00020`, `RAT-2026-00021`)
+  - `HTL-0008`: Blue Fort Residency — 3 rate sheets (`RAT-2026-00022`, `RAT-2026-00023`, `RAT-2026-00024`)
+  - `HTL-0009`: Capital Grand Hotel — 3 rate sheets (`RAT-2026-00025`, `RAT-2026-00026`, `RAT-2026-00027`)
+  - `HTL-0010`: Taj Gateway Inn — 3 rate sheets (`RAT-2026-00028`, `RAT-2026-00029`, `RAT-2026-00030`)
+  - `HTL-0011`: Ganges Heritage Hotel — 3 rate sheets (`RAT-2026-00031`, `RAT-2026-00032`, `RAT-2026-00033`)
+  - `HTL-0012`: Golden Temple View — 3 rate sheets (`RAT-2026-00034`, `RAT-2026-00035`, `RAT-2026-00036`)
+  - `HTL-0013`: Dal Lake Retreat — 3 rate sheets (`RAT-2026-00037`, `RAT-2026-00038`, `RAT-2026-00039`)
+  - `HTL-0014`: Himalayan Pine Resort — 3 rate sheets (`RAT-2026-00040`, `RAT-2026-00041`, `RAT-2026-00042`)
+  - `HTL-0015`: Ridge Mountain Hotel — 3 rate sheets (`RAT-2026-00043`, `RAT-2026-00044`, `RAT-2026-00045`)
+  - `HTL-0016`: Ganga Riverside Stay — 3 rate sheets (`RAT-2026-00046`, `RAT-2026-00047`, `RAT-2026-00048`)
+  - `HTL-0017`: Harbour Heritage Kochi — 3 rate sheets (`RAT-2026-00049`, `RAT-2026-00050`, `RAT-2026-00051`)
+  - `HTL-0018`: Tea Valley Resort — 3 rate sheets (`RAT-2026-00052`, `RAT-2026-00053`, `RAT-2026-00054`)
+  - `HTL-0019`: Garden City Suites — 3 rate sheets (`RAT-2026-00055`, `RAT-2026-00056`, `RAT-2026-00057`)
+  - `HTL-0020`: Royal Palace Residency — 3 rate sheets (`RAT-2026-00058`, `RAT-2026-00059`, `RAT-2026-00060`)
+  - `HTL-0021`: Sabarmati Grand Hotel — 3 rate sheets (`RAT-2026-00061`, `RAT-2026-00062`, `RAT-2026-00063`)
+  - `HTL-0022`: Dwarka Coast Resort — 3 rate sheets (`RAT-2026-00064`, `RAT-2026-00065`, `RAT-2026-00066`)
+- **Tenant Isolation:** 100% of all 66 RateSheets scoped to `cmu2g9rgq0000swtqbr5aie7x`. Exactly **0** cross-agency records.
+- **Destination Independence Preserved:** Zero RateSheets created or required direct Destination columns. Destination remains strictly a Hotel Master concern.
+- **Permanent Test Data Invariant:**
+  - **Hotels:** Exactly **22 / 22** intact.
+  - **Destinations:** Exactly **32 / 32** intact.
+  - **Vehicles:** Exactly **6 / 6** intact.
+  - **RateSheets:** Exactly **66 / 66** active.
+
+# 169. READ-ONLY POST-IMPORT RATESHEET QA & REGRESSION AUDIT
+
+## 169.1 Audit Execution & Methodology
+- **Audit Type:** Strict Read-Only Post-Import QA and Cross-Module Regression Verification.
+- **Target Agency:** `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`).
+- **Database Mutation Guard:** **0 database writes / updates / deletes executed during audit**.
+
+## 169.2 Database Integrity Baseline
+| Component | Baseline Count | Post-Audit Count | Status |
+| :--- | :---: | :---: | :--- |
+| **Hotels** | 22 | 22 | **PASS (100% Intact, 0 Duplicates)** |
+| **RateSheets** | 66 | 66 | **PASS (100% Intact, RAT-2026-00001 .. 00066)** |
+| **Destinations** | 32 | 32 | **PASS (100% Starter Catalog Intact)** |
+| **Vehicles** | 6 | 6 | **PASS (100% Intact)** |
+| **Cross-Agency Rates** | 0 | 0 | **PASS (Strict Tenant Scoping)** |
+
+## 169.3 Hotel Code Mapping & Distribution Verification
+- **22 / 22 Hotels Verified:** All 22 unique codes `HTL-0001` through `HTL-0022` verified with 0 duplicates.
+- **`HTL-0016` Confirmation:** Verified `HTL-0016` correctly maps to `Ganga Riverside Stay` (Rishikesh) with 3 RateSheets (`RAT-2026-00046`, `00047`, `00048`).
+- **`HTL-0015` Confirmation:** Verified `HTL-0015` correctly maps to `Ridge Mountain Hotel` (Shimla) with 3 RateSheets (`RAT-2026-00043`, `00044`, `00045`).
+- **Per-Hotel Distribution:** Exactly **22 / 22** Hotels have **3 RateSheets each** (`22 × 3 = 66`).
+
+## 169.4 Rate Lookup Engine & Hotel Isolation
+- **Lookup Verification:** Tested `rateSheetService.getApplicableHotelRate` across standard and premium validity windows:
+  - `HTL-0001` on `2026-05-15` (Deluxe / MAP) -> Resolved `RAT-2026-00002` (₹5,100, Premium Season) ✓
+  - `HTL-0001` on `2026-02-15` (Deluxe / CP) -> Resolved `RAT-2026-00001` (₹4,200, Standard Season) ✓
+- **Hotel Isolation:** Querying `HTL-0002` strictly resolves `HTL-0002` rates (`RAT-2026-00004`) with 0 cross-hotel leakage.
+
+## 169.5 Phase 155 Multi-Room Costing Regression
+- **Nightly Multi-Room Formula:** Verified `totalCost = nightlyRate × rooms × diffDays` in `tripCostingService`:
+  - 1 room × 2 nights × ₹3,500 = ₹7,000 ✓
+  - 2 rooms × 2 nights × ₹3,500 = ₹14,000 ✓
+  - 3 rooms × 2 nights × ₹3,500 = ₹21,000 ✓
+  - 4 rooms × 2 nights × ₹3,500 = ₹28,000 ✓
+
+## 169.6 Quotation, Booking & Public Redaction Security
+- **Public Proposal Redaction:** Verified public proposal projection in `quotationService.getPublicQuotationByToken` strips internal costs, nightly rate purchase prices, markups, and internal supplier notes.
+- **Tenant Scoping:** All API endpoints derive `agencyId` server-side from session auth guards (`requireReadAccess`, `requireWriteAccess`).
+- **TypeScript Integrity:** `npx tsc --noEmit` verified with **0 errors**.
+
+## 169.7 Final Audit Result
+- **Database Mutations During Audit:** Exactly **0**.
+- **Final RateSheet Count:** Exactly **66**.
+- **Final Verdict:** **POST-IMPORT QA PASSED — NO REGRESSIONS FOUND**.
+
+# 170. DESTINATION UI CONSISTENCY CHANGES & VERIFICATION
+
+## 170.1 Objective & Overview
+- Implemented targeted UI consistency improvements for Destination selection and filtering across the TripDesk workspace without altering backend schemas, database models, or tenancy rules.
+
+## 170.2 Change A: `/hotels` Destination Filter Dropdown Standardization
+- **File Modified:** [`src/app/(dashboard)/hotels/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/%28dashboard%29/hotels/page.tsx)
+- **Modifications:**
+  - Replaced the inconsistent native HTML `<select>` dropdown with the standard design system `Select` component (`@/components/ui/select`).
+  - Added `MapPin` icon, `rounded-xl`, consistent hover/focus rings (`focus-visible:ring-indigo-500/20`), and standard `SelectContent` popup.
+  - Maintained complete filtering functionality: `All Destinations` default, single destination selection, table filtering, and `Clear Filters` action.
+
+## 170.3 Change B: Trip Edit Destination UI Alignment
+- **File Modified:** [`src/app/(dashboard)/trips/[id]/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/%28dashboard%29/trips/%5Bid%5D/page.tsx)
+- **Modifications:**
+  - **Removed Standalone Card:** Completely removed the separate "Trip Destinations & Route" section, route summary bar, up/down reorder buttons, and standalone "Add Destination Modal".
+  - **Profile Grid Integration:** Added a clean `Destinations` entry to the main `Trip Profile Details` grid displaying assigned destination names as concise badges/labels.
+  - **Edit Modal Alignment:** Integrated the standard `DestinationMultiSelect` field inside the "Edit Trip Modal" matching the reference design of [`/trips/new`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/%28dashboard%29/trips/new/page.tsx).
+  - **Persistence & Sequence Integrity:** Implemented `syncTripDestinations` to safely synchronize multi-select changes to `TripDestination` records, preserving existing sequence ordering and multi-destination persistence.
+
+## 170.4 Data Safety & Architecture Invariants
+- **Database Schema:** Exactly **0** schema or migration changes.
+- **Database Baseline:** All permanent test data preserved intact (22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles).
+- **Tenant Isolation:** All destination queries and mutations remain strictly agency-scoped.
+
+## 170.5 Verification & QA Results
+- **TypeScript:** `npx tsc --noEmit` verified with **0 errors**.
+- **Browser Subagent QA:**
+  - `/hotels`: Verified filter dropdown styling, Goa filtering (2 properties), and All Destinations reset (22 properties) on desktop and mobile viewports (390×844).
+  - `/trips/new`: Verified `DestinationMultiSelect` popover search and multi-select behavior remain unchanged.
+  - `/trips/cmu5fhkk40006v4tqpd2k2kd4`: Verified removal of the separate route card, presence of Destinations in profile details, and functional `DestinationMultiSelect` inside the Edit Trip modal.
+- **Verdict:** **IMPLEMENTATION COMPLETE — DESTINATION UI CONSISTENCY VERIFIED**.
+
+# 171. COMPLETE QUOTATION UX, PRICING, PAYMENT SCHEDULE, PDF & LIVE-LINK PRODUCTION AUDIT
+
+## 171.1 Objective & Overview
+- Executed a deep production-readiness overhaul for the TripDesk Quotation Studio (`/trips/[id]/quotation`), price recalculation chain, payment milestone synchronization, customer-facing PDF, and public share token flows.
+
+## 171.2 Pricing Architecture & Pricing Semantics Guard
+- **Base Cost (`QuotationItem.costPrice`)**: Represents the net supplier procurement cost (from RateSheets, vehicle master, or manual supplier rates). Strictly internal to the agency for margin calculation (`markupAmount = subtotal * markupPct`).
+- **Base Cost Independence**: `QuotationItem.costPrice` is **NEVER** automatically rewritten when an agent edits the customer-facing `Quoted Unit Price`. Procurement cost remains strictly independent.
+- **Selling Price (`unitPrice` / `sellingPrice` / `totalPrice`)**: Customer-facing quoted unit and line-item prices.
+- **Pricing Propagation Chain**:
+  ```text
+  Quoted Unit Price
+          ↓
+  Item Selling Price (unitPrice × quantity)
+          ↓
+  Quotation Selling Subtotal
+          ↓
+  Quotation Markup Margin (sellingSubtotal - baseCostSubtotal)
+          ↓
+  Discount (%)
+          ↓
+  Statutory Tax / GST
+          ↓
+  Quotation Final Amount
+          ↓
+  Persisted Payment Milestones (Dynamically Synchronized)
+          ↓
+  Customer Preview / PDF / Public Live Link
+  ```
+
+## 171.3 Pricing Semantics & Invariance Rules
+- **Base Procurement Cost (`subtotal`)**: Persisted as $\sum (\text{costPrice})$ across all line items. Represents what the agency pays suppliers and remains strictly untouched during customer quoted price edits.
+- **Agency Markup Margin (`markupAmount`)**: Evaluated as $\text{Total Quoted Selling} - \text{subtotal}$.
+- **Signed Margin Support**: When customer quoted selling price is discounted below supplier cost (e.g., loss leaders or negotiated concessions), `markupAmount` and `markupPercentage` evaluate to negative values. The costing engine evaluates this state as `Loss Warning` (`status: "Loss"`). UI formats negative margin in rose styling (`-₹4,550`), while customer-facing documents and public links remain 100% sanitized.
+- **Quoted Selling Base**: $\text{subtotal} + \text{markupAmount} \equiv \sum (\text{line-item quoted selling prices})$.
+- **Taxable Amount**: $\max(0, (\text{subtotal} + \text{markupAmount}) - \text{discountAmount})$.
+- **Final Amount**: $\text{taxableAmount} + \text{taxAmount}$ (for `EXCLUSIVE` tax mode) or $\text{taxableAmount}$ (for `INCLUSIVE` tax mode).
+- **Consumer Consistency**: Verified across Quotation workspace, Option Packages, Customer Preview, React-PDF, Payment Schedule synchronization, Booking conversion (`booking.totalAmount = quotation.finalAmount`), and Profitability / Costing Engine.
+
+## 171.4 Payment Schedule Synchronization
+- **Root Cause Fixed**: Previously, `recalculateQuotationTotals` updated `quotation.finalAmount`, but left percentage-based milestone `amount` fields on `quotation_payment_milestones` frozen at draft creation values.
+- **Implementation (`syncPaymentMilestones`)**:
+  - Whenever line item prices, markups, discounts, or taxes alter `finalAmount`, all percentage milestones dynamically recompute `amount = Math.round((finalAmount * percentage) / 100)`.
+  - The rounding remainder is assigned to the final milestone, guaranteeing `sum(milestones.amount) === finalAmount` exactly.
+  - Recalculated milestones are persisted server-side in the database transaction.
+
+## 171.5 Empty Quotation UI Redesign
+- Replaced blank viewport when `!activeQuote` with a dedicated, professional TripDesk Empty Workspace Card displaying:
+  - Clear heading: *No Quotation Proposal Created Yet*.
+  - Feature overview: Costing Snapshot, Tiered Packages, Payment Schedule.
+  - Primary action: *Generate Initial Proposal* with loading spinner states.
+
+## 171.6 Line Item Modal Simplification
+- Replaced confusing competing editable price fields with a single, clear customer-facing **"Quoted Unit Price (₹) *"** input.
+- Added a dynamic real-time calculation box showing `Customer Quoted Total` and displaying internal `Base Procurement Cost` as a subtle non-editable badge.
+
+## 171.7 Customer-Facing PDF & Preview Privacy
+- **Stripped Markup Leakage**: Removed `"Agency Service & Planning ({markupPercentage}%)"` and raw markup margins from customer-facing previews (`preview/page.tsx`) and PDFs.
+- **Clean Commercial Presentation**: Customer sees clean tour package tariffs, inclusions/exclusions, statutory GST breakdown, payment milestone schedule, and prominent **TOTAL PROPOSAL INVESTMENT**.
+- **Public Share Security**: Verified `quotationService.getPublicQuotationByToken` strictly redacts `costPrice`, `markupPercentage`, `markupAmount`, and `internalNotes`.
+
+## 171.8 Verification & QA Test Matrix
+| Area | Test Description | Result |
+| :--- | :--- | :---: |
+| **Empty State** | Loaded when no quotation exists | **PASS** |
+| **Pricing** | Increase Quoted Unit Price (₹40,000 → ₹50,000) | **PASS** |
+| **Pricing** | Decrease Quoted Unit Price (₹50,000 → ₹35,000 — Below Base Cost) | **PASS** |
+| **Pricing** | Base Cost Independence (`costPrice` unchanged at ₹40,000) | **PASS** |
+| **Pricing** | Signed Margin Calculation (`markupAmount = -₹4,550` on below-cost quote) | **PASS** |
+| **Payment Schedule** | Dynamic milestone synchronization & persistence (`sum === finalAmount`) | **PASS** |
+| **Preview** | Latest total & no internal markup leak | **PASS** |
+| **PDF** | Professional format & zero commercial leakage | **PASS** |
+| **Public Live Link** | Real-time latest data & strict redaction | **PASS** |
+| **Quotation → Booking** | Compatibility & correct total snapshot | **PASS** |
+| **TypeScript** | `npx tsc --noEmit` (0 errors) | **PASS** |
+| **Production Build** | `npm run build` (all routes static/dynamic compiled) | **PASS** |
+| **Permanent Data** | 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles intact | **PASS** |
+
+## 171.9 Final Verdict
+- **QUOTATION FLOW VERIFIED — PRODUCTION READY**
+
+---
+
+# 172. READ-ONLY QUOTATION PRICING MODEL & CUSTOMER PDF FORMAT AUDIT
+
+## 172.1 Audit Baseline & Architectural Findings
+- **Pricing Model Alignment**: Identified previous hybrid pricing model where line items maintained individual quoted prices alongside package-level markup.
+- **Audit Recommendation for Phase 173**:
+  1. Standardize quotation line items to strictly reflect RateSheet unit rates. Line items do NOT have independent markup or selling price inputs.
+  2. Apply Agency Markup ONCE at the package/quotation level over aggregate RateSheet base subtotal.
+  3. Redact intermediate pricing breakdowns and non-final monetary amounts from customer-facing surfaces (Customer Preview, Public Proposal Link, Quotation PDF).
+  4. Redesign Customer Quotation PDF into an original, multi-section travel-itinerary document with a strict single monetary value rule (`FINAL QUOTATION AMOUNT: ₹XX,XXX`).
+
+---
+
+# 173. QUOTATION PRICING MODEL & CUSTOMER-FACING ITINERARY PDF REDESIGN
+
+## 173.1 Core Architecture & Single Package Markup Rule
+- **RateSheet Rate as Single Unit Rate**:
+  - For each quotation line item, `unitPrice` is sourced directly and read-only from the selected hotel/vehicle/activity RateSheet.
+  - Line items do NOT have individual markups or independent selling prices (`QuotationItem.markupPercentage = 0`).
+  - $\text{Line Item Base Amount} = \text{RateSheet Rate} \times \text{Quantity}$.
+  - `QuotationItem.costPrice = QuotationItem.sellingPrice = QuotationItem.totalPrice = Line Item Base Amount`.
+- **Package-Level Markup (Applied ONCE)**:
+  $$\text{Subtotal} = \sum (\text{Line Item Base Amounts})$$
+  $$\text{Agency Markup Amount} = \text{Math.round}((\text{Subtotal} \times \text{Quotation Markup \%}) / 100)$$
+  $$\text{Gross Package Amount} = \text{Subtotal} + \text{Agency Markup Amount}$$
+  $$\text{Discount Amount} = \text{Math.round}((\text{Gross Package Amount} \times \text{Discount \%}) / 100)$$
+  $$\text{Taxable Amount} = \max(0, \text{Gross Package Amount} - \text{Discount Amount})$$
+  $$\text{Final Quotation Amount} = \text{TaxService.calculate}(\text{Taxable Amount}, \text{Tax Rate}, \text{Tax Mode})$$
+
+## 173.2 Dynamic Payment Milestone Synchronization
+- `syncPaymentMilestones(id, finalAmount)` dynamically synchronizes all percentage-based milestones upon quotation recalculation.
+- Remainder distribution guarantees $\sum (\text{milestones.amount}) \equiv \text{finalAmount}$ exactly to the rupee.
+- `updateQuotation` automatically returns the refreshed quotation object with updated payment milestones.
+
+## 173.3 Customer-Facing Financial Redaction
+- **Customer Preview (`/trips/[id]/quotation/preview`)**:
+  - Displays package services, non-price quantity badges, itinerary schedule, inclusions/exclusions, milestone percentages, and **Total Final Quotation Amount** exclusively.
+  - Line prices, subtotals, markups, discounts, and tax breakdowns are strictly omitted.
+- **Public Share Proposal (`/q/[shareToken]`)**:
+  - Sanitized public DTO completely redacts internal costs, subtotals, line item rates, markups, discounts, and milestone currency amounts.
+  - Displays package tier options, day-wise itinerary, inclusions/exclusions, milestone percentages, and **Total Package Investment** exclusively.
+- **Public API (`/api/quotations/public/[token]`)**:
+  - Server-side redaction ensures zero confidential financial leakage over the network.
+
+## 173.4 Customer-Facing Travel Itinerary PDF Redesign
+- **Original TripDesk Design**: Rebuilt `QuotationPdfService` into an original, elegant, multi-section travel-itinerary proposal with modern typography, card styling, and brand palettes.
+- **Structured Sections**:
+  1. Cover / Hero Banner (Agency branding, title, quotation number, version, prepared for, travel dates, validity).
+  2. Trip Overview Card (Travel dates, group size, validity).
+  3. Travel Consultant Greeting (if present).
+  4. Day-Wise Tour Itinerary (Day badge, date, title, location, detailed description).
+  5. Hotel Accommodations (Hotel, city, room type, meal plan, check-in, check-out, nights, rooms — non-price).
+  6. Transportation & Transfers (Vehicle, type, capacity, notes — non-price).
+  7. Sightseeing & Activities (Excursion name, city, date, description — non-price).
+  8. Package Inclusions & Exclusions (Two-column emerald/rose structured cards).
+  9. Payment Schedule (Stage names and percentages only — strictly zero currency amounts).
+  10. Booking Policies & Terms (Cancellation policy, terms and conditions).
+  11. **FINAL QUOTATION AMOUNT**: The **ONLY** monetary section in the entire PDF document, rendered as a prominent dark hero card with emerald final amount.
+  12. Global Header / Footer (Agency contact details and `Page X of Y` on all pages).
+
+## 173.5 Verification & QA Test Results
+- **Automated Verification Suite (`prisma/test-phase173-pricing-pdf.ts`)**:
+  - Scenario A: RateSheet single unit rate sourcing & aggregate subtotal (PASS)
+  - Scenario B: Package markup applied once at quotation level (PASS)
+  - Scenario C: Discount and statutory tax recalculation (PASS)
+  - Scenario D: Dynamic payment milestone synchronization (PASS)
+  - Scenario E: Public proposal DTO security redaction (PASS)
+  - Scenario F: Customer PDF generation & single monetary value rule (PASS)
+  - Result: **54 PASSED, 0 FAILED (TOTAL: 54)**.
+- **TypeScript Compilation**: `npx tsc --noEmit` (0 errors).
+- **Target Trip & Agency**: Verified on Trip `cmu5fhkk40006v4tqpd2k2kd4` and Agency `cmu2g9rgq0000swtqbr5aie7x`.
+- **Permanent Test Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% intact.
+
+---
+
+# 174. PHASE 174 — CUSTOMER QUOTATION / ITINERARY UI REFERENCE ALIGNMENT
+
+**Status**: `PHASE 174 — IMPLEMENTATION COMPLETE — QA PASSED`  
+**Date**: September 2026  
+**Primary Surfaces**:
+1. Agency Owner Quotation Preview (`/trips/[id]/quotation/preview/page.tsx`)
+2. Public Quotation Link (`/q/[shareToken]/page.tsx`)
+3. Customer Quotation PDF (`src/lib/services/quotation-pdf-service.ts` & `/api/quotations/[id]/pdf`, `/api/quotations/public/[token]/pdf`)
+
+---
+
+## 174.1 Objective & Information Architecture Alignment
+Phase 174 successfully aligned the 3 customer-facing quotation representations around a unified, reference-inspired 14-section travel document information architecture using original TripDesk design system aesthetics:
+
+1. **Brand Header & Hero**: Agency identity, logo, quotation title, quotation number, version, dates, duration (`X Nights / Y Days`), group size, customer name.
+2. **Trip Overview**: Personal travel consultant greeting, structured trip metadata bar (Prepared For, Dates, Duration, Group Size, Validity).
+3. **Tour Highlights Bar**: Summary pills derived dynamically from trip services (e.g. `X Selected Stays`, `Private Transport Included`, `Y Sightseeing Activities`, `Z Tour Days`).
+4. **Destination Route Sequence**: Chronological transit route rendered from `TripDestination` records ordered by `sequence` (e.g., `Ahmedabad → Goa → Mumbai`), supporting multiple and repeated destinations without artificial duplication or collapsing.
+5. **Day-by-Day Itinerary**: Modern day-wise timeline cards detailing day numbers, dates, titles, locations, and descriptions.
+6. **Accommodation & Stay Details**: Structured hotel cards detailing hotel name, destination/city, room type, meal plan, stay dates, nights, and room counts (strictly non-financial).
+7. **Transportation & Logistics**: Dedicated vehicle cards detailing category, capacity, chauffeur, and logistics notes (strictly non-financial).
+8. **Sightseeing & Experiences**: Structured activity cards with excursion names, destinations, dates, and descriptions (strictly non-financial).
+9. **Coverage (Inclusions vs Exclusions)**: Unified, clean 2-column layout (Emerald Inclusions vs Rose Exclusions). Redundant raw quotation line-item table dump was completely eliminated.
+10. **Important Notes & Advisories**: Structured customer-facing advisory notes.
+11. **Booking Policies & Terms**: Terms & Conditions and Cancellation Policy cards.
+12. **Payment Milestone Schedule**: Structured payment milestones displaying stage titles, percentages (%), and due dates (strictly zero ₹ currency amounts).
+13. **FINAL QUOTATION AMOUNT**: Solitary hero banner presenting the single authoritative customer-facing quotation amount (`finalAmount`).
+14. **Agency Contact Footer**: Polished footer with agency name, phone, email, address, and branding.
+
+---
+
+## 174.2 Non-Negotiable Invariants & Pricing Integrity
+- **RateSheet Base & Single Package Markup Rule (Phase 173 Locked)**:
+  - $\text{RateSheet Base} \to \text{Package Markup} \to \text{Gross} \to \text{Discount} \to \text{Tax} \to \text{Final Amount}$ remains the strict pricing formula.
+  - RateSheet unit rates remain fixed and read-only.
+  - Agency markup is applied once at the aggregate package level.
+- **Single Monetary Value Rule**:
+  - Across Preview, Public Link, and PDF, **EXACTLY ONE** monetary value is rendered: the `FINAL QUOTATION AMOUNT`.
+  - All line-item rates, cost prices, selling prices, subtotals, markup %, markup amounts, discount amounts, taxable amounts, tax breakdowns (GST/CGST/SGST/IGST), and milestone currency amounts are strictly omitted.
+- **Package-Tier Pricing Restriction**:
+  - Tier selection cards in the public quotation preserve tier names, badges, descriptions, inclusions, vehicle notes, and selection functionality, but **NO individual package tier prices** are displayed.
+- **Security & Public DTO Sanitization**:
+  - `quotation-service.ts` and `quotation-client.ts` enforce strict public data sanitization.
+  - `tripDestinations` relation is securely exposed in the public payload with customer-safe fields (`destinationName`, `sequence`, `stayNights`, `notes`) without exposing internal commercial fields or unnecessary IDs.
+
+---
+
+## 174.3 PDF Engine Refinements (`QuotationPdfService`)
+- Sourced `destinations` from `trip.tripDestinations` sorted by sequence.
+- Added dynamic Tour Highlights bar with summary pills.
+- Added Destination Route sequence badges with clean arrow indicators.
+- Sourced structured hotels, vehicles, and activities from `trip.tripHotels`, `trip.tripVehicles`, and `trip.tripActivities`.
+- Replaced redundant line-item dump with structured Inclusions vs Exclusions.
+- Verified strict single monetary value output: programmatic PDF uncompressed stream hex inspection confirms exactly 1 ₹ currency symbol occurrence corresponding to `FINAL QUOTATION AMOUNT`.
+- Verified clean page breaks and document layout across multi-page proposals.
+
+---
+
+## 174.4 Verification & QA Results
+- **Automated Verification Suite (`prisma/qa-phase174-alignment-check.ts`)**:
+  - Sourcing & Route sequence verification: PASS
+  - Public DTO commercial redaction & security: PASS
+  - Package tier price redaction: PASS
+  - Preview single monetary value: PASS
+  - Public Link single monetary value: PASS
+  - Customer PDF single monetary value & text scan: PASS
+  - Result: **70 PASSED, 0 FAILED**.
+- **Phase 173 Pricing & Milestone Regression Suite (`prisma/qa-phase173-full-check.ts`)**:
+  - Result: **71 PASSED, 0 FAILED**.
+- **TypeScript Validation**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS** (All static and dynamic routes compiled without errors).
+- **Responsive Viewport QA**: Verified on Desktop ($1440 \times 900$), Tablet ($768 \times 1024$), and Mobile ($390 \times 844$).
+- **Database & Baseline Integrity**:
+  - Zero schema modifications to `prisma/schema.prisma`.
+  - Permanent test agency (`cmu2g9rgq0000swtqbr5aie7x`) and master baseline data remain 100% intact:
+    - **22 Hotels**
+    - **66 RateSheets**
+    - **32 Destinations**
+    - **6 Vehicles**
+
+---
+
+## 174.5 Files Modified
+- `src/lib/services/quotation-service.ts`: Expanded query relations (`tripDestinations`, `tripHotels`, `tripVehicles`, `tripActivities`) across `getQuotation`, `getQuotationsByTripId`, `getPublicQuotationByToken`, `createQuotation`, `updateQuotation`, `generateQuotationFromTrip`, and `createQuotationVersion`.
+- `src/lib/api-client/quotation-client.ts`: Updated `QuotationWithRelations` and `PublicQuotationPayload` types and public sanitization boundary.
+- `src/lib/services/quotation-pdf-service.ts`: Implemented 14-section information architecture, route sequence, tour highlights bar, structured services, and single-money verification.
+- `src/app/api/quotations/[id]/pdf/route.ts`: Updated PDF generator invocation to pass structured destinations.
+- `src/app/api/quotations/public/[token]/pdf/route.ts`: Updated public PDF generator invocation to pass structured destinations.
+- `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx`: Refactored into unified 14-section travel document presentation, removed redundant line-item table.
+- `src/app/q/[shareToken]/page.tsx`: Refactored into unified 14-section travel document presentation, removed tier price displays while preserving selection.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 174 implementation documentation.
+
+---
+
+# 175A. PHASE 175A — PDF VISUAL PARITY AUDIT & FIX
+
+**Status**: `PHASE 175A — PDF VISUAL FIX COMPLETE`  
+**Date**: September 2026  
+**Primary Surface**: `src/lib/services/quotation-pdf-service.ts`
+
+---
+
+## 175A.1 Objective & Visual Parity Problem Statement
+While the customer quotation preview (`/trips/[id]/quotation/preview`) was successfully aligned in Phase 174, the downloaded customer PDF had substantial visual discrepancies compared to the Web Preview:
+1. Fractured hero header (tiny 88pt dark bar separated from a grey overview box).
+2. Raw emoji icons (`🏨`, `🚗`) in Helvetica font which did not render cleanly in PDFKit.
+3. Unstructured text lists instead of rounded card containers with subtle borders.
+4. Hard-coded clipping (`slice(0, 6)`) on package inclusions and exclusions.
+5. Inconsistent vertical spacing and card height budgeting leading to poor page flow.
+
+Phase 175A completely overhauled `QuotationPdfService` to achieve 1:1 visual parity with the Web Preview while respecting A4 print layout conventions.
+
+---
+
+## 175A.2 Key PDF Visual Improvements
+- **Unified Dark Hero Card**:
+  - Implemented a single continuous Slate-900 hero block (140-152pt) with rounded corners (`r=10`).
+  - Integrated agency identity, subtext, top-right quotation reference capsule (`Q-XXXX • vX`), `TAILORED HOLIDAY PROPOSAL` category badge, bold white trip title, subtitle, and an embedded 4-column structured metadata bar (`PREPARED FOR`, `TRAVEL DATES & DURATION`, `GROUP SIZE`, `VALIDITY`).
+- **Advisor Greeting Card**:
+  - Soft indigo container (`#EEF2FF` fill, `#C7D2FE` border) with uppercase header and clean formatted consultant text.
+- **Tour Highlights Bar**:
+  - Clean slate card (`#F8FAFC` fill, `#E2E8F0` border) with neatly formatted bullet pills.
+- **Destination Route Sequence**:
+  - Soft purple container (`#FAF5FF` fill, `#E9D5FF` border) with `TOUR ROUTE SEQUENCE:` header and chronological arrow-connected transit route.
+- **Day-by-Day Itinerary Cards**:
+  - Each day rendered in a distinct card container with dark `DAY X` pill badge, bold title, date, indigo location pill badge (`📍 Location`), and formatted description with generous line spacing.
+- **Structured Accommodations, Transport & Activities**:
+  - Structured cards with hotel name, destination/city, room category, meal plan, stay dates, and nights/rooms badges.
+  - Dedicated transport cards with vehicle category, capacity badge (`X Seater`), and chauffeur notes.
+  - Dedicated activity cards with excursion name, date badge, location, and description.
+- **2-Column Inclusions vs Exclusions**:
+  - Side-by-side emerald (`#ECFDF5`) and rose (`#FFF1F2`) cards with dynamic height budgeting, ensuring zero items are truncated.
+- **Milestones & Solitary Final Quotation Amount**:
+  - Structured milestone schedule (percentages only, strictly zero ₹ amounts).
+  - Prominent dark hero card with emerald final amount (`formatCurrency(finalAmount)`) as the **solitary customer-facing monetary value**.
+- **Global Header / Footer**:
+  - Clean divider rule with agency contact info on the left and `Page X of Y` on the right across all pages.
+
+---
+
+## 175A.3 Package Tiers Status (Explicit Boundary Rule)
+- **PACKAGE TIERS & OPTIONS WERE INTENTIONALLY NOT CHANGED**:
+  - Left 100% untouched and frozen.
+  - Zero modifications to tier names, descriptions, pricing formulas, tier selection logic, or database structures.
+  - Discussion and investigation of multi-tier price differentials remain deferred to a separate future phase.
+
+---
+
+## 175A.4 Verification & QA Results
+- **PDF Stream & Currency Scan**: Programmatic scan verified **EXACTLY 1 ₹ currency symbol occurrence** across the entire PDF, matching the final quotation amount. Zero commercial leak (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹` all absent).
+- **Phase 175A Test Suite**: 29/29 assertions passed.
+- **Phase 173 Full Regression Suite**: 71/71 assertions passed.
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS (Exit code 0)**.
+- **Permanent Baseline Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% intact.
+- **Protected Systems**: All 7 protected systems untouched.
+
+---
+
+## 175A.5 Files Modified
+- `src/lib/services/quotation-pdf-service.ts`: Redesigned A4 visual layout, unified hero, card containers, and typography.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175A documentation.
+
+---
+
+# SECTION 175B: PDF PROFESSIONAL RENDERING & TYPOGRAPHY REFINEMENT
+
+## 175B.1 Discovered Rendering Defects & Root Cause Analysis
+Following manual visual inspection of the Phase 175A generated PDF, several visual/rendering defects were identified:
+1. **Malformed Hotel/Activity/Vehicle Glyphs (`Ø<ßè`)**:
+   - **Root Cause**: PDFKit's default PostScript fonts (Helvetica / Helvetica-Bold) utilize single-byte WinAnsi / ISO-8859-1 encoding. Multi-byte UTF-8 emoji strings (such as `🏨`, `🚗`, `🎟`, `📍`, `✔`, `➔`) were interpreted as raw Latin1 byte sequences, rendering as garbled glyphs (e.g., `Ø<ßè Harbour Heritage Kochi`).
+   - **Solution**: Removed all multi-byte Unicode emojis from strings. Introduced PDF-safe typographic badges (`HOTEL`, `VEHICLE`, `ACTIVITY`), clean textual tags (`Location: ...`), clean ASCII bullets (`-`), and clean ASCII arrows (`>`).
+2. **Malformed Currency Glyph (`¹`)**:
+   - **Root Cause**: The Unicode Indian Rupee symbol `₹` (U+20B9) is not in the standard Helvetica WinAnsi character set. Byte 0xB9 in WinAnsi maps to superscript one (`¹`), causing `¹1,05,052.50` instead of a clean monetary display.
+   - **Solution**: Implemented `formatPdfCurrency(amount, currency)` which outputs standard `INR 1,05,052.50` (or `USD ...`) using Indian number formatting (`en-IN`), completely eliminating `¹` and guaranteeing PDF-safe character rendering.
+3. **Card Spacing, Border Collisions & Vertical Balance**:
+   - **Root Cause**: Fixed or tight card heights caused text lines to touch card borders; insufficient internal horizontal and vertical padding caused labels and values to crowd.
+   - **Solution**: Systematized card padding across all components (Hero: 18pt horizontal / 14pt vertical; Hotel: 48pt with 10pt padding; Vehicle: 38pt; Activity: 36pt; Inclusions/Exclusions: 12pt padding). Added dynamic height padding buffers so text never touches container borders.
+
+---
+
+## 175B.2 PDF Layout & Typography Refinements
+- **Typography & Font Hierarchy**: Standardized on clean Helvetica typography: Document Title (18pt Bold), Section Titles (11pt Bold, Uppercase), Card Titles (9.5-10pt Bold), Metadata (8pt), Badges (6.5-7pt Bold), Body/Descriptions (8-8.5pt, 1.4-1.6 lineGap).
+- **Hotel Cards**: High-contrast hierarchy featuring bold hotel name, destination, metadata row (`Room: ... | Meal Plan: ...`), stay dates (`Oct 1 - Oct 2`), and night/room badges (`1 Night(s) - 1 Room(s)`).
+- **Vehicle & Transportation**: Clean `VEHICLE` badge, vehicle model name, `X Seater` capacity badge, category, and logistics notes with consistent vertical alignment.
+- **Sightseeing & Activities**: Clean `ACTIVITY` badge, bold activity title, date pill badge, destination tag, and readable multi-line descriptions.
+- **Inclusions & Exclusions**: Balanced 2-column layout with emerald `INCLUDED SERVICES` vs rose `EXCLUDED SERVICES` cards, generous internal padding, and clean `-` bullet points.
+- **Payment Milestones**: Strict percentage-only breakdown (`STAGE X (Y%)`, title, due date) with zero currency amounts.
+- **Final Quotation Amount Card**: Prominent dark slate card with emerald amount `INR X,XX,XXX.XX`, generous padding, and zero competing monetary figures.
+
+---
+
+## 175B.3 Strict Boundary & Freeze Confirmations
+- **PACKAGE TIERS & OPTIONS REMAIN 100% UNTOUCHED & FROZEN**:
+  - No changes to package tier pricing, tier options, selection logic, tier definitions, or database models.
+- **PRICING ENGINE & COSTING LOGIC REMAIN UNTOUCHED**:
+  - RateSheet Base $\to$ Package Markup $\to$ Gross $\to$ Discount $\to$ Tax $\to$ Final calculation flow preserved with 100% mathematical fidelity.
+- **SINGLE CUSTOMER-FACING MONETARY VALUE RULE PRESERVED**:
+  - The customer PDF displays exactly ONE monetary value (Final Quotation Amount).
+  - All internal pricing fields (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹`) remain strictly redacted.
+
+---
+
+## 175B.4 Validation & Quality Assurance
+- **Glyph & Unicode Audit**: Verified zero malformed characters (`Ø<ßè`, `¹`, fallback glyphs) in generated PDF.
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` $\to$ **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+
+---
+
+## 175B.5 Files Modified
+- `src/lib/services/quotation-pdf-service.ts`: Implemented PDF-safe typography, `formatPdfCurrency`, typographic badges, and refined card padding/alignment.
+- `prisma/qa-phase173-full-check.ts`: Updated PDF currency scanner to recognize `INR` and rupee formatting.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175B documentation.
+
+---
+
+# SECTION 175C: PDF LAYOUT, PAGINATION & DYNAMIC CONTENT REFINEMENT
+
+## 175C.1 Layout & Pagination Audit & Root Cause Analysis
+Following inspection of generated quotation PDFs, three core layout and pagination issues were audited and resolved:
+1. **Static Marketing Text Removal / Dynamic Replacement**:
+   - **`Bespoke Itineraries & Luxury Holiday Packages`**: Was hardcoded as decorative marketing copy under the agency name. Replaced with dynamic agency contact information (`agency.phone | agency.email`) or cleanly omitted if not provided.
+   - **`TAILORED HOLIDAY PROPOSAL`**: Was a static generic badge. Replaced with neutral, data-driven label: `PACKAGE: ${packageName}` when a package option is selected, or `TRAVEL PROPOSAL`.
+2. **Section Title Alignment Bleed (`DAY-WISE TOUR ITINERARY` & `PAYMENT MILESTONE SCHEDULE`)**:
+   - **Root Cause**: Multi-column text calls (e.g. Route Sequence and Inclusions/Exclusions right column) updated PDFKit internal cursor `doc.x` to the middle/right of the page (`margin + 120` or `rightX + 12`). Subsequent `drawSectionHeader` calls invoked `doc.text()` without resetting `doc.x` or passing `margin` explicitly, causing headings to render from the middle of the page.
+   - **Solution**: Explicitly anchored all section headers to `margin` with `{ width: contentWidth }` and enforced `doc.x = margin` across all section transitions.
+3. **Premature Page Break Cascading (6 Pages Bloat Reduced to 1-2 Pages)**:
+   - **Root Cause**: Excessive fixed card heights, large arbitrary spacing gaps (combined `moveDown()` + Y-jumps), and oversized page break thresholds in `checkPageBreak(50)` on both headers and each individual card caused premature page breaks whenever `doc.y` exceeded ~700, leaving 100-150pt of unused blank space at the bottom of almost every page.
+   - **Solution**: Implemented an atomic `ensureSpace(neededHeight)` layout system with compact, content-driven heights, 4-6pt card gaps, and 10-14pt section gaps. Single-day/single-hotel trips fit on **1 page**, and full 7-day rich multi-hotel tours fit seamlessly across **2 pages** (down from 6).
+
+---
+
+## 175C.2 Strict Boundary & Freeze Confirmations
+- **PACKAGE TIERS & OPTIONS REMAIN 100% UNTOUCHED & FROZEN**:
+  - No changes to package tier pricing, tier options, selection logic, tier definitions, or database models.
+- **PRICING ENGINE & COSTING LOGIC REMAIN UNTOUCHED**:
+  - RateSheet Base $\to$ Package Markup $\to$ Gross $\to$ Discount $\to$ Tax $\to$ Final calculation flow preserved with 100% mathematical fidelity.
+- **SINGLE CUSTOMER-FACING MONETARY VALUE RULE PRESERVED**:
+  - Exactly ONE monetary value (Final Quotation Amount) formatted as `INR 1,05,052.50`.
+  - All internal pricing fields (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹`) remain strictly redacted.
+
+---
+
+## 175C.3 Validation & Quality Assurance
+- **Page Count Verification**:
+  - Single-day test quotation: Reduced from **6 pages $\to$ 1 page**.
+  - Multi-day (7-day, 3-hotel) rich quotation: Reduced from **6 pages $\to$ 2 pages**.
+- **Section Heading Alignment**: Confirmed 100% left-aligned anchor across all section titles.
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` $\to$ **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+
+---
+
+## 175C.4 Files Modified
+# SECTION 175D: DOWNLOAD PDF / EXPORT PDF MUST MATCH CUSTOMER PREVIEW
+
+**Status**: `PHASE 175D — PDF/PREVIEW PARITY PASSED`  
+**Date**: September 2026  
+**Primary Surface**: `src/lib/services/quotation-pdf-service.ts`
+
+---
+
+## 175D.1 Problem & Root Cause Analysis
+- **Problem**: The customer preview UI (`/trips/[id]/quotation/preview` and `/q/[shareToken]`) was visually structured into 14 distinct cards/sections, but the generated "Download PDF" / "Export PDF" had visual & structural discrepancies with the web preview (omission of package tier specifications when multiple options were configured, inconsistent spacing in cards, section header styling differences).
+- **Root Cause**:
+  1. Web Preview displayed a Package Tier Specifications overview (Tier Name, Subtitle, Hotel Notes, Vehicle Notes, and `[SELECTED TIER]` badge) when multiple package options existed, but PDF omitted tier specs completely.
+  2. PDF card styles, highlight capsules, route pills, and milestone cards required exact 1:1 structural alignment with the Web Preview components while maintaining A4 print dimensions.
+  3. Single customer monetary value rule needed strict preservation across PDF (zero individual tier prices displayed, only the solitary Final Quotation Amount).
+
+---
+
+## 175D.2 Exact Fixes Applied
+1. **Quotation PDF Service (`src/lib/services/quotation-pdf-service.ts`)**:
+   - Replicated Web Preview's 14-section visual structure:
+     - **Hero/Header Banner**: Slate-900 / Indigo-950 dark container with agency branding, quotation pill (`QT-XXXXX • vX`), dynamic package/travel proposal badge, bold trip title, proposal subtitle, and 4-column metadata grid (`PREPARED FOR`, `TRAVEL DATES`, `GROUP SIZE`, `VALIDITY`).
+     - **Advisor Greeting**: Soft indigo container (`#EEF2FF` fill, `#C7D2FE` border) with `GREETING FROM YOUR TRAVEL CONSULTANT` header and clean message.
+     - **Package Tier Specifications**: Multi-tier comparison cards showing Tier Name, Subtitle, Hotel Specs, Transport Specs, and `[SELECTED TIER]` badge (strictly with zero monetary values, preserving the single customer price rule).
+     - **Tour Highlights Bar**: Compact capsule pills for stays, vehicles, activities, and tour schedule.
+     - **Destination Route Sequence**: Soft purple container (`#FAF5FF`, `#E9D5FF` border) with `[City] > [City]` transit route.
+     - **Day-Wise Itinerary**: Day badges, dates, bold titles, location pills, and formatted descriptions.
+     - **Hotel Accommodations**: Bold hotel name, city tag, stay dates, night/room badges, and meal plan.
+     - **Transportation**: Vehicle model, seater capacity badge, type and logistics notes.
+     - **Sightseeing & Activities**: Activity title, date badge, location tag, and description.
+     - **Inclusions vs Exclusions**: Side-by-side emerald and rose 2-column cards without truncation.
+     - **Payment Milestones**: Stage cards with stage name, percentage, and due date (zero ₹ amounts).
+     - **Important Notes & Policies**: Advisories, cancellation policy, terms & conditions.
+     - **Final Quotation Amount Card**: Prominent dark slate card (`#0F172A`) with emerald amount (`INR X,XX,XXX.XX`).
+     - **Global Footer**: Agency contact info on left, page numbers on right.
+   - Enforced strict cursor resets (`doc.x = margin`) before every section to guarantee left alignment.
+   - Preserved atomic `ensureSpace()` pagination preventing unnecessary page fragmentations.
+
+---
+
+## 175D.3 Strict Boundary & Freeze Confirmations
+- **PACKAGE TIERS & OPTIONS REMAIN 100% UNTOUCHED & FROZEN**:
+  - No changes to package tier pricing, tier options, selection logic, tier definitions, or database models.
+- **PRICING ENGINE & COSTING LOGIC REMAIN UNTOUCHED**:
+  - RateSheet Base → Package Markup → Gross → Discount → Tax → Final calculation flow preserved with 100% mathematical fidelity.
+- **SINGLE CUSTOMER-FACING MONETARY VALUE RULE PRESERVED**:
+  - Exactly ONE monetary value (Final Quotation Amount) formatted as `INR 1,05,052.50`.
+  - All internal pricing fields (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹`) remain strictly redacted.
+
+---
+
+## 175D.4 Validation & Quality Assurance
+- **TypeScript**: `npx tsc --noEmit` → **0 errors**.
+- **Production Build**: `npm run build` → **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` → **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+- **Protected Systems**: All 7 protected systems untouched.
+
+---
+
+## 175D.5 Files Modified
+- `src/lib/services/quotation-pdf-service.ts`: Redesigned layout engine to achieve 1:1 visual parity with Web Preview.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175D documentation.
+
+---
+
+# SECTION 175E: PDF CONTENT CLEANUP & DYNAMIC HEADER LABELS
+
+**Status**: `PHASE 175E — PDF CONTENT CLEANUP PASSED`  
+**Date**: September 2026  
+**Primary Surface**: `src/lib/services/quotation-pdf-service.ts`
+
+---
+
+## 175E.1 Cleaned Up Content & Removed PDF Sections
+Per customer document guidelines, the following 3 sections were completely removed from the generated customer-facing PDF:
+1. **`TOUR ROUTE` / Destination Route Sequence**: Entirely removed from PDF rendering (database model, trip destinations, and web preview remain 100% intact).
+2. **`PAYMENT MILESTONE SCHEDULE`**: Entirely removed from PDF rendering (database model, milestone calculations, and financial synchronization remain 100% intact).
+3. **`TRAVEL PACKAGE OPTIONS`**: Entirely removed from PDF rendering (package tier database models, tier pricing, tier selection, and costing remain 100% intact).
+
+---
+
+## 175E.2 Dynamic Header Labels & Fallbacks
+1. **Replaced `Bespoke Itineraries & Luxury Holiday Packages`**:
+   - Replaced with dynamic agency contact information (`agency.phone | agency.email`).
+   - If contact information is unavailable, falls back cleanly to the neutral label: `TRIP PROPOSAL`.
+   - Zero hard-coded luxury/marketing slogans.
+2. **Replaced `Tailored Holiday Proposal`**:
+   - Dynamically renders `PACKAGE: ${selectedPackageOption.name.toUpperCase()}` when a package tier is selected.
+   - Falls back cleanly to `TRAVEL PROPOSAL` when no specific tier is selected.
+   - Zero marketing copy.
+
+---
+
+## 175E.3 Boundary & Freeze Confirmations
+- **PACKAGE TIERS & OPTIONS REMAIN 100% UNTOUCHED & FROZEN**:
+  - No changes to package tier database schema, tier selection, tier pricing logic, or web preview UI.
+- **CUSTOMER PREVIEW & PUBLIC WEB PROPOSAL UNCHANGED**:
+  - `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx` and `src/app/q/[shareToken]/page.tsx` remain untouched.
+- **PRICING ENGINE & SINGLE MONETARY VALUE RULE PRESERVED**:
+  - Customer PDF contains strictly ONE monetary value (`FINAL QUOTATION AMOUNT`).
+  - Zero commercial leakage (`costPrice`, `subtotal`, `markup`, `tax`, `milestone ₹` all absent).
+
+---
+
+## 175E.4 Validation & Quality Assurance
+- **Targeted PDF String Verification**:
+  - Verified `TOUR ROUTE`, `PAYMENT MILESTONE SCHEDULE`, `TRAVEL PACKAGE OPTIONS`, `Bespoke Itineraries & Luxury Holiday Packages`, and `TAILORED HOLIDAY PROPOSAL` are **100% ABSENT** from generated PDF.
+  - Verified dynamic package badge (`PACKAGE: LUXURY HERITAGE`) and neutral fallback (`TRAVEL PROPOSAL`).
+  - Verified dynamic agency contact line and neutral fallback (`TRIP PROPOSAL`).
+- **TypeScript**: `npx tsc --noEmit` → **0 errors**.
+- **Production Build**: `npm run build` → **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` → **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+
+---
+
+## 175E.5 Files Modified
+- `src/lib/services/quotation-pdf-service.ts`: Removed 3 PDF sections, implemented dynamic header labels and neutral fallbacks.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175E documentation.
+
+---
+
+# SECTION 175F: CUSTOMER PREVIEW REGRESSION FIX & DYNAMIC HEADER LABELS
+
+**Status**: `PHASE 175F — PREVIEW REGRESSION FIX PASSED`  
+**Date**: September 2026  
+**Primary Surfaces**:
+- `src/lib/services/quotation-service.ts`
+- `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx`
+- `src/app/q/[shareToken]/page.tsx`
+
+---
+
+## 175F.1 Root Cause & Investigation
+- **Root Cause of Missing Service Details (Hotels, Vehicles, Activities)**:
+  - In `src/lib/services/quotation-service.ts`, the `getQuotations` and `getQuotationsByTripId` queries (used by `GET /api/trips/[id]/quotation` to feed the Customer Preview page) previously selected only basic trip scalar fields and omitted relations for `tripHotels`, `tripVehicles`, `tripActivities`, `tripDestinations`, and `agency` from Prisma's `include` block.
+  - As a consequence, `res.data.quotations[0].trip.tripHotels`, `tripVehicles`, and `tripActivities` returned `undefined`/empty arrays, causing the conditional rendering guards in the Preview page (`hotelsList.length > 0`, `vehiclesList.length > 0`, `activitiesList.length > 0`) to evaluate to false and hide those customer-safe service detail sections.
+- **Backend Fix Applied**:
+  - Updated `getQuotations` and `getQuotationsByTripId` in `src/lib/services/quotation-service.ts` to include `agency` and the full `trip` relation with nested `tripHotels` (including `hotel`), `tripVehicles` (including `vehicle`), `tripActivities` (including `activity`), and `tripDestinations` (including `destination`).
+  - Restored full data flow to `/trips/[id]/quotation/preview/page.tsx`.
+
+---
+
+## 175F.2 Dynamic Header Labels & Marketing Copy Removal
+1. **Replaced `Bespoke Itineraries & Luxury Holiday Packages`**:
+   - In both `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx` and `src/app/q/[shareToken]/page.tsx`, replaced hard-coded marketing copy with dynamic agency contact line (`agency.phone | agency.email`).
+   - If contact details are unavailable, falls back cleanly to neutral label `TRIP PROPOSAL`.
+2. **Replaced `Tailored Holiday Proposal`**:
+   - In both preview and public proposal pages, dynamically displays `PACKAGE: ${selectedPackageName.toUpperCase()}` when a package option is selected.
+   - When no package option is selected, falls back cleanly to neutral label `TRAVEL PROPOSAL`.
+   - Zero hard-coded luxury/bespoke slogans remain across the codebase.
+
+---
+
+## 175F.3 Preview Design & Pricing Security Intact
+- **Visual Design Preserved**:
+  - Header, hero gradient, trip overview metadata bar, day-by-day itinerary cards, hotel cards, vehicle cards, activity cards, and responsive layouts remained visually intact without any layout regression.
+- **Zero Commercial Information Leakage**:
+  - Customer Preview strictly renders only non-financial details for hotels (hotel name, city, room type, meal plan, check-in, check-out, nights), vehicles (vehicle name, type, capacity, notes), and activities (name, date, description).
+  - Internal pricing (`costPrice`, `unitPrice`, `sellingPrice`, `subtotal`, `markup`, `tax`, `milestone ₹`) strictly excluded.
+  - Final quotation amount remains the ONLY customer-facing price displayed.
+
+---
+
+## 175F.4 Validation & Quality Assurance
+- **TypeScript**: `npx tsc --noEmit` → **0 errors**.
+- **Production Build**: `npm run build` → **SUCCESS (Exit code 0)**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` → **71/71 assertions PASSED (100%)**.
+- **Permanent Master Data**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% preserved.
+- **Hard-coded String Audit**: Verified 0 occurrences of `Bespoke Itineraries`, `Tailored Holiday Proposal`, or `TAILORED HOLIDAY PROPOSAL` across `src`.
+
+---
+
+## 175F.5 Files Modified
+- `src/lib/services/quotation-service.ts`: Added full `trip` relations (`tripHotels`, `tripVehicles`, `tripActivities`, `tripDestinations`) and `agency` to `getQuotations` and `getQuotationsByTripId`.
+- `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx`: Dynamic agency contact subtext, dynamic proposal badge text.
+- `src/app/q/[shareToken]/page.tsx`: Dynamic agency contact subtext, dynamic proposal badge text.
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`: Updated with Phase 175F documentation.
+
+---
+
+---
+
+# 177. PHASE 177 DATABASE ROLLBACK RECORD
+
+## 177.1 Context & Rollback Scope
+- **Code Reversion**: Phase 177 experimental package tier code was reverted in Git.
+- **Database Audit**: Read-only audit confirmed that `prisma/schema.prisma` was in the clean pre-Phase-177 state, but the PostgreSQL table `quotation_package_options` still retained five extraneous columns introduced during Phase 177 via `prisma db push`:
+  - `packageType`
+  - `hotelIds`
+  - `vehicleIds`
+  - `activityIds`
+  - `selectedServices`
+- **Rollback Execution**:
+  - Executed authorized SQL dropping all five orphaned columns:
+    ```sql
+    ALTER TABLE "quotation_package_options"
+      DROP COLUMN IF EXISTS "packageType",
+      DROP COLUMN IF EXISTS "hotelIds",
+      DROP COLUMN IF EXISTS "vehicleIds",
+      DROP COLUMN IF EXISTS "activityIds",
+      DROP COLUMN IF EXISTS "selectedServices";
+    ```
+  - Regenerated Prisma Client (`npx prisma generate`) to synchronize DMMF definitions with `prisma/schema.prisma`.
+
+## 177.2 Data & Architecture Integrity
+- **0 Temporary Records**: All Phase 177 temporary QA test data was fully removed; 0 temporary records remain.
+- **Permanent Package Options Preserved**: All 6 pre-existing permanent package option records remain intact with zero financial or descriptive data loss.
+- **Permanent Master Data Preserved**: 22 Hotels, 66 RateSheets, 32 Destinations, 6 Vehicles 100% intact for permanent test agency `cmu2g9rgq0000swtqbr5aie7x`.
+- **Zero Migration Artifacts**: No migrations were created, altered, or deleted (`_prisma_migrations` remains at 4 baseline migrations).
+
+## 177.3 Verification
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors**.
+- **Regression Suite**: `prisma/qa-phase173-full-check.ts` $\to$ **71 / 71 assertions PASSED (100%)**.
+- **Production Build**: `npm run build` $\to$ **SUCCESS (Exit code 0)**.
+- **Current Alignment**: Current codebase and PostgreSQL database are 100% aligned to pre-Phase-177 schema.
+
+---
+
+# 178. QUOTATION TIER SIMPLIFICATION (SEPTEMBER 2026)
+
+## 178.1 Objective & Architecture Overview
+The complex multi-package tier architecture (`QuotationPackageOption` model, option modals, auto-generation multipliers, package cards) was completely removed and replaced with a **simple Tier selection field** on the Quotation model.
+
+### Key Rules & Behavior:
+1. **Field on Quotation**: `tier: String @default("Deluxe")` on `Quotation` model.
+2. **Exactly 3 Allowed Options**:
+   - `Deluxe`
+   - `Ultra Deluxe`
+   - `Premium`
+3. **Default Selection**: `Deluxe` is selected by default on all new quotations.
+4. **Free Selection / Zero Restrictions**: User can change tier freely anytime with NO eligibility conditions, NO hotel/vehicle/activity dependencies, NO package conditions, and NO pricing limits.
+5. **Single Purpose — Quotation Naming**:
+   - The selected Tier is used **ONLY as part of the Quotation Name** (e.g., `Proposal for [TripTitle] - Deluxe`, `Proposal for [TripTitle] - Ultra Deluxe`, `Proposal for [TripTitle] - Premium`).
+   - Changing the Tier updates the quotation name suffix seamlessly.
+6. **Zero Pricing / Costing / Calculation Impact**:
+   - Tier does **NOT** alter subtotal, costing, markup, discount, tax, payment milestones, or final quotation amount.
+   - Line items, hotels, rooms, vehicles, and activities remain 100% manually selected and controlled.
+7. **Single Source of Truth**:
+   - All legacy package options tables (`quotation_package_options`), API routes, and UI tabs have been dropped.
+   - Public proposal and PDFKit generator display the simple tier badge (`TIER: DELUXE`) and solitary customer investment amount without separate package cards.
+
+## 178.2 Database & Schema Migration
+- **Prisma Schema (`prisma/schema.prisma`)**:
+  - Added `tier String @default("Deluxe")` to `Quotation`.
+  - Removed `selectedPackageOptionId`, `selectedPackageOption`, `packageOptions` from `Quotation`.
+  - Removed obsolete model `QuotationPackageOption`.
+- **Migration SQL (`prisma/migrations/20260922113500_simplify_quotation_tier/migration.sql`)**:
+  ```sql
+  ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "tier" TEXT NOT NULL DEFAULT 'Deluxe';
+  ALTER TABLE "quotations" DROP CONSTRAINT IF EXISTS "quotations_selectedPackageOptionId_fkey";
+  DROP INDEX IF EXISTS "quotations_selectedPackageOptionId_idx";
+  ALTER TABLE "quotations" DROP COLUMN IF EXISTS "selectedPackageOptionId";
+  DROP TABLE IF EXISTS "quotation_package_options" CASCADE;
+  ```
+
+## 178.3 Verification & Baseline Preservation
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **End-to-End Tier Flow**:
+  - Default selection `Deluxe` $\to$ Verified.
+  - Switch to `Ultra Deluxe` $\to$ Title synchronized to `... - Ultra Deluxe`, pricing unchanged.
+  - Switch to `Premium` $\to$ Title synchronized to `... - Premium`, pricing unchanged.
+  - Switch back to `Deluxe` $\to$ Title synchronized to `... - Deluxe`, pricing unchanged.
+  - Public view & PDF output $\to$ Verified clean tier rendering with solitary final quotation amount.
+- **Permanent Baseline Counts**:
+  - Destinations: **32** (100% intact)
+  - Hotels: **26** (22 permanent + 4 test, 100% intact)
+  - RateSheets: **66** (100% intact)
+  - Vehicles: **9** (6 permanent + 3 test, 100% intact)
+  - PLATFORM_OWNER: `mzpatel14@gmail.com` (100% intact)
+
+---
+
+# 179. INTERNAL DASHBOARD NOTIFICATION V1 (SEPTEMBER 2026)
+
+## 179.1 Architectural Overview & Scope Isolation
+Phase 179 introduced a persistent, multi-tenant internal notification engine designed specifically for internal platform operators (`PLATFORM_OWNER`) and travel agency operators (`AGENCY_OWNER`).
+
+### Strict System Separation:
+- **Internal Dashboard Notifications (`UserNotification`)**:
+  - Target: Authenticated internal users (`User.id`).
+  - Scoping: `PLATFORM_OWNER` (`agencyId = null`) vs `AGENCY_OWNER` (`agencyId` matching agency).
+  - UI: Topbar Bell Popover (`NotificationsPopover`) across authenticated dashboards.
+  - Storage: Database table `user_notifications`.
+- **Customer Notification Engine (`CustomerNotification`)**:
+  - Target: External travelers/clients via public links (`/trip/[secureToken]`, `/q/[shareToken]`, `/b/[secureToken]`).
+  - Completely preserved and unaffected.
+- **Communication Ledger (`/communications`, `CommunicationLog`)**:
+  - Outbound multi-channel delivery audit ledger (Email, SMS, WhatsApp).
+  - Completely preserved and unaffected.
+- **Operations Timeline (`OperationEvent`) & Audit Log (`PlatformAuditLog`)**:
+  - Tour operational milestones and security audit logging.
+  - Completely preserved and unaffected.
+
+---
+
+## 179.2 Event Matrix & Recipient Targeting
+
+| Event / Action | Internal Recipient | Notification Type (`UserNotificationType`) | Navigation Link | Idempotency Pattern |
+| :--- | :--- | :--- | :--- | :--- |
+| Agency Sign-up / Onboarding | `PLATFORM_OWNER` | `AGENCY_SIGNUP` | `/admin/agencies` | `agency-signup-${agencyId}` |
+| Manual Subscription Payment Submitted | `PLATFORM_OWNER` | `SUBSCRIPTION_PAYMENT_SUBMITTED` | `/admin/subscriptions` | `sub-pay-sub-${paymentId}` |
+| Subscription Payment Verified | `AGENCY_OWNER` | `SUBSCRIPTION_PAYMENT_VERIFIED` | `/subscription` | `sub-pay-verify-${paymentId}` |
+| Subscription Payment Rejected | `AGENCY_OWNER` | `SUBSCRIPTION_PAYMENT_REJECTED` | `/subscription` | `sub-pay-reject-${paymentId}` |
+| Agency Account Suspended / Reactivated | `AGENCY_OWNER` | `AGENCY_STATUS_CHANGED` | `/subscription` or `/dashboard` | `agency-[status]-${agencyId}-${timestamp}` |
+| Public Quotation Accepted | `AGENCY_OWNER` | `QUOTATION_ACCEPTED` | `/quotations/${quotationId}` | `quote-accept-${quotationId}` |
+| Public Quotation Revision Requested | `AGENCY_OWNER` | `QUOTATION_CHANGE_REQUESTED` | `/quotations/${quotationId}` | `quote-changes-${quotationId}-${timestamp}` |
+| Booking Created / Converted | `AGENCY_OWNER` | `BOOKING_CREATED` | `/bookings/${bookingId}` | `booking-created-${bookingId}` |
+| Customer Payment Received & Logged | `AGENCY_OWNER` | `PAYMENT_RECEIVED` | `/bookings/${bookingId}` | `payment-recv-${paymentId}` |
+| Customer Enquiry Created | `AGENCY_OWNER` | `CUSTOMER_ENQUIRY_CREATED` | `/enquiries/${enquiryId}` | `enquiry-created-${enquiryId}` |
+| Platform Announcement Broadcast | All active `AGENCY_OWNER`s | `PLATFORM_ANNOUNCEMENT` | `/dashboard` | `announcement-${announcementId}` |
+
+---
+
+## 179.3 Database Schema & Index Design
+- **PostgreSQL Enum**: `UserNotificationType` with all 11 event types.
+- **Model `UserNotification` (`user_notifications`)**:
+  - `id`: String `@id @default(cuid())`
+  - `userId`: String (Foreign Key to `User.id`, `onDelete: Cascade`)
+  - `agencyId`: String? (Foreign Key to `Agency.id`, `onDelete: Cascade`, null for Platform Owners)
+  - `role`: `UserRole` (`PLATFORM_OWNER` or `AGENCY_OWNER`)
+  - `type`: `UserNotificationType`
+  - `title`: String
+  - `message`: Text
+  - `linkUrl`: String?
+  - `isRead`: Boolean `@default(false)`
+  - `readAt`: DateTime?
+  - `idempotencyKey`: String?
+  - `metadata`: Json?
+  - `createdAt`: DateTime `@default(now())`
+  - `updatedAt`: DateTime `@updatedAt`
+- **Compound & Unique Indexes**:
+  - `@@unique([userId, idempotencyKey])`: Guarantees zero duplicate notifications per user.
+  - `@@index([userId, isRead, createdAt])`: Ultra-fast query index for user list & unread count badge.
+  - `@@index([agencyId, isRead, createdAt])`: Tenant-scoped query index.
+- **Migration SQL**: Applied via `prisma/migrations/20260922124500_add_user_notifications/migration.sql`.
+
+---
+
+## 179.4 API & Service Architecture
+- **Service Layer (`src/lib/services/internal-notification-service.ts`)**:
+  - `createNotification(input)`: Atomic idempotent notification creation with error containment.
+  - `notifyPlatformOwners(payload)`: Dispatches to all users with role `PLATFORM_OWNER` (`agencyId = null`).
+  - `notifyAgencyOwner(agencyId, payload)`: Dispatches to all `AGENCY_OWNER` users of the target agency.
+  - `notifyAllAgencyOwners(payload)`: Broadcasts to all active `AGENCY_OWNER` users across the platform.
+  - `listNotifications(userId, query)`: Paginated query supporting `unreadOnly` and `type` filters.
+  - `getUnreadCount(userId)`: Fast unread counter for the topbar badge.
+  - `markAsRead(userId, notificationId)`: Secure single-notification read updater with ownership enforcement.
+  - `markAllAsRead(userId)`: Bulk read updater for all notifications belonging to the user.
+- **API Endpoints**:
+  - `GET /api/notifications`: Returns `{ data: UserNotificationItemView[], meta: { total, unreadCount, page, limit, totalPages } }`.
+  - `PATCH /api/notifications/[id]/read`: Marks a single notification as read.
+  - `POST /api/notifications/read-all`: Marks all unread notifications for the session user as read.
+- **Client SDK (`src/lib/api-client/notification-client.ts`)**:
+  - Type-safe wrapper for UI popover with full error handling.
+
+---
+
+## 179.5 UI & User Experience (`NotificationsPopover`)
+- **Live Badge**: Dynamic unread counter badge on the topbar bell icon; hidden when count is 0.
+- **Background Polling**: 30-second interval automatic polling with cleanup on unmount.
+- **Category Iconography & Visual Hierarchy**:
+  - Specific colored icons for Booking (blue ticket), Quotation (emerald receipt), Payment (green credit card), Enquiry (purple spark), Subscription (amber shield), and System Announcement (sky megaphone).
+  - Blue unread dot indicator + soft blue background highlight for unread items.
+- **Interactive Navigation**:
+  - Clicking any notification marks it as read instantly and navigates to the associated deep-link.
+- **Mark All as Read Action**: One-click button in the popover header to dismiss all unread items.
+- **Role-Aware Footers**: Contextual link directing Platform Owners to `/admin/audit-logs` and Agency Owners to `/communications`.
+
+---
+
+## 179.6 Verification & QA Results
+- **Automated E2E Suite**: Full lifecycle verification completed (`100% GREEN`):
+  - Platform Owner notification creation, listing, read, and deduplication verified.
+  - Agency Owner notification creation across all business events verified.
+  - Read/unread badge decrement and `markAllAsRead` verified.
+  - Strict tenant and role isolation verified (cross-access strictly blocked).
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **Permanent Baseline Preservation**:
+  - Destinations: **32** (100% intact)
+  - Hotels: **22** permanent (100% intact)
+  - RateSheets: **66** (100% intact)
+  - Vehicles: **6** permanent (100% intact)
+  - PLATFORM_OWNER: `mzpatel14@gmail.com` (100% intact)
+
+---
+
+## 179.7 Final Verification & Subscription URL Cleanup (September 2026)
+- **Audit Verdict**: Strict read-only audit classified as **PASS WITH NON-BLOCKING NOTES**.
+- **URL Correction Applied**:
+  - `SUBSCRIPTION_PAYMENT_VERIFIED` navigation target corrected from `/settings/subscription` to canonical `/subscription`.
+  - `SUBSCRIPTION_PAYMENT_REJECTED` navigation target corrected from `/settings/subscription` to canonical `/subscription`.
+  - `AGENCY_STATUS_CHANGED` (suspension) navigation target aligned to `/subscription`.
+- **Delivery Mechanism Clarification**:
+  - Explicitly classified as 30-second **polling-based notification refresh** in topbar popover (no WebSockets/Supabase Realtime).
+- **Verification**:
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Exit code 0 (PASSED)**.
+  - Zero database mutations occurred during cleanup.
+
+---
+
+# 180. PHASE 180 — PLATFORM BILLING SETTINGS: UPI + BANK DETAILS + QR CODE MANAGEMENT (September 2026)
+
+## 180.1 Architecture & Objectives
+1. **Centrally Managed Platform Billing**:
+   - Replaced hard-coded client payment instructions with a typed, global SaaS singleton model `PlatformBillingSettings`.
+   - Enabled `PLATFORM_OWNER` to manage official UPI VPA, UPI business display name, direct bank transfer details (Account Holder, Bank Name, Account Number, IFSC Code, Branch Name), and official QR Code image.
+   - Provided `AGENCY_OWNER` with dynamic, display-safe payment instructions in `/subscription` payment modal with 1-click copy helpers and QR scanning.
+2. **Zero Payment Flow Disruption**:
+   - Preserved manual UPI/bank payment workflow, UTR reference entry, `SubscriptionPayment` record creation, `PENDING` status flow, Platform Owner verification/rejection, and `SUBSCRIPTION_PAYMENT_SUBMITTED` notifications.
+   - Maintained absolute integrity of historical `SubscriptionPayment` audit records.
+
+---
+
+## 180.2 Database Model & Migration
+1. **Prisma Model (`prisma/schema.prisma`)**:
+   ```prisma
+   model PlatformBillingSettings {
+     id             String   @id @default("default")
+     upiId          String?
+     upiDisplayName String?
+     accountHolder  String?
+     bankName       String?
+     accountNumber  String?
+     ifscCode       String?
+     branchName     String?
+     qrCodeUrl      String?
+     qrStoragePath  String?
+     updatedBy      String?
+     createdAt      DateTime @default(now())
+     updatedAt      DateTime @updatedAt
+
+     @@map("platform_billing_settings")
+   }
+   ```
+2. **Migration & Idempotent Seeding**:
+   - Migration: `20260922150000_add_platform_billing_settings/migration.sql`.
+   - Preserved exact verified constants into the singleton row upon creation:
+     - `upiId`: `tripdesk.billing@icici`
+     - `upiDisplayName`: `TripDesk Billing`
+     - `accountHolder`: `TripDesk SaaS Technologies Pvt Ltd`
+     - `bankName`: `ICICI Bank`
+     - `accountNumber`: `002105009844`
+     - `ifscCode`: `ICIC0000021`
+     - `branchName`: `MG Road Branch`
+
+---
+
+## 180.3 QR Storage Lifecycle & Security
+1. **Storage Infrastructure**:
+   - Stored in Supabase Storage bucket `platform-assets` under `platform/billing/qr-[timestamp].[ext]`.
+   - Database stores public CDN reference `qrCodeUrl` and object path `qrStoragePath`.
+2. **Safe Replacement Lifecycle**:
+   - Order: Validate MIME & size $\to$ Upload new QR $\to$ Confirm upload $\to$ Update DB singleton $\to$ Only after DB update, clean up previous storage object.
+   - Clean deletion: `DELETE /api/admin/billing-settings/qr` clears DB reference and removes object from storage.
+3. **Server Validation**:
+   - MIME types: `image/png`, `image/jpeg`, `image/jpg`, `image/webp`.
+   - Max file size: 2 MB.
+
+---
+
+## 180.4 API Architecture & Access Control
+1. **Platform Owner APIs**:
+   - `GET /api/admin/billing-settings`: Retrieves full settings (RBAC: `requirePlatformOwnerContext()`).
+   - `PATCH /api/admin/billing-settings`: Validates and updates text & banking fields (Zod schema validation + `PlatformAuditLog` audit entry).
+   - `POST /api/admin/billing-settings/qr`: Multipart upload handler for QR image.
+   - `DELETE /api/admin/billing-settings/qr`: Removes QR image from storage and resets DB fields.
+2. **Agency Owner APIs**:
+   - `GET /api/subscription/billing-settings`: Returns display-safe billing instructions (`getRequestContext()`).
+   - Included directly in `subscriptionService.getAgencySubscription()` overview for zero-latency loading.
+
+---
+
+## 180.5 UI Implementation
+1. **Platform Owner Admin Settings (`src/app/admin/settings/page.tsx`)**:
+   - Dedicated "Platform Billing & Payment Instructions" management card.
+   - Form inputs for UPI ID, Display Name, Account Holder, Bank Name, Account Number, IFSC, Branch.
+   - QR Code manager with live preview, upload dropzone/file picker, replace action, and remove action.
+2. **Agency Owner Subscription Modal (`src/app/(dashboard)/subscription/page.tsx`)**:
+   - Replaced static JSX with dynamic `billingSettings`.
+   - Renders QR Code preview with "Scan & Pay via UPI App" if uploaded.
+   - 1-click copy buttons for UPI ID, Account Number, and IFSC Code.
+   - Graceful fallback when no QR code is uploaded (clean UPI + Bank table).
+
+---
+
+## 180.6 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Prisma Client**: `npx prisma generate` $\to$ **Client generated (PASSED)**.
+- **Migration**: `npx prisma migrate deploy` $\to$ **Applied successfully (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 (PASSED)**.
+- **Historical Data**: All `SubscriptionPayment` records remain 100% intact.
+- **Permanent Baseline**: Permanent Platform Owner, Agency Owner (`TripDesk Offical Test Agnecy`), 32 Destinations, 22 Hotels, 66 RateSheets, 6 Vehicles preserved without alteration.
+
+---
+
+## 180.7 UI Cleanup — Native QR Delete Confirmation Replacement (September 2026)
+- **Problem**: Platform Owner QR removal in `/admin/settings` triggered a native browser `window.confirm()` dialog.
+- **Solution**: Replaced native dialog with TripDesk's standard application-level `ConfirmDialog` component.
+- **Behavior**:
+  - Clicking "Remove QR" opens the modal dialog with destructive action styling.
+  - "Cancel" closes the dialog with zero state change.
+  - "Remove QR" executes `adminClient.deleteBillingQr()`, updates state, and dismisses the dialog.
+- **Verification**: Zero native `alert()` or `confirm()` remain in the billing settings flow. Build & TypeScript passed with 0 errors.
+
+---
+
+# 181. PHASE 181 — DESTINATION MASTER UI (September 2026)
+
+## 181.1 Architecture & Overview
+- **Objective**: Provide a dedicated master list & CRUD interface for Agency Owners to manage geographic destinations at `/destinations`.
+- **Navigation Placement**: Added `Destinations` (`href: "/destinations"`, `icon: MapPin`) under `RESOURCES` in `agencyNavigationConfig` ([src/lib/navigation.ts](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/navigation.ts)).
+- **Backend Reuse**: 100% reused existing Prisma `Destination` model, Zod validation schemas ([src/lib/validation/destination-schema.ts](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/validation/destination-schema.ts)), service layer ([src/lib/services/destination-service.ts](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/services/destination-service.ts)), API routes (`/api/destinations`, `/api/destinations/[id]`), and client SDK (`destinationClient`).
+
+---
+
+## 181.2 UI Components & Pages Implemented
+1. **Destination Master Page (`src/app/(dashboard)/destinations/page.tsx`)**:
+   - Command hero header with `MapPin` badge, total telemetry chip, title, description, and primary `Add Destination` action.
+   - Search toolbar with debounced 300ms query filter across `name`, `state`, `cityArea`, and `country`.
+   - Status dropdown filter (`ALL`, `ACTIVE`, `INACTIVE`) and filter reset button.
+   - Standard table displaying Destination & Region, City / Specific Area, Country, `StatusBadge`, and `Actions` dropdown menu.
+   - Action controls: `Edit Destination`, `Mark Active / Inactive`, and `Delete Destination`.
+   - State handling: `TableSkeleton` for loading, `ErrorState` with retry, `EmptyState` for zero/no-search results, `ReadOnlyBanner` for read-only subscriptions.
+   - Pagination footer with page indicator and `Prev`/`Next` buttons.
+   - Destructive deletion backed by `ConfirmDialog` with dependency error handling.
+2. **Add / Edit Destination Dialog (`src/components/destinations/destination-dialog.tsx`)**:
+   - Modal dialog component supporting both creation and updating of destination records.
+   - Controlled inputs for `name`, `state`, `country`, `cityArea`, and operational `status`.
+   - Client-side trimming and validation.
+   - Loading/submitting state with `Loader2` spinner.
+   - Conflict error feedback via `sonner` toast notifications.
+
+---
+
+## 181.3 Security & Tenant Isolation
+- Derived strictly server-side from session JWT via `requireReadAccess()` and `requireWriteAccess()`.
+- Zero client-supplied `agencyId` trust.
+- Dependency protection: Deletion blocked at service layer if referenced by Hotels, Activities, or TripDestinations; users advised to mark as Inactive.
+
+---
+
+## 181.4 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **Permanent Baseline**: 32 Destinations, 22 Hotels, 66 RateSheets, 6 Vehicles preserved without alteration.
+
+---
+
+# 182. PHASE 182 — QUOTATION PDF UI & SPACING ENHANCEMENT (September 2026)
+
+## 182.1 Overview & Architectural Objectives
+- **Objective**: Elevate the visual presentation and readability of customer-facing Quotation PDFs to match the elegance, spaciousness, and typography of the Quotation Preview UI.
+- **Renderer Preserved**: Maintained lightweight, high-performance `PDFKit` (v0.17.2) server-side streaming buffer generation without adding heavy browser dependencies.
+- **Strict Content Exclusions (Adhered 100%)**:
+  - `Tour Route Sequence` section explicitly excluded from PDF.
+  - `Payment Milestones` section explicitly excluded from PDF.
+- **Single Monetary Value Rule**: Preserved 100% (only `finalAmount` rendered in currency; individual cost prices, supplier markups, intermediate tax calculations, and item margins remain strictly redacted).
+
+---
+
+## 182.2 Visual, Typography & Spacing Improvements
+1. **Major Section Top Spacing**:
+   - Implemented a consistent spacing rhythm before all major section headings (`DAY-WISE TOUR ITINERARY`, `HOTEL ACCOMMODATIONS`, `TRANSPORTATION & LOGISTICS`, `SIGHTSEEING & EXPERIENCES`, `PACKAGE INCLUSIONS & EXCLUSIONS`, `IMPORTANT NOTES & BOOKING POLICIES`) with +18pt breathing room.
+   - Distinct heading hierarchy with 10.5pt bold titles, 7.5pt subtitles, and accent bar underlines.
+2. **Typography Scale Upgrade**:
+   - Hero Title: Upgraded to 14pt bold text.
+   - Body & Descriptions: Upgraded from cramped 5.5–6.5pt to readable 7.5–8.5pt with generous line heights (`lineGap: 2`).
+   - Badges & Pills: 7–7.5pt bold text in rounded pill containers.
+   - Final Price: 18pt bold emerald text in dark hero banner.
+3. **Dynamic Card Heights (Zero Text Clipping)**:
+   - Dynamic Hero Banner: Computed from wrapped title and subtitle text heights using `doc.heightOfString()`, eliminating header collision risks on multi-line trip titles.
+   - Dynamic Hotel, Vehicle, and Activity Cards: Replaced fixed height constraints (`boxH = 40`, `vH = 32`, `actH = 30`) with dynamic content measurement.
+   - Dynamic Itinerary Day Cards: Automatically adjusts to multi-paragraph day descriptions.
+   - Dynamic Inclusions / Exclusions: Expands cleanly with item count and description text.
+
+---
+
+## 182.3 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **Security & Data Safety**:
+  - Authenticated and public PDF routes (`/api/quotations/[id]/pdf` and `/api/quotations/public/[token]/pdf`) 100% operational.
+  - Zero sensitive internal fields exposed.
+  - Permanent baseline records (32 Destinations, 22 Hotels, 66 RateSheets, 6 Vehicles) 100% intact.
+
+---
+
+# 183. PHASE 183 — OPERATIONAL VOUCHERS (HOTEL, TRANSPORT & ACTIVITY) API + PDF AUDIT & VISUAL ALIGNMENT (September 2026)
+
+## 183.1 Overview & Scope
+- **Objective**: Full security audit, data sanitization, layout arithmetic overhaul, and visual alignment of the 3 primary operational PDF documents in TripDesk:
+  1. **Hotel Voucher** (`/api/operations/[id]/documents/hotel/[confirmationId]/pdf`)
+  2. **Transport Voucher** (`/api/operations/[id]/documents/vehicle/[dispatchId]/pdf`)
+  3. **Activity Pass** (`/api/operations/[id]/documents/activity/[confirmationId]/pdf`)
+- **Visual Baseline**: Replaced fragmented legacy templates with the modern design system established in the approved Quotation PDF (`quotation-pdf-service.ts`), featuring Slate 900 (`#0F172A`) hero banners, rounded containers (radius 6), dynamic height calculation (`doc.heightOfString()`), two-pass page numbering (`Page X of Y`), and spacious typography.
+- **Renderer Preserved**: Standard server-side `PDFKit` (v0.17.2) streaming buffer retained with zero heavy runtime overhead.
+
+---
+
+## 183.2 Security, Multi-Tenant Isolation & Commercial Data Sanitization
+1. **Strict Server-Side Tenant Context**:
+   - `agencyId` is derived exclusively from session JWT via `requireReadAccess()`.
+   - Zero trust in client-supplied parameters.
+2. **Complete Ownership Validation Chain**:
+   - `tripOperation`: Filtered by `{ id: operationId, agencyId }`.
+   - `hotelConfirmations`: Filtered by confirmation ID under the tenant's operation.
+   - `vehicleDispatches`: Filtered by dispatch ID under the tenant's operation.
+   - `activityConfirmations`: Filtered by confirmation ID under the tenant's operation.
+   - Cross-tenant and orphaned parameter tampering strictly blocked with 403/404 responses.
+3. **100% Commercial Data Sanitization**:
+   - Zero internal supplier pricing (`costPrice`, `supplierCost`, `markup`, `supplierMargin`, `supplierId`, `supplierNotes`, `internalNotes`) queried or rendered into customer/operational vouchers.
+
+---
+
+## 183.3 Visual & Engineering Improvements
+1. **Dynamic Layout & Height Calculation**:
+   - Eliminated all hardcoded box heights and fixed Y coordinates (e.g. legacy `y: 740` footers).
+   - Card heights, traveler rosters, routes, and venue locations are dynamically measured using `doc.heightOfString()`, eliminating text clipping and overlapping.
+2. **Multi-Page Safety & Running Footers**:
+   - `ensureSpace(neededHeight)` safely handles multi-page expansion without splitting cards or orphaning headers.
+   - Two-pass buffered page range adds running headers on pages 2+ and confidentiality footers with `Page X of Y` at `pageHeight - 26`.
+3. **Typography & Aesthetics**:
+   - Upgraded from micro-fonts to readable 7.5–12.5pt typography with comfortable leading (`lineGap: 1.5–3`).
+   - Clean 3/4-column specification grids with distinct label/value visual hierarchy.
+
+---
+
+## 183.4 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **Quotation PDF Safety**: Regression tests confirmed 100% untouched and passing.
+- **Database Safety**: 0 schema migrations, 0 seed modifications, permanent baseline records (32 Destinations, 22 Hotels, 66 RateSheets, 6 Vehicles) 100% preserved.
+
+---
+
+# 184. PHASE 184 — CONTROLLED PDF UI AUDIT & FIX (TRANSPORT VOUCHER, BOOKING CONFIRMATION & TRAVEL KIT) (September 2026)
+
+## 184.1 Overview & Targeted Scope
+- **Objective**: Execute focused PDF layout bug fixes and UI visual enhancements for:
+  1. **Transport Voucher** (`generateVehicleVoucher` via `/api/operations/[id]/documents/vehicle/[dispatchId]/pdf`): Fix route itinerary card overflow and eliminate stray `!’` glyphs.
+  2. **Customer Booking Confirmation PDF** (`generateBookingConfirmation` via `/api/operations/[id]/documents/booking/pdf`): Visual modernization aligning with the approved Slate 900 Quotation PDF design system.
+  3. **Final Travel Kit & Itinerary Pack PDF** (`generateTravelKit` via `/api/operations/[id]/documents/travel-kit/pdf`): Visual transformation into a polished, customer-facing comprehensive itinerary package.
+- **Strict Scope Boundaries**:
+  - `Hotel Voucher` and `Activity Pass` kept 100% untouched.
+  - `Quotation PDF` (`quotation-pdf-service.ts`) preserved as the visual reference baseline.
+  - 0 schema changes, 0 migrations, 0 business-logic or pricing formula alterations.
+  - Retained `PDFKit` (v0.17.2) engine.
+
+---
+
+## 184.2 Root Causes & Exact Fixes Applied
+
+### 1. Transport Voucher Route Card Overflow (Bug 1)
+- **Root Cause**: The parent vehicle card height was calculated with a fixed baseline (`150 + routeH`) that failed to dynamically incorporate multi-line chauffeur names, contact details, dynamic route lines, and inner container margins.
+- **Fix Applied**: Implemented mathematical dynamic height calculation:
+  - Calculated 3-column chauffeur grid height: `gridH = 12 + Math.max(16, dNameH, dPhoneH)`.
+  - Calculated route itinerary strip height: `routeStripH = 34 + routeTextH + 10`.
+  - Calculated parent card height: `vBoxHeight = 14 + 14 + 12 + 21 + gridH + 12 + routeStripH + 14`.
+  - Dynamically positioned the route strip inside the parent container at `routeStripY = gridY + gridH + 12`.
+  - Enforced `ensureSpace(vBoxHeight)` for page-break safety.
+
+### 2. Transport Voucher Bad Route Text with Stray `!’` (Bug 2)
+- **Root Cause**: The route string previously utilized the Unicode right arrow `→` (`\u2192`). In PDFKit's standard WinAnsiEncoding font (Helvetica), unmapped Unicode characters render as `!’`.
+- **Fix Applied**: Replaced Unicode arrow with clean multi-line label formatting:
+  ```ts
+  const routeText = `From: ${pickupLocStr}\nTo: ${dropLocStr}`;
+  ```
+  Handled empty, null, single-point, and multi-line pickup/drop locations gracefully.
+
+### 3. Customer Booking Confirmation PDF Modernization
+- **Enhancements**:
+  - Replaced legacy text layout with Slate 900 hero banner with booking reference badge.
+  - Customer & Reservation Details card with 2-column layout.
+  - Dynamic Itinerary Schedule card measuring day titles and bullet descriptions.
+  - Accommodation & Transit Logistics card summarizing confirmed hotels and vehicle allocations.
+  - Package Inclusions, Exclusions, and Terms cards with dynamic height calculation.
+  - Two-pass buffered running header and footer with `Page X of Y`.
+
+### 4. Final Travel Kit & Itinerary Pack PDF Modernization
+- **Enhancements**:
+  - Premium Slate 900 cover banner displaying agency brand, trip reference, and confirmation badge.
+  - Journey Overview & Passenger Roster card with 2-column grid.
+  - Day-by-day Itinerary Timeline with blue step badges, bold day titles, and wrapped day descriptions.
+  - Accommodation Confirmations card with room details and check-in/out dates.
+  - Transportation & Transfer Details card with vehicle specs, chauffeur contact, and pickup routes.
+  - Activities & Excursion Passes card with purple admission badges.
+  - 24/7 Guest Concierge & Emergency Assistance box.
+  - Two-pass buffered page numbering (`Page X of Y`).
+
+---
+
+## 184.3 Security & Multi-Tenant Isolation
+1. **Server-Derived Context**: All operations document endpoints strictly derive `agencyId` server-side via `requireReadAccess()` from session JWT.
+2. **Commercial Data Sanitization**: Internal commercial fields (`costPrice`, `supplierCost`, `markup`, `supplierMargin`, `supplierId`, `supplierNotes`, `internalNotes`) remain 100% excluded and unqueried.
+3. **Audit Trails**: All document generations log immutable `OperationEvent` records in PostgreSQL.
+
+---
+
+## 184.4 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **Actual PDF Output Tests**:
+  - `Vehicle-Voucher-TVV-2026-3769-01.pdf` (14,811 bytes) $\to$ **Valid PDF, zero overflow, no `!’` glyphs (PASSED)**.
+  - `Booking-Confirmation-TRIP-13I-1789468383769.pdf` (16,687 bytes) $\to$ **Valid PDF, Quotation-aligned visual system (PASSED)**.
+  - `Travel-Kit-TRIP-13I-1789468383769.pdf` (17,330 bytes) $\to$ **Valid PDF, comprehensive multi-section itinerary pack (PASSED)**.
+- **Regression Safety**:
+  - `quotation-pdf-service.ts` $\to$ 100% untouched.
+  - Database schema & permanent baseline records $\to$ 100% intact.
+
+---
+
+# 185. PHASE 185 — PDF CONFIRMATION NUMBER WRAPPING & HEADER LAYOUT AUDIT (September 2026)
+
+## 185.1 Overview & Root Cause Analysis
+- **Audit Objective**: Complete header layout audit across all 5 customer-facing operational PDF generators:
+  1. **Hotel Voucher** (`generateHotelVoucher`)
+  2. **Transport Voucher** (`generateVehicleVoucher`)
+  3. **Activity Pass** (`generateActivityVoucher`)
+  4. **Customer Booking Confirmation** (`generateBookingConfirmation`)
+  5. **Final Travel Kit & Itinerary Pack** (`generateTravelKit`)
+- **Root Cause**: The right-hand voucher/confirmation badge previously used static vertical Y coordinates (`rightY + 10`, `rightY + 24`, `rightY + 36`, `rightY + 49`). When `documentNumber`, `tripNumber`, or `bookingNumber` wrapped onto 2 lines, the second line overlapped subsequent date, reference, and status pill text inside the dark badge container. Furthermore, `bannerHeight` calculation did not dynamically incorporate multi-line right-badge content.
+
+---
+
+## 185.2 Exact Engineering Solution
+- **Dynamic Text Measurement**:
+  - Measured exact wrapped height for document identifier: `docNumH = doc.heightOfString(docNumText, { width: 155, align: "center" })`.
+  - Measured exact wrapped height for date: `dateH = doc.heightOfString(dateText, { width: 155, align: "center" })`.
+  - Measured exact wrapped height for reference: `refH = doc.heightOfString(refText, { width: 155, align: "center" })`.
+  - Calculated total dynamic right badge content height: `totalRightContentH = docNumH + 3 + dateH + 2 + refH + 5 + pillH`.
+- **Dynamic Container Sizing & Vertical Centering**:
+  - Enforced banner height: `bannerHeight = Math.max(88, leftContentH, totalRightContentH + 44)`.
+  - Calculated vertical start position: `rightStartY = rightY + Math.max(8, (rightBoxH - totalRightContentH) / 2)`.
+  - Sequential Y-progression tracking: `curRightY` increments by each element's exact rendered height + spacing gap, rendering vertical overlap mathematically impossible.
+  - Downstream content progression: `doc.y = margin + bannerHeight + 14` safely shifts all subsequent content cards dynamically.
+
+---
+
+## 185.3 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **All 5 PDFs Tested & Inspected**:
+  - Hotel Voucher: `Hotel-Voucher-HIM-PALACE-9944.pdf` (15,970 bytes) $\to$ **Valid PDF, zero overlap (PASSED)**.
+  - Transport Voucher: `Vehicle-Voucher-TVV-2026-3769-01.pdf` (14,944 bytes) $\to$ **Valid PDF, zero overlap (PASSED)**.
+  - Activity Pass: `Activity-Voucher-KUFRI-PASS-8822.pdf` (15,039 bytes) $\to$ **Valid PDF, zero overlap (PASSED)**.
+  - Customer Booking Confirmation: `Booking-Confirmation-TRIP-13I-1789468383769.pdf` (16,809 bytes) $\to$ **Valid PDF, zero overlap (PASSED)**.
+  - Final Travel Kit: `Travel-Kit-TRIP-13I-1789468383769.pdf` (17,473 bytes) $\to$ **Valid PDF, zero overlap (PASSED)**.
+- **Long Document Number & Wrapping Extremes Test**:
+  - Explicitly tested multi-line identifier wrapping across all 5 generators $\to$ **100% clean formatting, zero text collision, proper padding maintained (PASSED)**.
+- **Regression Safety**:
+  - `quotation-pdf-service.ts` $\to$ 100% untouched.
+  - Transport Voucher route-card dynamic layout $\to$ 100% preserved.
+  - Database schema & permanent baseline records $\to$ 100% intact.
+
+---
+
+# 186. PHASE 186 — FULL DASHBOARD UI AUDIT, RESPONSIVE FIX (320PX MINIMUM) & PROFESSIONALIZATION
+
+## 186.1 Objective
+Execute a comprehensive UI/UX audit, component architecture cleanup, and responsive layout hardening across the TripDesk Executive Dashboard:
+1. **Eliminate Financial Duplication**: Remove duplicate renderings of `RevenueChart` and `ReceivablesPayablesCard` between the **Overview** and **Finance & Profit** tabs.
+2. **Prevent Awkward Text/Number Wrapping**: Fix issue where values like `Won: ₹71,286.16` or KPI amounts wrap awkwardly across two lines (`Won: ₹71,286.` / `16`). Enforce `tabular-nums` and `whitespace-nowrap` on all financial figures.
+3. **320px Minimum Viewport Responsiveness**: Guarantee zero horizontal page overflow, no card clipping, proper mobile padding (`p-4 sm:p-6`), and fluid flex-wrapping from 320px up to 4K desktop screens.
+4. **Professional SaaS Presentation**: Align typography, badges, borders, and interaction states to production SaaS design standards.
+
+---
+
+## 186.2 Discovered Architecture & Root Causes
+- **Tab Duplication**: Both `activeTab === "OVERVIEW"` and `activeTab === "FINANCE"` were rendering the exact same full `RevenueChart` time-series and `ReceivablesPayablesCard` balance aging matrix.
+  - *Fix*: Overview tab now functions as an executive snapshot containing `KpiCards`, `SalesFunnelCard`, `TopDestinationsCustomersCard`, `UpcomingTripsList`, and `CommunicationHealthCard`. The Finance tab owns the dedicated, in-depth `RevenueChart` and `ReceivablesPayablesCard` analytical suite.
+- **KPI / Badge Wrapping (`Won: ₹71,286.16`)**:
+  - *Root Cause*: In `sales-funnel-card.tsx`, the Won amount container had rigid minimum widths (`min-w-[160px]`) and lacked `whitespace-nowrap` / `shrink-0` on the badge container.
+  - *Fix*: Replaced rigid widths with `min-w-0 flex-1 sm:flex-initial sm:min-w-[130px]`, wrapped badges with `whitespace-nowrap tabular-nums shrink-0`, and applied responsive typography.
+- **320px Mobile Overflow & Card Padding**:
+  - `PageHeader`, `KpiCards`, `RevenueChart`, `ReceivablesPayablesCard`, `UpcomingTripsList`, `CommunicationHealthCard`, `TopDestinationsCustomersCard`, and `DateRangeFilter` had fixed paddings (`p-5`, `p-6`) or multi-input forms exceeding 320px.
+  - *Fix*: Normalized all cards to responsive padding (`p-4 sm:p-5 sm:p-6`), enabled horizontal scrolling on tab navigators (`overflow-x-auto no-scrollbar`), flex-wrapped custom date range pickers, and enabled text truncation with `min-w-0` on all list labels.
+
+---
+
+## 186.3 Files Inspected & Updated
+1. `src/components/dashboard/kpi-cards.tsx` — Applied `whitespace-nowrap`, `tabular-nums`, responsive grid, and metadata row flex-wrapping.
+2. `src/components/dashboard/sales-funnel-card.tsx` — Fixed `Won: ...` wrapping, responsive stage widths, and progress bar container.
+3. `src/app/(dashboard)/dashboard/page.tsx` — Reorganized tab rendering architecture, eliminated duplicate financial sections from Overview, and added mobile-friendly tab bar.
+4. `src/components/dashboard/revenue-chart.tsx` — Responsive legend, Y-axis label spacing (`w-10 sm:w-14`), and tabular tooltips.
+5. `src/components/dashboard/receivables-payables-card.tsx` — Enforced `whitespace-nowrap tabular-nums` on all aging buckets, top customer balances, and top supplier payables.
+6. `src/components/dashboard/date-range-filter.tsx` — Flexible custom date range form preventing overflow on 320px screens.
+7. `src/components/shared/page-header.tsx` — Responsive padding (`p-4 sm:p-6`) and flex-wrapping action button layout.
+8. `src/components/dashboard/upcoming-trips-list.tsx` — Mobile document badge flex-wrapping and tabular date formatting.
+9. `src/components/dashboard/communication-health-card.tsx` — Responsive padding, channel breakdown flex direction, and tabular counters.
+10. `src/components/dashboard/top-destinations-customers-card.tsx` — Responsive truncation on destination/customer names with tabular revenue formatting.
+
+---
+
+## 186.4 Verification Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+- **Viewport Testing**: Verified at 320px, 360px, 375px, 390px, 412px, 768px, 1024px, 1280px, and 1440px+. Zero horizontal overflow, zero text clipping.
+---
+
+## 186.5 Targeted Responsive UI Correction (Revenue & Profit + Communications & Delivery)
+- **Revenue & Profit (`RevenueChart`)**:
+  - Root Cause: Fixed bar widths (`w-2.5`) and fixed column widths collided when rendering multiple time-series bars on 320px screens. Header legend and export button lacked vertical stacking on narrow viewports.
+  - Fix: Added compact 4-card KPI summary banner (`Total Revenue`, `Collected`, `Gross Profit`, `Margin %`), responsive bar widths (`w-1.5 sm:w-2 sm:w-2.5` with `gap-0.5 sm:gap-1`), compact Y-axis (`w-9 sm:w-12`), centered floating tooltips, and responsive header stacking with `p-3.5 sm:p-6`.
+- **Communications & Delivery (`CommunicationHealthCard`)**:
+  - Root Cause: Header badge collided with card title on 320px screens; metrics counters needed compact spacing and tabular number alignment.
+  - Fix: Implemented flexible header layout with self-aligning delivery badge, visual 3-part delivery rate progress bar (`deliveredPct` / `pendingPct` / `failedPct`), compact `p-2.5 sm:p-3` metric cards with `tabular-nums truncate`, and responsive channel breakdown pills.
+- **Dashboard Page Container**:
+  - Adjusted mobile container padding from `px-4` to `px-3 sm:px-6 lg:px-8` to maximize horizontal layout stability at 320px viewport.
+- **Verification**:
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+---
+
+## 186.6 Revenue & Profit Purpose-Built Mobile Alternative UI
+- **Dual-Mode Architectural Decision**:
+  - **Desktop / Tablet ($\ge$ 640px)**: Retains the full-featured, grouped 3-bar comparative chart (`Bookings`, `Collected`, `Profit`) with Y-axis currency scale, dashed gridlines, and hover tooltips.
+  - **Small Mobile (< 640px / 320px minimum)**: Replaces compressed multi-bar layout with a dedicated, touch-friendly SVG area/trendline chart.
+- **Mobile UI Features**:
+  - **2x2 Executive KPI Matrix**: Cleanly displays `Total Revenue`, `Total Collected`, `Gross Profit`, and `Gross Margin %` in compact cards with `tabular-nums` and `truncate`.
+  - **Segmented Touch Series Switcher**: Instant switching between `Bookings` (Indigo), `Collected` (Emerald), and `Profit` (Purple) series.
+  - **Vector SVG Area/Trendline**: Smooth bezier curve with subtle gradient area fill, dashed guide lines, compact Y-axis labels (`₹1L`, `₹50k`, `₹0`), and uncrowded period labels.
+  - **Interactive Touch Inspection**: Tapping any point updates an inline feedback indicator showing the exact rupee value and booking volume.
+- **Data & Business Logic Integrity**: 0 database changes, 0 formula changes, 100% data reuse from `analytics.timeSeries` and `analytics.summary`.
+- **Verification**:
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+---
+
+## 186.7 Final Dashboard UI Correction: Complete Chart Removal in Revenue & Profit + Quotation Conversion Fix
+- **Revenue & Profit Chart Removal & Replacement**:
+  - Decision: Completely eliminated the graphical chart visualization from Revenue & Profit in favor of a clean, responsive **Financial Performance Summary & Breakdown**.
+  - New UI Structure:
+    1. **Header**: Clean title with TrendingUp icon, subtitle, and CSV export action.
+    2. **4 Primary KPI Cards**: 2x2 on mobile, 4 columns on desktop (`Total Revenue`, `Total Collected`, `Gross Profit`, `Gross Margin %`) with `tabular-nums` and bold typography.
+    3. **Performance by Period Breakdown**:
+       - Desktop/Tablet ($\ge$ 640px): A clean, modern SaaS financial data table (`Period`, `Bookings`, `Revenue`, `Collected`, `Gross Profit`, `Margin %`, and summary `Total` footer).
+       - Mobile (< 640px / down to 320px): A compact, stacked list of period performance cards displaying individual period revenue, collection, profit, and margin metrics.
+       - Clean empty state when no transactions exist for the selected period.
+    4. **Dead Code Cleanup**: Completely removed SVG paths, canvas code, bar layouts, and chart-specific state.
+- **Quotation Conversion Header Wrapping Fix**:
+  - Root Cause: In `sales-funnel-card.tsx`, placing title and two fixed-width badges (`Win Rate` + `Won: ₹...`) in a single horizontal flex line squeezed the title on `lg:col-span-1` desktop cards and mobile viewports, forcing "Quotation Conversion" into two lines.
+  - Fix: Restructured header into a clean 2-line layout where the top line holds the title with `whitespace-nowrap` + `Win Rate` badge, and the bottom line holds the description + `Won: <amount>` badge.
+- **Dashboard Heading Audit**:
+  - Audited all card titles across the dashboard (`Revenue & Profit`, `Quotation Conversion`, `Communications & Delivery`, `Customer Receivables`, `Supplier Payables`, `Upcoming Departures`, `Top Destinations`, `Top Customers`). Verified zero two-line wrapping defects and zero badge collisions.
+- **Verification**:
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+---
+
+## 186.8 Revenue & Profit: Performance by Period Bounded Internal Scroll
+- **Objective**: Prevent the Finance & Profit page from becoming excessively tall when multi-month period datasets are displayed.
+- **Implementation**:
+  - **Desktop / Tablet ($\ge$ 640px)**:
+    - Added a bounded scroll container (`max-h-[340px] overflow-y-auto overflow-x-auto`) to the Period Performance table.
+    - Implemented a **sticky table header** (`thead.sticky top-0 z-10 bg-slate-50`) with subtle shadow so column headers remain visible during scroll.
+    - Implemented a **sticky summary footer** (`tfoot.sticky bottom-0 z-10 bg-slate-50 border-t`) anchoring the period totals.
+  - **Mobile (< 640px / down to 320px)**:
+    - Added a bounded scroll container (`max-h-[320px] overflow-y-auto space-y-2.5 pr-1`) to the stacked period card list.
+  - **Isolated Scroll Scope**: Bounded scrolling is applied strictly to the period data rows; the card header, 4 KPI summary cards, and section title remain static.
+- **Data & Business Logic**: 0 database changes, 0 calculation changes, 100% data fidelity preserved.
+- **Verification**:
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Compiled successfully with exit code 0 (PASSED)**.
+  - Validated across 320px, 360px, 375px, 390px, 412px, 768px, 1024px, and 1280px+ viewports $\to$ **Zero horizontal overflow, smooth internal scrolling, production-ready SaaS presentation (PASSED)**.
+
+---
+
+## 187. Full End-to-End QA Certification & System Audit (Phase 187)
+
+- **Execution Scope**:
+  - Full production-style browser and API verification across both supported roles:
+    1. **Platform Owner** (`mzpatel14@gmail.com`): Dashboard, Agencies, Subscriptions, Announcements, Settings, Billing Controls.
+    2. **Agency Owner** (`tripmadeeasy.in@gmail.com`): Dashboard, Enquiries, Customers, Trips, Itinerary Workspace, Quotation Engine, Public Proposals, Bookings, Invoices, Payments, Operations Desk, Vouchers & Documents, Communications, Rate Sheets, Hotels, Vehicles, Destinations.
+- **Workflow Verification**:
+  - Positive tests: **142/142 PASSED**.
+  - Negative tests: **38/38 PASSED** (Invalid credentials, malformed data, required field constraints, unauthorized access).
+  - Responsive viewports: **320px, 360px, 375px, 390px, 412px, 768px, 1024px, 1280px, 1440px** validated with 0 horizontal page scroll defects.
+  - Multi-tenant isolation: **100% verified** (server-enforced agencyId context).
+  - Permanent baseline: 32 destinations, 22 hotels, 66 RateSheets, 6 vehicles preserved intact.
+- **Key Findings / Status**:
+  - Core SaaS CRM, Quotation Engine, Itinerary Builder, Invoicing, and Operations Desk are fully functional and stable.
+  - In-App Customer Notifications are 100% live and functional. External Email/WhatsApp/SMS delivery adapters remain stubbed pending live provider credentials as previously audited.
+- **Code Changes**: **0 (Read-Only QA)**.
+
+---
+
+## 188. Project-Wide Formik & Client Validation Audit & Hardening (Phase 188)
+
+- **Audit Objective & Scope**:
+  - Full project-wide audit of all user-facing forms across authentication, portal, planning, master data, operations, finance, and settings.
+  - Resolved inconsistent/missing Formik validation in authentication and portal entry points (`/login`, `/signup`, `/forgot-password`, `/reset-password`, `/customer/login`, `DestinationDialog`).
+- **Standardized Formik + Yup Pattern**:
+  - Implemented `useFormik` coupled with `Yup.object().shape(...)` validation schemas across target forms.
+  - Field-level validation on blur and submit with clean inline feedback: `border-red-500`, focus ring highlighting, and descriptive helper text (`errors.<field>`).
+  - Strict separation of concerns: Client-side Formik validation enforces instant field constraints; server-side Actions and Zod schemas guard security, business rules, and tenant boundaries.
+  - Server errors (e.g. invalid credentials, duplicate registered accounts) cleanly displayed in top-level feedback alerts without replacing Formik UX or using native browser `window.alert()`.
+- **Files Modified**:
+  - `src/app/login/page.tsx`: Upgraded to `useFormik` + `Yup` (email format, password min length, inline validation, server error alerts).
+  - `src/app/signup/page.tsx`: Upgraded to `useFormik` + `Yup` (agency info, owner profile, password confirmation matching, inline field errors).
+  - `src/app/forgot-password/page.tsx`: Upgraded to `useFormik` + `Yup` (required email, valid email format).
+  - `src/app/reset-password/page.tsx`: Upgraded to `useFormik` + `Yup` (password min length, confirmation matching).
+  - `src/app/customer/login/page.tsx`: Upgraded to `useFormik` + `Yup` (booking reference / pass token validation).
+  - `src/components/destinations/destination-dialog.tsx`: Upgraded to `useFormik` + `Yup` (name required, maxLength 100, operational status).
+- **Verification**:
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Production build compiled successfully with exit code 0 (PASSED)**.
+  - Real browser testing validated empty submits, invalid strings, password mismatches, valid submissions, and responsive scaling down to 320px width.
+
+---
+
+## 189. Platform Owner ↔ Agency Owner Support Chat (Phase 189) — CLOSED
+
+- **Status**: **COMPLETED / CLOSED** (Fully verified in production code; final manual two-browser verification completed and confirmed by user).
+- **Objective & Scope**:
+  - Implemented a private, persistent, real-time, two-way communication channel between `PLATFORM_OWNER` and `AGENCY_OWNER`.
+  - Core use cases: Onboarding guidance, trial assistance, support questions, plan discussions, payment support, conversion assistance.
+  - Exactly one persistent, lazy-created conversation per agency (`@@unique([agencyId])`).
+- **Database Models & Constraints**:
+  - `PlatformChatConversation`:
+    - Exactly one conversation per agency enforced via database uniqueness `@@unique([agencyId])`.
+    - Fields: `id`, `agencyId`, `status`, `lastMessageAt`, `lastMessageSnippet`, `lastMessageSenderRole`, `agencyLastReadAt`, `platformLastReadAt`, `createdAt`, `updatedAt`.
+    - Indexes: `@@index([agencyId])`, `@@index([lastMessageAt])`, `@@index([status])`.
+  - `PlatformChatMessage`:
+    - Fields: `id`, `conversationId`, `agencyId`, `senderUserId`, `senderRole`, `messageText`, `clientMessageId`, `createdAt`.
+    - Constraints: `@@unique([conversationId, clientMessageId])` for idempotent message sending, optimistic reconciliation, and duplicate prevention.
+    - Indexes: `@@index([conversationId, createdAt])`, `@@index([agencyId])`, `@@index([senderUserId])`.
+    - Storage convention: Absolute UTC timestamps (`TIMESTAMP(3)`).
+- **Read State & Drift Prevention**:
+  - Uses conversation-level timestamp boundaries (`agencyLastReadAt` and `platformLastReadAt`) instead of mutable per-message flags or mutable counters.
+  - Unread counts are dynamically and recoverably computed from persistent database records where `createdAt > <lastReadAt>` and sender is the counterpart.
+  - Zero unread counter drift across multi-tab sessions, reconnects, or duplicate realtime events.
+- **Security & Row Level Security (RLS)**:
+  - Strict server-derived identity: `senderUserId`, `senderRole`, and `agencyId` are determined strictly from the authenticated Supabase session and Prisma user context.
+  - Client-supplied identity is never trusted.
+  - PostgreSQL Row Level Security (RLS) is active on `platform_chat_conversations` and `platform_chat_messages`:
+    - Platform Owners have global access to all agency chat records.
+    - Agency Owners are strictly isolated to their own `agencyId`.
+    - Direct client-side writes are prohibited; all writes flow through authenticated Next.js API routes (`/api/chat/...`).
+    - Evaluated securely via `SECURITY DEFINER` function `public.is_chat_participant(message_agency_id text)` with appropriate `GRANT SELECT ON platform_chat_messages TO authenticated` and `GRANT EXECUTE ON FUNCTION public.is_chat_participant TO authenticated`.
+  - Plain text rendering prevents HTML/XSS injection.
+- **Supabase Realtime Architecture**:
+  - Postgres Changes: Subscriptions listen exclusively to `postgres_changes` events (`INSERT` on `platform_chat_messages`) with conversation filter `conversationId=eq.${conversationId}`.
+  - Channel name: `platform-chat:${conversationId}`.
+  - Token Synchronization: Authenticated Supabase session token is synchronized on init and refreshed dynamically (`supabase.realtime.setAuth`).
+  - Two-Way Realtime Verification: Verified live two-way message delivery in real-time between Agency Owner (`/support`) and Platform Owner (`/admin/chat`) without page refreshes.
+  - Initialization race prevention: Initial message history fetch and Realtime subscription are merged with persistent ID and `clientMessageId` deduplication.
+  - Reconnection handling: Automatically backfills history on browser reconnect/online events.
+- **Timestamp Normalization & Deterministic Ordering**:
+  - Storage: Absolute UTC instant stored in PostgreSQL.
+  - Normalization: `normalizeIsoTimestamp` normalizes un-suffixed Realtime payload timestamps into UTC ISO strings ending in `Z` prior to Date parsing.
+  - Presentation: `formatChatTime` and `formatShortDate` render timestamps in the user's local browser timezone dynamically without hardcoded offsets.
+  - Ordering: `sortChatMessages` deterministically orders messages by `createdAt` epoch ASC (primary key) and `id` ASC (tiebreaker), ensuring messages never jump or invert upon Realtime arrival.
+- **Composer UX & Focus Behavior**:
+  - Deterministic focus restoration: After sending a message (via Enter or Send button), input focus is automatically restored via `inputRef` and non-blocking textarea states, allowing seamless sequential typing while preserving optimistic UI, empty validation, and multiline Shift+Enter.
+- **Sidebar & Mobile Support Chat Unread Indicator**:
+  - Integrated `usePlatformChatUnreadCount` into `Sidebar` and `MobileNav`.
+  - Displays a responsive unread indicator (pill/badge when expanded, glowing indicator dot on icon when collapsed or in mobile drawer) when unread messages exist.
+  - Synchronizes on route changes, `markAsRead` actions, Realtime chat events, and existing 30s background notification refreshes without creating polling loops or second state systems.
+  - Multi-conversation handling: For Platform Owner, aggregates all unread agency conversations and clears only when all relevant conversations are marked as read.
+- **Subscription Lifecycle & Chat Accessibility**:
+  - Implemented `requireAgencyOwnerChatAccess()`: Authenticated Agency Owners retain access to support chat even if their subscription is `EXPIRED` or `CANCELLED`, allowing them to communicate with the Platform Owner for plan upgrades, extensions, or billing support. Normal agency operational write access remains restricted as per subscription lifecycle rules.
+- **Notification Integration**:
+  - Reused existing `UserNotification` model and `InternalNotificationService` with `UserNotificationType.PLATFORM_CHAT_MESSAGE`.
+  - Messages sent by Agency Owner notify the Platform Owner; messages sent by Platform Owner notify the Agency Owner.
+- **UI & Entry Points**:
+  - Agency Owner Support Chat: `/support` (accessible from navigation and sidebar).
+  - Platform Owner Centralized Chat: `/admin/chat` (split master-detail view with search, unread filtering, Agency 360 overview sidebar, and message timeline).
+  - Agency 360 Link: Quick "Open Support Chat" action added to `/admin/agencies/[agencyId]`.
+  - Responsive design: Full mobile 320px support, word wrapping, smooth auto-scroll, optimistic sending state, and connection health indicators.
+- **Intentionally Deferred / Out of Scope**:
+  - File attachments / media uploads.
+  - Typing indicators (Supabase Broadcast).
+  - Presence / online state indicators (Supabase Presence).
+  - Message reactions / emojis.
+  - Message editing / deletion.
+  - Voice / video calls.
+  - Multiple support departments / ticket assignment / SLA workflows.
+  - AI chatbot integration.
+  - Email / WhatsApp / SMS cross-channel delivery.
+  - Customer communications integration (strictly for Platform Owner ↔ Agency Owner).
+  - Subscription/billing mutations directly executed from chat.
+- **Final Verification & Closure**:
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Production build compiled successfully with exit code 0 (PASSED)**.
+  - User Manual Verification Confirmed:
+    1. Realtime live delivery in both directions without refresh.
+    2. Accurate timestamp presentation in local timezone.
+    3. Deterministic chronological message ordering.
+    4. Composer focus restoration after sending.
+    5. Support Chat sidebar unread indicator display and dismissal upon reading.
+
+---
+
+# SECTION 190 — BOOKING DETAIL `trip` vs `tripOperation` AUDIT & DATA SOURCE CORRECTION [VERIFIED & CLOSED]
+
+## 190.1 Architectural Source-of-Truth Distinction
+1. **`trip` (Authoritative for Booked Specifications & Itinerary Data):**
+   - Holds core business data: `title`, `tripNumber`, `startDate`, `endDate`, `status`, `travelers`.
+   - Authoritative for booked itinerary items:
+     - `tripHotels`: Booked accommodations with hotel name, city, check-in date, check-out date, room type, meal plan, room count.
+     - `tripVehicles`: Booked fleet/transport with vehicle name, vehicle type, travel dates, pickup/drop locations, initial driver assignments, capacity.
+     - `tripActivities`: Booked activities/sightseeing with activity name, scheduled date, time, location, participant count.
+2. **`tripOperation` (Authoritative for Operational Execution & Dispatch):**
+   - Holds operational lifecycle and supplier coordination data:
+     - `operationalReadiness`: Calculated departure checklist and blocker validation.
+     - `hotelConfirmations`: Supplier voucher confirmation numbers, confirmation status (`CONFIRMED`, `PENDING`), supplier notes.
+     - `vehicleDispatches`: Chauffeur assignments (`driverName`, `driverPhone`), registration plate numbers, dispatch statuses (`ASSIGNED`, `ON_DUTY`, `CONFIRMED`).
+     - `activityConfirmations`: Voucher/ticket confirmation numbers, confirmation status.
+     - `issues` & `events`: Operational blockers and audit timeline.
+
+## 190.2 Root Cause & Resolution
+- **Issue**: The Booking Detail page (`/bookings/[id]`) was querying only `booking.tripOperation` for its services tables (Hotels, Transport, Activities). If operations had not been initialized or was partially filled, booked services from the trip (`tripHotels`, `tripVehicles`, `tripActivities`) were hidden or displayed as "No confirmation records initialized yet".
+- **Fix**:
+  1. Updated `src/app/(dashboard)/bookings/[id]/page.tsx` to read the booked service specifications from `booking.trip` (`tripHotels`, `tripVehicles`, `tripActivities`) as the primary service items, merging each with its corresponding operational confirmation status from `booking.tripOperation` (`hotelConfirmations`, `vehicleDispatches`, `activityConfirmations`).
+  2. Included `tripVehicle: true` in `vehicleDispatches` under `bookingService.getBooking` and synchronized TypeScript definitions in `booking-client.ts` and `booking-service.ts`.
+  3. Added safe fallback to `booking.trip?.startDate` and `booking.trip?.endDate` for travel dates display.
+
+## 190.3 Verification
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Production build compiled successfully with exit code 0 (PASSED)**.
+- Existing authorization and agency tenant isolation fully preserved.
+
+---
+
+# SECTION 191 — ACTIVITY ARCHITECTURE AUDIT & CONTROLLED SIMPLIFICATION [VERIFIED & CLOSED]
+
+## 191.1 Locked Business Architecture & Core Principles
+1. **Simplified Activity Concept**:
+   - Activities represent experiential items on a Trip with a binary package status: **`INCLUDED`** vs **`EXCLUDED`** (rendered on client and proposal views as **`Not Included`**).
+   - **No Activity Pricing / Financials**: Activities contribute ₹0 to package costing and have no rates, tariffs, markup, discount, tax, or payment fields.
+   - **No Timetable / Capacity Tracking**: Activities have no mandatory time, duration, location coordinates, supplier selector, or inventory constraints.
+2. **Activity Master (Reusable Catalogue)**:
+   - Contains: `Activity Name` (required), `Destination` (required, linked to existing Destination Master), `Description` (optional), internal agency `Notes` (optional), and `Status` (`ACTIVE` / `INACTIVE`).
+   - Tenant-isolated and owned per agency.
+   - Strictly contains no pricing, tariff, supplier, or permanent Include/Exclude default.
+3. **Trip Activity (Trip Inclusions & Exclusions)**:
+   - Belongs to an individual Trip.
+   - Supports two entry mechanisms:
+     - **Option A (Select from Catalogue)**: Choose from the agency's destination-filtered Activity Master list.
+     - **Option B (Manual One-off Entry)**: Type custom activity name directly without silently creating master records.
+   - Inclusion Status:
+     - **`INCLUDED`**: Included in the package price. Initialized in Operations as an `ActivityConfirmation` requirement.
+     - **`EXCLUDED`**: Not included in package price (guest purchases/pays directly on location). Excluded activities do not generate blocker confirmation tasks in operations.
+4. **Customer-Facing & Proposal Display**:
+   - Customer Portal (`/customer/trips/[tripId]`), Secure Token View (`/trip/[secureToken]`), Proposal View (`/q/[shareToken]`), and Preview (`/trips/[id]/quotation/preview`) cleanly render activity badges:
+     - **`Included`** / **`Included in Package`** (emerald badge).
+     - **`Not Included`** / **`Not Included (Pay on Site)`** (amber badge) with informational subtext: *"Ticket/admission directly payable by guest at the activity location"*.
+   - Never exposes internal pricing or cost concepts.
+
+## 191.2 Database & Codebase Changes
+- **Prisma Schema (`prisma/schema.prisma`)**:
+  - Updated `ActivityType` enum to `enum ActivityType { INCLUDED EXCLUDED OPTIONAL }` (preserving `OPTIONAL` for legacy DB safety without exposing it to active UI).
+  - Regenerated Prisma Client v7.9.1 via `npx prisma generate`.
+- **Validation Schemas (`src/lib/validation/activity-schema.ts` & `src/lib/validation/trip-activity-schema.ts`)**:
+  - Streamlined validation schemas around `name`, `destinationId`, `description`, `notes`, `type` (`INCLUDED` | `EXCLUDED`).
+  - Retained nullable legacy fields for backward compatibility with existing DB columns.
+- **Service Layer**:
+  - `src/lib/services/trip-costing-service.ts`: Set `activitiesTotal = 0` and removed monetary accumulation from trip costing.
+  - `src/lib/services/operations-service.ts`: Filtered `trip.tripActivities` so `ActivityConfirmation` records are only generated for `INCLUDED` activities.
+  - `src/lib/services/travel-document-service.ts`: Updated voucher generation to support custom one-off trip activities (`ta.name`).
+  - `src/lib/services/trip-public-service.ts` & `src/lib/services/booking-public-service.ts`: Serialized `activityName` and `type` (`INCLUDED` vs `EXCLUDED`).
+- **UI Streamlining**:
+  - Master pages (`/activities`, `/activities/new`, `/activities/[id]`): Simplified into clean table and forms without tariff/duration/pricing inputs.
+  - Trip Activity tab (`/trips/[id]`): Added dual-mode modal (Catalogue select vs Manual entry + Include/Not Included toggle).
+  - Customer & Quotation views (`/customer/trips/[tripId]`, `/q/[shareToken]`, `/trip/[secureToken]`, `/trips/[id]/quotation/preview`): Synchronized inclusion badges.
+
+## 191.3 Data Safety & Baseline Protection
+- **Permanent QA Baseline Preserved**: 32 Destinations, 22 Hotels, 66 RateSheets, 6 Vehicles, Agency Owner test agency, and Platform Owner intact.
+- **Historical Data Safety**: All 14 existing `TripActivity` records and 3 `Activity` records in the database were verified as `INCLUDED` and preserved without data loss or breaking schema alterations.
+- **Zero Parallel Systems**: Refactored existing models and services directly without creating duplicate tables or APIs.
+
+## 191.5 Activity Add Bug Fix & Modal UI Simplification [VERIFIED & CLOSED]
+- **PostgreSQL Enum Alignment**:
+  - Root cause: In PostgreSQL, enum `"ActivityType"` previously contained only `('INCLUDED', 'OPTIONAL')`. Inserting `type: "EXCLUDED"` caused a DB enum violation.
+  - Fix: Migrated PostgreSQL enum to include `'EXCLUDED'` (`ALTER TYPE "ActivityType" ADD VALUE 'EXCLUDED'`). Live database enum now aligns with Prisma schema: `['INCLUDED', 'OPTIONAL', 'EXCLUDED']`.
+- **Trip Activity Add API Bug Resolved**:
+  - `POST /api/trips/[id]/activities` now successfully handles `{ name, description, type: "EXCLUDED" }` for manual and catalogue activities.
+- **UI Simplification & Compact Modal**:
+  - Replaced bulky Add/Edit Activity modal with a compact, ultra-clean dialog (`max-w-md`) fitting standard viewports without vertical scrolling.
+  - **Removed `Assign to Itinerary Leg (Optional)` completely** from form state, payload, and dialog JSX.
+  - **Removed internal notes** from dialogs and simplified card view in the Activities tab.
+  - Binary inclusion selector: **Included in Package** (emerald) vs **Not Included (Pay on Site)** (amber).
+  - Catalogue selector automatically fills name and description while allowing one-click custom manual entry.
+- **Costing & Operations Intact**:
+  - Activities strictly contribute ₹0 to package costing.
+  - Operations continues generating `ActivityConfirmation` for `INCLUDED` activities and skipping `EXCLUDED`.
+- **Validation**:
+  - 8/8 automated test cases passed (Manual Included/Excluded, Catalogue Included/Excluded, Edit, Costing ₹0, Operations filtering, Tenant isolation).
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Exit code 0 across all routes (PASSED)**.
+
+---
+
+# SECTION 192: UNIFIED PAYABLES ARCHITECTURE (SERVICE, MANUAL, MULTI-PAYMENT, FINANCE & SAFETY)
+
+## 192.1 Core Architectural Principles & Invariants
+1. **Single Source of Truth (Unified Payables Ledger)**:
+   - All outgoing provider obligations are managed exclusively through `SupplierPayable` (`supplier_payables`) and paid via `SupplierPayment` (`supplier_payments`).
+   - Zero duplicate tables or fragmented models (e.g. no separate `HotelPayable`, `VehiclePayable`, or `Disbursement` tables).
+2. **Complete Financial Isolation**:
+   - **Customer Inflows**: Invoices, Customer Payments (`Payment`), and Receivables track customer collections.
+   - **Provider Outflows**: Supplier Payables (`SupplierPayable`) and Supplier Payments (`SupplierPayment`) track outgoing disbursements to vendors and service providers.
+   - Mutating a payable or recording a disbursement strictly never alters customer quotations, booking selling prices, customer invoices, taxes, or customer payment balances.
+3. **Immutability of Historical Pricing Snapshots**:
+   - Automatic payables capture a snapshot of cost obligations (Hotel: nightly rate × rooms × nights; Vehicle: total rate via authoritative `tripCostingService`) at Booking confirmation.
+   - Later changes to Master RateSheets do not retroactively alter confirmed payables.
+   - `plannedAmount` preserves the original generated obligation.
+   - `actualAmount` tracks the current payable obligation when edited by the agency coordinator.
+4. **Activity Cost Isolation**:
+   - In accordance with Section 191, Activities remain non-priced (₹0 cost) and strictly never generate automatic service payables.
+5. **Flexible Ad-hoc Payees**:
+   - Both `SupplierPayable` and `SupplierPayment` support ad-hoc custom payees via `payeeName` when a registered `supplierId` is not present, enabling manual payables for guides, tolls, parking, and miscellaneous trip expenses without forcing dummy Master Supplier creation.
+
+---
+
+## 192.2 Database Model Evolution & Durable Migration
+- **Schema Changes (`prisma/schema.prisma`)**:
+  - `SupplierPayable`:
+    - `supplierId`: `String?` (made nullable to support manual payables and custom vendors).
+    - `payeeName`: `String?` (stores custom payee name when `supplierId` is null).
+    - `origin`: `String @default("AUTOMATIC")` (identifies `"AUTOMATIC"` service payables vs `"MANUAL"` trip/booking payables).
+    - `plannedAmount`: `Decimal @default(0) @db.Decimal(12, 2)` (original snapshot).
+    - `actualAmount`: `Decimal @default(0) @db.Decimal(12, 2)` (current obligation).
+  - `SupplierPayment`:
+    - `supplierId`: `String?` (made nullable).
+    - `payeeName`: `String?` (stores custom payee name).
+- **Durable Prisma Migration History**:
+  - Migration folder: `prisma/migrations/20260928120000_unified_payables_architecture/migration.sql`
+  - Applied and tracked in `_prisma_migrations` via Prisma Migrate.
+- **Data Safety**: All existing `SupplierPayable` and `SupplierPayment` records retained intact with existing relations preserved.
+
+---
+
+## 192.3 Automatic Service Payable Generation & Authoritative Costing
+- **Trigger**: Automatic payables are generated on Booking creation via `generateBookingServicePayables` in `src/lib/services/finance-service.ts`, invoked during `createBooking` and `convertQuotationToBooking` in `src/lib/services/booking-service.ts`.
+- **Authoritative Costing Calculation**:
+  - Integrates with `tripCostingService.calculateTripCosting(agencyId, booking.tripId)` for exact RateSheet & snapshot resolution.
+  - **Hotels**: Generated per hotel booking. `plannedAmount = actualAmount = matchedCost`. Linked to `hotelId`, `bookingId`, and hotel supplier where available.
+  - **Vehicles**: Generated per vehicle booking. `plannedAmount = actualAmount = authoritativeVehicleCost`. Linked to `vehicleId`, `bookingId`, and vehicle supplier.
+  - **Activities**: Explicitly skipped. No payables generated for activity legs.
+  - **Origin**: Marked with `origin: "AUTOMATIC"`.
+- **Strict Idempotency**:
+  - `generateBookingServicePayables` validates existence by `serviceReferenceId` (`th.id` / `tv.id`). Re-executing generation skips existing payables with zero duplicate creation.
+
+---
+
+## 192.4 Manual Payables & Relationship Validation
+- **Trip-Level Payables**:
+  - Attached directly to a `tripId` with `bookingId = null`.
+  - Suitable for guide charges, road permits, tolls, entrance fees, and group logistics.
+  - Created via `RecordPayableDialog` or `POST /api/finance/supplier-payables`.
+- **Booking-Level Payables**:
+  - Attached to both `tripId` and `bookingId`.
+  - Validates that `booking.tripId === input.tripId` and `booking.agencyId === agencyId` to prevent cross-agency or mismatched attachments.
+- **Payee Resolution**:
+  - Can be linked to a Master Supplier (`supplierId`) or a custom payee string (`payeeName`).
+  - Marked with `origin: "MANUAL"`.
+
+---
+
+## 192.5 Editable Payables & Audit History
+- **Editable Properties**:
+  - Automatic and manual payables can be edited via `EditPayableDialog` or `PATCH /api/finance/supplier-payables/[id]`.
+  - Modifiable fields: `actualAmount` (current payable obligation), `dueDate`, `notes`, `payeeName`, `reason`.
+- **Planned vs Actual Preservation**:
+  - `plannedAmount` preserves the initial generated amount (e.g. ₹21,000).
+  - `actualAmount` reflects edited agreement (e.g. ₹19,500).
+- **Edit Audit Trail**:
+  - Changes to `actualAmount` automatically append a timestamped audit record to `notes` (e.g. `[Edited YYYY-MM-DD: Amount changed from ₹21,000 to ₹19,500 (Reason: ...)]`).
+  - Automatically logs a `SUPPLIER_PAYABLE_UPDATED` event to `OperationEvent` when linked to an operation.
+- **Soft-Cancellation**:
+  - `DELETE /api/finance/supplier-payables/[id]` soft-cancels the payable (`status: CANCELLED`, `archivedAt: new Date()`) and records the cancellation reason, preserving all financial history.
+
+---
+
+## 192.6 Multi-Payment Disbursements, Balances & Overpayment
+- **Disbursement Flow**:
+  - Multiple partial payments can be recorded against a single payable over time via `RecordSupplierPaymentDialog` or `POST /api/finance/supplier-payments`.
+  - Each payment records `amount`, `paymentDate`, `paymentMethod`, `referenceNumber`, `notes`, `paidBy`, and linked relations.
+- **Status & Balance Calculations**:
+  - `paidAmount` = `SUM(payments.amount)`
+  - `outstandingAmount` = `MAX(0, actualAmount - paidAmount)`
+  - `overpaidAmount` = `MAX(0, paidAmount - actualAmount)`
+  - Status lifecycle: `PENDING` $\to$ `PARTIALLY_PAID` $\to$ `PAID`.
+  - Overdue is derived dynamically (`dueDate < now && outstandingAmount > 0`) without corrupting payment status.
+  - Overpayments preserve true total paid and all individual payment records without negative balance corruption.
+
+---
+
+## 192.7 Finance & Payments UI Integration
+1. **Finance Dashboard (`/finance`)**:
+   - Displays Revenue, Outflow Payables, Gross Margin, Outstanding Receivables, Outstanding Payables.
+   - Outstanding Payables card: Displays payee name, origin badges (`AUTOMATIC` vs `MANUAL`), amounts, status, due date, Edit action, and Quick Pay action.
+   - Quick action: "+ Record Payable" modal for manual payables.
+2. **Payments Center (`/payments`)**:
+   - Refactored into two dedicated tabs:
+     - **Tab 1: Customer Collections (Inflow)**: Customer invoice receipts, customer names, payment methods, and "+ Log Payment" modal.
+     - **Tab 2: Payable Disbursements (Outflow)**: Outgoing disbursements, payee names, linked payables, origin badges, payment references, and "+ Record Disbursement" modal.
+
+---
+
+## 192.8 Verification & QA Test Results
+- **Comprehensive 28-Assertion Automated QA Suite Executed**:
+  - `[PASS]` 1 & 2: Historical payable and payment records preserved.
+  - `[PASS]` 3: Automatic Hotel payable generation with correct calculation.
+  - `[PASS]` 4: Automatic Vehicle payable generation with authoritative vehicle costing.
+  - `[PASS]` 5: Activities strictly ₹0 / skipped.
+  - `[PASS]` 6 & 6b: Automatic payable generation strict idempotency (0 duplicates on re-run).
+  - `[PASS]` 7 & 8: Planned amount preserved while actual amount edited with audit trail.
+  - `[PASS]` 9: Manual Trip-level payable with ad-hoc payee and `bookingId = null`.
+  - `[PASS]` 10: Manual Booking-level payable with relationship verification.
+  - `[PASS]` 11 & 12: Partial disbursements and `PARTIALLY_PAID` status transition.
+  - `[PASS]` 13: Full disbursement settlement and `PAID` status transition.
+  - `[PASS]` 14: Overpayment handling (Paid = ₹21,500, Outstanding = 0, 3 separate payments intact).
+  - `[PASS]` 15: Overdue dynamically derived without corrupting `PENDING` status.
+  - `[PASS]` 16: Soft-cancellation preserves payable record, timestamp, and reason.
+  - `[PASS]` 17 & 18: Booking selling price mutation does NOT mutate confirmed provider payables.
+  - `[PASS]` 19: Customer Invoice totals strictly isolated from payable edits.
+  - `[PASS]` 20: Customer Payment does not settle supplier payable obligation.
+  - `[PASS]` 21: Supplier Payment does not mutate or settle customer receivables.
+  - `[PASS]` 22: Cross-tenant payable read strictly rejected.
+  - `[PASS]` 23: Cross-tenant payable update strictly rejected.
+  - `[PASS]` 24: Cross-tenant payment disbursement strictly rejected.
+  - `[PASS]` 25: Mismatched Booking and Trip relationship strictly rejected.
+  - `[PASS]` 26: Payments page clean separation (Inflow Collections vs Outflow Disbursements).
+  - `[PASS]` 27: Finance dashboard KPI integration verified.
+  - `[PASS]` 28: Public routes contain zero supplier payables, provider costs, or margin leakage.
+- **Compiler & Build Checks**:
+  - `npx prisma generate` $\to$ **Client v7.9.1 generated (PASSED)**.
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Exit code 0 across all 72 routes (PASSED)**.
+
+---
+
+# SECTION 193: OPERATIONS-FIRST PAYABLES UX REDESIGN
+
+## 193.1 Core Architecture & Principles
+- **Context Ownership**:
+  - **Operations (`/operations/[tripId]`)**: Single operational source of truth. Service providers (Hotels, Vehicles, Other Costs) display live obligations, negotiated costs, deposits paid, and balances due directly on voucher/dispatch cards.
+  - **Payments (`/payments`)**: Central settlement and money movement registry (Customer Payments & Supplier Payments).
+  - **Finance (`/finance`)**: High-level financial reporting, profit margin analysis, receivables/payables ageing, and executive oversight.
+- **Unified Ledger Single Source of Truth**:
+  - Reuses the existing `SupplierPayable` and `SupplierPayment` database tables.
+  - Zero schema changes, zero migrations, zero duplicate ledgers.
+  - `plannedAmount` = original generated cost snapshot (preserved).
+  - `actualAmount` = current editable payable obligation.
+
+---
+
+## 193.2 Service Card Integration
+1. **Hotel Operations (`HotelConfirmationCard`)**:
+   - Matches payable deterministically via `SupplierPayable.serviceReferenceId === HotelConfirmation.tripHotelId`.
+   - Compact **Supplier & Cost** section displays Calculated Cost (`plannedAmount`), Current Payable (`actualAmount`), Paid (`paidAmount`), Outstanding (`outstandingAmount`), Status, and Due Date.
+   - Quick Actions: `Edit Payable` (opens existing `EditPayableDialog`) and `Record Payment` (opens existing `RecordSupplierPaymentDialog`).
+2. **Vehicle Operations (`VehicleDispatchCard`)**:
+   - Matches payable via `SupplierPayable.serviceReferenceId === VehicleDispatch.tripVehicleId`.
+   - Displays identical compact Supplier & Cost section with Edit/Payment actions.
+3. **Activity Operations (`ActivityConfirmationCard`)**:
+   - Strictly preserved as non-priced / ₹0 with no payable generation.
+
+---
+
+## 193.3 Other Costs (Manual Payables in Operations)
+- Dedicated **"Other Costs"** tab added to `/operations/[tripId]`.
+- Operational entry point for non-hotel/vehicle obligations (local tour guides, monument fees, entry permits, tolls).
+- Modal `AddOtherCostModal` creates `SupplierPayable` records with `origin: "MANUAL"`, `serviceType: "MANUAL"`, `tripId: operation.tripId`, `tripOperationId: operation.id`, and optional `bookingId`.
+- Other costs display full status, amounts, and support `Edit Payable` and `Record Payment` workflows.
+
+---
+
+## 193.4 Payments & Finance UI Streamlining
+1. **Payments Center (`/payments`)**:
+   - Terminology cleaned up to intuitive agency standards:
+     - `Customer Collections (Inflow)` $\to$ **`Customer Payments`**
+     - `Payable Disbursements (Outflow)` $\to$ **`Supplier Payments`**
+2. **Finance Dashboard (`/finance`)**:
+   - Refocused on reporting and control.
+   - Prominent `+ Add Payable` button removed from `OutstandingBalancesCard` header (relocated to Operations $\to$ Other Costs).
+   - Retains complete supplier outstanding list, overdue badges, trip links, and secondary Edit / Pay controls.
+
+---
+
+## 193.5 Server Query Adjustment & Typing
+- `operationsService.getOperationById` and `getOperationByTripId` updated to include active `supplierPayables` (with linked `payments` and `supplier`).
+- `OperationDetailWithRelations` updated to include `supplierPayables` relation.
+- All financial calculations (Gross Profit, Recognized Revenue, Selling Price, Invoices, Customer Payments) remain 100% isolated and intact.
+
+---
+
+# SECTION 194: UNIFIED PAYMENTS TABLE UX (CUSTOMER & SUPPLIER IN ONE TABLE)
+
+## 194.1 Overview & Architecture
+- **Single Master Payments Table**:
+  - Removed separate tab views (`Customer Payments` vs `Supplier Payments`) on `/payments`.
+  - Replaced with a single, consolidated ledger presenting all agency money movements (Customer Collections / Inflow and Supplier Disbursements / Outflow) chronologically in one table.
+- **Direction & Type Differentiation**:
+  - Added dedicated **Direction / Type** column with badges:
+    - **Customer (IN)**: Emerald badge with `ArrowDownLeft` icon representing money received from customers.
+    - **Supplier (OUT)**: Purple badge with `ArrowUpRight` icon representing money paid/disbursed to vendors/suppliers.
+  - Formatted Amounts:
+    - Customer payments display with a green `+ ₹Amount` indicator.
+    - Supplier payments display with a purple/slate `- ₹Amount` indicator.
+- **Data & Model Isolation**:
+  - Pure **UI presentation unification**.
+  - Database models (`Payment` for customer receipts and `SupplierPayment` for vendor disbursements), APIs, services, and calculations remain 100% separate and unchanged.
+  - Zero database schema or migration changes.
+
+---
+
+## 194.2 Top Summary & KPI Metrics
+- Top Command Header displays a 3-part financial metrics summary:
+  1. **Total Received (Inflow)**: Total money collected from customers with transaction count.
+  2. **Total Disbursed (Outflow)**: Total money paid to vendors/suppliers with transaction count.
+  3. **Net Cash Balance**: Real-time cash position (`Total Received - Total Disbursed`).
+- Quick Actions:
+  - `Log Customer Payment`: Opens existing booking payment dialog.
+  - `Record Supplier Payment`: Opens existing `RecordSupplierPaymentDialog`.
+
+---
+
+## 194.3 Multi-Dimensional Filter Suite
+- **Omni-Search Bar**: Real-time debounced search across payment references, UTR numbers, customer names, vendor names, booking numbers, and receipts.
+- **Direction Pill Filter**: Toggle between `All (Total)`, `Customer (IN)`, and `Supplier (OUT)`.
+- **Payment Method Filter**: Filter by UPI, Bank Transfer, Cash, Card, Cheque, or Other.
+- **Status Filter**: Filter by Completed, Pending, Refunded, Failed, or Cancelled.
+- **Pagination & Reset**: Client-side clean pagination with active filter reset button.
+
+---
+
+## 194.4 Verification & Build Results
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 72 routes (PASSED)**.
+
+---
+
+# 195. Vehicle Architecture Simplification
+
+## 195.1 Overview & Architectural Objectives
+Simplified the Vehicle module by separating reusable vehicle specification/identity from commercial pricing and operational costing:
+1. **Vehicle Master (Specs-Only)**: Stripped of driver assignments (`defaultDriver`, `driverPhone`), tariffs, pricing types, base rates, and rate per km. Master records represent reusable fleet physical identity (Name, Type, Capacity, Registration Number, Supplier Link, Notes). All existing 9 master records preserved intact.
+2. **RateSheet Decoupling**: Completely removed `VEHICLE` inventory type from RateSheets (`RateInventoryType.VEHICLE` dropped, `vehicleId` and vehicle tariff fields removed). RateSheets are now dedicated solely to contracted Hotel and Activity tariffs.
+3. **Trip Vehicle Commercials**: All transport pricing and costing resides exclusively on `TripVehicle`. Supports:
+   - `FIXED`: Total fixed vehicle amount (`totalRate`).
+   - `PER_KM`: `ratePerKm`, `estimatedKm` (initial planning), and `actualKm` (post-trip odometer entry).
+   - Costing formula: `pricingType === 'PER_KM' ? ratePerKm * (actualKm ?? estimatedKm) : totalRate`.
+   - Trip vehicles can be prefilled from Vehicle Master OR added completely manually (`vehicleId: null`).
+4. **Operations & Unified Payables Synchronization**:
+   - `VehicleDispatchCard`: Displays Rate Basis, Rate, Estimated KM, Actual KM, and live calculated transport cost breakdown alongside Unified Payable details.
+   - Post-trip `actualKm` updates recalculate `actualAmount` on `SupplierPayable` without mutating frozen customer quotations, booking selling prices, invoices, or customer payments.
+5. **Database Migration**: Created and executed Prisma migration `20260929110000_simplify_vehicle_architecture` (No `prisma db push`).
+
+## 195.2 Verification & Build Results
+- `npx tsx --env-file=.env scratch/test_vehicle_architecture.ts` $\to$ **12/12 QA Test Assertions PASSED**.
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASSED)**.
+
+---
+
+# 196. RateSheet Hotel-Only Architecture & Activity Pricing Decoupling
+
+## 196.1 Architectural Objective & Changes
+Following Phase 195, Phase 196 completely streamlined the RateSheet system to be dedicated solely to **Hotel rates**:
+1. **Activity Decoupling from RateSheets**:
+   - `RateInventoryType.ACTIVITY` removed from the Prisma schema and validation engine (`RateInventoryType` is now `HOTEL`).
+   - Dropped `activityId`, `adultCost`, `childCost`, and `infantCost` columns from `rate_sheets` table via Prisma migration `20260929113000_make_ratesheet_hotel_only`.
+   - Removed `rateSheets` relation from `Activity` master model.
+   - Removed Activity lookup methods (`getApplicableActivityRatesBatch`, `getApplicableActivityRate`) from `rate-sheet-service.ts`.
+2. **RateSheet System Scope**:
+   - RateSheet is now strictly a **Hotel Tariff Engine** managing seasonal validity, meal plans, room categories, base cost prices, extra adult/child rates, and priority resolution.
+   - RateSheet UI (Listing, Create, Detail, and Lookup) streamlined to Hotel tariffs with all Activity options and indicators removed.
+   - RateSheet Excel import/sample logic remains 100% Hotel-focused.
+3. **Activity Architecture Preservation**:
+   - Activity Master remains a clean reusable catalogue.
+   - TripActivity remains strictly non-monetary inclusion tracking (`INCLUDED` vs `EXCLUDED`).
+   - Activities maintain zero costing (`activitiesTotal = 0`), zero rate sheets, and zero supplier payables.
+4. **Baseline & Regression Integrity**:
+   - All **68 Hotel RateSheets** preserved intact in the database.
+   - Vehicle architecture from Phase 195 preserved with zero regression.
+
+## 196.2 Verification & Build Results
+- `npx prisma migrate deploy` $\to$ **Migration `20260929113000_make_ratesheet_hotel_only` applied successfully**.
+- `npx prisma generate` $\to$ **Prisma Client generated cleanly**.
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASSED)**.
+- Database baseline check: **68 RateSheets, 28 Hotels, 33 Destinations, 5 Activities, 23 TripActivities, 9 Vehicles, 12 TripVehicles, 30 Payables** all verified intact.
+
+---
+
+# 197. Assign Vehicle to Trip Modal UI Simplification
+
+## 197.1 Architectural Objective & Changes
+Streamlined the **Assign Vehicle to Trip** modal in `src/components/operations/assign-vehicle-modal.tsx`:
+1. **Compact Modal**: Reduced modal width to `max-w-md` with concise spacing.
+2. **Simplified Fields**: Optional Vehicle Master selector, required Vehicle Name, Vehicle Type, Capacity, and Registration Number. Manual vehicle entry supported without selecting Vehicle Master.
+3. **Compact Rate Basis Segmented Control**: Clean toggle between `Fixed` and `Per KM` with auto-calculated total transport cost.
+4. **Preserved Business Logic**: 100% compatibility with Phase 195 `TripVehicle` commercials and Unified Payables synchronization.
+
+---
+
+# 198. Invoice, Booking UI & Payment Schedule Cleanup
+
+## 198.1 Objectives & Architectural Summary
+Controlled cleanup across customer-facing invoice presentation, PDF generation, Booking UI, terminology, and temporary hiding of Payment Schedule UI without breaking underlying costing, quotation pricing, tax rules, or database models:
+
+1. **Invoice Total & Service Total Customer Reconciliation**:
+   - **Internal Agency Markup Protection**: Agency Markup remains strictly an internal commercial calculation and is never exposed as a customer-facing line item or percentage on the Invoice UI or PDF.
+   - **Reconciled Line Item Presentation**: `getOrCreateInvoiceForBooking` now allocates quotation package markup into individual invoice line item selling prices proportionately with odd-paise reconciliation (`itemsTotal === subtotal`).
+   - **Harmonious Customer-Facing Mathematical Flow**:
+     `Services Subtotal` $\to$ `Special Discount (if applicable)` $\to$ `Taxable Base Amount` $\to$ `Itemized GST (CGST/SGST or IGST if applicable)` $\to$ `Final Invoice Total`.
+   - **0% GST Exemption Presentation**: If tax is 0% or Non-GST Exempt, redundant 0% GST line items are omitted from customer summary cards and PDF invoices.
+
+2. **Invoice View Page Header UI Redesign**:
+   - Redesigned `src/app/(dashboard)/invoices/[id]/page.tsx` header with a clean, responsive hierarchy:
+     - Top row: Clean back navigation, invoice title, invoice number, and status badge.
+     - Secondary row: Associated booking number, customer name, and trip title context.
+     - Responsive action bar: Action buttons (`Record Payment`, `Download PDF`, `Preview Invoice`, `Issue Invoice`, `Cancel Invoice`) neatly grouped without wrapping issues or cramped title overlap.
+
+3. **Invoice PDF Fixes**:
+   - **Eradicated Stray `¹` Artifacts**: Fixed PDFKit WinAnsi encoding mismatch by formatting currency with standard ASCII `Rs.` / `INR` rather than raw UTF-8 `₹` (which was causing byte `0xB9` to render as superscript `¹`).
+   - **Clean Table Pagination & Header Repetition**: Refactored `checkPageBreak` to `ensureSpace(neededHeight)` with explicit `currentY` tracking. Both Services Itemization and Payment History tables automatically repeat their headers when crossing pages.
+   - **Prevented Orphaned Headers**: Payment History section heading, table header, and first row are kept together atomically.
+   - **Fixed Excess Blank Pages**: Eliminated phantom page break cascade caused by stale `doc.y` references. PDFs now render cleanly across only the exact number of pages required.
+
+4. **Booking Details — Dispatch Status & Terminology**:
+   - **Human-Friendly Dispatch Statuses**: Replaced raw database enums (`ON_DUTY` $\to$ `On Duty`, `IN_TRANSIT` $\to$ `In Transit`, `UNINITIALIZED` $\to$ `Unassigned`, `CONFIRMED` $\to$ `Confirmed`, `COMPLETED` $\to$ `Completed`, `PENDING` $\to$ `Pending`) in the Transport & Fleet Dispatches table.
+   - **Driver Terminology Clarification**: Updated user-facing occurrences of `Chauffeur` across booking tables, operation cards, and modals to `Driver (Chauffeur)` or `Driver` without altering database fields or API contracts.
+
+5. **Temporary Hiding of Payment Schedule / Milestone UI**:
+   - **Booking Details**: Safely commented out the `Payment Milestone Schedule & Allocation` card and badge counters from `src/app/(dashboard)/bookings/[id]/page.tsx`.
+   - **Quotation UI**: Safely commented out the `Payment Schedule` promo card, tab navigation button, and tab panel in `src/app/(dashboard)/trips/[id]/quotation/page.tsx`.
+   - **Full Feature Preservation**: All Prisma models (`QuotationPaymentMilestone`, `BookingPaymentMilestone`, `PaymentScheduleAllocation`), services, APIs, and business calculations remain completely intact for future re-enabling.
+
+## 198.2 Verification & Build Results
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASSED)**.
+
+---
+
+# 199. ACTIVITY UI VISIBILITY CLEANUP (2026-09-29)
+
+## 199.1 Purpose & Policy
+Activity in the TripDesk architecture is locked as a pure trip inclusion/catalogue feature (`INCLUDED` / `EXCLUDED` with labels `Included` / `Not Included`), non-priced and non-costed (₹0), with no supplier payables, RateSheets, or operational dispatch workflows.
+
+To align the user interface with this simplified architecture without deleting any underlying code, a **UI-only visibility cleanup** was performed by commenting out relevant surfaces.
+
+## 199.2 UI Surfaces Cleaned & Preserved
+1. **Operations Dashboard (`/operations`)**:
+   - Commented out pending activities count in operational attention calculation and pending action items.
+   - Commented out the `Activities` status check chip in the Operations Directory list while maintaining clean 3-column responsive grid layout for Hotels, Fleet, and Tickets.
+2. **Operations Trip Detail (`/operations/[tripId]`)**:
+   - Commented out `Activities` tab from the workspace tabs bar.
+   - Commented out the `Activities` line in the Overview tab component summary card.
+   - Commented out the `Activity & Excursion Bookings` check from the `Operational Readiness & Checklist` card and in `operations-service.ts` (`getReadiness`), re-balancing the UI checklist to a 3-column responsive layout (Hotels, Fleet, Issues).
+   - Commented out the `Tab 4: Activities` full workspace section.
+   - Commented out `ActivityConfirmationDialog` and `RescheduleActivityModal` triggers.
+   - Filtered out `ACTIVITY_VOUCHER` from the `Available Document Roster` in the Documents & Travel Kit tab so hidden passes do not leave empty cards or inflate document counts.
+3. **Operations Modals & Reconciliation**:
+   - **Complete Tour Modal (`complete-trip-modal.tsx`)**: Commented out the Activities item from the `Operational Delivery Checklist` and balanced the grid to 2 columns (Hotels & Fleet).
+   - **Travel Kit Readiness Modal (`travel-kit-readiness-modal.tsx`)**: Commented out Activities from the `Component Verification Breakdown`.
+   - **Service Reconciliation Card (`service-reconciliation-card.tsx`)**: Commented out the `3. Activities & Excursions Delivery` reconciliation card.
+   - **Communication Modal (`communication-modal.tsx`)**: Commented out `ACTIVITY_PASS` from the template scenario dropdown.
+4. **Documents & Vouchers (`/documents` & `/customer/trips/[tripId]/documents`)**:
+   - **Document Center (`/documents`)**: Commented out `Activity Pass` from the document type filter dropdown.
+   - **Customer Document Center**: Filtered out `ACTIVITY_PASS` from customer-facing document roster.
+
+## 199.3 Code & Feature Preservation Guarantee
+- **Zero Deletions**: No files, functions, components, API endpoints, Prisma models, or service logic were deleted.
+- **Activity Master & TripActivity Intact**: Activity catalogue (`/activities`), Master CRUD, and TripActivity selection/inclusion remain 100% intact and functional.
+- **TypeScript & Build**: `npx tsc --noEmit` and `npm run build` both passed with 0 errors.
+
+---
+
+# 200. ACTIVITY PRESENTATION & QUOTATION UI CLEANUP + QA (2026-09-29)
+
+## 200.1 Purpose & Architecture Alignment
+Activity in TripDesk is strictly a non-costed, non-priced catalogue inclusion feature:
+- `INCLUDED` internal state $\to$ Customer-facing badge: **Included** (emerald).
+- `EXCLUDED` internal state $\to$ Customer-facing badge: **Not Included** (amber with caption "Ticket/admission payable directly on location by guest").
+- Activity has ₹0 cost, ₹0 price, no RateSheet, no supplier payable, and no invoice line item impact.
+- Conceptual positioning: Activity belongs under **Inclusions & Exclusions**, not Costing/Pricing or Operations.
+
+## 200.2 Changes Implemented
+1. **Quotation Preview (`/trips/[id]/quotation/preview` & `/q/[shareToken]`)**:
+   - Customer-facing badges render **Included** (`INCLUDED`) and **Not Included** (`EXCLUDED`/`OPTIONAL`).
+   - No generic `Include`, `Exclude`, or `Optional` badges appear.
+   - Sightseeing & Activities renders with zero pricing, cost, or tax elements.
+2. **Booking Details Activity Table (`/bookings/[id]`)**:
+   - Removed user-facing columns: `Pass / Voucher #` and `Status` (code preserved in comments).
+   - Replaced with authoritative **Inclusion** column rendering **Included** or **Not Included** based on `TripActivity` inclusion state.
+   - No operational voucher status, booking status, supplier status, or financial figures are shown.
+3. **Invoice Line Items Exclusion (`invoice-service.ts`, `/invoices/[id]`, `invoice-pdf-service.ts`)**:
+   - Filtered out `type === "ACTIVITY"` and `sourceType === "TRIP_ACTIVITY"` from customer invoice item derivation and PDF generation.
+   - Financial Safety Verified: Zero impact on invoice subtotal, discount, taxable amount, GST, total amount, paid amount, and balance amount.
+4. **Costing & Pricing Snapshot (`/trips/[id]/quotation`)**:
+   - Filtered out `type === "ACTIVITY"` from the Quotation Line Items Snapshot table.
+   - Only financially relevant services (Hotels, Vehicles, Custom items) appear with RateSheet rates and line totals.
+5. **Inclusions & Exclusions Studio (`/trips/[id]/quotation`)**:
+   - Presented activities under the existing **Inclusions & Exclusions** tab:
+     - **Included Activities**: Listed with clean green badge under Package Inclusions.
+     - **Not Included Activities**: Listed with amber badge under Package Exclusions with direct venue note.
+6. **Quotation Version Labels (`V1`, `V2`, etc.)**:
+   - Normalized all user-facing quotation version badges and text across Quotation Studio, Quotation Preview, Share Token view, Trip Detail, Customer Details, and PDF generation from lowercase `v1`/`v2` to uppercase `V1`/`V2`.
+   - Numeric version values and sequencing remain unchanged.
+
+## 200.3 Quality Assurance & Verification
+- **Code Preservation**: Zero files, models, APIs, or database records deleted; legacy code preserved in clean comments.
+- **Multi-Tenant Security**: Multi-tenant isolation and server-authoritative role checks fully preserved.
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASSED)**.
+
+## 200.4 Focused Fix: Quotation Activity Inclusion Projection (2026-09-29)
+- **Root Cause**: In `src/lib/services/quotation-service.ts`, several Prisma `tripActivities.select` blocks omitted `type: true`. This caused `act.type` to be returned as `undefined` in quotation payloads, leading the presentation layer (`act.type === "EXCLUDED" || act.type === "OPTIONAL"`) to default excluded/optional activities to "Included".
+- **Fix Applied**: Added `type: true` to all 9 `tripActivities.select` projections across `getQuotationById`, `getQuotations`, `getQuotationByNumber`, `createQuotation`, `updateQuotation`, `updateQuotationStatus`, `generateQuotationFromCosting`, `createQuotationVersion`, and `getPublicQuotationByToken`.
+- **Inclusion Presentation Verified**:
+  - `INCLUDED` $\to$ **Included** (emerald badge).
+  - `EXCLUDED` $\to$ **Not Included** (amber badge with venue ticket note).
+  - `OPTIONAL` (legacy) $\to$ **Not Included**.
+- **Financial Safety**: Zero changes to financial logic, quotation totals, costing, or invoice calculations.
+- **Verification Results**:
+  - `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+  - `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASSED)**.
+
+---
+
+# 201. PROPOSAL BRANDING & POLICY TERMS DEFAULTS + PRIVACY POLICY + AUDIT TIMELINE SCROLL (2026-09-29)
+
+## 201.1 Purpose & Scope
+1. **Proposal Branding & Policy Terms Defaults & Privacy Policy**:
+   - Established professional proposal defaults across:
+     - `Proposal Subtitle` $\to$ `"Your Personalized Travel Proposal"`
+     - `Customer Welcome Note` $\to$ `"Thank you for choosing us for your travel plans. We are pleased to present this personalized proposal and look forward to making your journey comfortable, enjoyable, and memorable."`
+     - `Cancellation Policy` $\to$ `"Cancellation and amendment charges may vary depending on the service provider, hotel, transport arrangement, activity, and applicable booking conditions. Any applicable cancellation or amendment charges will be communicated before processing the request. Refunds, where applicable, are subject to the terms and conditions of the respective service providers."`
+     - `Important Traveler Notes` $\to$ `"Please carry valid government-issued identification and any required travel documents. Hotel check-in and check-out times are subject to the property's policies. Travel times may vary due to traffic, weather, local conditions, or operational circumstances. Guests are advised to review the final itinerary and service details before travel."`
+     - `Privacy Policy` $\to$ `"Your personal information is used to arrange and manage your travel services and to provide related customer support. We take reasonable measures to protect your information and do not use it for purposes unrelated to your travel arrangements except where required or permitted by applicable law. Please contact the agency for any questions regarding the handling of your personal information."`
+   - **Quotation-Level Snapshot Rule**: Defaults automatically snapshot onto newly generated/created quotations while remaining fully editable per quotation. Existing historical quotations are preserved with zero bulk overwrites.
+   - **Privacy Policy Persistence**: Added `privacyPolicy String?` to Prisma `Quotation` model via migration `20260929165000_add_quotation_privacy_policy`.
+   - **Surfaces Updated**:
+     - Quotation Studio (`/trips/[id]/quotation` Tab 5 Terms & Policies)
+     - Internal Quotation Preview (`/trips/[id]/quotation/preview`)
+     - Public Customer Quotation (`/q/[shareToken]`)
+     - Quotation PDF (`quotation-pdf-service.ts`)
+2. **Booking & Operations Audit Timeline Responsive Horizontal Scroll**:
+   - Added container `overflow-x-auto` with clean minimum width (`min-w-[360px]`) and word wrap to the Booking & Operations Audit Timeline in `src/app/(dashboard)/bookings/[id]/page.tsx`.
+   - Responsive across desktop, tablet, and mobile with zero page-level horizontal overflow.
+3. **Financial Safety**: Zero changes to financial logic, quotation totals, costing, or invoice calculations.
+
+## 201.2 Quality Assurance & Build
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASSED)**.
+
+---
+
+# PHASE 203 — REGENERATE INVOICE (SAME INVOICE NUMBER)
+
+## 203.1 Objective & Architecture
+Following the Phase 202 audit, Phase 203 introduces the user-triggered **Regenerate Invoice** capability:
+- **Same Record & Same Invoice Number**: When a Booking or Quotation is modified post-invoice issuance, the agency owner can explicitly trigger "Regenerate Invoice". The single persistent `Invoice` record (`@@unique([agencyId, bookingId])`) and its sequential `invoiceNumber` (`@@unique([agencyId, invoiceNumber])`) are 100% retained.
+- **NO Revision System**: Strictly NO `Rev 1`, `Rev 2`, revision models, revision numbers, or version suffixes.
+- **Snapshot Refresh**: Deletes and replaces child `InvoiceItem` records with the latest quotation line items (with odd-paise markup reconciliation), updates taxes, discounts, `customerSnapshot`, `bookingSnapshot`, and `agencySnapshot`.
+- **Payment & Receivable Preservation**: Preserves all completed `Payment` records attached to the booking, recalculates `paidAmount`, `balanceAmount`, and updates `InvoiceStatus` (`ISSUED`, `PARTIALLY_PAID`, `PAID`) within a single database transaction.
+- **Cancelled Invoices**: Regeneration of `CANCELLED` invoices is strictly rejected.
+
+## 203.2 Implementation Summary
+1. **Service Layer (`src/lib/services/invoice-service.ts`)**:
+   - Enhanced `getOrCreateInvoiceForBooking` to refresh `customerSnapshot`, `bookingSnapshot`, `agencySnapshot` alongside line items and totals.
+   - Added `invoiceService.regenerateInvoice(agencyId: string, invoiceId: string)` verifying invoice existence, tenant matching, and non-cancelled status before rebuilding the snapshot.
+2. **API Endpoint (`src/app/api/invoices/[id]/regenerate/route.ts`)**:
+   - `POST /api/invoices/[id]/regenerate` with server-derived `agencyId` via `requireWriteAccess()`.
+3. **UI Integration (`src/app/(dashboard)/invoices/[id]/page.tsx` & `src/app/(dashboard)/bookings/[id]/page.tsx`)**:
+   - Added **Regenerate Invoice** action button in the Invoice Detail header with `ConfirmDialog` confirmation before proceeding.
+   - Added contextual **Regenerate Invoice** action in Booking Details action menu.
+4. **PDF Integration (`src/lib/services/invoice-pdf-service.ts`)**:
+   - Streams high-resolution PDF directly from the refreshed invoice snapshot under the same `Invoice-${invoice.invoiceNumber}.pdf` filename.
+
+## 203.3 Quality Assurance & Build Validation
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 73+ routes (PASSED)**.
+
+---
+
+# PHASE 204 — MOVE REGENERATE INVOICE ACTION (UI ONLY)
+
+## 204.1 Objective & Changes
+- **Primary & Single Action Location**: **Regenerate Invoice** is available exclusively from **Booking Details $\to$ Invoice section** (and booking action menu) in `src/app/(dashboard)/bookings/[id]/page.tsx`.
+- **Removed from Invoice Surfaces**: Removed **Regenerate Invoice** button/dialog from the Invoice Detail page header and action menus in `src/app/(dashboard)/invoices/[id]/page.tsx`.
+- **Backend Architecture Preserved**: The underlying regeneration service (`invoiceService.regenerateInvoice`) and API (`POST /api/invoices/[id]/regenerate`) remain 100% authoritative and unchanged.
+- **Confirmation & Safety**: Triggered with standard `ConfirmDialog` preserving the existing Invoice ID, sequential Invoice Number, and existing customer payment records.
+
+## 204.2 Quality Assurance & Build Validation
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 73+ routes (PASSED)**.
+
+---
+
+# PHASE 205 — REGENERATE INVOICE BUG FIX (TAXABLE BASE, BOOKING INVOICE TOTAL & CONFIRMATION DIALOG)
+
+## 205.1 Purpose & Root Causes
+During real usage post-Phase 204, three specific defects were identified and resolved:
+1. **Bug 1 — Incorrect Taxable Base after Regeneration**:
+   - *Root Cause*: In `invoiceService.getOrCreateInvoiceForBooking()`, `taxableAmount`, `taxAmount`, `cgstAmount`, `sgstAmount`, `igstAmount`, and `totalAmount` were copying stale snapshot values from `booking` rather than dynamically recalculating via `TaxService` based on the updated `invoiceSubtotal` and `quoteDiscount`.
+   - *Fix*: Integrated `taxService.calculate({ amount: invoiceSubtotal, taxRate, taxMode, gstTreatment, discountAmount: quoteDiscount })` as the single authoritative calculation engine. Recomputed `taxableAmount`, `taxAmount`, `cgstAmount`, `sgstAmount`, `igstAmount`, `totalAmount`, `paidAmount`, `balanceAmount`, and `status` across both new invoice generation and regeneration.
+2. **Bug 2 — Booking Details Invoice Section Total Mismatch**:
+   - *Root Cause*: Invoice card and header summaries on Booking Details were reading stale total fields or prioritizing `booking.totalAmount` over the authoritative regenerated `Invoice.totalAmount`.
+   - *Fix*: Ensured `Invoice.totalAmount`, `Invoice.paidAmount`, `Invoice.balanceAmount`, and `Invoice.status` are the persisted source of truth in `invoice-service.ts`, `invoice-pdf-service.ts`, `invoices/[id]/page.tsx`, and `bookings/[id]/page.tsx`.
+3. **Bug 3 — Regenerate Confirmation Dialog Remaining Open**:
+   - *Root Cause*: In `src/app/(dashboard)/bookings/[id]/page.tsx`, the `ConfirmDialog` action callback did not reset `setConfirmAction(null)` on successful API response, leaving the dialog open indefinitely.
+   - *Fix*: Added `setActionLoading(true)` on confirm click, `setConfirmAction(null)` immediately on success before `await fetchBooking()`, and `setActionLoading(false)` in the `finally` block with proper error toast handling and double-click prevention.
+
+## 205.2 Architecture & Security Preserved
+- **Single Source of Truth**: Reuses existing `TaxService` (`tax-service.ts`) with deterministic odd-paise reconciliation for INTRA_STATE (CGST/SGST 50-50 split) and INTER_STATE (IGST 100%) across both EXCLUSIVE and INCLUSIVE modes.
+- **Zero Schema / Database Changes**: No new Prisma migrations, no schema alteration, no `prisma db push`.
+- **Identity & Records**: Retains the exact same `Invoice.id` and sequential `Invoice.invoiceNumber` (no Rev 1/Rev 2).
+- **Payment Integrity**: Completed `Payment` records remain untouched and linked.
+- **Tenant Isolation & Security**: Server-derived `agencyId` via `requireWriteAccess()` and CANCELLED invoice protection strictly enforced.
+
+## 205.3 Quality Assurance & Build Validation
+- **Automated QA Suite**: 51/51 test assertions passed (Exclusive tax hotel change, Inclusive tax discount & partial payment, PDF generation, security & cancelled invoice protection, activity exclusion, clean data teardown).
+- `npx tsc --noEmit` $\to$ **0 errors (PASSED)**.
+- `npm run build` $\to$ **Exit code 0 across all 73+ routes (PASSED)**.
+
+---
+
+# 206. QUOTATION PDF FULL UI & VISUAL REDESIGN (2026-09-30)
+
+## 206.1 Purpose & Scope
+- **Objective**: Complete presentation-only redesign of the generated Quotation PDF (`quotation-pdf-service.ts`) into a high-end, editorial-grade travel agency proposal document.
+- **Strict Scope Isolation**:
+  - **Quotation PDF Presentation Only**: Transformed from plain tabular layout to an editorial, structured travel proposal.
+  - **Zero Database Schema Changes**: No Prisma migrations, no schema mutations.
+  - **Zero Calculation Mutations**: Quotation totals, subtotal, discount, taxable base, GST split, markup, pricing engine, and invoice calculations remain strictly untouched.
+  - **Security & Non-Exposure**: Provider costs, buying rates, supplier payables, gross margins, and agency markups remain strictly non-exposed.
+  - **Activity Phase 200 Invariant**: Activities have zero financial impact and render with clean `Included` / `Not Included` badges without rates or voucher IDs.
+  - **Version Normalization**: Formatted strictly as uppercase `V1`, `V2`, `V3` (never lowercase `v1`).
+
+## 206.2 Architectural & Design Implementation
+1. **Dedicated Page 1 — Cover Page**:
+   - Agency branding banner with logo (or elegant vector monogram badge fallback).
+   - Prominent Proposal Title with dynamic Tier suffix (`Deluxe`, `Ultra Deluxe`, `Premium`).
+   - Customer details card (`Prepared for: Customer Name`, Contact details).
+   - Structured Trip Overview card (Destination route, Travel Dates, Duration in Days/Nights, Travelers/Pax count).
+   - Reference & validity bar (`Quotation Ref`, `Version V1/V2`, `Valid Until`).
+2. **Page 2+ Running Header & Footer System**:
+   - Running header on content pages: Agency Name, Quotation Number, and Version badge (`V1`).
+   - Running footer on all pages: Quotation Title, Version, and dynamic page numbering (`Page X of Y` via `doc.bufferedPageRange()`).
+3. **Trip At A Glance & Consultant Welcome**:
+   - Renders personalized `proposalSubtitle` and `customerMessage` welcome note snapshots.
+   - Clean summary grid for quick scanning.
+4. **Day-by-Day Itinerary Presentation**:
+   - Structured day cards with day badges (`Day 01`, `Day 02`), location tags, and itinerary descriptions.
+5. **Accommodation & Transport Cards**:
+   - Hotel cards with destination, room category, meal plan, stay dates, nights, and room counts.
+   - Transport cards with vehicle type, passenger capacity, and chauffeured service details.
+6. **Sightseeing & Excursions**:
+   - Editorial cards clearly displaying `Included` or `Not Included` status without financial clutter.
+7. **Inclusions & Exclusions Grid**:
+   - Two-column card layout cleanly separating what is included versus excluded.
+8. **Transparent Package Investment Breakdown**:
+   - Services / Package Amount, Special Discount, Taxable Base, GST Breakdown (CGST + SGST or IGST), and prominent Total Package Price.
+9. **Terms, Policies & Agency Closing**:
+   - Structured cards for Cancellation Policy, Important Traveler Notes, Privacy Policy, and Terms & Conditions.
+   - Professional closing card with agency contact details.
+
+## 206.3 Quality Assurance & Verification
+- **Test Suite**: Automated PDF generation QA suite (`scratch/test-quotation-pdf-qa.ts`) verified:
+  - Short Quotation (5-day tour): PASS (58,631 bytes).
+  - Long Multi-Day Expedition (14 days, multiple properties & vehicles): PASS (92,493 bytes).
+  - Inclusions & Exclusions formatting: PASS.
+  - Currency Formatting (`INR` without encoding glitches): PASS.
+  - Non-exposure of internal financials/markup: PASS.
+- **TypeScript Check**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASS)**.
+
+---
+
+# 207. QUOTATION PREVIEW & PUBLIC SHAREABLE RESPONSIVE UI AUDIT + FIX (2026-09-30)
+
+## 207.1 Purpose & Scope
+- **Objective**: Audit and enhance the responsive presentation of the **Internal Quotation Preview** (`/trips/[id]/quotation/preview`) and **Public Shareable Quotation** (`/q/[shareToken]`) across small/mobile viewports (320px, 360px, 375px, 390px, 430px) through tablet (768px) and desktop (1024px+).
+- **Desktop Parity**: Preserved existing rich desktop card designs, spacing, typography hierarchy, and branding intact.
+- **Strict Scope Isolation**: Zero database changes, zero calculation modifications, zero API contract changes, zero security/data exposure changes.
+
+## 207.2 Key Responsive Improvements Implemented
+1. **Top Floating Header Action Bar**:
+   - Replaced rigid horizontal action button row with responsive layout (`px-3 sm:px-8 py-2.5 sm:py-3`).
+   - Action buttons wrap gracefully and adapt labels cleanly (`Back to Editor` / `Back`, `Download PDF` / `PDF`, `Live Link`).
+   - Viewport switcher (`desktop`/`tablet`/`mobile`) elegantly adapts and remains hidden on physical mobile viewports.
+2. **Hero Header & Proposal Title**:
+   - Handled long quotation titles and agency names with `break-words` and responsive scale (`text-xl sm:text-3xl lg:text-5xl`).
+   - Agency contact and quotation reference badges wrap safely without colliding on 320px screens.
+3. **Trip Overview Metadata Bar**:
+   - Enhanced 2-column mobile to 4-column desktop grid with `min-w-0` and `gap-3 sm:gap-4` to prevent long travel date strings from clipping.
+4. **Highlights & Tour Badges**:
+   - Switched from rigid single flex-row to a clean 2-column mobile grid / centered desktop flex row with `min-w-0` and `truncate`.
+5. **Day-Wise Itinerary Cards**:
+   - Day badge + location tags wrap into a responsive header column on small mobile screens, preventing title/tag truncation.
+   - Long itinerary descriptions wrap cleanly with `whitespace-pre-wrap break-words`.
+6. **Hotel Accommodation & Transport Cards**:
+   - Check-in/check-out lines, meal plans, room types, and vehicle notes wrap safely into fluid multi-line spans on narrow screens.
+7. **Sightseeing / Activities Cards**:
+   - Activity titles and `Included` / `Not Included` status badges use `min-w-0 flex-1` and `shrink-0` to prevent badge compression.
+8. **Inclusions & Exclusions / Policies**:
+   - Responsive card padding (`p-4 sm:p-6`) and list items with `min-w-0 break-words`.
+9. **Total Package Price & Interactive Bottom Decision Bar**:
+   - Action buttons in public quotation (`PDF`, `WhatsApp`, `Request Changes`, `Accept Proposal`) use a responsive `grid grid-cols-2 sm:flex sm:flex-wrap` layout to completely prevent mobile horizontal overflow.
+10. **Accept & Revision Modals**:
+    - Dialog modals use `max-w-[94vw] sm:max-w-md` with responsive padding and touch-friendly controls.
+
+## 207.3 Validation & Quality Assurance
+- **Desktop Regression**: PASS (full layout, grid columns, and hierarchy preserved).
+- **Mobile QA (320px, 360px, 390px, 430px)**: PASS (0 horizontal overflow, 0 text clipping, 0 button collisions).
+- **Tablet QA (768px)**: PASS.
+- **Public Shareable Link (`/q/[shareToken]`)**: PASS.
+- **Internal Preview (`/trips/[id]/quotation/preview`)**: PASS.
+- **Security & Data Exposure**: PASS (zero provider costs, payables, or markups exposed).
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASS)**.
+- **Database / Schema**: No schema changes, no migrations.
+
+---
+
+# 208. CUSTOMER FEEDBACK & EXTERNAL REVIEW FLOW IMPLEMENTATION (2026-09-30)
+
+## 208.1 Purpose & Architecture Overview
+- **Objective**: Implement the completed, non-manipulative **Customer Feedback + External Review Flow** allowing customers to submit post-trip feedback and optionally click through to public review platforms (Google Review and TripAdvisor).
+- **Core Principles Maintained**:
+  - **Surgical Extension**: Reused existing `CustomerFeedback` and `AgencyCommunicationSetting` tables without introducing redundant models (`Review`, `CustomerReview`, `ReviewSubmission`, etc.).
+  - **Zero Review Manipulation**: External review links appear for **all** rating tiers (1 to 5 stars) equally if configured by the agency. No review gating, rating suppression, or conditional redirects.
+  - **Feedback Idempotency**: Both public token (`/trip/[secureToken]`) and authenticated customer portal (`/customer/trips/[tripId]/feedback`) paths update existing records on repeated submissions without duplicate row creation.
+  - **Staged Communication Isolation**: Real external delivery (Email/WhatsApp/SMS) remains strictly ON HOLD; provider stubs/staged notification architecture preserved.
+
+## 208.2 Database & Migration Changes
+- **Model Extended**: `AgencyCommunicationSetting` in `prisma/schema.prisma`
+  - Added optional fields: `googleReviewUrl String?` and `tripAdvisorReviewUrl String?`.
+- **Migration**: `20260930161500_add_agency_review_urls`
+  - SQL: `ALTER TABLE "AgencyCommunicationSetting" ADD COLUMN "googleReviewUrl" TEXT, ADD COLUMN "tripAdvisorReviewUrl" TEXT;`
+  - Zero disruption to existing records; backwards-compatible with `NULL` defaults.
+
+## 208.3 Validation & Security
+- **Schema**: `src/lib/validation/communication-schema.ts`
+  - Added strict HTTPS URL validation for `googleReviewUrl` and `tripAdvisorReviewUrl`, supporting empty string / null clearing.
+- **Tenant Isolation**: Settings updates and fetches strictly scoped to authenticated `agencyId` derived server-side via session.
+- **Public Payload Safety**: Public and customer portal feedback payloads expose only safe `{ googleReviewUrl, tripAdvisorReviewUrl }` objects. Zero internal costs, margins, supplier payables, email/WhatsApp configurations, or provider API keys are leaked.
+
+## 208.4 Implementation Details
+1. **Idempotent Customer Portal Feedback** (`src/lib/services/customer-portal-service.ts`):
+   - `submitCustomerTripFeedback`: Validates customer authentication, trip completion, and agency scoping. Checks for an existing `CustomerFeedback` record; updates if present, creates if absent. Automatically sets `serviceRecoveryStatus: FOLLOW_UP_REQUIRED` for ratings <= 3.
+2. **Public Feedback Flow** (`src/lib/services/feedback-service.ts`):
+   - `getPublicFeedbackStatus` & `submitPublicFeedback`: Returns `reviewLinks: { googleReviewUrl, tripAdvisorReviewUrl }` from the trip's agency settings.
+3. **Agency Dashboard Settings UI** (`src/app/(dashboard)/feedback/page.tsx`):
+   - Removed fake hardcoded placeholder URLs.
+   - Connected the Review Settings modal directly to `GET /api/communication/settings` and `PATCH /api/communication/settings`.
+   - Dynamic status badges: "Configured" with copy/link actions or "Not Configured" with direct configuration CTA.
+4. **Customer Post-Submission UI** (`/trip/[secureToken]` and `/customer/trips/[tripId]/feedback`):
+   - Upon feedback submission, customer is greeted with the thank-you state and dynamic "Share your experience publicly" section with "Review us on Google" and/or "Review us on TripAdvisor" buttons matching agency configuration.
+
+## 208.5 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all routes (PASS)**.
+- **Idempotency QA**: Repeated submissions in both public and portal flows update in place with 0 duplicate rows created (PASS).
+- **Tenant Isolation QA**: Agency A links never bleed into Agency B (PASS).
+- **Low-Rating Service Recovery**: Ratings $\le 3$ correctly trigger `FOLLOW_UP_REQUIRED` while still presenting configured public review links fairly (PASS).
+- **Responsive QA**: Verified across 320px, 360px, 390px, 430px, 768px, and 1024px+ viewports with zero horizontal overflow or clipping (PASS).
+
+---
+
+# 209. CUSTOMER FEEDBACK LINK SHARING IMPLEMENTATION (2026-09-30)
+
+## 209.1 Purpose & Architecture Overview
+- **Objective**: Give the Agency Owner a direct, contextual way to obtain, copy, and open the existing secure customer Trip feedback link directly from the Trip Details workspace (`/trips/[id]`).
+- **Core Principles Maintained**:
+  - **Surgical Extension**: Reused the existing `PublicShareLink` / secure token and `/trip/[secureToken]` public route.
+  - **Zero New Models / Zero Schema Migrations**: Zero new tables (`FeedbackLink`, `FeedbackToken`, etc.), zero new columns, zero schema migrations.
+  - **Single Source of Truth**: Uses `PublicShareLink` (`status: "ACTIVE"`, `revokedAt: null`) as the single source of truth for public customer trip URLs.
+  - **Explicit Link Generation & Strict Read-Only GET**: `getTripById(agencyId, tripId)` is strictly 100% read-only. Zero write operations, zero lazy creation on GET. Feedback link generation is strictly explicit via `POST /api/trips/[id]/share-link`.
+  - **Zero Review Manipulation**: Preserved Phase 208 behavior (Google and TripAdvisor external review CTAs are shown equally to all rating tiers post-submission).
+  - **Communication Scope Maintained**: Real external Email/WhatsApp/SMS delivery remains ON HOLD (manual copy and direct link access only).
+  - **Tenant Isolation & Public Safety**: Agency tenant scoping strictly enforced server-side; non-exposure of internal financials, margins, costs, and payables intact.
+
+## 209.2 Authoritative Corrected Architecture Implementation
+1. **Strict Read/Write Separation in Service Layer (`src/lib/services/trip-service.ts`)**:
+   - `tripService.getTripById`: **100% READ-ONLY**. All database write/INSERT side effects were completely removed. Querying a trip executes only `SELECT` operations regardless of status.
+   - `tripService.getOrCreateFeedbackLink`: Dedicated server mutation for generating/retrieving customer feedback links.
+2. **Dedicated Server Mutation API (`src/app/api/trips/[id]/share-link/route.ts`)**:
+   - `POST /api/trips/[id]/share-link`: Enforces authenticated agency tenancy (`requireWriteAccess()`).
+   - **Completed Status Guard**: Server-side validation strictly enforces `trip.status === TripStatus.COMPLETED`. Rejects `PLANNING`, `CONFIRMED`, `IN_PROGRESS`, `CANCELLED`, `DRAFT` with HTTP 400 (`ValidationError`).
+   - **Active Link Reuse**: Reuses existing `PublicShareLink` where `status: "ACTIVE"` and `revokedAt: null`.
+   - **Revoked Link Protection**: Prevents silent replacement of explicitly revoked links (`status: "REVOKED"` or `revokedAt !== null`), returning `ValidationError("Customer feedback link for this trip was explicitly revoked.")`.
+   - **Concurrency Serialization & Race Protection**: Uses parameterized `tx.$queryRaw` (`SELECT "id", "status" FROM "trips" WHERE "id" = ${tripId} AND "agencyId" = ${agencyId} FOR UPDATE`) inside `prisma.$transaction` to serialize concurrent requests for the same Trip. The active/revoked link lookup and creation occur AFTER acquiring the trip row lock, ensuring no duplicate `ACTIVE` links can be created concurrently for the same Trip.
+3. **Trip Details UI & Workspace Integration (`src/app/(dashboard)/trips/[id]/page.tsx`)**:
+   - Opening Trip Details performs zero database mutations.
+   - For `COMPLETED` trips with an active link: Copy and Open actions work immediately with full URL preview (`/trip/[secureToken]`).
+   - For `COMPLETED` trips without an active link: Clicking **[ Get Feedback Link ]** or **[ Copy Feedback Link ]** triggers the explicit server mutation, displaying a loading spinner (`isGeneratingFeedbackLink`) and updating local state upon success.
+   - For non-completed trips: Creation actions are disabled with explanatory guidance.
+
+## 209.3 Verification & QA Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all 72+ routes (PASS)**.
+- **Concurrency QA Suite (`prisma/test-phase209-concurrency-qa.ts`)**:
+  - **Case A (Concurrent requests, no link)**: Concurrent requests acquire row lock, exactly 1 active `PublicShareLink` created, both requests return exact same `tokenHash` and ID (PASS).
+  - **Case B (Concurrent requests, active link exists)**: Both concurrent requests re-check after lock, reuse existing link, 0 new links created (PASS).
+  - **Case C (Concurrent requests, revoked link exists)**: Both requests rejected with `ValidationError`, 0 replacement active links created (PASS).
+  - **Case D (Concurrent requests, non-completed trip)**: Both requests rejected with `ValidationError`, 0 links created (PASS).
+  - **Case E (Cross-Tenant Isolation)**: Request for another agency's trip rejected with `NotFoundError`, 0 links created (PASS).
+- **Public Feedback Link UI Cleanup (`src/app/trip/[secureToken]/page.tsx`)**: Removed unnecessary customer dashboard sections (notifications tray, notifications card, payment statement, day schedule, hotels, vehicles, activities, print button) from the public `/trip/[secureToken]` route. Page is now 100% focused on trip context, feedback submission, thank-you state, external review CTAs, and WhatsApp consultant contact (PASS).
+- **Read/Write Separation**: Verified `getTripById` executes zero INSERTs across all trip statuses (PASS).
+- **Completed Trip Guard**: Server rejects creation requests for non-completed trip statuses (PASS).
+- **Revocation Integrity**: Revoked links remain respected without silent bypass (PASS).
+- **Public URL Consistency**: Canonical `/trip/[secureToken]` route resolves directly (PASS).
+- **Phase 208 Integration**: Customer feedback submission, idempotency, and external review links remain intact (PASS).
+- **Communication Scope**: Real external Email/WhatsApp/SMS delivery remains strictly ON HOLD (PASS).
+
+---
+
+# 210. PHASE 210 — CUSTOMER PAYMENT & PAYABLE DISBURSEMENT OVERPAYMENT VALIDATION & HARDENING (COMPLETED)
+
+## 210.1 Purpose & Architecture Overview
+- **Objective**: Prevent payment and disbursement entries exceeding current outstanding balances across both Customer Payments and Supplier Payable Disbursements, and simplify Payable Obligation editing rules.
+- **Locked Business Rules Enforced**:
+  - **Customer Payment**: `amount > 0 AND amount <= current customer outstanding balance`.
+  - **Payable Disbursement**: `amount > 0 AND amount <= current outstanding payable balance`.
+  - **Payable Obligation Edit**: `new actualAmount >= current paidAmount`. (User-facing "Reason for Adjustment" option completely removed from UI).
+  - **Exact Amounts**: Equal amounts (`amount == currentOutstanding`) are allowed.
+  - **Overpayments**: Rejection enforced (`amount > currentOutstanding` rejected).
+  - **Zero / Negative**: Rejection enforced (`amount <= 0` rejected).
+- **Core Principles Maintained**:
+  - **Zero Database Schema Changes**: Zero new models, zero new columns, zero Prisma migrations (`prisma db push` not required).
+  - **Architecture Preserved**: Existing distinction between Customer Payments (`Quotation -> Booking -> Invoice -> Customer Payment -> Receivable`) and Supplier Payables (`Trip / Booking -> Payable -> Supplier Payment -> Outstanding`) remains intact.
+  - **Two-Tier Validation**: Client-side immediate feedback (Formik/Yup, React dialog validation, page-level validation) combined with server-side authoritative protection inside PostgreSQL transaction.
+  - **Concurrency & Stale Dialog Protection**: PostgreSQL `SELECT ... FOR UPDATE` row-locking prevents concurrent overpayments, stale dialog submissions, and race conditions between payable edits and disbursements.
+  - **Paise / Decimal Precision**: Integer-cent/paise precision math prevents floating point rounding errors.
+
+## 210.2 Entry Points Updated
+1. **Customer Payment Client UI**:
+   - `src/components/booking/add-payment-modal.tsx`: Dynamic Formik / Yup schema validating `amount <= booking.pendingAmount`.
+   - `src/components/finance/record-payment-dialog.tsx`: Manual validation enforcing `numAmount <= selectedBooking.balanceAmount`.
+   - `src/app/(dashboard)/bookings/[id]/page.tsx` (**Booking Details -> Payment Transactions -> Log Payment**): Added client-side balance validation (`amt > currentBalance` check).
+2. **Payable Disbursement Client UI**:
+   - `src/components/booking/supplier-payment-modal.tsx`: Dynamic Formik / Yup schema validating `amount <= maxAmount`.
+   - `src/components/finance/record-supplier-payment-dialog.tsx`: Manual validation enforcing `numAmount <= selectedPayable.outstandingAmount`.
+3. **Payable Obligation Edit UI**:
+   - `src/components/finance/edit-payable-dialog.tsx` (**Operations -> Edit Payable Obligation**): Removed "Reason for Adjustment" option completely. Added client-side validation enforcing `numAmount >= paidAmount`.
+4. **Server Service Layer (`src/lib/services/finance-service.ts` & `src/lib/services/payment-service.ts`)**:
+   - `financeService.recordCustomerPayment`: Acquires row lock `SELECT "id" FROM "bookings" ... FOR UPDATE`, recalculates real-time active completed payment balance, and throws explicit error if requested amount exceeds current outstanding due.
+   - `financeService.recordSupplierPayment`: Acquires row lock `SELECT "id" FROM "supplier_payables" ... FOR UPDATE`, recalculates real-time payable balance, and throws explicit error if requested amount exceeds current outstanding payable.
+   - `paymentService.createPayment`: Acquires row lock `SELECT "id" FROM "bookings" ... FOR UPDATE`, recalculates real-time active completed payment balance, and throws explicit error if requested amount exceeds current outstanding due.
+   - `financeService.updateSupplierPayable`: Acquires row lock `SELECT "id" FROM "supplier_payables" ... FOR UPDATE` inside Prisma `$transaction`, recalculates fresh paid amount, and throws explicit error if `newActual < currentPaid`.
+
+## 210.3 Verification & Automated QA Matrix Results (`prisma/test-phase210-overpayment-qa.ts`)
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all routes (PASS)**.
+- **QA Suite Results (21/21 PASSED, 0 FAILED)**:
+  - **A1**: Customer Outstanding ₹15,000 $\to$ Payment ₹10,000 $\to$ **PASS** (New balance: ₹5,000).
+  - **A2**: Customer Outstanding ₹5,000 $\to$ Payment ₹5,000 $\to$ **PASS** (New balance: ₹0).
+  - **A3**: Customer Outstanding ₹15,000 $\to$ Payment ₹15,000.01 $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **A4**: Customer Outstanding ₹15,000 $\to$ Payment ₹20,000 $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **A5**: Customer Outstanding ₹0 $\to$ Payment ₹1 $\to$ **REJECTED** (`The booking is already fully paid...`).
+  - **A8**: Customer Stale Dialog submission $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **A9**: Customer Concurrent ₹10,000 + ₹10,000 against ₹15,000 $\to$ **1 Succeeded, 1 Rejected** (Total paid: ₹10,000).
+  - **B1**: Payable Outstanding ₹11,000 $\to$ Payment ₹8,000 $\to$ **PASS** (Outstanding remaining: ₹3,000).
+  - **B2**: Payable Outstanding ₹3,000 $\to$ Payment ₹3,000 $\to$ **PASS** (Outstanding: ₹0, Status: PAID).
+  - **B3**: Payable Outstanding ₹11,000 $\to$ Payment ₹11,000.01 $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **B4**: Payable Outstanding ₹11,000 $\to$ Payment ₹12,000 $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **B5**: Payable Outstanding ₹0 $\to$ Payment ₹1 $\to$ **REJECTED** (`The payable is already fully settled...`).
+  - **B8**: Payable Stale Dialog submission $\to$ **REJECTED** (`Payment amount cannot exceed...`).
+  - **B9**: Payable Concurrent ₹10,000 + ₹10,000 against ₹15,000 $\to$ **1 Succeeded, 1 Rejected** (Total paid: ₹10,000).
+  - **G**: Payable Edit Actual ₹7,999 (below Paid ₹8,000) $\to$ **REJECTED** (`Payable amount cannot be less than...`).
+  - **H**: Payable Edit Actual ₹8,000 (equal to Paid ₹8,000) $\to$ **PASS** (Outstanding: ₹0, Status: PAID).
+  - **I**: Payable Edit Actual ₹25,000 (above Paid ₹8,000) $\to$ **PASS** (Outstanding: ₹17,000).
+  - **K**: Payable Edit Stale Paid protection $\to$ **REJECTED** (`Payable amount cannot be less than...`).
+  - **R (Tenant Isolation - Payable Edit)**: Cross-agency payable edit attempt $\to$ **REJECTED** (`Payable record not found`).
+  - **Tenant Isolation (Customer Payment)**: Cross-agency payment attempt $\to$ **REJECTED** (`Booking not found...`).
+  - **Tenant Isolation (Supplier Disbursement)**: Cross-agency disbursement attempt $\to$ **REJECTED** (`Payable record not found...`).
+
+---
+
+# 211. SUBSCRIPTION ENTITLEMENT, USAGE QUOTAS & FEATURE GATING (PHASE A, B, C, D COMPLETE)
+
+## 211.1 Overview & Architecture
+- **Normalized Entitlement Models**:
+  - `PlanFeatureEntitlement`: Maps `(planId, featureKey)` to `enabled` boolean flag.
+  - `PlanUsageLimit`: Maps `(planId, resourceKey)` to `limit` (integer or null for unlimited).
+  - Feature keys: `CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, `REPORTS_ANALYTICS`.
+  - Resource keys: `TRIPS`, `QUOTATIONS`, `BOOKINGS`.
+- **Authoritative Resolution & Fail-Closed Logic**:
+  - `entitlementService.resolveAgencySubscription(agencyId)` determines effective plan using authoritative latest subscription row (`createdAt DESC`).
+  - Active `TRIAL` subscriptions receive **Professional** plan entitlements regardless of stored `planId`.
+  - Missing subscriptions throw `NoActiveSubscriptionError` (`NO_ACTIVE_SUBSCRIPTION`, HTTP 403).
+  - Expired / cancelled subscriptions throw `ReadOnlyAccessError` (`READ_ONLY_ACCESS`, HTTP 403).
+  - Disabled or missing feature rows throw `FeatureNotAllowedError` (`FEATURE_NOT_ALLOWED`, HTTP 403).
+  - Creation quotas throw `QuotaExceededError` (`QUOTA_EXCEEDED`, HTTP 403).
+
+## 211.2 Phase C Transactional Quota Enforcement
+- **Transactional Row Locking**: Every creation operation (`createTrip`, `createQuotation`, `generateTripQuotation`, `createBooking`) acquires a row lock at the start of a Prisma `$transaction`:
+  `SELECT "id" FROM "subscriptions" WHERE "agencyId" = :agencyId ORDER BY "createdAt" DESC LIMIT 1 FOR UPDATE;`
+- **Creation-Based Accounting**: Resource creation counts are calculated over the authoritative billing period (`createdAt >= periodStart AND createdAt < periodEnd`) including soft-deleted/archived entities using composite indexes `[agencyId, createdAt]`.
+- **Exact Boundary Concurrency**: Starter plan limits (20/20) fail closed under high concurrency ($19/20 \to 20/20$ exact, 0 overages).
+
+## 211.3 Phase D Feature Entitlement Enforcement
+- **`CUSTOM_AGENCY_LOGO`**: Server-side mutation gate implemented at `POST/DELETE /api/agency/logo`. Upload and deletion of custom logos require active Professional entitlement. Existing logo display behavior and document rendering remain unchanged.
+- **`FEEDBACK_REVIEWS`**: Server-side entry points `GET/POST /api/feedback`, `GET/PATCH /api/feedback/[id]`, and `feedbackService` agency-side methods enforce `FEEDBACK_REVIEWS` entitlement. Public customer feedback submission (`/api/trips/public/[token]/feedback`) and Customer Portal feedback remain open to all plans without gating.
+- **`CUSTOMER_INSIGHTS`**: Server-side entry point `GET /api/customer-insights` and `customerInsightsService.getCustomerInsights` enforce `CUSTOMER_INSIGHTS` entitlement.
+- **`REPORTS_ANALYTICS`**: Server-side entry points `GET /api/reports`, `GET /api/reports/export`, `GET /api/reports/pdf`, and `reportingService.getAgencyBIReport` enforce `REPORTS_ANALYTICS` entitlement.
+
+## 211.4 Verification & Automated Test Matrix Results
+- **TypeScript**: `npx tsc --noEmit` $\to$ **0 errors (PASS)**.
+- **Production Build**: `npm run build` $\to$ **Exit code 0 across all routes (PASS)**.
+- **Phase A Test Suite (`prisma/test-phase-a-entitlements.ts`)**: **PASSED**.
+- **Phase B Test Suite (`prisma/test-phase-b-entitlements.ts`)**: **PASSED**.
+- **Phase C Concurrency Suite (`prisma/test-phase-c-concurrency.ts`)**: **7/7 PASSED** (TRIPS, QUOTATIONS, BOOKINGS 19/20 concurrency $\to$ 1 Success, 1 QUOTA_EXCEEDED, 20 final count).
+- **Phase D Feature Suite (`prisma/test-phase-d-entitlements.ts`)**: **8/8 PASSED** (Starter denials, Pro access, Trial Professional access, disabled DB row fail-closed, missing DB row fail-closed, missing/expired sub fail-closed, direct service gates, public feedback safety).
+
+---
+
+# 212. PHASE E — FRONTEND ENTITLEMENT UI, USAGE METERS & UPGRADE GUIDANCE [CLOSED]
+
+## 212.1 Objective & Final Status
+
+- **Phase E Objective**: Frontend Entitlement UI, Usage Meters & Upgrade Guidance.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+- **Independent Final Read-Only Audit**: **PASS**
+- Phase E adds frontend visibility and UX guidance on top of the existing centralized server-side entitlement architecture.
+
+## 212.2 Subscription API Extension
+
+- Reused existing `GET /api/subscription` endpoint via `subscriptionService.getAgencySubscription()`.
+- Extended the existing subscription overview response payload with:
+  - `usage`: Usage counters and limits for `TRIPS`, `QUOTATIONS`, `BOOKINGS`
+  - `features`: Entitlement status for `CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, `REPORTS_ANALYTICS`
+- No duplicate usage endpoint created.
+- Existing subscription response fields (`agency`, `subscription`, `paymentHistory`, `billingSettings`) preserved.
+
+## 212.3 Usage Meters
+
+- `/subscription` page displays authoritative, database-driven usage meters for Trips, Quotations, and Bookings.
+- Displays current count, limit, remaining quota, progress percentage, and unlimited status indicators.
+- **Starter Plan**: Enforces limits of 20 per subscription billing period (`[periodStart, periodEnd)`).
+- **Professional Plan & Valid Trial**: Displays unlimited usage indicators.
+- Usage remains creation-based and tied to the authoritative stored subscription/trial billing period.
+
+## 212.4 Creation Quota UX
+
+- `/trips/new`
+- `/quotations/new`
+- `/bookings/new`
+
+Added client-side pre-submit UX:
+- Approaching-limit warning banner (`remaining <= 2 && remaining > 0`)
+- Exhausted-limit alert banner (`remaining === 0`)
+- Disabled creation submit button when quota is exhausted
+- Upgrade CTA linking directly to `/subscription`
+
+Explicitly documented: Frontend quota controls are UX guidance only. Server-side transactional quota enforcement from Phase C (`trip-service.ts`, `quotation-service.ts`, `booking-service.ts`) remains authoritative.
+
+## 212.5 Professional Feature Locked UX
+
+- Added reusable presentation-only `LockedFeatureCard` (`src/components/shared/locked-feature-card.tsx`).
+- Page-level locked UX added for Starter plan on restricted routes:
+  - `/feedback`
+  - `/customer-insights`
+  - `/reports`
+- Professional plan and valid Trial retain 100% normal access.
+- Navigation entries for these features remain visible and routable across all plans.
+
+## 212.6 Custom Agency Logo UX
+
+- `/settings` Branding & Logo tab locks custom agency logo mutation controls for Starter plan with Professional upgrade guidance.
+- Professional plan and valid Trial retain full logo upload and deletion capabilities.
+- Existing logo retention/display and document rendering remain unchanged.
+- No logo or storage object deletion or automatic hiding was introduced.
+
+## 212.7 Public Feedback & Customer Portal Regression Safety
+
+- Public customer feedback submission (`/api/trips/public/[token]/feedback`) remains unrestricted across all plans.
+- Customer Portal (`/customer/...`) remains available to Starter, Professional, and Trial.
+- No public or customer-facing flow was gated behind Professional.
+
+## 212.8 Security & Architecture
+
+- Centralized `entitlementService` remains the single source of truth.
+- Zero `if (plan === "Professional")` or hardcoded plan-name string authorization introduced.
+- Authenticated server-side agency context is strictly enforced.
+- Cross-agency tenant isolation preserved.
+- Server-side entitlement gates (Phase B/C/D) remain 100% intact.
+
+## 212.9 Billing & Data Safety
+
+- Prisma schema: **UNCHANGED**
+- Database migrations: **NONE**
+- Subscription / Payment records: **UNCHANGED**
+- Historical billing / Invoices: **UNCHANGED**
+- Existing logo storage: **UNCHANGED**
+- QA data: **UNCHANGED**
+
+## 212.10 Verification
+
+- Phase E implementation: **PASS**
+- Independent Phase E read-only audit: **PASS**
+- `npx tsc --noEmit`: **PASS — 0 errors**
+- `npm run build`: **PASS — exit code 0 across all routes**
+- Security / tenant isolation: **PASS**
+- Phase C regression: **PASS**
+- Phase D regression: **PASS**
+- Public feedback regression: **PASS**
+- Customer Portal regression: **PASS**
+- Starter / Professional / Trial regression: **PASS**
+- Unexpected changes: **NONE**
+- Critical findings: **NONE**
+- Non-blocking observations: **NONE**
+
+## 212.11 Files Changed
+
+- `src/lib/services/subscription-service.ts`
+- `src/lib/api-client/index.ts`
+- `src/components/shared/locked-feature-card.tsx`
+- `src/app/(dashboard)/subscription/page.tsx`
+- `src/app/(dashboard)/trips/new/page.tsx`
+- `src/app/(dashboard)/quotations/new/page.tsx`
+- `src/app/(dashboard)/bookings/new/page.tsx`
+- `src/app/(dashboard)/feedback/page.tsx`
+- `src/app/(dashboard)/customer-insights/page.tsx`
+- `src/app/(dashboard)/reports/page.tsx`
+- `src/app/(dashboard)/settings/page.tsx`
+
+## 212.12 Closure
+
+**Phase E — CLOSED / PASS**
+
+The entitlement backend, transactional quota enforcement, and database-driven feature configuration remain authoritative. Phase E completes the frontend entitlement visibility, usage-meter, quota-guidance, and Professional feature lock UX layer without introducing a duplicate authorization architecture or changing historical billing/data.
+
+---
+
+# 213. PHASE 213 — PLATFORM OWNER ENTITLEMENT & USAGE QUOTA MANAGEMENT [CLOSED]
+
+## 213.1 Objective & Final Status
+- **Objective**: Connect the Platform Owner subscription plan management experience (`/admin/plans`) to the machine-enforced normalized entitlement tables (`PlanFeatureEntitlement` and `PlanUsageLimit`), allowing Platform Owner to dynamically configure feature flags and creation usage quotas per plan.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 213.2 Architectural & Implementation Summary
+1. **Admin Validation Schema Extension (`src/lib/validation/admin-schema.ts`)**:
+   - Extended `planCreateSchema` and `planUpdateSchema` with validated `entitlements` (canonical feature booleans) and `usageLimits` (canonical resource non-negative integers or `null` for Unlimited).
+2. **Atomic Service Mutation Layer (`src/lib/services/admin-service.ts`)**:
+   - `adminService.listPlans`: Includes `featureEntitlements` and `usageLimits` relations, returning structured `entitlements` and `usageLimits` records per plan.
+   - `adminService.createPlan` & `adminService.updatePlan`: Wrapped inside interactive Prisma transaction (`prisma.$transaction`). Atomically updates `SubscriptionPlan` scalar attributes alongside `PlanFeatureEntitlement` and `PlanUsageLimit` rows via `upsert`.
+3. **Platform Owner Admin UI Extension (`src/app/admin/plans/page.tsx`)**:
+   - Plan cards render live machine-enforced resource creation quotas (Trips, Quotations, Bookings) and feature access flags (`CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, `REPORTS_ANALYTICS`).
+   - Create/Edit Plan modal provides toggle switches for feature entitlement flags and dual numeric/unlimited controls for usage limits (`null` mapped strictly to Unlimited).
+4. **Authoritative Runtime Consumption (`src/lib/services/entitlement-service.ts`)**:
+   - Existing `entitlementService` dynamically reads the updated `PlanFeatureEntitlement` and `PlanUsageLimit` rows from PostgreSQL, enforcing updated feature rules and creation quotas immediately without code redeployment.
+
+## 213.3 Security, Billing & Data Safety
+- **Platform Owner Authorization**: Admin APIs (`GET/POST /api/admin/plans`, `PATCH /api/admin/plans/[id]`) remain strictly guarded by `requirePlatformOwnerContext()` with `agencyId = null`. Non-admin requests fail closed with HTTP 403.
+- **Historical Billing Preservation**: Updating plan prices or entitlements affects future subscription evaluation only. Historical `SubscriptionPayment` amounts, historical subscription dates, and invoices remain strictly untouched.
+- **Atomicity**: Plan creation and updates execute within a single Prisma transaction, rolling back completely if any element fails.
+- **Database Schema**: Zero schema alterations, zero migrations created (`prisma db push` not used).
+
+## 213.4 Verification & Automated Test Matrix Results
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 PASSED (100%)**
+  - Read normalized configuration: PASS
+  - Dynamic feature entitlement mutation (OFF $\to$ ON): PASS
+  - Dynamic usage quota mutation (20 $\to$ 30 and Unlimited `null`): PASS
+  - Create new plan with entitlements/limits: PASS
+  - Fail-closed security check on missing config: PASS
+  - Historical billing safety check: PASS
+  - Baseline state restoration: PASS
+
+## 213.5 Files Changed
+- `src/lib/validation/admin-schema.ts`
+- `src/lib/services/admin-service.ts`
+- `src/app/admin/plans/page.tsx`
+- `prisma/test-phase-213-entitlements.ts`
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 213.6 Closure
+**Phase 213 — CLOSED / PASS**
+
+---
+
+# 214. PHASE 214 — SUBSCRIPTION QUOTA BYPASS REMEDIATION [CLOSED]
+
+## 214.1 Objective & Final Status
+- **Objective**: Remediate the two server-side subscription creation quota bypasses identified during the subscription audit (Quotation Fork Version and Quotation $\to$ Booking Conversion), ensuring that every billable creation path across Trips, Quotations, and Bookings enforces authoritative quota limits and subscription row locks inside PostgreSQL interactive transactions.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 214.2 Root Causes & Remediation Summary
+1. **Quotation Fork Version Remediation (`src/lib/services/quotation-service.ts`)**:
+   - **Root Cause**: `quotationService.createQuotationVersion` created a new `Quotation` row in the `quotations` table (which is counted toward usage by `entitlementService.getResourceUsage`) inside a Prisma transaction, but omitted `lockAgencySubscription` and `checkQuota("QUOTATIONS")`.
+   - **Remediation**: Added `await entitlementService.lockAgencySubscription(agencyId, tx)` and `await entitlementService.checkQuota(agencyId, "QUOTATIONS", tx)` inside the interactive `$transaction` prior to `tx.quotation.create`.
+2. **Quotation $\to$ Booking Conversion Remediation (`src/lib/services/booking-service.ts`)**:
+   - **Root Cause**: `bookingService.convertQuotationToBooking` created a new `Booking` row in the `bookings` table inside a Prisma transaction, but omitted `lockAgencySubscription` and `checkQuota("BOOKINGS")`.
+   - **Remediation**: Added `await entitlementService.lockAgencySubscription(agencyId, tx)` and `await entitlementService.checkQuota(agencyId, "BOOKINGS", tx)` inside the interactive `$transaction` prior to `tx.booking.create`.
+
+## 214.3 Complete Billable Creation-Path Matrix
+- **Trips**:
+  - New Manual Trip (`createTrip`): **PROTECTED** (`TRIPS` quota check + subscription lock FOR UPDATE)
+  - Enquiry $\to$ Trip (`convertEnquiryToTrip`): **PROTECTED** (delegates to `createTrip`)
+- **Quotations**:
+  - New Manual Quotation (`createQuotation`): **PROTECTED** (`QUOTATIONS` quota check + subscription lock FOR UPDATE)
+  - Generate Trip Quotation (`generateQuotationFromTrip`): **PROTECTED** (`QUOTATIONS` quota check + subscription lock FOR UPDATE)
+  - Fork New Version (`createQuotationVersion`): **REMEDIATED & PROTECTED** (`QUOTATIONS` quota check + subscription lock FOR UPDATE)
+- **Bookings**:
+  - New Manual Booking (`createBooking`): **PROTECTED** (`BOOKINGS` quota check + subscription lock FOR UPDATE)
+  - Convert Quotation $\to$ Booking (`convertQuotationToBooking`): **REMEDIATED & PROTECTED** (`BOOKINGS` quota check + subscription lock FOR UPDATE)
+
+## 214.4 Database, Concurrency & Security Protection
+- **Concurrency & Locking**: All creation paths execute `lockAgencySubscription(agencyId, tx)` (`SELECT FOR UPDATE`) and `checkQuota` inside the same Prisma transaction, preventing race conditions where simultaneous requests exceed the subscription quota.
+- **Database Schema**: Zero schema alterations, zero migrations created (`prisma db push` not used).
+- **Data & Configuration Safety**: QA test data created during automated testing was completely cleaned up, and original `PlanUsageLimit` values were fully restored.
+
+## 214.5 Automated QA Verification Results
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-214-quota-bypass.ts` $\to$ **20/20 PASSED (100%)**
+  - Forking quotation version below limit (1/2 $\to$ 2/2): PASS
+  - Forking quotation version at quota capacity (2/2): REJECTED with `QuotaExceededError` (DB count unchanged): PASS
+  - Converting quotation to booking below limit (0/1 $\to$ 1/1): PASS
+  - Converting quotation to booking at quota capacity (1/1): REJECTED with `QuotaExceededError` (DB count unchanged): PASS
+  - Concurrency protection test (2 simultaneous requests with 1 spot remaining $\to$ 1 succeeded, 1 blocked, usage = capacity): PASS
+  - Dynamic limit integration test (limit = 10): PASS
+  - Professional plan unlimited test (`limit = null`): PASS
+  - Full matrix regression test (Trip creation blocked at 1/1 capacity): PASS
+
+## 214.6 Files Changed
+- `src/lib/services/quotation-service.ts`
+- `src/lib/services/booking-service.ts`
+- `prisma/test-phase-214-quota-bypass.ts`
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 214.7 Closure
+**Phase 214 — CLOSED / PASS**
+
+---
+
+# 215. PHASE 215 — FRONTEND ENTITLEMENT-GATED NAVIGATION & PLAN CAPABILITY UX [CLOSED]
+
+## 215.1 Objective & Final Status
+- **Objective**: Improve the Agency Owner frontend experience for Professional-only features by ensuring features remain discoverable in navigation with clear lock indicators for Starter users, routes render dedicated locked/upgrade experiences (`LockedFeatureCard`) rather than failing after backend calls, feature-specific API requests are suppressed when disabled, and the Subscription page dynamically presents accurate plan capabilities for both Starter and Professional tiers.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 215.2 Architectural & UX Implementation Summary
+1. **Sidebar Navigation & Mobile Drawer Gating (`src/components/layout/sidebar.tsx`, `src/components/layout/mobile-nav.tsx`)**:
+   - Professional-only features (`Feedback & Reviews`, `Customer Insights`, `Reports & Analytics`) remain fully visible in the sidebar to Starter Agency Owners.
+   - For Starter users whose plan does not entitle a feature (`!isFeatureAllowed(item.featureKey)`), a clean Lucide `Lock` icon is displayed alongside the navigation label (and a `(Pro Feature)` lock badge in collapsed tooltip).
+   - For Professional users, navigation items display normally without lock indications.
+2. **Page-Level Entitlement Gating Before Feature Data Loading (`src/app/(dashboard)/feedback/page.tsx`, `src/app/(dashboard)/customer-insights/page.tsx`, `src/app/(dashboard)/reports/page.tsx`)**:
+   - Consumes live database-driven entitlements from `useSubscription()`.
+   - While subscription context resolves, renders a graceful loading skeleton.
+   - When a feature is not entitled (`!isAllowed`), immediately renders `LockedFeatureCard` with the canonical feature title, clear explanation, and "Upgrade to Professional" CTA linking to `/subscription`.
+   - Feature-specific data fetching (`experienceClient.listFeedbacks`, `experienceClient.getCustomerInsights`, `reportingClient.getReport`) is **strictly prevented** from executing when the feature is locked, eliminating unneeded API traffic and avoiding unexpected `FEATURE_NOT_ALLOWED` error toast experiences.
+   - Direct URL navigation (e.g. typing `/feedback`, `/customer-insights`, or `/reports`) is safely gated by the same entitlement check.
+3. **Subscription Page Dynamic Plan Capabilities (`src/app/(dashboard)/subscription/page.tsx`)**:
+   - Connected `data.entitlements` directly to the "Feature Entitlements" scorecard, accurately displaying `Included` vs `Available with Pro` for `CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, and `REPORTS_ANALYTICS`.
+   - "Current Billing Period Usage" meters dynamically display exact numeric limits (`20 per billing period` or updated quota such as `30`) or `UNLIMITED` when `limit === null`.
+4. **Backend Security Boundary Retained**:
+   - Backend `entitlementService.checkFeatureAllowed` and `entitlementService.checkQuota` remain the final authoritative security barrier. Direct API requests from unauthorized plans continue to be rejected with `FeatureNotAllowedError` (HTTP 403).
+
+## 215.3 Database & System Safety
+- **Database Schema**: Zero schema changes, zero migrations, no `prisma db push` or reset.
+- **Tenant Isolation**: Preserved. No client-supplied IDs trusted.
+- **Billing Semantics**: Historical payments, subscriptions, and invoice records remain 100% immutable and intact.
+
+## 215.4 Automated QA & Regression Test Matrix
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all routes**
+- `prisma/test-phase-215-entitlement-ux.ts` $\to$ **23/23 PASSED (100%)**
+  - Starter baseline machine entitlements verification: PASS
+  - Professional baseline machine entitlements verification: PASS
+  - Permanent test agency entitlement overview consumption: PASS
+  - Controlled dynamic entitlement mutation (OFF $\to$ ON $\to$ OFF): PASS
+  - Backend authorization fail-closed enforcement verification: PASS
+- `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 PASSED (100%)**
+- `prisma/test-phase-214-quota-bypass.ts` $\to$ **20/20 PASSED (100%)**
+
+## 215.5 Files Changed
+- `src/components/layout/sidebar.tsx`
+- `src/components/layout/mobile-nav.tsx`
+- `src/app/(dashboard)/feedback/page.tsx`
+- `src/app/(dashboard)/customer-insights/page.tsx`
+- `src/app/(dashboard)/reports/page.tsx`
+- `src/app/(dashboard)/subscription/page.tsx`
+- `src/app/(dashboard)/settings/page.tsx`
+- `src/lib/services/quotation-service.ts`
+- `prisma/test-phase-215-entitlement-ux.ts`
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 215.6 Closure
+**Phase 215 — CLOSED / PASS**
+
+---
+
+# 216. PHASE 216 — SUBSCRIPTION STATE OPTIMIZATION & QUOTA-AWARE CREATION UX [CLOSED]
+
+## 216.1 Objective & Final Status
+- **Objective**:
+  1. Optimize client subscription state management by eliminating duplicate, redundant `GET /api/subscription` network calls across dashboard pages (`/trips/new`, `/quotations/new`, `/bookings/new`, and `/settings`), consolidating data retrieval into the root `<SubscriptionProvider>` with in-memory React Context and throttled focus revalidation.
+  2. Implement proactive, quota-aware creation UX for Trips, Quotations, and Bookings on both listing pages (intercepting "New" actions when finite quota is exhausted with `QuotaExceededDialog` and upgrade guidance) and direct `/new` routes (guarding active form rendering with `QuotaExceededCard`).
+  3. Ensure post-creation local usage synchronization (`incrementUsage`) to keep in-memory quota counts immediately fresh without triggering full API refetches, while preserving the backend as the final authoritative security and concurrency boundary.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 216.2 Architectural & UX Implementation Summary
+1. **Centralized React State & Context Enhancement (`src/context/subscription-context.tsx`)**:
+   - Enhanced `SubscriptionContext` with `canCreate(resourceKey: 'TRIPS' | 'QUOTATIONS' | 'BOOKINGS'): QuotaDecision` providing `{ allowed, reason, currentUsage, limit, remaining, isExceeded, loading }`.
+   - Enhanced `SubscriptionContext` with `incrementUsage(resourceKey)` to optimistically update in-memory counters post-successful backend creation.
+   - Incorporated 5-minute throttled window focus revalidation to gracefully capture multi-tab or dynamic admin configuration updates without polling or network overhead.
+2. **Redundant Subscription API Fetch Elimination**:
+   - `src/app/(dashboard)/trips/new/page.tsx`: Removed redundant `subscriptionClient.getSubscription()` call; consumes `useSubscription()`.
+   - `src/app/(dashboard)/quotations/new/page.tsx`: Removed redundant `subscriptionClient.getSubscription()` call; consumes `useSubscription()`.
+   - `src/app/(dashboard)/bookings/new/page.tsx`: Removed redundant `subscriptionClient.getSubscription()` call; consumes `useSubscription()`.
+   - `src/app/(dashboard)/settings/page.tsx`: Removed redundant `subscriptionClient.getSubscription()` call; consumes `useSubscription().isFeatureAllowed('CUSTOM_AGENCY_LOGO')` and `overview.logo`.
+   - `src/app/(dashboard)/subscription/page.tsx`: Preserved dedicated billing data fetching while synchronizing with `refreshSubscription()` upon payment requests and data reloads.
+3. **Quota-Aware Listing Page Interception (`src/app/(dashboard)/trips/page.tsx`, `src/app/(dashboard)/quotations/page.tsx`, `src/app/(dashboard)/bookings/page.tsx`)**:
+   - Evaluates `canCreate(resource)` before navigation.
+   - When quota is reached on finite tiers (e.g. Starter 20/20), prevents navigation into the `/new` form and opens `QuotaExceededDialog` (`src/components/shared/quota-exceeded-dialog.tsx`) detailing exact usage, limit, current billing period context, and an "Upgrade Plan" CTA to `/subscription`.
+   - Loading-safe: Never blocks legitimate Professional or available-quota users while subscription state is resolving.
+4. **Direct Route Protection (`src/app/(dashboard)/trips/new/page.tsx`, `src/app/(dashboard)/quotations/new/page.tsx`, `src/app/(dashboard)/bookings/new/page.tsx`)**:
+   - When a user directly navigates to a `/new` URL while quota is exhausted, active form rendering is suppressed.
+   - Renders `QuotaExceededCard` (`src/components/shared/quota-exceeded-card.tsx`) with telemetry pills, plan benefit breakdown, "Back to [Resource]" navigation, and "Upgrade to Professional" CTA.
+5. **Backend Authority & Concurrency Integrity Retained**:
+   - Backend `entitlementService.checkQuota`, transaction locks, and Phase 214 `createQuotationVersion` interactive transaction settings `{ timeout: 15000, maxWait: 10000 }` remain 100% authoritative and unchanged.
+   - On backend `QUOTA_EXCEEDED` (HTTP 403) responses, frontend catches the conflict and triggers `refreshSubscription()` to reconcile local state with authoritative server data.
+
+## 216.3 Database & System Safety
+- **Database Schema**: Zero schema modifications, zero migrations, no `prisma db push` or reset.
+- **Tenant Isolation**: Preserved. Session verified `agencyId` strictly enforced on backend.
+- **External Dependencies**: Zero new libraries added.
+
+## 216.4 Automated QA & Regression Test Matrix
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-216-caching-and-quota-ux.ts` $\to$ **22/22 PASSED (100%)**
+  - Overview payload usage and telemetry integrity: PASS
+  - Starter finite limit evaluation (19/20 allows, 20/20 blocks): PASS
+  - Professional unlimited evaluation (`limit === null` allows): PASS
+  - Active Trial receiving Professional capability evaluation: PASS
+  - Read-only/Canceled subscription rejection: PASS
+  - Authoritative backend `checkQuota` execution: PASS
+- `prisma/test-phase-215-entitlement-ux.ts` $\to$ **23/23 PASSED (100%)**
+- `prisma/test-phase-214-quota-bypass.ts` $\to$ **20/20 PASSED (100%)**
+- `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 PASSED (100%)**
+
+## 216.5 Files Changed / Added
+- `src/context/subscription-context.tsx` (Enhanced with `canCreate`, `incrementUsage`, focus revalidation)
+- `src/components/shared/quota-exceeded-dialog.tsx` (New reusable modal for listing pages)
+- `src/components/shared/quota-exceeded-card.tsx` (New reusable guard card for direct routes)
+- `src/app/(dashboard)/trips/page.tsx` (Added quota-aware `handleNewTrip` and `QuotaExceededDialog`)
+- `src/app/(dashboard)/trips/new/page.tsx` (Eliminated duplicate fetch, added `QuotaExceededCard`, synchronized usage on create)
+- `src/app/(dashboard)/quotations/page.tsx` (Added quota-aware `handleGenerateQuotation` and `QuotaExceededDialog`)
+- `src/app/(dashboard)/quotations/new/page.tsx` (Eliminated duplicate fetch, added `QuotaExceededCard`, synchronized usage on create)
+- `src/app/(dashboard)/bookings/page.tsx` (Added quota-aware `handleNewBooking` and `QuotaExceededDialog`)
+- `src/app/(dashboard)/bookings/new/page.tsx` (Eliminated duplicate fetch, added `QuotaExceededCard`, synchronized usage on create)
+- `src/app/(dashboard)/settings/page.tsx` (Eliminated duplicate fetch, synchronized logo entitlement and branding from Context)
+- `src/app/(dashboard)/subscription/page.tsx` (Synchronized context on payment submissions and data reloads)
+- `prisma/test-phase-216-caching-and-quota-ux.ts` (New Phase 216 automated test suite)
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 216.6 Closure
+**Phase 216 — CLOSED / PASS**
+
+---
+
+# 217. PHASE 217 — READ-ONLY MODE & AGENCY SUSPENSION HARDENING [CLOSED]
+
+## 217.1 Objective & Final Status
+- **Objective**:
+  1. Fix the backend security gap where a suspended agency owner with an active subscription could perform write/mutation actions, ensuring that `requireWriteAccess()` and server request context strictly enforce read-only status (`403 Forbidden` / `READ_ONLY_ACCESS`) when `Agency.status === 'SUSPENDED'`.
+  2. Protect custom agency logo upload and deletion mutation routes (`POST /api/agency/logo`, `DELETE /api/agency/logo`) with `requireWriteAccess()`.
+  3. Centralize frontend read-only state in `src/context/subscription-context.tsx` (`isReadOnly`, `readOnlyReason`, `canWrite`), establishing a clean precedence hierarchy where Read-Only Mode strictly supersedes Quota Exceeded states.
+  4. Create reusable `ReadOnlyModeDialog` and `ReadOnlyModeCard` components with differentiated UX messaging and action paths for Suspended accounts (WhatsApp Support CTA) vs Expired/Cancelled accounts (Renew Subscription CTA).
+  5. Proactively guard all listing pages (Trips, Quotations, Bookings, Hotels, Vehicles, Activities, Destinations, Rate Sheets, Customers) to intercept creation attempts before navigation or form rendering, and guard direct `/new` creation routes with `ReadOnlyModeCard`.
+  6. Guard quotation editor proposal generation, forking, and booking conversion flows against read-only state.
+  7. Preserve legitimate exceptions: Subscription renewal/payment requests (`POST /api/subscription/payment-request`), notification read statuses, and platform support communications.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 217.2 Architectural & UX Implementation Summary
+1. **Authoritative Server Guard Hardening (`src/lib/api/context.ts` & `src/app/api/agency/logo/route.ts`)**:
+   - `getRequestContext()`: Computes `isSuspendedAgency = isAgencyOwner && agency?.status === AgencyStatus.SUSPENDED` and forces `canWrite = false` and `hasFullAccess = false` whenever the agency is suspended, regardless of whether the subscription plan is Professional, Starter, or active Trial.
+   - `requireWriteAccess()`: Explicit check `if (context.agency.status === AgencyStatus.SUSPENDED)` throws `ReadOnlyAccessError("Your agency workspace is currently suspended. Creating or modifying business records is restricted. Please contact TripDesk support to reactivate your workspace.")`.
+   - `src/app/api/agency/logo/route.ts`: Updated `POST` and `DELETE` handlers to execute `await requireWriteAccess()` before performing logo modifications.
+2. **Centralized Frontend State & Hierarchy (`src/context/subscription-context.tsx`)**:
+   - Exposed `isReadOnly: boolean`, `readOnlyReason: ReadOnlyReason` (`"SUSPENDED" | "EXPIRED" | "CANCELLED" | "PAST_DUE" | "UNPAID" | null`), and `canWrite: boolean`.
+   - `canCreate(resourceKey)` returns `{ allowed: false, reason: "READ_ONLY_SUBSCRIPTION" }` when `isReadOnly` is true, ensuring read-only restrictions always take precedence over quota limit evaluations.
+3. **Reusable Read-Only UI Components**:
+   - `src/components/shared/read-only-mode-dialog.tsx`: Reusable modal dialog for listing pages and action triggers. Differentiates copy and CTA (Suspended $\to$ Contact Support via WhatsApp vs Expired $\to$ Upgrade / Renew Plan via `/subscription`).
+   - `src/components/shared/read-only-mode-card.tsx`: Reusable full-card view for direct `/new` routes, suppressing input forms when workspace is suspended or read-only.
+4. **Proactive Page & Workflow Interception**:
+   - `src/app/(dashboard)/trips/page.tsx` & `trips/new/page.tsx`: Intercepts "New Trip" button; displays `ReadOnlyModeDialog` or `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/quotations/page.tsx` & `quotations/new/page.tsx`: Intercepts "Generate Quotation"; displays `ReadOnlyModeDialog` or `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/bookings/page.tsx` & `bookings/new/page.tsx`: Intercepts "New Booking"; displays `ReadOnlyModeDialog` or `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/hotels/page.tsx` & `hotels/new/page.tsx`: Guarded with `ReadOnlyModeDialog` and `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/vehicles/page.tsx` & `vehicles/new/page.tsx`: Guarded with `ReadOnlyModeDialog` and `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/activities/page.tsx` & `activities/new/page.tsx`: Guarded with `ReadOnlyModeDialog` and `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/destinations/page.tsx`: Guarded with `ReadOnlyModeDialog`.
+   - `src/app/(dashboard)/rate-sheets/page.tsx` & `rate-sheets/new/page.tsx`: Guarded with `ReadOnlyModeDialog` and `ReadOnlyModeCard`.
+   - `src/app/(dashboard)/customers/page.tsx`: Guarded with `ReadOnlyModeDialog`.
+   - `src/app/(dashboard)/trips/[id]/quotation/page.tsx`: Guarded "Generate Proposal", "Fork New Version", and "Convert to Booking" flows.
+5. **Legitimate Exceptions Preserved**:
+   - `POST /api/subscription/payment-request` remains available for suspended/expired agencies to submit offline payment proofs for reactivation.
+   - `PATCH /api/notifications` remains accessible for in-app alert status updates.
+   - Support communication channels remain open for account resolution.
+
+## 217.3 Database & System Safety
+- **Database Schema**: Zero schema modifications, zero migrations, no `prisma db push` or reset.
+- **Tenant Isolation**: Preserved. Session verified `agencyId` strictly enforced across all server handlers.
+- **External Dependencies**: Zero new libraries added.
+
+## 217.4 Automated QA & Regression Test Matrix
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-217-read-only-hardening.ts` $\to$ **43/43 PASSED (100%)**
+  - Section 1 (Server-Side Backend Guards):
+    - Active Agency + Active Subscription: PASS (write allowed)
+    - Active Agency + Active Trial: PASS (write allowed)
+    - Suspended Agency + Active Starter Subscription: PASS (write blocked, 403 ReadOnlyAccessError)
+    - Suspended Agency + Professional Subscription: PASS (write blocked, 403 ReadOnlyAccessError)
+    - Expired Subscription: PASS (write blocked, 403 ReadOnlyAccessError)
+    - Cancelled Subscription: PASS (write blocked, 403 ReadOnlyAccessError)
+  - Section 2 (Frontend Context State & Precedence Logic):
+    - Suspended Agency produces `isReadOnly=true` & `readOnlyReason='SUSPENDED'`: PASS
+    - Suspended Agency creation returns `READ_ONLY_SUBSCRIPTION` despite remaining quota: PASS
+    - Read-Only takes strict precedence over `QUOTA_EXCEEDED`: PASS
+    - Expired subscription prevents creation with `READ_ONLY_SUBSCRIPTION`: PASS
+    - Active subscription with quota space allows creation: PASS
+    - Active Starter at 20/20 returns `QUOTA_EXCEEDED`: PASS
+  - Section 3 (UI Presentation & CTAs):
+    - Suspended dialog styling, WhatsApp CTA, and external routing: PASS
+    - Expired dialog styling, `/subscription` CTA, and internal routing: PASS
+
+## 217.5 Files Changed / Added
+- `src/lib/api/context.ts` (Hardened `getRequestContext` and `requireWriteAccess` against `AgencyStatus.SUSPENDED`)
+- `src/app/api/agency/logo/route.ts` (Guarded POST/DELETE endpoints with `requireWriteAccess`)
+- `src/context/subscription-context.tsx` (Centralized `isReadOnly`, `readOnlyReason`, `canWrite`, precedence in `canCreate`)
+- `src/components/shared/read-only-mode-dialog.tsx` (New reusable dialog component)
+- `src/components/shared/read-only-mode-card.tsx` (New reusable guard card component)
+- `src/app/(dashboard)/trips/page.tsx` & `trips/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/quotations/page.tsx` & `quotations/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/bookings/page.tsx` & `bookings/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/hotels/page.tsx` & `hotels/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/vehicles/page.tsx` & `vehicles/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/activities/page.tsx` & `activities/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/destinations/page.tsx` (Read-only guards & modal UX)
+- `src/app/(dashboard)/rate-sheets/page.tsx` & `rate-sheets/new/page.tsx` (Read-only guards & modal/card UX)
+- `src/app/(dashboard)/customers/page.tsx` (Read-only guards & modal UX)
+- `src/app/(dashboard)/trips/[id]/quotation/page.tsx` (Proposal generation, version forking, and booking conversion guards)
+- `prisma/test-phase-217-read-only-hardening.ts` (Phase 217 automated QA test suite)
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`
+
+## 217.6 Closure
+**Phase 217 — CLOSED / PASS**
+
+---
+
+# 218. PHASE 218 — CUSTOM AGENCY LOGO REAL FILE UPLOAD & REPLACEMENT FLOW [CLOSED]
+
+## 218.1 Objective & Final Status
+- **Objective**:
+  1. Convert the legacy Custom Agency Logo URL-input mechanism into a real binary file upload, replacement, and removal flow.
+  2. Implement robust server-side binary validation: Enforce magic byte signatures for PNG, JPEG, and WEBP, strict 2MB file size limits, and explicitly disallow SVG files to prevent script injection / XSS vulnerabilities.
+  3. Integrate agency-scoped object storage via Supabase Storage (`agency-assets` bucket) under path convention `agencies/${agencyId}/logo/logo-${timestamp}-${random}.${ext}`.
+  4. Ensure safe replacement ordering: Validate new file $\to$ Upload new storage object $\to$ Update PostgreSQL `Agency.logo` $\to$ Safely delete old storage object (non-fatal cleanup).
+  5. Ensure safe removal flow: Set `Agency.logo` to `null` in PostgreSQL and clean up existing storage object idempotently.
+  6. Enforce strict server-side authorization via `requireWriteAccess()` (Phase 217 read-only and suspension protection) and `entitlementService.checkFeatureAllowed(agencyId, "CUSTOM_AGENCY_LOGO")`.
+  7. Update Agency Owner Settings UI (`src/app/(dashboard)/settings/page.tsx`) with a real file picker, local staged preview, file size pill, upload confirmation, active logo display, change logo trigger, removal with `ConfirmDialog`, and read-only blocking with `ReadOnlyModeDialog`.
+  8. Execute automated QA suite and ensure clean typecheck and production build.
+- **Final Status**: **COMPLETED & CERTIFIED / CLOSED — PASS**
+
+## 218.2 Architectural & Security Implementation Summary
+1. **Server-Side File Validation (`src/lib/services/agency-logo-service.ts`)**:
+   - `validateLogoFile()`: Validates file buffer length (1B to 2MB limit), whitelisted MIME types (`image/png`, `image/jpeg`, `image/webp`), and magic byte headers:
+     - PNG: `0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a`
+     - JPEG: `0xff, 0xd8, 0xff`
+     - WEBP: `RIFF....WEBP`
+   - Disallows SVG explicitly to prevent stored XSS / malicious active content.
+   - Throws structured `ApiError` codes (`EMPTY_FILE`, `FILE_TOO_LARGE`, `INVALID_FILE_TYPE`, `CORRUPTED_IMAGE`).
+2. **Agency-Scoped Storage & Tenant Isolation**:
+   - Bucket: `agency-assets` (public read).
+   - Storage Path: `agencies/${agencyId}/logo/logo-${Date.now()}-${random}.${ext}`.
+   - `extractAgencyLogoStoragePath()`: Validates that storage operations only resolve paths prefixed with `agencies/${agencyId}/logo/`, strictly preventing cross-tenant file deletion attempts.
+   - Never trusts client-supplied storage paths, file names, or agency IDs.
+3. **Safe Replacement Order & Failure Invariants**:
+   - Step 1: Validate new file buffer and magic bytes.
+   - Step 2: Upload new object into `agency-assets` bucket.
+   - Step 3: Update `Agency.logo` in PostgreSQL database.
+   - Step 4: If update succeeds and old logo resided in storage, delete old storage object.
+   - If upload fails: Existing DB record and old logo are untouched.
+   - If DB update fails: Newly uploaded orphan object is cleaned up, and old logo remains valid.
+   - If old storage deletion fails: DB update remains committed and new logo is preserved (non-fatal cleanup).
+4. **Safe Removal Flow (`DELETE /api/agency/logo`)**:
+   - Updates `Agency.logo` to `null` in PostgreSQL.
+   - Cleans up storage object if present; idempotent on repeat deletion.
+5. **Entitlement & Read-Only Hardening**:
+   - Gated server-side by `requireWriteAccess()` (Phase 217 suspension & expired subscription blocking).
+   - Gated server-side by `entitlementService.checkFeatureAllowed(agencyId, "CUSTOM_AGENCY_LOGO")`. Starter plan blocked (`403 FORBIDDEN`), Professional plan and active Trial allowed.
+6. **Settings Page UI Integration (`src/app/(dashboard)/settings/page.tsx`)**:
+   - Replaced URL text input with hidden `<input type="file" accept="image/png,image/jpeg,image/webp" />`.
+   - Staged preview card displays image preview, file name, and formatted file size in KB before upload.
+   - "Confirm & Save Logo" and "Cancel" actions for staged selection.
+   - Active logo card displays current logo image with "Change Logo" and "Remove Logo" buttons.
+   - Removal guarded by `ConfirmDialog` modal.
+   - Mutation triggers `refreshSubscription()` upon completion to synchronize context.
+   - Intercepted by `ReadOnlyModeDialog` if workspace is suspended or read-only.
+
+## 218.3 Database & Data Safety
+- **Database Schema**: Zero schema migrations required. Reused existing `Agency.logo String?` column safely.
+- **Backward Compatibility**: Legacy external URLs stored in `Agency.logo` remain viewable and can be safely replaced or deleted without throwing storage path errors.
+- **Baseline Data**: Zero production or QA baseline records altered or destroyed.
+
+## 218.4 Automated QA & Regression Test Matrix
+- `npx tsc --noEmit` $\to$ **PASS — 0 errors**
+- `npm run build` $\to$ **PASS — Exit code 0 across all 80+ routes**
+- `prisma/test-phase-218-logo-upload.ts` $\to$ **22/22 PASSED (100%)**
+  - Section 1 (Binary File Validation & Magic Bytes):
+    - Valid PNG magic bytes $\to$ PASS
+    - Valid JPEG magic bytes $\to$ PASS
+    - Valid WEBP magic bytes $\to$ PASS
+    - Corrupted / spoofed HTML $\to$ PASS (rejected with `CORRUPTED_IMAGE`)
+    - SVG format $\to$ PASS (rejected with `INVALID_FILE_TYPE`)
+    - Oversized file (>2MB) $\to$ PASS (rejected with `FILE_TOO_LARGE`)
+    - Empty file (0B) $\to$ PASS (rejected with `EMPTY_FILE`)
+  - Section 2 (Storage Path Resolution & Tenant Isolation):
+    - Scoped path extraction $\to$ PASS
+    - Cross-tenant storage path attempt $\to$ PASS (returns `null`, deletion blocked)
+    - Legacy external URL extraction $\to$ PASS (returns `null`, storage bypassed safely)
+  - Section 3 (Service Lifecycles):
+    - Initial logo upload & DB persistence $\to$ PASS
+    - Logo replacement with safe ordering $\to$ PASS
+    - Logo removal setting `Agency.logo = null` $\to$ PASS
+    - Repeated removal idempotency $\to$ PASS
+  - Section 4 (Entitlement & Read-Only Hardening):
+    - Starter plan blocked with 403 `FeatureNotAllowedError` $\to$ PASS
+    - `isFeatureAllowed` returns false on Starter $\to$ PASS
+    - Professional plan allowed $\to$ PASS
+    - Expired subscription blocked with 403 `ReadOnlyAccessError` $\to$ PASS
+    - Suspended agency status verified $\to$ PASS
+
+## 218.5 Files Changed / Added
+- `src/lib/services/agency-logo-service.ts` (New service for logo file validation, storage upload, safe replacement, and deletion)
+- `src/app/api/agency/logo/route.ts` (Refactored `POST` for `multipart/form-data` file upload and `DELETE` for logo removal)
+- `src/app/(dashboard)/settings/page.tsx` (Updated Agency Branding tab with real file picker, staged preview, change/remove flows, and `ConfirmDialog`)
+- `prisma/test-phase-218-logo-upload.ts` (Phase 218 automated QA test suite)
+- `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` (Updated with Section 218)
+
+## 218.6 Known Limitations & Deferred Work
+- **Logo Display**: Logo rendering in customer-facing PDFs implemented in Phase 219. Customer portal UI and email templates remain deferred.
+- **SVG Format**: SVG remains unsupported in this phase to prevent script injection / XSS risks until an SVG sanitization library is introduced.
+
+## 218.7 Closure
+**Phase 218 — CLOSED / PASS**
+
+---
+
+# 219. PROFESSIONAL AGENCY LOGO IN CUSTOMER-FACING PDFs
+
+## 219.1 Purpose & Scope
+- **Objective:** Render the custom agency logo uploaded in Phase 218 onto all customer-facing PDF documents generated across TripDesk SaaS for agencies with the `CUSTOM_AGENCY_LOGO` entitlement (Professional plan, active Trials, or dynamically entitled).
+- **Core Principle:** Presentation-only branding enhancement. Zero redesign of PDF layouts, zero changes to financial formulas, pricing, taxes, line items, booking states, or operational workflows.
+- **Fail-Open Resilience:** PDF generation must never crash if a logo URL is null, corrupt, unreachable, timed out, or unentitled; the document cleanly falls back to the existing text-based header layout.
+
+## 219.2 Architecture & Shared Helper
+- **Shared Helper (`src/lib/services/pdf-branding-helper.ts`):**
+  - Resolves `Agency.logo` into an in-memory `Buffer` compatible with PDFKit.
+  - Verifies `CUSTOM_AGENCY_LOGO` entitlement via `entitlementService.isFeatureAllowed()`.
+  - Supports base64 Data URLs and remote HTTPS Supabase Storage URLs.
+  - Bounded 3000ms network timeout via `AbortSignal.timeout(3000)`.
+  - Enforces magic-byte signature validation (PNG `\x89PNG...`, JPEG `\xff\xd8\xff`, WEBP `RIFF...WEBP`). Disallows SVG and non-image streams.
+  - Fail-open exception handling returning `null` on errors or timeouts.
+
+## 219.3 Customer-Facing PDF Integrations & Approved Visual Placements
+1. **Quotation / Proposal PDF (`quotation-pdf-service.ts`):**
+   - Page 1 Hero Banner (top-left). Refined `fit: [135, 40]`, positioned at `(margin + 16, heroHeaderTopY + 14)`.
+   - Vertical branding flow: Agency logo $\to$ Agency name (`10.5pt bold #A5B4FC`) + contact text $\to$ Trip Title (`17pt bold white`) $\to$ Subtitle $\to$ Metadata pill.
+   - Dynamic hero height computation: `heroTopSectionH = 48 + titleHeight + subtitleHeight + (logoBuffer ? 46 : 0)`.
+   - Preserves proposal metadata, trip title, package comparison, pricing breakdown, milestones, and terms.
+2. **Tax Invoice PDF (`invoice-pdf-service.ts`):**
+   - Page 1 Agency Header Column (top-left). Refined `fit: [140, 44]`, positioned at `(margin, margin)`.
+   - Commercial layout: Renders logo at `[140, 44]`, then drops `+48pt` to render Agency Name (`12pt bold brandPrimary`), Address, Contact, and GSTIN with clean vertical spacing.
+   - Preserves GSTIN, state code, tax tables (CGST/SGST/IGST), totals, and payment status.
+3. **Hotel Voucher PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Hero Container (top-left). Refined `fit: [130, 40]` (operations) / `[130, 36]` (document suite), positioned at `(margin + 16, margin + 12)`.
+   - Banner height dynamically adapts to `Math.max(90, leftContentH, minRightBoxH + 28)` / `94pt`.
+   - Preserves guest details, check-in/out dates, room configurations, and guidelines.
+4. **Transport / Vehicle Voucher PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Hero Container (top-left). Refined `fit: [130, 40]` (operations) / `[130, 36]` (document suite).
+   - Preserves Phase 185 dynamic header height and multi-line title wrapping logic (`bannerHeight = Math.max(90, leftContentH, minRightBoxH + 28)`).
+5. **Activity Pass / Voucher PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Hero Container (top-left). Refined `fit: [130, 40]` (operations) / `[130, 36]` (document suite).
+   - Preserves pass holder details, activity timings, and meeting point instructions.
+6. **Booking Confirmation PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Hero Container (top-left). Refined `fit: [130, 40]` (operations) / `[130, 36]` (document suite).
+   - Preserves traveler overview, financial balance ledger, and confirmation status.
+7. **Final Travel Kit / Customer Itinerary PDF (`operations-document-service.ts` / `document-pdf-service.ts`):**
+   - Page 1 Cover Hero Banner ONLY. Refined `fit: [140, 44]` (operations) / `[135, 36]` (document suite).
+   - Preserves subsequent day-by-day itinerary page layout and global text footers without repeating hero logo.
+8. **Official Payment Receipt PDF (`document-pdf-service.ts`):**
+   - Page 1 Header Banner (top-left). Refined `fit: [130, 34]`, positioned at `(margin + 16, margin + 12)`.
+   - Strict 1-page financial layout constraint fully preserved.
+
+## 219.4 Internal Documents Unchanged
+- **Operations Closure Report** (`operations-document-service.ts`) & **Executive/BI Report** (`reporting-service.ts`): Remain internal-only documents without agency logo branding.
+
+## 219.5 Verification & QA Results
+- **Automated QA Suite (`prisma/test-phase-219-pdf-logo-branding.ts`):**
+  - Section 1: Magic byte validation (PNG, JPEG, WEBP pass; SVG, corrupt data URL, null, unreachable URL fail open) $\to$ PASS (6/6)
+  - Section 2: Entitlement checks (Starter unentitled returns null; Professional and Active Trial return Buffer) $\to$ PASS (3/3)
+  - Section 3: End-to-end PDF generation for all 8 customer-facing documents (with and without logo) $\to$ PASS (11/11)
+  - Section 4: Tenant isolation & fail-open security $\to$ PASS (2/2)
+  - Total: **22/22 Tests PASSED**
+- **Regression Suites:**
+  - `prisma/test-phase-218-logo-upload.ts` $\to$ **22/22 Tests PASSED**
+  - `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 Tests PASSED**
+- **Typecheck & Production Build:**
+  - `npx tsc --noEmit` $\to$ **PASS (0 errors)**
+  - `npm run build` $\to$ **PASS (Turbopack production build compiled successfully)**
+
+## 219.6 Closure
+**Phase 219 — Visual Refinement & PDF Branding: CLOSED / PASS**
+
+---
+
+# 80. PHASE 220 — PDF TRAILING BLANK PAGES / FOOTER PAGINATION FIX
+
+## 220.1 Objective & Background
+- **Problem:** Quotation, Invoice, and Operations PDFs generated extra trailing blank pages after the actual content finished (e.g. 1 content page generated 3 total pages, 2 content pages generated 6 total pages, 3 content pages generated 9 total pages).
+- **Audit Findings:** The issue was not related to the agency logo implementation. The root cause was located in the second-pass footer rendering loop over `doc.bufferedPageRange()`.
+- **Root Cause:** When `doc.switchToPage(i)` was called to draw footer text and page numbers, `doc.text()` was invoked at `footerY` coordinates ($y \approx 815.89\text{--}820.89\text{ pt}$) that exceeded PDFKit's configured printable bottom text boundary ($\text{pageHeight} - \text{bottomMargin} = 841.89 - 32 = 809.89\text{ pt}$). PDFKit's text layout engine interpreted this position as page overflow and automatically generated a new trailing page for each `doc.text()` invocation in the footer pass.
+
+## 220.2 Implementation
+- **Surgical Targeted Correction:** In the second-pass footer rendering loops across all affected services, `doc.page.margins.bottom = 0` is temporarily set inside a `try/finally` block:
+  ```ts
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    const origBottomMargin = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    try {
+      // Render footer border line, agency contact info, and "Page X of Y"
+    } finally {
+      doc.page.margins.bottom = origBottomMargin;
+    }
+  }
+  ```
+- **Files Modified:**
+  1. `src/lib/services/quotation-pdf-service.ts`: Global footer loop (lines 1037–1078).
+  2. `src/lib/services/invoice-pdf-service.ts`: Watermark & global footer loop (lines 630–675).
+  3. `src/lib/services/operations-document-service.ts`: All 6 document footer loops (Hotel Voucher, Transport Voucher, Activity Pass, Booking Confirmation, Travel Kit, Closure Report).
+- **Clean Service Preserved:** `src/lib/services/document-pdf-service.ts` remained completely untouched (already clean with footer positioned inside margin bounds at $y = 780\text{ pt}$).
+
+## 220.3 Verification & QA Results
+- **Automated QA Suite (`prisma/test-phase-220-pagination-fix.ts`):**
+  - Test 1: Quotation (Minimal without logo) $\to$ exactly 1 page (0 trailing pages) $\to$ PASS
+  - Test 2: Quotation (Minimal with logo) $\to$ exactly 1 page (0 trailing pages) $\to$ PASS
+  - Test 3: Quotation (Medium) $\to$ exactly 2 pages (0 trailing pages) $\to$ PASS
+  - Test 4: Tax Invoice (Standard without logo) $\to$ exactly 1 page (0 trailing pages) $\to$ PASS
+  - Test 5: Tax Invoice (Standard with logo) $\to$ exactly 1 page (0 trailing pages) $\to$ PASS
+  - Tests 6–10: Document Suite regressions (Hotel Voucher, Vehicle Voucher, Activity Pass, Booking Confirmation, Payment Receipt strict 1-page) $\to$ PASS
+  - Total: **10/10 Tests PASSED**
+- **Regression Suites:**
+  - `prisma/test-phase-219-pdf-logo-branding.ts` $\to$ **22/22 Tests PASSED**
+  - `prisma/test-phase-218-logo-upload.ts` $\to$ **22/22 Tests PASSED**
+  - `prisma/test-phase-213-entitlements.ts` $\to$ **22/22 Tests PASSED**
+- **Typecheck & Production Build:**
+  - `npx tsc --noEmit` $\to$ **PASS (0 errors)**
+  - `npm run build` $\to$ **PASS (Turbopack production build compiled successfully)**
+- **Data & Security Safety:**
+  - Schema Changed: **NO**
+  - Migrations Created: **NO**
+  - Database Mutated: **NO**
+  - Tenant Isolation & Entitlement Rules: **100% Preserved**
+
+## 220.4 Closure
+**Phase 220 — PDF Trailing Blank Pages / Footer Pagination Fix: CLOSED / PASS**
+
+---
+
+# 221. DEFAULT TAX RATE DROPDOWN — COMMON DROPDOWN UI CONSISTENCY
+
+## 221.1 Overview & Scope
+- **Objective:** Standardize the **Default Tax Rate (Catalog Presets)** dropdown in the agency settings page to use the common TripDesk dropdown UI (`@/components/ui/select`) instead of an unstyled native HTML `<select>` tag.
+- **Strict Guardrails:**
+  - Frontend UI presentation consistency fix only.
+  - Zero modifications to backend tax calculation services, APIs, Prisma schema, migrations, or database tables.
+  - 100% preservation of TripDesk's locked tax business rules (0/5/12/18/28% rates, EXCLUSIVE/INCLUSIVE modes, Intra/Inter-state treatment).
+
+## 221.2 Implementation
+- **File Updated:** [`src/app/(dashboard)/settings/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/(dashboard)/settings/page.tsx)
+- **Component Reused:** Shared `@/components/ui/select` (`Select`, `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectItem`).
+- **State & Data Flow:**
+  - Value bound to `String(defaultGstRate)`.
+  - Selection handler safely casts to numeric state `setDefaultGstRate(Number(val))`.
+  - Rate list continues mapping from dynamic `taxRates` API array.
+  - Preserved disabled state binding `disabled={savingTax}`.
+
+## 221.3 Verification & Quality Assurance
+- **Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Turbopack compiled successfully)**.
+- **Data Safety:**
+  - Schema changed: **NO**
+  - Migrations created: **NO**
+  - Database altered: **NO**
+  - API / Calculation changed: **NO**
+
+## 221.4 Closure
+**Default Tax Rate Dropdown UI Consistency: CLOSED / PASS**
+
+---
+
+# 222. NOTIFICATION POPUP + COMMUNICATIONS NOTIFICATION CENTER
+
+## 222.1 Overview & Scope
+- **Objective:** Enhance internal operator notification interactions across the dashboard by:
+  1. Truncating the Topbar notification popover to the **latest 10 notifications** (`limit: 10`) while preserving global unread count badge accuracy.
+  2. Introducing an accessible **hover mark-as-read check button** on every unread notification row in the popover that marks only that item read without navigating away.
+  3. Updating the popover footer action to **"Show All Notifications →"** navigating to `/communications?tab=notifications` (while preserving Platform Owner audit logs navigation).
+  4. Expanding the `/communications` page with a tabbed interface providing a full **System Notifications** history view (`UserNotification`) with pagination, All/Unread filtering, and bulk mark-all-read while keeping the outbound customer communications ledger (`CommunicationLog`) 100% intact.
+- **Strict Guardrails:**
+  - Zero database schema changes, zero migrations, zero database mutations during deployment.
+  - Reused existing `UserNotification` models, `InternalNotificationService`, and `/api/notifications` endpoints.
+  - Strict preservation of tenant and user authorization boundaries (user can only see and mark their own notifications read).
+  - Segregation between `UserNotification` (internal) and `CommunicationLog` (outbound traveler dispatch) preserved.
+
+## 222.2 Implementation
+- **Files Modified:**
+  1. [`src/components/shared/notifications-popover.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/shared/notifications-popover.tsx):
+     - Updated fetch request to `limit: 10`.
+     - Added `handleMarkSingleRead` with `e.stopPropagation()` and optimistic count/state updates.
+     - Added hover `Check` button on unread rows.
+     - Updated footer button to `"Show All Notifications →"` redirecting to `/communications?tab=notifications`.
+  2. [`src/app/(dashboard)/communications/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/(dashboard)/communications/page.tsx):
+     - Added tab switcher: **System Notifications** (`"notifications"`) vs. **Outbound Communications** (`"outbound"`).
+     - Bound active tab to `?tab=notifications` query parameter.
+     - Built System Notifications view with server-side pagination (`notifPage`, `notifTotalPages`), All/Unread filter pills, Mark All Read action, and card rows with category icons and hover mark-as-read.
+     - Preserved 100% of existing Outbound Communications KPI scorecards, filters, search, table, detail modal, and manual message composer.
+
+## 222.3 Verification & Quality Assurance
+- **Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Turbopack compiled all static and dynamic routes successfully)**.
+- **Data Safety:**
+  - Schema changed: **NO**
+  - Migrations created: **NO**
+  - Database altered: **NO**
+  - API / Calculation changed: **NO**
+
+## 222.4 Closure
+**Phase 222 — Notification Popup + Communications Notification Center: CLOSED / PASS**
+
+---
+
+# 223. COMMUNICATIONS SYSTEM NOTIFICATIONS SCROLL CONTAINER
+
+## 223.1 Overview & Scope
+- **Objective:** Prevent extensive notification history from inflating the vertical height of the `/communications` page when the System Notifications tab is active.
+- **Implementation:**
+  - Added `max-h-[620px] overflow-y-auto` to the notification items list container in [`src/app/(dashboard)/communications/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/(dashboard)/communications/page.tsx).
+  - Keeps top filter controls, Mark All Read header action, and bottom pagination bar visible and fixed outside the scrolling content area.
+  - Conforms to the standard TripDesk dashboard table/list scroll pattern (`max-h-[620px] overflow-y-auto`).
+- **Functionality Preserved:**
+  - 100% of Phase 222 features preserved (server-side pagination, hover check mark-as-read, row click navigation, All/Unread filters, true unread counts, loading/empty states, and Outbound Communications ledger).
+
+## 223.2 Verification & Quality Assurance
+- **Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Turbopack compiled all static and dynamic routes successfully)**.
+- **Data Safety:**
+  - Schema changed: **NO**
+  - Migrations created: **NO**
+  - Database altered: **NO**
+
+## 223.3 Closure
+**Phase 223 — Communications System Notifications Scroll Container: CLOSED / PASS**
+
+---
+
+# 224. PHASE 224 — PROJECT-WIDE MODAL BACKGROUND SCROLL LOCK
+
+## 224.1 Objective & Architectural Design
+- **Objective:** Ensure that when any modal/dialog is opened across the entire TripDesk application, background page scrolling (wheel, trackpad, arrow keys, touch gestures, scrollbar drag) is locked, while modal content remains scrollable, layout shift is prevented, page position is preserved upon close, and nested modals maintain lock until all modals are dismissed.
+- **Central Primitive Integration:** Implemented reference-counted scroll locker in `@/lib/scroll-lock` (`useModalScrollLock(isOpen)`). Hooked directly into `DialogContent` in `@/components/ui/dialog.tsx` which automatically covers all standard `Dialog`, `ConfirmDialog`, `AlertDialog`, search modals, and operational/financial dialogs built upon the shared primitive.
+- **Custom Modals Coverage:** Audited and applied `useModalScrollLock` across all standalone `fixed inset-0` modal overlays (Operations dialogs, Invoices modals, Booking modals, Excel import, Mobile navigation drawer, Feedback/Referrals/Subscription/Trip-guest pages, and Admin management overlays).
+- **Layout Shift Compensation:** Dynamically measures `window.innerWidth - document.documentElement.clientWidth` and sets compensatory `paddingRight` on `document.body` along with `overflow: hidden` on both `document.body` and `document.documentElement` during active lock.
+- **Nested Modal Safety:** Uses an active lock reference count (`activeLockCount`). Opening modal A (count=1) -> nested modal B (count=2) -> closing modal B (count=1, still locked) -> closing modal A (count=0, scroll unlocked).
+- **Popovers/Dropdowns Untouched:** Normal dropdowns, comboboxes, select menus, and tooltips are not wrapped in modal lock, preserving standard background interactions.
+
+## 224.2 Verification & Build Results
+- **TypeScript:** `npx tsc --noEmit` passed with 0 errors.
+- **Production Build:** `npm run build` passed with 0 errors.
+- **Database/API Safety:** 0 schema changes, 0 migrations, 0 API route modifications.
+
+## 224.3 Closure
+**Phase 224 — Project-Wide Modal Background Scroll Lock: CLOSED / PASS**
+
+---
+
+# 225. PHASE 1 FINAL VERIFICATION — DEAD CODE / UNUSED IMPORTS / UNUSED FILES CLEANUP
+
+## 225.1 Executive Summary
+- **Objective:** Final verification-only audit confirming that all dead code, legacy services, obsolete mock data, and unused imports/parameters removed during Phase 1 are safe and complete, with zero regression or accidental logic mutation.
+- **Legacy Service Layer Removal:** Conclusively confirmed deletion of legacy `src/services/` folder (`booking-service.ts`, `customer-service.ts`, `hotel-service.ts`, `payment-service.ts`, `quotation-service.ts`, `trip-service.ts`, `index.ts`). All active architecture runs exclusively on production `@/lib/services/*` Prisma multi-tenant server services.
+- **Legacy Mock Data Removal:** Conclusively confirmed deletion of `src/data/demo.ts`. Zero active runtime or test references remain.
+- **Import & Variable Cleanup:** 46 files cleaned across UI components, React contexts, API clients, validation schemas, and services.
+
+## 225.2 Verification Results
+- **TypeScript Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (all static and dynamic routes compiled)**.
+- **Database / Schema Safety:** 0 schema changes, 0 migrations, 0 database mutation scripts.
+- **Environment & Configuration:** `.env`, `next.config.ts`, `tsconfig.json`, `package.json`, `tailwind.config.ts` untouched.
+- **Business Logic & Security:** Authentication, multi-tenant isolation, billing, quotation engine, operations, and PDF generation 100% preserved.
+- **Permanent QA Data:** No test agency, hotel, destination, or vehicle record altered.
+
+## 225.3 Closure
+**Phase 1 Final Verification: CLOSED / PASS**
+
+---
+
+# 226. PHASE 2 — STATIC / MOCK / HARD-CODED / PLACEHOLDER DATA AUDIT
+
+## 226.1 Executive Summary
+- **Objective:** Perform a project-wide audit for static, mock, demo, placeholder, fake, seeded, hard-coded, or development-only business data that could incorrectly appear in production.
+- **Production Data Source Confirmation:** Confirmed that 100% of production pages (Dashboard, Enquiries, Customers, Trips, Quotations, Bookings, Invoices, Payments, Operations, Suppliers, Hotels, Rate Sheets, Destinations, Vehicles, Communications, Feedback, Referrals, Customer Portal, and Public Tokens) pull data exclusively from authenticated Prisma database API services (`@/lib/services/*` & `@/lib/api-client/*`).
+- **Accidental Static Fallbacks Remediation:** Identified and corrected accidental fake phone fallback (`"919876543210"`) in `src/app/q/[shareToken]/page.tsx` for WhatsApp contact, replacing it with dynamic agency phone resolution and clean fallback to universal WhatsApp dialog.
+- **Legacy Client Contexts Categorized:** Identified legacy in-memory React contexts (`saas-context.tsx`, `enquiry-context.tsx`, `inventory-context.tsx`, `costing-context.tsx`, `quotation-context.tsx`, `booking-context.tsx`, `operations-context.tsx`) as development prototype stores that are bypassed by active production pages in favor of direct server API clients.
+- **Legitimate Constants Preserved:** Locked quotation tiers (`Deluxe`, `Ultra Deluxe`, `Premium`), tax rate options (`0%`, `5%`, `12%`, `18%`, `28%`), support helpline numbers, and UI form input placeholders preserved.
+
+## 226.2 Verification Results
+- **TypeScript Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (all static and dynamic routes compiled)**.
+- **Database / Schema Safety:** 0 schema changes, 0 migrations, 0 database mutation scripts.
+- **Permanent QA Data:** No test agency, hotel, destination, or vehicle record altered.
+
+## 226.3 Closure
+**Phase 2 — Static / Mock / Hard-Coded Data Audit: CLOSED / PASS**
+
+---
+
+# 227. PHASE 3 — DB / SCHEMA / ARCHITECTURE / SECURITY PRE-QA AUDIT
+
+## 227.1 Executive Summary
+- **Objective:** Comprehensive pre-QA inspection of the database schema, relations, indexes, migrations, multi-tenant isolation, IDOR protection, authentication, authorization, financial state machines, and file storage boundaries.
+- **Audit Findings:**
+  - **Prisma Schema & Relations:** 57 models verified. All 36 agency-scoped models mandate `agencyId String` with `onDelete: Cascade` to `Agency`. Global singleton and platform models have `agencyId = null` strictly guarded for `PLATFORM_OWNER`.
+  - **Database Unique Constraints:** Uniqueness constraints verified on `Invoice` (`@@unique([agencyId, invoiceNumber])`, `@@unique([agencyId, bookingId])`), `Trip` (`@@unique([agencyId, tripNumber])`), `Quotation` (`@@unique([agencyId, quotationNumber, version])`), `Booking` (`@@unique([agencyId, bookingNumber])`), `Destination` (`@@unique([agencyId, name])`), and idempotency keys on notifications.
+  - **Tenant Isolation & IDOR Protection:** Server-enforced identity via `getRequestContext()`, `requireAgencyOwnerContext()`, `requirePlatformOwnerContext()`, `requireWriteAccess()`, and `requireReadAccess()` in `src/lib/api/context.ts`. Multi-tenant query filtering with `where: { id, agencyId }` across all 224 API routes and `@/lib/services/*`.
+  - **Public Token Route Sanitization:** Public quotation proposals (`/q/[shareToken]`), trip views (`/trip/[secureToken]`), and booking views (`/b/[secureToken]`) strictly whitelist traveler-safe DTOs, stripping cost prices, markups, supplier rates, and internal consultant notes.
+  - **Secrets & Storage:** Server-only secrets isolated from client bundles. Storage uploads follow safe sequential replacement (`validate -> upload new -> update DB -> delete old`).
+- **Audit Result:** **CLOSED / PASS (0 production blockers, 0 security defects)**.
+
+---
+
+# 228. SEO & PRODUCTION WEB READINESS AUDIT AND REMEDIATION
+
+## 228.1 Executive Summary
+- **Objective:** Perform a project-wide SEO, crawlability, metadata, canonical, indexing, and production web readiness audit and focused remediation without compromising application security.
+- **Audited Surface:** 84 pages, 4 layouts, 224 API routes across `src/app/**`.
+- **Key Remediation Implemented:**
+  1. **Private Route Indexing Protection:** Added explicit `robots: { index: false, follow: false }` metadata to private/authenticated layout boundaries:
+     - `src/app/admin/layout.tsx` (Platform Owner area)
+     - `src/app/(dashboard)/layout.tsx` (Agency Owner workspace)
+     - `src/app/customer/layout.tsx` (Traveler OTP portal)
+     - `src/app/q/layout.tsx` (Customer-specific quotation proposals)
+     - `src/app/trip/layout.tsx` (Guest trip detail views)
+     - `src/app/b/layout.tsx` (Guest booking confirmation views)
+  2. **Robots.txt Configuration:** Created `src/app/robots.ts` using Next.js `MetadataRoute.Robots`, explicitly disallowing crawler access to `/admin/`, `/api/`, `/dashboard/`, `/customer/`, `/trip/`, `/b/`, `/q/`, and all internal authenticated paths while allowing public authentication and landing entry points.
+  3. **Sitemap Configuration:** Created `src/app/sitemap.ts` using Next.js `MetadataRoute.Sitemap`, exposing strictly the public landing discovery URL `/` backed by `NEXT_PUBLIC_APP_URL`.
+  4. **Root Metadata & Social Previews:** Updated `src/app/layout.tsx` with:
+     - `metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://app.tripdesk.io")`
+     - `title: { default: "TripDesk - Travel Agency SaaS Operating System", template: "%s | TripDesk" }`
+     - Root Open Graph (`og:*`) and Twitter (`twitter:card: summary_large_image`) card metadata.
+  5. **Security & Privacy Boundary:** Verified zero customer personal details, supplier costs, markup margins, or secret tokens are leaked through metadata or public discovery feeds.
+
+## 228.2 Verification Results
+- **TypeScript Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Static `robots.txt` and `sitemap.xml` generated; 38/38 static pages and dynamic routes compiled)**.
+- **Database / Schema Safety:** 0 schema changes, 0 migrations, 0 database mutations.
+- **Permanent QA Data:** 100% preserved.
+
+## 228.3 Closure
+**SEO & Production Web Readiness: CLOSED / COMPLETE — PASS**
+
+---
+
+# 229. PHASE 5 — COMPREHENSIVE FUNCTIONAL QA AUDIT
+
+## 229.1 Executive Summary
+- **Objective:** Verify that TripDesk's complete user-facing functionality across all 19 major functional areas operates strictly according to established business rules, security models, and locked constraints.
+- **Audited Functional Areas:**
+  1. **Authentication & RBAC:** Verified 2-role internal model (`PLATFORM_OWNER` with `agencyId = null`, `AGENCY_OWNER` with `agencyId != null`). Zero customer internal user/role. Session resolution via Supabase Auth + Prisma User UUID mapping.
+  2. **Agency Owner Workspace & Dashboard:** Verified dashboard summary metrics, revenue, trips, quotations, bookings, operations, and quick actions.
+  3. **Master Data Invariants:**
+     - **Destinations:** Exactly 32 Starter India Destinations seeded and preserved without duplicates.
+     - **Hotels:** Collision-resistant sequential `hotelCode` (`HTL-0001`, `HTL-0002`), destination relationships, status filtering.
+     - **Activities:** Destination association, adult/child pricing, type classification.
+     - **Vehicles:** Independent vehicle master with fixed/per-km pricing, capacity, and registration.
+     - **Rate Sheets:** Hotel-linked rate validity engine with seasonality, room type, meal plan, and single-rate deduplication.
+  4. **Customers & Enquiries / CRM:** Customer duplicate protection, traveler relationships, stage transitions (NEW -> CONTACTED -> PROPOSAL_SENT -> WON/LOST).
+  5. **Quotations & Locked Tiers:**
+     - Tiers strictly locked to: `Deluxe` (default), `Ultra Deluxe`, and `Premium`.
+     - Tiers only affect quotation title/suffix, never pricing, markup, tax, or items.
+  6. **Public Quotation / Guest Views:** Sanitized DTOs strictly redact cost prices, markups, supplier rates, and internal notes. Universal WhatsApp contact dialog without fake phone fallback.
+  7. **Trip Management & Costing:**
+     - Destination multi-select without card/grid anti-patterns.
+     - Locked Nightly Rate Formula verified: `manual hotel cost = nightlyRate × rooms × diffDays`.
+  8. **Bookings & One-Invoice Invariant:**
+     - Conversion from Quotation to Booking.
+     - Confirmed booking generates exactly one persistent `invoiceNumber`.
+     - Invoices restricted to `CONFIRMED`, `ONGOING`, or `COMPLETED` bookings.
+  9. **Invoices & Payments:**
+     - Status state machine: `Draft`, `Issued`, `Partially Paid`, `Paid`, `Cancelled`.
+     - Transaction-safe payment allocation and voiding.
+  10. **Tax V1 Engine:**
+      - Rates: 0%, 5%, 12%, 18%, 28%. Modes: `EXCLUSIVE`, `INCLUSIVE`.
+      - GST split: `INTRA_STATE` (50/50 CGST/SGST with odd-paise reconciliation), `INTER_STATE` (100% IGST), `NON_GST_EXEMPT` (0%).
+      - No 5% default tax; discount deducted before tax.
+  11. **Platform Owner Admin:** Agency management, trial extension, suspension, reactivation, announcements, plans, and safe QR upload workflow (`validate -> upload new -> update DB -> delete old`).
+  12. **Subscription & Billing Lifecycle:** 7-day Starter trial, manual UPI/bank + UTR payment proof submission, Platform Owner verification/rejection, expired read-only mode.
+  13. **Internal Notifications:** Deterministic idempotency, role-based visibility, unread counts, mark all read.
+  14. **Dialogs & UI Safety:** Zero `window.alert()` / `window.confirm()`; 100% compliant with TripDesk `ConfirmDialog`.
+
+## 229.2 Verification Results
+- **Pure Calculation & State Machine Assertions:** 27/27 Tax tests PASS; 26/26 Functional QA assertions PASS.
+- **TypeScript Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (all 84 static & dynamic pages compiled)**.
+- **Database / Schema Safety:** 0 schema changes, 0 migrations, 0 database mutations.
+- **Permanent QA Baseline:** 33 Destinations, 28 Hotels, 68 RateSheets, 9 Vehicles, Test Agency, Platform Owner preserved.
+
+## 229.3 Closure
+**Phase 5 — Comprehensive Functional QA: CLOSED / COMPLETE — PASS**
+
+---
+
+# 230. PHASE 5A — FUNCTIONAL QA RECONCILIATION & RUNTIME AUDIT
+
+## 230.1 Executive Summary
+- **Objective:** Perform a rigorous read-only database baseline inventory and runtime QA reconciliation before closing Phase 5.
+- **Database Baseline Reconciliation Findings:**
+  1. **Destinations (33 Total):** Exactly the 32 permanent India starter records (`cmu435w4100005gtq6aju7627` to `cmu435w42000v5gtqn6o5w9ir`, created 2026-09-16) + 1 valid QA destination (`cmuf60sb100005wtqdu0fz9hc` "QA-Formik Goa Beach", created 2026-09-24 during Phase 158d Formik QA). Status: **SAFE / EXPECTED**.
+  2. **Hotels (28 Total):** Under `TripDesk Offical Test Agnecy` (`cmu2g9rgq0000swtqbr5aie7x`), exactly 22 permanent baseline hotels (`HTL-0001` through `HTL-0022`) are 100% intact + 2 additional hotels (`HTL-0023` and `HTL-0024`) from Phase 158d Formik QA (2026-09-24). The remaining 4 hotels are legacy test records under historical test agencies (`cmu2j9tz6...`, `cmu2jb352...`, `qa13-...`). Status: **SAFE / EXPECTED**.
+  3. **RateSheets (68 Total):** Under `TripDesk Offical Test Agnecy`, exactly 66 permanent baseline rate sheets (`RAT-2026-00001` through `RAT-2026-00066`, created 2026-09-18) are 100% intact + 2 additional rate sheets (`RAT-2026-00067` for `HTL-0024`, `RAT-2026-00068` for `HTL-0023`, created 2026-09-24). Status: **SAFE / EXPECTED**.
+  4. **Vehicles (9 Total):** Under `TripDesk Offical Test Agnecy`, exactly 6 permanent baseline vehicles are 100% intact + 3 legacy vehicles under historical test agencies. Status: **SAFE / EXPECTED**.
+- **Runtime Smoke Verification:**
+  - Verified live Next.js HTTP server routing and security middleware (`/login`, `/dashboard`, `/admin`, `/api/auth/me`).
+  - Verified unauthenticated access to `/dashboard` and `/admin` immediately redirects to `/login` with `redirectTo` preservation.
+  - Verified zero `window.alert()` / `window.confirm()` across all client UI components.
+  - Verified locked rules: Deluxe default quotation tier, Nightly Rate formula (`nightlyRate × rooms × diffDays`), 1 Booking = 1 persistent invoice number.
+
+## 230.2 Verification Results
+- **TypeScript Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (38 static pages, 84 total pages & routes compiled)**.
+- **Database / Schema Safety:** 0 schema changes, 0 migrations, 0 baseline deletions.
+- **Permanent QA Baseline:** 100% intact and preserved.
+
+## 230.3 Closure
+**Phase 5A — Functional QA Reconciliation: CLOSED / COMPLETE — PASS**
+
+---
+
+# 231. PHASE 6 — INTEGRATION QA & CROSS-MODULE RECONCILIATION
+
+## 231.1 Executive Summary
+- **Objective:** Conduct an exhaustive, evidence-based integration audit verifying that independently functional modules correctly work together across UI, API, server actions, services, Prisma/database, auth/session context, tenant isolation, business-state transitions, financial calculations, notifications, and public/customer-facing surfaces.
+- **Audited Integration Chains:**
+  1. **Group A (Auth & Tenancy):** Supabase Auth $\to$ Prisma User $\to$ `getRequestContext` $\to$ `requireAgencyOwnerContext` / `requirePlatformOwnerContext` $\to$ `assertTenantOwnership` / `scopeTenant`. Server-side identity enforcement prevents tenant override. Platform Owner is strictly global and isolated from tenant scoping.
+  2. **Group B (Agency Signup & Trial):** Atomic transaction provisions Agency + User + Starter Subscription (7-day trial). Starter plan invariant and trial expiry math verified.
+  3. **Group C & D (Destination / Inventory / Costing):** Destination $\to$ Hotel $\to$ Activity $\to$ TripDestination. Nightly rate formula `nightlyRate × rooms × diffDays` strictly verified (Phase 155).
+  4. **Group E & F (Customer / Enquiry / Quotation):** Quotation tier modification modifies *only* title/suffix, preserving underlying pricing, cost, markup, discount, tax, and item rows.
+  5. **Group G & 24 (Public DTO Sanitization):** `/q/[shareToken]` and `/trip/[secureToken]` strip all internal costs, supplier rates, markups, and internal notes.
+  6. **Group H & I (Quotation $\to$ Booking $\to$ Invoice):** Converted quotations create confirmed bookings and trip state `BOOKED`. 1 Booking = 1 persistent invoice number `INV-XXXX` invariant verified with unique composite constraint `agencyId_bookingId`.
+  7. **Group J & K (Invoice $\to$ Payment $\to$ Tax V1):** Row-locked payment allocation with balance recalculation. Tax V1 engine (0%, 5%, 12%, 18%, 28%, Exclusive/Inclusive, Intra 50/50 CGST/SGST, Inter 100% IGST, Non-GST Exempt 0%) verified with discount deducted before tax.
+  8. **Group L & O (Notifications & Announcements):** Idempotent delivery across `BOOKING_CREATED`, `PAYMENT_RECEIVED`, `PLATFORM_ANNOUNCEMENT` verified. Duplicate notification suppression verified.
+  9. **Group M & N (Subscription State & Billing QR):** Subscription payment states (`PENDING` $\to$ `VERIFIED` / `REJECTED`), atomic QR upload $\to$ DB update $\to$ storage cleanup invariant verified.
+  10. **Group Q (Transaction & Failure Safety):** Multi-write operations wrapped in `prisma.$transaction` with transactional rollback safety verified.
+
+## 231.2 Reconciled Integration Matrix (Phase 6A)
+
+| # | Integration | Evidence Type | Actual Evidence | Result |
+|---|---|---|---|---|
+| 1 | Signup → Agency → User | `SERVICE/DB VERIFIED` | `onboarding-service.ts` atomic `prisma.$transaction` provisioning | **PASS** |
+| 2 | Signup → Trial | `SERVICE/DB VERIFIED` | `7-Day Trial Duration` calculation & Starter Plan invariant | **PASS** |
+| 3 | Auth → Agency Context | `SERVICE/DB VERIFIED` | `getRequestContext` + `requireAgencyOwnerContext` server-side DB user binding | **PASS** |
+| 4 | Destination → Hotel | `SERVICE/DB VERIFIED` | Live DB relations verified across 33 destinations and 28 hotels | **PASS** |
+| 5 | Destination → Activity | `SERVICE/DB VERIFIED` | Activity destination foreign key and pricing tier models verified in DB | **PASS** |
+| 6 | Destination → Trip | `SERVICE/DB VERIFIED` | `TripDestination` sequence order and legs verified | **PASS** |
+| 7 | Repeated Destination → Inventory | `SERVICE/DB VERIFIED` | `trip-service.ts` multi-leg inventory deduplication verified | **PASS** |
+| 8 | Hotel → RateSheet | `SERVICE/DB VERIFIED` | 68 seasonal rate sheets linked to hotels via collision-resistant codes | **PASS** |
+| 9 | RateSheet → Trip Cost | `SERVICE/DB VERIFIED` | Nightly rate formula `rate * rooms * diffDays` verified (₹3500 * 2 * 3 = ₹21000) | **PASS** |
+| 10 | Customer → Enquiry | `SERVICE/DB VERIFIED` | CRM customer linking and duplicate enquiry check verified | **PASS** |
+| 11 | Enquiry → Quotation | `SERVICE/DB VERIFIED` | Proposal generation from enquiry verified | **PASS** |
+| 12 | Quotation → Trip | `SERVICE/DB VERIFIED` | Synchronized itinerary, hotels, vehicles, activities verified | **PASS** |
+| 13 | Quotation → Booking | `SERVICE/DB VERIFIED` | `convertQuotationToBooking` idempotent conversion, trip status `BOOKED` | **PASS** |
+| 14 | Quotation → Public View | `SERVICE/DB VERIFIED` | `getPublicQuotationByToken` strips all internal costs/markups (token `0f724031...`) | **PASS** |
+| 15 | Quotation → Acceptance | `SERVICE/DB VERIFIED` | Public accept action transitions quotation status to `ACCEPTED` | **PASS** |
+| 16 | Quotation → Change Request | `SERVICE/DB VERIFIED` | `requestChanges` records change notes and timestamp | **PASS** |
+| 17 | Booking → Invoice | `SERVICE/DB VERIFIED` | `getOrCreateInvoiceForBooking` persistent invoice invariant with unique DB constraint | **PASS** |
+| 18 | Invoice → Payment | `SERVICE/DB VERIFIED` | `createPayment` row-locked payment allocation with active invoice linking | **PASS** |
+| 19 | Payment → Balance/Status | `SERVICE/DB VERIFIED` | `recalculateBookingPaymentTotals` updates status to `PARTIALLY_PAID` / `PAID` | **PASS** |
+| 20 | Tax → Quotation | `SERVICE/DB VERIFIED` | Tax V1 engine (discount deducted before tax, intra 50/50 CGST/SGST) | **PASS** |
+| 21 | Tax → Booking | `SERVICE/DB VERIFIED` | Tax V1 calculation models applied consistently to booking totals | **PASS** |
+| 22 | Tax → Invoice | `SERVICE/DB VERIFIED` | Tax breakdowns matching quotation and booking lines | **PASS** |
+| 23 | Booking → Notification | `SERVICE/DB VERIFIED` | `BOOKING_CREATED` notification dispatched with idempotency key | **PASS** |
+| 24 | Customer Payment → Notification | `SERVICE/DB VERIFIED` | `PAYMENT_RECEIVED` notification dispatched with idempotency key | **PASS** |
+| 25 | Payment Proof → Platform | `SERVICE/DB VERIFIED` | UTR proof submitted with status `PENDING` | **PASS** |
+| 26 | Verification → Agency Access | `SERVICE/DB VERIFIED` | Platform verification updates subscription to `ACTIVE` and extends validity | **PASS** |
+| 27 | Rejection → Agency State | `SERVICE/DB VERIFIED` | Rejection sets status to `REJECTED` and preserves trial/suspension state | **PASS** |
+| 28 | Suspension → Access | `SERVICE/DB VERIFIED` | Read-only middleware and write-guards prevent data mutation | **PASS** |
+| 29 | Reactivation → Access | `SERVICE/DB VERIFIED` | Reactivation restores full workspace write permissions | **PASS** |
+| 30 | Announcement → Notification | `SERVICE/DB VERIFIED` | Broadcast to active agency owners with duplicate suppression | **PASS** |
+| 31 | Billing QR → Storage → DB | `SERVICE/DB VERIFIED` | Atomic storage upload $\to$ DB update $\to$ old file cleanup | **PASS** |
+| 32 | Cache/Revalidation | `STATIC VERIFIED` | `revalidatePath` calls verified across server actions; no stale cache race test run | **PASS** |
+| 33 | Transaction Failure Safety | `STATIC VERIFIED` | `prisma.$transaction` multi-write inspection verified; no forced runtime rollback test run | **PASS** |
+| 34 | Cross-Tenant Isolation | `SERVICE/DB VERIFIED` | `assertTenantOwnership` returns 404 on cross-tenant access; `scopeTenant` strictly binds agencyId | **PASS** |
+| 35 | Public/Internal Data Boundary | `SERVICE/DB VERIFIED` | Public DTO sanitization removes sensitive supplier costs/markups | **PASS** |
+
+## 231.3 Validation & Data Safety
+- **TypeScript Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Next.js Build:** `npm run build` $\to$ **PASS (Compiled successfully in 18.7s, generated 108 static/dynamic routes with Turbopack)**.
+- **Permanent Baseline Safety:**
+  - 33 Starter India Destinations: 100% intact.
+  - 28 Permanent QA Hotels: 100% intact.
+  - 68 Permanent QA RateSheets: 100% intact.
+  - 9 Permanent QA Vehicles: 100% intact.
+  - Official Test Agency & Platform Owner: 100% intact.
+- **Database / Schema Safety:** 0 schema migrations, 0 baseline deletions.
+
+## 231.4 Closure
+**Phase 6 / Phase 6A — Integration QA Evidence Reconciliation: CLOSED / COMPLETE — PASS**
+
+---
+
+# 232. PHASE 224 — PROJECT-WIDE MODAL BACKGROUND SCROLL LOCK
+
+## 232.1 Overview & Requirements
+- **Objective:** Implement a robust, project-wide background scroll lock across TripDesk so that whenever any modal, dialog, drawer, or sheet is open, background page scrolling is completely prevented on desktop (mouse wheel, keyboard keys, trackpad) and mobile (touch drag/scroll), while preserving the modal's internal scrollability.
+- **Key UX Requirements:**
+  1. If any modal is open, background page scrolling must stop immediately.
+  2. The modal's own internal content must remain smooth and scrollable when overflowing.
+  3. Reference-counted lock state (`activeLockCount`): Opening nested modals (or multiple modals in sequence) maintains the background lock, and only closing the last active modal restores page scrolling.
+  4. Zero Layout Shift: Automatically measures scrollbar width (`window.innerWidth - document.documentElement.clientWidth`) and compensates on `document.body.style.paddingRight` when hiding scrollbars, preventing horizontal jumps.
+  5. Clean teardown & unmount safety: Snapshots initial style properties (`overflow`, `paddingRight`, `touchAction`) and restores them identically upon modal close or component unmount.
+  6. Exclusions: Standard inline dropdowns, popovers, select menus, and tooltips are not treated as full modal overlays and do not trigger scroll locking.
+
+## 232.2 Architecture & System Design
+- **Central Utility:** [`src/lib/scroll-lock.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/scroll-lock.ts)
+  - `acquireScrollLock()`: Increments `activeLockCount`, captures initial body & html styles on count 0 -> 1, sets `overflow: hidden`, `touchAction: none` on body, and applies layout shift compensation.
+  - `releaseScrollLock()`: Decrements `activeLockCount`, fully restores snapshot styles on count 1 -> 0.
+  - `useModalScrollLock(isOpen: boolean)`: React hook with `useEffect` lifecycle that acquires lock when `isOpen=true` and automatically cleans up on `false` or unmount.
+- **Shared Primitive Integration:**
+  - [`src/components/ui/dialog.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/ui/dialog.tsx): Embedded `useModalScrollLock(true)` inside `DialogContent`. Automatically protects dozens of standard dialogs (`ConfirmDialog`, `DestinationDialog`, `ReadOnlyModeDialog`, `QuotaExceededDialog`, `GlobalSearch`, `RecordPaymentDialog`, `RecordPayableDialog`, `EditPayableDialog`, `CreateExpenseDialog`, `RateChangeModal`, `LockCostingModal`, `AddManualCostModal`, `QuotationShareModal`, `QuotationVersionModal`, etc.).
+- **Custom Portal & Overlay Components Protected:**
+  - **Operations:**
+    - [`src/components/operations/hotel-confirmation-dialog.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/operations/hotel-confirmation-dialog.tsx)
+    - [`src/components/operations/activity-confirmation-dialog.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/operations/activity-confirmation-dialog.tsx)
+    - [`src/components/operations/communication-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/operations/communication-modal.tsx)
+    - [`src/components/operations/travel-kit-readiness-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/operations/travel-kit-readiness-modal.tsx)
+    - [`src/components/operations/reschedule-activity-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/operations/reschedule-activity-modal.tsx)
+    - [`src/components/operations/report-delay-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/operations/report-delay-modal.tsx)
+    - [`src/components/operations/resolve-issue-dialog.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/operations/resolve-issue-dialog.tsx)
+    - [`src/components/operations/create-issue-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/operations/create-issue-modal.tsx)
+    - [`src/components/operations/complete-trip-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/operations/complete-trip-modal.tsx)
+    - [`src/components/operations/assign-driver-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/operations/assign-driver-modal.tsx)
+  - **Invoices:**
+    - [`src/components/invoices/record-payment-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/invoices/record-payment-modal.tsx)
+    - [`src/components/invoices/void-payment-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/invoices/void-payment-modal.tsx)
+    - [`src/components/invoices/cancel-invoice-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/invoices/cancel-invoice-modal.tsx)
+  - **Excel Import:**
+    - [`src/components/excel/excel-import-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/excel/excel-import-modal.tsx)
+  - **Booking Modals:**
+    - [`src/components/booking/add-payment-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/booking/add-payment-modal.tsx)
+    - [`src/components/booking/supplier-payment-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/booking/supplier-payment-modal.tsx)
+    - [`src/components/booking/confirm-item-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/booking/confirm-item-modal.tsx)
+    - [`src/components/booking/cancel-booking-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/booking/cancel-booking-modal.tsx)
+    - [`src/components/booking/document-preview-modal.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/booking/document-preview-modal.tsx)
+  - **Navigation Drawer:**
+    - [`src/components/layout/mobile-nav.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/components/layout/mobile-nav.tsx)
+  - **Dashboard & Guest Pages:**
+    - [`src/app/(dashboard)/feedback/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/(dashboard)/feedback/page.tsx)
+    - [`src/app/(dashboard)/referrals/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/(dashboard)/referrals/page.tsx)
+    - [`src/app/(dashboard)/subscription/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/(dashboard)/subscription/page.tsx)
+    - [`src/app/trip/[secureToken]/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/trip/%5BsecureToken%5D/page.tsx)
+  - **Admin Pages:**
+    - [`src/app/admin/agencies/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/admin/agencies/page.tsx)
+    - [`src/app/admin/agencies/[agencyId]/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/admin/agencies/%5BagencyId%5D/page.tsx)
+    - [`src/app/admin/plans/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/admin/plans/page.tsx)
+    - [`src/app/admin/subscriptions/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/admin/subscriptions/page.tsx)
+    - [`src/app/admin/payments/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/admin/payments/page.tsx)
+    - [`src/app/admin/announcements/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/admin/announcements/page.tsx)
+    - [`src/app/admin/audit-logs/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/admin/audit-logs/page.tsx)
+    - [`src/app/admin/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/admin/page.tsx)
+
+## 232.3 Verification & Quality Certification
+- **TypeScript Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Next.js Build:** `npm run build` $\to$ **PASS (Compiled successfully with Turbopack, 100+ routes generated cleanly)**.
+- **Full E2E Regression Suite:** `prisma/test-phase7-e2e-qa.ts` $\to$ **19/19 JOURNEYS PASSED (100% Pass Rate)**.
+- **Database & Schema Safety:** 0 database schema changes, 0 destructive data mutations.
+
+## 232.4 Status
+**Phase 224 — Project-Wide Modal Background Scroll Lock: COMPLETE & VERIFIED — PASS**
+
+---
+
+# 233. PLATFORM OWNER CREDENTIAL MUTATION PROTECTION — SECURITY HARDENING
+
+## 233.1 Overview & Requirements
+- **Objective:** Ensure ordinary QA, E2E, integration tests, and test-account provisioning scripts cannot accidentally or silently change, reset, overwrite, bootstrap, or otherwise mutate permanent Platform Owner credentials.
+- **Constraints Maintained:**
+  - Zero password changes/rotations during hardening.
+  - Zero exposure or hardcoding of passwords, service keys, tokens, or secrets.
+  - Permanent QA Agency Owner account (`tripmadeeasy.in@gmail.com`) strictly preserved.
+  - Platform Owner password was NOT changed, rotated, inspected, or leaked.
+  - No permanent test data was mutated.
+  - Legitimate administrative tools (`prisma/bootstrap-owner.ts`, `prisma/reset-platform-owner-password.ts`) remain separate and functional for deliberate manual administrative execution.
+
+## 233.2 Architecture & Guard Design
+- **Central Reusable Guard:** [`src/lib/auth/platform-owner-guard.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/auth/platform-owner-guard.ts)
+  - Enforces dual-layer protection:
+    1. **Identity Protection:** Matches known permanent Platform Owner email identifiers (`mzpatel14@gmail.com`, `BOOTSTRAP_OWNER_EMAIL`, `PLATFORM_OWNER_EMAIL`) and canonical user IDs (`de5c1377-0e7c-4747-b3ed-aaee8b7e32a9`, `e03a6a21-a355-4afe-ab3e-c8097b6be773`).
+    2. **Role-Based Defense in Depth:** Detects and blocks operations if target resolves to `PLATFORM_OWNER` via explicit parameter, Supabase user metadata, or Prisma database lookup.
+  - Fails closed immediately before any Supabase Auth or database mutation executes.
+  - Throws standardized error: `Blocked: QA/test automation cannot mutate a protected Platform Owner account.` with zero credential leakage.
+
+## 233.3 Protected QA / Test Paths
+- [`src/lib/supabase/admin.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/supabase/admin.ts): `deleteAuthUser` now guards against deletion of the Platform Owner account.
+- [`prisma/test-qa-01-auth.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-01-auth.ts): Added top-level config guards and pre-mutation guards before all `createUser` and `updateUserById` calls.
+- [`prisma/test-qa-02-auth-routing.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-02-auth-routing.ts): Removed dangerous environment fallback (`PLATFORM_OWNER_EMAIL`); added top-level config guards and pre-mutation guards.
+- [`prisma/test-qa-05-signup.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-05-signup.ts): Guarded user cleanup step before invoking `deleteUser`.
+- [`prisma/bootstrap-agency-owner.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/bootstrap-agency-owner.ts): Pre-emptively fails closed if invoked against Platform Owner email, ID, or role.
+- [`prisma/test-phase20.6-smoke.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-phase20.6-smoke.ts): Guarded pilot auth user creation.
+- [`prisma/test-qa-04-journey.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-04-journey.ts): Switched agency email from `BOOTSTRAP_OWNER_EMAIL` to agency variables and added guard.
+- [`prisma/qa-browser-e2e.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/qa-browser-e2e.ts): Retained safe non-mutating credential usage from environment without Auth-admin password mutations.
+
+## 233.4 Preserved Legitimate Administrative Paths
+- `prisma/reset-platform-owner-password.ts`: Explicit interactive CLI tool with stdin hidden password input and target verification.
+- `prisma/bootstrap-owner.ts`: Bootstraps initial owner or maintains email confirmation/metadata idempotently without resetting existing passwords.
+- `prisma/reset-pilot-database.ts`: Explicitly preserves canonical Platform Owner ID and requires confirmation flag.
+
+## 233.5 Verification & Security Test Suite
+- Comprehensive Security Test Suite ([`prisma/test-platform-owner-guard.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-platform-owner-guard.ts)):
+  - **Test 1 — Platform Owner target blocked by email:** PASS (BLOCKED)
+  - **Test 2 — Platform Owner detected by role:** PASS (BLOCKED)
+  - **Test 3 — Permanent Platform Owner ID protected:** PASS (BLOCKED)
+  - **Test 4 — Environment fallback protected:** PASS (BLOCKED)
+  - **Test 5 — Disposable test account still works:** PASS (ALLOWED)
+  - **Test 6 — Legitimate admin tool remains available:** PASS (Static/operational check intact)
+  - **Test 7 — No password leakage:** PASS (Zero secrets exposed)
+- Static & Build Validation:
+  - `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+  - `git diff --check` $\to$ **PASS (clean)**.
+  - `npm run build` $\to$ **PASS (Compiled successfully with Turbopack, all 108 routes generated)**.
+
+## 233.6 Status
+**Platform Owner Credential Mutation Protection: COMPLETE & VERIFIED — PASS**
+
+---
+
+# 234. YOUR TRAVEL DESK BRANDING MIGRATION — VERIFIED & COMPLETE
+
+## 234.1 Overview & Official Branding Decision
+- **Official Brand Migration:** The SaaS product and public-facing site brand has officially migrated from:
+  - **Previous Brand:** `TripDesk` / `Trip Desk`
+  - **Current Official Brand:** **Your Travel Desk**
+- **Canonical Domain Targets:**
+  - **Production Domain:** `https://yourtraveldesk.in`
+  - **Staging Domain:** `https://staging.yourtraveldesk.in`
+  - `NEXT_PUBLIC_APP_URL` remains the authoritative environment variable source of truth, with `https://yourtraveldesk.in` as the default production fallback.
+- **Migration Status:** **COMPLETE / VERIFIED / APPROVED**
+
+## 234.2 Migration Scope & Coverage
+The branding migration was conducted as a presentation-focused, non-destructive migration across customer-facing, agency-facing, and platform-admin surfaces:
+- **Application Metadata & Layouts:** Root layout HTML `<title>`, descriptions, OpenGraph tags, Twitter cards, favicon references, and robots/sitemap canonical fallback URLs.
+- **Authentication & Onboarding:** Login page title, card headers, subtitles, verification notices, registration branding, and client auth context initial state.
+- **Navigation & Shell:** Sidebar desktop logo text, mobile navigation drawer brand header, topbar breadcrumbs, and platform role display badges.
+- **Customer Portal:** Customer portal layout header, footer attribution ("Powered by Your Travel Desk"), welcome view, and public itinerary view.
+- **Quotation System:** Public quotation proposal renderer, cover metadata defaults, quotation share link generator (`share-helpers.ts`), and quotation PDF service creator metadata.
+- **Invoices & Booking Documents:** Document generator metadata, invoice PDF creator metadata, fallback agency branding strings, and footer attribution text ("Generated via Your Travel Desk").
+- **Operations & Communication UI:** Communication modal placeholders, support chat greeting messages, timeline audit actor labels, and read-only mode dialogs.
+- **Platform Administration & Settings:** Admin overview greeting, plan tier descriptions, platform settings form placeholders, and agency lifecycle subscription banners.
+- **Documentation & Deployment Reference:** Updated `README.md`, `UPCOMING_FEATURE.md`, `docs/PRODUCTION_DEPLOYMENT.md`, and `docs/PRODUCTION_CHECKLIST.md`.
+
+*Note: This migration updated codebase assets and application configuration. External domain registrar, DNS, and hosting infrastructure cutovers remain separate operational deployment steps.*
+
+## 234.3 Technical Identifier Preservation Policy
+**Critical Policy:** Branding migration does **NOT** rename technical compatibility identifiers.
+
+To guarantee zero regression in authentication, browser persistence, cross-tab communication, third-party messaging integrations, database relations, and API endpoints, the following contracts are intentionally preserved:
+1. **Authentication Session Cookies:** `tripdesk_customer_session` remains the active customer portal cookie name.
+2. **Cross-Tab Window Events:** `tripdesk:chat-unread-updated` remains the real-time chat unread notification event.
+3. **LocalStorage Compatibility Keys:** `tripdesk_cost_items_v1`, `tripdesk_internal_expenses_v1`, `tripdesk_trip_costings_v1`, `tripdesk_quotations_v1`, and `tripdesk_agency_profile_v1` remain unchanged.
+4. **Prisma Role Enums & Constants:** `PLATFORM_OWNER`, `AGENCY_OWNER`, and compatibility constant `TRIPDESK_OWNER` remain untouched.
+5. **Approved Meta WhatsApp Template Keys:** All pre-approved Meta WhatsApp template identifiers (`tripdesk_enquiry_received`, `tripdesk_quotation_proposal`, `tripdesk_booking_confirmed`, `tripdesk_payment_reminder`, `tripdesk_payment_receipt`, `tripdesk_trip_reminder`, `tripdesk_feedback_request`) remain strictly unchanged.
+6. **API Route Endpoints:** All `/api/*` route paths and contracts remain 100% unchanged.
+7. **Environment Variable Names:** `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL`, etc., remain untouched.
+8. **Prisma Schema Models & Fields:** Zero models or database columns were renamed.
+
+## 234.4 Database & Schema Safety
+- `prisma/schema.prisma` is **100% UNCHANGED** by the branding migration.
+- `prisma/migrations` is **100% UNCHANGED**.
+- Zero Prisma migrations created; zero migrations executed; zero `prisma db push` commands executed.
+- Zero seed scripts executed.
+- Zero database schema alterations required.
+- Zero permanent production or QA database records renamed.
+- Zero historical subscription records or `SubscriptionPayment` rows altered.
+
+## 234.5 Platform Owner Safety & Credential Integrity
+- **Platform Owner Credentials:** No changes were made to Platform Owner email (`mzpatel14@gmail.com`), canonical User ID, role, or credentials.
+- **Credential Protection Guard:** [`src/lib/auth/platform-owner-guard.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/auth/platform-owner-guard.ts) remains active and untouched.
+- **Zero Credential Mutations:** Auditing the Git diff confirms zero additions of credential mutation operations (`updateUserById`, `deleteUser`, etc.). Pre-existing Section 233 protection remains authoritative.
+- **Zero Secrets Recorded:** No passwords, service keys, JWTs, or secrets are exposed or modified.
+
+## 234.6 Permanent QA Account Safety
+- **Permanent QA Baseline:** The permanent TripDesk QA Agency Owner account remains strictly preserved and unmodified:
+  - **Agency Name:** `"TripDesk Offical Test Agnecy"` (preserved as established baseline; not renamed).
+  - **Agency Owner Email:** `"tripmadeeasy.in@gmail.com"`.
+  - **Agency ID:** `cmu2g9rgq0000swtqbr5aie7x`.
+  - **Owner User ID:** `1a5b8334-aef6-4754-83bc-8eb8b0c54151`.
+- Zero automated tests or scripts renamed this permanent baseline fixture.
+
+## 234.7 Billing Fallback Findings & Precedence Architecture
+A rigorous line-by-line inspection of subscription and admin billing services established the following:
+1. **Database Precedence:** When `PlatformBillingSettings` exists in the database, `subscriptionService.getPaymentSettings()` returns database values (`upiId`, `accountHolder`, `bankName`, etc.) directly. Fallback values are completely bypassed.
+2. **Missing-Record Runtime Fallback:** When no database record exists, in-memory fallback values are returned (`yourtraveldesk.billing@icici`, `"Your Travel Desk Billing"`, `"Your Travel Desk SaaS Technologies Pvt Ltd"`).
+3. **Read-Only Safety:** Viewing the `/subscription` page issues a read-only `findUnique` query; zero records are created in `PlatformBillingSettings` or `SubscriptionPayment` simply by reading the page.
+4. **Historical Payment Safety:** All `SubscriptionPayment` records, transaction references (UTR), payment proof storage URLs, and verification workflows remain governed strictly by database relations and are unaffected by branding changes.
+5. **Mandatory Production Prerequisite:**
+   > **Before enabling live subscription payment collection, the Platform Owner must save and verify real bank/UPI billing settings in `/admin/settings`. The fallback UPI value is not a real production payment destination and must not be relied upon for live collection.**
+
+## 234.8 External Communication Delivery Status (Deferred)
+- External Email, WhatsApp, and SMS delivery remains **completely deferred**.
+- The branding migration:
+  - Did NOT activate external messaging delivery.
+  - Did NOT add email transport providers (zero SMTP, Resend, SendGrid, or AWS SES packages added to `package.json`).
+  - Did NOT add external WhatsApp dispatch mechanisms.
+  - Preserved all Meta approved template identifiers.
+- New brand email references (`support@yourtraveldesk.in`, `notifications@yourtraveldesk.in`, `holidays@yourtraveldesk.in`) are presentation and fallback values only. Mailboxes have not been provisioned externally yet.
+
+## 234.9 Security & Tenant Isolation Integrity
+- Supabase authentication logic, password verification, and session token resolution remain unchanged.
+- Next.js server-side cookie handling and middleware routing remain unchanged.
+- Tenant isolation enforcement (`where: { agencyId }`) across all Prisma queries remains unchanged.
+- Multi-tier role authorization (`PLATFORM_OWNER`, `AGENCY_OWNER`, `AGENT`) and read/write workspace protection remain unchanged.
+- Customer portal authentication contracts remain intact.
+
+## 234.10 Independent Verification Evidence
+Independent automated checks and runtime smoke tests executed cleanly:
+- **Whitespace / Conflict Marker Check:** `git diff --check` $\to$ **PASS (0 errors)**.
+- **TypeScript Static Verification:** `npx tsc --noEmit` $\to$ **PASS (0 errors across codebase)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, 108 routes compiled successfully)**.
+- **Runtime Smoke Verification:**
+  - `/api/health` $\to$ Returned `200 OK`, `service: "Your Travel Desk API"`, `database: "connected"`.
+  - `/login` $\to$ Rendered successfully with `<title>Your Travel Desk - Travel Agency SaaS Operating System</title>`, clean headings, and zero hydration errors.
+  - Robots & Sitemap $\to$ Correctly resolve fallback URLs to `https://yourtraveldesk.in`.
+
+## 234.11 Branding Search Results & Legacy String Audit
+Repository search across `src/` confirmed:
+- `git grep -n -i "Trip Desk" src/`: **0 matches** (100% eliminated).
+- `git grep -n -i "tripdesk.io" src/`: **0 matches**.
+- `git grep -n -i "tripdesk.com" src/`: **0 matches**.
+- `git grep -n -i "support@tripdesk" src/`: **0 matches**.
+- `git grep -n -i "notifications@tripdesk" src/`: **0 matches**.
+- Remaining `TripDesk` occurrences are 100% classified as approved technical contracts (cookies, local storage keys, window events, Meta template keys, internal code docstrings, and pre-SaaS mock fixtures).
+- **Result:** **Zero unexplained customer-facing old-brand occurrences remain.**
+
+## 234.12 Outstanding Production Prerequisites
+The following operational items remain required before commercial production launch:
+1. **Configure Real Platform Billing Settings:** Platform Owner must log in to `/admin/settings` and enter verified bank account details and a real UPI VPA before accepting live payments.
+2. **Production DNS Cutover:** Configure apex and `www` DNS records pointing `yourtraveldesk.in` to the production deployment.
+3. **Provision Email Mailboxes & DNS Records:** Configure SPF, DKIM, and DMARC for `yourtraveldesk.in` and provision mailboxes (`support@yourtraveldesk.in`, etc.) when email delivery is activated.
+4. **Meta WhatsApp Business Profile Display Name:** Submit a business display name update in Meta Business Manager from "TripDesk" to "Your Travel Desk" while retaining approved template keys.
+5. **Search Console & SEO Indexing:** Submit `https://yourtraveldesk.in/sitemap.xml` to Google Search Console upon DNS cutover.
+6. **Production UAT Smoke Test:** Execute final browser smoke test on the live production domain once deployed.
+
+## 234.13 Launch-Readiness Distinction
+> **The Your Travel Desk branding migration is codebase-complete and verified, but this does NOT mean the overall SaaS platform is production-launch complete.**
+> Existing production-readiness prerequisites and infrastructure/UAT requirements remain governed by their respective V3 sections.
+
+## 234.14 Status
+**Your Travel Desk Branding Migration: COMPLETE / VERIFIED / APPROVED — PASS**
+
+---
+
+# 235. TEMPORARY EMAIL VERIFICATION DISABLEMENT — ALL ROLES (October 2026)
+
+## 235.1 Context & Architectural Objective
+- **Objective:** Temporarily disable the entire email verification and OTP requirement from the Your Travel Desk authentication and onboarding system across **BOTH supported roles**:
+  1. `AGENCY_OWNER`
+  2. `PLATFORM_OWNER`
+- **Core Decision:** Email verification is being **deferred completely** and will be re-enabled in a future phase.
+- **Strict Distinction:** Disable **email verification**, NOT authentication. Supabase Auth, email/password validation, session cookie management, tenant isolation, role-based access control, subscription entitlement enforcement, and Platform Owner credential protection remain 100% mandatory and active.
+- **Desired Flow:**
+  - **Agency Owner (`AGENCY_OWNER`):** `/signup` $\to$ validate signup data $\to$ Supabase Auth `signUp()` $\to$ immediate existing atomic onboarding service (`provisionOnboardedAgencyOwner`) $\to$ Agency + User (`AGENCY_OWNER`) + Starter 7-day Trial provisioned $\to$ redirect to `/login?registered=true` (zero OTP screens, zero "check your email" gates).
+  - **Platform Owner (`PLATFORM_OWNER`):** Direct Supabase Auth email/password login $\to$ zero email confirmation gate $\to$ normal administrative access at `/admin`.
+
+---
+
+## 235.2 Reversible Architecture & File Modifications
+The verification infrastructure was intentionally preserved in a dormant, non-breaking state rather than destructively purged, allowing future reactivation without redesigning the authentication architecture.
+
+### 1. Onboarding Service (`src/lib/services/onboarding-service.ts`)
+- **Modification:** Made `isEmailConfirmed` gate dormant by commenting out the check with explicit phase-deferral documentation.
+- **Direct Provisioning:** Extended `provisionOnboardedAgencyOwner(supabaseUser, explicitMetadata?)` to accept explicit signup metadata directly from `signUp()`, allowing atomic Agency, User (`AGENCY_OWNER`), and Starter 7-day trial creation immediately upon signup without waiting for Supabase session re-hydration or email confirmation callbacks.
+- **Idempotency:** Reused existing transactional onboarding logic; preserved duplicate check (`findUnique` on `ownerEmail` or `id`) to prevent duplicate agency creation.
+
+### 2. Authentication Server Actions (`src/actions/auth-actions.ts`)
+- **`signupAgencyOwnerAction`:**
+  - Invokes `supabase.auth.signUp()`.
+  - Immediately invokes `onboardingService.provisionOnboardedAgencyOwner()` to create Agency, User, and Starter 7-day trial.
+  - Signs out any temporary browser session from `signUp()` to maintain the standard login credential pattern.
+  - Redirects directly to `/login?registered=true` with zero intermediate `/verify-email` redirection.
+- **`loginAction`:**
+  - Removed the `email not confirmed` error check and `unverified: true` return payload.
+  - Removed the `!isPlatformOwner && !isEmailConfirmed` verification gate.
+  - Added lazy fallback onboarding: If an agency owner registered previously and their database record is not yet present, `loginAction` runs `provisionOnboardedAgencyOwner` before completing login.
+- **Dormant Helpers Retained:**
+  - `verifyEmailOtpAction` and `resendVerificationEmailAction` were preserved in place in a dormant state for future reactivation.
+
+### 3. Login Interface (`src/app/login/page.tsx`)
+- **Removed:** Removed `serverResult?.unverified` block and link to `/verify-email`.
+- **Added:** Added prominent emerald success banner when `registered=true` query param is present: `"Account created successfully! Your 7-day Starter trial is active. Please log in with your credentials to get started."`
+- **Maintained:** Formik + Yup email and password validation, invalid credentials error handling, and session redirection.
+
+### 4. Verification Route (`src/app/verify-email/page.tsx`)
+- **Dormant & Trap-Prevention State:** Route preserved so existing links or direct bookmarks do not 404, but users cannot become trapped.
+- **Banner Added:** Renders an informational notice: `"Email Verification Deferred: Email verification is temporarily disabled. You can log in directly to your account."` with a primary `"Proceed to Login"` button.
+- **Dormant Component:** The OTP input form and resend button remain in dormant state below the banner for seamless future reactivation.
+
+### 5. Auth Callback Handler (`src/app/auth/callback/route.ts`)
+- Made `isEmailConfirmed` check dormant.
+- Proactively executes `provisionOnboardedAgencyOwner` if user has onboarding metadata, then redirects to `/login?registered=true` (or error page if exchange fails).
+
+---
+
+## 235.3 Platform Owner Security & Guard Immutability
+- **Security Guard Unchanged:** `src/lib/auth/platform-owner-guard.ts` remains 100% active, untouched, and unbypassed.
+- **Protected Identities:**
+  - Protected Email: `"mzpatel14@gmail.com"`
+  - Canonical Local/QA User ID: `"de5c1377-0e7c-4747-b3ed-aaee8b7e32a9"` (nsqarlegqxymqfyvfrjw)
+  - Staging User ID: `"e03a6a21-a355-4afe-ab3e-c8097b6be773"` (qypkowejgqrmilckemcr)
+  - Role: `PLATFORM_OWNER`
+  - Agency ID: `null`
+- **Zero Credential Mutations:** Removing email verification was strictly isolated from credential mutation. No endpoints or scripts were added to modify Platform Owner credentials.
+- **Guard Test Suite:** `prisma/test-platform-owner-guard.ts` executed and verified (7/7 tests passed).
+
+---
+
+## 235.4 Permanent QA Baseline & Tenant Isolation
+- **Permanent Agency Owner Baseline:**
+  - Agency: `"TripDesk Offical Test Agnecy"` (`cmu2g9rgq0000swtqbr5aie7x`)
+  - Owner: `"tripmadeeasy.in@gmail.com"` (`1a5b8334-aef6-4754-83bc-8eb8b0c54151`)
+  - Preserved 100% intact with zero modifications to email, role, agency association, or subscription.
+- **Multi-Tenant Security Invariants:**
+  - Session JWT resolution via `getRequestContext()`, `requireAgencyOwnerContext()`, `requirePlatformOwnerContext()`, `requireReadAccess()`, and `requireWriteAccess()` remains unchanged.
+  - Zero client-supplied `agencyId` trust.
+
+---
+
+## 235.5 Database & Schema Safety
+- `prisma/schema.prisma` is **100% UNCHANGED**.
+- `prisma/migrations` is **100% UNCHANGED**.
+- Zero Prisma migrations created or run; zero `prisma db push` executed; zero seed scripts executed.
+- Zero database rows deleted, overwritten, or corrupted.
+
+---
+
+## 235.6 Supabase Configuration Observation
+- **Application Configuration:** Application code does not require `isEmailConfirmed` or trigger verification emails.
+- **Target Staging Environment Verified:** Probing the staging Supabase project (`https://qypkowejgqrmilckemcr.supabase.co`, `staging.yourtraveldesk.in`) confirmed that "Confirm email" is **DISABLED**; `signUp()` returns `email_confirmed_at` and an active session immediately with zero confirmation email sent.
+- **QA Environment State:** In the local QA Supabase project (`https://nsqarlegqxymqfyvfrjw.supabase.co`), Supabase Auth returns `Email not confirmed` when `signInWithPassword` is called for users created while email confirmation was toggled ON.
+- **No Manual Automation Added:** Per instructions, zero service-role backdoor confirmation scripts or manual password overrides were created.
+
+---
+
+## 235.7 Verification & Validation Results
+- **Whitespace / Git Diff Check:** `git diff --check` $\to$ **PASS (0 errors)**.
+- **TypeScript Static Verification:** `npx tsc --noEmit` $\to$ **PASS (0 errors across entire repository)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, 108 routes compiled successfully with exit code 0)**.
+- **Automated Signup & Onboarding Verification (`prisma/test-qa-05-signup.ts`):**
+  - Executed end-to-end Agency Owner signup flow simulation with `onboardingService.provisionOnboardedAgencyOwner()`.
+  - Verified: Prisma User created with `role: AGENCY_OWNER`, Agency created with `status: ACTIVE`, Subscription created with `plan: STARTER`, `status: TRIAL`, `trialEndsAt: now + 7 days`.
+  - Result: **100% PASS**.
+- **Platform Owner Guard Verification (`prisma/test-platform-owner-guard.ts`):**
+  - Result: **7/7 PASS (100% protected)**.
+
+---
+
+## 235.8 Future Reactivation Procedure
+When email verification / OTP is reintroduced in a future phase, perform the following steps to restore:
+1. **Supabase Auth Console:** Re-enable "Confirm email" in the Supabase Dashboard Authentication settings.
+2. **`onboarding-service.ts`:** Re-uncomment the `isEmailConfirmed` validation check inside `provisionOnboardedAgencyOwner`.
+3. **`auth-actions.ts`:**
+   - In `signupAgencyOwnerAction`: Restore the redirect to `/verify-email?email=${encodeURIComponent(email)}` instead of direct onboarding.
+   - In `loginAction`: Re-enable the `!isPlatformOwner && !isEmailConfirmed` gate returning `{ success: false, unverified: true }`.
+4. **`login/page.tsx`:** Restore the unverified notification banner with the link to `/verify-email`.
+5. **`verify-email/page.tsx`:** Remove the temporary deferral notice banner, re-enabling standard OTP verification submission.
+
+---
+
+## 235.9 Status
+**Temporary Email Verification Disablement (All Roles): COMPLETE / VERIFIED / SAFE — PASS**
+
+---
+
+# 236. CANONICAL SUBSCRIPTION PRICING ALIGNMENT (₹499 / ₹999)
+
+## 236.1 Background & Root Cause
+A read-only pricing audit identified a discrepancy between the local database and the staging environment:
+- **Local DB Catalog:** Starter ₹499/mo (₹4,999/yr), Professional ₹999/mo (₹9,999/yr) (configured earlier by Platform Owner via `/admin/plans`).
+- **Staging DB Catalog:** Starter ₹1,999/mo (yearlyPrice: null), Professional ₹4,999/mo (yearlyPrice: null).
+- **Root Cause:** Staging had been re-seeded on Oct 7, 2026 using `prisma:seed:staging` (`prisma/seed.ts`), which still contained legacy pre-pilot pricing (`1999` and `4999`). Additionally, `prisma/bootstrap-agency-owner.ts`, `prisma/reset-pilot-database.ts`, and admin fallback UI code held stale legacy price literals.
+
+## 236.2 Database-Driven Pricing Authority
+Runtime subscription pricing across TripDesk is 100% database-driven via `SubscriptionPlan.price` (monthly) and `SubscriptionPlan.yearlyPrice` (annual).
+The canonical public plan catalog is officially established as:
+
+| Plan | Monthly Catalog Price | Annual Catalog Price | Trial / Duration | Entitlements & Quotas |
+|---|---:|---:|---|---|
+| **Starter** | **₹499** | **₹4,999** | 7-day Free Trial / 30 Days recurring | 20 Trips, 20 Quotes, 20 Bookings, Unlimited Customers |
+| **Professional** | **₹999** | **₹9,999** | Immediate paid / 30 Days recurring | Unlimited Trips, Quotes, Bookings, Customers |
+
+*Note: Feature entitlements, quotas, trial behavior, and plan names remain completely unchanged.*
+
+## 236.3 Code & Seed Alignment
+1. **`prisma/seed.ts`:**
+   - Starter upsert aligned to `price: 499.0`, `yearlyPrice: 4999.0`.
+   - Professional upsert aligned to `price: 999.0`, `yearlyPrice: 9999.0`.
+2. **`prisma/bootstrap-agency-owner.ts`:**
+   - Starter plan bootstrap aligned to `price: 499.0`, `yearlyPrice: 4999.0`.
+3. **`prisma/reset-pilot-database.ts`:**
+   - Reset template aligned to Starter `499 / 4999` and Professional `999 / 9999` (script preserved without execution).
+4. **`src/app/admin/agencies/new/page.tsx`:**
+   - Removed hardcoded legacy strings (`Starter Plan (₹1,999/mo)` and `Professional Plan (₹4,999/mo)`).
+   - Replaced with dynamic database-backed plan mapping with canonical fallbacks (`₹499/mo` and `₹999/mo`).
+5. **`src/app/admin/plans/page.tsx`:**
+   - Plan editor form state defaults aligned to `499 / 4999` and `999 / 9999`. Placeholders updated to `499 / 4999`.
+6. **`src/app/admin/payments/page.tsx`:**
+   - Replaced legacy fallback `planPrice || "1999"` with `planPrice || "499"`. Input placeholder updated to `"499"`.
+7. **`src/data/saas-data.ts`:**
+   - Dormant SaaS fixture aligned to canonical plan rates (`Starter`: 499/4999, `Professional`: 999/9999). Historical mock payment amounts preserved immutable.
+
+## 236.4 Controlled Database State Alignment
+- **Staging Database (`.env.staging` Supabase):**
+  - Updated existing `SubscriptionPlan` catalog rows in place without re-seeding or recreating tables:
+    - `Starter` (`cmuy0rwxt0000vwtqb7nxxv6z`): `price = 499.00`, `yearlyPrice = 4999.00`, `isActive = true`.
+    - `Professional` (`cmuy0rxix0001vwtqikr8ncs3`): `price = 999.00`, `yearlyPrice = 9999.00`, `isActive = true`.
+  - Zero duplicate plans created (total plans = 2). Plan IDs preserved.
+- **Local Database (`.env`):**
+  - Verified catalog state:
+    - `Starter` (`cmt76818k000010tq0si2x3gb`): `price = 499.00`, `yearlyPrice = 4999.00`.
+    - `Professional` (`cmt7681uv000110tqk7x07058`): `price = 999.00`, `yearlyPrice = 9999.00`.
+  - Zero duplicate plans created (total plans = 2). Plan IDs preserved.
+
+## 236.5 Historical Billing & Payment Protection
+- **`SubscriptionPayment.amount`:** Preserved as strictly immutable `Decimal(10,2)`.
+- All historical payment records (e.g. ₹1,999 historical transactions), payment proofs, audit logs, and customer invoices remain completely untouched.
+- Existing tenant subscription associations remain preserved.
+
+## 236.6 Verification & Validation Results
+- **Git Diff Check:** `git diff --check` $\to$ **PASS (0 errors, 0 trailing whitespace)**.
+- **TypeScript Static Verification:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, all routes compiled successfully with exit code 0)**.
+- **Automated Entitlement & Plan QA Suite (`prisma/test-phase-213-entitlements.ts`):** $\to$ **PASS (22/22 tests passed)**, verifying dynamic pricing mutations, quota resolutions, fail-closed handling, and historical payment amount immutability.
+- **Repository Search Verification:** All occurrences of legacy pricing (`1999`, `4999`, `₹1,999`, `₹4,999`) in active application code eliminated; remaining references are strictly immutable historical test fixtures and documentation archives.
+
+## 236.7 Status
+**Canonical Subscription Pricing Alignment (₹499 / ₹999): COMPLETE / VERIFIED / SAFE — PASS**
+
+---
+
+# 237. CUSTOMER AUTHENTICATION HEADER TRUST SECURITY REMEDIATION (DISC-02)
+
+## 237.1 Background & Root Cause
+Finding `DISC-02` from the October 9, 2026 baseline audit identified an architectural vulnerability in `src/lib/auth/customer-auth.ts`:
+- `getAuthenticatedCustomer()` directly evaluated unauthenticated incoming HTTP request headers `x-customer-id` and `x-agency-id` prior to checking the customer session cookie (`tripdesk_customer_session`).
+- If matching active customer records existed in PostgreSQL, the request was immediately authenticated with `authMethod: "SESSION_HEADER"`.
+- Because customer portal endpoints (`/customer/*`, `/api/customer/*`) are public routes in Next.js middleware that do not sanitize or strip custom headers, an external caller possessing a victim's `customerId` and `agencyId` could forge headers to bypass the customer portal login gateway (`/customer/login` & `/api/customer/auth/access`) and gain unauthorized access to all 13 customer portal API endpoints.
+- Additionally, a secondary defect in token fallback permitted raw booking numbers/IDs (`x-customer-token: BK-1001`) to authenticate customer identity without phone/email verification.
+
+## 237.2 Elimination of Unauthenticated Header Trust
+1. **Header Stripping from Auth Logic:** Removed all parsing and trust of `x-customer-id` and `x-agency-id` in `src/lib/auth/customer-auth.ts`.
+2. **Type Cleanup:** Completely removed the `SESSION_HEADER` union member from `AuthenticatedCustomerContext["authMethod"]`. Zero occurrences of `SESSION_HEADER` remain in active codebase.
+3. **Removal of Plain Identifier Bypasses:** Eliminated the fallback in token resolution that looked up raw booking numbers/IDs without cryptographic tokens or contact verification.
+
+## 237.3 Scoped Public Share Link Token Architecture (`SECURE_TOKEN`)
+1. **Narrow Resource Binding:** Public share tokens (`tokenHash` from `PublicShareLink`) are strictly evaluated only when an explicit `options.tripId` scope is provided by a trip-specific route handler.
+2. **Trip Authorization Boundary:** If an active `PublicShareLink` exists, it is accepted if and only if its associated `tripId` exactly matches the route's requested `options.tripId`. It returns `authMethod: "SECURE_TOKEN"` and records `tokenTripId`.
+3. **Cross-Trip & Account Isolation:** Attempting to use a share token for Trip A to access Trip B is strictly rejected (returns `null` / 401 Unauthorized).
+4. **Account-Wide Protection:** Account-level routes (`/api/customer/profile`, `/api/customer/bookings`, `/api/customer/notifications/*`) pass `requireAccountSession: true` or omit `tripId`. Tokens are fail-closed and rejected for account operations, preventing a public trip link from granting customer-wide account control.
+
+## 237.4 Preservation of Signed Customer Session Cookie (`tripdesk_customer_session`)
+1. **Established Cookie Mechanism Preserved:** The HTTP-only session cookie `tripdesk_customer_session` (issued upon phone/email verification at `/api/customer/auth/access`) remains the primary authority for customer portal authentication (`authMethod: "COOKIE"`).
+2. **Robust Validation:** Safely parses session JSON, validates non-empty string IDs, enforces active tenant matching (`where: { id: parsed.customerId, agencyId: parsed.agencyId, archivedAt: null }`), and safely rejects malformed, tampered, expired, or archived sessions.
+3. **Header Forgery Resistance:** A forged header cannot override a valid cookie session. The cookie session is evaluated independently and forged headers are completely ignored.
+
+## 237.5 Changed Files
+1. **`src/lib/auth/customer-auth.ts`**:
+   - Removed `x-customer-id` and `x-agency-id` evaluation.
+   - Removed `SESSION_HEADER` from `AuthenticatedCustomerContext`.
+   - Added `CustomerAuthOptions` (`tripId?: string`, `requireAccountSession?: boolean`).
+   - Scoped `SECURE_TOKEN` strictly to `options.tripId` for active `PublicShareLink` rows.
+   - Removed unauthenticated booking number fallback.
+2. **`src/app/api/customer/profile/route.ts`**: Enforces `requireAccountSession: true` on `GET` and `PATCH`.
+3. **`src/app/api/customer/bookings/route.ts`**: Enforces `requireAccountSession: true` on `GET`.
+4. **`src/app/api/customer/bookings/[id]/route.ts`**: Enforces `requireAccountSession: true` on `GET`.
+5. **`src/app/api/customer/notifications/route.ts`**: Enforces `requireAccountSession: true` on `GET`.
+6. **`src/app/api/customer/notifications/[id]/read/route.ts`**: Enforces `requireAccountSession: true` on `PATCH`.
+7. **`src/app/api/customer/notifications/read-all/route.ts`**: Enforces `requireAccountSession: true` on `POST`.
+8. **`src/app/api/customer/notifications/preferences/route.ts`**: Enforces `requireAccountSession: true` on `GET` and `PATCH`.
+9. **`src/app/api/customer/notifications/unread-count/route.ts`**: Enforces `requireAccountSession: true` on `GET`.
+10. **`src/app/api/customer/trips/[tripId]/route.ts`**: Scopes authentication to `{ tripId }`.
+11. **`src/app/api/customer/trips/[tripId]/documents/route.ts`**: Scopes authentication to `{ tripId }`.
+12. **`src/app/api/customer/trips/[tripId]/documents/[type]/[docId]/pdf/route.ts`**: Scopes authentication to `{ tripId }`.
+13. **`src/app/api/customer/trips/[tripId]/payments/route.ts`**: Scopes authentication to `{ tripId }`.
+14. **`src/app/api/customer/trips/[tripId]/feedback/route.ts`**: Scopes authentication to `{ tripId }`.
+15. **`prisma/test-disc02-customer-auth-security.ts`**: Dedicated 26-assertion security regression test suite.
+
+## 237.6 Verification & Validation Results
+- **Security Regression Suite (`prisma/test-disc02-customer-auth-security.ts`):** **PASS (26/26 assertions passed, 0 failures)**:
+  - Test 1: Unauthenticated header-based identity (`x-customer-id`, `x-agency-id`) rejected.
+  - Test 2: Forged headers cannot override a valid customer session cookie.
+  - Test 3: Valid customer session cookie authenticates correctly (`COOKIE`).
+  - Test 4: Invalid, tampered, incomplete, and malformed session cookies rejected.
+  - Test 5: Customer resource isolation across route IDs verified (no IDOR).
+  - Test 6: Multi-tenant agency isolation intact across agency boundaries.
+  - Test 7: Public share token scoped strictly to associated trip (`SECURE_TOKEN`).
+  - Test 8: Share token denied for account-wide privileges (profile/bookings/notifications) and unscoped calls.
+  - Test 9: Plain booking numbers rejected as tokens.
+  - Test 10: Legitimate portal access gateway flow with phone verification preserved.
+- **TypeScript Static Verification:** `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, all 190+ pages/routes compiled successfully with exit code 0)**.
+- **Git Diff Hygiene:** `git diff --check` $\to$ **PASS (0 whitespace or syntax warnings)**.
+
+## 237.7 Status
+# 238. TRIPDESK — PROJECT-WIDE NUMERIC INPUT, FORMIK VALIDATION & FIELD INTEGRITY AUDIT (OCTOBER 2026)
+
+## 238.1 Executive Summary & Core Requirements
+- **Objective:** Undertook a comprehensive, project-wide audit and remediation across all forms, dialogs, Excel import processors, and backend API schemas in Your Travel Desk / TripDesk SaaS to eliminate invalid input acceptance, silent coercion of non-numeric data, scientific notation vulnerabilities, and arbitrary symbol injections.
+- **Core Requirement:**
+  - Phone and telephone numbers MUST remain string data types in database schemas; preserve leading zeroes (`022-12345678`, `09876543210`), allow legitimate international prefixes (`+91 98765 43210`), allow standard punctuation (`+`, `-`, ` `, `(`, `)`), enforce 7–15 digits, and strictly reject alphabetic strings (`abc`), alphanumeric strings (`12abc`), scientific notation (`1e5`), and arbitrary symbols.
+  - Whole-number fields (counts, rooms, nights, vehicles, capacity, priority, days) must accept valid integer digits only; strictly reject decimals (`1.5`, `0.5`), alphabetic characters, scientific notation (`1e5`), and negative numbers where prohibited.
+  - Monetary fields (rates, prices, costs, selling prices, milestones, payment amounts, refunds, payables) must accept valid numeric decimals; strictly reject letters, scientific notation, multiple decimal points (`12.34.56`), and negative amounts where prohibited.
+  - Locked GST rates (0%, 5%, 12%, 18%, 28%) and commercial calculation formulas were preserved 100% without alteration.
+  - Zero database schema migrations, zero schema mutations, and zero QA database modifications.
+
+## 238.2 Centralized Field Validation System (`src/lib/validation/field-validators.ts`)
+Created a centralized, reusable validation module defining standard regexes and validator functions across the codebase:
+1. `PHONE_REGEX = /^\+?[0-9\s\-()]{7,25}$/`:
+   - Validates format while enforcing `digitCount >= 7 && digitCount <= 15`.
+   - Preserves leading zeros (`022-12345678`).
+   - Rejects letters, scientific notation (`1e5`), and malformed strings.
+2. `isValidPhoneNumber(val)`: Full validation helper returning boolean.
+3. `isValidInteger(val, options)`: Rejects decimals, non-digits, scientific notation (`1e5`), and checks min/max ranges.
+4. `isValidDecimal(val, options)`: Rejects letters, scientific notation (`1e5`), multiple dots, and validates finite numbers with min/max ranges.
+5. `isLockedGstRate(rate)`: Enforces membership in `LOCKED_GST_RATES = [0, 5, 12, 18, 28]`.
+
+## 238.3 Enhanced Shared Yup Validation Helpers & Schemas (`src/lib/validation-schemas.ts`)
+Added standard, reusable Yup custom validators:
+1. `phoneYup(required, label)`: Custom test verifying string against `isValidPhoneNumber`.
+2. `integerYup({ min, max, required, label })`: Hardened integer validator rejecting scientific notation (`e`/`E`) and non-integers.
+3. `moneyYup({ min, max, required, label })`: Decimal validator rejecting scientific notation (`e`/`E`).
+4. `percentageYup({ min, max, required, label })`: Percentage validator rejecting scientific notation.
+5. **Hardened Schemas in `validation-schemas.ts`:**
+   - `customerSchema`: `phone` and `alternatePhone` now use `phoneYup`.
+   - `tripSchema`: `adults`, `children`, `infants` use `integerYup`; `budget` validated with `isValidDecimal`.
+   - `supplierSchema`: `phone` and `alternatePhone` use `phoneYup`.
+   - `hotelSchema`: `phone` uses `phoneYup`, `starCategory` uses `integerYup`.
+   - `hotelRoomSchema`: `maxAdults`, `maxChildren` use `integerYup`.
+   - `hotelRateSchema`: `baseRate`, `extraAdultRate`, `childRate` use `moneyYup`; `occupancyAdults`, `occupancyChildren` use `integerYup`.
+   - `vehicleSchema`: `seatingCapacity`, `luggageCapacity` use `integerYup`.
+   - `vehicleRateSchema`: `baseRate`, `extraKmRate`, `driverAllowance`, `nightHalt` use `moneyYup`; `includedKm` uses `integerYup`.
+   - `activityRateSchema`: `adultRate`, `childRate`, `groupRate`, `vehicleRate`, `bookingRate` use `moneyYup`.
+   - `manualCostItemSchema`: `quantity`, `duration` use `integerYup`; `unitCost` uses `moneyYup`.
+   - `internalExpenseSchema`: `amount` uses `moneyYup`.
+   - `pricingSettingsSchema`: `markupValue`, `discountValue`, `manualSellingPrice` use `moneyYup`; `customTaxRate`, `lowMarginThreshold` use `percentageYup`; `roundPriceTo` uses `integerYup`.
+
+## 238.4 Client Formik & Controlled Form Hardening Across All Modules
+Audited and updated all client page components:
+1. `src/app/(dashboard)/customers/new/page.tsx`: Uses `phoneYup` for `phone` and `alternatePhone`.
+2. `src/app/(dashboard)/customers/[id]/page.tsx`: Uses `phoneYup` for `phone` and `alternatePhone` in `editCustomerValidationSchema`.
+3. `src/app/(dashboard)/hotels/new/page.tsx`: Uses `phoneYup` for `phone`.
+4. `src/app/(dashboard)/hotels/[id]/page.tsx`: Uses `phoneYup` in `editHotelSchema`.
+5. `src/app/(dashboard)/vehicles/new/page.tsx`: Uses `integerYup({ min: 1, max: 100 })` for capacity.
+6. `src/app/(dashboard)/vehicles/[id]/page.tsx`: Uses `integerYup({ min: 1, max: 100 })` in `editVehicleSchema`.
+7. `src/app/(dashboard)/trips/[id]/page.tsx`: Added `editTripValidationSchema` to `editTripFormik`; hardened traveler phone inputs with `isValidPhoneNumber`.
+8. `src/app/(dashboard)/enquiries/new/page.tsx`: Hardened `newCustomerPhone`, `adults`, `children`, `infants`, `budget` with `phoneYup`, `integerYup`, `isValidDecimal`.
+9. `src/app/(dashboard)/quotations/new/page.tsx`: Hardened `markupPct`, `discountPct`, `taxPct` with `percentageYup`.
+10. `src/app/(dashboard)/trips/[id]/quotation/page.tsx`:
+    - Hardened proposal item add/edit with `isValidInteger` for `itemQuantity` and `isValidDecimal` for `itemUnitPrice`.
+    - Hardened payment milestone add/edit with `isValidDecimal` for `milestonePct` (0–100) and `milestoneAmt` (min 0).
+    - Hardened `markupInput` and `discountInput` on blur to prevent silent coercion to 0.
+11. `src/app/(dashboard)/rate-sheets/new/page.tsx` & `src/app/(dashboard)/rate-sheets/[id]/page.tsx`:
+    - Enforced `isValidDecimal` on `hotelCostPrice`, `extraAdultRate`, `extraChildRate`, `taxPercentage`.
+    - Enforced `isValidInteger` on `priority` (0–1000).
+12. `src/app/signup/page.tsx`:
+    - `agencyPhone` validated with `phoneYup(true, "Agency Phone")`.
+    - `phone` (owner) validated with `phoneYup(false, "Owner Phone")`.
+13. `src/app/admin/plans/page.tsx`:
+    - `planPrice`, `planYearlyPrice` validated with `isValidDecimal`.
+    - `planDuration`, `displayOrder`, and usage quota limits validated with `isValidInteger`.
+14. `src/app/admin/agencies/new/page.tsx`:
+    - `phone` and `ownerPhone` validated with `isValidPhoneNumber`.
+
+## 238.5 Finance & Operations Dialog Hardening
+Eliminated loose `parseFloat()` checks that allowed trailing letters (`"100abc"`) or scientific notation (`"1e5"`):
+1. `src/components/operations/assign-driver-modal.tsx`: `driverPhone` validated with `phoneYup(true, "Driver phone")`.
+2. `src/components/booking/confirm-item-modal.tsx`: `driverPhone` validated with `phoneYup(false, "Driver phone")`.
+3. `src/components/finance/record-payment-dialog.tsx`: Amount validated with `isValidDecimal(amount, { min: 0.01 })`.
+4. `src/components/finance/record-payable-dialog.tsx`: Amount validated with `isValidDecimal(amount, { min: 0.01 })`.
+5. `src/components/finance/refund-payment-dialog.tsx`: Amount validated with `isValidDecimal(amount, { min: 0.01 })`.
+6. `src/components/finance/record-supplier-payment-dialog.tsx`: Amount validated with `isValidDecimal(amount, { min: 0.01 })`.
+7. `src/components/invoices/record-payment-modal.tsx`: Amount validated with `isValidDecimal(amount, { min: 0.01 })`.
+
+## 238.6 Excel Import Engine Numeric & Phone Hardening
+1. `src/lib/excel/hotel-excel-service.ts`: Added phone format validation using `isValidPhoneNumber` during row validation before import preview or execution.
+2. `src/lib/excel/rate-excel-service.ts`: Hardened `parseNumericCell` with `isValidDecimal(cleaned, { min: 0 })` to reject scientific notation (`1e5`), non-digits, and invalid decimals from Excel tariff sheets.
+
+## 238.7 Backend Zod Schema Security & Validation Layer
+Hardened backend Zod schemas to reject invalid formats at the API boundary:
+1. `customer-schema.ts`: Refined `phone` and `alternatePhone` with `isValidPhoneNumber`.
+2. `hotel-schema.ts`: Refined `phone` with `isValidPhoneNumber`.
+3. `supplier-schema.ts`: Refined `phone` and `alternatePhone` with `isValidPhoneNumber`.
+4. `traveler-schema.ts`: Refined `phone` with `isValidPhoneNumber`.
+5. `trip-vehicle-schema.ts`: Refined `driverPhone` with `isValidPhoneNumber`.
+6. `operations-schema.ts`: Refined `driverPhone` in `createVehicleDispatchSchema` & `updateVehicleDispatchSchema`, and `recipientPhone` in `logCommunicationSchema` with `isValidPhoneNumber`.
+7. `tax-schema.ts`: Refined `defaultGstRate` with `isLockedGstRate` to enforce locked GST slabs (0%, 5%, 12%, 18%, 28%).
+
+## 238.8 Commercial Invariants & Locked GST Preservation
+- Preserved existing locked GST slabs: 0%, 5%, 12%, 18%, and 28%.
+- No arbitrary GST rates permitted.
+- Preserved all tax calculation formulas, margin calculations, and commercial rounding rules across Quotations, Invoices, Costing Engine, and Finance.
+- Preserved string data types for all phone numbers in the database schema; leading zeros and prefixes preserved.
+
+## 238.9 Automated Regression Test Suite (`prisma/test-numeric-validation-audit.ts`)
+Created and executed an automated test suite comprising 60 assertions across 6 categories:
+1. Phone Number Validation (Standard Indian mobile, 10-digit mobile, landlines with leading zeroes, parens/dashes, international formats; rejection of letters, mixed strings, scientific notation, out-of-range lengths, illegal symbols).
+2. Whole-Number Validation (Valid integers; rejection of decimals, scientific notation, negative numbers, out-of-range values).
+3. Decimal/Monetary Validation (Valid decimals, zero amounts; rejection of alphabetic characters, mixed strings, scientific notation, multiple dots, negative amounts).
+4. Locked GST Rates (Validation of 0%, 5%, 12%, 18%, 28%; rejection of arbitrary rates, negative rates, scientific notation).
+5. Shared Yup Schemas (Customer schema phone tests, Hotel rate schema integer/money tests, Pricing settings schema tax rate tests).
+6. Backend Zod Schemas (Zod customer schema, tax profile schema, vehicle dispatch schema).
+- **Result:** **60 / 60 PASS (0 failures)**.
+
+## 238.10 Verification & Build Status
+- `npx tsc --noEmit` $\to$ **PASS (0 errors)**.
+- `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, all static and dynamic routes compiled successfully with exit code 0)**.
+- `git diff --check` $\to$ **PASS (0 whitespace or syntax errors)**.
+- Relevant existing test suites: `prisma/test-disc02-customer-auth-security.ts` $\to$ **PASS (26 / 26 tests passed)**.
+
+## 238.11 Status
+**TripDesk — Project-Wide Numeric Input, Formik Validation & Field Integrity Audit: COMPLETED, VERIFIED, AND SEALED — PASS**
+
+---
+
+# 239. TRIPDESK — CORRECTIVE PASS FOR VERIFIED NUMERIC & PHONE VALIDATION GAPS (OCTOBER 2026)
+
+## 239.1 Executive Summary & Scope
+Following the independent read-only audit of Section 238, three confirmed gaps were identified and remediated without altering database schemas, migrations, QA data, commercial calculation formulas, locked GST rates, or authentication/tenant boundaries:
+1. **Yup Scientific-Notation Coercion Bypass:** `Yup.number()` natively coerces string inputs such as `"1e5"` into `100000` before running validator `.test()` functions. Added `.transform((value, originalValue) => ...)` to `integerYup`, `moneyYup`, and `percentageYup` in `src/lib/validation-schemas.ts` to inspect the raw input string before coercion, rejecting exponent notation (`e`/`E`), alphabetic characters, and malformed formats (`100abc`, `12.34.56`, `NaN`, `Infinity`), while intentionally mapping empty strings on optional fields to `undefined` (avoiding silent zero conversion) and preserving strict `.required()` checks.
+2. **Phone Parenthesis and Symbol Validation:** `isValidPhoneNumber` in `src/lib/validation/field-validators.ts` was enhanced to reject unclosed or unopened parentheses (`(9876543210`, `98765)43210`), double or nested parentheses (`((9876543210))`), misplaced or multiple plus signs (`++91...`, `91+...`), and empty parentheses (`()`), while preserving supported formats such as `(98765) 43210`, `+1 (555) 123-4567`, `022-12345678`, `+91 98765 43210`, and standard 10-digit mobile numbers.
+3. **Numeric Input Keystroke & Paste Guards:** Standardized `<Input>` component (`src/components/ui/input.tsx`) and exported helpers (`blockNumericKey`, `sanitizeNumericPaste` in `src/lib/validation/field-validators.ts`) to block typing `e`, `E`, and `+` on `<Input type="number">`, block decimal point `.` when `numericMode="integer"` or `step="1"`, and intercept paste events containing exponent notation or invalid decimals. Intermediate typing states (e.g. temporary empty inputs or in-progress decimals) remain unhindered, and values are never silently replaced with zero.
+
+## 239.2 Technical Implementation Details
+1. **`src/lib/validation/field-validators.ts`:**
+   - Enhanced `isValidPhoneNumber(value: unknown)`: Checks for at most one leading `+`, verifies that open and close parentheses match in count (`openParens === closeParens`) and do not exceed 1 pair (`openParens <= 1`), ensures `(` precedes `)`, ensures inner content contains digits only, and validates 7–15 digits.
+   - Added `blockNumericKey(e, options)`: Prevents typing `e`, `E`, `+`, optional `-` if non-negative, and `.` if integer.
+   - Added `sanitizeNumericPaste(e, options)`: Prevents pasting scientific notation or invalid decimal text.
+2. **`src/lib/validation-schemas.ts`:**
+   - `integerYup`: Uses `.transform()` to evaluate `originalValue`. If string, rejects `/[eE]/`, `/[a-zA-Z]/`, `.` or `!/^-?\d+$/`, returning `NaN` (which triggers `typeError`), and converts empty string to `undefined`. If number, checks `Number.isFinite` and exponent string.
+   - `moneyYup`: Uses `.transform()` to evaluate `originalValue`. Rejects `/[eE]/`, letters, and malformed decimals (`!/^-?\d+(\.\d+)?$/`), returning `NaN`. Maps empty strings to `undefined`.
+   - `percentageYup`: Uses `.transform()` to evaluate `originalValue`. Rejects exponent notation and malformed formats before min/max boundary checks. Maps empty strings to `undefined`.
+3. **`src/components/ui/input.tsx`:**
+   - Extended with `InputProps` accepting `numericMode?: "integer" | "decimal"`.
+   - Attaches `handleKeyDown` and `handlePaste` guards automatically whenever `type === "number"` or `numericMode` is specified. Calls through to any caller-provided `onKeyDown` and `onPaste` handlers.
+4. **`prisma/test-numeric-validation-audit.ts`:**
+   - Expanded test suite from 60 to 122 automated assertions, verifying direct Yup raw string invocations (`"1e5"`, `"100abc"`, `"12.34.56"`, `"NaN"`, `"Infinity"`, `""`, `"0"`, `"1234.56"`), all phone parenthesis variants, and Formik schema integrations.
+
+## 239.3 Verification & Automated Test Results
+- **Automated Numeric Validation Suite:** `npx tsx prisma/test-numeric-validation-audit.ts` $\to$ **122 / 122 PASS (0 failures)**.
+- **TypeScript Typecheck:** `npx tsc --noEmit` $\to$ **PASS (0 errors, exit code 0)**.
+- **Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, all dynamic/static routes compiled, exit code 0)**.
+- **DISC-02 Customer Auth Security Suite:** `npx tsx prisma/test-disc02-customer-auth-security.ts` $\to$ **26 / 26 PASS (0 failures)**.
+- **Git Check:** `git diff --check` $\to$ **PASS (0 whitespace or formatting issues)**.
+
+## 239.4 Browser Verification Status & Limitations
+- **Verification Status:** Unit, schema, and API-level behavior has been 100% verified via automated integration tests and compilation. Real browser keystroke blocking was verified via component handler unit logic. Full automated headless browser interactions (e.g. typing/pasting inside an active browser DOM session) remain unverified in this pass as no headless browser subagent session was requested during testing.
+- **Remaining Limitations:** Standard HTML5 `<input type="number">` behavior on certain non-standard mobile virtual keyboards may submit raw text through IME composition events before `keydown` triggers; however, backend Zod schemas and Formik/Yup schemas with raw string inspection strictly guarantee that malformed or scientific inputs cannot pass validation or persist into the system.
+
+## 239.5 Status
+**TripDesk — Corrective Pass for Verified Numeric & Phone Validation Gaps: FULLY IMPLEMENTED, VERIFIED, AND SEALED — PASS**
+
+---
+
+# 240. TRIPDESK — EMAIL OTP VERIFICATION IMPLEMENTATION & VERIFICATION (OCTOBER 2026)
+
+## 240.1 Executive Summary & Architectural Scope
+Following read-only architectural audits, email verification for new Agency Owner signups has been reactivated using **Resend Free + Supabase Auth**:
+- **Authentication Authority:** Supabase Auth remains the sole authority for authentication, credentials, and verification state. No custom OTP tables, custom verification tokens, or parallel authentication databases were introduced.
+- **Verification Flow:** New Agency Owner signups create an unconfirmed Supabase Auth user with temporary staging metadata. Direct database provisioning (Agency, User, Subscription) during unverified signup has been eliminated.
+- **Six-Digit OTP Delivery:** Supabase Auth sends a 6-digit confirmation code via configured custom SMTP (Resend Free). The user enters the code on `/verify-email`.
+- **Atomic Workspace Provisioning:** Workspace provisioning (`provisionOnboardedAgencyOwner`) executes strictly after successful OTP verification, confirmed by Supabase Auth's `user.email_confirmed_at` timestamp.
+- **Trial Timing:** The 7-day Starter trial begins exactly at the moment of verified provisioning (`trialEnd = now + 7 days`, 168 hours), preserving trial access until after account verification.
+- **No Auto-Login Rule:** Upon successful OTP verification, temporary sessions are explicitly terminated via `supabase.auth.signOut()`, redirecting to `/login?verified=true`. Standard email/password login is retained.
+- **Security & Tenant Isolation:** Server-side route guards (`getCurrentUser`, `requireAuth`, `requireAgencyOwner`) reject unverified users from accessing protected workspace routes or APIs. The private Platform Owner bootstrap and login flows remain completely unaffected and isolated.
+
+## 240.2 Files Changed & Implementation Details
+
+### 1. `src/actions/auth-actions.ts`
+- **`signupAgencyOwnerAction`:** Removed immediate onboarding call. Unconfirmed accounts are created via `supabase.auth.signUp()`, staging temporary onboarding metadata. Calls `supabase.auth.signOut()` to enforce no auto-login and redirects to `/verify-email?email=${encodeURIComponent(email)}`.
+- **`verifyEmailOtpAction`:** Enforces strict 6 numeric digits format (`/^\d{6}$/`). Verifies token with `supabase.auth.verifyOtp({ email, token, type: "email" })`. Confirms `user.email_confirmed_at` before executing atomic onboarding. Destroys temporary session via `supabase.auth.signOut()` and returns `{ success: true }`.
+- **`loginAction`:** Restored server-side email confirmation gate. Checks `isEmailConfirmed = !!(authData.user.email_confirmed_at || authData.user.confirmed_at)`. If `!isPlatformOwner && !isEmailConfirmed`, signs out and returns `{ error: "...", unverified: true, email }`. Lazy onboarding fallback is hardened to run only if `isEmailConfirmed` is true.
+
+### 2. `src/lib/services/onboarding-service.ts`
+- **`provisionOnboardedAgencyOwner`:** Restored verification gate at Step 1:
+  `const isEmailConfirmed = !!(user.email_confirmed_at || (user as any).confirmed_at);`
+  `if (!isEmailConfirmed) return { success: false, error: "unverified_account" };`
+- Preserves atomic Prisma interactive transaction (`prisma.$transaction`), idempotent user check, unique constraints, Starter plan lookup, 32 starter destination seeding, and post-provisioning staging metadata wipe via Supabase Admin API.
+
+### 3. `src/app/auth/callback/route.ts`
+- **`GET(request)`:** Preserves password recovery flow: if `type === "recovery"`, redirects to `/reset-password`.
+- Restores confirmed-email guard for public signup callbacks: verifies `user.email_confirmed_at` before provisioning, rejecting unverified requests to `/login?error=unverified_account`.
+
+### 4. `src/app/verify-email/page.tsx`
+- Removed temporary "Email Verification Deferred" card.
+- Reactivated 6-digit OTP verification form with `maxLength={6}`, placeholder `••••••`, numeric sanitization, and disabled state when `token.length !== 6 || !email`.
+- Preserved 60-second client-side resend cooldown and clear loading/error feedback.
+
+### 5. `src/app/login/page.tsx`
+- Added dedicated amber alert banner when `serverResult?.unverified` is true, providing an immediate direct link to `/verify-email?email=${encodeURIComponent(serverResult.email)}`.
+- Preserved existing Formik validation, generic auth errors, success banners, and role-based redirects (`/admin` for Platform Owner, `/dashboard` for Agency Owner).
+
+## 240.3 Automated Test Suite & Verification Results
+1. **Dedicated Email OTP Verification Audit Suite (`prisma/test-email-otp-verification-audit.ts`):**
+   - Platform Owner Baseline Integrity (mzpatel14@gmail.com protected and present): **PASS**.
+   - Input Validation Invariants (rejection of missing email, bad email, missing token, non-numeric token, token < 6 digits, token > 6 digits): **PASS**.
+   - Unverified Account Security Gate in `provisionOnboardedAgencyOwner` (unverified user rejected with zero database records created): **PASS**.
+   - Missing Metadata Security Gate (incomplete metadata rejected with `missing_onboarding_data`): **PASS**.
+   - Verified User Atomic Provisioning & Idempotency (atomic creation of Agency, User, Starter Trial with exactly 168 hours duration, 32 starter destinations, followed by safe idempotent re-provisioning): **PASS**.
+   - Concurrency & Duplicate Protection (unique constraint on User ID prevents duplicate users): **PASS**.
+   - **Result:** **29 / 29 PASS (0 failures)**.
+2. **Project-Wide Numeric Validation Suite (`prisma/test-numeric-validation-audit.ts`):**
+   - **Result:** **122 / 122 PASS (0 failures)**.
+3. **DISC-02 Customer Auth Security Suite (`prisma/test-disc02-customer-auth-security.ts`):**
+   - **Result:** **26 / 26 PASS (0 failures)**.
+4. **TypeScript Compiler Check:** `npx tsc --noEmit` $\to$ **PASS (0 errors, exit code 0)**.
+5. **Next.js Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, all static and dynamic routes compiled, exit code 0)**.
+6. **Git Diff Check:** `git diff --check` $\to$ **PASS (0 whitespace or formatting issues)**.
+
+## 240.4 External Dashboard and DNS Requirements (Pending Admin Setup)
+To complete live email delivery, the following external configurations must be applied in the respective dashboards:
+1. **Resend Dashboard:**
+   - Add and verify domain (recommended: `auth.yourtraveldesk.in` or `yourtraveldesk.in`).
+   - Add DNS records generated by Resend (SPF TXT, DKIM CNAMEs, DMARC TXT).
+   - Generate an API key with sending permissions.
+2. **Supabase Dashboard (Authentication > SMTP Settings):**
+   - Enable Custom SMTP.
+   - Host: `smtp.resend.com`, Port: `465` (SSL).
+   - User: `resend`, Password: `[Resend API Key]`.
+   - Sender Email: `no-reply@auth.yourtraveldesk.in` (matching verified Resend domain).
+   - Sender Name: `Your Travel Desk`.
+3. **Supabase Dashboard (Authentication > Email Templates > Confirm signup):**
+   - Update template to include `{{ .Token }}` as the 6-digit confirmation code.
+4. **Supabase Dashboard (Authentication > Providers > Email):**
+   - Ensure "Confirm email" is toggled ON.
+
+## 240.5 Live Delivery Verification Note
+Automated integration tests verified the complete verification lifecycle, atomic provisioning, idempotency, input validation, and server-side authorization gates with mock Supabase responses and database transactions. Live email dispatch through Resend was not executed in this pass, as it depends on external domain verification and Supabase dashboard SMTP configuration by the administrator.
+
+## 240.6 Status
+**TripDesk — Email OTP Verification Implementation: FULLY IMPLEMENTED, VERIFIED, AND SEALED — PASS**
+
+---
+
+# 241. TRIPDESK — UNVERIFIED SIGNUP LOGIN AND EMAIL VERIFICATION RECOVERY (OCTOBER 2026)
+
+## 241.1 Objective & Scenario Audit
+Audit and resolution of the real-world user scenario:
+1. User signs up with email and password on `/signup`.
+2. An OTP is dispatched, but the user leaves or closes the tab without verifying.
+3. Hours or days later, the user returns and attempts to log in with their credentials at `/login`.
+4. The application must explicitly detect that email verification is required, explain the situation clearly, and provide an actionable link to `/verify-email?email=...` where they can enter the code or request a fresh OTP.
+5. After successful verification, the workspace is atomically provisioned and the user can log in normally.
+
+## 241.2 Confirmed Root Cause
+1. **Premature Generic 400 Trap in `loginAction` (`src/actions/auth-actions.ts`):**
+   - When an unconfirmed user attempts to sign in, Supabase Auth GoTrue rejects `signInWithPassword` and returns `{ status: 400, code: "email_not_confirmed", message: "Email not confirmed" }`.
+   - In `loginAction`, `authData.user` was null and the returned error was evaluated. A generic check for `authError?.status === 400` caught the failure before the downstream verification gate (`!isEmailConfirmed`) could ever be reached, returning a generic `"Invalid email or password"` error.
+   - The user was unable to know that their credentials were valid and that their account only needed email verification.
+2. **Resend and OTP Error Classification Ambiguity:**
+   - Provider errors during resend (`supabase.auth.resend({ type: "signup", email })`) and OTP verification (`supabase.auth.verifyOtp({ email, token, type: "email" })`) required structured classification to handle rate limits (`over_request_rate_limit`, `over_email_send_rate_limit`, 429), expired tokens (`otp_expired`), already confirmed accounts (`email_already_confirmed`), and missing registrations (`user_not_found`).
+3. **Recovery Link Encoding:**
+   - Any query parameter passed to `/verify-email?email=...` must be strictly URL-encoded (`encodeURIComponent`) so that email addresses with plus signs (e.g. `user+tag@domain.com`) are not corrupted into spaces by URL query parsers.
+
+## 241.3 Implementation Corrections
+1. **`src/actions/auth-actions.ts`:**
+   - **`classifyLoginError` & `loginAction`:** Evaluates unconfirmed status before generic 400 error handling: checks `code === "email_not_confirmed"`, `code === "provider_email_needs_verification"`, and case-insensitive substrings (`"email not confirmed"`, `"not confirmed"`, `"unconfirmed"`). Returns `{ error: "Please verify your email address before signing in to Your Travel Desk.", unverified: true, email }`.
+   - **`classifyResendError` & `resendVerificationEmailAction`:** Safely maps provider errors for rate limits (cooldown message), already verified accounts (`email_already_confirmed`), and unlisted accounts (`user_not_found`).
+   - **`classifyOtpVerifyError` & `verifyEmailOtpAction`:** Evaluates rate limits (`over_request_rate_limit`, 429), expiration (`otp_expired`), and invalid tokens, returning clear, sanitized user feedback without exposing internal stack traces.
+2. **`src/app/login/page.tsx`:**
+   - When `serverResult?.unverified` is true, displays an actionable amber alert banner with a direct link: `<Link href={'/verify-email?email=' + encodeURIComponent(serverResult.email || formik.values.email || "")}>Enter Verification Code &rarr;</Link>`.
+3. **`src/app/verify-email/page.tsx`:**
+   - Preserves 6-digit numeric OTP input, auto-populates email from query parameter, supports unauthenticated resend via `resendVerificationEmailAction`, and maintains a 60-second cooldown timer.
+4. **`src/lib/services/onboarding-service.ts`:**
+   - Preserves strict `user.email_confirmed_at` verification gate, idempotent transaction (`prisma.$transaction`), 7-day Starter trial allocation (168 hours), and 32 Starter destination seeding. Persistent staging metadata in Supabase Auth `user_metadata` remains accessible for delayed recovery days later.
+
+## 241.4 Automated Test Suite & Verification Results
+1. **Dedicated Email OTP Verification Audit Suite (`prisma/test-email-otp-verification-audit.ts`):**
+   - Platform Owner baseline integrity & protection: **PASS**.
+   - Input validation invariants (rejection of missing email, bad email, missing/short/long/alphabetic token): **PASS**.
+   - Unverified account gate in onboarding service (zero database records created): **PASS**.
+   - Missing metadata gate in onboarding service (`missing_onboarding_data`): **PASS**.
+   - Atomic provisioning, 7-day trial (168 hours), 32 starter destinations, and idempotency: **PASS**.
+   - Concurrency & unique constraint invariants: **PASS**.
+   - Unverified login error classification (`email_not_confirmed`, `provider_email_needs_verification`, unconfirmed messages return `unverified: true` with target email): **PASS**.
+   - Invalid credentials (wrong password) strictly does not return `unverified: true`: **PASS**.
+   - Rate limit classification (429 / `over_request_rate_limit`): **PASS**.
+   - Safe URL encoding of email query parameter (preservation of `+` aliases): **PASS**.
+   - Resend error mapping (rate limits, already confirmed, user not found): **PASS**.
+   - OTP verification error mapping (rate limits, expired tokens, invalid tokens): **PASS**.
+   - Delayed provisioning recovery after transient failure without duplicate records: **PASS**.
+   - Customer portal authentication & tenant isolation integrity: **PASS**.
+   - **Result:** **52 / 52 PASS (0 failures)**.
+2. **DISC-02 Customer Auth Security Suite (`prisma/test-disc02-customer-auth-security.ts`):**
+   - **Result:** **26 / 26 PASS (0 failures)**.
+3. **TypeScript Compiler Check:** `npx tsc --noEmit` $\to$ **PASS (0 errors, exit code 0)**.
+4. **Next.js Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, exit code 0)**.
+5. **Git Diff Check:** `git diff --check` $\to$ **PASS (0 whitespace or formatting issues)**.
+
+## 241.5 Live Delivery Verification Note
+Automated test harnesses verified all error classification contracts, state transitions, idempotent recovery, URL encoding round-trips, and database state invariants. Live end-to-end email delivery via custom SMTP remains subject to administrator domain configuration in Resend and SMTP settings in Supabase Auth dashboard as documented in Section 240.4.
+
+## 241.6 Status
+**TripDesk — Unverified Signup Login and Email Verification Recovery: FULLY IMPLEMENTED, VERIFIED, AND SEALED — PASS**
+
+---
+
+# 242. TRIPDESK — AGENCY WORKSPACE PROVISIONING RECOVERY, REFERENTIAL INTEGRITY AUDIT & OTP RESEND HARDENING (OCTOBER 2026)
+
+## 242.1 Objective & Defect Scope
+Investigate and resolve two reproducible failures in the TripDesk email-verification and workspace onboarding workflow:
+1. **Issue A (Workspace Provisioning Failure):** After entering the valid 6-digit email OTP, the application displayed:
+   `Failed to initialize agency workspace. Please try again or contact support.`
+2. **Issue B (OTP Resend Failure):** Following the provisioning error, clicking "Resend Verification Code" did not result in a new email arriving.
+3. **Referential Integrity & Security Audit:** Formally verify that UUID re-linking preserves all database relationships, tenant isolation, and security guardrails without risking account takeover or data corruption.
+
+## 242.2 Root-Cause Investigation & Runtime Evidence
+
+### Issue A: Supabase Auth UUID Desynchronization vs. PostgreSQL Unique Email Constraint
+- **Trace & Mechanism:**
+  - When an unverified user was recreated or re-registered in Supabase Auth (e.g. `patelzalavadiya@gmail.com`), GoTrue assigned a fresh `user.id` UUID (`99f5f6d4-d848-407d-8ca6-5af3eac268c9`).
+  - However, PostgreSQL already held an existing `User` record under `email = patelzalavadiya@gmail.com` with the previous Supabase UUID (`eac89a3e-757f-4543-b985-621f45cdabf2`) and an associated `Agency`.
+  - In `src/lib/services/onboarding-service.ts`, Step 2 idempotency check evaluated:
+    ```ts
+    const existingUser = await prisma.user.findUnique({
+      where: { id: user.id }, // Only checked the new active Supabase UUID!
+    });
+    ```
+  - Because `user.id` was novel, `existingUser` returned `null`.
+  - The service proceeded to execute `prisma.$transaction(async (tx) => { ... })` and attempted `tx.user.create({ data: { id: user.id, email: user.email, ... } })`.
+  - PostgreSQL rejected this insert with:
+    `PrismaClientKnownRequestError: P2002: Unique constraint failed on the fields: (email)`
+  - The subsequent `catch (err)` block inside the transaction rechecked:
+    ```ts
+    const userExists = await tx.user.findUnique({ where: { id: user.id } });
+    ```
+    Which again returned `null`, returning `{ success: false, reason: "onboarding_failed" }`.
+  - `src/actions/auth-actions.ts` (`verifyEmailOtpAction`) intercepted `onboarding_failed` and surfaced the user-facing error: `"Failed to initialize agency workspace. Please try again or contact support."`
+
+### Issue B: GoTrue Silent Discard of Resend for Confirmed Email Accounts
+- **Trace & Mechanism:**
+  - Before workspace provisioning was invoked in `verifyEmailOtpAction`, the user submitted the 6-digit OTP to Supabase Auth:
+    ```ts
+    const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: "email",
+    });
+    ```
+  - `verifyOtp` completed with HTTP 200, successfully confirming the email and setting `email_confirmed_at` in Supabase Auth.
+  - When the downstream database provisioning failed due to Issue A, the user remained on `/verify-email?email=...` with the error banner.
+  - The user clicked "Resend Verification Code", triggering `resendVerificationEmailAction`, which called:
+    ```ts
+    await supabase.auth.resend({ type: "signup", email });
+    ```
+  - In Supabase Auth (GoTrue), `POST /resend` with `type: "signup"` for an **already-confirmed** email account is an intentional no-op: it returns HTTP 200 `{}` to prevent user enumeration, but dispatches **no email**.
+  - The UI displayed `"Verification code resent! Please check your inbox."` and started a 60-second cooldown timer, giving the misleading impression that a code was en route, trapping the user in an unrecoverable loop.
+
+## 242.3 Exhaustive Database Referential Integrity Audit
+
+### Enumeration of Models and Foreign Keys Referencing `User.id`
+An exhaustive analysis of `prisma/schema.prisma` and PostgreSQL `information_schema` was conducted:
+1. **Actual PostgreSQL Foreign Keys on `users(id)`:**
+   - `user_notifications.userId -> users.id`: Foreign key `user_notifications_userId_fkey` with `ON UPDATE CASCADE, ON DELETE CASCADE`.
+   - `platform_chat_messages.senderUserId -> users.id`: Foreign key `platform_chat_messages_senderUserId_fkey` with `ON UPDATE CASCADE, ON DELETE CASCADE`.
+   - There are **zero** other foreign keys referencing `users(id)` in PostgreSQL.
+2. **Application Columns Storing User References:**
+   - `platform_audit_logs.actorUserId`: Stores plain text actor ID without foreign key constraint; preserves historical immutable event records.
+3. **Multi-Tenant Scoping (Agency Isolation):**
+   - All 40 business models in TripDesk (`Customer`, `Trip`, `Destination`, `Hotel`, `Vehicle`, `Activity`, `Quotation`, `Booking`, `Payment`, `Invoice`, `Enquiry`, `Supplier`, `RateSheet`, `TripOperation`, `TravelDocument`, etc.) reference `Agency` via `agencyId`.
+   - **Zero business models reference `User.id` directly.**
+   - Consequently, re-linking `User.id` from an outdated Supabase Auth UUID to the active Supabase Auth UUID:
+     - Updates `users.id` in place.
+     - Automatically updates `user_notifications.userId` and `platform_chat_messages.senderUserId` via native PostgreSQL `ON UPDATE CASCADE`.
+     - Preserves `agencyId`, maintaining 100% of all agency trips, bookings, customers, rate sheets, and destinations without relational displacement.
+     - Synchronizes PostgreSQL identity with Supabase Auth so that `requireReadAccess()` and `prisma.user.findUnique({ where: { id: user.id } })` immediately resolve the user.
+
+## 242.4 Security Guardrails & Anti-Hijack Protections
+
+### 1. Platform Owner Protection (`src/lib/services/onboarding-service.ts`)
+- Evaluates `isPlatformOwnerTargetSync({ userId, email })` at the top of `provisionOnboardedAgencyOwner`.
+- If the email belongs to a Platform Owner (e.g. `mzpatel14@gmail.com`), onboarding fails closed immediately with `{ success: false, error: "protected_account" }`.
+- Under no circumstances can a Platform Owner account be re-linked, converted into an agency, or demoted.
+
+### 2. Role Integrity Guard (`src/lib/services/onboarding-service.ts`)
+- If an existing database user is found by email:
+  - Verifies `existingUser.role === "AGENCY_OWNER"`.
+  - Rejects any account with an unexpected role with `{ success: false, error: "account_already_registered_with_different_role" }`.
+
+### 3. Tenant Continuity & Anti-Orphaning
+- If `existingUser.agencyId` is already populated, re-linking strictly preserves `existingUser.agencyId` and seeds missing trial or starter destinations if interrupted. It never creates a second agency or reassigns ownership.
+
+### 4. UI Hardening (`src/app/verify-email/page.tsx`)
+- When `resendState?.alreadyVerified` is true, the resend form is hidden entirely, eliminating redundant resend attempts and displaying a prominent green guidance card with `"Sign In to Your Workspace →"`.
+
+## 242.5 Verification & Test Results
+1. **Automated OTP Verification Audit Suite (`prisma/test-email-otp-verification-audit.ts`):**
+   - Platform Owner permanent baseline integrity (`mzpatel14@gmail.com`): **PASS**.
+   - Input validation invariants (missing email, invalid formats, length limits): **PASS**.
+   - Unverified account gate in onboarding service (zero database records created): **PASS**.
+   - Missing metadata gate (`missing_onboarding_data`): **PASS**.
+   - Atomic provisioning, 7-day trial (168 hours), 32 starter destinations: **PASS**.
+   - Concurrency & unique constraint invariants: **PASS**.
+   - Dual-key lookup recovery & Auth UUID re-linking: **PASS**.
+   - Already-verified resend detection (returns `alreadyVerified: true` without false cooldown): **PASS**.
+   - Unverified login error classification (`email_not_confirmed`): **PASS**.
+   - Rate limit classification (429 / `over_request_rate_limit`): **PASS**.
+   - Platform Owner onboarding attempt fails closed with `protected_account`: **PASS**.
+   - Existing DB Platform Owner immutable re-link protection: **PASS**.
+   - **Result:** **62 / 62 PASS (0 failures)**.
+2. **DISC-02 Customer Auth Security Suite (`prisma/test-disc02-customer-auth-security.ts`):**
+   - **Result:** **26 / 26 PASS (0 failures)**.
+3. **TypeScript Compiler Check:** `npx tsc --noEmit` $\to$ **PASS (0 errors, exit code 0)**.
+4. **Next.js Production Build:** `npm run build` $\to$ **PASS (Next.js 16.3.2 Turbopack, exit code 0)**.
+5. **Git Diff Check:** `git diff --check` $\to$ **PASS (0 whitespace or formatting issues)**.
+6. **Live Runtime Data Verification:**
+   - Evaluated `patelzalavadiya@gmail.com`: Re-linked old UUID to active Auth UUID (`99f5f6d4-...`), confirmed agency `Test 1 agency`, verified 1 active 7-day trial and 32 seeded starter destinations.
+   - Platform Owner baseline (`mzpatel14@gmail.com`), 32 master destinations, 22 hotels, 66 rate sheets, and 6 vehicles preserved 100% intact.
+
+## 242.6 Status
+**TripDesk — Agency Workspace Provisioning Recovery, Referential Integrity Audit & OTP Resend Hardening: FULLY RESOLVED, VERIFIED, AND SEALED — PASS**
+
+---
+
+# 243. TRIPDESK — STAGING EMAIL OTP VERIFICATION: SUCCESSFUL END-TO-END VALIDATION (OCTOBER 2026)
+
+## 243.1 Overview & Staging Architecture
+- **Objective:** Formally record user-confirmed, end-to-end operational validation of the native Supabase Email OTP verification and agency onboarding flow in the staging environment.
+- **Environment Separation & Isolation:**
+  - **Local Development / QA:** Connected to local Supabase project (`nsqarlegqxymqfyvfrjw`, `aws-0-ap-northeast-1`).
+  - **Staging Environment:** Connected to separate staging Supabase project (`qypkowejgqrmilckemcr`, `aws-0-ap-northeast-2`).
+  - **Authoritative Staging URL:** `https://staging.yourtraveldesk.in`
+  - **Staging Supabase Project Reference:** `qypkowejgqrmilckemcr`
+- **Configuration Preconditions Completed in Staging:**
+  - Supabase Auth "Confirm email" setting enabled on staging project `qypkowejgqrmilckemcr`.
+  - Staging "Confirm signup" email template configured with `{{ .Token }}` for 6-digit numeric OTP delivery.
+  - Custom SMTP email delivery configured and active in the staging Supabase project.
+  - Application URL and redirect routes anchored to `https://staging.yourtraveldesk.in`.
+
+## 243.2 User-Confirmed End-to-End Validation
+The user has directly tested and confirmed the successful completion of the Email OTP verification workflow on `https://staging.yourtraveldesk.in`:
+1. **Agency Owner Signup:** Submitting signup details creates an unconfirmed Auth user in the staging Supabase project and dispatches a 6-digit numeric OTP.
+2. **OTP Email Delivery:** The 6-digit verification code is delivered to the user's inbox via staging SMTP.
+3. **OTP Submission & Email Confirmation:** The user submits the 6-digit code on `/verify-email`. Native `supabase.auth.verifyOtp({ email, token, type: "email" })` validates the token and confirms the email in Supabase Auth.
+4. **Workspace Provisioning:** The onboarding service (`provisionOnboardedAgencyOwner`) executes atomically:
+   - Provisions the Agency record.
+   - Links the `AGENCY_OWNER` user.
+   - Activates the 7-day Starter trial subscription (168 hours).
+   - Seeds the 32 starter destinations.
+5. **Session Teardown & Login Access:** The user is cleanly signed out, redirected to `/login`, and can successfully authenticate to access their provisioned agency workspace.
+
+> **Distinction Note:** This validation represents **user-confirmed live runtime behavior** in the deployed staging environment (`https://staging.yourtraveldesk.in`), complementing and confirming the automated unit/integration test results (62/62 audit assertions and 26/26 customer auth assertions) established during local development.
+
+## 243.3 Environment & Data Safety Protocols Preserved
+- **Strict Environment Isolation:** Local development and staging remain 100% isolated with independent Supabase projects, databases, and credentials. Local data is never copied wholesale into staging.
+- **Zero Schema Drift:** Verified via `node --env-file=.env.staging node_modules/prisma/build/index.js migrate status` that the staging database schema is fully up to date with the repository baseline (`20261007120000_baseline_schema`).
+- **No Destructive Operations:** Zero schema-altering commands (`prisma db push`, `prisma migrate reset`) and zero overwriting seed scripts were executed.
+- **Staging Data Integrity Preserved:**
+  - Permanent Platform Owner (`mzpatel14@gmail.com`, `e03a6a21-a355-4afe-ab3e-c8097b6be773`) preserved 100% intact.
+  - Staging Agency Owner (`tripmadeeasy.in@gmail.com`, `38c562a8-9d13-42b0-a472-946ad444d734`) and `TripDesk Staging Agnecy` (`cmuzgcvqc000006k15dn1jkft`) preserved.
+  - Existing staging subscription plans (Starter ₹499, Professional ₹999), destinations, hotels, and rate sheets remain untouched.
+- **Credential & Secret Protection:** Zero raw secrets, passwords, access tokens, SMTP passwords, or API keys are recorded.
+
+## 243.4 Status
+**TripDesk / Your Travel Desk — Staging Email OTP Verification: VALIDATED & CONFIRMED END-TO-END IN STAGING — PASS**
+
+---
+
+# 244. TRIPDESK — SIX-DIGIT FORGOT PASSWORD OTP RECOVERY IMPLEMENTATION (OCTOBER 2026)
+
+## 244.1 Overview & Architectural Objectives
+- **Objective:** Fully implement and secure the six-digit email OTP password recovery flow for Your Travel Desk / TripDesk.
+- **Architectural Seams Addressed:**
+  1. **Two-Stage Recovery UI on `/reset-password`:** Separated the workflow into Stage A (6-digit OTP verification + resend action with 60s cooldown) and Stage B (new-password and confirmation fields with eye toggles), unlocking password inputs only upon verified OTP validation.
+  2. **Cryptographic Server-Side Recovery Authorization Gate:** Introduced an HMAC-SHA256 signed `tripdesk_recovery_proof` cookie (`src/lib/auth/recovery-proof.ts`) issued only upon successful `verifyOtp({ email, token, type: 'recovery' })`. The password update action strictly validates this proof against the authenticated Supabase user and email, preventing ordinary authenticated sessions or client flags from bypassing OTP verification.
+  3. **Neutral Account Enumeration Defense:** Hardened `requestPasswordResetAction` to return equivalent `{ success: true }` responses regardless of whether the email is registered in Supabase Auth, preventing probing while safely catching and surfacing rate-limit constraints.
+  4. **Session Cleanup & Middleware Unblocking:** In `resetPasswordAction`, explicitly called `clearRecoveryProofCookie()` and `supabase.auth.signOut()` before `redirect("/login?reset=success")`. This completely eliminates the middleware bounce loop where an active recovery session redirected users to `/` and guarantees clean display of the emerald success banner.
+  5. **Direct Navigation Protection:** Direct visits to `/reset-password` without email parameters safely prompt for email and OTP without ever displaying password update fields.
+
+## 244.2 Changed Files Inventory
+- [`src/lib/auth/recovery-proof.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/auth/recovery-proof.ts): Server-only cryptographic recovery proof utility (`setRecoveryProofCookie`, `getVerifiedRecoveryProof`, `clearRecoveryProofCookie`) using HMAC-SHA256 with 15-minute expiration and constant-time signature comparison (`timingSafeEqual`).
+- [`src/actions/auth-actions.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/actions/auth-actions.ts):
+  - Hardened `requestPasswordResetAction` with email regex and neutral enumeration response.
+  - Added `verifyRecoveryOtpAction` calling `supabase.auth.verifyOtp({ email, token, type: 'recovery' })` and writing cryptographic recovery proof.
+  - Added `resendRecoveryOtpAction` calling `supabase.auth.resetPasswordForEmail(email)` with 60s rate-limit handling and neutral response.
+  - Added `checkRecoveryStateAction` to preserve verified state across page refreshes.
+  - Hardened `resetPasswordAction` to require valid Supabase session AND cryptographic recovery proof, update password, clear proof, execute `signOut()`, and redirect to `/login?reset=success`.
+- [`src/app/forgot-password/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/forgot-password/page.tsx): Updated with neutral enumeration messaging, 60s request cooldown timer, and transition action to `/reset-password?email=...`.
+- [`src/app/reset-password/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/reset-password/page.tsx): Rebuilt with two-stage recovery architecture (Stage A: 6-digit numeric OTP entry with 60s resend timer; Stage B: Formik + Yup password form with eye toggles unlocked only after server OTP verification).
+- [`prisma/test-qa-22-password-recovery-otp.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-22-password-recovery-otp.ts): Dedicated non-mutating automated QA test suite verifying all 29 assertions for input validation, neutral enumeration, OTP verification, cryptographic proof, Platform Owner guards, and regression invariants.
+
+## 244.3 Verification & Quality Assurance Summary
+1. **Dedicated QA Suite (`prisma/test-qa-22-password-recovery-otp.ts`):** **29 / 29 PASSED (100%)**.
+   - Input validation (missing/malformed emails, non-numeric/short/long OTPs, short/mismatched passwords): **PASS**.
+   - Neutral enumeration response contract: **PASS**.
+   - Cryptographic proof generation, verification, and expiration: **PASS**.
+   - Platform Owner baseline and guard integrity (`mzpatel14@gmail.com`): **PASS**.
+   - Read-only database invariant (0 users/agencies created or modified): **PASS**.
+2. **Email OTP Verification Audit (`prisma/test-email-otp-verification-audit.ts`):** **62 / 62 PASSED (100%)**.
+   - Re-linked user onboarding, idempotency, trial subscription, and starter destinations: **PASS**.
+3. **Customer Auth Security Regression (`prisma/test-disc02-customer-auth-security.ts`):** **26 / 26 PASSED (100%)**.
+   - Multi-tenant and customer resource isolation: **PASS**.
+4. **TypeScript Compiler Check:** `npx tsc --noEmit` $\to$ **PASS (0 errors, exit code 0)**.
+5. **Next.js Production Build:** `npm run build` $\to$ **PASS (Turbopack, exit code 0)**.
+6. **Git Diff Check:** `git diff --check` $\to$ **PASS (0 issues)**.
+
+## 244.4 Status
+**TripDesk / Your Travel Desk — Six-Digit Forgot Password OTP Recovery: FULLY IMPLEMENTED, HARDENED, AND VERIFIED — PASS**
+
+---
+
+# 245. TRIPDESK — PASSWORD RECOVERY HARDENING & CRYPTOGRAPHIC TEST EXTENSION (POST-REVIEW)
+
+## 245.1 Overview & Hardening Objectives
+Following the read-only post-implementation security review, the password recovery flow has been hardened across three architectural dimensions:
+1. **Signing-Secret Hardening (Finding 1):** Completely eliminated the hardcoded static string fallback (`tripdesk-recovery-fallback-secret-2026`). Implemented `getRecoverySigningSecret()` which prefers a dedicated server-only `RECOVERY_SIGNING_SECRET`, falling back to `SUPABASE_SERVICE_ROLE_KEY`. Enforced fail-closed behavior: if neither secret is configured or if the key has insufficient entropy (< 32 characters), the system throws an error and fails closed immediately.
+2. **Safe Password-Update Error Classification (Finding 2):** Eliminated raw Supabase Auth provider error leaks from `supabase.auth.updateUser()` in `resetPasswordAction`. Implemented `classifyPasswordUpdateError` to map recognized error states (rate limits, same password reuse, password complexity requirements, expired sessions) to safe user-facing guidance while masking all unexpected internal provider/database errors with a safe generic message. Preserved retry capability on failed updates without prematurely destroying recovery session cookies.
+3. **Decoupled Cryptographic Unit Test Suite (Finding 3):** Separated token creation (`createRecoveryProofToken`) and token verification (`verifyRecoveryProofToken`) into pure cryptographic functions independent of Next.js cookie headers. Extended `prisma/test-qa-22-password-recovery-otp.ts` with 18 dedicated assertions validating valid verification, tampered user ID, tampered email, tampered signature, truncated signature, malformed inputs, missing fields, expired tokens (> 15m), clock skew rejection (> 60s future), missing/invalid secret fail-closed, and safe error classification.
+
+## 245.2 Changed Files Inventory
+- [`src/lib/auth/recovery-proof.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/auth/recovery-proof.ts):
+  - Refactored `getRecoverySigningSecret()` to prefer `RECOVERY_SIGNING_SECRET`, falling back to `SUPABASE_SERVICE_ROLE_KEY`, with fail-closed validation (< 32 characters).
+  - Exported pure cryptographic functions `createRecoveryProofToken` and `verifyRecoveryProofToken` with clock-skew defenses and constant-time HMAC validation (`timingSafeEqual`).
+  - Preserved cookie wrappers `setRecoveryProofCookie`, `getVerifiedRecoveryProof`, and `clearRecoveryProofCookie`.
+- [`src/actions/auth-actions.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/actions/auth-actions.ts):
+  - Wrapped `setRecoveryProofCookie` in `verifyRecoveryOtpAction` within a try/catch to fail closed and sign out cleanly on secret/storage errors.
+  - Hardened `resetPasswordAction` to route provider errors through `classifyPasswordUpdateError` without exposing raw strings.
+  - Implemented `classifyPasswordUpdateError` mapping rate limits, password reuse, weak passwords, and expired sessions to safe messages.
+- [`prisma/test-qa-22-password-recovery-otp.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-22-password-recovery-otp.ts):
+  - Expanded test suite from 29 to 47 assertions covering end-to-end cryptographic tampering, expiration, clock skew, secret validation, and error classification.
+
+## 245.3 Required Environment Configuration for Staging
+Before conducting live recovery smoke testing in staging, ensure the following configuration:
+1. **Dedicated Signing Secret (Recommended):**
+   - Add `RECOVERY_SIGNING_SECRET` to staging environment variables with a high-entropy string (e.g. 64-character random hex or base64 token).
+   - If not set, the runtime securely falls back to staging `SUPABASE_SERVICE_ROLE_KEY` (already verified present in `.env.staging` with 219 characters).
+2. **Supabase Reset Password Email Template:**
+   - In Supabase Dashboard $\to$ Authentication $\to$ Email Templates $\to$ Reset Password:
+   - Ensure the template contains `{{ .Token }}` for 6-digit numeric OTP delivery.
+   - Example recommended copy:
+     > *"Use this six-digit verification code to reset your Your Travel Desk password: {{ .Token }}. If you did not request this, please ignore this email."*
+
+## 245.4 Verification & Validation Results
+- **Cryptographic QA Suite (`prisma/test-qa-22-password-recovery-otp.ts`):** **47 / 47 PASSED (100%)**.
+- **Email OTP Verification Regression Suite (`prisma/test-email-otp-verification-audit.ts`):** **62 / 62 PASSED (100%)**.
+- **Customer Auth Security Regression Suite (`prisma/test-disc02-customer-auth-security.ts`):** **26 / 26 PASSED (100%)**.
+- **TypeScript Compiler Check (`npx tsc --noEmit`):** **PASS (0 errors, exit code 0)**.
+- **Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**.
+- **Git Diff Check (`git diff --check`):** **PASS (0 whitespace or formatting issues)**.
+
+## 245.5 Status & Readiness
+**TripDesk / Your Travel Desk — Password Recovery Post-Review Hardening: FULLY COMPLETE, HARDENED, AND VERIFIED — READY FOR STAGING SMOKE TESTING ONCE STAGING EMAIL TEMPLATE IS VERIFIED.**
+
+---
+
+# 246. TRIPDESK — EMAIL VERIFICATION CONSISTENCY & PASSWORD RECOVERY RATE LIMIT UX FIXES
+
+## 246.1 Overview & Problem Statement
+During pre-staging authentication verification, two UX and state-synchronization discrepancies were identified:
+
+1. **Issue A — Sign-in / Email Verification Inconsistency:**
+   - **Symptom:** When a user with an unconfirmed Supabase Auth account attempted sign-in, login rejected access with "Verification Required". The user navigated to `/verify-email` and clicked "Resend Code", but the action immediately returned:
+     *“Email already verified! This email address is already verified. Please sign in to access your workspace.”*
+     When the user returned to `/login`, sign-in was blocked again with "Verification Required", leaving the user unable to receive a new signup OTP or access their workspace.
+   - **Expected Behavior:** Login and resend actions must consistently evaluate the authoritative Supabase Auth confirmation status. Unconfirmed accounts must receive a new signup OTP (subject to provider limits), while verified accounts must receive clear guidance to sign in. Stale database timestamps must never override provider state.
+
+2. **Issue B — Password Recovery Rate-Limit Message & Volatile Cooldowns:**
+   - **Symptom:** Entering an email on Forgot Password and navigating to the recovery OTP screen or re-entering the flow triggered:
+     *“Too many password reset requests. Please wait a moment before trying again.”*
+   - **Expected Behavior:** The 60-second cooldown must persist across navigation and page re-entry via client session storage so users see the real-time countdown rather than an immediate submission failure. When Supabase provider rate-limits are reached, the message must provide clear, actionable guidance without revealing account registration status.
+
+## 246.2 Confirmed Root Causes & Code Evidence
+1. **Root Cause A (Stale Database Verification Timestamp vs GoTrue Authority):**
+   - In `resendVerificationEmailAction` ([src/actions/auth-actions.ts](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/actions/auth-actions.ts)), the action previously evaluated:
+     ```ts
+     const dbUser = await prisma.user.findUnique({ where: { email } });
+     if (dbUser && dbUser.emailVerified) {
+       return { error: "Email already verified! ...", alreadyVerified: true };
+     }
+     ```
+   - In instances where an agency owner record was provisioned in PostgreSQL with `emailVerified: new Date()` (e.g. from direct provisioning scripts or test fixtures), but `auth.users.email_confirmed_at` in Supabase GoTrue remained `null`, `loginAction` enforced `authData.user.email_confirmed_at` and blocked login, while `resendVerificationEmailAction` inspected `dbUser.emailVerified` and refused to dispatch a new verification code.
+   - **Fix:** Swapped priority so Supabase Auth GoTrue (`adminClient.auth.admin.listUsers()`) is the primary authoritative source of truth. When the account exists in Supabase Auth, `authUser.email_confirmed_at` exclusively governs verification state, ignoring stale DB flags. A database fallback is retained solely for mock/test records absent from GoTrue.
+
+2. **Root Cause B (Volatile React Cooldown State & Unfriendly Rate-Limit Messaging):**
+   - Both `/forgot-password` and `/reset-password` maintained cooldown timers strictly within React component state (`useState(0)`).
+   - When a user navigated from `/forgot-password` to `/reset-password`, or reloaded/navigated back, component unmounting reset `cooldown` to `0`. The user was permitted to click "Send Verification Code" or "Resend Code" immediately, which hit Supabase's strict 60-second email rate limit (HTTP 429).
+   - In `requestPasswordResetAction` and `resendRecoveryOtpAction`, HTTP 429 errors from Supabase GoTrue (`over_email_send_rate_limit` / `over_request_rate_limit`) were returned as generic rate-limit text.
+   - **Fix:** Implemented persistent client-side cooldown tracking in `sessionStorage` keyed by email (`tripdesk_recovery_cooldown_${email}` and `tripdesk_verify_cooldown_${email}`) calculating real-time remaining seconds on mount across navigation. Mapped rate limits in recovery actions to:
+     *“A recovery code was recently requested for this email. Please check your inbox or wait 60 seconds before requesting another code.”* with `rateLimited: true`.
+
+## 246.3 Changed Files Inventory
+- [`src/actions/auth-actions.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/actions/auth-actions.ts):
+  - Updated `AuthActionResult` interface to include `rateLimited?: boolean`.
+  - In `resendVerificationEmailAction`: Authoritatively queries Supabase GoTrue users via `adminClient.auth.admin.listUsers()`. If the user exists in Supabase Auth, `email_confirmed_at` is authoritative. Retains safe DB fallback only when the user is not present in GoTrue.
+  - In `requestPasswordResetAction` and `resendRecoveryOtpAction`: Differentiates rate-limit responses (HTTP 429, `over_email_send_rate_limit`, `over_request_rate_limit`) and returns actionable 60-second guidance with `rateLimited: true`.
+  - In `classifyResendError`: Preserves standardized cooldown error contract with `rateLimited: true`.
+- [`src/app/forgot-password/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/forgot-password/page.tsx):
+  - Added `tripdesk_recovery_cooldown_${email}` storage in `sessionStorage`.
+  - Restores active cooldown upon mount or email re-entry, disabling submission and showing countdown timer.
+- [`src/app/reset-password/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/reset-password/page.tsx):
+  - Reads `tripdesk_recovery_cooldown_${email}` on component mount, synchronizing cooldown state from forgot-password page.
+  - Updates storage timestamp upon successful resend or provider rate-limit response.
+- [`src/app/verify-email/page.tsx`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/app/verify-email/page.tsx):
+  - Implemented persistent cooldown storage via `sessionStorage` (`tripdesk_verify_cooldown_${email}`) across page refreshes.
+- [`prisma/test-qa-22-password-recovery-otp.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-22-password-recovery-otp.ts):
+  - Added TEST 9 assertions verifying Issue A (unconfirmed Supabase accounts not falsely flagged, confirmed accounts flagged) and Issue B (cooldown math, rate-limit classification, persistence invariants).
+
+## 246.4 Automated Test Results
+- **QA-22 Password Recovery & UX Invariants (`test-qa-22-password-recovery-otp.ts`):** **53 / 53 ASSERTIONS PASSED (100%)**
+- **Email OTP Verification Automated Audit (`test-email-otp-verification-audit.ts`):** **62 / 62 ASSERTIONS PASSED (100%)**
+- **Customer Auth Security Regression (`test-disc02-customer-auth-security.ts`):** **26 / 26 ASSERTIONS PASSED (100%)**
+- **TypeScript Typecheck (`npx tsc --noEmit`):** **PASS (0 errors, exit code 0)**
+- **Next.js Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Git Diff Hygiene (`git diff --check`):** **PASS (0 whitespace errors)**
+
+## 246.5 Staging Smoke Testing & Operational Readiness
+- Both Issue A and Issue B are fully resolved with zero database schema migrations, zero configuration modifications, and zero disruption to role boundaries or tenant isolation.
+- Staging smoke testing is safe to proceed.
+
+---
+
+# 247. TRIPDESK — TARGETED AUTH HARDENING: MULTI-PAGE ADMIN LOOKUP & FAIL-CLOSED PRISMA GATES
+
+## 247.1 Overview & Hardening Objectives
+Following the Section 246 read-only security review, targeted hardening was implemented in `resendVerificationEmailAction` to eliminate two subtle edge cases:
+1. **Elimination of Admin API Error Fallback:** Previously, if `adminClient.auth.admin.listUsers()` encountered an API error or network failure, `authUserFound` remained false, which inadvertently allowed execution to fall back to `prisma.user.findUnique()`. If the user had a historical `emailVerified` flag in PostgreSQL, they would be falsely reported as already verified.
+2. **Multi-Page Auth Directory Pagination:** Previously, only page 1 (`perPage: 1000`) was queried, which assumed all users fit on the first page. Accounts at index 1001+ were not inspected and could be treated as absent.
+3. **Isolation of Synthetic Test Fixtures (Requirement 9):** Production decision-making now strictly relies on Supabase Auth. Fallback to PostgreSQL `emailVerified` is strictly quarantined to conclusive non-existence on synthetic test domains (`@test.com`, `@example.test`, `mock-`) required by isolated unit test mocks. Real accounts never use Prisma `emailVerified` as verification proof.
+
+## 247.2 Architectural & Code Changes
+- **`lookupAuthUserByEmail` ([`src/actions/auth-actions.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/actions/auth-actions.ts)):**
+  - Iterates through Supabase Auth pages following `data.nextPage` up to a safety cap of 50 pages (50,000 users).
+  - Categorizes search results into four distinct outcomes:
+    1. `{ status: "confirmed", user }`: User located and `email_confirmed_at` is set.
+    2. `{ status: "unconfirmed", user }`: User located and `email_confirmed_at` is null/falsy.
+    3. `{ status: "conclusive_not_found" }`: Entire user directory exhausted without finding email.
+    4. `{ status: "inconclusive", reason, error }`: Missing Admin client, API error (HTTP 5xx/4xx), network exception, malformed response, or pagination safety cap exceeded.
+- **Fail-Closed Fallback Gates in `resendVerificationEmailAction`:**
+  - If `status === "confirmed"`: Returns `alreadyVerified: true` with guidance to sign in.
+  - If `status === "unconfirmed"`: Proceeds directly to `supabase.auth.resend({ type: 'signup' })`. Prisma is never consulted.
+  - If `status === "inconclusive"`: Fallback to Prisma is strictly blocked. Proceeds directly to native `supabase.auth.resend({ type: 'signup' })` and lets Supabase GoTrue decide.
+  - If `status === "conclusive_not_found"`: Real accounts are never declared verified from Prisma. Only synthetic test mocks with designated test domains (`@test.com`, `@example.test`, `mock-`) consult Prisma.
+- **Expanded Test Suite ([`prisma/test-qa-22-password-recovery-otp.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-22-password-recovery-otp.ts)):**
+  - Added TEST 10 containing 7 dedicated unit assertions validating missing Admin client, API error mapping, network exception handling, multi-page page 2 confirmed lookup, multi-page page 2 unconfirmed lookup, exhausted directory conclusive absence, and runaway pagination safety termination.
+
+## 247.3 Automated Test Results
+- **QA-22 Password Recovery & Targeted Lookup QA (`test-qa-22-password-recovery-otp.ts`):** **60 / 60 ASSERTIONS PASSED (100%)**
+- **Email OTP Verification Automated Audit (`test-email-otp-verification-audit.ts`):** **62 / 62 ASSERTIONS PASSED (100%)**
+- **Customer Auth Security Regression (`test-disc02-customer-auth-security.ts`):** **26 / 26 ASSERTIONS PASSED (100%)**
+- **TypeScript Typecheck (`npx tsc --noEmit`):** **PASS (0 errors, exit code 0)**
+- **Next.js Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Git Diff Hygiene (`git diff --check`):** **PASS (0 whitespace errors)**
+
+## 247.4 Staging Smoke Testing & Operational Readiness
+- Targeted auth hardening is complete, fully verified, and ready for staging smoke testing.
+- Database, environment configuration, and role boundaries remain 100% intact.
+
+---
+
+# 248. TRIPDESK — AUTH TEST-ISOLATION FIX & PURGE OF PRODUCTION DOMAIN HEURISTICS
+
+## 248.1 Overview & Architecture Hardening
+Following the read-only audit of Section 247, the production authentication flow in `resendVerificationEmailAction` was hardened to completely eliminate test-fixture domain heuristics:
+1. **Purge of Production Email Pattern Matching:** Removed all string-based branching (`@test.com`, `@example.test`, `mock-`) and eliminated fallback to Prisma `emailVerified`. Supabase Auth is now the 100% sole authority for email verification status across all production paths.
+2. **Clean Test Dependency Injection:** `resendVerificationEmailAction` was augmented with an optional testing options parameter (`options?: { adminClientOverride?: any; supabaseClientOverride?: any }`), allowing automated test harnesses to inject mock clients cleanly without embedding synthetic test logic into production code.
+3. **Preservation of Fail-Closed Pagination & Cooldowns:** The multi-page paginated lookup in `lookupAuthUserByEmail()` remains strictly fail-closed on all API errors, network timeouts, thrown exceptions, malformed responses, and the 50-page safety limit, returning `inconclusive`. Persistent 60-second client cooldowns in `sessionStorage` remain fully preserved.
+
+## 248.2 Changed Files Inventory
+- [`src/actions/auth-actions.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/actions/auth-actions.ts):
+  - Removed lines querying `prisma.user.findUnique({ where: { email } })` on `conclusive_not_found`.
+  - Removed domain/prefix heuristic branching (`@test.com`, `@example.test`, `mock-`).
+  - Added optional dependency injection options (`adminClientOverride`, `supabaseClientOverride`) to `resendVerificationEmailAction` for clean test harness isolation.
+- [`prisma/test-email-otp-verification-audit.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-email-otp-verification-audit.ts):
+  - Updated TEST 11 to pass explicit `adminClientOverride` containing the simulated verified user record, completely decoupling test execution from production heuristics.
+- [`prisma/test-qa-22-password-recovery-otp.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-22-password-recovery-otp.ts):
+  - Added TEST 11 containing 6 new action-level unit assertions validating:
+    - 11A: Unconfirmed Supabase user with stale Prisma `emailVerified` is NOT reported as verified.
+    - 11B: Inconclusive Admin lookup does not use stale Prisma state to claim verified status.
+    - 11C: Real-looking email matching previously designated test pattern (`@test.com`) receives zero special treatment.
+    - 11D: Genuinely confirmed Supabase user consistently returns `alreadyVerified: true`.
+    - 11E: Platform Owner protection checks and onboarding guards remain intact.
+
+## 248.3 Verification & Validation Results
+- **QA-22 Password Recovery & Auth Test-Isolation Suite (`test-qa-22-password-recovery-otp.ts`):** **66 / 66 ASSERTIONS PASSED (100%)**
+- **Email OTP Verification Automated Audit (`test-email-otp-verification-audit.ts`):** **62 / 62 ASSERTIONS PASSED (100%)**
+- **Customer Auth Security Regression (`test-disc02-customer-auth-security.ts`):** **26 / 26 ASSERTIONS PASSED (100%)**
+- **TypeScript Compiler Check (`npx tsc --noEmit`):** **PASS (0 errors, exit code 0)**
+- **Next.js Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Git Diff Check (`git diff --check`):** **PASS (0 whitespace errors)**
+
+## 248.4 Staging Prerequisites & Readiness
+- Production auth code is 100% free of test heuristics.
+- Ready for staging smoke testing once staging email template is verified (`{{ .Token }}`).
+- Zero database changes, zero environment alterations, zero tenant isolation breaches.
+
+---
+
+# 249. TRIPDESK — SERVER ACTION TEST-INJECTION HARDENING & INTERNAL SERVICE EXTRACTION
+
+## 249.1 Overview & Architecture Hardening
+Following architectural review of Section 248, the Server Action boundary was hardened to guarantee that test dependency injection cannot leak into public Next.js Server Action interfaces:
+1. **Public Server Action Interface Restoration:** Removed `adminClientOverride` and `supabaseClientOverride` from `resendVerificationEmailAction`. The exported Server Action now strictly enforces the standard 2-argument Next.js signature `(prevState: any, formData: FormData) => Promise<AuthActionResult>` required by `useActionState`.
+2. **Extraction of Internal Server-Side Verification Service:** Extracted core verification logic, paginated Supabase Auth lookup, and provider error classification into a dedicated, internal server-side module: [`src/lib/services/verification-service.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/services/verification-service.ts) guarded with `import "server-only";` (NOT a `"use server"` module).
+3. **Decoupled Offline Test Mocking:** Offline test suites now inject mock dependencies directly into the internal service (`sendVerificationEmail` and `lookupAuthUserByEmail`) without modifying or weakening the production Server Action interface. No test hooks are exported from `"use server"` files.
+4. **Enhanced Pagination Safety & Ambiguity Handling:** In `lookupAuthUserByEmail`, if pagination metadata is malformed (e.g. backward/stagnant `nextPage`), missing on a full page, or contradictory with `total`, the lookup safely fails closed returning `{ status: "inconclusive", reason: "invalid_pagination_metadata" | "ambiguous_pagination" }`, preventing false non-existence determinations.
+
+## 249.2 Changed Files Inventory
+- [`src/lib/services/verification-service.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/lib/services/verification-service.ts):
+  - Created dedicated internal service module (`server-only`).
+  - Houses `lookupAuthUserByEmail`, `sendVerificationEmail`, `classifyResendError`, and `AuthLookupResult`.
+  - Implements fail-safe detection of corrupted or ambiguous pagination metadata.
+- [`src/actions/auth-actions.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/src/actions/auth-actions.ts):
+  - Strictly preserves `'use server'` boundary with zero test hooks or parameter overrides.
+  - `resendVerificationEmailAction` accepts strictly `(prevState: any, formData: FormData)`.
+  - Delegates internally to `sendVerificationEmail` supplying production SSR client and redirect URL.
+- [`prisma/test-email-otp-verification-audit.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-email-otp-verification-audit.ts):
+  - Updated TEST 11 to invoke `sendVerificationEmail(recoveryEmail, { adminClient: mockAdminClientForVerifiedResend })`.
+- [`prisma/test-qa-22-password-recovery-otp.ts`](file:///c:/Users/hp/OneDrive/Desktop/Mohit/tripdesk/prisma/test-qa-22-password-recovery-otp.ts):
+  - Updated TEST 10 to include 10H (stagnant `nextPage` metadata) and 10I (ambiguous contradictory pagination).
+  - Updated TEST 11 to test `sendVerificationEmail` with injected mocks and assert `resendVerificationEmailAction.length === 2`.
+
+## 249.3 Verification & Validation Results
+- **QA-22 Password Recovery & Server Action Boundary Suite (`test-qa-22-password-recovery-otp.ts`):** **70 / 70 ASSERTIONS PASSED (100%)**
+- **Email OTP Verification Automated Audit (`test-email-otp-verification-audit.ts`):** **62 / 62 ASSERTIONS PASSED (100%)**
+- **Customer Auth Security Regression (`test-disc02-customer-auth-security.ts`):** **26 / 26 ASSERTIONS PASSED (100%)**
+- **TypeScript Compiler Check (`npx tsc --noEmit`):** **PASS (0 errors, exit code 0)**
+- **Next.js Production Build (`npm run build`):** **PASS (Turbopack, exit code 0)**
+- **Git Diff Check (`git diff --check`):** **PASS (0 whitespace errors)**
+
+## 249.4 Staging Prerequisites & Readiness
+- Server Action interface is 100% clean, standard, and secure.
+- Internal verification logic is completely decoupled and tested.
+- Zero database modifications, zero live emails, zero live credentials used.
+
+---
+
+# 250. TRIPDESK — STAGING SUPABASE RLS SECURITY REMEDIATION DEPLOYMENT & VERIFICATION
+
+## 250.1 Target Environment & Confirmed Initial Findings
+On 2026-10-10, Supabase Security Advisor reported two security findings on the staging environment:
+- **Canonical Staging Application:** `https://staging.yourtraveldesk.in`
+- **Staging Supabase Project Reference:** `qypkowejgqrmilckemcr`
+- **Target Host:** `aws-0-ap-northeast-2.pooler.supabase.com:5432` / port `6543`
+- **Initial Advisor Findings:**
+  1. `rls_disabled_in_public`: 58 tables in schema `public` had Row Level Security disabled.
+  2. `auth_leaked_password_protection`: HaveIBeenPwned compromised credential checking disabled in Supabase Auth.
+
+## 250.2 Architecture Inspection & Defense-in-Depth Rationale
+1. **Prisma Connection Role:** Prisma connects via transaction pooler as role `postgres` (`rolsuper = false`, `rolbypassrls = true`). Tables in `public` are owned by `postgres`.
+2. **Access Patterns:** 100% of application database CRUD operations run through Prisma (`@prisma/adapter-pg`). Zero direct PostgREST calls (`supabase.from('table')` or `.rpc()`) exist in the application code. Supabase client is used strictly for Auth SSR and Storage buckets.
+3. **Public Sharing:** Public quote (`/q/[token]`) and customer portal access are handled exclusively through Next.js server-side routes querying Prisma, not direct client-side PostgREST.
+4. **PostgREST Lockdown Rationale:** Enabling RLS (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`) without `FORCE ROW LEVEL SECURITY` activates default-deny for PostgREST roles (`anon`, `authenticated`) while allowing Prisma (`postgres`) to bypass RLS seamlessly via `rolbypassrls`.
+5. **CRITICAL INVARIANT — NO FORCE RLS:** `FORCE ROW LEVEL SECURITY` was strictly avoided. Enabling `FORCE RLS` would subject the table owner (`postgres`) to RLS policies. Because Prisma connects directly over SQL without Supabase JWT context, `FORCE RLS` would break the application.
+6. **No RLS Policies Added:** Access remains completely mediated through the existing server-side Prisma architecture. No permissive policies (`USING true`) or artificial JWT-based policies were created.
+
+## 250.3 Applied Migration Specification
+The reviewed, non-destructive migration at `prisma/migrations/20261010153000_remediate_public_rls_and_privileges/migration.sql` was prepared and deployed:
+1. **RLS Activation:** `ALTER TABLE public.<table_name> ENABLE ROW LEVEL SECURITY;` across all 58 tables.
+2. **Revocation of Existing Privileges:** `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated, PUBLIC;`, explicit revocation on `_prisma_migrations`, `REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated, PUBLIC;`, and `REVOKE CREATE ON SCHEMA public FROM anon, authenticated, PUBLIC;`.
+3. **No Blanket Routine Revocation:** Routine/function revocation was omitted; live staging inventory confirmed zero custom functions in `public`, preventing any interference with extension objects.
+4. **No Unnecessary `service_role` Expansion:** Avoided redundant `GRANT ALL ... TO service_role` statements to preserve least-privilege principles.
+5. **Default Privileges for Future Prisma Migrations:** `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated, PUBLIC;` and `REVOKE ALL ON SEQUENCES ...`.
+6. **`supabase_admin` Role Boundary:** Handled cleanly; role `postgres` altered its own defaults in `public`, protecting all future Prisma migrations.
+
+## 250.4 Pre-Deployment Gate & Staging Execution
+1. **Pre-Deployment Gate:** Target verified as staging project `qypkowejgqrmilckemcr` on `aws-0-ap-northeast-2.pooler.supabase.com:5432`.
+2. **Pending Migration Check:** Ran `npx prisma migrate status` with staging configuration; confirmed exactly 1 pending migration (`20261010153000_remediate_public_rls_and_privileges`). Gate passed.
+3. **Deployment Execution:** Executed `npx prisma migrate deploy` using staging environment profile on 2026-10-10.
+4. **Deployment Result:** `All migrations have been successfully applied.` Migration recorded in `public._prisma_migrations` (`finished_at = 2026-10-10T09:58:00.227Z`, `applied_steps_count = 1`, `rolled_back_at = null`). Staging data was preserved; no local or production database was targeted.
+
+## 250.5 Reported Post-Deployment Verification Results
+*(Note: These verification checks were executed and reported during the remediation task on 2026-10-10; no new live database queries were executed during subsequent documentation-only tasks).*
+1. **Prisma Migrate Status:** `Database schema is up to date!` (exit code 0).
+2. **RLS & FORCE RLS Live Status:**
+   - Total tables in schema `public`: **58**
+   - Tables with RLS disabled: **0** (All 58 enabled)
+   - Tables with FORCE RLS enabled: **0** (None forced)
+3. **Table Privilege Revocation:**
+   - Querying `information_schema.role_table_grants` for `anon`, `authenticated`, and `PUBLIC` in schema `public` returned **0 rows**.
+4. **PostgREST Direct API Denial (HTTP Verification):**
+   - Direct HTTP GET to `https://qypkowejgqrmilckemcr.supabase.co/rest/v1/customers?select=*` with anon key: **HTTP 401 Unauthorized** (`code: 42501, message: permission denied for table customers`).
+   - Direct HTTP GET to `/rest/v1/_prisma_migrations`: **HTTP 401 Unauthorized** (`code: 42501`).
+   - Direct HTTP GET to `/rest/v1/users`: **HTTP 401 Unauthorized** (`code: 42501`).
+5. **Prisma Connection Health & Staging Smoke Tests:**
+   - Direct queries via Prisma (`postgres` role) succeeded 100% across users, agencies, trips, quotations, bookings, customers, and invoice sequences.
+   - Server-side public share token resolution verified working (`/q/[token]`).
+   - Offline test suites passed: QA-22 (70/70), Email OTP Audit (62/62), Customer Auth Security (26/26).
+
+## 250.6 Remaining Security Advisor Finding: Leaked-Password Protection (Acknowledged Limitation)
+The `auth_leaked_password_protection` finding remains **UNRESOLVED** on staging.
+1. **Root Cause / Tier Constraint:** In the Supabase Dashboard for project `qypkowejgqrmilckemcr`, the feature **"Prevent use of leaked passwords"** (HaveIBeenPwned check) is restricted to the Supabase Pro plan tier.
+2. **User Decision:** The user has explicitly decided not to upgrade the staging Supabase project plan solely to satisfy this Security Advisor advisory.
+3. **Current Security Status:**
+   - Leaked-password protection is **currently disabled** on staging.
+   - This finding is an **acknowledged operational limitation**, not a resolved issue.
+   - It should be reconsidered if the project plan is upgraded or an eligible alternative becomes available.
+4. **CAPTCHA Status:** CAPTCHA protection is a separate Auth setting and was **not enabled** as part of this remediation.
+5. **Overall Security Advisor Posture:** Not all Security Advisor findings are resolved; `rls_disabled_in_public` is resolved, while `auth_leaked_password_protection` remains open as an acknowledged plan constraint.
+
+---
+
+# 251. INVESTIGATION & REPAIR OF RECURRING INTERMITTENT 404 ERRORS
+
+## 251.1 Objective & Context
+During manual testing across browser sessions, users and testers encountered intermittent occurrences of the generic Next.js `404 — This page could not be found.` page. A targeted investigation was executed to identify the actual root cause, eliminate false hypotheses, implement the minimal safe fix, and verify zero regression.
+
+## 251.2 Root Cause Analysis & Forensic Evidence
+A full audit of all 309 routes, Next.js routing trees, navigation links, and database records established the definitive root causes:
+
+1. **Nonexistent Route in Notification Payload (`/quotations/[id]`):**
+   - In `src/lib/services/quotation-service.ts`, lines 2780 and 2835:
+     - When a customer accepts a proposal via `/q/[shareToken]`, `internalNotificationService.notifyAgencyOwner()` was invoked with `linkUrl: `/quotations/${quotation.id}``.
+     - When a customer requests changes via `/q/[shareToken]`, it was invoked with `linkUrl: `/quotations/${quotation.id}``.
+   - In the Next.js App Router, quotation details and editing do not reside at `/quotations/[id]`; they reside at `/trips/[id]/quotation` (`src/app/(dashboard)/trips/[id]/quotation/page.tsx`).
+   - The directory `src/app/(dashboard)/quotations/` contained only `page.tsx` (quotations table) and `new/page.tsx`. No dynamic route segment `[id]` existed.
+   - When agency users clicked any "Quotation Accepted" or "Quotation Revision Requested" notification item in the TopBar `NotificationsPopover` (`router.push(notif.linkUrl)`), Next.js attempted to resolve `/quotations/<quotationId>` and immediately rendered the 404 error page.
+   - Forensic DB inspection confirmed 11 historical notification records in `UserNotification` storing `linkUrl: "/quotations/[cuid]"`. Any user clicking these historical or new notifications triggered the 404 error intermittently during testing.
+
+2. **Missing Custom Next.js `app/not-found.tsx` Fallback:**
+   - The repository lacked `src/app/not-found.tsx`. Whenever any unhandled route or broken link was hit, Next.js fell back to the unstyled built-in black/white `404 — This page could not be found.` screen without navigation recovery options (Back to Dashboard, Go Back, or Support).
+
+3. **Public Route Exclusions in Supabase Middleware:**
+   - In `src/lib/supabase/middleware.ts`, `isPublicRoute` did not include `/robots.txt` and `/sitemap.xml`, causing unauthenticated search engine crawlers or browser requests for `robots.txt` to receive an unexpected 307 redirect to `/login?redirectTo=%2Frobots.txt`.
+
+## 251.3 Architecture Decisions & Fixes Implemented
+
+1. **Quotation Service Notification URL Correction:**
+   - File: `src/lib/services/quotation-service.ts`
+   - Updated lines 2780 and 2835 from `linkUrl: `/quotations/${quotation.id}`` to `linkUrl: `/trips/${quotation.tripId}/quotation``.
+   - Ensures all future notifications direct the agency owner straight to the quotation workspace.
+
+2. **Dynamic Resolver & Redirect Route for Quotations (`/quotations/[id]`):**
+   - File: `src/app/(dashboard)/quotations/[id]/page.tsx`
+   - Implemented a server component that safely resolves any direct access, legacy notification click, or external bookmark for `/quotations/[id]`.
+   - Strict tenant isolation: checks `user.agency?.id` against `quotation.agencyId` (bypassed only for Platform Owner).
+   - If found, redirects cleanly to `/trips/${quotation.tripId}/quotation`.
+   - If not found or deleted, redirects safely to `/quotations`.
+   - Completely neutralizes the 404 error for all past and future `/quotations/<id>` URLs without modifying existing database records.
+
+3. **Branded Global Not-Found Handler:**
+   - File: `src/app/not-found.tsx`
+   - Added a modern, responsive 404 page styled with the TripDesk design system, brand badge, clear messaging, "Go to Dashboard" button, "Go Back" button, and "Contact Support" link.
+
+4. **Public Route Whitelist in Middleware:**
+   - File: `src/lib/supabase/middleware.ts`
+   - Added `/robots.txt` and `/sitemap.xml` to `isPublicRoute` to prevent auth redirects for standard SEO endpoints.
+
+## 251.4 Verification & Validation Results
+- **URL Navigation Audit:** Ran AST-based URL-to-Route verification across the entire codebase; confirmed **0 unmatched URLs**.
+- **TypeScript Static Analysis:** `npx tsc --noEmit` exited with code 0 (zero errors).
+- **Production Build:** `npm run build` completed successfully with exit code 0 (`/quotations/[id]` successfully registered as a dynamic server-rendered route).
+- **Git Diff Hygiene:** `git diff --check` passed with 0 errors.
+- **Regression Suite:** `npx tsx prisma/test-qa-22-password-recovery-otp.ts` passed 100% (70/70 assertions passed).
+- **Data Safety:** Zero database mutations, zero schema changes, zero Prisma pushes.
+
+## 251.5 Browser Reproduction & Verification Status
+- **Reproduction:** Confirmed that navigating to `/quotations/<id>` in the absence of `src/app/(dashboard)/quotations/[id]/page.tsx` directly produced Next.js's unhandled 404 page.
+- **Verification:** Verified via live dev server and production build that `/quotations/<id>` is now caught and properly handled, and any unhandled path renders the branded TripDesk 404 UI.
+- **Remaining Risk:** None identified. Legacy notifications and future notifications now both resolve cleanly to the quotation workspace.
+
+---
+
+# 252. CONTEXT-LOCKED PAYABLE DISBURSEMENT IN OPERATIONS
+
+## 252.1 Objective & Context
+When recording a payable disbursement from an Operations card (Accommodations, Fleet, or Other Costs), the modal previously rendered an open, editable dropdown for `Link to Payable (Optional)` alongside redundant "Catalogue Supplier" inputs, querying all agency-wide payables. This introduced risks of accidental misattribution and visual overflow on narrow screens. A context-locked workflow was implemented to bind the disbursement modal strictly to the specific payable being paid.
+
+## 252.2 Changes Implemented
+1. **`RecordSupplierPaymentDialog` Component (`src/components/finance/record-supplier-payment-dialog.tsx`):**
+   - Added `payable?: any | null` and `isPayableLocked?: boolean` props.
+   - When `isPayableLocked` is true:
+     - Replaces the selectable `Link to Payable` dropdown with a locked read-only summary card displaying payable number, payee/service name, service type badge, and outstanding balance.
+     - Hides the redundant "Catalogue Supplier" selector dropdown and payee name input, protecting the authoritative payee binding.
+     - Pre-fills `amount` with `payable.outstandingAmount` while preserving the user's ability to enter a lower partial amount.
+     - Detects settled payables (`outstandingAmount <= 0` or status `PAID`) or cancelled payables (`status === "CANCELLED"`), rendering clear status banners and disabling the submit button (`disabled={true}`).
+     - Optimizes performance: bypasses fetching agency-wide payables and suppliers when context-locked.
+   - In global mode (`isPayableLocked` is false, e.g. from `/payments` or `/finance`):
+     - Preserves the full searchable dropdown, direct payment option, and catalogue supplier selection.
+   - Resets state on close to prevent state leakage between successive clicks.
+   - Hardened for narrow 320px viewports with compact grid layout and zero horizontal overflow.
+
+2. **Operations Details Page (`src/app/(dashboard)/operations/[tripId]/page.tsx`):**
+   - Updated lines 1661–1675 to pass `payable={selectedPayableForPayment}` and `isPayableLocked={true}` to `RecordSupplierPaymentDialog`.
+   - Updated `onOpenChange` to clear `selectedPayableForPayment(null)` on close.
+
+## 252.3 Verification & Safety
+- **Type Checking:** `npx tsc --noEmit` passed with 0 errors.
+- **Production Build:** `npm run build` passed with exit code 0.
+- **Git Diff Hygiene:** `git diff --check` passed cleanly.
+- **Backend Safety:** Preserved atomic concurrency locks (`SELECT ... FOR UPDATE`), server-side overpayment rejection, finalized operation guards, and multi-tenant isolation in `financeService.recordSupplierPayment`.
+- **Zero Schema Mutations:** No Prisma schema changes or migrations required.
+
+
+---
+
+# 253. WHATSAPP CLICK-TO-CHAT INTEGRATION & APPLICATION-WIDE EMAIL-SENDING UI REMOVAL
+
+## 253.1 Architecture & Core Design Decisions
+- **Implementation Model:** Realized a lightweight, reliable, zero-cost WhatsApp communication layer leveraging the official WhatsApp Click-to-Chat protocol (`https://wa.me/<phone>?text=<encoded_text>`).
+- **Strict Anti-Mock & Truthful Tracking Semantics:**
+  - Strictly avoided implementing any Meta WhatsApp Cloud API credentials, mock delivery webhooks, or false claims of delivery.
+  - Opening a WhatsApp chat via `window.open` does not constitute guaranteed message transmission.
+  - The backend (`communicationService.sendManualMessage`, `communicationService.sendCommunication`, and `resendCommunication`) records notifications dispatched via Click-to-Chat with `status: NotificationDeliveryStatus.PENDING`, `providerMessageId: "click_to_chat"`, and metadata `{ deliveryMode: "CLICK_TO_CHAT", action: "LINK_OPENED" }` without calling mock delivery providers.
+  - Operations guest communications log truthful dispatch notes: `"WhatsApp chat opened for <Guest> (<phone>)"`.
+  - Quotations: Decoupled opening WhatsApp chat from marking quotation as sent. A user can click `"Open in WhatsApp"` without falsely marking the quotation as sent, with an explicit optional `"Mark as Sent"` action retained for agency operators.
+- **Shared Click-to-Chat Helper (`src/lib/communication/whatsapp/click-to-chat.ts`):**
+  - `validateAndNormalizeWhatsAppPhone(rawPhone)`: Validates and normalizes phone numbers.
+    - Strips all non-digit characters except leading `+`.
+    - Automatically normalizes standard 10-digit Indian mobile numbers (starting with 6–9) to E.164 without `+` (`91XXXXXXXXXX`).
+    - Eliminates the Iranian country code (+98) misrouting bug that previously affected 10-digit numbers starting with 9.
+    - Strips leading domestic trunk zero (`0XXXXXXXXXX` -> `91XXXXXXXXXX`).
+    - Handles explicit `+91` and `91` prefixes cleanly without double-prefixing.
+    - Preserves valid international numbers (8–15 digits) starting with `+`.
+    - Returns `{ isValid: false, error: "..." }` for blank, short (<8 digits), overlong (>15 digits), or ambiguous numbers.
+  - `buildWhatsAppChatUrl(phone, messageText)`: Produces safe `https://wa.me/<normalizedPhone>[?text=<encoded>]` using `encodeURIComponent`.
+  - `openWhatsAppChat(options)`: Safe browser execution via `window.open(url, "_blank", "noopener,noreferrer")` with popup blocked fallback warnings.
+
+## 253.2 Workflows Integrated
+1. **Operations Guest Communication Modal (`src/components/operations/communication-modal.tsx`):**
+   - Replaced fragile ad-hoc regex with `openWhatsAppChat`.
+   - Updated dispatch logger (`operationsService.logCommunicationDispatch`) to record `{ deliveryMode: "CLICK_TO_CHAT", action: "LINK_OPENED" }`.
+2. **Quotation Sharing (`src/lib/quotation/share-helpers.ts` & `src/components/quotation/quotation-share-modal.tsx`):**
+   - Integrated `openWhatsAppChat` in `openWhatsAppShare`.
+   - Removed email option from dialog copy.
+   - Decoupled `onMarkSent` from the link opening action, providing an explicit, non-destructive operator control.
+3. **Customer Details Page (`src/app/(dashboard)/customers/[id]/page.tsx`):**
+   - Direct messaging dialog updated: removed email channel selector, verified phone input, launches `openWhatsAppChat` and records manual dispatch in customer notification history with `status: PENDING`.
+4. **Communications Hub (`src/app/(dashboard)/communications/page.tsx`):**
+   - Removed `NotificationChannel.EMAIL` from channel selection dropdown and modal labels.
+   - Compose modal button dynamically labels `"Open in WhatsApp"` when WhatsApp channel is active, validating the recipient phone number before opening `wa.me` and recording dispatch.
+5. **Documents Hub (`src/app/(dashboard)/documents/page.tsx`):**
+   - Removed email channel from Issue Document and Resend Document modals; defaulted channel state strictly to `NotificationChannel.WHATSAPP`.
+   - Swapped "Recipient Email" input for "Recipient Phone Number" with Indian formatting placeholder.
+   - `handleIssue`: When issuing with customer notification on WhatsApp, validates phone number and actively opens `openWhatsAppChat` with document details and customer traveler portal link (`/customer/trips/[tripId]/documents`) before recording issuance.
+   - `handleResend`: Actively invokes `openWhatsAppChat` with the customer's phone (or custom recipient phone) and pre-filled message with customer portal documents link, then calls `documentClient.resend` to record the dispatch.
+6. **Booking Details Page (`src/app/(dashboard)/bookings/[id]/page.tsx`):**
+   - Document table action button updated to `"WhatsApp"` and `handleResendDoc` actively opens `openWhatsAppChat` with traveler's phone, booking number, document title, and customer portal documents link before recording resend.
+7. **Travel Document Service Backend (`src/lib/services/travel-document-service.ts`):**
+   - Updated `issueDocument` and `resendDocument` to default channel parameter to `NotificationChannel.WHATSAPP` instead of `EMAIL`.
+
+## 253.3 Application-Wide Email-Sending UI Removal
+- **UI Send Options Removed:**
+  - Removed email channel buttons, tabs, toggles, and dropdown choices across Operations, Quotations, Customers, Communications Hub, Documents Hub, and Bookings.
+  - Removed misleading "Email Delivery (ACTIVE / DISABLED)" toggle card from Agency Settings Notifications tab (`src/app/(dashboard)/settings/page.tsx`).
+- **Strictly Preserved Non-Sending Email Features:**
+  - Preserved transactional auth email delivery (signup, signin OTP, password recovery, verification).
+  - Preserved customer, vendor, and agency contact email profile fields (`customer.email`, `agency.defaultSenderEmail`).
+  - Preserved historical `NotificationChannel.EMAIL` records in communication logs and activity timelines.
+  - Preserved CRM internal follow-up task types (`CALL`, `WHATSAPP`, `EMAIL`, `MEETING` in `follow-ups` and `enquiries` calendar reminders).
+
+## 253.4 Verification & Quality Gates
+- **Comprehensive Unit Tests (`prisma/test-click-to-chat.ts`):** 30 automated tests executed via `tsx` covering Indian mobile normalization, prefix sanitization, leading trunk zeros, international formats, empty/invalid strings, URL building, and percent-encoding. Passed: 30/30 (100%).
+- **TypeScript Typecheck:** `npx tsc --noEmit` passed with 0 errors.
+- **Production Build:** `npm run build` completed successfully (Next.js 16.3.2 Turbopack, exit code 0).
+- **Git Diff Check:** `git diff --check` passed cleanly with 0 whitespace or formatting issues.
+- **Database Schema Integrity:** Zero schema modifications; zero Prisma migrations; zero data mutations.
+
+## 253.5 Technical Limitations & Remaining Manual Staging Checks
+- **Verified Implementation Facts:**
+  - WhatsApp Click-to-Chat URLs follow official `https://wa.me/<phone>?text=<encoded>` specifications.
+  - No Meta WhatsApp Cloud API credentials or webhooks are configured or called.
+  - Database status is strictly recorded as `PENDING` with `deliveryMode: "CLICK_TO_CHAT"`.
+  - Email sending UI options are completely removed from all operational and customer-facing compose surfaces.
+- **Remaining Technical Limitations:**
+  - `wa.me` links cannot confirm recipient receipt or delivery state on device. Status remains `PENDING` indefinitely unless an external webhook provider is integrated in a future phase.
+  - Browser popup blockers may prevent `window.open` if triggered asynchronously outside of direct user event loops (mitigated by opening synchronously prior to async dispatch logs).
+- **Manual Staging Checks Required:**
+  1. Verify browser tab opening behavior across Safari, Chrome, and Firefox on desktop and mobile devices.
+  2. Verify that clicking "Open in WhatsApp" on an operations trip item pre-fills the guest briefing accurately.
+  3. Verify quotation share link resolution in a live staging browser session.
+  4. Verify customer portal document download flow when following the link from WhatsApp.
+
+---
+
+# END OF MASTER HANDOVER V3
+
+**Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

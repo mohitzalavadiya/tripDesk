@@ -1,783 +1,629 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
-import * as XLSX from "xlsx"
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  FileSpreadsheet,
-  Upload,
-  Download,
-  Plus,
-  ArrowLeft,
-  ChevronRight,
-  Sparkles,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  FileUp,
-  Building2,
-  Calendar,
-  Clock,
-  Archive,
-  RefreshCw,
-  FileCheck,
-} from "lucide-react"
-import { PageHeader } from "@/components/shared/page-header"
-import { EmptyState } from "@/components/shared/empty-state"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog"
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { rateSheetClient,RateSheetWithRelations } from "@/lib/api-client";
+import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
+import { isValidDecimal,isValidInteger } from "@/lib/validation/field-validators";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { useInventory } from "@/context/inventory-context"
-import { HotelRate, MealPlan, RateStatus, Hotel, HotelRoom } from "@/types"
-import { toast } from "sonner"
-
-interface ParsedRow {
-  rowIndex: number
-  hotelName: string
-  roomName: string
-  mealPlan: string
-  baseRate: number
-  extraAdultRate?: number
-  childRate?: number
-  validFrom: string
-  validTo: string
-  // Validation status
-  status: "valid" | "warning" | "error"
-  messages: string[]
-  matchedHotel?: Hotel
-  matchedRoom?: HotelRoom
-}
+AlertTriangle,
+ArrowLeft,
+Calendar,
+Edit2,
+Hotel as HotelIcon,
+Loader2,
+MoreVertical,
+Sparkles,
+Trash2,
+Truck,
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function RateSheetDetailPage() {
-  const params = useParams()
-  const router = useRouter()
-  const rateSheetId = params.id as string
+  const router = useRouter();
+  const params = useParams();
+  const id = params.id as string;
 
-  const {
-    rateSheets,
-    suppliers,
-    hotels,
-    hotelRooms,
-    hotelRates,
-    updateRateSheet,
-    importHotelRates,
-    addHotelRoom,
-  } = useInventory()
+  // Data states
+  const [rateSheet, setRateSheet] = React.useState<RateSheetWithRelations | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
-  const rateSheet = rateSheets.find((rs) => rs.id === rateSheetId)
-  const supplier = rateSheet ? suppliers.find((s) => s.id === rateSheet.supplierId) : null
-  const linkedRates = hotelRates.filter((hr) => hr.rateSheetId === rateSheetId)
+  // Edit Rate Modal State
+  const [isEditOpen, setIsEditOpen] = React.useState(false);
+  const [editName, setEditName] = React.useState("");
+  const [editSeasonName, setEditSeasonName] = React.useState("");
+  const [editValidFrom, setEditValidFrom] = React.useState("");
+  const [editValidTo, setEditValidTo] = React.useState("");
+  const [editCostPrice, setEditCostPrice] = React.useState("0");
+  const [editExtraAdultRate, setEditExtraAdultRate] = React.useState("");
+  const [editExtraChildRate, setEditExtraChildRate] = React.useState("");
+  const [editPriority, setEditPriority] = React.useState(0);
+  const [editTaxPercentage, setEditTaxPercentage] = React.useState(0);
+  const [editNotes, setEditNotes] = React.useState("");
+  const [savingEdit, setSavingEdit] = React.useState(false);
 
-  // ─── Import Dialog States ─────────────────────────────────────────────
-  const [isImportModalOpen, setIsImportModalOpen] = React.useState(false)
-  const [importStep, setImportStep] = React.useState<"upload" | "preview">("upload")
-  const [uploadedFileName, setUploadedFileName] = React.useState("")
-  const [parsedRows, setParsedRows] = React.useState<ParsedRow[]>([])
-  const [isImporting, setIsImporting] = React.useState(false)
+  // Load rate sheet
+  const loadRateSheet = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  if (!rateSheet) {
-    return (
-      <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
-        <PageHeader
-          title="Rate Sheet Not Found"
-          breadcrumbs={[{ label: "Rate Sheets", href: "/rate-sheets" }, { label: "Not Found" }]}
-        />
-        <div className="px-4 py-8 md:px-8 max-w-lg">
-          <EmptyState
-            icon={FileSpreadsheet}
-            title="Rate Sheet Not Found"
-            description="The requested rate sheet contract does not exist."
-            actionText="Back to Rate Sheets"
-            onAction={() => router.push("/rate-sheets")}
-          />
-        </div>
-      </div>
-    )
-  }
+      const res = await rateSheetClient.getRateSheet(id);
+      if (res.success && res.data) {
+        setRateSheet(res.data);
+        // Pre-fill edit form
+        setEditName(res.data.name || "");
+        setEditSeasonName(res.data.seasonName || "");
+        setEditValidFrom(
+          res.data.validFrom ? new Date(res.data.validFrom).toISOString().split("T")[0] : ""
+        );
+        setEditValidTo(
+          res.data.validTo ? new Date(res.data.validTo).toISOString().split("T")[0] : ""
+        );
+        setEditCostPrice(String(res.data.costPrice || 0));
+        setEditExtraAdultRate(res.data.extraAdultRate ? String(res.data.extraAdultRate) : "");
+        setEditExtraChildRate(res.data.extraChildRate ? String(res.data.extraChildRate) : "");
+        setEditPriority(res.data.priority || 0);
+        setEditTaxPercentage(res.data.taxPercentage ? Number(res.data.taxPercentage) : 0);
+        setEditNotes(res.data.notes || "");
+      }
+    } catch (err: any) {
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setIsReadOnly(true);
+      }
+      setError(err?.message || "Failed to load rate sheet.");
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
-  const formatDate = (iso?: string) => {
-    if (!iso) return "—"
-    const d = new Date(iso)
-    if (isNaN(d.getTime())) return "—"
-    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
-  }
+  React.useEffect(() => {
+    if (id) loadRateSheet();
+  }, [id, loadRateSheet]);
 
-  // ─── Generate & Download Sample Excel Template ────────────────────────
-  const handleDownloadSample = () => {
-    const sampleData = [
-      {
-        "Hotel Name": "Parakkat Nature Resort",
-        "Room Category": "Premium Valley View Room",
-        "Meal Plan": "CPAI",
-        "Base Rate (INR)": 5500,
-        "Extra Adult Rate": 1500,
-        "Child Rate": 800,
-        "Valid From (YYYY-MM-DD)": "2026-10-01",
-        "Valid To (YYYY-MM-DD)": "2027-03-31",
-      },
-      {
-        "Hotel Name": "Parakkat Nature Resort",
-        "Room Category": "Executive Suite",
-        "Meal Plan": "MAPAI",
-        "Base Rate (INR)": 9500,
-        "Extra Adult Rate": 2000,
-        "Child Rate": 1000,
-        "Valid From (YYYY-MM-DD)": "2026-10-01",
-        "Valid To (YYYY-MM-DD)": "2027-03-31",
-      },
-      {
-        "Hotel Name": "Munnar Valley Retreat",
-        "Room Category": "Premium Room",
-        "Meal Plan": "CPAI",
-        "Base Rate (INR)": 5500,
-        "Extra Adult Rate": 1400,
-        "Child Rate": 700,
-        "Valid From (YYYY-MM-DD)": "2026-10-01",
-        "Valid To (YYYY-MM-DD)": "2027-03-31",
-      },
-      {
-        "Hotel Name": "Kerala Backwater Lake Resort",
-        "Room Category": "Lake View Cottage",
-        "Meal Plan": "CPAI",
-        "Base Rate (INR)": 8500,
-        "Extra Adult Rate": 2500,
-        "Child Rate": 1200,
-        "Valid From (YYYY-MM-DD)": "2026-09-01",
-        "Valid To (YYYY-MM-DD)": "2027-04-30",
-      },
-    ]
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isReadOnly) {
+      toast.error("Subscription expired. Read-only mode is active.");
+      return;
+    }
 
-    const ws = XLSX.utils.json_to_sheet(sampleData)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "Hotel_Rates")
-    XLSX.writeFile(wb, `TripDesk_Rate_Sheet_Template.xlsx`)
-    toast.success("Sample template downloaded.")
-  }
+    if (!editName.trim()) {
+      toast.error("Rate sheet name is required.");
+      return;
+    }
 
-  // ─── File Upload & Parse ──────────────────────────────────────────────
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    if (!isValidDecimal(editCostPrice, { min: 0 })) {
+      toast.error("Room Cost Rate must be a valid non-negative amount.");
+      return;
+    }
 
-    setUploadedFileName(file.name)
+    if (editExtraAdultRate && !isValidDecimal(editExtraAdultRate, { min: 0 })) {
+      toast.error("Extra Adult Rate must be a valid non-negative amount.");
+      return;
+    }
 
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result
-        const wb = XLSX.read(bstr, { type: "binary" })
-        const wsName = wb.SheetNames[0]
-        const ws = wb.Sheets[wsName]
-        const rawData = XLSX.utils.sheet_to_json<Record<string, any>>(ws)
+    if (editExtraChildRate && !isValidDecimal(editExtraChildRate, { min: 0 })) {
+      toast.error("Extra Child Rate must be a valid non-negative amount.");
+      return;
+    }
 
-        if (rawData.length === 0) {
-          toast.error("The uploaded file is empty.")
-          return
+    if (!isValidInteger(editPriority, { min: 0, max: 1000 })) {
+      toast.error("Priority weight must be a whole number between 0 and 1000.");
+      return;
+    }
+
+    if (!isValidDecimal(editTaxPercentage, { min: 0, max: 100 })) {
+      toast.error("Supplier Tax percentage must be between 0 and 100.");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      const res = await rateSheetClient.updateRateSheet(id, {
+        name: editName.trim(),
+        seasonName: editSeasonName.trim() || null,
+        validFrom: new Date(editValidFrom),
+        validTo: new Date(editValidTo),
+        costPrice: Number(editCostPrice),
+        extraAdultRate: editExtraAdultRate ? Number(editExtraAdultRate) : null,
+        extraChildRate: editExtraChildRate ? Number(editExtraChildRate) : null,
+        priority: Number(editPriority),
+        taxPercentage: Number(editTaxPercentage),
+        notes: editNotes.trim() || null,
+      });
+
+      if (res.success) {
+        toast.success("Rate sheet updated successfully!");
+        setIsEditOpen(false);
+        await loadRateSheet();
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update rate sheet.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleArchive = () => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Read-only mode is active.");
+      return;
+    }
+
+    if (!rateSheet) return;
+    setConfirmAction({
+      title: "Archive rate sheet?",
+      description: `Archive rate sheet "${rateSheet.name}"? Historical quotation records will remain safe.`,
+      confirmText: "Archive Rate Sheet",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await rateSheetClient.archiveRateSheet(id);
+          toast.success(`Rate sheet ${rateSheet.name} archived.`);
+          setConfirmAction(null);
+          router.push("/rate-sheets");
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the rate sheet. Please try again."));
+        } finally {
+          setActionLoading(false);
         }
+      },
+    });
+  };
 
-        // Validate and map rows
-        const processed: ParsedRow[] = rawData.map((row, index) => {
-          const hotelName = String(row["Hotel Name"] || row["hotel_name"] || row["Hotel"] || "").trim()
-          const roomName = String(row["Room Category"] || row["room_category"] || row["Room"] || "").trim()
-          const mealPlanRaw = String(row["Meal Plan"] || row["meal_plan"] || row["Plan"] || "CPAI").trim().toUpperCase()
-          const baseRate = Number(row["Base Rate (INR)"] || row["Base Rate"] || row["base_rate"] || row["Rate"] || 0)
-          const extraAdultRate = Number(row["Extra Adult Rate"] || row["extra_adult"] || 0)
-          const childRate = Number(row["Child Rate"] || row["child_rate"] || 0)
-          const validFrom = String(row["Valid From (YYYY-MM-DD)"] || row["valid_from"] || rateSheet.validFrom).trim()
-          const validTo = String(row["Valid To (YYYY-MM-DD)"] || row["valid_to"] || rateSheet.validTo).trim()
+  const formatDateDisplay = (date: Date | string | null | undefined) => {
+    if (!date) return "—";
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
 
-          const messages: string[] = []
-          let status: "valid" | "warning" | "error" = "valid"
-
-          // 1. Hotel Matching
-          const matchedHotel = hotels.find(
-            (h) => h.name.toLowerCase() === hotelName.toLowerCase()
-          )
-
-          if (!matchedHotel) {
-            status = "error"
-            messages.push(`Hotel "${hotelName}" not found in inventory. Create hotel first.`)
-          }
-
-          // 2. Room Matching
-          let matchedRoom: HotelRoom | undefined
-          if (matchedHotel) {
-            matchedRoom = hotelRooms.find(
-              (r) => r.hotelId === matchedHotel.id && r.name.toLowerCase() === roomName.toLowerCase()
-            )
-            if (!matchedRoom) {
-              status = status === "error" ? "error" : "warning"
-              messages.push(`Room "${roomName}" does not exist. Will be auto-created.`)
-            }
-          }
-
-          // 3. Meal Plan Validation
-          const validPlans = ["RO", "CPAI", "MAPAI", "APAI"]
-          if (!validPlans.includes(mealPlanRaw)) {
-            status = "error"
-            messages.push(`Invalid Meal Plan "${mealPlanRaw}". Must be RO, CPAI, MAPAI or APAI.`)
-          }
-
-          // 4. Base Rate Validation
-          if (isNaN(baseRate) || baseRate <= 0) {
-            status = "error"
-            messages.push("Base rate must be a positive number.")
-          }
-
-          // 5. Duplicate Check
-          if (matchedHotel && matchedRoom) {
-            const isDuplicate = hotelRates.some(
-              (hr) =>
-                hr.hotelId === matchedHotel.id &&
-                hr.roomId === matchedRoom?.id &&
-                hr.mealPlan === mealPlanRaw &&
-                hr.validFrom === validFrom &&
-                hr.status === "Active"
-            )
-            if (isDuplicate) {
-              status = status === "error" ? "error" : "warning"
-              messages.push("Matching rate already exists. This will update/supplement it.")
-            }
-          }
-
-          return {
-            rowIndex: index + 1,
-            hotelName: hotelName || "Unnamed Hotel",
-            roomName: roomName || "Standard Room",
-            mealPlan: mealPlanRaw as MealPlan,
-            baseRate,
-            extraAdultRate,
-            childRate,
-            validFrom,
-            validTo,
-            status,
-            messages,
-            matchedHotel,
-            matchedRoom,
-          }
-        })
-
-        setParsedRows(processed)
-        setImportStep("preview")
-      } catch (err) {
-        console.error(err)
-        toast.error("Failed to parse file. Ensure it is a valid .xlsx or .csv.")
-      }
-    }
-    reader.readAsBinaryString(file)
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-slate-50/50">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
+        <h3 className="text-xs font-bold text-slate-700">Loading rate sheet details...</h3>
+      </div>
+    );
   }
 
-  // ─── Execute Import ───────────────────────────────────────────────────
-  const handleExecuteImport = () => {
-    setIsImporting(true)
-    const validRowsToImport = parsedRows.filter((r) => r.status !== "error")
-
-    if (validRowsToImport.length === 0) {
-      toast.error("No valid rows to import. Please resolve the errors.")
-      setIsImporting(false)
-      return
-    }
-
-    // Auto-create missing rooms if needed
-    const newRatesPayload: Omit<HotelRate, "id" | "createdAt" | "updatedAt">[] = []
-
-    validRowsToImport.forEach((row) => {
-      if (!row.matchedHotel) return
-
-      let roomId = row.matchedRoom?.id
-      if (!roomId) {
-        // Auto-create room
-        const createdRoom = addHotelRoom({
-          hotelId: row.matchedHotel.id,
-          name: row.roomName,
-          maxAdults: 2,
-          maxChildren: 1,
-          bedType: "King Bed",
-          status: "Active",
-        })
-        roomId = createdRoom.id
-      }
-
-      newRatesPayload.push({
-        hotelId: row.matchedHotel.id,
-        roomId,
-        rateSheetId: rateSheet.id,
-        mealPlan: row.mealPlan as MealPlan,
-        currency: "INR",
-        baseRate: row.baseRate,
-        occupancyAdults: 2,
-        occupancyChildren: 0,
-        extraAdultRate: row.extraAdultRate || 0,
-        childRate: row.childRate || 0,
-        validFrom: row.validFrom,
-        validTo: row.validTo,
-        status: "Active",
-        sourceType: "Excel",
-        notes: `Imported from ${uploadedFileName}`,
-      })
-    })
-
-    const count = importHotelRates(newRatesPayload)
-
-    // Update rate sheet fileName
-    updateRateSheet(rateSheet.id, {
-      fileName: uploadedFileName,
-      status: "Active",
-    })
-
-    setIsImporting(false)
-    setIsImportModalOpen(false)
-    setImportStep("upload")
-    setParsedRows([])
-    toast.success(`Successfully imported ${count} B2B contract rates from ${uploadedFileName}!`)
+  if (error || !rateSheet) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-slate-50/50">
+        <AlertTriangle className="h-12 w-12 text-slate-400 mb-3" />
+        <h3 className="text-lg font-bold text-slate-800">Rate Sheet Not Found</h3>
+        <p className="text-xs text-slate-500 max-w-md mt-1">
+          {error || "The requested rate sheet does not exist or has been archived."}
+        </p>
+        <Link href="/rate-sheets" className="mt-4">
+          <Button variant="outline" size="sm" className="bg-white border-slate-200 cursor-pointer">
+            Back to Rate Sheets
+          </Button>
+        </Link>
+      </div>
+    );
   }
 
-  const validCount = parsedRows.filter((r) => r.status === "valid").length
-  const warningCount = parsedRows.filter((r) => r.status === "warning").length
-  const errorCount = parsedRows.filter((r) => r.status === "error").length
+  const isExpired = new Date(rateSheet.validTo) < new Date();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        
-        {/* Top Hero Command Header */}
-        <div className="flex flex-col gap-5 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
+      <div className="max-w-[1550px] mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6">
+        {/* Read-Only Banner */}
+        {isReadOnly && <ReadOnlyBanner moduleName="Rate Sheet Detail" />}
 
-          {/* Top Title & Telemetry Row */}
+        {/* Top Hero Command Header */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden space-y-4 sm:space-y-5">
+          <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-purple-50/70 via-purple-50/20 to-transparent pointer-events-none" />
+
+          {/* Breadcrumb & Badges */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 z-10">
+            <Link
+              href="/rate-sheets"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shrink-0"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </Link>
+            <span className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide uppercase bg-purple-50 text-purple-700 border border-purple-100 whitespace-nowrap">
+              <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-purple-500" />
+              Hotel Tariff
+            </span>
+            <span className="text-[11px] sm:text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded whitespace-nowrap">
+              {rateSheet.rateSheetNumber || "RAT-LEGACY"}
+            </span>
+            <Badge
+              variant="outline"
+              className={`text-[9px] sm:text-[10px] font-bold whitespace-nowrap px-1.5 sm:px-2.5 ${
+                isExpired
+                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : rateSheet.status === "ACTIVE"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-slate-100 text-slate-600 border-slate-200"
+              }`}
+            >
+              {isExpired ? "EXPIRED" : rateSheet.status}
+            </Badge>
+          </div>
+
+          {/* Main Info Row */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 z-10">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2.5">
-                <Link
-                  href="/rate-sheets"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                </Link>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
-                  <FileSpreadsheet className="h-3 w-3 text-indigo-500" />
-                  Tariff Contract
-                </span>
-                <span className="text-slate-300">•</span>
-                <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                  {rateSheet.id}
-                </span>
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
-                    rateSheet.status === "Active"
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
-                      : "bg-slate-100 text-slate-600 border-slate-200"
-                  }`}
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full ${rateSheet.status === "Active" ? "bg-emerald-500" : "bg-slate-400"}`} />
-                  {rateSheet.status}
-                </span>
+            <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+              <div className="h-11 w-11 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold border border-purple-100 shadow-2xs shrink-0">
+                <HotelIcon className="h-5 w-5 sm:h-8 sm:w-8" />
               </div>
 
-              <div className="flex flex-wrap items-baseline gap-3">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+              <div className="space-y-1.5 min-w-0 flex-1">
+                <h1 className="text-base sm:text-xl lg:text-2xl font-black text-slate-900 tracking-tight leading-snug sm:leading-tight break-words">
                   {rateSheet.name}
                 </h1>
-                <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-md">
-                  {rateSheet.sourceType} Format
-                </span>
-              </div>
 
-              {/* Micro-Telemetry Stat Badges */}
-              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                {supplier && (
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100/80 text-slate-700 font-medium">
-                    <span>Partner:</span>
-                    <Link href={`/suppliers/${supplier.id}`} className="font-bold text-indigo-600 hover:underline">
-                      {supplier.name}
-                    </Link>
-                  </div>
-                )}
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 text-blue-800 font-medium border border-blue-100/60">
-                  <Calendar className="h-3 w-3 text-blue-600" />
-                  <span className="font-bold text-blue-950">Validity:</span>
-                  <span>{formatDate(rateSheet.validFrom)} → {formatDate(rateSheet.validTo)}</span>
-                </div>
-                {rateSheet.fileName && (
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100/80 text-slate-700 font-mono text-[11px]">
-                    <span>📄 {rateSheet.fileName}</span>
-                  </div>
-                )}
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-medium border border-emerald-100/60">
-                  <Sparkles className="h-3 w-3 text-emerald-600" />
-                  <span className="font-bold text-emerald-950">{linkedRates.length}</span> Rates Loaded
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-600">
+                  <span className="flex items-center gap-1 font-semibold text-slate-800">
+                    <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <span className="break-words">{formatDateDisplay(rateSheet.validFrom)} → {formatDateDisplay(rateSheet.validTo)}</span>
+                  </span>
+
+                  {rateSheet.seasonName && (
+                    <span className="inline-flex items-center gap-1 text-slate-700 font-medium before:content-['•'] before:mr-1 before:text-slate-300">
+                      {rateSheet.seasonName}
+                    </span>
+                  )}
+
+                  {rateSheet.supplier && (
+                    <span className="inline-flex items-center gap-1 font-semibold text-slate-700 before:content-['•'] before:mr-1 before:text-slate-300">
+                      <Truck className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                      <span className="break-words">{rateSheet.supplier.name}</span>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Right Action Controls */}
-            <div className="flex items-center gap-2.5 z-10 self-start lg:self-center">
+            {/* Actions */}
+            <div className="flex items-center gap-2 pt-1 lg:pt-0 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleDownloadSample}
-                className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-9 px-3.5 rounded-xl shadow-2xs cursor-pointer"
+                onClick={() => setIsEditOpen(true)}
+                disabled={isReadOnly}
+                className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-9 rounded-xl shadow-2xs cursor-pointer gap-1.5"
               >
-                <Download className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
-                Template
+                <Edit2 className="h-3.5 w-3.5 text-slate-500" />
+                Edit Rate Sheet
               </Button>
 
-              <Button
-                size="sm"
-                onClick={() => {
-                  setImportStep("upload")
-                  setParsedRows([])
-                  setIsImportModalOpen(true)
-                }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-9 px-4 rounded-xl cursor-pointer shadow-xs"
-              >
-                <Upload className="h-3.5 w-3.5 mr-1.5" />
-                Import Excel / CSV
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Rates Content Container */}
-        <div className="space-y-6">
-        {/* Linked Rates Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                Rates Linked to this Contract ({linkedRates.length})
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                All B2B room rates active and mapped under this supplier contract.
-              </p>
-            </div>
-
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setImportStep("upload")
-                setIsImportModalOpen(true)
-              }}
-              className="text-xs font-semibold bg-white border-slate-200"
-            >
-              <FileUp className="h-3.5 w-3.5 mr-1" />
-              Upload Tariff
-            </Button>
-          </div>
-
-          {linkedRates.length === 0 ? (
-            <EmptyState
-              icon={FileSpreadsheet}
-              title="No rates in this sheet yet"
-              description="Click 'Import Excel / CSV' to upload your supplier's contracted rate sheet in seconds."
-              actionText="Import Rates Now"
-              onAction={() => {
-                setImportStep("upload")
-                setIsImportModalOpen(true)
-              }}
-            />
-          ) : (
-            <div className="bg-white rounded-xl border border-border overflow-hidden shadow-2xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50/75 border-b border-slate-100 text-slate-500 uppercase font-bold text-[10px] tracking-wider select-none">
-                    <tr>
-                      <th className="py-3.5 px-4 font-bold">Hotel / Property</th>
-                      <th className="py-3.5 px-4 font-bold">Room Category</th>
-                      <th className="py-3.5 px-4 font-bold">Meal Plan</th>
-                      <th className="py-3.5 px-4 font-bold">Base Rate (Net)</th>
-                      <th className="py-3.5 px-4 font-bold">Extra Person Rates</th>
-                      <th className="py-3.5 px-4 font-bold">Validity Range</th>
-                      <th className="py-3.5 px-4 font-bold text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
-                    {linkedRates.map((rate) => {
-                      const hotel = hotels.find((h) => h.id === rate.hotelId)
-                      const room = hotelRooms.find((r) => r.id === rate.roomId)
-
-                      return (
-                        <tr key={rate.id} className="hover:bg-slate-50/80 transition-colors">
-                          {/* Hotel */}
-                          <td className="py-3.5 px-4">
-                            <Link href={`/hotels/${rate.hotelId}`} className="font-bold text-slate-900 hover:text-indigo-600">
-                              {hotel?.name || rate.hotelId}
-                            </Link>
-                            <div className="text-[11px] text-slate-400 font-normal">
-                              {hotel?.destination}
-                            </div>
-                          </td>
-
-                          {/* Room */}
-                          <td className="py-3.5 px-4 font-semibold text-slate-800">
-                            {room?.name || rate.roomId}
-                          </td>
-
-                          {/* Meal Plan */}
-                          <td className="py-3.5 px-4">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                              {rate.mealPlan}
-                            </span>
-                          </td>
-
-                          {/* Base Rate */}
-                          <td className="py-3.5 px-4 font-bold text-slate-900 text-sm">
-                            ₹{rate.baseRate.toLocaleString("en-IN")}
-                            <span className="text-[10px] text-slate-400 font-normal block">/ night</span>
-                          </td>
-
-                          {/* Extra Person */}
-                          <td className="py-3.5 px-4 text-slate-600">
-                            <div>Adult: {rate.extraAdultRate ? `₹${rate.extraAdultRate}` : "—"}</div>
-                            <div className="text-[11px] text-slate-400">Child: {rate.childRate ? `₹${rate.childRate}` : "—"}</div>
-                          </td>
-
-                          {/* Validity */}
-                          <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600">
-                            {formatDate(rate.validFrom)} → {formatDate(rate.validTo)}
-                          </td>
-
-                          {/* Status */}
-                          <td className="py-3.5 px-4 text-center">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              {rate.status}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ─── Interactive Rate Import Dialog ─────────────────────────────────── */}
-      <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
-        <DialogContent className="bg-white border border-slate-200 rounded-xl max-w-4xl p-6 max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5 text-indigo-600" />
-              <span>Import Contract Rates from Excel / CSV</span>
-            </DialogTitle>
-            <DialogDescription className="text-slate-500 text-xs">
-              Upload your supplier's rate sheet. TripDesk parses the columns, verifies against existing inventory, and validates data integrity.
-            </DialogDescription>
-          </DialogHeader>
-
-          {importStep === "upload" && (
-            <div className="space-y-5 py-4">
-              {/* Dropzone */}
-              <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-col items-center justify-center">
-                <div className="h-12 w-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3">
-                  <Upload className="h-6 w-6 stroke-[1.8]" />
-                </div>
-                <h4 className="text-sm font-bold text-slate-800">Select or Drag & Drop Rate Sheet</h4>
-                <p className="text-xs text-slate-500 mt-1 max-w-sm leading-relaxed">
-                  Supports Excel (.xlsx, .xls) and CSV (.csv) spreadsheets formatted with standard column headers.
-                </p>
-
-                <div className="mt-4">
-                  <label className="cursor-pointer">
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
                     <Button
-                      type="button"
-                      variant="default"
+                      variant="outline"
                       size="sm"
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4"
-                      onClick={() => document.getElementById("file-upload-input")?.click()}
+                      className="bg-white hover:bg-slate-50 border-slate-200 h-9 w-9 p-0 rounded-xl shadow-2xs cursor-pointer"
                     >
-                      Browse Files
+                      <MoreVertical className="h-4 w-4 text-slate-500" />
                     </Button>
-                    <input
-                      id="file-upload-input"
-                      type="file"
-                      accept=".xlsx, .xls, .csv"
-                      className="hidden"
-                      onChange={handleFileUpload}
-                    />
-                  </label>
+                  }
+                />
+                <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 rounded-xl p-1 text-xs">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      onClick={handleArchive}
+                      disabled={isReadOnly}
+                      className="text-rose-600 hover:bg-rose-50 cursor-pointer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-2 text-rose-500" />
+                      Archive Rate
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </div>
+
+        {/* Pricing Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
+            <span className="text-[11px] uppercase font-bold text-slate-400">Primary Purchase Rate</span>
+            <h3 className="text-xl sm:text-2xl font-black text-emerald-700">
+              {formatCurrency(Number(rateSheet.costPrice))}
+              <span className="text-xs text-slate-500 font-normal"> / room / night</span>
+            </h3>
+          </div>
+
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
+            <span className="text-[11px] uppercase font-bold text-slate-400">Resolution Priority</span>
+            <h3 className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
+              Priority: {rateSheet.priority}
+            </h3>
+            <p className="text-[11px] text-slate-500">Higher priority overrides generic dates</p>
+          </div>
+
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
+            <span className="text-[11px] uppercase font-bold text-slate-400">Supplier Tax (%)</span>
+            <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+              {Number(rateSheet.taxPercentage || 0)}%
+            </h3>
+            <p className="text-[11px] text-slate-500">Inclusive supplier-side tax</p>
+          </div>
+        </div>
+
+        {/* Configuration Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Linked Inventory details */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-4">
+            <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">
+              Contracted Hotel Resource
+            </h3>
+
+            <div className="space-y-3 text-xs">
+              {rateSheet.hotel ? (
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Hotel Property</span>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="font-bold text-slate-900 text-sm">{rateSheet.hotel.name}</span>
+                    <Link href={`/hotels/${rateSheet.hotel.id}`} className="text-indigo-600 hover:underline text-xs font-semibold">
+                      View Hotel
+                    </Link>
+                  </div>
+                  <p className="text-slate-600 mt-1">
+                    Room: <strong>{rateSheet.roomType || "Standard Room"}</strong> • Meal: <strong>{rateSheet.mealPlan || "CP"}</strong>
+                  </p>
+                </div>
+              ) : (
+                <p className="text-slate-500 italic">No specific hotel linked.</p>
+              )}
+
+              {/* Extra rates Breakdown */}
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Extra Adult Rate</span>
+                  <p className="font-bold text-slate-800">
+                    {rateSheet.extraAdultRate ? formatCurrency(Number(rateSheet.extraAdultRate)) : "—"}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Extra Child Rate</span>
+                  <p className="font-bold text-slate-800">
+                    {rateSheet.extraChildRate ? formatCurrency(Number(rateSheet.extraChildRate)) : "—"}
+                  </p>
                 </div>
               </div>
+            </div>
+          </div>
 
-              {/* Template Helper Card */}
-              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2.5">
-                  <FileCheck className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
-                  <div>
-                    <div className="font-bold text-slate-800">Need the standard import format?</div>
-                    <div className="text-slate-500 text-[11px]">Download our pre-configured template with sample rows.</div>
+          {/* Supplier & Contractual Notes */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-4">
+            <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">
+              Supplier & Contractual Terms
+            </h3>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400">Supplier / Vendor Partner</span>
+                {rateSheet.supplier ? (
+                  <div className="pt-1">
+                    <h4 className="font-bold text-slate-900">{rateSheet.supplier.name}</h4>
+                    <span className="text-[11px] text-slate-500 font-mono">{rateSheet.supplier.supplierCode}</span>
+                  </div>
+                ) : (
+                  <p className="text-slate-700 font-semibold pt-1">Direct Hotel / In-House Inventory</p>
+                )}
+              </div>
+
+              {rateSheet.notes && (
+                <div className="pt-2">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Contract Notes & Remarks</span>
+                  <p className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-slate-700 mt-1 leading-relaxed whitespace-pre-wrap">
+                    {rateSheet.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ─── EDIT RATE SHEET MODAL ─── */}
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
+            <form onSubmit={handleEditSubmit}>
+              <DialogHeader>
+                <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
+                  <Edit2 className="h-4 w-4 text-indigo-600" />
+                  <span>Edit Rate Sheet</span>
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-1">
+                  Modify tariff pricing, seasonal validity, and priority for {rateSheet.name}.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3.5 mt-4 text-xs max-h-[60vh] overflow-y-auto pr-1">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Tariff Title *</label>
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Season Name</label>
+                    <Input
+                      value={editSeasonName}
+                      onChange={(e) => setEditSeasonName(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Priority Weight</label>
+                    <Input
+                      type="number"
+                      value={editPriority}
+                      onChange={(e) => setEditPriority(Number(e.target.value))}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs font-mono font-bold"
+                    />
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadSample}
-                  className="bg-white border-slate-200 text-xs font-semibold h-8"
-                >
-                  <Download className="h-3 w-3 mr-1" />
-                  Download Sample
-                </Button>
-              </div>
-            </div>
-          )}
 
-          {importStep === "preview" && (
-            <div className="space-y-4 py-2">
-              {/* Validation Summary Bar */}
-              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-800">File: {uploadedFileName}</span>
-                  <span className="text-slate-400 font-mono">({parsedRows.length} rows parsed)</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Valid From *</label>
+                    <Input
+                      type="date"
+                      value={editValidFrom}
+                      onChange={(e) => setEditValidFrom(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Valid To *</label>
+                    <Input
+                      type="date"
+                      value={editValidTo}
+                      onChange={(e) => setEditValidTo(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      required
+                    />
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px]">
-                    <CheckCircle2 className="h-3 w-3" />
-                    {validCount} Valid
-                  </span>
-                  {warningCount > 0 && (
-                    <span className="flex items-center gap-1 font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-[11px]">
-                      <AlertTriangle className="h-3 w-3" />
-                      {warningCount} Warnings
-                    </span>
-                  )}
-                  {errorCount > 0 && (
-                    <span className="flex items-center gap-1 font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded text-[11px]">
-                      <XCircle className="h-3 w-3" />
-                      {errorCount} Errors
-                    </span>
-                  )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Cost Price (₹) *</label>
+                    <Input
+                      type="number"
+                      value={editCostPrice}
+                      onChange={(e) => setEditCostPrice(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs font-bold text-emerald-700"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Tax Percentage (%)</label>
+                    <Input
+                      type="number"
+                      value={editTaxPercentage}
+                      onChange={(e) => setEditTaxPercentage(Number(e.target.value))}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {/* Rows Preview Table */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-[350px] overflow-y-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-600 sticky top-0 uppercase font-bold text-[10px] tracking-wider z-10 select-none">
-                    <tr>
-                      <th className="py-2.5 px-3">#</th>
-                      <th className="py-2.5 px-3">Hotel</th>
-                      <th className="py-2.5 px-3">Room Category</th>
-                      <th className="py-2.5 px-3">Plan</th>
-                      <th className="py-2.5 px-3">Rate (INR)</th>
-                      <th className="py-2.5 px-3">Validity</th>
-                      <th className="py-2.5 px-3">Validation Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
-                    {parsedRows.map((row) => (
-                      <tr
-                        key={row.rowIndex}
-                        className={
-                          row.status === "error"
-                            ? "bg-red-50/40"
-                            : row.status === "warning"
-                            ? "bg-amber-50/40"
-                            : "hover:bg-slate-50"
-                        }
-                      >
-                        <td className="py-2 px-3 font-mono text-slate-400">{row.rowIndex}</td>
-                        <td className="py-2 px-3 font-bold text-slate-800">{row.hotelName}</td>
-                        <td className="py-2 px-3 text-slate-700">{row.roomName}</td>
-                        <td className="py-2 px-3">
-                          <span className="font-bold text-[10px] px-1.5 py-0.2 bg-slate-100 rounded">
-                            {row.mealPlan}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3 font-bold text-slate-900">
-                          ₹{row.baseRate.toLocaleString("en-IN")}
-                        </td>
-                        <td className="py-2 px-3 font-mono text-[10px] text-slate-500">
-                          {row.validFrom} → {row.validTo}
-                        </td>
-                        <td className="py-2 px-3">
-                          {row.status === "valid" ? (
-                            <span className="text-emerald-600 font-bold flex items-center gap-1 text-[11px]">
-                              <CheckCircle2 className="h-3 w-3" /> Ready
-                            </span>
-                          ) : row.status === "warning" ? (
-                            <div className="text-amber-700 font-semibold text-[10px]">
-                              {row.messages.join(", ")}
-                            </div>
-                          ) : (
-                            <div className="text-red-600 font-bold text-[10px] flex items-center gap-1">
-                              <XCircle className="h-3 w-3 shrink-0" />
-                              <span>{row.messages.join(", ")}</span>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Extra Adult (₹)</label>
+                    <Input
+                      type="number"
+                      value={editExtraAdultRate}
+                      onChange={(e) => setEditExtraAdultRate(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Extra Child (₹)</label>
+                    <Input
+                      type="number"
+                      value={editExtraChildRate}
+                      onChange={(e) => setEditExtraChildRate(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
 
-          <DialogFooter className="mt-4 flex justify-between sm:justify-between items-center gap-2">
-            {importStep === "preview" ? (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setImportStep("upload")}
-                  className="bg-white border-slate-200 text-xs"
-                >
-                  Choose Different File
-                </Button>
-                <div className="flex gap-2">
-                  <DialogClose
-                    render={
-                      <Button type="button" variant="ghost" size="sm" className="text-xs">
-                        Cancel
-                      </Button>
-                    }
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Remarks & Notes</label>
+                  <Textarea
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    rows={2}
+                    className="bg-slate-50/50 border-slate-200 text-xs"
                   />
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={validCount + warningCount === 0 || isImporting}
-                    onClick={handleExecuteImport}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-5 shadow-xs"
-                  >
-                    {isImporting ? "Importing..." : `Import ${validCount + warningCount} Valid Rates`}
-                  </Button>
                 </div>
-              </>
-            ) : (
-              <DialogClose
-                render={
-                  <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs">
-                    Close
-                  </Button>
-                }
-              />
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              </div>
+
+              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={savingEdit}
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl"
+                >
+                  {savingEdit ? "Saving..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          open={confirmAction !== null}
+          onOpenChange={(open) => {
+            if (!open && !actionLoading) setConfirmAction(null);
+          }}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (confirmAction?.action) {
+              await confirmAction.action();
+            }
+          }}
+        />
       </div>
     </div>
-  )
+  );
 }

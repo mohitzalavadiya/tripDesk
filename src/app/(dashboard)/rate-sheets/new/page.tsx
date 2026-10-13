@@ -1,238 +1,461 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { useFormik } from "formik"
-import { FileSpreadsheet, Plus, ArrowLeft } from "lucide-react"
-import { PageHeader } from "@/components/shared/page-header"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { PageHeader } from "@/components/shared/page-header";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ReadOnlyModeCard } from "@/components/shared/read-only-mode-card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { useInventory } from "@/context/inventory-context"
-import { rateSheetSchema } from "@/lib/validation-schemas"
-import { RateSheetStatus, RateSheetSourceType } from "@/types"
-import { toast } from "sonner"
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useSubscription } from "@/context/subscription-context";
+import {
+hotelClient,
+rateSheetClient,
+supplierClient,
+} from "@/lib/api-client";
+import { isValidDecimal,isValidInteger } from "@/lib/validation/field-validators";
+import { Hotel,Supplier } from "@prisma/client";
+import {
+Calendar,
+Hotel as HotelIcon,
+Loader2,
+Plus
+} from "lucide-react";
+import { useRouter,useSearchParams } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 function NewRateSheetForm() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const preselectedSupplier = searchParams.get("supplierId") || ""
-  const { addRateSheet, suppliers } = useInventory()
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectedSupplier = searchParams.get("supplierId") || "";
+  const preselectedHotel = searchParams.get("hotelId") || "";
 
-  const formik = useFormik({
-    initialValues: {
-      name: "",
-      supplierId: preselectedSupplier,
-      description: "",
-      validFrom: "2026-10-01",
-      validTo: "2027-03-31",
-      status: "Active" as RateSheetStatus,
-      sourceType: "Excel" as RateSheetSourceType,
-    },
-    validationSchema: rateSheetSchema,
-    onSubmit: (values) => {
-      const newRs = addRateSheet({
-        name: values.name.trim(),
-        supplierId: values.supplierId,
-        description: values.description.trim() || undefined,
-        validFrom: values.validFrom,
-        validTo: values.validTo,
-        status: values.status,
-        sourceType: values.sourceType,
-      })
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
 
-      toast.success("Rate sheet created. You can now import rates.")
-      router.push(`/rate-sheets/${newRs.id}`)
-    },
-  })
+  // Master options
+  const [suppliers, setSuppliers] = React.useState<Supplier[]>([]);
+  const [hotels, setHotels] = React.useState<Hotel[]>([]);
+  const [loadingMasters, setLoadingMasters] = React.useState(true);
 
-  const getFieldError = (field: string) => {
-    const touched = formik.touched[field as keyof typeof formik.touched]
-    const error = formik.errors[field as keyof typeof formik.errors]
-    return touched && error ? (error as string) : undefined
-  }
+  // Form states
+  const [name, setName] = React.useState("");
+  const [supplierId, setSupplierId] = React.useState(preselectedSupplier);
+  const [seasonName, setSeasonName] = React.useState("Peak Season 2026-27");
+  const [validFrom, setValidFrom] = React.useState("2026-10-01");
+  const [validTo, setValidTo] = React.useState("2027-03-31");
+  const [currency, setCurrency] = React.useState("INR");
+  const [priority, setPriority] = React.useState(1);
+  const [taxPercentage, setTaxPercentage] = React.useState(0);
+  const [notes, setNotes] = React.useState("");
 
-  return (
-    <form onSubmit={formik.handleSubmit} className="space-y-6 max-w-3xl">
-      <div className="bg-white rounded-xl border border-border p-6 shadow-2xs space-y-5">
-        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2.5 flex items-center gap-2">
-          <FileSpreadsheet className="h-4 w-4 text-purple-600" />
-          <span>Contract Header & Validity Period</span>
-        </h3>
+  // Hotel states
+  const [hotelId, setHotelId] = React.useState(preselectedHotel);
+  const [roomType, setRoomType] = React.useState("Deluxe Room");
+  const [mealPlan, setMealPlan] = React.useState("CP");
+  const [hotelCostPrice, setHotelCostPrice] = React.useState("4500");
+  const [extraAdultRate, setExtraAdultRate] = React.useState("1500");
+  const [extraChildRate, setExtraChildRate] = React.useState("800");
 
-        {/* Name */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-slate-700">
-            Rate Sheet Title / Contract Name <span className="text-red-500">*</span>
-          </label>
-          <Input
-            placeholder="e.g. 2026–27 WGH Annual Contract, Kerala Monsoon Promo..."
-            {...formik.getFieldProps("name")}
-            className={`h-9.5 text-xs bg-slate-50/50 border-slate-200 focus-visible:ring-indigo-500 ${
-              getFieldError("name") ? "border-red-500" : ""
-            }`}
-          />
-          {getFieldError("name") && (
-            <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("name")}</p>
-          )}
-        </div>
+  const [submitting, setSubmitting] = React.useState(false);
 
-        {/* Supplier & Source Format */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">
-              Supplier Partner <span className="text-red-500">*</span>
-            </label>
-            <Select
-              value={formik.values.supplierId}
-              onValueChange={(val) => formik.setFieldValue("supplierId", val)}
-            >
-              <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
-                <SelectValue placeholder="Select Supplier" />
-              </SelectTrigger>
-              <SelectContent className="bg-white border-slate-200">
-                {suppliers.map((s) => (
-                  <SelectItem key={s.id} value={s.id} className="text-xs">
-                    {s.name} ({s.city || s.type})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {getFieldError("supplierId") && (
-              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("supplierId")}</p>
-            )}
-          </div>
+  const isReadOnly = isCentralReadOnly || localReadOnly;
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">Expected Import Format</label>
-            <Select
-              value={formik.values.sourceType}
-              onValueChange={(val) => formik.setFieldValue("sourceType", val as RateSheetSourceType)}
-            >
-              <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-white border-slate-200">
-                <SelectItem value="Excel" className="text-xs">Excel (.xlsx / .xls)</SelectItem>
-                <SelectItem value="CSV" className="text-xs">CSV Spreadsheet (.csv)</SelectItem>
-                <SelectItem value="Manual" className="text-xs">Manual Entry</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+  // Load masters on mount
+  React.useEffect(() => {
+    async function loadMasters() {
+      try {
+        setLoadingMasters(true);
+        const [supRes, hotRes] = await Promise.all([
+          supplierClient.getSuppliers({ limit: 100 }).catch(() => ({ data: [] })),
+          hotelClient.getHotels({ limit: 100 }).catch(() => ({ data: [] })),
+        ]);
 
-        {/* Validity Range */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">
-              Contract Valid From <span className="text-red-500">*</span>
-            </label>
-            <Input
-              type="date"
-              {...formik.getFieldProps("validFrom")}
-              className={`h-9.5 text-xs bg-slate-50/50 border-slate-200 ${
-                getFieldError("validFrom") ? "border-red-500" : ""
-              }`}
-            />
-            {getFieldError("validFrom") && (
-              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("validFrom")}</p>
-            )}
-          </div>
+        if (supRes.data) setSuppliers(supRes.data);
+        if (hotRes.data) {
+          setHotels(hotRes.data);
+          if (!hotelId && hotRes.data[0]) setHotelId(hotRes.data[0].id);
+        }
+      } finally {
+        setLoadingMasters(false);
+      }
+    }
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">
-              Contract Valid To <span className="text-red-500">*</span>
-            </label>
-            <Input
-              type="date"
-              {...formik.getFieldProps("validTo")}
-              className={`h-9.5 text-xs bg-slate-50/50 border-slate-200 ${
-                getFieldError("validTo") ? "border-red-500" : ""
-              }`}
-            />
-            {getFieldError("validTo") && (
-              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("validTo")}</p>
-            )}
-          </div>
-        </div>
+    loadMasters();
+  }, []);
 
-        {/* Status */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold text-slate-700">Initial Status</label>
-          <Select
-            value={formik.values.status}
-            onValueChange={(val) => formik.setFieldValue("status", val as RateSheetStatus)}
-          >
-            <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-white border-slate-200">
-              <SelectItem value="Active" className="text-xs">Active (Available for cost calculation)</SelectItem>
-              <SelectItem value="Draft" className="text-xs">Draft (Under review)</SelectItem>
-              <SelectItem value="Expired" className="text-xs">Expired</SelectItem>
-              <SelectItem value="Archived" className="text-xs">Archived</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+  // Automatically update suggested rate sheet name
+  React.useEffect(() => {
+    const h = hotels.find((x) => x.id === hotelId);
+    setName(`${h?.name || "Hotel"} - ${roomType} (${seasonName || "Tariff"})`);
+  }, [hotelId, roomType, seasonName, hotels]);
 
-        {/* Description */}
-        <div className="space-y-1.5 pt-1">
-          <label className="text-xs font-bold text-slate-700">Contract Scope & Description</label>
-          <Textarea
-            placeholder="Contract terms, blackout periods, commission discounts, supplier remarks..."
-            {...formik.getFieldProps("description")}
-            className="min-h-[80px] text-xs bg-slate-50/50 border-slate-200 leading-relaxed"
-          />
-        </div>
-      </div>
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isReadOnly) {
+      toast.error("Modifications are restricted in read-only mode.");
+      return;
+    }
 
-      {/* Buttons */}
-      <div className="flex items-center justify-end gap-3 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.push("/rate-sheets")}
-          className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-9 px-4 cursor-pointer"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-9 px-6 cursor-pointer shadow-xs"
-        >
-          Create Rate Sheet
-        </Button>
-      </div>
-    </form>
-  )
-}
+    if (!name.trim()) {
+      toast.error("Rate sheet name is required.");
+      return;
+    }
 
-export default function NewRateSheetPage() {
+    if (!hotelId) {
+      toast.error("Please select a hotel property.");
+      return;
+    }
+
+    if (!isValidDecimal(hotelCostPrice, { min: 0 })) {
+      toast.error("Room Cost Rate must be a valid non-negative amount.");
+      return;
+    }
+
+    if (extraAdultRate && !isValidDecimal(extraAdultRate, { min: 0 })) {
+      toast.error("Extra Adult Rate must be a valid non-negative amount.");
+      return;
+    }
+
+    if (extraChildRate && !isValidDecimal(extraChildRate, { min: 0 })) {
+      toast.error("Extra Child Rate must be a valid non-negative amount.");
+      return;
+    }
+
+    if (!isValidInteger(priority, { min: 0, max: 1000 })) {
+      toast.error("Priority weight must be a whole number between 0 and 1000.");
+      return;
+    }
+
+    if (!isValidDecimal(taxPercentage, { min: 0, max: 100 })) {
+      toast.error("Supplier Tax percentage must be between 0 and 100.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      const payload: any = {
+        name: name.trim(),
+        inventoryType: "HOTEL",
+        supplierId: supplierId || undefined,
+        hotelId,
+        roomType: roomType.trim(),
+        mealPlan: mealPlan.trim(),
+        costPrice: Number(hotelCostPrice),
+        extraAdultRate: extraAdultRate ? Number(extraAdultRate) : undefined,
+        extraChildRate: extraChildRate ? Number(extraChildRate) : undefined,
+        seasonName: seasonName.trim() || undefined,
+        validFrom: new Date(validFrom),
+        validTo: new Date(validTo),
+        currency,
+        priority: Number(priority),
+        taxPercentage: Number(taxPercentage),
+        notes: notes.trim() || undefined,
+      };
+
+      const res = await rateSheetClient.createRateSheet(payload);
+
+      if (res.success && res.data) {
+        toast.success(`Rate sheet ${res.data.rateSheetNumber || res.data.name} created successfully!`);
+        router.push(`/rate-sheets/${res.data.id}`);
+      }
+    } catch (err: any) {
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setLocalReadOnly(true);
+        refreshSubscription();
+        toast.error("Modifications restricted. Read-only mode is active.");
+      } else {
+        toast.error(err?.message || "Failed to create rate sheet.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+        {isReadOnly && !isCentralReadOnly && <ReadOnlyBanner moduleName="Rate Sheets" />}
+
         <PageHeader
-          title="New Rate Sheet"
-          description="Create a rate sheet container to organize supplier tariffs and Excel imports."
+          title="Create Hotel Rate Sheet"
+          description="Define hotel supplier purchase costs with date validity and deterministic priority resolution for live trip costing."
           breadcrumbs={[
             { label: "Rate Sheets", href: "/rate-sheets" },
             { label: "New Rate Sheet" },
           ]}
         />
 
-        <div className="max-w-3xl mx-auto w-full">
-          <React.Suspense fallback={<div className="text-xs text-slate-400">Loading form...</div>}>
-            <NewRateSheetForm />
-          </React.Suspense>
-        </div>
+        {isCentralReadOnly ? (
+          <div className="max-w-4xl mx-auto">
+            <ReadOnlyModeCard
+              title="Rate Sheet Creation Restricted"
+              description="Your agency workspace is currently in read-only mode. Adding new rate sheets is not permitted."
+              reason={readOnlyReason}
+              backHref="/rate-sheets"
+              backLabel="Back to Rate Sheets"
+            />
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* 1. Hotel Room & Meal Plan Pricing */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+              <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
+                <HotelIcon className="h-4 w-4 text-blue-600" />
+                <span>Hotel Room & Meal Plan Pricing</span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Hotel Property *</label>
+                  <Select value={hotelId} onValueChange={(val) => val && setHotelId(val)}>
+                    <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
+                      <SelectValue placeholder="Select hotel">
+                        {(val: string | null) => {
+                          if (!val) return undefined;
+                          const h = hotels.find((item) => item.id === val);
+                          return h ? `${h.name} ${h.city ? `(${h.city})` : ""}` : val;
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-slate-200">
+                      {hotels.map((h) => (
+                        <SelectItem key={h.id} value={h.id}>
+                          {h.name} {h.city ? `(${h.city})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Room Category / Type</label>
+                  <Input
+                    value={roomType}
+                    onChange={(e) => setRoomType(e.target.value)}
+                    placeholder="Deluxe Room"
+                    className="h-9.5 bg-slate-50/50 border-slate-200 font-semibold text-xs"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Meal Plan Basis</label>
+                  <Select value={mealPlan} onValueChange={(val) => val && setMealPlan(val)}>
+                    <SelectTrigger className="h-9.5 text-xs bg-slate-50/50 border-slate-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-slate-200">
+                      <SelectItem value="EP">EP (Room Only)</SelectItem>
+                      <SelectItem value="CP">CP (Breakfast Included)</SelectItem>
+                      <SelectItem value="MAP">MAP (Breakfast + Dinner)</SelectItem>
+                      <SelectItem value="AP">AP (All Meals Included)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-1">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Room Cost Rate (₹ / night) *</label>
+                  <Input
+                    type="number"
+                    value={hotelCostPrice}
+                    onChange={(e) => setHotelCostPrice(e.target.value)}
+                    placeholder="4500"
+                    className="h-9 bg-slate-50/50 border-slate-200 font-bold text-xs text-emerald-700"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Extra Adult Rate (₹ / night)</label>
+                  <Input
+                    type="number"
+                    value={extraAdultRate}
+                    onChange={(e) => setExtraAdultRate(e.target.value)}
+                    placeholder="1500"
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Extra Child Rate (₹ / night)</label>
+                  <Input
+                    type="number"
+                    value={extraChildRate}
+                    onChange={(e) => setExtraChildRate(e.target.value)}
+                    placeholder="800"
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Season, Validity & Supplier Terms */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+              <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-purple-600" />
+                <span>Validity Dates, Season & Supplier Contract</span>
+              </h3>
+
+              <div className="space-y-1 text-xs">
+                <label className="font-bold text-slate-700">Rate Sheet Title / Identifier *</label>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Parakkat Nature Resort - Deluxe Room (Peak Season)"
+                  className="h-9.5 bg-slate-50/50 border-slate-200 font-semibold text-xs"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Supplier / Vendor Partner</label>
+                  <Select value={supplierId || "DIRECT"} onValueChange={(val) => setSupplierId(val === "DIRECT" ? "" : (val || ""))}>
+                    <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                      <SelectValue placeholder="Direct / In-house">
+                        {(val: string | null) => {
+                          if (!val || val === "DIRECT") return "Direct / In-house";
+                          const s = suppliers.find((item) => item.id === val);
+                          return s ? `${s.name} ${s.supplierCode ? `(${s.supplierCode})` : ""}` : val;
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-slate-200">
+                      <SelectItem value="DIRECT">Direct / In-house</SelectItem>
+                      {suppliers.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name} {s.supplierCode ? `(${s.supplierCode})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Season Name</label>
+                  <Input
+                    value={seasonName}
+                    onChange={(e) => setSeasonName(e.target.value)}
+                    placeholder="Peak Season 2026-27"
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Priority Weight (Higher = Preferred)</label>
+                  <Input
+                    type="number"
+                    value={priority}
+                    onChange={(e) => setPriority(Number(e.target.value))}
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-1">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Valid From *</label>
+                  <Input
+                    type="date"
+                    value={validFrom}
+                    onChange={(e) => setValidFrom(e.target.value)}
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Valid To *</label>
+                  <Input
+                    type="date"
+                    value={validTo}
+                    onChange={(e) => setValidTo(e.target.value)}
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs font-semibold"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Supplier Tax (%)</label>
+                  <Input
+                    type="number"
+                    value={taxPercentage}
+                    onChange={(e) => setTaxPercentage(Number(e.target.value))}
+                    placeholder="0"
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1 text-xs pt-1">
+                <label className="font-bold text-slate-700">Remarks & Contracting Notes</label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="e.g. Non-refundable during Diwali / New Year dates; includes breakfast for 2 adults..."
+                  rows={3}
+                  className="bg-slate-50/50 border-slate-200 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between gap-4 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push("/rate-sheets")}
+                className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-10 px-5 cursor-pointer"
+              >
+                Cancel
+              </Button>
+
+              <Button
+                type="submit"
+                disabled={submitting || isReadOnly || loadingMasters}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-10 px-6 cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving Rate Sheet...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    Save & Activate Rate Sheet
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
-  )
+  );
+}
+
+export default function NewRateSheetPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        </div>
+      }
+    >
+      <NewRateSheetForm />
+    </React.Suspense>
+  );
 }

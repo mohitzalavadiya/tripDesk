@@ -1,8 +1,8 @@
-# TripDesk
+# Your Travel Desk
 
 Travel Agency Operating System for modern Indian travel agents and small tour operators.
 
-TripDesk provides a polished, premium SaaS workspace designed to help agents manage customer enquiries, construct itineraries, issue quotations, track follow-ups, and log payments.
+Your Travel Desk provides a polished, premium SaaS workspace designed to help agents manage customer enquiries, construct itineraries, issue quotations, track follow-ups, and log payments.
 
 ---
 

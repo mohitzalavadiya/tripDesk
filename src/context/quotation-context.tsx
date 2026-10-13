@@ -1,34 +1,31 @@
 "use client"
 
-import * as React from "react"
 import {
-  Quotation,
-  QuotationStatus,
-  PublicQuotation,
-  AgencyBranding,
-  Trip,
-  Customer,
-  ItineraryDay,
-  TripHotel,
-  TripVehicle,
-  TripActivity,
-  TripCosting,
-  Hotel,
-  HotelRoom,
-  Vehicle,
-  Activity,
-} from "@/types"
-import {
-  DEFAULT_AGENCY_BRANDING,
-  DEFAULT_QUOTATION_SECTIONS,
-  DEFAULT_INCLUSIONS,
-  DEFAULT_EXCLUSIONS,
-  createQuotationSnapshot,
-  sanitizeToPublicQuotation,
-  generateQuotationNumber,
-  generateShareToken,
-  isQuotationExpired,
+DEFAULT_AGENCY_BRANDING,
+DEFAULT_EXCLUSIONS,
+DEFAULT_INCLUSIONS,
+DEFAULT_QUOTATION_SECTIONS,
+createQuotationSnapshot,
+generateShareToken,
+sanitizeToPublicQuotation,
 } from "@/lib/quotation/quotation-service"
+import {
+Activity,
+AgencyBranding,
+Customer,
+Hotel,
+HotelRoom,
+ItineraryDay,
+PublicQuotation,
+Quotation,
+Trip,
+TripActivity,
+TripCosting,
+TripHotel,
+TripVehicle,
+Vehicle,
+} from "@/types"
+import * as React from "react"
 import { toast } from "sonner"
 
 // ═════════════════════════════════════════════════════════════════════
@@ -415,7 +412,6 @@ export function QuotationProvider({ children }: { children: React.ReactNode }) {
         activities: Activity[]
       }
     ) => {
-      const existingTripQuotations = quotations.filter((q) => q.tripId === trip.id)
       const nextIndex = quotations.length + 1
 
       const newQuotation = createQuotationSnapshot(

@@ -1,0 +1,28 @@
+import { ApiError,apiSuccess,handleApiError } from "@/lib/api";
+import { getAuthenticatedCustomer } from "@/lib/auth/customer-auth";
+import { customerNotificationService } from "@/lib/services/customer-notification-service";
+import { NextRequest } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * GET /api/customer/notifications/unread-count
+ * Returns unread notification count for the authenticated customer.
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const auth = await getAuthenticatedCustomer(request, { requireAccountSession: true });
+    if (!auth) {
+      throw new ApiError(401, "CUSTOMER_UNAUTHORIZED", "Please sign in to view unread count.");
+    }
+
+    const unreadCount = await customerNotificationService.getUnreadCount(
+      auth.agencyId,
+      auth.customerId
+    );
+
+    return apiSuccess({ unreadCount });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}

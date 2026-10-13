@@ -1,27 +1,26 @@
 "use client"
 
-import * as React from "react"
 import {
-  CostItem,
-  InternalExpense,
-  TaxRule,
-  PricingSettings,
-  TripCosting,
-  CostingSummary,
-  RateSnapshot,
-  TripHotel,
-  TripVehicle,
-  TripActivity,
-  HotelRate,
-  VehicleRate,
-  ActivityRate,
-} from "@/types"
-import {
-  computeCostingSummary,
-  calculateHotelCost,
-  calculateVehicleCost,
-  calculateActivityCost,
+calculateActivityCost,
+calculateHotelCost,
+calculateVehicleCost,
+computeCostingSummary,
 } from "@/lib/costing-engine"
+import {
+ActivityRate,
+CostingSummary,
+CostItem,
+HotelRate,
+InternalExpense,
+PricingSettings,
+TaxRule,
+TripActivity,
+TripCosting,
+TripHotel,
+TripVehicle,
+VehicleRate,
+} from "@/types"
+import * as React from "react"
 import { toast } from "sonner"
 
 // ═════════════════════════════════════════════════════════════════════
@@ -645,7 +644,7 @@ export function CostingProvider({ children }: { children: React.ReactNode }) {
             ...existing,
             status: "Locked",
             lockedAt: new Date().toISOString(),
-            lockedBy: "Senior Travel Agent",
+            lockedBy: "Agency Owner",
             updatedAt: new Date().toISOString(),
           },
         }
@@ -717,7 +716,7 @@ export function CostingProvider({ children }: { children: React.ReactNode }) {
         vehicles: TripVehicle[]
         activities: TripActivity[]
       },
-      inventoryRates: {
+      _inventoryRates?: {
         hotelRates: HotelRate[]
         vehicleRates: VehicleRate[]
         activityRates: ActivityRate[]

@@ -1,24 +1,22 @@
 "use client";
 
-import * as React from "react";
-import { Booking, BookingItem, CustomerPayment, BookingDocument } from "@/types";
 import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/costing-engine";
 import { triggerDocumentPrint } from "@/lib/booking/document-templates";
+import { formatCurrency } from "@/lib/costing-engine";
+import { useModalScrollLock } from "@/lib/scroll-lock";
+import { Booking,BookingDocument,BookingItem,CustomerPayment } from "@/types";
 import {
-  X,
-  Printer,
-  FileText,
-  Hotel,
-  Car,
-  Ticket,
-  CheckCircle2,
-  MapPin,
-  Calendar,
-  Users,
-  Compass,
-  Phone,
-  Mail,
+Calendar,
+Car,
+CheckCircle2,
+Compass,
+Hotel,
+Mail,
+Phone,
+Printer,
+Ticket,
+Users,
+X
 } from "lucide-react";
 
 interface DocumentPreviewModalProps {
@@ -38,13 +36,14 @@ export function DocumentPreviewModal({
   isOpen,
   onClose,
 }: DocumentPreviewModalProps) {
+  useModalScrollLock(isOpen);
   if (!isOpen) return null;
 
   const agency = booking.agencySnapshot || {
-    name: "TripDesk Travel Studio",
+    name: "Your Travel Desk Studio",
     tagline: "Tailor-Made Luxury & Experiential Journeys",
     phone: "+91 98470 12345",
-    email: "holidays@tripdesk.in",
+    email: "holidays@yourtraveldesk.in",
     address: "Suite 402, Trade Tower, MG Road, Kochi, Kerala",
   };
 
@@ -208,7 +207,7 @@ export function DocumentPreviewModal({
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">{selectedItem.title}</h3>
-                    <p className="text-xs text-slate-500">{selectedItem.subtitle || "Private Chauffeur Driven Vehicle"}</p>
+                    <p className="text-xs text-slate-500">{selectedItem.subtitle || "Private Driver (Chauffeur) Driven Vehicle"}</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -233,7 +232,7 @@ export function DocumentPreviewModal({
                   <span className="font-bold text-slate-800">{selectedItem.pickupTime || "As per Flight/Train Arrival"}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Assigned Chauffeur</span>
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Assigned Driver (Chauffeur)</span>
                   <span className="font-bold text-slate-800">{selectedItem.driverName || "Driver details shared 4 hrs prior"}</span>
                 </div>
                 <div>

@@ -1,0 +1,414 @@
+import { NotFoundError } from "@/lib/api";
+import { prisma } from "@/lib/prisma";
+import {
+CreateRateSheetInput,
+RateSheetQueryParams,
+UpdateRateSheetInput,
+} from "@/lib/validation/rate-sheet-schema";
+import { Prisma,RateInventoryType,RateSheet } from "@prisma/client";
+import "server-only";
+
+export interface RateSheetWithRelations extends RateSheet {
+  supplier?: { id: string; name: string; supplierCode?: string | null } | null;
+  hotel?: { id: string; name: string; city?: string | null } | null;
+}
+
+export interface MatchedRateResult {
+  matched: boolean;
+  rateSheetId?: string;
+  rateSheetNumber?: string | null;
+  rateName?: string;
+  seasonName?: string | null;
+  supplierId?: string | null;
+  supplierName?: string | null;
+  currency: string;
+  costPrice: number;
+  extraAdultRate?: number | null;
+  extraChildRate?: number | null;
+  taxPercentage?: number | null;
+  priority: number;
+  validFrom?: Date;
+  validTo?: Date;
+}
+
+export const rateSheetService = {
+  /**
+   * Generates sequential rate sheet number scoped per agency per calendar year: RAT-YYYY-XXXXX
+   */
+  async generateNextRateSheetNumber(agencyId: string): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `RAT-${year}-`;
+
+    const lastRate = await prisma.rateSheet.findFirst({
+      where: {
+        agencyId,
+        rateSheetNumber: { startsWith: prefix },
+      },
+      orderBy: { rateSheetNumber: "desc" },
+      select: { rateSheetNumber: true },
+    });
+
+    let nextNumber = 1;
+    if (lastRate?.rateSheetNumber) {
+      const parts = lastRate.rateSheetNumber.split("-");
+      if (parts.length === 3) {
+        const lastNum = parseInt(parts[2], 10);
+        if (!isNaN(lastNum)) {
+          nextNumber = lastNum + 1;
+        }
+      }
+    }
+
+    return `${prefix}${nextNumber.toString().padStart(5, "0")}`;
+  },
+
+  /**
+   * Lists rate sheets with hotel filters and search.
+   */
+  async listRateSheets(
+    agencyId: string,
+    params: Partial<RateSheetQueryParams> = {}
+  ): Promise<{
+    items: RateSheetWithRelations[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const page = Math.max(1, params.page || 1);
+    const limit = Math.max(1, Math.min(100, params.limit || 20));
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.RateSheetWhereInput = {
+      agencyId,
+      ...(params.includeArchived ? {} : { archivedAt: null }),
+      ...(params.inventoryType ? { inventoryType: params.inventoryType } : {}),
+      ...(params.supplierId ? { supplierId: params.supplierId } : {}),
+      ...(params.hotelId ? { hotelId: params.hotelId } : {}),
+      ...(params.status ? { status: params.status } : {}),
+      ...(params.seasonName
+        ? { seasonName: { contains: params.seasonName, mode: "insensitive" } }
+        : {}),
+    };
+
+    if (params.validDate) {
+      where.validFrom = { lte: new Date(params.validDate) };
+      where.validTo = { gte: new Date(params.validDate) };
+    }
+
+    if (params.search?.trim()) {
+      const term = params.search.trim();
+      where.OR = [
+        { name: { contains: term, mode: "insensitive" } },
+        { rateSheetNumber: { contains: term, mode: "insensitive" } },
+        { seasonName: { contains: term, mode: "insensitive" } },
+        { roomType: { contains: term, mode: "insensitive" } },
+        { mealPlan: { contains: term, mode: "insensitive" } },
+        { hotel: { name: { contains: term, mode: "insensitive" } } },
+        { supplier: { name: { contains: term, mode: "insensitive" } } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      prisma.rateSheet.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: {
+          [params.sortBy || "createdAt"]: params.sortOrder || "desc",
+        },
+        include: {
+          supplier: { select: { id: true, name: true, supplierCode: true } },
+          hotel: { select: { id: true, name: true, city: true } },
+        },
+      }),
+      prisma.rateSheet.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+  },
+
+  /**
+   * Retrieves single rate sheet with hotel and supplier relations.
+   */
+  async getRateSheetById(agencyId: string, id: string): Promise<RateSheetWithRelations | null> {
+    return prisma.rateSheet.findFirst({
+      where: { id, agencyId },
+      include: {
+        supplier: { select: { id: true, name: true, supplierCode: true } },
+        hotel: { select: { id: true, name: true, city: true } },
+      },
+    });
+  },
+
+  /**
+   * Validates if there's any conflicting overlapping rate with identical priority.
+   */
+  async validateRateOverlap(
+    agencyId: string,
+    data: {
+      inventoryType?: RateInventoryType;
+      hotelId?: string | null;
+      roomType?: string | null;
+      mealPlan?: string | null;
+      validFrom: Date;
+      validTo: Date;
+      priority?: number;
+    },
+    excludeId?: string
+  ): Promise<{ hasOverlap: boolean; overlappingRates: RateSheet[] }> {
+    const where: Prisma.RateSheetWhereInput = {
+      agencyId,
+      inventoryType: data.inventoryType || "HOTEL",
+      archivedAt: null,
+      status: "ACTIVE",
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+      ...(data.hotelId ? { hotelId: data.hotelId } : {}),
+      ...(data.roomType ? { roomType: data.roomType } : {}),
+      ...(data.mealPlan ? { mealPlan: data.mealPlan } : {}),
+      ...(data.priority !== undefined ? { priority: data.priority } : {}),
+      // Overlap condition: (StartA <= EndB) and (EndA >= StartB)
+      validFrom: { lte: new Date(data.validTo) },
+      validTo: { gte: new Date(data.validFrom) },
+    };
+
+    const overlappingRates = await prisma.rateSheet.findMany({
+      where,
+      take: 5,
+    });
+
+    return {
+      hasOverlap: overlappingRates.length > 0,
+      overlappingRates,
+    };
+  },
+
+  /**
+   * Creates a new Rate Sheet record (Hotel only).
+   */
+  async createRateSheet(agencyId: string, data: CreateRateSheetInput): Promise<RateSheet> {
+    const rateSheetNumber = await this.generateNextRateSheetNumber(agencyId);
+
+    return prisma.rateSheet.create({
+      data: {
+        agencyId,
+        rateSheetNumber,
+        name: data.name,
+        inventoryType: "HOTEL",
+        supplierId: data.supplierId || null,
+        hotelId: data.hotelId || null,
+        roomType: data.roomType || null,
+        mealPlan: data.mealPlan || null,
+        seasonName: data.seasonName || null,
+        validFrom: new Date(data.validFrom),
+        validTo: new Date(data.validTo),
+        currency: data.currency || "INR",
+        costPrice: new Prisma.Decimal(data.costPrice ?? 0),
+        extraAdultRate: data.extraAdultRate !== undefined && data.extraAdultRate !== null ? new Prisma.Decimal(data.extraAdultRate) : null,
+        extraChildRate: data.extraChildRate !== undefined && data.extraChildRate !== null ? new Prisma.Decimal(data.extraChildRate) : null,
+        taxPercentage: data.taxPercentage !== undefined && data.taxPercentage !== null ? new Prisma.Decimal(data.taxPercentage) : new Prisma.Decimal(0),
+        priority: data.priority ?? 0,
+        status: data.status || "ACTIVE",
+        sourceType: data.sourceType || "MANUAL",
+        notes: data.notes || null,
+        internalNotes: data.internalNotes || null,
+      },
+    });
+  },
+
+  /**
+   * Updates an existing Rate Sheet.
+   */
+  async updateRateSheet(
+    agencyId: string,
+    id: string,
+    data: UpdateRateSheetInput
+  ): Promise<RateSheet> {
+    const existing = await prisma.rateSheet.findFirst({
+      where: { id, agencyId },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundError("Rate Sheet");
+    }
+
+    return prisma.rateSheet.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.inventoryType !== undefined ? { inventoryType: data.inventoryType } : {}),
+        ...(data.supplierId !== undefined ? { supplierId: data.supplierId || null } : {}),
+        ...(data.hotelId !== undefined ? { hotelId: data.hotelId || null } : {}),
+        ...(data.roomType !== undefined ? { roomType: data.roomType || null } : {}),
+        ...(data.mealPlan !== undefined ? { mealPlan: data.mealPlan || null } : {}),
+        ...(data.seasonName !== undefined ? { seasonName: data.seasonName || null } : {}),
+        ...(data.validFrom !== undefined ? { validFrom: new Date(data.validFrom) } : {}),
+        ...(data.validTo !== undefined ? { validTo: new Date(data.validTo) } : {}),
+        ...(data.currency !== undefined ? { currency: data.currency } : {}),
+        ...(data.costPrice !== undefined ? { costPrice: new Prisma.Decimal(data.costPrice) } : {}),
+        ...(data.extraAdultRate !== undefined ? { extraAdultRate: data.extraAdultRate !== null ? new Prisma.Decimal(data.extraAdultRate) : null } : {}),
+        ...(data.extraChildRate !== undefined ? { extraChildRate: data.extraChildRate !== null ? new Prisma.Decimal(data.extraChildRate) : null } : {}),
+        ...(data.taxPercentage !== undefined ? { taxPercentage: new Prisma.Decimal(data.taxPercentage) } : {}),
+        ...(data.priority !== undefined ? { priority: data.priority } : {}),
+        ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(data.sourceType !== undefined ? { sourceType: data.sourceType } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes || null } : {}),
+        ...(data.internalNotes !== undefined ? { internalNotes: data.internalNotes || null } : {}),
+      },
+    });
+  },
+
+  /**
+   * Soft archives a Rate Sheet.
+   */
+  async archiveRateSheet(agencyId: string, id: string): Promise<RateSheet> {
+    const existing = await prisma.rateSheet.findFirst({
+      where: { id, agencyId },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundError("Rate Sheet");
+    }
+
+    return prisma.rateSheet.update({
+      where: { id },
+      data: {
+        archivedAt: new Date(),
+        status: "INACTIVE",
+      },
+    });
+  },
+
+  // ═════════════════════════════════════════════════════════════════════
+  // RATE LOOKUP ENGINE (DETERMINISTIC PRIORITY RESOLUTION - HOTEL ONLY)
+  // ═════════════════════════════════════════════════════════════════════
+
+  /**
+   * Resolves applicable Hotel purchase rates in a single batch query.
+   * Deterministic priority rule:
+   * 1. Exact roomType (+2000) & mealPlan (+1000) match
+   * 2. Highest priority number
+   * 3. Narrowest validity window (validTo - validFrom)
+   * 4. Most recently created
+   */
+  async getApplicableHotelRatesBatch(
+    agencyId: string,
+    items: Array<{
+      id: string;
+      hotelId: string;
+      travelDate: Date | string;
+      roomType?: string | null;
+      mealPlan?: string | null;
+    }>
+  ): Promise<Map<string, MatchedRateResult>> {
+    const resultMap = new Map<string, MatchedRateResult>();
+    if (!items || items.length === 0) return resultMap;
+
+    const validHotelIds = Array.from(new Set(items.map((i) => i.hotelId).filter(Boolean)));
+    if (validHotelIds.length === 0) {
+      for (const item of items) {
+        resultMap.set(item.id, { matched: false, currency: "INR", costPrice: 0, priority: 0 });
+      }
+      return resultMap;
+    }
+
+    const timestamps = items.map((i) => new Date(i.travelDate).getTime()).filter((t) => !isNaN(t));
+    const minDate = timestamps.length > 0 ? new Date(Math.min(...timestamps)) : new Date();
+    const maxDate = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : new Date();
+
+    const candidates = await prisma.rateSheet.findMany({
+      where: {
+        agencyId,
+        hotelId: { in: validHotelIds },
+        inventoryType: "HOTEL",
+        status: "ACTIVE",
+        archivedAt: null,
+        validFrom: { lte: maxDate },
+        validTo: { gte: minDate },
+      },
+      include: {
+        supplier: { select: { id: true, name: true } },
+      },
+      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+    });
+
+    for (const item of items) {
+      const itemDate = new Date(item.travelDate);
+      const itemCandidates = candidates.filter(
+        (c) =>
+          c.hotelId === item.hotelId &&
+          new Date(c.validFrom) <= itemDate &&
+          new Date(c.validTo) >= itemDate
+      );
+
+      if (itemCandidates.length === 0) {
+        resultMap.set(item.id, { matched: false, currency: "INR", costPrice: 0, priority: 0 });
+        continue;
+      }
+
+      const ranked = itemCandidates.map((c) => {
+        let score = (c.priority || 0) * 10000;
+        if (item.roomType && c.roomType && c.roomType.toLowerCase() === item.roomType.toLowerCase()) {
+          score += 2000;
+        }
+        if (item.mealPlan && c.mealPlan && c.mealPlan.toLowerCase() === item.mealPlan.toLowerCase()) {
+          score += 1000;
+        }
+        const daysSpan = Math.max(
+            1,
+            (new Date(c.validTo).getTime() - new Date(c.validFrom).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        score -= Math.min(500, daysSpan);
+
+        return { candidate: c, score };
+      });
+
+      ranked.sort((a, b) => b.score - a.score);
+      const selected = ranked[0].candidate;
+
+      resultMap.set(item.id, {
+        matched: true,
+        rateSheetId: selected.id,
+        rateSheetNumber: selected.rateSheetNumber,
+        rateName: selected.name,
+        seasonName: selected.seasonName,
+        supplierId: selected.supplierId,
+        supplierName: selected.supplier?.name,
+        currency: selected.currency,
+        costPrice: Number(selected.costPrice),
+        extraAdultRate: selected.extraAdultRate ? Number(selected.extraAdultRate) : null,
+        extraChildRate: selected.extraChildRate ? Number(selected.extraChildRate) : null,
+        taxPercentage: selected.taxPercentage ? Number(selected.taxPercentage) : null,
+        priority: selected.priority,
+        validFrom: selected.validFrom,
+        validTo: selected.validTo,
+      });
+    }
+
+    return resultMap;
+  },
+
+  /**
+   * Resolves the applicable Hotel purchase rate for a travel date.
+   */
+  async getApplicableHotelRate(
+    agencyId: string,
+    hotelId: string,
+    travelDate: Date | string,
+    roomType?: string | null,
+    mealPlan?: string | null
+  ): Promise<MatchedRateResult> {
+    const map = await this.getApplicableHotelRatesBatch(agencyId, [
+      { id: "single", hotelId, travelDate, roomType, mealPlan },
+    ]);
+    return map.get("single") || { matched: false, currency: "INR", costPrice: 0, priority: 0 };
+  },
+};

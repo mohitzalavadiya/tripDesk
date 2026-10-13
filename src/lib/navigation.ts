@@ -1,29 +1,27 @@
 import {
-  LayoutDashboard,
-  Inbox,
-  Users,
-  Compass,
-  FileText,
-  Clock,
-  Hotel,
-  Car,
-  Ticket,
-  Truck,
-  FileSpreadsheet,
-  IndianRupee,
-  BarChart,
-  Settings,
-  HelpCircle,
-  CalendarCheck,
-  Activity,
-  Star,
-  Gift,
-  TrendingUp,
-  Building,
-  CreditCard,
-  Layers,
-  ShieldCheck,
-  LucideIcon
+Activity,
+BarChart,
+Building,
+CalendarCheck,
+Car,
+Clock,
+Compass,
+CreditCard,
+FileSpreadsheet,
+FileText,
+Hotel,
+Inbox,
+IndianRupee,
+Layers,
+LayoutDashboard,
+LucideIcon,
+MapPin,
+MessageSquare,
+Settings,
+Star,
+Ticket,
+TrendingUp,
+Users
 } from "lucide-react";
 
 export interface NavigationItem {
@@ -32,6 +30,7 @@ export interface NavigationItem {
   icon: LucideIcon;
   badge?: string;
   badgeVariant?: "default" | "warning" | "success" | "info" | "travel";
+  featureKey?: string;
 }
 
 export interface NavigationSection {
@@ -57,6 +56,11 @@ export const agencyNavigationConfig: NavigationSection[] = [
     title: "TRAVEL MANAGEMENT",
     items: [
       {
+        label: "Enquiries",
+        href: "/enquiries",
+        icon: Inbox,
+      },
+      {
         label: "Customers",
         href: "/customers",
         icon: Users,
@@ -65,8 +69,6 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Trips",
         href: "/trips",
         icon: Compass,
-        badge: "9",
-        badgeVariant: "success",
       },
       {
         label: "Quotations",
@@ -77,8 +79,11 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Bookings",
         href: "/bookings",
         icon: CalendarCheck,
-        badge: "7",
-        badgeVariant: "travel",
+      },
+      {
+        label: "Documents",
+        href: "/documents",
+        icon: FileText,
       },
       {
         label: "Operations",
@@ -93,9 +98,24 @@ export const agencyNavigationConfig: NavigationSection[] = [
     title: "RESOURCES",
     items: [
       {
+        label: "Destinations",
+        href: "/destinations",
+        icon: MapPin,
+      },
+      {
         label: "Hotels",
         href: "/hotels",
         icon: Hotel,
+      },
+      {
+        label: "Vehicles",
+        href: "/vehicles",
+        icon: Car,
+      },
+      {
+        label: "Activities",
+        href: "/activities",
+        icon: Ticket,
       },
       {
         label: "Rate Sheets",
@@ -108,31 +128,42 @@ export const agencyNavigationConfig: NavigationSection[] = [
     title: "FINANCE & RETENTION",
     items: [
       {
+        label: "Finance",
+        href: "/finance",
+        icon: IndianRupee,
+      },
+      {
         label: "Payments",
         href: "/payments",
-        icon: IndianRupee,
+        icon: CreditCard,
+      },
+      {
+        label: "Follow-ups",
+        href: "/follow-ups",
+        icon: Clock,
       },
       {
         label: "Feedback & Reviews",
         href: "/feedback",
         icon: Star,
-        badge: "4.8 ★",
-        badgeVariant: "travel",
-      },
-      {
-        label: "Referrals & Rewards",
-        href: "/referrals",
-        icon: Gift,
+        featureKey: "FEEDBACK_REVIEWS",
       },
       {
         label: "Customer Insights",
         href: "/customer-insights",
         icon: TrendingUp,
+        featureKey: "CUSTOMER_INSIGHTS",
       },
       {
-        label: "Reports",
+        label: "Reports & Analytics",
         href: "/reports",
         icon: BarChart,
+        featureKey: "REPORTS_ANALYTICS",
+      },
+      {
+        label: "Communications",
+        href: "/communications",
+        icon: MessageSquare,
       },
     ],
   },
@@ -148,8 +179,11 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Subscription",
         href: "/subscription",
         icon: CreditCard,
-        badge: "Active",
-        badgeVariant: "success",
+      },
+      {
+        label: "Support Chat",
+        href: "/support",
+        icon: MessageSquare,
       },
     ],
   },
@@ -168,18 +202,24 @@ export const adminNavigationConfig: NavigationSection[] = [
         icon: LayoutDashboard,
       },
       {
+        label: "Support Chat",
+        href: "/admin/chat",
+        icon: MessageSquare,
+      },
+      {
         label: "Agencies",
         href: "/admin/agencies",
         icon: Building,
-        badge: "24",
-        badgeVariant: "info",
       },
       {
         label: "Subscriptions",
         href: "/admin/subscriptions",
         icon: CreditCard,
-        badge: "Active",
-        badgeVariant: "success",
+      },
+      {
+        label: "Payment Requests",
+        href: "/admin/payments",
+        icon: IndianRupee,
       },
       {
         label: "Plans & Pricing",
@@ -187,15 +227,26 @@ export const adminNavigationConfig: NavigationSection[] = [
         icon: Layers,
       },
       {
-        label: "SaaS Payments",
-        href: "/admin/payments",
-        icon: IndianRupee,
+        label: "Usage & Analytics",
+        href: "/admin/analytics",
+        icon: TrendingUp,
       },
     ],
   },
+
   {
-    title: "SYSTEM",
+    title: "GOVERNANCE & SYSTEM",
     items: [
+      {
+        label: "Audit Logs",
+        href: "/admin/audit-logs",
+        icon: Activity,
+      },
+      {
+        label: "Announcements",
+        href: "/admin/announcements",
+        icon: Star,
+      },
       {
         label: "Platform Settings",
         href: "/admin/settings",
@@ -208,10 +259,4 @@ export const adminNavigationConfig: NavigationSection[] = [
 // Default export alias for backward compatibility
 export const navigationConfig = agencyNavigationConfig;
 
-export const secondaryNavigation = [
-  {
-    label: "Help & Support",
-    href: "/help",
-    icon: HelpCircle,
-  },
-];
+export const secondaryNavigation: NavigationItem[] = [];

@@ -1,23 +1,24 @@
 "use client";
 
-import * as React from "react";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import { Booking, BookingItem, PaymentMethod } from "@/types";
-import { useBooking } from "@/context/booking-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useBooking } from "@/context/booking-context";
 import { formatCurrency } from "@/lib/costing-engine";
+import { useModalScrollLock } from "@/lib/scroll-lock";
+import { Booking,BookingItem,PaymentMethod } from "@/types";
+import { useFormik } from "formik";
+import { Calendar,Hash,IndianRupee,Truck,X } from "lucide-react";
+import * as React from "react";
 import { toast } from "sonner";
-import { X, Truck, IndianRupee, Calendar, Hash } from "lucide-react";
+import * as Yup from "yup";
 
 interface SupplierPaymentModalProps {
   booking: Booking;
@@ -26,16 +27,22 @@ interface SupplierPaymentModalProps {
   onClose: () => void;
 }
 
-const supplierPaymentSchema = Yup.object({
-  supplierName: Yup.string().required("Supplier is required"),
-  amount: Yup.number()
-    .required("Amount is required")
-    .positive("Amount must be greater than 0"),
-  date: Yup.string().required("Date is required"),
-  method: Yup.string().required("Payment method is required"),
-  transactionId: Yup.string().optional(),
-  notes: Yup.string().optional(),
-});
+const getSupplierPaymentSchema = (maxAmount: number) =>
+  Yup.object({
+    supplierName: Yup.string().required("Supplier is required"),
+    amount: Yup.number()
+      .required("Amount is required")
+      .positive("Amount must be greater than 0")
+      .test(
+        "max-outstanding-payable",
+        `Payment amount cannot exceed the outstanding payable of ${formatCurrency(maxAmount)}`,
+        (val) => val === undefined || val === null || val <= maxAmount
+      ),
+    date: Yup.string().required("Date is required"),
+    method: Yup.string().required("Payment method is required"),
+    transactionId: Yup.string().optional(),
+    notes: Yup.string().optional(),
+  });
 
 export function SupplierPaymentModal({
   booking,
@@ -43,6 +50,7 @@ export function SupplierPaymentModal({
   isOpen,
   onClose,
 }: SupplierPaymentModalProps) {
+  useModalScrollLock(isOpen);
   const { addSupplierPayment } = useBooking();
 
   const suppliersList = React.useMemo(() => {
@@ -70,7 +78,10 @@ export function SupplierPaymentModal({
       transactionId: "",
       notes: "",
     },
-    validationSchema: supplierPaymentSchema,
+    validationSchema: React.useMemo(
+      () => getSupplierPaymentSchema(preselectedItem?.supplierCost || 10000),
+      [preselectedItem?.supplierCost]
+    ),
     enableReinitialize: true,
     onSubmit: (values) => {
       try {
@@ -99,6 +110,17 @@ export function SupplierPaymentModal({
       }
     },
   });
+
+  const getFieldError = (field: keyof typeof formik.values) => {
+    return formik.touched[field] && formik.errors[field]
+      ? formik.errors[field]
+      : undefined;
+  };
+
+  const inputCls = (field: keyof typeof formik.values, base: string = "h-9.5 text-xs") => {
+    const err = getFieldError(field);
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
+  };
 
   if (!isOpen) return null;
 
@@ -137,12 +159,15 @@ export function SupplierPaymentModal({
             <Select
               value={formik.values.supplierName}
               onValueChange={(val) => {
-                const matched = suppliersList.find((s) => s.name === val);
-                formik.setFieldValue("supplierName", val || "");
-                formik.setFieldValue("supplierId", matched?.id || "");
+                if (val) {
+                  const matched = suppliersList.find((s) => s.name === val);
+                  formik.setFieldValue("supplierName", val || "");
+                  formik.setFieldValue("supplierId", matched?.id || "");
+                  formik.setFieldTouched("supplierName", true);
+                }
               }}
             >
-              <SelectTrigger className="h-9.5 text-xs font-medium">
+              <SelectTrigger className={`h-9.5 text-xs font-medium ${getFieldError("supplierName") ? "border-red-500 focus:ring-red-500" : ""}`}>
                 <SelectValue placeholder="Select Supplier" />
               </SelectTrigger>
               <SelectContent className="bg-white border-slate-200">
@@ -153,6 +178,9 @@ export function SupplierPaymentModal({
                 ))}
               </SelectContent>
             </Select>
+            {getFieldError("supplierName") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("supplierName")}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -167,9 +195,12 @@ export function SupplierPaymentModal({
                   type="number"
                   placeholder="e.g. 15000"
                   {...formik.getFieldProps("amount")}
-                  className="pl-9 h-9.5 text-xs font-semibold"
+                  className={inputCls("amount", "pl-9 h-9.5 text-xs font-semibold")}
                 />
               </div>
+              {getFieldError("amount") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("amount")}</p>
+              )}
             </div>
 
             {/* Date */}
@@ -182,9 +213,12 @@ export function SupplierPaymentModal({
                 <Input
                   type="date"
                   {...formik.getFieldProps("date")}
-                  className="pl-9 h-9.5 text-xs font-medium"
+                  className={inputCls("date", "pl-9 h-9.5 text-xs font-medium")}
                 />
               </div>
+              {getFieldError("date") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("date")}</p>
+              )}
             </div>
           </div>
 
@@ -196,9 +230,14 @@ export function SupplierPaymentModal({
               </label>
               <Select
                 value={formik.values.method}
-                onValueChange={(val) => formik.setFieldValue("method", val)}
+                onValueChange={(val) => {
+                  if (val) {
+                    formik.setFieldValue("method", val);
+                    formik.setFieldTouched("method", true);
+                  }
+                }}
               >
-                <SelectTrigger className="h-9.5 text-xs font-medium">
+                <SelectTrigger className={`h-9.5 text-xs font-medium ${getFieldError("method") ? "border-red-500 focus:ring-red-500" : ""}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-slate-200">
@@ -209,6 +248,9 @@ export function SupplierPaymentModal({
                   <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
+              {getFieldError("method") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("method")}</p>
+              )}
             </div>
 
             {/* Transaction ID */}
@@ -221,9 +263,12 @@ export function SupplierPaymentModal({
                 <Input
                   placeholder="e.g. NEFT/SBIN881923"
                   {...formik.getFieldProps("transactionId")}
-                  className="pl-9 h-9.5 text-xs font-mono"
+                  className={inputCls("transactionId", "pl-9 h-9.5 text-xs font-mono")}
                 />
               </div>
+              {getFieldError("transactionId") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("transactionId")}</p>
+              )}
             </div>
           </div>
 
@@ -234,8 +279,11 @@ export function SupplierPaymentModal({
               placeholder="e.g. 50% room retention advance or driver fuel allowance"
               rows={2}
               {...formik.getFieldProps("notes")}
-              className="text-xs min-h-[60px]"
+              className={`text-xs min-h-[60px] ${getFieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
+            {getFieldError("notes") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("notes")}</p>
+            )}
           </div>
 
           {/* Action Buttons */}

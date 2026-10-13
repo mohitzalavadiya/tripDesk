@@ -1,13 +1,11 @@
-import {
-  Booking,
-  CustomerSnapshot,
-  TripOperation,
-  TripReadiness,
-  ReadinessCheck,
-  TransportOperation,
-  Driver,
-} from "@/types";
 import { formatCurrency } from "@/lib/costing-engine";
+import {
+Booking,
+ReadinessCheck,
+TransportOperation,
+TripOperation,
+TripReadiness,
+} from "@/types";
 
 /**
  * Evaluates all operational criteria and calculates the 0-100% readiness score.
@@ -247,7 +245,7 @@ export function generateCommunicationTemplate(
 ): string {
   const customerName = operation.customerSnapshot.name;
   const destination = operation.destination;
-  const agencyName = operation.agencySnapshot?.name || "TripDesk Holidays";
+  const agencyName = operation.agencySnapshot?.name || "Your Travel Desk Holidays";
   const agencyPhone = operation.agencySnapshot?.phone || "+91 98470 12345";
 
   switch (type) {

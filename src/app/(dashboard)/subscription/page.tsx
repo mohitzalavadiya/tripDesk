@@ -1,196 +1,1251 @@
 "use client";
 
-import * as React from "react";
-import { useAuth } from "@/context/auth-context";
-import { useSaaS } from "@/context/saas-context";
 import { PageHeader } from "@/components/shared/page-header";
-import { formatCurrency } from "@/lib/costing-engine";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useSubscription } from "@/context/subscription-context";
+import { subscriptionClient } from "@/lib/api-client/subscription-client";
+import { formatCurrency } from "@/lib/costing-engine";
+import { useModalScrollLock } from "@/lib/scroll-lock";
 import {
-  CreditCard,
-  CheckCircle2,
-  Calendar,
-  Sparkles,
-  ShieldCheck,
-  Phone,
-  QrCode,
-  Building,
-  Check,
-  HelpCircle,
-  Clock,
-  ExternalLink,
+AlertTriangle,
+ArrowRight,
+BarChart3,
+Calendar,
+Check,
+CheckCircle2,
+Clock,
+Copy,
+FileCheck,
+FileText,
+Lock,
+PackageCheck,
+Phone,
+QrCode,
+X,
+Zap
 } from "lucide-react";
+import * as React from "react";
+import { toast } from "sonner";
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  BANK_TRANSFER: "Bank Transfer",
+  UPI: "UPI",
+  CASH: "Cash",
+  CARD: "Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other",
+};
+
+const BILLING_CYCLE_LABELS: Record<string, string> = {
+  MONTHLY: "Monthly",
+  YEARLY: "Yearly",
+};
+
+export interface ResourceUsageItem {
+  resource: string;
+  allowed: boolean;
+  limit: number | null;
+  currentUsage: number;
+  remaining: number | null;
+  isExceeded: boolean;
+  unlimited: boolean;
+}
+
+export interface FeatureEntitlementItem {
+  feature: string;
+  allowed: boolean;
+  reason: string;
+}
+
+interface AgencySubscriptionData {
+  agency: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    status: string;
+  };
+  subscription: {
+    id: string;
+    status: "TRIAL" | "ACTIVE" | "EXPIRED" | "CANCELLED";
+    billingCycle: "MONTHLY" | "YEARLY" | string;
+    planId: string;
+    planName: string;
+    planPrice: number;
+    planYearlyPrice: number | null;
+    planDescription: string | null;
+    planFeatures: string[];
+    trialStart: string | null;
+    trialEnd: string | null;
+    subscriptionStart: string | null;
+    subscriptionEnd: string | null;
+    daysRemaining: number;
+    isTrialExpired: boolean;
+    isActive: boolean;
+  };
+  usage?: Record<string, ResourceUsageItem>;
+  entitlements?: Record<string, boolean>;
+  features?: Record<string, FeatureEntitlementItem>;
+  latestPendingPayment: {
+    id: string;
+    amount: number;
+    currency: string;
+    planId: string | null;
+    planName?: string;
+    billingCycle: string;
+    paymentMethod: string;
+    utrNumber: string | null;
+    paymentDate: string;
+    status: string;
+    notes: string | null;
+    createdAt: string;
+  } | null;
+  paymentHistory: Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    planId: string | null;
+    planName?: string;
+    billingCycle: string;
+    paymentMethod: string;
+    utrNumber: string | null;
+    paymentDate: string;
+    status: string;
+    notes: string | null;
+    verifiedAt: string | null;
+    rejectedAt: string | null;
+    rejectionReason: string | null;
+    createdAt: string;
+  }>;
+  billingSettings?: {
+    upiId: string | null;
+    upiDisplayName: string | null;
+    accountHolder: string | null;
+    bankName: string | null;
+    accountNumber: string | null;
+    ifscCode: string | null;
+    branchName: string | null;
+    qrCodeUrl: string | null;
+  };
+}
+
+interface PlanItem {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  yearlyPrice: number | null;
+  durationDays: number;
+  features: string[];
+  isPopular: boolean;
+  displayOrder: number;
+  isActive: boolean;
+}
 
 export default function AgencySubscriptionPage() {
-  const { currentUser } = useAuth();
-  const { agencies, subscriptions, plans } = useSaaS();
+  const { refreshSubscription } = useSubscription();
+  const [data, setData] = React.useState<AgencySubscriptionData | null>(null);
+  const [plans, setPlans] = React.useState<PlanItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [billingCycle, setBillingCycle] = React.useState<"MONTHLY" | "YEARLY">("MONTHLY");
 
-  const currentAgency = agencies.find((a) => a.id === currentUser.agencyId) || agencies[0];
-  const currentSub = subscriptions.find((s) => s.agencyId === currentAgency.id) || subscriptions[0];
-  const currentPlan = plans.find((p) => p.id === currentSub.planId) || plans[0];
+  // Plan Selection & Payment Modal State
+  const [selectedPlanForPurchase, setSelectedPlanForPurchase] = React.useState<PlanItem | null>(null);
+  const [modalStep, setModalStep] = React.useState<"CONFIRM" | "PAYMENT" | "SUCCESS">("CONFIRM");
+  const [paymentMethod, setPaymentMethod] = React.useState<"UPI" | "BANK_TRANSFER">("UPI");
+  const [utrNumber, setUtrNumber] = React.useState("");
+  const [paymentNotes, setPaymentNotes] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+  const [copiedField, setCopiedField] = React.useState<string | null>(null);
+
+  useModalScrollLock(Boolean(selectedPlanForPurchase));
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(label);
+    toast.success(`Copied ${label} to clipboard`);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const fetchData = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const subRes = await subscriptionClient.getSubscription();
+      if (subRes.success && subRes.data) {
+        setData(subRes.data);
+        refreshSubscription().catch(() => {});
+        if (subRes.data.availablePlans && subRes.data.availablePlans.length > 0) {
+          setPlans(subRes.data.availablePlans);
+        } else {
+          const plansRes = await subscriptionClient.getActivePlans().catch(() => ({ success: false, data: [] }));
+          if (plansRes.success && plansRes.data) {
+            setPlans(plansRes.data);
+          }
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load subscription details");
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshSubscription]);
+
+
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleContactSupport = () => {
+    const agencyName = data?.agency.name || "Agency";
     window.open(
       `https://wa.me/919847099000?text=${encodeURIComponent(
-        `Hi TripDesk Support! I am ${currentUser.name} from ${currentAgency.name}. I need assistance with our SaaS subscription.`
+        `Hi Your Travel Desk Billing Support! I am from ${agencyName}. I need assistance with our SaaS subscription & plan upgrade.`
       )}`,
       "_blank"
     );
   };
+
+  const handleOpenPurchase = (plan: PlanItem) => {
+    setSelectedPlanForPurchase(plan);
+    setModalStep("CONFIRM");
+    setUtrNumber("");
+    setPaymentNotes("");
+  };
+
+  const handleCloseModal = () => {
+    setSelectedPlanForPurchase(null);
+    setModalStep("CONFIRM");
+    setUtrNumber("");
+    setPaymentNotes("");
+  };
+
+  const calculatePlanPrice = (plan: PlanItem, cycle: "MONTHLY" | "YEARLY") => {
+    if (cycle === "YEARLY") {
+      return plan.yearlyPrice ? plan.yearlyPrice : plan.price * 10;
+    }
+    return plan.price;
+  };
+
+  const calculateSavingsPercent = (plan: PlanItem) => {
+    if (!plan.yearlyPrice) return 0;
+    const regularYearly = plan.price * 12;
+    const savings = regularYearly - plan.yearlyPrice;
+    if (savings <= 0) return 0;
+    return Math.round((savings / regularYearly) * 100);
+  };
+
+  const handleSubmitPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPlanForPurchase) return;
+
+    if (!utrNumber.trim() || utrNumber.trim().length < 4) {
+      toast.error("Please enter a valid transaction reference / UTR number (min 4 characters).");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await subscriptionClient.submitPaymentRequest({
+        planId: selectedPlanForPurchase.id,
+        billingCycle,
+        paymentMethod,
+        utrNumber: utrNumber.trim(),
+        notes: paymentNotes.trim() || undefined,
+      });
+
+      toast.success("Payment request submitted successfully! Waiting for verification.");
+      setModalStep("SUCCESS");
+      fetchData();
+      refreshSubscription().catch(() => {});
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit payment request");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50/50 pb-20">
+        <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+          <div className="h-10 bg-slate-200/60 rounded-xl w-72 animate-pulse" />
+          <div className="h-56 bg-slate-900/10 rounded-3xl animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="h-96 bg-white rounded-3xl border border-slate-200/80 animate-pulse" />
+            <div className="h-96 bg-white rounded-3xl border border-slate-200/80 animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const sub = data?.subscription;
+  const isTrial = sub?.status === "TRIAL";
+  const isTrialExpired = sub?.isTrialExpired;
+  const isActivePaid = sub?.status === "ACTIVE";
+  const pendingPayment = data?.latestPendingPayment;
+  const rejectedPayments = (data?.paymentHistory || []).filter((p) => p.status === "REJECTED");
+  const latestRejected = rejectedPayments.length > 0 ? rejectedPayments[0] : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
         {/* Top Header */}
         <PageHeader
-          title="Agency Subscription & Plan"
-          description="View your TripDesk SaaS plan details, subscription renewals, feature inclusions, and billing support."
+          title="Agency Subscription & Billing"
+          description="Manage your Your Travel Desk subscription tier, renewals, billing cycle, and manual payment verification."
           breadcrumbs={[{ label: "Agency Settings" }, { label: "Subscription" }]}
           primaryAction={{
-            label: "Contact TripDesk",
+            label: "Contact Billing Support",
             onClick: handleContactSupport,
             icon: Phone,
           }}
         />
 
-        {/* ─── ACTIVE PLAN HERO CARD ──────────────────────────────────────── */}
-        <div className="bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
+        {/* ─── 1. ACTIVE NOTIFICATIONS / ALERTS ────────────────────────────── */}
+        {/* A. Pending Payment Notification */}
+        {pendingPayment && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-5 sm:p-6 shadow-xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-amber-500/20 text-amber-700 rounded-2xl shrink-0 mt-0.5">
+                  <Clock className="h-5 w-5 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                      Payment Verification In Progress
+                    </span>
+                    <span className="text-[10px] font-bold bg-amber-200/60 text-amber-900 px-2 py-0.5 rounded-full">
+                      Status: Pending
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-900/90 mt-1 leading-relaxed">
+                    Your payment request for the <strong>{pendingPayment.planName || "Selected"} Plan</strong> ({BILLING_CYCLE_LABELS[pendingPayment.billingCycle] ?? pendingPayment.billingCycle}) amounting to <strong>{formatCurrency(pendingPayment.amount)}</strong> has been submitted.
+                  </p>
+                  <p className="text-[11px] text-amber-800 font-mono mt-1">
+                    UTR / Reference: <strong>{pendingPayment.utrNumber || "N/A"}</strong> • Submitted: {new Date(pendingPayment.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-xs font-semibold text-amber-700 bg-amber-100/70 border border-amber-300/60 px-3 py-1.5 rounded-xl block text-center">
+                  Reviewing by Platform Owner
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* B. Rejected Payment Notification */}
+        {latestRejected && !pendingPayment && (
+          <div className="bg-rose-50 border border-rose-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-rose-100 text-rose-600 rounded-2xl shrink-0 mt-0.5">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-rose-900">
+                  Previous Payment Request Rejected
+                </h4>
+                <p className="text-xs text-rose-700 leading-relaxed">
+                  Reason: <strong>{latestRejected.rejectionReason || "UTR reference could not be verified on bank records."}</strong>
+                </p>
+                <p className="text-[11px] text-rose-600 font-mono">
+                  UTR: {latestRejected.utrNumber} • Amount: {formatCurrency(latestRejected.amount)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── 2. CURRENT PLAN / TRIAL HERO CARD ───────────────────────────── */}
+        <div className="bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 relative overflow-hidden">
+          <div className="absolute right-0 top-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+            <div className="space-y-1.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <span
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                    currentAgency.status === "ACTIVE"
+                    isActivePaid
                       ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                      : currentAgency.status === "TRIAL"
+                      : isTrial && !isTrialExpired
                       ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                      : currentAgency.status === "PAST_DUE"
-                      ? "bg-orange-500/20 text-orange-300 border-orange-500/30"
                       : "bg-rose-500/20 text-rose-300 border-rose-500/30"
                   }`}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  {currentAgency.status === "PAST_DUE" ? "PAYMENT REQUIRED" : `${currentAgency.status} SUBSCRIPTION`}
+                  {isActivePaid
+                    ? "ACTIVE SUBSCRIPTION"
+                    : isTrial && !isTrialExpired
+                    ? "7-DAY FREE TRIAL"
+                    : "TRIAL EXPIRED"}
                 </span>
                 <span className="text-xs text-slate-400 font-mono">
-                  Agency: {currentAgency.name}
+                  Agency: {data?.agency.name}
                 </span>
               </div>
+
               <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                {currentPlan.name} Plan
+                {sub?.planName || "Starter"} Plan
               </h2>
-              <p className="text-xs text-slate-300">{currentPlan.tagline}</p>
+              <p className="text-xs text-slate-300 max-w-xl">
+                {sub?.planDescription || "Complete cloud workspace for modern travel agencies and boutique tour operators."}
+              </p>
             </div>
 
-            <div className="text-left sm:text-right">
+            <div className="text-left sm:text-right shrink-0">
               <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                Subscription Fee ({currentSub.billingCycle})
+                {isActivePaid ? `Billed ${BILLING_CYCLE_LABELS[sub?.billingCycle] ?? sub?.billingCycle}` : "Trial Pricing"}
               </span>
               <span className="text-2xl sm:text-3xl font-black text-amber-300 font-mono">
-                {formatCurrency(currentSub.amount)}
+                {isActivePaid
+                  ? sub?.billingCycle === "YEARLY" && sub.planYearlyPrice
+                    ? formatCurrency(sub.planYearlyPrice)
+                    : formatCurrency(sub?.planPrice || 0)
+                  : "₹0.00"}
               </span>
               <span className="text-xs text-slate-400 block font-medium">
-                {currentSub.billingCycle === "Yearly" ? "/ year" : "/ month"}
+                {isActivePaid
+                  ? sub?.billingCycle === "YEARLY"
+                    ? "/ year"
+                    : "/ month"
+                  : "Free 7-Day Access"}
               </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/10 backdrop-blur-xs rounded-2xl p-4 text-xs border border-white/15">
+          {/* 4-Item Metric Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/10 backdrop-blur-xs rounded-2xl p-4 text-xs border border-white/15 relative z-10">
             <div>
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Status</span>
               <span className="font-bold text-emerald-400 flex items-center gap-1 mt-0.5">
-                <CheckCircle2 className="h-3.5 w-3.5" /> {currentAgency.status}
+                <CheckCircle2 className="h-3.5 w-3.5" /> {sub?.status === "TRIAL" ? "Trial" : sub?.status === "ACTIVE" ? "Active" : sub?.status === "EXPIRED" ? "Expired" : "Cancelled"}
               </span>
             </div>
 
             <div>
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">Billing Cycle</span>
-              <span className="font-bold text-white mt-0.5 block">{currentSub.billingCycle}</span>
-            </div>
-
-            <div>
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">Trial Status</span>
+              <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                {isTrial ? "Trial Validity" : "Billing Cycle"}
+              </span>
               <span className="font-bold text-white mt-0.5 block">
-                {currentSub.status === "TRIAL" ? "7-Day Free Trial" : "Full Paid Account"}
+                {isTrial
+                  ? `${sub?.daysRemaining} days remaining`
+                  : sub?.billingCycle === "YEARLY"
+                  ? "Yearly Billing"
+                  : "Monthly Billing"}
               </span>
             </div>
 
             <div>
-              <span className="text-[10px] text-slate-400 uppercase font-bold block">Next Renewal</span>
+              <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                {isTrial ? "Trial Started" : "Subscription Start"}
+              </span>
+              <span className="font-bold text-slate-200 mt-0.5 block font-mono">
+                {isTrial
+                  ? sub?.trialStart
+                    ? new Date(sub.trialStart).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "—"
+                  : sub?.subscriptionStart
+                  ? new Date(sub.subscriptionStart).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : "—"}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                {isTrial ? "Trial Ends / Expires" : "Next Renewal Date"}
+              </span>
               <span className="font-bold text-amber-300 font-mono mt-0.5 block">
-                {currentSub.renewalDate}
+                {isTrial
+                  ? sub?.trialEnd
+                    ? new Date(sub.trialEnd).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "—"
+                  : sub?.subscriptionEnd
+                  ? new Date(sub.subscriptionEnd).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : "—"}
               </span>
             </div>
           </div>
         </div>
 
-        {/* ─── 2-COLUMN SECTION: INCLUSIONS & MANUAL PAYMENT DETAILS ───────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left 7 Cols: Plan Inclusions */}
-          <div className="lg:col-span-7 bg-white border border-slate-200/90 rounded-3xl p-6 shadow-2xs space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-3">
-              Included Features in {currentPlan.name} Plan
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              {currentPlan.features.map((feat, idx) => (
-                <div key={idx} className="flex items-start gap-2 text-slate-700">
-                  <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>{feat}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right 5 Cols: Subscription Renewal & Manual Payment Info */}
-          <div className="lg:col-span-5 bg-white border border-slate-200/90 rounded-3xl p-6 shadow-2xs space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <QrCode className="h-5 w-5 text-indigo-600" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                Manual Subscription Renewal (V1)
-              </h3>
-            </div>
-
-            <p className="text-xs text-slate-500 leading-relaxed">
-              TripDesk subscriptions are renewed manually via Direct UPI or Bank Transfer. After making payment, share your UTR reference for instant verification.
-            </p>
-
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3 text-xs">
-              <div className="space-y-1">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                  TripDesk Official Billing UPI ID
-                </span>
-                <span className="font-mono font-black text-slate-900 text-sm bg-white px-2.5 py-1 rounded border border-slate-200 block">
-                  tripdesk.billing@icici
-                </span>
-              </div>
-
-              <div className="space-y-1 pt-1 border-t border-slate-200/60">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                  Bank Account Transfer (NEFT / RTGS / IMPS)
-                </span>
-                <p className="text-slate-700 leading-relaxed">
-                  <strong>A/C Name:</strong> TripDesk SaaS Technologies Pvt Ltd<br />
-                  <strong>Bank:</strong> ICICI Bank, MG Road Branch<br />
-                  <strong>A/C No:</strong> 002105009844<br />
-                  <strong>IFSC:</strong> ICIC0000021
+        {/* ─── 2.5 SUBSCRIPTION USAGE METERS & FEATURE ENTITLEMENTS ──────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Usage Meters Card (2 cols on lg) */}
+          <div className="lg:col-span-2 bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 md:p-8 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 shrink-0" />
+                  <span>Current Billing Period Usage</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Monthly resource creation counts enforced by your subscription plan.
                 </p>
               </div>
+              <span className="self-start sm:self-auto text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-100 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full shrink-0">
+                Authoritative
+              </span>
             </div>
 
-            <div className="flex gap-2">
-              <Button
-                onClick={handleContactSupport}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 rounded-xl cursor-pointer"
-              >
-                <Phone className="h-3.5 w-3.5 mr-1.5" />
-                Contact TripDesk for Renewal
-              </Button>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { key: "TRIPS", label: "Trips", icon: Calendar },
+                { key: "QUOTATIONS", label: "Quotations", icon: FileCheck },
+                { key: "BOOKINGS", label: "Bookings", icon: PackageCheck },
+              ].map(({ key, label, icon: Icon }) => {
+                const item = data?.usage?.[key];
+                const isUnlimited = item?.unlimited ?? false;
+                const limit = item?.limit;
+                const currentUsage = item?.currentUsage ?? 0;
+                const remaining = item?.remaining;
+                const isExceeded = item?.isExceeded ?? false;
+                const isApproaching = !isUnlimited && remaining !== null && remaining !== undefined && remaining <= 2 && remaining > 0;
+
+                const percent = isUnlimited || !limit || limit <= 0
+                  ? 100
+                  : Math.min(100, Math.round((currentUsage / limit) * 100));
+
+                return (
+                  <div
+                    key={key}
+                    className={`rounded-2xl p-4 border space-y-3 transition-all ${
+                      isExceeded
+                        ? "bg-rose-50/70 border-rose-200"
+                        : isApproaching
+                        ? "bg-amber-50/70 border-amber-200"
+                        : "bg-slate-50/70 border-slate-200/80"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`p-2 rounded-xl ${
+                          isExceeded
+                            ? "bg-rose-100 text-rose-700"
+                            : isApproaching
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-indigo-100 text-indigo-700"
+                        }`}>
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-900">{label}</span>
+                      </div>
+                      {isUnlimited ? (
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                          UNLIMITED
+                        </span>
+                      ) : isExceeded ? (
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">
+                          Quota Reached
+                        </span>
+                      ) : isApproaching ? (
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">
+                          {remaining} Left
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-slate-500 font-mono">
+                          {remaining !== null ? `${remaining} remaining` : ""}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-baseline text-xs">
+                        <span className="text-xl font-black text-slate-900 font-mono">
+                          {isUnlimited ? currentUsage : `${currentUsage} / ${limit ?? 0}`}
+                        </span>
+                        {!isUnlimited && (
+                          <span className="text-[11px] font-medium text-slate-500">
+                            {percent}% used
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="h-2 w-full bg-slate-200/80 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isUnlimited
+                              ? "bg-emerald-500"
+                              : isExceeded
+                              ? "bg-rose-600"
+                              : isApproaching
+                              ? "bg-amber-500"
+                              : "bg-indigo-600"
+                          }`}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {isExceeded && (
+                      <p className="text-[11px] text-rose-700 font-medium leading-tight">
+                        Creation limit reached for current billing cycle. Upgrade your plan to create more.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Feature Entitlements Card (1 col on lg) */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="border-b border-slate-100 pb-4">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-amber-500" />
+                  <span>Feature Entitlements</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Database-driven capability access for your current plan.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  { key: "CUSTOM_AGENCY_LOGO", label: "Custom Agency Logo" },
+                  { key: "FEEDBACK_REVIEWS", label: "Feedback & Reviews" },
+                  { key: "CUSTOMER_INSIGHTS", label: "Customer Insights" },
+                  { key: "REPORTS_ANALYTICS", label: "Reports & Analytics" },
+                ].map(({ key, label }) => {
+                  const allowed =
+                    (data?.entitlements && data.entitlements[key as keyof typeof data.entitlements]) ??
+                    data?.features?.[key]?.allowed ??
+                    false;
+
+                  return (
+                    <div
+                      key={key}
+                      className={`flex items-center justify-between p-3 rounded-2xl border text-xs ${
+                        allowed
+                          ? "bg-emerald-50/50 border-emerald-200/60 text-slate-900"
+                          : "bg-slate-50 border-slate-200/60 text-slate-500"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {allowed ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        ) : (
+                          <Lock className="h-4 w-4 text-slate-400 shrink-0" />
+                        )}
+                        <span className="font-semibold">{label}</span>
+                      </div>
+
+                      {allowed ? (
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                          Included
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">
+                          Available with Pro
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
+
+        {/* ─── 3. PLAN SELECTION SECTION & BILLING TOGGLE ─────────────────── */}
+        <div className="space-y-6 pt-4">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h3 className="text-2xl font-black tracking-tight text-slate-900">
+              Choose the Plan That’s Right for Your Agency
+            </h3>
+            <p className="text-xs text-slate-500">
+              Upgrade or renew your subscription with flexible monthly or yearly billing. All plans include full CRM, operations, financial ledgers, and document generators.
+            </p>
+
+            {/* Monthly / Yearly Switcher */}
+            <div className="inline-flex items-center p-1 bg-slate-200/80 rounded-2xl shadow-inner border border-slate-300/60 mt-2">
+              <button
+                type="button"
+                onClick={() => setBillingCycle("MONTHLY")}
+                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  billingCycle === "MONTHLY"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Monthly Billing
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingCycle("YEARLY")}
+                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  billingCycle === "YEARLY"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <span>Yearly Billing</span>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-900 px-2 py-0.5 rounded-full shadow-2xs">
+                  Save ~17%
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Dynamic Plan Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 max-w-5xl mx-auto items-stretch">
+            {plans.map((plan) => {
+              const isCurrentActive =
+                isActivePaid &&
+                sub?.planId === plan.id &&
+                sub?.billingCycle === billingCycle;
+              const isCurrentPlanTrial =
+                isTrial && sub?.planId === plan.id;
+              const price = calculatePlanPrice(plan, billingCycle);
+              const savingsPercent = calculateSavingsPercent(plan);
+
+              return (
+                <div
+                  key={plan.id}
+                  className={`bg-white rounded-3xl p-6 sm:p-8 border shadow-xs flex flex-col justify-between space-y-6 relative transition-all ${
+                    plan.isPopular
+                      ? "border-indigo-500 ring-2 ring-indigo-500/20"
+                      : "border-slate-200/90 hover:border-indigo-200"
+                  }`}
+                >
+                  {plan.isPopular && (
+                    <div className="absolute -top-3.5 right-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-md">
+                      Most Popular
+                    </div>
+                  )}
+
+                  <div className="space-y-6">
+                    {/* Header */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xl font-black text-slate-900">{plan.name}</h4>
+                        {isCurrentActive && (
+                          <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                            Current Plan
+                          </span>
+                        )}
+                        {isCurrentPlanTrial && (
+                          <span className="text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                            Active in Trial
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        {plan.description || "Essential travel CRM & workflow suite for professional agencies."}
+                      </p>
+                    </div>
+
+                    {/* Pricing */}
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-1">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-3xl sm:text-4xl font-black text-slate-900 font-mono">
+                          {formatCurrency(price)}
+                        </span>
+                        <span className="text-xs text-slate-500 font-medium">
+                          {billingCycle === "YEARLY" ? "/ year" : "/ month"}
+                        </span>
+                      </div>
+                      {billingCycle === "YEARLY" && savingsPercent > 0 && (
+                        <p className="text-[11px] text-emerald-600 font-bold">
+                          ✓ Includes 2 months free (Save {savingsPercent}%)
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Features Checklist */}
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Included Features & Capabilities
+                      </p>
+                      <ul className="space-y-2.5 text-xs text-slate-700">
+                        {plan.features.map((feat, fIdx) => (
+                          <li key={fIdx} className="flex items-start gap-2.5">
+                            <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                            <span>{feat}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* CTA Button */}
+                  <div className="pt-4 border-t border-slate-100">
+                    {isCurrentActive ? (
+                      <Button
+                        disabled
+                        className="w-full bg-slate-100 text-slate-500 font-bold text-xs h-10 rounded-2xl cursor-not-allowed"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1.5 text-emerald-600" />
+                        Current Active Plan
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => handleOpenPurchase(plan)}
+                        className={`w-full font-bold text-xs h-10 rounded-2xl transition-all cursor-pointer ${
+                          plan.isPopular
+                            ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20"
+                            : "bg-slate-900 hover:bg-slate-800 text-white"
+                        }`}
+                      >
+                        <span>Choose {plan.name} ({billingCycle})</span>
+                        <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ─── 4. PAYMENT & SUBSCRIPTION HISTORY ──────────────────────────── */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-4 sm:p-6 md:p-8 shadow-xs space-y-4 mt-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-slate-900">Subscription Payment History</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Log of all manual UPI and Bank Transfer payment submissions for verification.
+              </p>
+            </div>
+            <span className="self-start sm:self-auto text-[10px] sm:text-xs font-semibold text-slate-500 font-mono bg-slate-100 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full shrink-0">
+              {(data?.paymentHistory || []).length} Records
+            </span>
+          </div>
+
+          {(data?.paymentHistory || []).length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-xs">
+              <FileText className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+              No previous payment records found. Your free trial is currently active.
+            </div>
+          ) : (
+            <div className="overflow-x-auto max-h-[380px] overflow-y-auto">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm shadow-2xs">
+                  <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase text-[10px]">
+                    <th className="pb-3 pr-4">Plan & Cycle</th>
+                    <th className="pb-3 px-4">Amount</th>
+                    <th className="pb-3 px-4">Payment Method</th>
+                    <th className="pb-3 px-4">UTR / Ref Number</th>
+                    <th className="pb-3 px-4">Submitted Date</th>
+                    <th className="pb-3 px-4">Status</th>
+                    <th className="pb-3 pl-4 text-right">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {data?.paymentHistory.map((p) => (
+                    <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 pr-4 font-bold text-slate-900">
+                        {p.planName || "SaaS Plan"} ({BILLING_CYCLE_LABELS[p.billingCycle] ?? p.billingCycle})
+                      </td>
+                      <td className="py-3 px-4 font-bold font-mono text-slate-900">
+                        {formatCurrency(p.amount)}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600">
+                        {PAYMENT_METHOD_LABELS[p.paymentMethod] ?? p.paymentMethod}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-slate-700">
+                        {p.utrNumber || "—"}
+                      </td>
+                      <td className="py-3 px-4 text-slate-500">
+                        {new Date(p.createdAt).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </td>
+                      <td className="py-3 px-4">
+                        <StatusBadge
+                          status={p.status}
+                          label={
+                            p.status === "VERIFIED"
+                              ? "Verified"
+                              : p.status === "PENDING"
+                              ? "Pending"
+                              : p.status === "REJECTED"
+                              ? "Rejected"
+                              : p.status
+                          }
+                        />
+                      </td>
+                      <td className="py-3 pl-4 text-right text-slate-500 max-w-xs truncate">
+                        {p.rejectionReason ? (
+                          <span className="text-rose-600 font-medium">
+                            {p.rejectionReason}
+                          </span>
+                        ) : (
+                          p.notes || "—"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* ─── 5. CONFIRMATION & UTR SUBMISSION MODAL ───────────────────────── */}
+      {selectedPlanForPurchase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 sm:p-8 space-y-6 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            {modalStep === "CONFIRM" && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">Confirm Subscription</h3>
+                    <p className="text-xs text-slate-500">Review selected tier parameters before payment</p>
+                  </div>
+                  <button
+                    onClick={handleCloseModal}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Plan Tier:</span>
+                    <span className="font-black text-slate-900 text-sm">{selectedPlanForPurchase.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Billing Cycle:</span>
+                    <span className="font-bold text-indigo-700">{BILLING_CYCLE_LABELS[billingCycle] ?? billingCycle}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-slate-200/60 pt-2">
+                    <span className="text-slate-500">Payable Amount:</span>
+                    <span className="font-black text-slate-900 text-base font-mono">
+                      {formatCurrency(calculatePlanPrice(selectedPlanForPurchase, billingCycle))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-[11px] text-slate-400">
+                    <span>Payment Method:</span>
+                    <span className="font-semibold text-slate-700">Direct UPI / Bank Transfer (NEFT/IMPS)</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCloseModal}
+                    className="w-1/2 text-xs font-semibold h-10 rounded-xl cursor-pointer"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setModalStep("PAYMENT")}
+                    className="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold h-10 rounded-xl cursor-pointer"
+                  >
+                    Continue to Payment
+                    <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {modalStep === "PAYMENT" && (
+              <form onSubmit={handleSubmitPayment} className="space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">Complete Manual Payment</h3>
+                    <p className="text-xs text-slate-500">Transfer payment and enter your UTR reference</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Amount to Pay Callout */}
+                <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-indigo-700 block">Total Amount Due</span>
+                    <span className="text-2xl font-black text-indigo-950 font-mono">
+                      {formatCurrency(calculatePlanPrice(selectedPlanForPurchase, billingCycle))}
+                    </span>
+                  </div>
+                  <span className="text-xs font-bold text-indigo-700 bg-white px-3 py-1 rounded-xl border border-indigo-200">
+                    {selectedPlanForPurchase.name} • {billingCycle}
+                  </span>
+                </div>
+
+                {/* Dynamic Bank / UPI / QR Billing Details */}
+                {(() => {
+                  const billing = data?.billingSettings;
+                  const upi = billing?.upiId || "";
+                  const upiName = billing?.upiDisplayName || "";
+                  const accHolder = billing?.accountHolder || "—";
+                  const bank = billing?.bankName || "—";
+                  const branch = billing?.branchName || "";
+                  const accNum = billing?.accountNumber || "—";
+                  const ifsc = billing?.ifscCode || "—";
+                  const qrUrl = billing?.qrCodeUrl;
+
+                  return (
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4 text-xs">
+                      {/* Optional QR Code Preview */}
+                      {qrUrl && (
+                        <div className="bg-white border border-slate-200/90 rounded-xl p-3 flex flex-col sm:flex-row items-center gap-4 shadow-2xs">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={qrUrl}
+                            alt="Subscription Payment QR"
+                            className="w-28 h-28 object-contain bg-white rounded-lg border border-slate-200 p-1 shrink-0"
+                          />
+                          <div className="space-y-1 text-center sm:text-left">
+                            <div className="flex items-center justify-center sm:justify-start gap-1.5 text-slate-900 font-bold">
+                              <QrCode className="h-4 w-4 text-indigo-600" />
+                              <span>Scan & Pay via UPI App</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 leading-relaxed">
+                              Open GPay, PhonePe, Paytm, or any banking UPI app to scan and complete payment.
+                            </p>
+                            {upi && (
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(upi, "UPI ID")}
+                                className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded cursor-pointer mt-1"
+                              >
+                                <span>{upi}</span>
+                                {copiedField === "UPI ID" ? (
+                                  <Check className="h-3 w-3 text-emerald-600" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Official UPI ID Section */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                            Your Travel Desk Official Billing UPI ID
+                          </span>
+                          {upiName && (
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              Name: {upiName}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-slate-200">
+                          <span className="font-mono font-black text-slate-900 text-xs sm:text-sm select-all">
+                            {upi || "—"}
+                          </span>
+                          {upi && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(upi, "UPI ID")}
+                              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors cursor-pointer"
+                            >
+                              {copiedField === "UPI ID" ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                  <span className="text-emerald-600 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3.5 w-3.5" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Direct Bank Transfer Section */}
+                      <div className="space-y-2 pt-2 border-t border-slate-200/60">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                          Direct Bank Transfer (NEFT / IMPS / RTGS)
+                        </span>
+                        <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-2 text-slate-700 select-all">
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-500">Beneficiary Name:</span>
+                            <span className="font-bold text-slate-900">{accHolder}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-500">Bank & Branch:</span>
+                            <span className="font-semibold text-slate-900">{bank}{branch ? `, ${branch}` : ""}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px] border-t border-slate-100 pt-1.5">
+                            <span className="text-slate-500">Account Number:</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-slate-900">{accNum}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(accNum, "Account Number")}
+                                className="text-slate-400 hover:text-indigo-600 p-0.5 rounded cursor-pointer"
+                                title="Copy Account Number"
+                              >
+                                {copiedField === "Account Number" ? (
+                                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-500">IFSC Code:</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-slate-900">{ifsc}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(ifsc, "IFSC Code")}
+                                className="text-slate-400 hover:text-indigo-600 p-0.5 rounded cursor-pointer"
+                                title="Copy IFSC Code"
+                              >
+                                {copiedField === "IFSC Code" ? (
+                                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* UTR Input Form */}
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-800">
+                      Transaction Reference Number / UTR <span className="text-rose-500">*</span>
+                    </label>
+                    <Input
+                      value={utrNumber}
+                      onChange={(e) => setUtrNumber(e.target.value)}
+                      placeholder="e.g. 423589123456 or UPI Reference ID"
+                      className="text-xs font-mono"
+                      required
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      Enter the 12-digit UTR from your bank or UPI payment receipt.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-800">
+                      Payment Mode
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("UPI")}
+                        className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          paymentMethod === "UPI"
+                            ? "bg-indigo-50 border-indigo-300 text-indigo-700"
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        UPI Transfer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("BANK_TRANSFER")}
+                        className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          paymentMethod === "BANK_TRANSFER"
+                            ? "bg-indigo-50 border-indigo-300 text-indigo-700"
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        Bank Transfer (NEFT/IMPS)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-800">
+                      Optional Remarks
+                    </label>
+                    <Textarea
+                      value={paymentNotes}
+                      onChange={(e) => setPaymentNotes(e.target.value)}
+                      placeholder="e.g. Paid via HDFC Corporate UPI"
+                      className="text-xs min-h-[60px]"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2 border-t border-slate-100">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setModalStep("CONFIRM")}
+                    disabled={submitting}
+                    className="w-1/3 text-xs font-semibold h-10 rounded-xl cursor-pointer"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-10 rounded-xl cursor-pointer"
+                  >
+                    {submitting ? "Submitting..." : "Submit Payment for Verification"}
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {modalStep === "SUCCESS" && (
+              <div className="text-center py-4 space-y-4">
+                <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="h-8 w-8" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-black text-slate-900">Payment Request Submitted!</h3>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    Your payment request has been received. Our team will verify your UTR reference against bank statements and activate your subscription shortly.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <Button
+                    onClick={handleCloseModal}
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs h-10 rounded-xl cursor-pointer"
+                  >
+                    Back to Subscription Dashboard
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

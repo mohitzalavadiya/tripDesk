@@ -1,28 +1,23 @@
 "use client";
 
-import * as React from "react";
-import {
-  TripOperation,
-  TripOperationsStatus,
-  DailyOperationStatus,
-  ActivityOperationStatus,
-  TransportStatus,
-  TransportOperation,
-  DailyTripPlan,
-  DailyActivityOperation,
-  Driver,
-  TripIssue,
-  TripChange,
-  OperationalTimelineEvent,
-  EmergencyContact,
-  PostTripFeedback,
-} from "@/types";
-import {
-  calculateTripReadiness,
-  detectDriverConflict,
-  detectVehicleConflict,
-} from "@/lib/operations/operations-service";
 import { useBooking } from "@/context/booking-context";
+import {
+calculateTripReadiness,
+detectDriverConflict,
+} from "@/lib/operations/operations-service";
+import {
+ActivityOperationStatus,
+DailyActivityOperation,
+Driver,
+EmergencyContact,
+PostTripFeedback,
+TransportStatus,
+TripChange,
+TripIssue,
+TripOperation,
+TripOperationsStatus,
+} from "@/types";
+import * as React from "react";
 
 interface OperationsContextType {
   operations: TripOperation[];
@@ -709,7 +704,7 @@ export function OperationsProvider({
 }) {
   const [operations, setOperations] =
     React.useState<TripOperation[]>(INITIAL_OPERATIONS);
-  const [drivers, setDrivers] = React.useState<Driver[]>(INITIAL_DRIVERS);
+  const [drivers] = React.useState<Driver[]>(INITIAL_DRIVERS);
   const { bookings } = useBooking();
 
   // Recalculate readiness whenever operations or bookings change
@@ -943,7 +938,7 @@ export function OperationsProvider({
           ];
 
           // Auto-create issue if delayed
-          let updatedIssues = [...o.issues];
+          const updatedIssues = [...o.issues];
           if (status === "Delayed") {
             updatedIssues.push({
               id: `iss_${Date.now()}`,

@@ -1,18 +1,19 @@
 "use client";
 
-import * as React from "react";
+import {
+Tooltip,
+TooltipContent,
+TooltipProvider,
+TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useAuth } from "@/context/auth-context";
+import { EntitlementsState,useSubscription } from "@/context/subscription-context";
+import { usePlatformChatUnreadCount } from "@/hooks/use-platform-chat";
+import { adminNavigationConfig,agencyNavigationConfig,secondaryNavigation } from "@/lib/navigation";
+import { cn } from "@/lib/utils";
+import { ChevronLeft,ChevronRight,Lock,PlaneTakeoff,ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PlaneTakeoff, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
-import { agencyNavigationConfig, adminNavigationConfig, secondaryNavigation } from "@/lib/navigation";
-import { useAuth } from "@/context/auth-context";
-import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -21,9 +22,11 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
   const pathname = usePathname();
-  const { currentUser } = useAuth();
-  const isPlatformOwner = currentUser.role === "TRIPDESK_OWNER";
-  const navSections = isPlatformOwner ? adminNavigationConfig : agencyNavigationConfig;
+  const { isPlatformOwner } = useAuth();
+  const isPlatform = isPlatformOwner || pathname.startsWith("/admin");
+  const navSections = isPlatform ? adminNavigationConfig : agencyNavigationConfig;
+  const { unreadCount: chatUnreadCount } = usePlatformChatUnreadCount();
+  const { isFeatureAllowed } = useSubscription();
 
   return (
     <TooltipProvider delay={0}>
@@ -36,15 +39,15 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
         {/* Branding Logo Header */}
         <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border/30 shrink-0">
           <Link
-            href={isPlatformOwner ? "/admin" : "/dashboard"}
+            href={isPlatform ? "/admin" : "/dashboard"}
             className="flex items-center gap-2.5 font-bold tracking-tight text-white focus-visible:ring-1 focus-visible:ring-indigo-400 rounded-md"
           >
             <div
               className={`flex h-9 w-9 items-center justify-center rounded-lg shadow-sm shrink-0 ${
-                isPlatformOwner ? "bg-purple-600" : "bg-indigo-600"
+                isPlatform ? "bg-purple-600" : "bg-indigo-600"
               }`}
             >
-              {isPlatformOwner ? (
+              {isPlatform ? (
                 <ShieldCheck className="h-5 w-5 text-white" />
               ) : (
                 <PlaneTakeoff className="h-5 w-5 text-white stroke-[2]" />
@@ -52,11 +55,11 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
             </div>
             {!collapsed && (
               <div className="flex flex-col">
-                <span className="text-lg font-black tracking-tight text-white">
-                  Trip<span className={isPlatformOwner ? "text-purple-400" : "text-indigo-400"}>Desk</span>
+                <span className="text-sm font-black tracking-tight text-white leading-tight">
+                  Your Travel <span className={isPlatform ? "text-purple-400" : "text-indigo-400"}>Desk</span>
                 </span>
                 <span className="text-[9px] uppercase font-bold tracking-widest text-slate-400">
-                  {isPlatformOwner ? "SaaS Platform" : "Agency Suite"}
+                  {isPlatform ? "SaaS Platform" : "Agency Suite"}
                 </span>
               </div>
             )}
@@ -86,6 +89,10 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href || (item.href !== "/admin" && item.href !== "/dashboard" && pathname.startsWith(item.href));
+                  const isSupportChat = item.href === "/support" || item.href === "/admin/chat";
+                  const hasUnread = isSupportChat && chatUnreadCount > 0;
+                  const isFeatureGated = !isPlatform && Boolean(item.featureKey);
+                  const isLocked = isFeatureGated && !isFeatureAllowed(item.featureKey as keyof EntitlementsState);
 
                   return (
                     <Tooltip key={item.label} disabled={!collapsed}>
@@ -96,7 +103,7 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                             className={cn(
                               "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group relative",
                               isActive
-                                ? isPlatformOwner
+                                ? isPlatform
                                   ? "bg-purple-600/15 text-white font-semibold"
                                   : "bg-indigo-600/10 text-white font-semibold"
                                 : "text-slate-400 hover:text-white hover:bg-sidebar-accent/50"
@@ -106,21 +113,31 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                             {isActive && (
                               <span
                                 className={`absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md ${
-                                  isPlatformOwner ? "bg-purple-500" : "bg-indigo-500"
+                                  isPlatform ? "bg-purple-500" : "bg-indigo-500"
                                 }`}
                               />
                             )}
 
-                            <Icon
-                              className={cn(
-                                "h-5 w-5 shrink-0 transition-colors",
-                                isActive
-                                  ? isPlatformOwner
-                                    ? "text-purple-400"
-                                    : "text-indigo-400"
-                                  : "text-slate-400 group-hover:text-white"
+                            <div className="relative shrink-0 flex items-center justify-center">
+                              <Icon
+                                className={cn(
+                                  "h-5 w-5 shrink-0 transition-colors",
+                                  isActive
+                                    ? isPlatform
+                                      ? "text-purple-400"
+                                      : "text-indigo-400"
+                                    : "text-slate-400 group-hover:text-white"
+                                )}
+                              />
+                              {hasUnread && (
+                                <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-purple-500 ring-2 ring-sidebar animate-pulse" />
                               )}
-                            />
+                              {isLocked && collapsed && (
+                                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-800 border border-slate-700 text-slate-400">
+                                  <Lock className="h-2 w-2 text-slate-300" />
+                                </span>
+                              )}
+                            </div>
 
                             {!collapsed && (
                               <span className="truncate flex-1 animate-in fade-in duration-150">
@@ -128,7 +145,14 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                               </span>
                             )}
 
-                            {!collapsed && item.badge && (
+                            {!collapsed && hasUnread && (
+                              <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 leading-none bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+                                {chatUnreadCount > 1 ? `${chatUnreadCount} new` : "New"}
+                              </span>
+                            )}
+
+                            {!collapsed && !hasUnread && item.badge && (
                               <span
                                 className={cn(
                                   "text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0 leading-none select-none",
@@ -141,6 +165,15 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                                 {item.badge}
                               </span>
                             )}
+
+                            {!collapsed && !hasUnread && !item.badge && isLocked && (
+                              <span
+                                className="inline-flex items-center text-slate-400 group-hover:text-amber-400 transition-colors ml-auto shrink-0"
+                                title="Available with Professional Plan"
+                              >
+                                <Lock className="h-3.5 w-3.5" />
+                              </span>
+                            )}
                           </Link>
                         }
                       />
@@ -149,8 +182,16 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
                         className="bg-slate-900 border border-slate-800 text-white px-2 py-1 text-xs rounded-md shadow-md"
                       >
                         {item.label}
+                        {isLocked && (
+                          <span className="ml-1.5 font-bold text-amber-400">(Pro Feature)</span>
+                        )}
                         {item.badge && (
                           <span className="ml-1.5 font-bold text-slate-400">({item.badge})</span>
+                        )}
+                        {hasUnread && (
+                          <span className="ml-1.5 font-bold text-purple-400">
+                            ({chatUnreadCount > 1 ? `${chatUnreadCount} unread` : "Unread"})
+                          </span>
                         )}
                       </TooltipContent>
                     </Tooltip>
@@ -162,61 +203,63 @@ export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
         </div>
 
         {/* Footer Support section */}
-        <div className="p-3 border-t border-sidebar-border/30 shrink-0">
-          {secondaryNavigation.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
+        {(secondaryNavigation.length > 0 || collapsed) && (
+          <div className="p-3 border-t border-sidebar-border/30 shrink-0">
+            {secondaryNavigation.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
 
-            return (
-              <Tooltip key={item.label} disabled={!collapsed}>
-                <TooltipTrigger
-                  render={
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group relative",
-                        isActive
-                          ? "bg-indigo-600/10 text-white"
-                          : "text-slate-400 hover:text-white hover:bg-sidebar-accent/50"
-                      )}
-                    >
-                      {isActive && (
-                        <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-indigo-500" />
-                      )}
-                      <Icon
+              return (
+                <Tooltip key={item.label} disabled={!collapsed}>
+                  <TooltipTrigger
+                    render={
+                      <Link
+                        href={item.href}
                         className={cn(
-                          "h-5 w-5 shrink-0 transition-colors",
-                          isActive ? "text-indigo-400" : "text-slate-400 group-hover:text-white"
+                          "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group relative",
+                          isActive
+                            ? "bg-indigo-600/10 text-white"
+                            : "text-slate-400 hover:text-white hover:bg-sidebar-accent/50"
                         )}
-                      />
-                      {!collapsed && (
-                        <span className="truncate flex-1 animate-in fade-in duration-150">
-                          {item.label}
-                        </span>
-                      )}
-                    </Link>
-                  }
-                />
-                <TooltipContent
-                  side="right"
-                  className="bg-slate-900 border border-slate-800 text-white px-2 py-1 text-xs rounded-md"
-                >
-                  {item.label}
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
+                      >
+                        {isActive && (
+                          <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-indigo-500" />
+                        )}
+                        <Icon
+                          className={cn(
+                            "h-5 w-5 shrink-0 transition-colors",
+                            isActive ? "text-indigo-400" : "text-slate-400 group-hover:text-white"
+                          )}
+                        />
+                        {!collapsed && (
+                          <span className="truncate flex-1 animate-in fade-in duration-150">
+                            {item.label}
+                          </span>
+                        )}
+                      </Link>
+                    }
+                  />
+                  <TooltipContent
+                    side="right"
+                    className="bg-slate-900 border border-slate-800 text-white px-2 py-1 text-xs rounded-md"
+                  >
+                    {item.label}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
 
-          {collapsed && (
-            <button
-              onClick={() => setCollapsed(false)}
-              className="flex h-10 w-full items-center justify-center rounded-lg hover:bg-sidebar-accent text-slate-400 hover:text-white transition-colors cursor-pointer mt-2"
-              aria-label="Expand sidebar"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+            {collapsed && (
+              <button
+                onClick={() => setCollapsed(false)}
+                className="flex h-10 w-full items-center justify-center rounded-lg hover:bg-sidebar-accent text-slate-400 hover:text-white transition-colors cursor-pointer"
+                aria-label="Expand sidebar"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
       </aside>
     </TooltipProvider>
   );

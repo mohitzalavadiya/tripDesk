@@ -1,19 +1,15 @@
 "use client"
 
-import * as React from "react"
+import { evaluateMarginHealth,formatCurrency } from "@/lib/costing-engine"
+import { CostingSummary,PricingSettings } from "@/types"
 import {
-  DollarSign,
-  TrendingUp,
-  Receipt,
-  Layers,
-  Sparkles,
-  AlertTriangle,
-  CheckCircle2,
-  ShieldCheck,
-  Percent,
+AlertTriangle,
+DollarSign,
+Layers,
+Percent,
+Receipt,
+TrendingUp
 } from "lucide-react"
-import { CostingSummary, PricingSettings } from "@/types"
-import { formatCurrency, evaluateMarginHealth } from "@/lib/costing-engine"
 
 interface CostingSummaryCardsProps {
   summary: CostingSummary

@@ -1,133 +1,199 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { useRouter } from "next/navigation"
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorState } from "@/components/shared/error-state";
+import { TableSkeleton } from "@/components/shared/loading-skeletons";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Ticket,
-  Plus,
-  Search,
-  MapPin,
-  Clock,
-  Sparkles,
-  Compass,
-  Users,
-  RotateCcw,
-  X,
-  Eye,
-  MoreVertical,
-  CheckCircle2,
-  ArrowUpRight,
-} from "lucide-react"
-import { EmptyState } from "@/components/shared/empty-state"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuLabel,
+DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
+} from "@/components/ui/table";
+import { useSubscription } from "@/context/subscription-context";
+import { activityClient,ActivityWithRelations } from "@/lib/api-client";
+import { getErrorMessage } from "@/lib/utils";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useInventory } from "@/context/inventory-context"
-import { ActivityCategory, ActivityStatus } from "@/types"
+Archive,
+ChevronLeft,
+ChevronRight,
+Compass,
+Eye,
+MoreVertical,
+Plus,
+Search,
+Sparkles,
+Ticket,
+X
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
 export default function ActivitiesPage() {
-  const router = useRouter()
-  const { activities, activityRates, suppliers } = useInventory()
+  const router = useRouter();
+  const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
 
-  const [searchQuery, setSearchQuery] = React.useState("")
-  const [statusFilter, setStatusFilter] = React.useState<string>("all")
+  // Data states
+  const [activities, setActivities] = React.useState<ActivityWithRelations[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [localReadOnly, setLocalReadOnly] = React.useState(false);
+  const [showReadOnlyDialog, setShowReadOnlyDialog] = React.useState(false);
+  const [archivingId, setArchivingId] = React.useState<string | null>(null);
+
+  const isReadOnly = isCentralReadOnly || localReadOnly;
+
+  const handleAddActivity = () => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
+    }
+    router.push("/activities/new");
+  };
+
+  // Filter & Search states
+  const [search, setSearch] = React.useState("");
+  const [debouncedSearch, setDebouncedSearch] = React.useState("");
+  const [page, setPage] = React.useState(1);
+  const [pagination, setPagination] = React.useState({
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 1,
+  });
+
+  // Debounce search (300ms)
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Fetch real activities from API
+  const fetchActivities = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const res = await activityClient.getActivities({
+        search: debouncedSearch || undefined,
+        page,
+        limit: 20,
+      });
+
+      if (res.success && res.data) {
+        setActivities(res.data);
+        setPagination(res.meta);
+      }
+    } catch (err: any) {
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setLocalReadOnly(true);
+      }
+      setError(getErrorMessage(err, "Unable to load activity catalog. Please try again."));
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, page]);
+
+  React.useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
+
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleClearFilters = () => {
-    setSearchQuery("")
-    setStatusFilter("all")
-  }
+    setSearch("");
+    setDebouncedSearch("");
+    setPage(1);
+  };
 
-  const isFilterActive = searchQuery !== "" || statusFilter !== "all"
+  const isFilterActive = search.trim() !== "";
 
-  // Status counts
-  const statusCounts = React.useMemo(() => {
-    const counts: Record<string, number> = {
-      all: activities.length,
-      Active: 0,
-      Inactive: 0,
-      Archived: 0,
+  // Archive Activity
+  const handleArchive = (id: string, name: string) => {
+    if (isCentralReadOnly) {
+      setShowReadOnlyDialog(true);
+      return;
     }
-    activities.forEach((a) => {
-      if (counts[a.status] !== undefined) {
-        counts[a.status]++
-      }
-    })
-    return counts
-  }, [activities])
+    if (isReadOnly) {
+      toast.error("Modifications are restricted in read-only mode.");
+      return;
+    }
 
-  // Key KPI numbers
-  const stats = React.useMemo(() => {
-    const total = activities.length
-    const active = activities.filter((a) => a.status === "Active").length
-    const adventure = activities.filter((a) => ["Adventure", "Water Activity", "Wildlife"].includes(a.category)).length
-    const sightseeing = activities.filter((a) => ["Sightseeing", "Cultural", "Experience"].includes(a.category)).length
-
-    return { total, active, adventure, sightseeing }
-  }, [activities])
-
-  // Filter activities
-  const filteredActivities = React.useMemo(() => {
-    return activities.filter((act) => {
-      const q = searchQuery.toLowerCase().trim()
-      const supplier = suppliers.find((s) => s.id === act.supplierId)
-      const supplierName = supplier ? supplier.name.toLowerCase() : ""
-
-      // 1. Multi-column search
-      const matchesSearch =
-        !q ||
-        act.name.toLowerCase().includes(q) ||
-        act.id.toLowerCase().includes(q) ||
-        act.destination.toLowerCase().includes(q) ||
-        act.category.toLowerCase().includes(q) ||
-        (act.duration && act.duration.toLowerCase().includes(q)) ||
-        (act.operatingDays && act.operatingDays.some((d) => d.toLowerCase().includes(q))) ||
-        (act.ageRestrictions && act.ageRestrictions.toLowerCase().includes(q)) ||
-        (act.description && act.description.toLowerCase().includes(q)) ||
-        (act.notes && act.notes.toLowerCase().includes(q)) ||
-        supplierName.includes(q)
-
-      // 2. Status filter
-      const matchesStatus =
-        statusFilter === "all" || act.status === statusFilter
-
-      return matchesSearch && matchesStatus
-    })
-  }, [activities, suppliers, searchQuery, statusFilter])
+    setConfirmAction({
+      title: "Archive activity?",
+      description: `Archive activity "${name}"? This soft-deletes the record while keeping historical trip assignments safe.`,
+      confirmText: "Archive Activity",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          setArchivingId(id);
+          await activityClient.archiveActivity(id);
+          toast.success(`Activity "${name}" archived successfully.`);
+          setConfirmAction(null);
+          await fetchActivities();
+        } catch (err: any) {
+          if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+            setLocalReadOnly(true);
+            refreshSubscription();
+            toast.error("Modifications restricted. Read-only mode is active.");
+          } else {
+            toast.error(getErrorMessage(err, "We couldn't archive the activity. Please try again."));
+          }
+        } finally {
+          setActionLoading(false);
+          setArchivingId(null);
+        }
+      },
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        
+        {/* Read-Only Banner */}
+        {isReadOnly && <ReadOnlyBanner moduleName="Activities & Excursions" />}
+
         {/* Top Hero Command Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
           {/* Left Title & Telemetry */}
           <div className="space-y-3 z-10">
-            <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
-                <Ticket className="h-3 w-3 text-indigo-500" />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0 whitespace-nowrap">
+                <Ticket className="h-3 w-3 text-indigo-500 shrink-0" />
                 Experiences & Sightseeing
               </span>
               <span className="text-slate-300">•</span>
               <span className="text-xs font-semibold text-slate-500">
-                {activities.length} excursion packages
+                {pagination.total} activities registered
               </span>
             </div>
 
@@ -136,324 +202,275 @@ export default function ActivitiesPage() {
                 Activities & Excursions
               </h1>
               <span className="text-xs font-medium text-slate-500 hidden sm:inline-block">
-                Manage sightseeing day-tours, adventure activities, ticket passes, and per-person tariffs
+                Manage sightseeing day-tours, adventure tickets, entry passes, and excursion tariffs
               </span>
             </div>
 
             {/* Micro-Telemetry Stat Badges */}
             <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-medium border border-emerald-100/60">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="font-bold text-emerald-950">{stats.active}</span> Active Tours
+              <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-medium border border-emerald-100/60 shrink-0">
+                <Sparkles className="h-3 w-3 text-emerald-600 shrink-0" />
+                <span className="font-bold text-emerald-950">{pagination.total}</span> Activities Available
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-purple-50 text-purple-800 font-medium border border-purple-100/60">
-                <Sparkles className="h-3 w-3 text-purple-600" />
-                <span className="font-bold text-purple-950">{stats.adventure}</span> Adventure & Sports
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 text-blue-800 font-medium border border-blue-100/60">
-                <Compass className="h-3 w-3 text-blue-600" />
-                <span className="font-bold text-blue-950">{stats.sightseeing}</span> Sightseeing & City
+              <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-slate-100/80 text-slate-700 font-medium shrink-0">
+                <span>Page</span>
+                <strong className="text-slate-900">{pagination.page}</strong>
+                <span>of</span>
+                <strong className="text-slate-900">{pagination.totalPages}</strong>
               </div>
             </div>
           </div>
 
           {/* Right Action Controls */}
-          <div className="flex items-center gap-3 z-10 self-start lg:self-center">
+          <div className="flex items-center gap-3 z-10 self-stretch sm:self-start lg:self-center w-full sm:w-auto">
             <Button
-              onClick={() => router.push("/activities/new")}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all"
+              onClick={handleAddActivity}
+              className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
-              New Activity
+              Add Activity
             </Button>
           </div>
         </div>
 
-        {/* Master Workspace Card (Unified Filter Bar + Table) */}
+        {/* Master Card (Filter Bar + Table) */}
         <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
-          
-          {/* Master Toolbar Header */}
-          <div className="p-4 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
+          {/* Search Toolbar */}
+          <div className="p-3.5 sm:p-5 border-b border-slate-100 space-y-3.5 bg-white">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="relative flex-1 max-w-2xl">
                 <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search by activity name, destination, category (Sightseeing, Adventure), duration, supplier..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search activities by title, location..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
                   className="pl-10 pr-9 h-9.5 text-xs bg-slate-50/70 border-slate-200 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 focus-visible:bg-white rounded-xl transition-all"
                 />
-                {searchQuery && (
+                {search && (
                   <button
-                    onClick={() => setSearchQuery("")}
+                    onClick={() => setSearch("")}
                     className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 )}
               </div>
-
-              {isFilterActive && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleClearFilters}
-                  className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 shrink-0 cursor-pointer font-semibold rounded-lg self-start sm:self-auto"
-                >
-                  <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                  Reset Filters
-                </Button>
-              )}
-            </div>
-
-            {/* Status Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
-              {(
-                [
-                  { id: "all", label: "All Activities" },
-                  { id: "Active", label: "Active" },
-                  { id: "Inactive", label: "Inactive" },
-                  { id: "Archived", label: "Archived" },
-                ] as const
-              ).map((tab) => {
-                const isActive = statusFilter === tab.id
-                const count = statusCounts[tab.id] ?? 0
-
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setStatusFilter(tab.id)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer select-none shrink-0 ${
-                      isActive
-                        ? "bg-slate-900 text-white shadow-2xs"
-                        : "bg-slate-100/75 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                    }`}
-                  >
-                    <span>{tab.label}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                        isActive
-                          ? "bg-white/20 text-white"
-                          : "bg-white text-slate-500 border border-slate-200/60"
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  </button>
-                )
-              })}
             </div>
           </div>
 
-          {/* Content Table */}
-          {filteredActivities.length === 0 ? (
+          {/* Loading State */}
+          {loading && (
+            <div className="p-4">
+              <TableSkeleton rows={6} />
+            </div>
+          )}
+
+          {/* Error State */}
+          {!loading && error && (
+            <div className="p-8">
+              <ErrorState
+                title="Unable to load activities"
+                description={error}
+                onRetry={() => fetchActivities()}
+              />
+            </div>
+          )}
+
+          {/* Table Content */}
+          {!loading && !error && activities.length === 0 ? (
             <div className="p-12 text-center">
               <EmptyState
                 icon={Ticket}
-                title={isFilterActive ? "No matching activities found" : "No activities in inventory"}
+                title={isFilterActive ? "No matching activities found" : "No activities registered yet"}
                 description={
                   isFilterActive
-                    ? "Try adjusting your search criteria or resetting filters."
-                    : "Add sightseeing excursions, adventure sports, and day tours to include in customer trip itineraries."
+                    ? "Try adjusting your search query."
+                    : "Add your first sightseeing tour or adventure activity to assign it to itineraries."
                 }
-                actionText={isFilterActive ? "Clear Search" : "New Activity"}
-                onAction={isFilterActive ? handleClearFilters : () => router.push("/activities/new")}
+                actionText={isFilterActive ? "Clear Filter" : "Add Activity"}
+                onAction={isFilterActive ? handleClearFilters : handleAddActivity}
               />
             </div>
-          ) : (
+          ) : !loading && !error && (
             <div className="overflow-hidden">
               <div className="hidden lg:block overflow-x-auto max-h-[620px] overflow-y-auto">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">
-                      <TableHead className="py-3 px-4 font-bold text-slate-600 w-[260px]">Activity & Tour</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Category</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600 w-[300px]">Activity Name</TableHead>
                       <TableHead className="py-3 px-4 font-bold text-slate-600">Destination</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Duration</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Supplier</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Pricing Tariffs</TableHead>
-                      <TableHead className="py-3 px-4 font-bold text-slate-600">Status</TableHead>
-                      <TableHead className="py-3 px-4 w-[60px] text-right font-bold text-slate-600">Actions</TableHead>
+                      <TableHead className="py-3 px-4 font-bold text-slate-600">Description</TableHead>
+                      <TableHead className="py-3 px-4 w-[80px] text-right font-bold text-slate-600">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredActivities.map((act) => {
-                      const supplier = suppliers.find((s) => s.id === act.supplierId)
-                      const rates = activityRates.filter((r) => r.activityId === act.id)
-
-                      return (
-                        <TableRow
-                          key={act.id}
-                          onClick={() => router.push(`/activities/${act.id}`)}
-                          className="hover:bg-slate-50/70 cursor-pointer transition-colors group border-b border-slate-100/80"
-                        >
-                          <TableCell className="py-3.5 px-4 font-medium text-slate-900">
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-lg bg-purple-50 border border-purple-100 text-purple-600 flex items-center justify-center shadow-2xs shrink-0">
-                                <Ticket className="h-4 w-4" />
-                              </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="font-semibold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">
-                                  {act.name}
-                                </span>
-                                <span className="text-[11px] text-slate-400 font-mono">
-                                  ID: {act.id}
-                                </span>
-                              </div>
+                    {activities.map((act) => (
+                      <TableRow
+                        key={act.id}
+                        onClick={() => router.push(`/activities/${act.id}`)}
+                        className="hover:bg-slate-50/70 cursor-pointer transition-colors group border-b border-slate-100/80"
+                      >
+                        <TableCell className="py-3.5 px-4 font-medium text-slate-900">
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-full bg-purple-50 text-purple-700 font-bold text-xs flex items-center justify-center border border-purple-100 shrink-0">
+                              <Ticket className="h-4 w-4" />
                             </div>
-                          </TableCell>
-
-                          <TableCell className="py-3.5 px-4">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/50">
-                              {act.category}
-                            </span>
-                          </TableCell>
-
-                          <TableCell className="py-3.5 px-4">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-50/60 text-indigo-900 border border-indigo-100/60">
-                              <MapPin className="h-3 w-3 text-indigo-500 shrink-0" />
-                              <span className="truncate max-w-[130px]">{act.destination}</span>
-                            </span>
-                          </TableCell>
-
-                          <TableCell className="py-3.5 px-4 text-xs font-medium text-slate-600">
-                            {act.duration ? (
-                              <span className="inline-flex items-center gap-1 text-slate-700">
-                                <Clock className="h-3 w-3 text-slate-400" />
-                                {act.duration}
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-semibold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">
+                                {act.name}
                               </span>
-                            ) : (
-                              <span className="text-slate-400">—</span>
-                            )}
-                          </TableCell>
+                            </div>
+                          </div>
+                        </TableCell>
 
-                          <TableCell className="py-3.5 px-4 text-xs font-medium text-slate-700">
-                            {supplier?.name || "Direct Activity"}
-                          </TableCell>
-
-                          <TableCell className="py-3.5 px-4 text-xs">
-                            <span className="bg-indigo-50 px-2 py-0.5 rounded font-semibold text-indigo-700 text-[11px]">
-                              {rates.length} {rates.length === 1 ? "Tariff" : "Tariffs"}
+                        <TableCell className="py-3.5 px-4">
+                          {act.destination ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md">
+                              <Compass className="h-3 w-3 text-emerald-600 shrink-0" />
+                              <span className="truncate max-w-[150px]">{act.destination.name}</span>
                             </span>
-                          </TableCell>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Unassigned</span>
+                          )}
+                        </TableCell>
 
-                          <TableCell className="py-3.5 px-4">
-                            <Badge
-                              variant="outline"
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-medium rounded-full ${
-                                act.status === "Active"
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
-                                  : act.status === "Inactive"
-                                  ? "bg-amber-50 text-amber-700 border-amber-200/60"
-                                  : "bg-slate-100 text-slate-600 border-slate-200"
-                              }`}
-                            >
-                              <span
-                                className={`h-1.5 w-1.5 rounded-full ${
-                                  act.status === "Active"
-                                    ? "bg-emerald-500"
-                                    : act.status === "Inactive"
-                                    ? "bg-amber-500"
-                                    : "bg-slate-400"
-                                }`}
-                              />
-                              <span>{act.status}</span>
-                            </Badge>
-                          </TableCell>
+                        <TableCell className="py-3.5 px-4">
+                          <span className="text-xs text-slate-600 line-clamp-1 max-w-md">
+                            {act.description || <span className="text-slate-400 italic">No description</span>}
+                          </span>
+                        </TableCell>
 
-                          <TableCell className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger
-                                render={
-                                  <Button variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-slate-700 rounded-md cursor-pointer">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                }
-                              />
-                              <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md rounded-xl p-1 w-44">
-                                <DropdownMenuGroup>
-                                  <DropdownMenuLabel className="text-[10px] font-bold uppercase text-slate-400 px-2 py-1">Activity</DropdownMenuLabel>
-                                  <DropdownMenuItem onClick={() => router.push(`/activities/${act.id}`)} className="text-xs cursor-pointer rounded-md">
-                                    <Eye className="mr-2 h-3.5 w-3.5 text-slate-400" />
-                                    Manage Tariffs
-                                  </DropdownMenuItem>
-                                </DropdownMenuGroup>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
+                        <TableCell className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-slate-700 rounded-md cursor-pointer"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              }
+                            />
+                            <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md rounded-xl p-1 w-44">
+                              <DropdownMenuGroup>
+                                <DropdownMenuLabel className="text-[10px] font-bold uppercase text-slate-400 px-2 py-1">
+                                  Activity Options
+                                </DropdownMenuLabel>
+                                <DropdownMenuItem
+                                  onClick={() => router.push(`/activities/${act.id}`)}
+                                  className="text-xs cursor-pointer rounded-md"
+                                >
+                                  <Eye className="mr-2 h-3.5 w-3.5 text-slate-400" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleArchive(act.id, act.name)}
+                                  disabled={isReadOnly || archivingId === act.id}
+                                  className="text-xs text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md disabled:opacity-50"
+                                >
+                                  <Archive className="mr-2 h-3.5 w-3.5 text-rose-500" />
+                                  {archivingId === act.id ? "Archiving..." : "Archive Activity"}
+                                </DropdownMenuItem>
+                              </DropdownMenuGroup>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </div>
 
               {/* Mobile Card View */}
               <div className="block lg:hidden divide-y divide-slate-100">
-                {filteredActivities.map((act) => {
-                  return (
-                    <div
-                      key={act.id}
-                      onClick={() => router.push(`/activities/${act.id}`)}
-                      className="p-4 space-y-3 hover:bg-slate-50/50 cursor-pointer active:bg-slate-100 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-xs truncate">{act.name}</h4>
-                          <span className="text-[10px] text-slate-400 font-mono">{act.category}</span>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] ${
-                            act.status === "Active"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
-                              : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {act.status}
+                {activities.map((act) => (
+                  <div
+                    key={act.id}
+                    onClick={() => router.push(`/activities/${act.id}`)}
+                    className="p-4 space-y-2 hover:bg-slate-50/50 cursor-pointer active:bg-slate-100 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs">{act.name}</h4>
+                        {act.description && (
+                          <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{act.description}</p>
+                        )}
+                      </div>
+                      {act.destination && (
+                        <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 flex items-center font-medium shrink-0">
+                          <Compass className="h-2.5 w-2.5" />
+                          {act.destination.name}
                         </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 bg-slate-50/80 p-2.5 rounded-lg text-xs">
-                        <div>
-                          <span className="text-[10px] font-semibold text-slate-400 block uppercase">Destination</span>
-                          <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
-                            <MapPin className="h-3 w-3 text-indigo-500" />
-                            {act.destination}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-semibold text-slate-400 block uppercase">Duration</span>
-                          <span className="font-semibold text-slate-800 mt-0.5 block">{act.duration || "—"}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                        <span>{act.operatingDays ? act.operatingDays.join(", ") : "Operating daily"}</span>
-                        <span className="text-indigo-600 font-semibold flex items-center gap-0.5">
-                          Manage <ArrowUpRight className="h-3 w-3" />
-                        </span>
-                      </div>
+                      )}
                     </div>
-                  )
-                })}
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Master Card Footer Strip */}
-          <div className="px-5 py-3 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+          {/* Master Footer with Pagination */}
+          <div className="px-5 py-3.5 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
             <span>
-              Showing <strong className="text-slate-800">{filteredActivities.length}</strong> of{" "}
-              <strong className="text-slate-800">{activities.length}</strong> experiences
+              Showing <strong className="text-slate-800">{activities.length}</strong> of{" "}
+              <strong className="text-slate-800">{pagination.total}</strong> activities
             </span>
-            <span className="text-[11px] text-slate-400">
-              TripDesk Excursions Catalog
-            </span>
+
+            {pagination.totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="h-8 px-2.5 text-xs rounded-lg cursor-pointer"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Prev
+                </Button>
+                <span className="text-xs font-bold text-slate-700 px-1">
+                  {page} / {pagination.totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= pagination.totalPages || loading}
+                  onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                  className="h-8 px-2.5 text-xs rounded-lg cursor-pointer"
+                >
+                  Next <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
-
       </div>
+
+      {/* Read-Only Mode Warning Dialog */}
+      <ReadOnlyModeDialog
+        open={showReadOnlyDialog}
+        onOpenChange={setShowReadOnlyDialog}
+        reason={readOnlyReason}
+        actionLabel="Adding or modifying activities"
+      />
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setConfirmAction(null);
+        }}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmText={confirmAction?.confirmText || "Confirm"}
+        variant={confirmAction?.variant || "destructive"}
+        loading={actionLoading}
+        onConfirm={async () => {
+          if (confirmAction?.action) {
+            await confirmAction.action();
+          }
+        }}
+      />
     </div>
-  )
+  );
 }

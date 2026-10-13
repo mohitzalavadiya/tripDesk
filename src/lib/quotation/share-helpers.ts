@@ -1,12 +1,17 @@
-import { Quotation, PublicQuotation } from "@/types"
+import {
+openWhatsAppChat,
+WhatsAppChatOpenResult,
+} from "@/lib/communication/whatsapp/click-to-chat"
 import { formatCurrency } from "@/lib/costing-engine"
+import { PublicQuotation,Quotation } from "@/types"
 import { toast } from "sonner"
 
 export function getPublicQuotationUrl(shareToken: string): string {
   if (typeof window !== "undefined") {
     return `${window.location.origin}/q/${shareToken}`
   }
-  return `https://tripdesk.in/q/${shareToken}`
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://yourtraveldesk.in"
+  return `${appUrl.replace(/\/$/, "")}/q/${shareToken}`
 }
 
 export function formatWhatsAppShareText(
@@ -35,15 +40,21 @@ export function openWhatsAppShare(
   quotation: Quotation | PublicQuotation,
   phone?: string,
   customerName?: string
-) {
+): WhatsAppChatOpenResult {
   const text = formatWhatsAppShareText(quotation, customerName)
-  const cleanPhone = phone ? phone.replace(/[^0-9]/g, "") : ""
-  const whatsappUrl = cleanPhone
-    ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`
-    : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
 
+  if (phone && phone.trim()) {
+    return openWhatsAppChat(phone, text)
+  }
+
+  // If no specific phone is provided, open generic WhatsApp share
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`
   if (typeof window !== "undefined") {
     window.open(whatsappUrl, "_blank", "noopener,noreferrer")
+  }
+  return {
+    success: true,
+    url: whatsappUrl,
   }
 }
 

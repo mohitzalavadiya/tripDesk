@@ -1,18 +1,17 @@
 "use client"
 
-import * as React from "react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { CostItem } from "@/types"
+import {
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog"
 import { formatCurrency } from "@/lib/costing-engine"
-import { RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react"
+import { CostItem } from "@/types"
+import { RefreshCw } from "lucide-react"
 
 interface RateChangeModalProps {
   open: boolean

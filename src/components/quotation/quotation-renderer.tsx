@@ -1,34 +1,28 @@
 "use client"
 
-import * as React from "react"
-import {
-  Quotation,
-  PublicQuotation,
-  QuotationSection,
-} from "@/types"
 import { formatCurrency } from "@/lib/costing-engine"
 import {
-  Calendar,
-  Clock,
-  MapPin,
-  Users,
-  Building2,
-  Hotel,
-  Car,
-  Ticket,
-  Check,
-  X,
-  Phone,
-  Mail,
-  Globe,
-  ShieldCheck,
-  Sparkles,
-  Info,
-  DollarSign,
-  AlertCircle,
-  FileText,
-  Compass,
+PublicQuotation,
+Quotation
+} from "@/types"
+import {
+Calendar,
+Car,
+Check,
+Clock,
+Compass,
+FileText,
+Globe,
+Hotel,
+Mail,
+MapPin,
+Phone,
+Sparkles,
+Ticket,
+Users,
+X,
 } from "lucide-react"
+import * as React from "react"
 
 interface QuotationRendererProps {
   quotation: Quotation | PublicQuotation
@@ -40,7 +34,7 @@ interface QuotationRendererProps {
 export function QuotationRenderer({
   quotation,
   previewMode = "desktop",
-  isPublicView = false,
+  isPublicView: _isPublicView = false,
 }: QuotationRendererProps) {
   // Determine customer data whether from Quotation or PublicQuotation
   const customer = "customerSnapshot" in quotation ? quotation.customerSnapshot : quotation.customer
@@ -586,7 +580,7 @@ export function QuotationRenderer({
 
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400 flex-wrap gap-2">
               <span>Thank you for choosing {agency.name}. Travel with confidence.</span>
-              <span>Generated via TripDesk Operating System · {quotation.quotationNumber}</span>
+              <span>Generated via Your Travel Desk · {quotation.quotationNumber}</span>
             </div>
           </footer>
         )}

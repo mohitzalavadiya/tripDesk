@@ -1,1420 +1,1777 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { useParams } from "next/navigation"
-import { useFormik } from "formik"
-import Link from "next/link"
-import { useEnquiry } from "@/context/enquiry-context"
-import { useInventory } from "@/context/inventory-context"
-import { useCosting } from "@/context/costing-context"
-import { CostingSummaryCards } from "@/components/costing/costing-summary-cards"
-import { CostBreakdownTable } from "@/components/costing/cost-breakdown-table"
-import { PricingControlPanel } from "@/components/costing/pricing-control-panel"
-import { AddManualCostModal } from "@/components/costing/add-manual-cost-modal"
-import { AddInternalExpenseModal } from "@/components/costing/add-internal-expense-modal"
-import { LockCostingModal } from "@/components/costing/lock-costing-modal"
-import { RateChangeModal } from "@/components/costing/rate-change-modal"
-import { useQuotation } from "@/context/quotation-context"
-import { QuotationShareModal } from "@/components/quotation/quotation-share-modal"
-import { QuotationVersionModal } from "@/components/quotation/quotation-version-modal"
-import { QuotationChangeAlert } from "@/components/quotation/quotation-change-alert"
-import { detectQuotationChanges } from "@/lib/quotation/compare-quotation"
-import { exportQuotationPDF } from "@/lib/quotation/pdf-service"
-import { formatCurrency } from "@/lib/costing-engine"
-import { CostItem, InternalExpense, TripStatus, ItineraryDay, MealPlan, Quotation } from "@/types"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { getTripStatusBadgeColor } from "../page"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { EmptyState } from "@/components/shared/empty-state"
+import { QuotationStatusBadge } from "@/app/(dashboard)/quotations/page";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { DestinationMultiSelect } from "@/components/shared/destination-multi-select";
+import { EmptyState } from "@/components/shared/empty-state";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose
-} from "@/components/ui/dialog"
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  ArrowLeft,
-  Compass,
-  Calendar,
-  Info,
-  Plus,
-  Edit2,
-  Trash2,
-  ArrowUp,
-  ArrowDown,
-  Clock,
-  CheckCircle2,
-  PlusCircle,
-  X,
-  ExternalLink,
-  Hotel,
-  Car,
-  Ticket,
-  FileText,
-  MapPin,
-  BedDouble,
-  Sparkles,
-  Users,
-  ShieldCheck,
-  DollarSign,
-  Receipt,
-  Layers,
-  Percent,
-  Share2,
-  Download,
-  Copy,
-} from "lucide-react"
-import { toast } from "sonner"
-import { tripEditSchema, itineraryDaySchema, itineraryPlaceSchema, noteSchema } from "@/lib/validation-schemas"
+activityClient,
+ActivityWithRelations,
+hotelClient,
+HotelWithRelations,
+itineraryClient,
+rateSheetClient,
+RateSheetWithRelations,
+travelerClient,
+tripActivityClient,
+TripActivityWithActivity,
+tripClient,
+tripDestinationClient,
+TripDestinationWithDestination,
+tripHotelClient,
+TripHotelWithHotel,
+tripVehicleClient,
+TripVehicleWithVehicle,
+vehicleClient,
+} from "@/lib/api-client";
+import { TripWithRelations } from "@/lib/services/trip-service";
+import { getErrorMessage } from "@/lib/utils";
+import { formatEnumLabel,GENDER_OPTIONS } from "@/lib/utils/enum-formatters";
+import { isValidPhoneNumber } from "@/lib/validation/field-validators";
+import {
+Activity,
+ActivityType,
+Hotel,
+ItineraryItem,
+Traveler,
+TravelerType,
+TripStatus,
+Vehicle,
+VehiclePricingType,
+} from "@prisma/client";
+import { useFormik } from "formik";
+import {
+Archive,
+ArrowLeft,
+Building2,
+Calculator,
+Calendar,
+Car,
+Check,
+CheckCircle2,
+Compass,
+Copy,
+DollarSign,
+Edit2,
+ExternalLink,
+Eye,
+FileText,
+Hotel as HotelIcon,
+Info,
+Loader2,
+Mail,
+MapPin,
+MessageSquare,
+Phone,
+Plus,
+Share2,
+Sparkles,
+Ticket,
+Trash2,
+UserPlus,
+Users
+} from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
+import * as Yup from "yup";
+import { TripStatusBadge } from "../page";
 
 export default function TripDetailPage() {
-  const params = useParams()
-  const id = params.id as string
+  const params = useParams();
+  const router = useRouter();
+  const id = params.id as string;
 
-  const {
-    trips,
-    customers,
-    enquiries,
-    activities: timelineActivities,
-    itineraryDays,
-    tripNotes,
-    updateTrip,
-    updateTripStatus,
-    addTripNote,
-    deleteTripNote,
-    addItineraryDay,
-    updateItineraryDay,
-    deleteItineraryDay,
-    reorderItineraryDays,
-    addItineraryPlace,
-    removeItineraryPlace,
-  } = useEnquiry()
+  // Real Database States
+  const [trip, setTrip] = React.useState<TripWithRelations | null>(null);
+  const [tripDestinations, setTripDestinations] = React.useState<TripDestinationWithDestination[]>([]);
+  const [travelers, setTravelers] = React.useState<Traveler[]>([]);
+  const [itineraryItems, setItineraryItems] = React.useState<ItineraryItem[]>([]);
+  const [tripHotels, setTripHotels] = React.useState<TripHotelWithHotel[]>([]);
+  const [tripVehicles, setTripVehicles] = React.useState<TripVehicleWithVehicle[]>([]);
+  const [tripActivities, setTripActivities] = React.useState<TripActivityWithActivity[]>([]);
 
-  const {
-    hotels,
-    hotelRooms,
-    hotelRates,
-    vehicles,
-    vehicleRates,
-    activities: invActivities,
-    activityRates,
-    tripHotels,
-    tripVehicles,
-    tripActivities: invTripActivities,
-    addTripHotel,
-    removeTripHotel,
-    addTripVehicle,
-    removeTripVehicle,
-    addTripActivity,
-    removeTripActivity,
-    suppliers,
-  } = useInventory()
+  // Master Inventory States (for selectors)
+  const [masterHotels, setMasterHotels] = React.useState<HotelWithRelations[]>([]);
+  const [masterVehicles, setMasterVehicles] = React.useState<Vehicle[]>([]);
+  const [masterActivities, setMasterActivities] = React.useState<ActivityWithRelations[]>([]);
 
-  const trip = trips.find((t) => t.id === id)
-  const customer = trip ? customers.find((c) => c.id === trip.customerId) : undefined
-  const enquiry = trip?.enquiryId ? enquiries.find((e) => e.id === trip.enquiryId) : undefined
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [isArchiving, setIsArchiving] = React.useState(false);
 
-  // Filter trip services
-  const thisTripHotels = tripHotels.filter((th) => th.tripId === id)
-  const thisTripVehicles = tripVehicles.filter((tv) => tv.tripId === id)
-  const thisTripActivities = invTripActivities.filter((ta) => ta.tripId === id)
-
-  // Costing Engine Context Hook
-  const {
-    taxRules,
-    getCostingForTrip,
-    addCostItem,
-    updateCostItem,
-    deleteCostItem,
-    addInternalExpense,
-    updateInternalExpense,
-    deleteInternalExpense,
-    updatePricingSettings,
-    lockCosting,
-    unlockCosting,
-    recalculateTripCosting,
-    syncInventoryServicesToCosting,
-    refreshRateSnapshot,
-  } = useCosting()
+  // Confirm Dialog state
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
   // Active Tab state
   const [activeTab, setActiveTab] = React.useState<
     | "overview"
+    | "travelers"
     | "itinerary"
     | "hotels"
     | "vehicles"
     | "activities"
     | "costing"
     | "quotation"
-    | "documents"
-    | "timeline"
-  >("overview")
+  >("overview");
 
-  // Quotation Context Hooks & Modals
-  const {
-    getQuotationsForTrip,
-    createQuotationFromTrip,
-    createQuotationVersion,
-    markQuotationSent,
-    deleteQuotation,
-  } = useQuotation()
+  // Fetch real trip details and assignments from APIs
+  const fetchTripDetails = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const tripQuotations = trip ? getQuotationsForTrip(trip.id) : []
-  const activeQuotation = tripQuotations[0]
+      const [tripRes, destsRes, hotelsRes, vehiclesRes, activitiesRes] = await Promise.all([
+        tripClient.getTrip(id),
+        tripDestinationClient.getTripDestinations(id).catch(() => ({ success: true, data: [] as TripDestinationWithDestination[] })),
+        tripHotelClient.getTripHotels(id).catch(() => ({ success: true, data: [] as TripHotelWithHotel[] })),
+        tripVehicleClient.getTripVehicles(id).catch(() => ({ success: true, data: [] as TripVehicleWithVehicle[] })),
+        tripActivityClient.getTripActivities(id).catch(() => ({ success: true, data: [] as TripActivityWithActivity[] })),
+      ]);
 
-  const [isQuotationShareModalOpen, setIsQuotationShareModalOpen] = React.useState(false)
-  const [isQuotationVersionModalOpen, setIsQuotationVersionModalOpen] = React.useState(false)
-  const [selectedQuotationForAction, setSelectedQuotationForAction] = React.useState<Quotation | null>(null)
+      if (tripRes.success && tripRes.data) {
+        setTrip(tripRes.data);
+        setTravelers(tripRes.data.travelers || []);
+        setItineraryItems(tripRes.data.itineraryItems || []);
+      }
 
-  // Costing Modal States
-  const [isAddManualCostOpen, setIsAddManualCostOpen] = React.useState(false)
-  const [editingCostItem, setEditingCostItem] = React.useState<CostItem | null>(null)
-  const [isAddExpenseOpen, setIsAddExpenseOpen] = React.useState(false)
-  const [editingExpense, setEditingExpense] = React.useState<InternalExpense | null>(null)
-  const [isLockModalOpen, setIsLockModalOpen] = React.useState(false)
-  const [lockActionType, setLockActionType] = React.useState<"lock" | "unlock">("lock")
-  const [rateChangeItem, setRateChangeItem] = React.useState<CostItem | null>(null)
-  const [isRateChangeModalOpen, setIsRateChangeModalOpen] = React.useState(false)
+      if (destsRes.success && destsRes.data) {
+        setTripDestinations(destsRes.data);
+      }
 
-  // Edit Trip states
-  const [isEditOpen, setIsEditOpen] = React.useState(false)
+      if (hotelsRes.success && hotelsRes.data) {
+        setTripHotels(hotelsRes.data);
+      }
 
-  // Trip Note states
-  const [newNoteContent, setNewNoteContent] = React.useState("")
-  const [noteErrors, setNoteErrors] = React.useState<Record<string, string>>({})
-  const [dayErrors, setDayErrors] = React.useState<Record<string, string>>({})
-  const [placeErrors, setPlaceErrors] = React.useState<Record<string, string>>({})
+      if (vehiclesRes.success && vehiclesRes.data) {
+        setTripVehicles(vehiclesRes.data);
+      }
 
-  // Service modal states (declared at top level to satisfy Rules of Hooks)
-  const [isAddHotelToTripOpen, setIsAddHotelToTripOpen] = React.useState(false)
-  const [selectedHotelId, setSelectedHotelId] = React.useState("")
-  const [selectedRoomId, setSelectedRoomId] = React.useState("")
-  const [selectedMealPlan, setSelectedMealPlan] = React.useState<MealPlan>("CPAI")
-  const [hotelCheckIn, setHotelCheckIn] = React.useState(trip?.startDate || "")
-  const [hotelCheckOut, setHotelCheckOut] = React.useState(trip?.endDate || "")
-  const [hotelRoomsCount, setHotelRoomsCount] = React.useState(1)
-  const [hotelAdultsCount, setHotelAdultsCount] = React.useState(trip?.adults || 2)
-  const [hotelChildrenCount, setHotelChildrenCount] = React.useState(trip?.children || 0)
-  const [hotelBookingNotes, setHotelBookingNotes] = React.useState("")
-
-  const [isAddVehicleToTripOpen, setIsAddVehicleToTripOpen] = React.useState(false)
-  const [selectedVehicleId, setSelectedVehicleId] = React.useState("")
-  const [selectedVehicleRateId, setSelectedVehicleRateId] = React.useState("")
-  const [vehicleStartDate, setVehicleStartDate] = React.useState(trip?.startDate || "")
-  const [vehicleEndDate, setVehicleEndDate] = React.useState(trip?.endDate || "")
-  const [vehicleBookingNotes, setVehicleBookingNotes] = React.useState("")
-
-  const [isAddActivityToTripOpen, setIsAddActivityToTripOpen] = React.useState(false)
-  const [selectedActivityId, setSelectedActivityId] = React.useState("")
-  const [selectedActivityRateId, setSelectedActivityRateId] = React.useState("")
-  const [activityDate, setActivityDate] = React.useState(trip?.startDate || "")
-  const [activityAdultsCount, setActivityAdultsCount] = React.useState(trip?.adults || 2)
-  const [activityChildrenCount, setActivityChildrenCount] = React.useState(trip?.children || 0)
-  const [activityBookingNotes, setActivityBookingNotes] = React.useState("")
-
-  // Retrieve Live Costing Data for this trip
-  const tripCostingData = trip ? getCostingForTrip(trip.id) : null
-
-  // Auto-sync Phase 4 selected inventory to Costing items
-  React.useEffect(() => {
-    if (trip && tripCostingData && tripCostingData.costing.status !== "Locked") {
-      syncInventoryServicesToCosting(
-        trip.id,
-        {
-          hotels: thisTripHotels,
-          vehicles: thisTripVehicles,
-          activities: thisTripActivities,
-        },
-        {
-          hotelRates,
-          vehicleRates,
-          activityRates,
-        }
-      )
+      if (activitiesRes.success && activitiesRes.data) {
+        setTripActivities(activitiesRes.data);
+      }
+    } catch (err: any) {
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setIsReadOnly(true);
+      }
+      setError(err?.message || "Failed to load trip workspace.");
+    } finally {
+      setLoading(false);
     }
-  }, [trip?.id, thisTripHotels.length, thisTripVehicles.length, thisTripActivities.length])
+  }, [id]);
 
-  // Formik for Edit Trip Properties dialog
+  // Fetch master inventories for pickers
+  const fetchMasterInventories = React.useCallback(async () => {
+    try {
+      const [hRes, vRes, aRes] = await Promise.all([
+        hotelClient.getHotels({ limit: 100 }).catch(() => ({ success: true, data: [] as Hotel[] })),
+        vehicleClient.getVehicles({ limit: 100 }).catch(() => ({ success: true, data: [] as Vehicle[] })),
+        activityClient.getActivities({ limit: 100 }).catch(() => ({ success: true, data: [] as Activity[] })),
+      ]);
+
+      if (hRes.success && hRes.data) setMasterHotels(hRes.data);
+      if (vRes.success && vRes.data) setMasterVehicles(vRes.data);
+      if (aRes.success && aRes.data) setMasterActivities(aRes.data);
+    } catch {
+      // Non-blocking for master inventory
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (id) {
+      fetchTripDetails();
+      fetchMasterInventories();
+    }
+  }, [id, fetchTripDetails, fetchMasterInventories]);
+
+  const tripQuotations = trip?.quotations || [];
+
+  // Edit Trip Modal state
+  const [isEditOpen, setIsEditOpen] = React.useState(false);
+  const [editSaving, setEditSaving] = React.useState(false);
+
+  // Destination Dialog & Action states (no standalone route card needed)
+
+
+  // Traveler Dialog states
+  const [isAddTravelerOpen, setIsAddTravelerOpen] = React.useState(false);
+  const [isEditTravelerOpen, setIsEditTravelerOpen] = React.useState(false);
+  const [selectedTravelerId, setSelectedTravelerId] = React.useState<string | null>(null);
+  const [travelerName, setTravelerName] = React.useState("");
+  const [travelerType, setTravelerType] = React.useState<TravelerType>("ADULT");
+  const [travelerPhone, setTravelerPhone] = React.useState("");
+  const [travelerEmail, setTravelerEmail] = React.useState("");
+  const [travelerGender, setTravelerGender] = React.useState("");
+  const [travelerSaving, setTravelerSaving] = React.useState(false);
+
+  // Itinerary Item Dialog states
+  const [isAddItemOpen, setIsAddItemOpen] = React.useState(false);
+  const [isEditItemOpen, setIsEditItemOpen] = React.useState(false);
+  const [selectedItemId, setSelectedItemId] = React.useState<string | null>(null);
+  const [itemDayNumber, setItemDayNumber] = React.useState(1);
+  const [itemDate, setItemDate] = React.useState("");
+  const [itemTitle, setItemTitle] = React.useState("");
+  const [itemDescription, setItemDescription] = React.useState("");
+  const [itemLocation, setItemLocation] = React.useState("");
+  const [itemStartTime, setItemStartTime] = React.useState("");
+  const [itemEndTime, setItemEndTime] = React.useState("");
+  const [itemSaving, setItemSaving] = React.useState(false);
+
+  // Trip Hotel Dialog states
+  const [isAddHotelOpen, setIsAddHotelOpen] = React.useState(false);
+  const [isEditHotelOpen, setIsEditHotelOpen] = React.useState(false);
+  const [selectedTripHotelId, setSelectedTripHotelId] = React.useState<string | null>(null);
+  const [hotelFormTripDestinationId, setHotelFormTripDestinationId] = React.useState("");
+  const [hotelFormHotelId, setHotelFormHotelId] = React.useState("");
+  const [hotelFormCheckIn, setHotelFormCheckIn] = React.useState("");
+  const [hotelFormCheckOut, setHotelFormCheckOut] = React.useState("");
+  const [hotelFormRoomType, setHotelFormRoomType] = React.useState("Deluxe Room");
+  const [hotelFormRooms, setHotelFormRooms] = React.useState(1);
+  const [hotelFormMealPlan, setHotelFormMealPlan] = React.useState("CP - Breakfast Included");
+  const [hotelFormNightlyRate, setHotelFormNightlyRate] = React.useState("");
+  const [hotelFormTotalAmount, setHotelFormTotalAmount] = React.useState("");
+  const [hotelFormNotes, setHotelFormNotes] = React.useState("");
+  const [hotelSaving, setHotelSaving] = React.useState(false);
+  const [hotelAvailableRates, setHotelAvailableRates] = React.useState<RateSheetWithRelations[]>([]);
+  const [hotelFormRateSheetId, setHotelFormRateSheetId] = React.useState<string | null>(null);
+  const [hotelRateLoading, setHotelRateLoading] = React.useState(false);
+  const [hotelRateMessage, setHotelRateMessage] = React.useState<string | null>(null);
+
+  // Trip Vehicle Dialog states
+  const [isAddVehicleOpen, setIsAddVehicleOpen] = React.useState(false);
+  const [isEditVehicleOpen, setIsEditVehicleOpen] = React.useState(false);
+  const [selectedTripVehicleId, setSelectedTripVehicleId] = React.useState<string | null>(null);
+  const [vehicleFormVehicleId, setVehicleFormVehicleId] = React.useState("");
+  const [vehicleFormName, setVehicleFormName] = React.useState("Toyota Innova Crysta");
+  const [vehicleFormType, setVehicleFormType] = React.useState("SUV");
+  const [vehicleFormCapacity, setVehicleFormCapacity] = React.useState(7);
+  const [vehicleFormStartDate, setVehicleFormStartDate] = React.useState("");
+  const [vehicleFormEndDate, setVehicleFormEndDate] = React.useState("");
+  const [vehicleFormPickup, setVehicleFormPickup] = React.useState("");
+  const [vehicleFormDrop, setVehicleFormDrop] = React.useState("");
+  const [vehicleFormDriverName, setVehicleFormDriverName] = React.useState("");
+  const [vehicleFormDriverPhone, setVehicleFormDriverPhone] = React.useState("");
+  const [vehicleFormPricingType, setVehicleFormPricingType] = React.useState<VehiclePricingType>(VehiclePricingType.FIXED);
+  const [vehicleFormRatePerKm, setVehicleFormRatePerKm] = React.useState("");
+  const [vehicleFormEstimatedKm, setVehicleFormEstimatedKm] = React.useState("");
+  const [vehicleFormActualKm, setVehicleFormActualKm] = React.useState("");
+  const [vehicleFormTotalRate, setVehicleFormTotalRate] = React.useState("");
+  const [vehicleFormNotes, setVehicleFormNotes] = React.useState("");
+  const [vehicleSaving, setVehicleSaving] = React.useState(false);
+
+  // Trip Activity Dialog states
+  const [isAddActivityOpen, setIsAddActivityOpen] = React.useState(false);
+  const [isEditActivityOpen, setIsEditActivityOpen] = React.useState(false);
+  const [selectedTripActivityId, setSelectedTripActivityId] = React.useState<string | null>(null);
+  const [activityFormActivityId, setActivityFormActivityId] = React.useState("");
+  const [activityFormName, setActivityFormName] = React.useState("");
+  const [activityFormDescription, setActivityFormDescription] = React.useState("");
+  const [activityFormType, setActivityFormType] = React.useState<ActivityType>(ActivityType.INCLUDED);
+  const [activitySaving, setActivitySaving] = React.useState(false);
+
+  // Phase 209: Customer Feedback Link state & helpers
+  const [copiedFeedbackLink, setCopiedFeedbackLink] = React.useState(false);
+  const [isGeneratingFeedbackLink, setIsGeneratingFeedbackLink] = React.useState(false);
+
+  const activeShareLink = trip?.publicShareLinks?.find(
+    (psl: any) => psl.status === "ACTIVE" && !psl.revokedAt
+  );
+
+  const getTripFeedbackUrl = React.useCallback(() => {
+    if (!activeShareLink?.tokenHash) return "";
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}/trip/${activeShareLink.tokenHash}`;
+    }
+    return `/trip/${activeShareLink.tokenHash}`;
+  }, [activeShareLink]);
+
+  const handleCopyFeedbackLink = React.useCallback(async () => {
+    let url = getTripFeedbackUrl();
+
+    // If no active link exists yet, explicitly request generation via server mutation
+    if (!url) {
+      if (trip?.status !== TripStatus.COMPLETED) {
+        toast.error("Feedback link can only be generated for completed trips.");
+        return;
+      }
+
+      try {
+        setIsGeneratingFeedbackLink(true);
+        const res = await tripClient.getOrCreateFeedbackLink(id);
+        if (res.success && res.data?.shareLink) {
+          const newLink = res.data.shareLink;
+          setTrip((prev) => (prev ? { ...prev, publicShareLinks: [newLink as any] } : null));
+          url = `${window.location.origin}/trip/${newLink.tokenHash}`;
+        } else {
+          toast.error("Failed to obtain feedback link.");
+          return;
+        }
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to generate feedback link.");
+        return;
+      } finally {
+        setIsGeneratingFeedbackLink(false);
+      }
+    }
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = url;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopiedFeedbackLink(true);
+      toast.success("Feedback link copied.");
+      setTimeout(() => setCopiedFeedbackLink(false), 2500);
+    } catch (err) {
+      console.error("Failed to copy feedback link:", err);
+      toast.error("Failed to copy feedback link to clipboard.");
+    }
+  }, [id, trip?.status, getTripFeedbackUrl]);
+
+  // Helper to sync TripDestinations on edit save
+  const syncTripDestinations = async (
+    tripId: string,
+    currentTDs: TripDestinationWithDestination[],
+    targetDestIds: string[]
+  ) => {
+    const currentIds = currentTDs.map((td) => td.destinationId);
+    if (
+      currentIds.length === targetDestIds.length &&
+      currentIds.every((dId, idx) => dId === targetDestIds[idx])
+    ) {
+      return;
+    }
+
+    const usedCurrentIndices = new Set<number>();
+    const toAdd: string[] = [];
+
+    for (const targetDestId of targetDestIds) {
+      let foundIdx = -1;
+      for (let i = 0; i < currentTDs.length; i++) {
+        if (!usedCurrentIndices.has(i) && currentTDs[i].destinationId === targetDestId) {
+          foundIdx = i;
+          break;
+        }
+      }
+      if (foundIdx !== -1) {
+        usedCurrentIndices.add(foundIdx);
+      } else {
+        toAdd.push(targetDestId);
+      }
+    }
+
+    for (let i = 0; i < currentTDs.length; i++) {
+      if (!usedCurrentIndices.has(i)) {
+        await tripDestinationClient.deleteTripDestination(tripId, currentTDs[i].id);
+      }
+    }
+
+    const addedTdIds: string[] = [];
+    for (const destId of toAdd) {
+      const res = await tripDestinationClient.addTripDestination(tripId, {
+        destinationId: destId,
+      });
+      if (res.success && res.data) {
+        addedTdIds.push(res.data.id);
+      }
+    }
+
+    let addedPtr = 0;
+    const finalOrderedTdIds: string[] = [];
+    const usedFinalMatched = new Set<string>();
+
+    for (const targetDestId of targetDestIds) {
+      const matched = currentTDs.find(
+        (td, idx) =>
+          usedCurrentIndices.has(idx) &&
+          !usedFinalMatched.has(td.id) &&
+          td.destinationId === targetDestId
+      );
+      if (matched) {
+        usedFinalMatched.add(matched.id);
+        finalOrderedTdIds.push(matched.id);
+      } else if (addedPtr < addedTdIds.length) {
+        finalOrderedTdIds.push(addedTdIds[addedPtr]);
+        addedPtr++;
+      }
+    }
+
+    if (finalOrderedTdIds.length > 1) {
+      await tripDestinationClient.reorderTripDestinations(tripId, {
+        tripDestinationIds: finalOrderedTdIds,
+      });
+    }
+  };
+
+  // Edit Trip Validation Schema
+  const editTripValidationSchema = Yup.object().shape({
+    title: Yup.string()
+      .trim()
+      .required("Trip title is required")
+      .min(3, "Trip title must be at least 3 characters")
+      .max(150, "Trip title cannot exceed 150 characters"),
+    startDate: Yup.string()
+      .required("Start date is required")
+      .test("valid-start", "Please enter a valid Start Date", (v) => !v || !isNaN(new Date(v).getTime())),
+    endDate: Yup.string()
+      .required("End date is required")
+      .test("valid-end", "Please enter a valid End Date", (v) => !v || !isNaN(new Date(v).getTime()))
+      .test("end-after-start", "End date cannot be before start date", function (value) {
+        const { startDate } = this.parent;
+        if (!value || !startDate) return true;
+        const start = new Date(startDate);
+        const end = new Date(value);
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) return true;
+        return end >= start;
+      }),
+    notes: Yup.string().max(2000, "Notes cannot exceed 2000 characters"),
+  });
+
+  // Edit Trip Formik
   const editTripFormik = useFormik({
     initialValues: {
-      tripName: "",
-      destination: "",
-      startDate: "",
-      endDate: "",
-      adults: 2,
-      children: 0,
-      infants: 0,
-      budget: "",
-      status: "Planning" as string,
-      notes: "",
+      title: trip?.title || "",
+      startDate: trip?.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "",
+      endDate: trip?.endDate ? new Date(trip.endDate).toISOString().split("T")[0] : "",
+      status: trip?.status || TripStatus.PLANNING,
+      destinationIds: tripDestinations.map((td) => td.destinationId),
+      notes: trip?.notes || "",
     },
-    validationSchema: tripEditSchema,
-    enableReinitialize: false,
-    onSubmit: (values) => {
-      if (!trip) return
-      const trimmedTripName = values.tripName.trim()
-      const trimmedDestination = values.destination.trim()
-      const parsedBudget = values.budget ? parseFloat(values.budget) : undefined
+    validationSchema: editTripValidationSchema,
+    enableReinitialize: true,
+    onSubmit: async (values) => {
+      try {
+        setEditSaving(true);
+        const res = await tripClient.updateTrip(id, {
+          title: values.title.trim(),
+          startDate: values.startDate ? new Date(values.startDate) : undefined,
+          endDate: values.endDate ? new Date(values.endDate) : undefined,
+          status: values.status,
+          notes: values.notes.trim() || undefined,
+        });
 
-      updateTrip(trip.id, {
-        name: trimmedTripName || `${trimmedDestination} Holiday`,
-        destination: trimmedDestination,
-        startDate: values.startDate,
-        endDate: values.endDate,
-        adults: values.adults,
-        children: values.children,
-        infants: values.infants,
-        budget: parsedBudget,
-        status: values.status as TripStatus,
-        notes: values.notes.trim() || undefined,
-      })
+        await syncTripDestinations(id, tripDestinations, values.destinationIds);
 
-      toast.success("Trip updated successfully.")
-      setIsEditOpen(false)
+        if (res.success && res.data) {
+          toast.success("Trip updated successfully.");
+          setIsEditOpen(false);
+          await fetchTripDetails();
+        }
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to update trip.");
+      } finally {
+        setEditSaving(false);
+      }
     },
-  })
+  });
 
-  // Helper for edit trip formik errors
-  const editFieldError = (field: string) => {
-    const touched = editTripFormik.touched[field as keyof typeof editTripFormik.touched]
-    const error = editTripFormik.errors[field as keyof typeof editTripFormik.errors]
-    return touched && error ? (error as string) : undefined
-  }
+  // Archive Trip
+  const handleArchiveTrip = () => {
+    setConfirmAction({
+      title: "Archive trip?",
+      description: `Archive trip "${trip?.title || "this trip"}"? Associated reservations and itinerary records will be preserved.`,
+      confirmText: "Archive Trip",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setIsArchiving(true);
+          await tripClient.archiveTrip(id);
+          toast.success("Trip archived successfully.");
+          router.push("/trips");
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to archive trip. Please try again."));
+        } finally {
+          setIsArchiving(false);
+        }
+      },
+    });
+  };
 
-  // Itinerary add/edit day states
-  const [isAddDayOpen, setIsAddDayOpen] = React.useState(false)
-  const [isEditDayOpen, setIsEditDayOpen] = React.useState(false)
-  const [selectedDayId, setSelectedDayId] = React.useState<string | null>(null)
-  
-  const [dayTitle, setDayTitle] = React.useState("")
-  const [dayDescription, setDayDescription] = React.useState("")
-  const [dayDate, setDayDate] = React.useState("")
-  const [dayNotes, setDayNotes] = React.useState("")
+  // ──────────────────────── TRAVELER HANDLERS ─────────────────────────
+  const handleOpenAddTraveler = () => {
+    setTravelerName("");
+    setTravelerType("ADULT");
+    setTravelerPhone("");
+    setTravelerEmail("");
+    setTravelerGender("");
+    setIsAddTravelerOpen(true);
+  };
 
-  // Place states
-  const [isAddPlaceOpen, setIsAddPlaceOpen] = React.useState(false)
-  const [placeName, setPlaceName] = React.useState("")
-  const [placeDescription, setPlaceDescription] = React.useState("")
-  const [placeVisitTime, setPlaceVisitTime] = React.useState("")
-  const [placeNotes, setPlaceNotes] = React.useState("")
-
-  // Manual Progress checklist
-  const [progressState, setProgressState] = React.useState({
-    customerConfirmed: true,
-    requirementsCollected: true,
-    tripCreated: true,
-    hotelsSelected: false,
-    vehicleSelected: false,
-    activitiesAdded: false,
-    itineraryCompleted: false,
-    quotationPrepared: false,
-    finalConfirmed: false,
-  })
-
-  // Date helper
-  const addDaysToDate = (dateStr: string, days: number) => {
-    const d = new Date(dateStr)
-    if (isNaN(d.getTime())) return ""
-    d.setDate(d.getDate() + days)
-    return d.toISOString().split("T")[0]
-  }
-
-  // Pre-fill Edit Trip fields when opening Dialog
-  const handleOpenEditDialogChange = (open: boolean) => {
-    if (open && trip) {
-      editTripFormik.resetForm({
-        values: {
-          tripName: trip.name,
-          destination: trip.destination,
-          startDate: trip.startDate,
-          endDate: trip.endDate,
-          adults: trip.adults,
-          children: trip.children,
-          infants: trip.infants,
-          budget: trip.budget ? String(trip.budget) : "",
-          status: trip.status,
-          notes: trip.notes || "",
-        },
-      })
+  const handleSaveAddTraveler = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!travelerName.trim()) {
+      toast.error("Traveler name is required.");
+      return;
     }
-    setIsEditOpen(open)
+    if (travelerPhone.trim() && !isValidPhoneNumber(travelerPhone.trim())) {
+      toast.error("Please enter a valid phone number (7-15 digits, no letters).");
+      return;
+    }
+
+    try {
+      setTravelerSaving(true);
+      await travelerClient.createTraveler(id, {
+        name: travelerName.trim(),
+        type: travelerType,
+        phone: travelerPhone.trim() || undefined,
+        email: travelerEmail.trim() || undefined,
+        gender: travelerGender.trim() || undefined,
+      });
+
+      toast.success("Traveler added.");
+      setIsAddTravelerOpen(false);
+      await fetchTripDetails();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to add traveler.");
+    } finally {
+      setTravelerSaving(false);
+    }
+  };
+
+  const handleOpenEditTraveler = (t: Traveler) => {
+    setSelectedTravelerId(t.id);
+    setTravelerName(t.name);
+    setTravelerType(t.type);
+    setTravelerPhone(t.phone || "");
+    setTravelerEmail(t.email || "");
+    setTravelerGender(t.gender || "");
+    setIsEditTravelerOpen(true);
+  };
+
+  const handleSaveEditTraveler = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTravelerId || !travelerName.trim()) {
+      toast.error("Traveler name is required.");
+      return;
+    }
+    if (travelerPhone.trim() && !isValidPhoneNumber(travelerPhone.trim())) {
+      toast.error("Please enter a valid phone number (7-15 digits, no letters).");
+      return;
+    }
+
+    try {
+      setTravelerSaving(true);
+      await travelerClient.updateTraveler(id, selectedTravelerId, {
+        name: travelerName.trim(),
+        type: travelerType,
+        phone: travelerPhone.trim() || undefined,
+        email: travelerEmail.trim() || undefined,
+        gender: travelerGender.trim() || undefined,
+      });
+
+      toast.success("Traveler updated.");
+      setIsEditTravelerOpen(false);
+      await fetchTripDetails();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update traveler.");
+    } finally {
+      setTravelerSaving(false);
+    }
+  };
+
+  const handleDeleteTraveler = (travelerId: string, name: string) => {
+    setConfirmAction({
+      title: "Remove traveler?",
+      description: `Remove traveler "${name}" from this trip?`,
+      confirmText: "Remove Traveler",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await travelerClient.deleteTraveler(id, travelerId);
+          toast.success("Traveler removed.");
+          await fetchTripDetails();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to remove traveler. Please try again."));
+        }
+      },
+    });
+  };
+
+  // ──────────────────────── ITINERARY HANDLERS ─────────────────────────
+  const handleOpenAddItem = () => {
+    const nextDay = itineraryItems.length + 1;
+    setItemDayNumber(nextDay);
+    setItemDate("");
+    setItemTitle(`Day ${nextDay}: Sightseeing & Transfers`);
+    setItemDescription("");
+    setItemLocation("");
+    setItemStartTime("09:00 AM");
+    setItemEndTime("05:00 PM");
+    setIsAddItemOpen(true);
+  };
+
+  const handleSaveAddItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!itemTitle.trim()) return;
+
+    try {
+      setItemSaving(true);
+      await itineraryClient.createItineraryItem(id, {
+        dayNumber: Number(itemDayNumber),
+        sortOrder: itineraryItems.length,
+        date: itemDate ? new Date(itemDate) : undefined,
+        title: itemTitle.trim(),
+        description: itemDescription.trim() || undefined,
+        location: itemLocation.trim() || undefined,
+        startTime: itemStartTime.trim() || undefined,
+        endTime: itemEndTime.trim() || undefined,
+      });
+
+      toast.success("Itinerary item added.");
+      setIsAddItemOpen(false);
+      await fetchTripDetails();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to add itinerary item.");
+    } finally {
+      setItemSaving(false);
+    }
+  };
+
+  const handleOpenEditItem = (item: ItineraryItem) => {
+    setSelectedItemId(item.id);
+    setItemDayNumber(item.dayNumber);
+    setItemDate(item.date ? new Date(item.date).toISOString().split("T")[0] : "");
+    setItemTitle(item.title);
+    setItemDescription(item.description || "");
+    setItemLocation(item.location || "");
+    setItemStartTime(item.startTime || "");
+    setItemEndTime(item.endTime || "");
+    setIsEditItemOpen(true);
+  };
+
+  const handleSaveEditItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedItemId || !itemTitle.trim()) return;
+
+    try {
+      setItemSaving(true);
+      await itineraryClient.updateItineraryItem(id, selectedItemId, {
+        dayNumber: Number(itemDayNumber),
+        date: itemDate ? new Date(itemDate) : undefined,
+        title: itemTitle.trim(),
+        description: itemDescription.trim() || undefined,
+        location: itemLocation.trim() || undefined,
+        startTime: itemStartTime.trim() || undefined,
+        endTime: itemEndTime.trim() || undefined,
+      });
+
+      toast.success("Itinerary item updated.");
+      setIsEditItemOpen(false);
+      await fetchTripDetails();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update itinerary item.");
+    } finally {
+      setItemSaving(false);
+    }
+  };
+
+  const handleDeleteItem = (itemId: string, dayNumber: number) => {
+    setConfirmAction({
+      title: "Delete itinerary schedule?",
+      description: `Delete itinerary schedule for Day ${dayNumber}?`,
+      confirmText: "Delete Day Schedule",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await itineraryClient.deleteItineraryItem(id, itemId);
+          toast.success("Itinerary item deleted.");
+          await fetchTripDetails();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to delete itinerary item. Please try again."));
+        }
+      },
+    });
+  };
+
+  // ──────────────────────── TRIP HOTEL HANDLERS ─────────────────────────
+  const getFilteredHotels = React.useCallback(() => {
+    if (tripDestinations.length === 0) return [];
+    const uniqueDestIds = Array.from(new Set(tripDestinations.map((td) => td.destinationId)));
+    return masterHotels.filter((h) => h.destinationId && uniqueDestIds.includes(h.destinationId));
+  }, [masterHotels, tripDestinations]);
+
+  const getFilteredActivities = React.useCallback(() => {
+    if (tripDestinations.length === 0) return [];
+    const uniqueDestIds = Array.from(new Set(tripDestinations.map((td) => td.destinationId)));
+    return masterActivities.filter((a) => a.destinationId && uniqueDestIds.includes(a.destinationId));
+  }, [masterActivities, tripDestinations]);
+
+  const computeHotelTotalTariff = (checkInStr: string, checkOutStr: string, roomsCount: number, rateStr: string): string => {
+    if (!checkInStr || !checkOutStr || !rateStr) return "";
+    const rate = Number(rateStr);
+    if (isNaN(rate) || rate <= 0) return "";
+    const cIn = new Date(checkInStr).getTime();
+    const cOut = new Date(checkOutStr).getTime();
+    if (isNaN(cIn) || isNaN(cOut)) return "";
+    const nights = Math.max(1, Math.ceil((cOut - cIn) / (1000 * 60 * 60 * 24)));
+    const rooms = Math.max(1, Number(roomsCount) || 1);
+    return String(rate * rooms * nights);
+  };
+
+  const hotelRateReqRef = React.useRef(0);
+  const fetchApplicableHotelRates = React.useCallback(
+    async (
+      hId: string,
+      travelDate: string,
+      currentRoomType?: string,
+      currentMealPlan?: string,
+      overrideRooms?: number,
+      overrideCheckIn?: string,
+      overrideCheckOut?: string
+    ) => {
+      if (!hId) {
+        setHotelAvailableRates([]);
+        setHotelFormRateSheetId(null);
+        setHotelRateMessage(null);
+        return;
+      }
+      const reqId = ++hotelRateReqRef.current;
+      setHotelRateLoading(true);
+      setHotelRateMessage(null);
+      try {
+        const res = await rateSheetClient.getRateSheets({
+          inventoryType: "HOTEL",
+          hotelId: hId,
+          status: "ACTIVE",
+          validDate: travelDate ? new Date(travelDate) : undefined,
+          limit: 100,
+        });
+
+        if (reqId !== hotelRateReqRef.current) return;
+
+        if (res.success && res.data) {
+          const rates = res.data;
+          setHotelAvailableRates(rates);
+
+          const cIn = overrideCheckIn ?? hotelFormCheckIn;
+          const cOut = overrideCheckOut ?? hotelFormCheckOut;
+          const rCount = overrideRooms ?? hotelFormRooms;
+
+          if (rates.length === 0) {
+            setHotelFormRateSheetId(null);
+            setHotelRateMessage("No active master rate sheet found for this property on selected dates. You may enter rate manually.");
+          } else if (rates.length === 1) {
+            const singleRate = rates[0];
+            setHotelFormRateSheetId(singleRate.id);
+            if (singleRate.roomType) setHotelFormRoomType(singleRate.roomType);
+            if (singleRate.mealPlan) setHotelFormMealPlan(singleRate.mealPlan);
+            const rateCost = String(Number(singleRate.costPrice));
+            setHotelFormNightlyRate(rateCost);
+            const computed = computeHotelTotalTariff(cIn, cOut, rCount, rateCost);
+            if (computed) setHotelFormTotalAmount(computed);
+            setHotelRateMessage(null);
+          } else {
+            const match =
+              rates.find(
+                (r) =>
+                  r.roomType?.toLowerCase() === (currentRoomType || "").toLowerCase() &&
+                  r.mealPlan?.toLowerCase() === (currentMealPlan || "").toLowerCase()
+              ) || rates[0];
+
+            setHotelFormRateSheetId(match.id);
+            if (match.roomType) setHotelFormRoomType(match.roomType);
+            if (match.mealPlan) setHotelFormMealPlan(match.mealPlan);
+            const rateCost = String(Number(match.costPrice));
+            setHotelFormNightlyRate(rateCost);
+            const computed = computeHotelTotalTariff(cIn, cOut, rCount, rateCost);
+            if (computed) setHotelFormTotalAmount(computed);
+            setHotelRateMessage(null);
+          }
+        }
+      } catch {
+        if (reqId === hotelRateReqRef.current) {
+          setHotelAvailableRates([]);
+          setHotelRateMessage("Failed to load rate sheets.");
+        }
+      } finally {
+        if (reqId === hotelRateReqRef.current) {
+          setHotelRateLoading(false);
+        }
+      }
+    },
+    [hotelFormCheckIn, hotelFormCheckOut, hotelFormRooms]
+  );
+
+  const handleHotelCheckInChange = (val: string) => {
+    setHotelFormCheckIn(val);
+    const computed = computeHotelTotalTariff(val, hotelFormCheckOut, hotelFormRooms, hotelFormNightlyRate);
+    if (computed) setHotelFormTotalAmount(computed);
+    if (hotelFormHotelId) {
+      fetchApplicableHotelRates(hotelFormHotelId, val, hotelFormRoomType, hotelFormMealPlan, hotelFormRooms, val, hotelFormCheckOut);
+    }
+  };
+
+  const handleHotelCheckOutChange = (val: string) => {
+    setHotelFormCheckOut(val);
+    const computed = computeHotelTotalTariff(hotelFormCheckIn, val, hotelFormRooms, hotelFormNightlyRate);
+    if (computed) setHotelFormTotalAmount(computed);
+  };
+
+  const handleHotelRoomsChange = (val: number) => {
+    setHotelFormRooms(val);
+    const computed = computeHotelTotalTariff(hotelFormCheckIn, hotelFormCheckOut, val, hotelFormNightlyRate);
+    if (computed) setHotelFormTotalAmount(computed);
+  };
+
+  const handleHotelNightlyRateChange = (val: string) => {
+    setHotelFormNightlyRate(val);
+    const computed = computeHotelTotalTariff(hotelFormCheckIn, hotelFormCheckOut, hotelFormRooms, val);
+    if (computed) setHotelFormTotalAmount(computed);
+  };
+
+  const handleOpenAddHotel = () => {
+    const cIn = trip?.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "";
+    const cOut = trip?.endDate ? new Date(trip.endDate).toISOString().split("T")[0] : "";
+    const defaultRooms = 1;
+
+    const filtered = getFilteredHotels();
+    const initialHotelId = filtered[0]?.id || "";
+
+    setHotelFormTripDestinationId("");
+    setHotelFormHotelId(initialHotelId);
+    setHotelFormCheckIn(cIn);
+    setHotelFormCheckOut(cOut);
+    setHotelFormRoomType("Deluxe Room");
+    setHotelFormRooms(defaultRooms);
+    setHotelFormMealPlan("CP - Breakfast Included");
+    setHotelFormNightlyRate("");
+    setHotelFormTotalAmount("");
+    setHotelFormNotes("");
+    setHotelAvailableRates([]);
+    setHotelFormRateSheetId(null);
+    setHotelRateMessage(null);
+    setIsAddHotelOpen(true);
+
+    if (initialHotelId) {
+      fetchApplicableHotelRates(initialHotelId, cIn, "Deluxe Room", "CP - Breakfast Included", defaultRooms, cIn, cOut);
+    }
+  };
+
+  const handleSaveAddHotel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hotelFormHotelId || !hotelFormCheckIn || !hotelFormCheckOut) {
+      toast.error("Please select a hotel and specify check-in/check-out dates.");
+      return;
+    }
+
+    try {
+      setHotelSaving(true);
+      await tripHotelClient.createTripHotel(id, {
+        tripDestinationId: undefined,
+        hotelId: hotelFormHotelId,
+        checkIn: new Date(hotelFormCheckIn),
+        checkOut: new Date(hotelFormCheckOut),
+        roomType: hotelFormRoomType.trim(),
+        rooms: Number(hotelFormRooms),
+        mealPlan: hotelFormMealPlan.trim() || undefined,
+        nightlyRate: hotelFormNightlyRate !== "" ? Number(hotelFormNightlyRate) : undefined,
+        totalAmount: hotelFormTotalAmount !== "" ? Number(hotelFormTotalAmount) : undefined,
+        notes: hotelFormNotes.trim() || undefined,
+      });
+
+      toast.success("Hotel reservation attached to trip.");
+      setIsAddHotelOpen(false);
+      await fetchTripDetails();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to add hotel reservation.");
+    } finally {
+      setHotelSaving(false);
+    }
+  };
+
+  const handleOpenEditHotel = (th: TripHotelWithHotel) => {
+    const cIn = th.checkIn ? new Date(th.checkIn).toISOString().split("T")[0] : "";
+    const cOut = th.checkOut ? new Date(th.checkOut).toISOString().split("T")[0] : "";
+    const rateStr = th.nightlyRate !== null && th.nightlyRate !== undefined ? String(th.nightlyRate) : "";
+    const computed = computeHotelTotalTariff(cIn, cOut, th.rooms, rateStr);
+    const totalStr = computed || (th.totalAmount !== null && th.totalAmount !== undefined ? String(th.totalAmount) : "");
+
+    setSelectedTripHotelId(th.id);
+    setHotelFormTripDestinationId(th.tripDestinationId || "");
+    setHotelFormHotelId(th.hotelId);
+    setHotelFormCheckIn(cIn);
+    setHotelFormCheckOut(cOut);
+    setHotelFormRoomType(th.roomType);
+    setHotelFormRooms(th.rooms);
+    setHotelFormMealPlan(th.mealPlan || "");
+    setHotelFormNightlyRate(rateStr);
+    setHotelFormTotalAmount(totalStr);
+    setHotelFormNotes(th.notes || "");
+    setHotelAvailableRates([]);
+    setHotelFormRateSheetId(null);
+    setHotelRateMessage(null);
+    setIsEditHotelOpen(true);
+
+    if (th.hotelId) {
+      fetchApplicableHotelRates(th.hotelId, cIn, th.roomType, th.mealPlan || "", th.rooms, cIn, cOut);
+    }
+  };
+
+  const handleSaveEditHotel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTripHotelId || !hotelFormCheckIn || !hotelFormCheckOut) return;
+
+    try {
+      setHotelSaving(true);
+      await tripHotelClient.updateTripHotel(id, selectedTripHotelId, {
+        tripDestinationId: hotelFormTripDestinationId || null,
+        hotelId: hotelFormHotelId,
+        checkIn: new Date(hotelFormCheckIn),
+        checkOut: new Date(hotelFormCheckOut),
+        roomType: hotelFormRoomType.trim(),
+        rooms: Number(hotelFormRooms),
+        mealPlan: hotelFormMealPlan.trim() || undefined,
+        nightlyRate: hotelFormNightlyRate !== "" ? Number(hotelFormNightlyRate) : undefined,
+        totalAmount: hotelFormTotalAmount !== "" ? Number(hotelFormTotalAmount) : undefined,
+        notes: hotelFormNotes.trim() || undefined,
+      });
+
+      toast.success("Hotel reservation updated.");
+      setIsEditHotelOpen(false);
+      await fetchTripDetails();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update hotel reservation.");
+    } finally {
+      setHotelSaving(false);
+    }
+  };
+
+  const handleDeleteTripHotel = (tripHotelId: string, hotelName: string) => {
+    setConfirmAction({
+      title: "Remove hotel reservation?",
+      description: `Remove hotel reservation for "${hotelName}"?`,
+      confirmText: "Remove Reservation",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await tripHotelClient.deleteTripHotel(id, tripHotelId);
+          toast.success("Hotel reservation removed.");
+          await fetchTripDetails();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to remove hotel reservation. Please try again."));
+        }
+      },
+    });
+  };
+
+  // ──────────────────────── TRIP VEHICLE HANDLERS ─────────────────────────
+  const handleOpenAddVehicle = () => {
+    setVehicleFormVehicleId("");
+    setVehicleFormName("");
+    setVehicleFormType("Sedan");
+    setVehicleFormCapacity(4);
+    setVehicleFormStartDate(trip?.startDate ? new Date(trip.startDate).toISOString().split("T")[0] : "");
+    setVehicleFormEndDate(trip?.endDate ? new Date(trip.endDate).toISOString().split("T")[0] : "");
+    setVehicleFormPickup(tripDestinations[0]?.destination.name || "");
+    setVehicleFormDrop(tripDestinations[tripDestinations.length - 1]?.destination.name || "");
+    setVehicleFormDriverName("");
+    setVehicleFormDriverPhone("");
+    setVehicleFormPricingType(VehiclePricingType.FIXED);
+    setVehicleFormRatePerKm("");
+    setVehicleFormEstimatedKm("");
+    setVehicleFormActualKm("");
+    setVehicleFormTotalRate("");
+    setVehicleFormNotes("");
+    setIsAddVehicleOpen(true);
+  };
+
+  const handleSelectMasterVehicle = (vId: string | null) => {
+    if (!vId) return;
+    setVehicleFormVehicleId(vId);
+    const mv = masterVehicles.find((v) => v.id === vId);
+    if (mv) {
+      setVehicleFormName(mv.name);
+      setVehicleFormType(mv.type);
+      setVehicleFormCapacity(mv.capacity);
+    }
+  };
+
+  const handleSaveAddVehicle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vehicleFormName.trim() || !vehicleFormType.trim()) {
+      toast.error("Please enter a vehicle name and type.");
+      return;
+    }
+
+    try {
+      setVehicleSaving(true);
+      await tripVehicleClient.createTripVehicle(id, {
+        vehicleId: vehicleFormVehicleId || undefined,
+        vehicleName: vehicleFormName.trim(),
+        vehicleType: vehicleFormType.trim(),
+        capacity: Number(vehicleFormCapacity),
+        startDate: vehicleFormStartDate ? new Date(vehicleFormStartDate) : undefined,
+        endDate: vehicleFormEndDate ? new Date(vehicleFormEndDate) : undefined,
+        pickupLocation: vehicleFormPickup.trim() || undefined,
+        dropLocation: vehicleFormDrop.trim() || undefined,
+        driverName: vehicleFormDriverName.trim() || undefined,
+        driverPhone: vehicleFormDriverPhone.trim() || undefined,
+        pricingType: vehicleFormPricingType,
+        ratePerKm: vehicleFormRatePerKm !== "" ? Number(vehicleFormRatePerKm) : undefined,
+        estimatedKm: vehicleFormEstimatedKm !== "" ? Number(vehicleFormEstimatedKm) : undefined,
+        actualKm: vehicleFormActualKm !== "" ? Number(vehicleFormActualKm) : undefined,
+        totalRate: vehicleFormTotalRate !== "" ? Number(vehicleFormTotalRate) : undefined,
+        notes: vehicleFormNotes.trim() || undefined,
+      });
+
+      toast.success("Vehicle assigned to trip.");
+      setIsAddVehicleOpen(false);
+      await fetchTripDetails();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to assign vehicle.");
+    } finally {
+      setVehicleSaving(false);
+    }
+  };
+
+  const handleOpenEditVehicle = (tv: TripVehicleWithVehicle) => {
+    setSelectedTripVehicleId(tv.id);
+    setVehicleFormVehicleId(tv.vehicleId || "");
+    setVehicleFormName(tv.vehicleName);
+    setVehicleFormType(tv.vehicleType);
+    setVehicleFormCapacity(tv.capacity || 4);
+    setVehicleFormStartDate(tv.startDate ? new Date(tv.startDate).toISOString().split("T")[0] : "");
+    setVehicleFormEndDate(tv.endDate ? new Date(tv.endDate).toISOString().split("T")[0] : "");
+    setVehicleFormPickup(tv.pickupLocation || "");
+    setVehicleFormDrop(tv.dropLocation || "");
+    setVehicleFormDriverName(tv.driverName || "");
+    setVehicleFormDriverPhone(tv.driverPhone || "");
+    setVehicleFormPricingType(tv.pricingType);
+    setVehicleFormRatePerKm(tv.ratePerKm !== null && tv.ratePerKm !== undefined ? String(tv.ratePerKm) : "");
+    setVehicleFormEstimatedKm(tv.estimatedKm !== null && tv.estimatedKm !== undefined ? String(tv.estimatedKm) : "");
+    setVehicleFormActualKm((tv as any).actualKm !== null && (tv as any).actualKm !== undefined ? String((tv as any).actualKm) : "");
+    setVehicleFormTotalRate(tv.totalRate !== null && tv.totalRate !== undefined ? String(tv.totalRate) : "");
+    setVehicleFormNotes(tv.notes || "");
+    setIsEditVehicleOpen(true);
+  };
+
+  const handleSaveEditVehicle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTripVehicleId || !vehicleFormName.trim()) return;
+
+    try {
+      setVehicleSaving(true);
+      await tripVehicleClient.updateTripVehicle(id, selectedTripVehicleId, {
+        vehicleId: vehicleFormVehicleId || undefined,
+        vehicleName: vehicleFormName.trim(),
+        vehicleType: vehicleFormType.trim(),
+        capacity: Number(vehicleFormCapacity),
+        startDate: vehicleFormStartDate ? new Date(vehicleFormStartDate) : undefined,
+        endDate: vehicleFormEndDate ? new Date(vehicleFormEndDate) : undefined,
+        pickupLocation: vehicleFormPickup.trim() || undefined,
+        dropLocation: vehicleFormDrop.trim() || undefined,
+        driverName: vehicleFormDriverName.trim() || undefined,
+        driverPhone: vehicleFormDriverPhone.trim() || undefined,
+        pricingType: vehicleFormPricingType,
+        ratePerKm: vehicleFormRatePerKm !== "" ? Number(vehicleFormRatePerKm) : undefined,
+        estimatedKm: vehicleFormEstimatedKm !== "" ? Number(vehicleFormEstimatedKm) : undefined,
+        actualKm: vehicleFormActualKm !== "" ? Number(vehicleFormActualKm) : undefined,
+        totalRate: vehicleFormTotalRate !== "" ? Number(vehicleFormTotalRate) : undefined,
+        notes: vehicleFormNotes.trim() || undefined,
+      });
+
+      toast.success("Vehicle assignment updated.");
+      setIsEditVehicleOpen(false);
+      await fetchTripDetails();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update vehicle assignment.");
+    } finally {
+      setVehicleSaving(false);
+    }
+  };
+
+  const handleDeleteTripVehicle = (tripVehicleId: string, vehicleName: string) => {
+    setConfirmAction({
+      title: "Remove vehicle assignment?",
+      description: `Remove vehicle assignment "${vehicleName}" from this trip?`,
+      confirmText: "Remove Vehicle",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await tripVehicleClient.deleteTripVehicle(id, tripVehicleId);
+          toast.success("Vehicle assignment removed.");
+          await fetchTripDetails();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to remove vehicle assignment. Please try again."));
+        }
+      },
+    });
+  };
+
+  // ──────────────────────── TRIP ACTIVITY HANDLERS ─────────────────────────
+  const handleOpenAddActivity = () => {
+    const filtered = getFilteredActivities();
+    const act = filtered[0] || null;
+
+    setActivityFormActivityId(act?.id || "");
+    setActivityFormName(act?.name || "");
+    setActivityFormDescription(act?.description || "");
+    setActivityFormType(ActivityType.INCLUDED);
+    setIsAddActivityOpen(true);
+  };
+
+  const handleSelectMasterActivity = (actId: string | null) => {
+    if (!actId) {
+      setActivityFormActivityId("");
+      return;
+    }
+    setActivityFormActivityId(actId);
+    const ma = masterActivities.find((a) => a.id === actId);
+    if (ma) {
+      setActivityFormName(ma.name);
+      setActivityFormDescription(ma.description || "");
+    }
+  };
+
+  const handleSaveAddActivity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activityFormName.trim()) {
+      toast.error("Please enter an activity name.");
+      return;
+    }
+
+    try {
+      setActivitySaving(true);
+      await tripActivityClient.createTripActivity(id, {
+        activityId: activityFormActivityId || undefined,
+        name: activityFormName.trim(),
+        description: activityFormDescription.trim() || undefined,
+        type: activityFormType,
+      });
+
+      toast.success("Activity added to trip.");
+      setIsAddActivityOpen(false);
+      await fetchTripDetails();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to add activity.");
+    } finally {
+      setActivitySaving(false);
+    }
+  };
+
+  const handleOpenEditActivity = (ta: TripActivityWithActivity) => {
+    setSelectedTripActivityId(ta.id);
+    setActivityFormActivityId(ta.activityId || "");
+    setActivityFormName(ta.name);
+    setActivityFormDescription(ta.description || "");
+    setActivityFormType(ta.type);
+    setIsEditActivityOpen(true);
+  };
+
+  const handleSaveEditActivity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTripActivityId || !activityFormName.trim()) return;
+
+    try {
+      setActivitySaving(true);
+      await tripActivityClient.updateTripActivity(id, selectedTripActivityId, {
+        activityId: activityFormActivityId || undefined,
+        name: activityFormName.trim(),
+        description: activityFormDescription.trim() || undefined,
+        type: activityFormType,
+      });
+
+      toast.success("Activity updated.");
+      setIsEditActivityOpen(false);
+      await fetchTripDetails();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update activity.");
+    } finally {
+      setActivitySaving(false);
+    }
+  };
+
+  const handleDeleteTripActivity = (tripActivityId: string, activityName: string) => {
+    setConfirmAction({
+      title: "Remove activity?",
+      description: `Remove activity "${activityName}" from this trip?`,
+      confirmText: "Remove Activity",
+      variant: "destructive",
+      action: async () => {
+        try {
+          await tripActivityClient.deleteTripActivity(id, tripActivityId);
+          toast.success("Activity removed.");
+          await fetchTripDetails();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "Failed to remove activity. Please try again."));
+        }
+      },
+    });
+  };
+
+  // ──────────────────────── TRIP DESTINATION HANDLERS (HANDLED VIA EDIT MODAL) ─────────────────────────
+
+
+  const formatDateDisplay = (date: Date | string | null | undefined) => {
+    if (!date) return "Unscheduled";
+    return new Date(date).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-slate-50/50">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
+        <h3 className="text-xs font-bold text-slate-700">Loading trip workspace...</h3>
+      </div>
+    );
   }
 
-  if (!trip) {
+  if (error || !trip) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-slate-50/50">
         <Compass className="h-12 w-12 text-slate-400 mb-3" />
-        <h3 className="text-lg font-bold text-slate-800">Trip not found</h3>
+        <h3 className="text-lg font-bold text-slate-800">Trip Workspace Not Found</h3>
+        <p className="text-xs text-slate-500 max-w-md mt-1">
+          {error || "The requested trip record does not exist or has been archived."}
+        </p>
         <Link href="/trips" className="mt-4">
           <Button variant="outline" size="sm" className="bg-white border-slate-200 cursor-pointer">
             Back to Trips
           </Button>
         </Link>
       </div>
-    )
+    );
   }
 
-  // Calculate Nights and Days
-  const getDurationNightsDays = (start: string, end: string) => {
-    if (!start || !end) return { nights: 0, days: 0 }
-    const s = new Date(start)
-    const e = new Date(end)
-    if (isNaN(s.getTime()) || isNaN(e.getTime())) return { nights: 0, days: 0 }
-    const diff = Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24))
-    return { nights: diff, days: diff + 1 }
-  }
-  
-  const { nights, days } = getDurationNightsDays(trip.startDate, trip.endDate)
-
-  // Filter itinerary days for this trip
-  const tripItinerary = itineraryDays
-    .filter((d) => d.tripId === trip.id)
-    .sort((a, b) => a.dayNumber - b.dayNumber)
-
-  // Filter internal notes for this trip
-  const tripNotesList = tripNotes.filter((n) => n.tripId === trip.id)
-
-  // Filter activities timeline for this trip
-  const tripTimelineEvents = timelineActivities.filter((act) => act.tripId === trip.id)
-
-  const formatRupees = (val?: number) => {
-    if (val === undefined) return "-"
-    return `₹${val.toLocaleString("en-IN")}`
-  }
-
-  const formatDateDisplay = (dateStr: string) => {
-    const d = new Date(dateStr)
-    if (isNaN(d.getTime())) return dateStr
-    return d.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
-  }
-
-  // Actions
-  const handleStatusChange = (status: TripStatus) => {
-    updateTripStatus(trip.id, status)
-    toast.success("Trip status updated.")
-  }
-
-  const handleAddNote = () => {
-    const trimmed = newNoteContent.trim()
-    try {
-      noteSchema.validateSync({ content: trimmed })
-      setNoteErrors((prev) => {
-        const copy = { ...prev }
-        delete copy.newNote
-        return copy
-      })
-      addTripNote(trip.id, trimmed)
-      setNewNoteContent("")
-      toast.success("Note added.")
-    } catch (err) {
-      if (err instanceof Error) {
-        setNoteErrors((prev) => ({ ...prev, newNote: err.message }))
-      }
-    }
-  }
-
-  const handleDeleteNote = (noteId: string) => {
-    if (confirm("Are you sure you want to delete this internal note?")) {
-      deleteTripNote(noteId)
-      toast.success("Note deleted.")
-    }
-  }
-
-  // Itinerary handlers
-  const handleAddDayClick = () => {
-    const nextDayNum = tripItinerary.length + 1
-    // Auto-calculate suggested date
-    const suggestedDate = addDaysToDate(trip.startDate, nextDayNum - 1)
-    
-    setDayTitle("")
-    setDayDescription("")
-    setDayDate(suggestedDate)
-    setDayNotes("")
-    setIsAddDayOpen(true)
-  }
-
-  const handleSaveDay = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    const trimmedTitle = dayTitle.trim()
-    const trimmedDesc = dayDescription.trim()
-    const trimmedNotes = dayNotes.trim()
-
-    try {
-      itineraryDaySchema.validateSync(
-        { dayTitle: trimmedTitle || `Day ${tripItinerary.length + 1} Itinerary`, dayDate, dayDescription: trimmedDesc, dayNotes: trimmedNotes },
-        { abortEarly: false }
-      )
-      setDayErrors({})
-    } catch (err) {
-      const newErrors: Record<string, string> = {}
-      if (err && typeof err === "object" && "inner" in err) {
-        const yupErr = err as { inner: Array<{ path?: string; message: string }> }
-        yupErr.inner.forEach((e) => {
-          if (e.path) newErrors[e.path] = e.message
-        })
-      }
-      if (!dayDate) newErrors.dayDate = "Day date is required"
-      if (Object.keys(newErrors).length > 0) {
-        setDayErrors(newErrors)
-        return
-      }
-    }
-
-    if (!dayDate) {
-      setDayErrors({ dayDate: "Day date is required" })
-      return
-    }
-
-    // Validation check: date outside trip bounds warning
-    if (dayDate < trip.startDate || dayDate > trip.endDate) {
-      toast.warning("Note: Day date is outside trip travel schedule.")
-    }
-
-    const nextDayNum = tripItinerary.length + 1
-    addItineraryDay(trip.id, {
-      tripId: trip.id,
-      dayNumber: nextDayNum,
-      date: dayDate,
-      title: trimmedTitle || `Day ${nextDayNum} Itinerary`,
-      description: trimmedDesc || undefined,
-      notes: trimmedNotes || undefined,
-    })
-
-    toast.success("Itinerary day added.")
-    setIsAddDayOpen(false)
-  }
-
-  const handleStartEditDay = (d: ItineraryDay) => {
-    setSelectedDayId(d.id)
-    setDayTitle(d.title)
-    setDayDescription(d.description || "")
-    setDayDate(d.date)
-    setDayNotes(d.notes || "")
-    setIsEditDayOpen(true)
-  }
-
-  const handleSaveEditDay = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedDayId) return
-
-    const trimmedTitle = dayTitle.trim()
-    const trimmedDesc = dayDescription.trim()
-    const trimmedNotes = dayNotes.trim()
-
-    try {
-      itineraryDaySchema.validateSync(
-        { dayTitle: trimmedTitle || "Itinerary Day", dayDate, dayDescription: trimmedDesc, dayNotes: trimmedNotes },
-        { abortEarly: false }
-      )
-      setDayErrors({})
-    } catch (err) {
-      const newErrors: Record<string, string> = {}
-      if (err && typeof err === "object" && "inner" in err) {
-        const yupErr = err as { inner: Array<{ path?: string; message: string }> }
-        yupErr.inner.forEach((e) => {
-          if (e.path) newErrors[e.path] = e.message
-        })
-      }
-      if (!dayDate) newErrors.dayDate = "Day date is required"
-      if (Object.keys(newErrors).length > 0) {
-        setDayErrors(newErrors)
-        return
-      }
-    }
-
-    if (!dayDate) {
-      setDayErrors({ dayDate: "Day date is required" })
-      return
-    }
-
-    if (dayDate < trip.startDate || dayDate > trip.endDate) {
-      toast.warning("Note: Day date is outside trip travel schedule.")
-    }
-
-    updateItineraryDay(selectedDayId, {
-      title: trimmedTitle || "Itinerary Day",
-      description: trimmedDesc || undefined,
-      date: dayDate,
-      notes: trimmedNotes || undefined,
-    })
-
-    toast.success("Itinerary day updated.")
-    setIsEditDayOpen(false)
-    setSelectedDayId(null)
-  }
-
-  const handleDeleteDay = (dayId: string, dayNum: number) => {
-    if (confirm(`Delete itinerary day?\nThis will remove Day ${dayNum} from this trip itinerary.`)) {
-      deleteItineraryDay(dayId)
-      toast.success("Itinerary day deleted.")
-    }
-  }
-
-  const handleMoveDay = (idx: number, direction: "up" | "down") => {
-    const dayIds = tripItinerary.map((d) => d.id)
-    const targetIdx = direction === "up" ? idx - 1 : idx + 1
-    
-    if (targetIdx < 0 || targetIdx >= dayIds.length) return
-
-    const temp = dayIds[idx]
-    dayIds[idx] = dayIds[targetIdx]
-    dayIds[targetIdx] = temp
-
-    reorderItineraryDays(trip.id, dayIds)
-    toast.success("Itinerary order updated.")
-  }
-
-  // Places Handlers
-  const handleOpenAddPlace = (dayId: string) => {
-    setSelectedDayId(dayId)
-    setPlaceName("")
-    setPlaceDescription("")
-    setPlaceVisitTime("")
-    setPlaceNotes("")
-    setIsAddPlaceOpen(true)
-  }
-
-  const handleAddPlaceSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedDayId) return
-
-    const trimmedName = placeName.trim()
-    const trimmedDesc = placeDescription.trim()
-    const trimmedTime = placeVisitTime.trim()
-    const trimmedNotes = placeNotes.trim()
-
-    try {
-      itineraryPlaceSchema.validateSync(
-        { placeName: trimmedName, placeDescription: trimmedDesc, placeVisitTime: trimmedTime, placeNotes: trimmedNotes },
-        { abortEarly: false }
-      )
-      setPlaceErrors({})
-    } catch (err) {
-      const newErrors: Record<string, string> = {}
-      if (err && typeof err === "object" && "inner" in err) {
-        const yupErr = err as { inner: Array<{ path?: string; message: string }> }
-        yupErr.inner.forEach((e) => {
-          if (e.path) newErrors[e.path] = e.message
-        })
-      }
-      if (Object.keys(newErrors).length > 0) {
-        setPlaceErrors(newErrors)
-        return
-      }
-    }
-
-    addItineraryPlace(selectedDayId, {
-      name: trimmedName,
-      description: trimmedDesc || undefined,
-      visitTime: trimmedTime || undefined,
-      notes: trimmedNotes || undefined,
-    })
-
-    toast.success("Itinerary place added.")
-    setIsAddPlaceOpen(false)
-    setSelectedDayId(null)
-  }
-
-  const handleRemovePlace = (dayId: string, placeId: string) => {
-    if (confirm("Remove this place from day itinerary?")) {
-      removeItineraryPlace(dayId, placeId)
-      toast.success("Itinerary place removed.")
-    }
-  }
-
-  const handleMovePlace = (day: ItineraryDay, pIdx: number, direction: "up" | "down") => {
-    const targetIdx = direction === "up" ? pIdx - 1 : pIdx + 1
-    if (targetIdx < 0 || targetIdx >= day.places.length) return
-
-    const newPlaces = [...day.places]
-    const temp = newPlaces[pIdx]
-    newPlaces[pIdx] = newPlaces[targetIdx]
-    newPlaces[targetIdx] = temp
-
-    updateItineraryDay(day.id, { places: newPlaces })
-    toast.success("Place order updated.")
-  }
+  const duration =
+    trip.startDate && trip.endDate
+      ? Math.max(
+          1,
+          Math.ceil(
+            (new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) /
+              (1000 * 60 * 60 * 24)
+          ) + 1
+        )
+      : 1;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-        
+        {/* Read-Only Banner */}
+        {isReadOnly && <ReadOnlyBanner moduleName="Trip Workspace" />}
+
         {/* Top Hero Command Header */}
-        <div className="flex flex-col gap-5 bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
           <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/70 via-indigo-50/20 to-transparent pointer-events-none" />
 
-          {/* Top Title & Telemetry Row */}
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 z-10">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2.5">
-                <Link
-                  href="/trips"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                </Link>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
-                  <Compass className="h-3 w-3 text-indigo-500" />
-                  Trip Workspace
-                </span>
-                <span className="text-slate-300">•</span>
-                <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                  {trip.id}
-                </span>
-
-                {/* Status Dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <button
-                        type="button"
-                        className="inline-flex items-center cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-full"
-                      >
-                        <Badge className={`border select-none text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${getTripStatusBadgeColor(trip.status)}`}>
-                          {trip.status}
-                        </Badge>
-                      </button>
-                    }
-                  />
-                  <DropdownMenuContent align="start" className="bg-white border border-slate-200 shadow-md rounded-xl p-1 w-44">
-                    <DropdownMenuLabel className="text-[10px] text-slate-400 font-bold uppercase tracking-wider px-2 py-1">Change Status</DropdownMenuLabel>
-                    <DropdownMenuGroup>
-                      {(["Planning", "Quoting", "Confirmed", "In Progress", "Completed", "Cancelled"] as const).map((st) => (
-                        <DropdownMenuItem
-                          key={st}
-                          disabled={trip.status === st}
-                          onClick={() => handleStatusChange(st)}
-                          className="text-xs cursor-pointer rounded-md"
-                        >
-                          {st}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div className="flex flex-wrap items-baseline gap-3">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-                  {trip.name}
-                </h1>
-                <span className="text-xs font-medium text-slate-500">
-                  Destination: <b className="text-slate-800">{trip.destination}</b>
-                </span>
-              </div>
-
-              {/* Micro-Telemetry Stat Badges */}
-              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100/80 text-slate-700 font-medium">
-                  <span>Customer:</span>
-                  <Link href={`/customers/${trip.customerId}`} className="font-bold text-indigo-600 hover:underline">
-                    {customer?.name || "Client"}
-                  </Link>
-                </div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 text-blue-800 font-medium border border-blue-100/60">
-                  <Calendar className="h-3 w-3 text-blue-600" />
-                  <span className="font-bold text-blue-950">{formatDateDisplay(trip.startDate)} – {formatDateDisplay(trip.endDate)}</span>
-                  <span>• {nights}N / {days}D</span>
-                </div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-medium border border-emerald-100/60">
-                  <Users className="h-3 w-3 text-emerald-600" />
-                  <span className="font-bold text-emerald-950">{trip.adults} Adults {trip.children > 0 && `+ ${trip.children} Kids`}</span>
-                </div>
-                {trip.budget && (
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 text-amber-800 font-medium border border-amber-100/60">
-                    <span className="font-bold text-amber-950">{formatRupees(trip.budget)}</span>
-                    <span className="text-amber-700/70 text-[11px]">budget</span>
-                  </div>
-                )}
-              </div>
+          {/* Left Title & Telemetry */}
+          <div className="space-y-3 z-10 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/trips"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shrink-0"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+              </Link>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0 whitespace-nowrap">
+                <Compass className="h-3 w-3 text-indigo-500 shrink-0" />
+                Trip Workspace
+              </span>
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <TripStatusBadge status={trip.status} />
             </div>
 
-            {/* Right Action Controls */}
-            <div className="flex items-center gap-2.5 z-10 self-start lg:self-center">
-              <Dialog open={isEditOpen} onOpenChange={handleOpenEditDialogChange}>
-                <DialogTrigger
-                  render={
-                    <Button variant="outline" size="sm" className="bg-white hover:bg-slate-50 border-slate-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer">
-                      <Edit2 className="h-3.5 w-3.5 mr-1.5 text-slate-400" /> Edit Trip
-                    </Button>
-                  }
-                />
-                <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
-                  <form onSubmit={editTripFormik.handleSubmit}>
-                    <DialogHeader>
-                      <DialogTitle className="text-slate-900 font-bold text-base">Edit Trip Workspace</DialogTitle>
-                      <DialogDescription className="text-slate-500 text-xs mt-1">
-                        Modify travel properties, passenger counts, budget and operations planning.
-                      </DialogDescription>
-                    </DialogHeader>
+            <div className="flex flex-wrap items-baseline gap-2.5">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900 leading-tight">
+                {trip.title}
+              </h1>
+              <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+                {duration} Days Trip
+              </span>
+            </div>
 
-                    <div className="space-y-4 mt-4 text-xs">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Trip Name</label>
-                        <Input {...editTripFormik.getFieldProps("tripName")} className={`h-9 bg-slate-50/50 border-slate-200 ${editFieldError("tripName") ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
-                        {editFieldError("tripName") && (
-                          <p className="text-[10px] text-red-500 font-semibold mt-0.5">{editFieldError("tripName")}</p>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">Destination</label>
-                          <Input {...editTripFormik.getFieldProps("destination")} className={`h-9 bg-slate-50/50 border-slate-200 ${editFieldError("destination") ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
-                          {editFieldError("destination") && (
-                            <p className="text-[10px] text-red-500 font-semibold mt-0.5">{editFieldError("destination")}</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">Trip Status</label>
-                          <Select value={editTripFormik.values.status} onValueChange={(val) => editTripFormik.setFieldValue("status", val)}>
-                            <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white border-slate-200">
-                              <SelectItem value="Planning" className="text-xs">Planning</SelectItem>
-                              <SelectItem value="Quoting" className="text-xs">Quoting</SelectItem>
-                              <SelectItem value="Confirmed" className="text-xs">Confirmed</SelectItem>
-                              <SelectItem value="In Progress" className="text-xs">In Progress</SelectItem>
-                              <SelectItem value="Completed" className="text-xs">Completed</SelectItem>
-                              <SelectItem value="Cancelled" className="text-xs">Cancelled</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">Start Date</label>
-                          <Input type="date" {...editTripFormik.getFieldProps("startDate")} className={`h-9 bg-slate-50/50 border-slate-200 ${editFieldError("startDate") ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
-                          {editFieldError("startDate") && (
-                            <p className="text-[10px] text-red-500 font-semibold mt-0.5">{editFieldError("startDate")}</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">End Date</label>
-                          <Input type="date" {...editTripFormik.getFieldProps("endDate")} className={`h-9 bg-slate-50/50 border-slate-200 ${editFieldError("endDate") ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
-                          {editFieldError("endDate") && (
-                            <p className="text-[10px] text-red-500 font-semibold mt-0.5">{editFieldError("endDate")}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-4 gap-2">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">Adults</label>
-                          <Input type="number" min={1} {...editTripFormik.getFieldProps("adults")} onChange={(e) => editTripFormik.setFieldValue("adults", parseInt(e.target.value) || 0)} className={`h-9 bg-slate-50/50 border-slate-200 ${editFieldError("adults") ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
-                          {editFieldError("adults") && (
-                            <p className="text-[10px] text-red-500 font-semibold mt-0.5">{editFieldError("adults")}</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">Children</label>
-                          <Input type="number" min={0} {...editTripFormik.getFieldProps("children")} onChange={(e) => editTripFormik.setFieldValue("children", parseInt(e.target.value) || 0)} className={`h-9 bg-slate-50/50 border-slate-200 ${editFieldError("children") ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
-                          {editFieldError("children") && (
-                            <p className="text-[10px] text-red-500 font-semibold mt-0.5">{editFieldError("children")}</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">Infants</label>
-                          <Input type="number" min={0} {...editTripFormik.getFieldProps("infants")} onChange={(e) => editTripFormik.setFieldValue("infants", parseInt(e.target.value) || 0)} className={`h-9 bg-slate-50/50 border-slate-200 ${editFieldError("infants") ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
-                          {editFieldError("infants") && (
-                            <p className="text-[10px] text-red-500 font-semibold mt-0.5">{editFieldError("infants")}</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase">Budget</label>
-                          <Input type="number" min={0} {...editTripFormik.getFieldProps("budget")} className={`h-9 bg-slate-50/50 border-slate-200 ${editFieldError("budget") ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
-                          {editFieldError("budget") && (
-                            <p className="text-[10px] text-red-500 font-semibold mt-0.5">{editFieldError("budget")}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Internal Operations Notes</label>
-                        <Textarea {...editTripFormik.getFieldProps("notes")} rows={3} className="bg-slate-50/50 border-slate-200" />
-                      </div>
-                    </div>
-
-                    <DialogFooter className="mt-6 flex justify-end gap-2.5">
-                      <DialogClose
-                        render={
-                          <Button variant="outline" size="sm" className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold rounded-xl">
-                            Cancel
-                          </Button>
-                        }
-                      />
-                      <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl">
-                        Save Changes
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-
-              <Button
-                onClick={() => {
-                  toast.success("Navigated to day-by-day Itinerary builder.")
-                  setActiveTab("itinerary")
-                }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4.5 rounded-xl cursor-pointer shadow-xs"
-              >
-                Continue Planning
-              </Button>
+            {/* Micro details */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-600">
+              <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+                <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                {formatDateDisplay(trip.startDate)} – {formatDateDisplay(trip.endDate)}
+              </span>
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+                <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                {tripDestinations.length} {tripDestinations.length === 1 ? "Destination" : "Destinations"}
+              </span>
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+                <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                {travelers.length} Travelers
+              </span>
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+                <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                {tripHotels.length} Hotels
+              </span>
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+                <Car className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                {tripVehicles.length} Vehicles
+              </span>
+              <span className="text-slate-300 hidden xs:inline">•</span>
+              <span className="flex items-center gap-1 font-medium whitespace-nowrap">
+                <Ticket className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                {tripActivities.length} Activities
+              </span>
             </div>
           </div>
 
-          {/* Sub Navigation Segmented Tabs */}
-          <div className="flex items-center overflow-x-auto gap-1 border-t border-slate-100 pt-3 no-scrollbar z-10">
-            {([
-              { id: "overview", label: "Overview", icon: Compass },
-              { id: "itinerary", label: "Itinerary", icon: Calendar, count: tripItinerary.length },
-              { id: "hotels", label: "Hotels", icon: Hotel, count: thisTripHotels.length },
-              { id: "vehicles", label: "Vehicles", icon: Car, count: thisTripVehicles.length },
-              { id: "activities", label: "Activities", icon: Ticket, count: thisTripActivities.length },
-              {
-                id: "costing",
-                label: "Costing & Pricing",
-                icon: DollarSign,
-                count: (tripCostingData?.costItems.length || 0) + (tripCostingData?.internalExpenses.length || 0),
-              },
-              {
-                id: "quotation",
-                label: "Quotation Proposal",
-                icon: FileText,
-                count: tripQuotations.length,
-              },
-              { id: "documents", label: "Documents", icon: Receipt },
-              { id: "timeline", label: "Timeline", icon: Clock, count: tripTimelineEvents.length },
-            ] as Array<{ id: "overview" | "itinerary" | "hotels" | "vehicles" | "activities" | "costing" | "quotation" | "documents" | "timeline"; label: string; icon: React.ElementType; count?: number }>).map((tab) => {
-              const TabIcon = tab.icon
-              const isSelected = activeTab === tab.id
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 flex-wrap z-10 w-full sm:w-auto">
+            {trip.status === TripStatus.COMPLETED && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isGeneratingFeedbackLink}
+                onClick={handleCopyFeedbackLink}
+                className="flex-1 xs:flex-initial bg-amber-50 hover:bg-amber-100/80 border-amber-200 text-amber-900 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer justify-center whitespace-nowrap"
+                title="Copy Customer Feedback Link"
+              >
+                {isGeneratingFeedbackLink ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1 text-amber-600 animate-spin shrink-0" />
+                    Generating...
+                  </>
+                ) : copiedFeedbackLink ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 mr-1 text-emerald-600 shrink-0" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="h-3.5 w-3.5 mr-1 text-amber-600 shrink-0" />
+                    {activeShareLink ? "Feedback Link" : "Get Feedback Link"}
+                  </>
+                )}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isReadOnly}
+              onClick={() => setIsEditOpen(true)}
+              className="flex-1 xs:flex-initial bg-white hover:bg-slate-50 border-slate-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer disabled:opacity-50 justify-center whitespace-nowrap"
+            >
+              <Edit2 className="h-3.5 w-3.5 mr-1 text-slate-400 shrink-0" /> Edit Trip
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isReadOnly || isArchiving}
+              onClick={handleArchiveTrip}
+              className="flex-1 xs:flex-initial bg-white hover:bg-rose-50 border-slate-200 text-rose-600 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer disabled:opacity-50 justify-center whitespace-nowrap"
+            >
+              <Archive className="h-3.5 w-3.5 mr-1 text-rose-500 shrink-0" />
+              {isArchiving ? "Archiving..." : "Archive"}
+            </Button>
+          </div>
+        </div>
+
+        {/* Workspace Navigation Tabs */}
+        <div className="border-b border-slate-200 bg-white rounded-xl shadow-2xs px-3">
+          <div className="flex gap-2 overflow-x-auto py-2">
+            {[
+              { id: "overview", label: "Overview", icon: Info },
+              { id: "travelers", label: "Travelers", icon: Users, count: travelers.length },
+              { id: "itinerary", label: "Itinerary", icon: Calendar, count: itineraryItems.length },
+              { id: "hotels", label: "Hotels", icon: HotelIcon, count: tripHotels.length },
+              { id: "vehicles", label: "Vehicles", icon: Car, count: tripVehicles.length },
+              { id: "activities", label: "Activities", icon: Ticket, count: tripActivities.length },
+              { id: "costing", label: "Costing", icon: DollarSign },
+              { id: "quotation", label: "Quotations", icon: CheckCircle2, count: tripQuotations.length },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border transition-all shrink-0 cursor-pointer ${
-                    isSelected
-                      ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
-                      : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? "bg-indigo-50 text-indigo-700 shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
                 >
-                  <TabIcon className="h-3.5 w-3.5 shrink-0" />
+                  <Icon className={`h-3.5 w-3.5 ${isActive ? "text-indigo-600" : "text-slate-400"}`} />
                   <span>{tab.label}</span>
                   {tab.count !== undefined && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                      isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500 border border-slate-200/50"
-                    }`}>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                        isActive ? "bg-indigo-200/60 text-indigo-900" : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
                       {tab.count}
                     </span>
                   )}
                 </button>
-              )
+              );
             })}
           </div>
-
         </div>
 
-        {/* Main Workspace content */}
-        <div className="space-y-6">
-        
+        {/* TAB 1: OVERVIEW */}
         {activeTab === "overview" && (
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3 animate-in fade-in duration-150">
-            
-            {/* Left 2 columns */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-150">
             <div className="lg:col-span-2 space-y-6">
-              
-              {/* Trip Summary grid */}
-              <div className="bg-white rounded-xl border border-border p-6 shadow-2xs space-y-4">
-                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-50 pb-2.5">
-                  Trip Summary Details
+              <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6 shadow-2xs space-y-4">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3">
+                  Trip Profile Details
                 </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-xs font-medium text-slate-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                   <div>
-                    <span className="text-slate-400 block font-bold uppercase text-[9px] tracking-wide">Destination</span>
-                    <span className="text-slate-900 font-bold block mt-0.5">{trip.destination}</span>
+                    <span className="text-slate-400 block text-[11px]">Customer Account</span>
+                    <Link href={`/customers/${trip.customerId}`} className="font-bold text-indigo-600 hover:underline">
+                      {trip.customer?.name} ({trip.customer?.phone})
+                    </Link>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-bold uppercase text-[9px] tracking-wide">Start Date</span>
-                    <span className="text-slate-900 font-bold block mt-0.5">{formatDateDisplay(trip.startDate)}</span>
+                    <span className="text-slate-400 block text-[11px]">Customer Email</span>
+                    <span className="font-semibold text-slate-800 break-all">{trip.customer?.email || "No email registered"}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-bold uppercase text-[9px] tracking-wide">End Date</span>
-                    <span className="text-slate-900 font-bold block mt-0.5">{formatDateDisplay(trip.endDate)}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block font-bold uppercase text-[9px] tracking-wide">Duration</span>
-                    <span className="text-indigo-650 font-bold block mt-0.5">{nights} Nights / {days} Days</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block font-bold uppercase text-[9px] tracking-wide">Travellers</span>
-                    <span className="text-slate-900 font-bold block mt-0.5">
-                      {trip.adults} Adults {trip.children > 0 && `+ ${trip.children} Child`} {trip.infants > 0 && `+ ${trip.infants} Inf`}
+                    <span className="text-slate-400 block text-[11px]">Destinations</span>
+                    <span className="font-semibold text-slate-800">
+                      {tripDestinations.length > 0
+                        ? tripDestinations.map((td) => td.destination.name).join(", ")
+                        : "No destinations assigned"}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-bold uppercase text-[9px] tracking-wide">Trip Value</span>
-                    <span className="text-slate-900 font-bold block mt-0.5">{formatRupees(trip.budget)}</span>
+                    <span className="text-slate-400 block text-[11px]">Travel Dates</span>
+                    <span className="font-semibold text-slate-800">
+                      {formatDateDisplay(trip.startDate)} – {formatDateDisplay(trip.endDate)} ({duration} Days)
+                    </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block font-bold uppercase text-[9px] tracking-wide">Status</span>
-                    <span className="text-slate-900 font-bold block mt-0.5">{trip.status}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block font-bold uppercase text-[9px] tracking-wide">Created</span>
-                    <span className="text-slate-500 block mt-0.5">{formatDateDisplay(trip.createdAt)}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block font-bold uppercase text-[9px] tracking-wide">Last Updated</span>
-                    <span className="text-slate-500 block mt-0.5">{formatDateDisplay(trip.updatedAt || trip.createdAt)}</span>
+                    <span className="text-slate-400 block text-[11px]">Created At</span>
+                    <span className="font-semibold text-slate-800">{formatDateDisplay(trip.createdAt)}</span>
                   </div>
                 </div>
 
                 {trip.notes && (
-                  <div className="border-t border-slate-50 pt-3 mt-2">
-                    <span className="text-slate-400 block font-bold uppercase text-[9px] tracking-wide">Remarks / Requirements Note</span>
-                    <p className="text-slate-650 leading-relaxed font-medium mt-1 bg-slate-50/50 p-3 rounded-lg border border-slate-100/50">
+                  <div className="pt-3 border-t border-slate-100">
+                    <span className="text-slate-400 block text-[11px] font-bold uppercase mb-1">Planning Notes</span>
+                    <p className="text-xs text-slate-700 bg-slate-50/70 p-3 rounded-lg border border-slate-100 whitespace-pre-wrap">
                       {trip.notes}
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* CRM Customer Info Card */}
-              <div className="bg-white rounded-xl border border-border p-6 shadow-2xs space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-50 pb-2.5">
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Customer Contact Profile
-                  </h3>
-                  <Link href={`/customers/${trip.customerId}`}>
-                    <Button variant="ghost" size="sm" className="h-7 text-indigo-650 hover:bg-indigo-50/50 hover:text-indigo-850 font-bold text-[11px] gap-1 cursor-pointer">
-                      View CRM Profile <ExternalLink className="h-3 w-3" />
-                    </Button>
-                  </Link>
-                </div>
-                
-                {customer ? (
-                  <div className="grid sm:grid-cols-2 gap-4 text-xs font-medium text-slate-800">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Name</span>
-                      <span className="text-slate-900 font-bold mt-0.5">{customer.name}</span>
+              {/* Customer Feedback & Review Link (Phase 209) */}
+              <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="p-2 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 shrink-0">
+                      <MessageSquare className="h-4 w-4" />
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Phone</span>
-                      <span className="text-slate-900 font-bold mt-0.5">{customer.phone}</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Email</span>
-                      <span className="text-slate-700 mt-0.5">{customer.email || "-"}</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">City</span>
-                      <span className="text-slate-700 mt-0.5">{customer.city || "-"}</span>
+                    <div className="min-w-0">
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        Customer Feedback & Review Link
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        {trip.status === TripStatus.COMPLETED
+                          ? "Share this secure link with the customer to collect feedback and external reviews."
+                          : "Customer feedback collection unlocks automatically once the trip status is set to Completed."}
+                      </p>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-xs text-slate-400 italic">No customer account associated with this record.</div>
-                )}
-              </div>
 
-              {/* Original Enquiry Relationship */}
-              {enquiry ? (
-                <div className="bg-indigo-50/20 border border-indigo-150/40 rounded-xl p-5 shadow-2xs space-y-3 flex items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <span className="text-indigo-950 font-bold text-xs block">Created From Sales Enquiry</span>
-                    <p className="text-[11px] text-slate-600 font-medium">
-                      Linked Enquiry: <span className="font-bold text-indigo-700">{enquiry.id}</span> – {enquiry.destination} Holiday
-                    </p>
-                    <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-100/50">
-                      Conversion Status: Converted
-                    </span>
-                  </div>
-
-                  <Link href={`/enquiries/${enquiry.id}`} className="shrink-0">
-                    <Button variant="outline" size="sm" className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 cursor-pointer shadow-xs">
-                      View Enquiry
-                    </Button>
-                  </Link>
-                </div>
-              ) : null}
-
-            </div>
-
-            {/* Right Column: Progress checklist and Internal Notes */}
-            <div className="lg:col-span-1 space-y-6">
-              
-              {/* Trip Operations Progress Checklist */}
-              <div className="bg-white rounded-xl border border-border p-5 shadow-2xs space-y-4">
-                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-50 pb-2.5">
-                  Trip Progress Tracker
-                </h3>
-
-                <div className="space-y-2.5 text-xs font-semibold text-slate-650">
-                  {([
-                    { key: "customerConfirmed", label: "Customer Confirmed", initial: true },
-                    { key: "requirementsCollected", label: "Travel Requirements Collected", initial: true },
-                    { key: "tripCreated", label: "Trip Workspace Created", initial: true },
-                    { key: "hotelsSelected", label: "Hotels Selected", initial: false },
-                    { key: "vehicleSelected", label: "Vehicle Arranged", initial: false },
-                    { key: "activitiesAdded", label: "Activities Configured", initial: false },
-                    { key: "itineraryCompleted", label: "Itinerary Completed", initial: false },
-                    { key: "quotationPrepared", label: "Quotation Prepared", initial: false },
-                    { key: "finalConfirmed", label: "Final Booking Voucher Issued", initial: false },
-                  ] as const).map((item) => {
-                    const isDone = progressState[item.key]
-                    return (
-                      <div
-                        key={item.key}
-                        onClick={() => {
-                          setProgressState((prev) => ({
-                            ...prev,
-                            [item.key]: !prev[item.key],
-                          }))
-                          toast.info(`Updated operations item: ${item.label}`)
-                        }}
-                        className="flex items-center gap-2.5 p-2 rounded-lg border border-slate-100 hover:bg-slate-50 transition-all cursor-pointer select-none"
-                      >
-                        <CheckCircle2 className={`h-4.5 w-4.5 shrink-0 transition-colors ${
-                          isDone ? "text-emerald-500 fill-emerald-50" : "text-slate-300"
-                        }`} />
-                        <span className={`text-[11px] leading-none ${isDone ? "text-slate-800 font-bold" : "text-slate-500 font-medium"}`}>
-                          {item.label}
+                  {/* Submission Status Badge */}
+                  {trip.status === TripStatus.COMPLETED && (
+                    <div className="shrink-0">
+                      {trip.feedbacks && trip.feedbacks.length > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 whitespace-nowrap">
+                          <Check className="h-3 w-3" /> Feedback Received ({trip.feedbacks[0].rating}/5 ★)
                         </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Trip Notes Section */}
-              <div className="bg-white rounded-xl border border-border p-5 shadow-2xs space-y-4">
-                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-50 pb-2.5 flex items-center gap-1.5">
-                  <Info className="h-4.5 w-4.5 text-indigo-550 shrink-0" />
-                  <span>Internal Planning Notes</span>
-                </h3>
-
-                <div className="space-y-1">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add an internal note..."
-                      value={newNoteContent}
-                      onChange={(e) => setNewNoteContent(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddNote()
-                      }}
-                      className={`h-9.5 bg-slate-50/50 border-slate-200 text-xs focus-visible:ring-indigo-500 flex-1 ${noteErrors.newNote ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                    />
-                    <Button
-                      onClick={handleAddNote}
-                      className="bg-indigo-650 hover:bg-indigo-755 text-white font-semibold text-xs h-9.5 px-4 cursor-pointer shrink-0"
-                    >
-                      Add
-                    </Button>
-                  </div>
-                  {noteErrors.newNote && (
-                    <p className="text-[11px] text-red-500 font-semibold mt-0.5">{noteErrors.newNote}</p>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0 whitespace-nowrap">
+                          Pending Response
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
 
-                {tripNotesList.length === 0 ? (
-                  <div className="text-xs text-slate-400 italic py-2">No internal operational notes yet.</div>
-                ) : (
-                  <div className="space-y-2 pt-1 max-h-[250px] overflow-y-auto no-scrollbar">
-                    {tripNotesList.map((item) => (
-                      <div
-                        key={item.id}
-                        className="p-3 rounded-lg border border-slate-100 bg-slate-50/20 text-xs space-y-1.5 flex flex-col justify-between"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-slate-650 font-medium leading-relaxed flex-1 whitespace-pre-wrap">
-                            {item.content}
-                          </p>
-                          <button
-                            onClick={() => handleDeleteNote(item.id)}
-                            className="text-slate-400 hover:text-red-650 transition-colors shrink-0 p-0.5 cursor-pointer"
-                            title="Delete Note"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                        <span className="text-[9px] text-slate-400 font-medium">
-                          {formatDateDisplay(item.createdAt)}
+                {trip.status === TripStatus.COMPLETED ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-2.5">
+                      <div className="w-full flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-600 min-w-0 overflow-hidden">
+                        <span className="truncate block">
+                          {getTripFeedbackUrl() ||
+                            (isGeneratingFeedbackLink
+                              ? "Generating secure link..."
+                              : "Click 'Get Feedback Link' to generate customer feedback link.")}
                         </span>
                       </div>
-                    ))}
+                      <div className="flex flex-col xs:flex-row sm:flex-row items-stretch sm:items-center gap-2 w-full">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isGeneratingFeedbackLink}
+                          onClick={handleCopyFeedbackLink}
+                          className="w-full xs:flex-1 sm:w-auto h-9 text-xs font-semibold bg-white hover:bg-slate-50 border-slate-200 cursor-pointer justify-center whitespace-nowrap"
+                        >
+                          {isGeneratingFeedbackLink ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 text-slate-500 animate-spin shrink-0" />
+                              Generating...
+                            </>
+                          ) : copiedFeedbackLink ? (
+                            <>
+                              <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-600 shrink-0" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3.5 w-3.5 mr-1.5 text-slate-500 shrink-0" />
+                              {activeShareLink ? "Copy Feedback Link" : "Get Feedback Link"}
+                            </>
+                          )}
+                        </Button>
+                        {getTripFeedbackUrl() && (
+                          <a
+                            href={getTripFeedbackUrl()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center w-full xs:flex-1 sm:w-auto h-9 px-3 text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-slate-700 shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 mr-1.5 text-slate-500 shrink-0" />
+                            Open Link
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    {trip.feedbacks && trip.feedbacks.length > 0 && trip.feedbacks[0].comments && (
+                      <div className="bg-slate-50/80 rounded-lg p-3 border border-slate-100 text-xs text-slate-600 italic">
+                        &ldquo;{trip.feedbacks[0].comments}&rdquo;
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs text-slate-500">
+                    <span>
+                      Current Trip Status: <strong className="text-slate-700">{formatEnumLabel(trip.status)}</strong>
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Feedback available when status is Completed
+                    </span>
                   </div>
                 )}
               </div>
 
+              {/* Quick Summary Cards for Attached Inventory */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div
+                  onClick={() => setActiveTab("hotels")}
+                  className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs hover:border-indigo-200 cursor-pointer transition-all space-y-1"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">Hotels</span>
+                    <HotelIcon className="h-4 w-4 text-indigo-500" />
+                  </div>
+                  <strong className="text-lg text-slate-900 block">{tripHotels.length}</strong>
+                  <span className="text-[11px] text-slate-500">Reserved properties</span>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab("vehicles")}
+                  className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs hover:border-indigo-200 cursor-pointer transition-all space-y-1"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">Vehicles</span>
+                    <Car className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <strong className="text-lg text-slate-900 block">{tripVehicles.length}</strong>
+                  <span className="text-[11px] text-slate-500">Assigned fleet units</span>
+                </div>
+
+                <div
+                  onClick={() => setActiveTab("activities")}
+                  className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs hover:border-indigo-200 cursor-pointer transition-all space-y-1"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">Activities</span>
+                    <Ticket className="h-4 w-4 text-purple-500" />
+                  </div>
+                  <strong className="text-lg text-slate-900 block">{tripActivities.length}</strong>
+                  <span className="text-[11px] text-slate-500">Tours & excursion passes</span>
+                </div>
+              </div>
             </div>
 
+            {/* Right Col: Summary Stats & CTA */}
+            <div className="lg:col-span-1 space-y-6">
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-3">
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-100 pb-2.5">
+                  Workspace Telemetry
+                </h3>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">Destinations</span>
+                    <strong className="text-slate-900">{tripDestinations.length}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">Travelers</span>
+                    <strong className="text-slate-900">{travelers.length}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">Itinerary Days</span>
+                    <strong className="text-slate-900">{itineraryItems.length}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">Hotels Reserved</span>
+                    <strong className="text-slate-900">{tripHotels.length}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">Vehicles Assigned</span>
+                    <strong className="text-slate-900">{tripVehicles.length}</strong>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-500">Activities Scheduled</span>
+                    <strong className="text-slate-900">{tripActivities.length}</strong>
+                  </div>
+                </div>
+
+                <div className="pt-3 space-y-2">
+                  <Button
+                    onClick={() => setActiveTab("itinerary")}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 rounded-xl cursor-pointer"
+                  >
+                    Build Day-by-Day Itinerary
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {activeTab === "itinerary" && (
+        {/* TAB 2: TRAVELERS */}
+        {activeTab === "travelers" && (
           <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
-            
-            {/* Itinerary control header panel */}
-            <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-border shadow-2xs">
-              <div>
-                <h3 className="font-bold text-slate-900 text-sm">Day-by-day Itinerary Builder</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
+                <h3 className="font-bold text-slate-900 text-sm">Travelers & Passenger Manifest</h3>
                 <p className="text-xs text-slate-500">
-                  Dates: {formatDateDisplay(trip.startDate)} to {formatDateDisplay(trip.endDate)} ({nights} Nights / {days} Days)
+                  Manage passenger profiles, contact information, and travel demographics.
                 </p>
               </div>
 
               <Button
-                onClick={handleAddDayClick}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4.5 cursor-pointer shadow-xs"
+                onClick={handleOpenAddTraveler}
+                disabled={isReadOnly}
+                className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Day
+                <UserPlus className="h-3.5 w-3.5 mr-1 shrink-0" /> Add Traveler
               </Button>
             </div>
 
-            {/* Itinerary days stack */}
-            {tripItinerary.length === 0 ? (
+            {travelers.length === 0 ? (
               <EmptyState
-                icon={Calendar}
-                title="No itinerary added yet"
-                description="Start building your operational day-by-day travel plan including transfers, sightseeing, and coordinates."
-                actionText="Add Day 1"
-                onAction={handleAddDayClick}
+                icon={Users}
+                title="No travelers registered yet"
+                description="Add adult and child passengers to this trip manifest for itinerary scheduling and flight vouchers."
+                actionText="Add Traveler"
+                onAction={handleOpenAddTraveler}
               />
             ) : (
-              <div className="space-y-4">
-                {tripItinerary.map((day, dIdx) => {
-                  const isDateWarning = day.date < trip.startDate || day.date > trip.endDate
-                  return (
-                    <div
-                      key={day.id}
-                      className="bg-white rounded-xl border border-border p-5 shadow-2xs space-y-4 hover:shadow-xs transition-all relative"
-                    >
-                      {/* Day Header row */}
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-50 pb-3 gap-2">
-                        <div className="space-y-0.5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[10px] font-black bg-indigo-600/10 text-indigo-700 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                              Day {day.dayNumber}
-                            </span>
-                            <h4 className="font-extrabold text-slate-905 text-sm">{day.title}</h4>
-                          </div>
-                          <span className={`text-[11px] font-semibold flex items-center gap-1.5 mt-0.5 ${
-                            isDateWarning ? "text-amber-600" : "text-slate-450"
-                          }`}>
-                            <Calendar className="h-3.5 w-3.5 shrink-0" />
-                            {formatDateDisplay(day.date)}
-                            {isDateWarning && (
-                              <Badge className="bg-amber-50 text-amber-700 border border-amber-200/50 text-[9px] px-1 rounded-sm select-none font-bold">
-                                Outside bounds warning
-                              </Badge>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {travelers.map((t) => (
+                  <div key={t.id} className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3 hover:shadow-xs transition-all">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="h-9 w-9 rounded-full bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center border border-indigo-100 shrink-0">
+                          {t.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="font-bold text-slate-900 text-xs leading-snug break-words">{t.name}</h4>
+                            {t.isPrimary && (
+                              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 shrink-0 whitespace-nowrap">
+                                Primary
+                              </span>
                             )}
+                          </div>
+                          <span className="text-[11px] text-slate-500 capitalize block truncate">
+                            {t.type.toLowerCase()} {t.gender ? `• ${formatEnumLabel(t.gender)}` : ""} {t.nationality ? `• ${t.nationality}` : ""}
                           </span>
                         </div>
-
-                        {/* Operations Controls */}
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            disabled={dIdx === 0}
-                            onClick={() => handleMoveDay(dIdx, "up")}
-                            className="p-1.5 rounded-md border border-slate-100 hover:bg-slate-50 text-slate-400 hover:text-slate-750 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                            title="Move Day Up"
-                          >
-                            <ArrowUp className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            disabled={dIdx === tripItinerary.length - 1}
-                            onClick={() => handleMoveDay(dIdx, "down")}
-                            className="p-1.5 rounded-md border border-slate-100 hover:bg-slate-50 text-slate-400 hover:text-slate-750 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                            title="Move Day Down"
-                          >
-                            <ArrowDown className="h-3.5 w-3.5" />
-                          </button>
-
-                          <div className="w-[1px] h-4.5 bg-slate-100 mx-1" />
-
-                          <button
-                            onClick={() => handleStartEditDay(day)}
-                            className="p-1.5 rounded-md border border-slate-100 hover:bg-slate-50 text-slate-400 hover:text-indigo-650 cursor-pointer"
-                            title="Edit Day Details"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteDay(day.id, day.dayNumber)}
-                            className="p-1.5 rounded-md border border-slate-100 hover:bg-slate-50 text-slate-400 hover:text-red-650 cursor-pointer"
-                            title="Delete Day"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
                       </div>
 
-                      {/* Day description content */}
-                      {day.description && (
-                        <p className="text-slate-650 text-xs font-medium leading-relaxed whitespace-pre-wrap">
-                          {day.description}
-                        </p>
-                      )}
-
-                      {/* Day internal operations planning notes */}
-                      {day.notes && (
-                        <div className="bg-slate-50/50 rounded-lg p-2.5 border border-slate-100 text-[11px] font-medium leading-relaxed text-slate-500">
-                          <span className="font-bold text-slate-450 uppercase text-[9px] block mb-0.5">Internal Day Remark</span>
-                          {day.notes}
-                        </div>
-                      )}
-
-                      {/* Places stack inside day card */}
-                      <div className="space-y-2 pt-1 border-t border-slate-50/50 mt-1">
-                        <div className="flex items-center justify-between">
-                          <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-                            Places & Sightseeing itinerary
-                          </h5>
-                          <button
-                            onClick={() => handleOpenAddPlace(day.id)}
-                            className="text-[11px] font-bold text-indigo-650 hover:text-indigo-855 flex items-center gap-0.5 cursor-pointer"
-                          >
-                            <PlusCircle className="h-3.5 w-3.5" /> Add Place
-                          </button>
-                        </div>
-
-                        {day.places.length === 0 ? (
-                          <div className="text-[11px] text-slate-400 italic py-1 pl-1">No sightseeing coordinates added.</div>
-                        ) : (
-                          <div className="space-y-1.5 pl-1">
-                            {day.places.map((place, pIdx) => (
-                              <div
-                                key={place.id}
-                                className="flex items-start justify-between gap-3 p-2 border border-slate-100/80 bg-slate-50/20 rounded-lg group"
-                              >
-                                <div className="space-y-0.5 min-w-0 flex-1">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-bold text-slate-800 text-xs">{place.name}</span>
-                                    {place.visitTime && (
-                                      <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1 py-0.2 rounded-sm">
-                                        {place.visitTime}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {place.description && (
-                                    <p className="text-[11px] text-slate-550 leading-relaxed font-medium">
-                                      {place.description}
-                                    </p>
-                                  )}
-                                  {place.notes && (
-                                    <span className="text-[10px] text-slate-400 italic font-semibold block">
-                                      Note: {place.notes}
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Place ordering/delete controls */}
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    disabled={pIdx === 0}
-                                    onClick={() => handleMovePlace(day, pIdx, "up")}
-                                    className="p-1 rounded hover:bg-slate-100 text-slate-400 disabled:opacity-20 cursor-pointer"
-                                    title="Move Place Up"
-                                  >
-                                    <ArrowUp className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    disabled={pIdx === day.places.length - 1}
-                                    onClick={() => handleMovePlace(day, pIdx, "down")}
-                                    className="p-1 rounded hover:bg-slate-100 text-slate-400 disabled:opacity-20 cursor-pointer"
-                                    title="Move Place Down"
-                                  >
-                                    <ArrowDown className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleRemovePlace(day.id, place.id)}
-                                    className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-red-600 cursor-pointer"
-                                    title="Remove Place"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </div>
-
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => handleOpenEditTraveler(t)}
+                          disabled={isReadOnly}
+                          className="p-1 rounded text-slate-400 hover:text-slate-700 cursor-pointer disabled:opacity-50"
+                          title="Edit Traveler"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTraveler(t.id, t.name)}
+                          disabled={isReadOnly}
+                          className="p-1 rounded text-slate-400 hover:text-rose-600 cursor-pointer disabled:opacity-50"
+                          title="Remove Traveler"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
-
                     </div>
-                  )
-                })}
-              </div>
-            )}
 
-            {/* Accordion / Preview itinerary summary list */}
-            {tripItinerary.length > 0 && (
-              <div className="bg-white rounded-xl border border-border p-5 shadow-2xs space-y-3">
-                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-50 pb-2 flex items-center justify-between">
-                  <span>Itinerary Overview Preview</span>
-                  <span className="text-[10px] text-slate-400 font-bold font-mono">DRAFT</span>
-                </h4>
-                <div className="space-y-2 text-xs font-semibold text-slate-750">
-                  {tripItinerary.map((day) => (
-                    <div key={day.id} className="flex gap-4">
-                      <span className="text-indigo-650 shrink-0 font-extrabold w-[45px]">Day {day.dayNumber}:</span>
-                      <span className="text-slate-800 flex-1">{day.title}</span>
-                      <span className="text-slate-400 text-[10px] font-medium font-mono">{formatDateDisplay(day.date)}</span>
+                    <div className="space-y-1 text-xs text-slate-600 border-t border-slate-100 pt-2.5">
+                      {t.phone && (
+                        <div className="flex items-center gap-1.5 truncate">
+                          <Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{t.phone}</span>
+                        </div>
+                      )}
+                      {t.email && (
+                        <div className="flex items-center gap-1.5 truncate">
+                          <Mail className="h-3 w-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{t.email}</span>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-          </div>
-        )}
-
-        {activeTab === "timeline" && (
-          <div className="bg-white rounded-xl border border-border p-6 shadow-2xs space-y-5 animate-in fade-in duration-150 max-w-2xl mx-auto w-full">
-            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-50 pb-2.5 flex items-center gap-2">
-              <Clock className="h-4.5 w-4.5 text-indigo-500 shrink-0" />
-              <span>Trip Workspace Activity Timeline</span>
-            </h3>
-
-            {tripTimelineEvents.length === 0 ? (
-              <div className="text-xs text-slate-450 italic py-6 text-center">No timeline updates recorded for this workspace. Change status or add notes to trigger timeline entries.</div>
-            ) : (
-              <div className="space-y-6 pl-4 border-l border-slate-100 relative mt-4">
-                {tripTimelineEvents.map((act) => (
-                  <div key={act.id} className="relative space-y-1.5">
-                    {/* Circle timeline pin */}
-                    <span className="absolute -left-[22.5px] top-0.5 h-4 w-4 rounded-full border border-white bg-indigo-600 flex items-center justify-center shadow-xs">
-                      <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                    </span>
-                    
-                    <div className="flex items-center justify-between text-xs">
-                      <h4 className="font-bold text-slate-850">{act.title}</h4>
-                      <span className="text-slate-400 font-medium font-mono">{formatDateDisplay(act.createdAt)}</span>
-                    </div>
-                    <p className="text-xs text-slate-550 font-medium leading-relaxed">
-                      {act.description}
-                    </p>
                   </div>
                 ))}
               </div>
@@ -1422,1444 +1779,2295 @@ export default function TripDetailPage() {
           </div>
         )}
 
-        {/* ─── HOTELS TAB ────────────────────────────────────────────── */}
-        {activeTab === "hotels" && (
-          <div className="space-y-5 animate-in fade-in duration-150">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Selected Accommodations ({thisTripHotels.length})
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  Hotels, room categories and contracted supplier rates attached to this itinerary.
+        {/* TAB 3: ITINERARY */}
+        {activeTab === "itinerary" && (
+          <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
+                <h3 className="font-bold text-slate-900 text-sm">Day-by-Day Itinerary Builder</h3>
+                <p className="text-xs text-slate-500">
+                  Dates: {formatDateDisplay(trip.startDate)} to {formatDateDisplay(trip.endDate)} ({duration} Days)
                 </p>
               </div>
 
               <Button
-                size="sm"
-                onClick={() => {
-                  setSelectedHotelId(hotels[0]?.id || "")
-                  setSelectedRoomId("")
-                  setSelectedMealPlan("CPAI")
-                  setHotelCheckIn(trip.startDate)
-                  setHotelCheckOut(trip.endDate)
-                  setHotelRoomsCount(1)
-                  setHotelAdultsCount(trip.adults || 2)
-                  setHotelChildrenCount(trip.children || 0)
-                  setHotelBookingNotes("")
-                  setIsAddHotelToTripOpen(true)
-                }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8.5 px-3 cursor-pointer shadow-xs"
+                onClick={handleOpenAddItem}
+                disabled={isReadOnly}
+                className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Add Hotel to Trip
+                <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> Add Day
               </Button>
             </div>
 
-            {thisTripHotels.length === 0 ? (
+            {itineraryItems.length === 0 ? (
               <EmptyState
-                icon={Hotel}
-                title="No hotels added to this trip"
-                description="Attach hotel rooms and meal plans from your inventory with verified B2B rate snapshots."
-                actionText="Add Hotel"
-                onAction={() => {
-                  setSelectedHotelId(hotels[0]?.id || "")
-                  setIsAddHotelToTripOpen(true)
-                }}
+                icon={Calendar}
+                title="No itinerary items added yet"
+                description="Start adding daily schedules, sightseeing, transfers, and coordinates to this trip."
+                actionText="Add Day 1"
+                onAction={handleOpenAddItem}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {thisTripHotels.map((th) => {
-                  const hotel = hotels.find((h) => h.id === th.hotelId)
-                  const room = hotelRooms.find((r) => r.id === th.roomId)
-                  const nightsCount = th.checkIn && th.checkOut ? getDurationNightsDays(th.checkIn, th.checkOut).nights : 1
-
-                  return (
-                    <div
-                      key={th.id}
-                      className="bg-white rounded-xl border border-border p-5 shadow-2xs space-y-4 hover:border-slate-300 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm shrink-0">
-                            <Hotel className="h-5 w-5 stroke-[1.8]" />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-slate-900 text-sm">
-                              {hotel?.name || th.rateSnapshot?.name || "Hotel"}
-                            </h4>
-                            <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
-                              <span className="font-semibold text-slate-700">
-                                {room?.name || th.rateSnapshot?.roomName || "Standard Room"}
-                              </span>
-                              <span>•</span>
-                              <span>{hotel?.destination}</span>
-                            </div>
-                          </div>
+              <div className="space-y-4">
+                {itineraryItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3 hover:shadow-xs transition-all"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2.5">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md uppercase shrink-0 whitespace-nowrap">
+                            Day {item.dayNumber}
+                          </span>
+                          <h4 className="font-bold text-slate-900 text-sm leading-snug break-words">{item.title}</h4>
                         </div>
+                        {item.date && (
+                          <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
+                            <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
+                            {formatDateDisplay(item.date)}
+                          </span>
+                        )}
+                      </div>
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm("Remove this hotel from trip?")) {
-                              removeTripHotel(th.id)
-                              toast.success("Hotel removed from trip.")
-                            }
-                          }}
-                          className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 cursor-pointer"
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleOpenEditItem(item)}
+                          disabled={isReadOnly}
+                          className="p-1.5 rounded-md border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          <Edit2 className="h-3 w-3" /> Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteItem(item.id, item.dayNumber)}
+                          disabled={isReadOnly}
+                          className="p-1.5 rounded-md border border-slate-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                        >
+                          <Trash2 className="h-3 w-3" /> Delete
+                        </button>
                       </div>
-
-                      {/* Stay parameters */}
-                      <div className="grid grid-cols-3 gap-2 bg-slate-50/75 p-3 rounded-lg text-xs">
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Stay Dates</span>
-                          <span className="font-semibold text-slate-800">
-                            {formatDateDisplay(th.checkIn)} → {formatDateDisplay(th.checkOut)}
-                          </span>
-                          <span className="text-[10px] text-slate-500 block">({nightsCount} {nightsCount === 1 ? "Night" : "Nights"})</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Rooms / Guests</span>
-                          <span className="font-semibold text-slate-800">
-                            {th.rooms} {th.rooms === 1 ? "Room" : "Rooms"}
-                          </span>
-                          <span className="text-[10px] text-slate-500 block">
-                            {th.adults} Adults {th.children ? `• ${th.children} Ch` : ""}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Meal Plan</span>
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 mt-0.5">
-                            {th.rateSnapshot?.mealPlan || "CPAI"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Rate Snapshot Banner */}
-                      {th.rateSnapshot && (
-                        <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                              Unit B2B Tariff (Rate Snapshot)
-                            </span>
-                            <div className="font-bold text-indigo-600 text-sm">
-                              ₹{th.rateSnapshot.baseRate.toLocaleString("en-IN")}{" "}
-                              <span className="text-[11px] font-normal text-slate-500">/ room / night</span>
-                            </div>
-                          </div>
-
-                          {th.rateSnapshot.supplierName && (
-                            <div className="text-right text-[11px] text-slate-500">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Supplier</span>
-                              <span className="font-semibold text-slate-700">{th.rateSnapshot.supplierName}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {th.notes && (
-                        <p className="text-[11px] text-slate-500 italic bg-amber-50/50 border border-amber-100 p-2 rounded">
-                          Note: {th.notes}
-                        </p>
-                      )}
                     </div>
-                  )
-                })}
+
+                    {item.description && (
+                      <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-words">
+                        {item.description}
+                      </p>
+                    )}
+
+                    {(item.location || item.startTime || item.endTime) && (
+                      <div className="flex flex-wrap gap-2 sm:gap-3 text-xs text-slate-500 pt-1">
+                        {item.location && (
+                          <span>Location: <strong className="text-slate-800">{item.location}</strong></span>
+                        )}
+                        {(item.startTime || item.endTime) && (
+                          <span>Timing: <strong className="text-slate-800">{item.startTime || ""} – {item.endTime || ""}</strong></span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
         )}
 
-        {/* ─── VEHICLES TAB ───────────────────────────────────────────── */}
-        {activeTab === "vehicles" && (
-          <div className="space-y-5 animate-in fade-in duration-150">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Transport Services ({thisTripVehicles.length})
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  Fleet vehicles, cabs and transport tariffs linked to this trip.
+        {/* TAB 4: HOTELS (Real PostgreSQL Trip-Hotel Integration) */}
+        {activeTab === "hotels" && (
+          <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
+                <h3 className="font-bold text-slate-900 text-sm">Accommodation & Hotel Reservations</h3>
+                <p className="text-xs text-slate-500">
+                  Assign contracted agency hotels, room categories, check-in dates, and meal plans.
                 </p>
               </div>
 
               <Button
-                size="sm"
-                onClick={() => {
-                  setSelectedVehicleId(vehicles[0]?.id || "")
-                  setSelectedVehicleRateId("")
-                  setVehicleStartDate(trip.startDate)
-                  setVehicleEndDate(trip.endDate)
-                  setVehicleBookingNotes("")
-                  setIsAddVehicleToTripOpen(true)
-                }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8.5 px-3 cursor-pointer shadow-xs"
+                onClick={handleOpenAddHotel}
+                disabled={isReadOnly}
+                className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Add Vehicle to Trip
+                <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> Add Hotel
               </Button>
             </div>
 
-            {thisTripVehicles.length === 0 ? (
+            {tripHotels.length === 0 ? (
+              <EmptyState
+                icon={HotelIcon}
+                title="No hotel reservations attached"
+                description="Assign hotel properties from your agency inventory to this trip for room booking and voucher creation."
+                actionText="Add Hotel Reservation"
+                onAction={handleOpenAddHotel}
+              />
+            ) : (
+              <div className="space-y-4">
+                {tripHotels.map((th) => (
+                  <div
+                    key={th.id}
+                    className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3 hover:shadow-xs transition-all"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2.5">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md uppercase shrink-0 whitespace-nowrap">
+                            {th.roomType}
+                          </span>
+                          <h4 className="font-bold text-slate-900 text-sm leading-snug break-words">{th.hotel?.name || "Contracted Hotel"}</h4>
+                          {th.tripDestination && (
+                            <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0 whitespace-nowrap">
+                              <MapPin className="h-2.5 w-2.5 shrink-0" /> Leg {th.tripDestination.sequence}: {th.tripDestination.destination?.name}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
+                          <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
+                          Check-in: {formatDateDisplay(th.checkIn)} → Check-out: {formatDateDisplay(th.checkOut)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleOpenEditHotel(th)}
+                          disabled={isReadOnly}
+                          className="p-1.5 rounded-md border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                        >
+                          <Edit2 className="h-3 w-3" /> Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTripHotel(th.id, th.hotel?.name || "Hotel")}
+                          disabled={isReadOnly}
+                          className="p-1.5 rounded-md border border-slate-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                        >
+                          <Trash2 className="h-3 w-3" /> Remove
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-600 pt-1">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Rooms</span>
+                        <strong className="text-slate-800">{th.rooms} Room(s)</strong>
+                      </div>
+                      {th.mealPlan && (
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Meal Plan</span>
+                          <span className="text-slate-800 font-medium">{th.mealPlan}</span>
+                        </div>
+                      )}
+                      {th.nightlyRate !== null && th.nightlyRate !== undefined && (
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Nightly Rate</span>
+                          <span className="text-slate-800 font-medium">₹{Number(th.nightlyRate)} / night</span>
+                        </div>
+                      )}
+                      {th.totalAmount !== null && th.totalAmount !== undefined && (
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Tariff</span>
+                          <strong className="text-slate-900 font-bold">₹{Number(th.totalAmount)}</strong>
+                        </div>
+                      )}
+                    </div>
+
+                    {th.notes && (
+                      <p className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100 break-words">
+                        {th.notes}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 5: VEHICLES (Real PostgreSQL Trip-Vehicle Integration) */}
+        {activeTab === "vehicles" && (
+          <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
+                <h3 className="font-bold text-slate-900 text-sm">Transportation & Vehicle Assignments</h3>
+                <p className="text-xs text-slate-500">
+                  Assign fleet units, sedans, SUVs, and tempo travellers with driver arrangements.
+                </p>
+              </div>
+
+              <Button
+                onClick={handleOpenAddVehicle}
+                disabled={isReadOnly}
+                className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> Add Vehicle
+              </Button>
+            </div>
+
+            {tripVehicles.length === 0 ? (
               <EmptyState
                 icon={Car}
-                title="No vehicles attached to this trip"
-                description="Attach chauffeur-driven sedans, SUVs or tempo travellers with daily or per-KM rates."
-                actionText="Add Vehicle"
-                onAction={() => {
-                  setSelectedVehicleId(vehicles[0]?.id || "")
-                  setIsAddVehicleToTripOpen(true)
-                }}
+                title="No vehicles assigned to this trip"
+                description="Assign private mobility, chauffeurs, or airport transfers to this trip workspace."
+                actionText="Assign Vehicle"
+                onAction={handleOpenAddVehicle}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {thisTripVehicles.map((tv) => {
-                  const veh = vehicles.find((v) => v.id === tv.vehicleId)
-
-                  return (
-                    <div
-                      key={tv.id}
-                      className="bg-white rounded-xl border border-border p-5 shadow-2xs space-y-4 hover:border-slate-300 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0">
-                            <Car className="h-5 w-5 stroke-[1.8]" />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-slate-900 text-sm">
-                              {veh?.name || tv.rateSnapshot?.name || "Vehicle"}
-                            </h4>
-                            <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
-                              <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
-                                {veh?.vehicleType || tv.rateSnapshot?.vehicleType}
-                              </span>
-                              <span>•</span>
-                              <span>{veh?.seatingCapacity || 4} Seats</span>
-                              <span>•</span>
-                              <span>{veh?.ac ? "AC" : "Non-AC"}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm("Remove this vehicle from trip?")) {
-                              removeTripVehicle(tv.id)
-                              toast.success("Vehicle removed from trip.")
-                            }
-                          }}
-                          className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      {/* Travel schedule */}
-                      <div className="bg-slate-50/75 p-3 rounded-lg text-xs space-y-1">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Service Schedule</span>
-                        <div className="font-semibold text-slate-800">
-                          {formatDateDisplay(tv.startDate)} → {formatDateDisplay(tv.endDate)}
-                        </div>
-                      </div>
-
-                      {/* Rate Snapshot Banner */}
-                      {tv.rateSnapshot && (
-                        <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                              Unit Transport Tariff (Snapshot)
-                            </span>
-                            <div className="font-bold text-blue-600 text-sm">
-                              ₹{tv.rateSnapshot.baseRate.toLocaleString("en-IN")}{" "}
-                              <span className="text-[11px] font-normal text-slate-500">
-                                /{tv.rateSnapshot.rateType || "day"}
-                              </span>
-                            </div>
-                          </div>
-
-                          {tv.rateSnapshot.supplierName && (
-                            <div className="text-right text-[11px] text-slate-500">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fleet Vendor</span>
-                              <span className="font-semibold text-slate-700">{tv.rateSnapshot.supplierName}</span>
-                            </div>
+              <div className="space-y-4">
+                {tripVehicles.map((tv) => (
+                  <div
+                    key={tv.id}
+                    className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3 hover:shadow-xs transition-all"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2.5">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md uppercase shrink-0 whitespace-nowrap">
+                            {tv.vehicleType}
+                          </span>
+                          <h4 className="font-bold text-slate-900 text-sm leading-snug break-words">{tv.vehicleName}</h4>
+                          {tv.capacity && (
+                            <span className="text-[11px] text-slate-500 shrink-0 whitespace-nowrap">({tv.capacity} Seats)</span>
                           )}
                         </div>
-                      )}
+                        {(tv.startDate || tv.endDate) && (
+                          <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
+                            <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
+                            {formatDateDisplay(tv.startDate)} → {formatDateDisplay(tv.endDate)}
+                          </span>
+                        )}
+                      </div>
 
-                      {tv.notes && (
-                        <p className="text-[11px] text-slate-500 italic bg-blue-50/50 border border-blue-100 p-2 rounded">
-                          Route / Notes: {tv.notes}
-                        </p>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleOpenEditVehicle(tv)}
+                          disabled={isReadOnly}
+                          className="p-1.5 rounded-md border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                        >
+                          <Edit2 className="h-3 w-3" /> Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTripVehicle(tv.id, tv.vehicleName)}
+                          disabled={isReadOnly}
+                          className="p-1.5 rounded-md border border-slate-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                        >
+                          <Trash2 className="h-3 w-3" /> Remove
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-600 pt-1">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Rate Basis</span>
+                        <span className="font-semibold text-slate-800">
+                          {tv.pricingType === "PER_KM" ? "Per KM" : "Fixed Amount"}
+                        </span>
+                      </div>
+                      {tv.pricingType === "PER_KM" ? (
+                        <>
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-bold">Rate / KM</span>
+                            <span className="text-slate-800 font-medium">₹{Number(tv.ratePerKm || 0)}/km</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-bold">KM (Est / Act)</span>
+                            <span className="text-slate-800 font-medium">
+                              {Number(tv.estimatedKm || 0)} km {((tv as any).actualKm !== null && (tv as any).actualKm !== undefined) ? `(Act: ${Number((tv as any).actualKm)} km)` : ""}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                              {((tv as any).actualKm !== null && (tv as any).actualKm !== undefined) ? "Final Cost" : "Est. Cost"}
+                            </span>
+                            <strong className="text-slate-900 font-bold">
+                              ₹{Number(tv.ratePerKm || 0) * Number(((tv as any).actualKm !== null && (tv as any).actualKm !== undefined) ? (tv as any).actualKm : (tv.estimatedKm || 0))}
+                            </strong>
+                          </div>
+                        </>
+                      ) : (
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Fixed Amount</span>
+                          <strong className="text-slate-900 font-bold">₹{Number(tv.totalRate || 0)}</strong>
+                        </div>
                       )}
                     </div>
-                  )
-                })}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 text-xs text-slate-600 pt-1 border-t border-slate-100">
+                      {tv.pickupLocation && (
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Pickup</span>
+                          <span className="text-slate-800 font-medium break-words">{tv.pickupLocation}</span>
+                        </div>
+                      )}
+                      {tv.dropLocation && (
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Drop</span>
+                          <span className="text-slate-800 font-medium break-words">{tv.dropLocation}</span>
+                        </div>
+                      )}
+                      {tv.driverName && (
+                        <div>
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">Driver (Chauffeur)</span>
+                          <span className="text-slate-800 font-medium">{tv.driverName} {tv.driverPhone ? `(${tv.driverPhone})` : ""}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {tv.notes && (
+                      <p className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100 break-words">
+                        {tv.notes}
+                      </p>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
         )}
 
-        {/* ─── ACTIVITIES TAB ─────────────────────────────────────────── */}
+        {/* TAB 6: ACTIVITIES (Real PostgreSQL Trip-Activity Integration) */}
         {activeTab === "activities" && (
-          <div className="space-y-5 animate-in fade-in duration-150">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Sightseeing & Experiences ({thisTripActivities.length})
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  Excursions, guided tours and adventure bookings for this trip.
+          <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
+                <h3 className="font-bold text-slate-900 text-sm">Sightseeing & Activity Passes</h3>
+                <p className="text-xs text-slate-500">
+                  Attach guided excursions, boat tickets, entrance passes, and adventure experiences.
                 </p>
               </div>
 
               <Button
-                size="sm"
-                onClick={() => {
-                  setSelectedActivityId(invActivities[0]?.id || "")
-                  setSelectedActivityRateId("")
-                  setActivityDate(trip.startDate)
-                  setActivityAdultsCount(trip.adults || 2)
-                  setActivityChildrenCount(trip.children || 0)
-                  setActivityBookingNotes("")
-                  setIsAddActivityToTripOpen(true)
-                }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8.5 px-3 cursor-pointer shadow-xs"
+                onClick={handleOpenAddActivity}
+                disabled={isReadOnly}
+                className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Add Activity to Trip
+                <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> Add Activity
               </Button>
             </div>
 
-            {thisTripActivities.length === 0 ? (
+            {tripActivities.length === 0 ? (
               <EmptyState
                 icon={Ticket}
-                title="No activities added to this trip"
-                description="Select guided tours, cultural shows, houseboats and adventure excursions from inventory."
+                title="No activities assigned to this trip"
+                description="Add included package activities or excluded (pay on site) suggestions to this itinerary."
                 actionText="Add Activity"
-                onAction={() => {
-                  setSelectedActivityId(invActivities[0]?.id || "")
-                  setIsAddActivityToTripOpen(true)
-                }}
+                onAction={handleOpenAddActivity}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {thisTripActivities.map((ta) => {
-                  const act = invActivities.find((a) => a.id === ta.activityId)
-
+              <div className="space-y-3">
+                {tripActivities.map((ta) => {
+                  const isIncluded = ta.type === ActivityType.INCLUDED;
                   return (
                     <div
                       key={ta.id}
-                      className="bg-white rounded-xl border border-border p-5 shadow-2xs space-y-4 hover:border-slate-300 transition-colors"
+                      className="bg-white rounded-xl border border-slate-200 p-4 sm:p-4.5 shadow-2xs space-y-2 hover:shadow-xs transition-all"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-sm shrink-0">
-                            <Ticket className="h-5 w-5 stroke-[1.8]" />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-slate-900 text-sm">
-                              {act?.name || ta.rateSnapshot?.name || "Activity"}
-                            </h4>
-                            <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
-                              <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                {act?.category || "Sightseeing"}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2.5">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {isIncluded ? (
+                              <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
+                                Included in Package
                               </span>
-                              <span>•</span>
-                              <span>{act?.destination}</span>
-                              {act?.duration && (
-                                <>
-                                  <span>•</span>
-                                  <span>{act.duration}</span>
-                                </>
-                              )}
-                            </div>
+                            ) : (
+                              <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                <Info className="h-2.5 w-2.5 text-amber-600 shrink-0" />
+                                Not Included (Pay on Site)
+                              </span>
+                            )}
+                            <h4 className="font-bold text-slate-900 text-sm leading-snug break-words">{ta.name}</h4>
                           </div>
                         </div>
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm("Remove this activity from trip?")) {
-                              removeTripActivity(ta.id)
-                              toast.success("Activity removed from trip.")
-                            }
-                          }}
-                          className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      {/* Excursion details */}
-                      <div className="grid grid-cols-2 gap-2 bg-slate-50/75 p-3 rounded-lg text-xs">
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Activity Date</span>
-                          <span className="font-semibold text-slate-800">{formatDateDisplay(ta.date || "")}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Participants</span>
-                          <span className="font-semibold text-slate-800">
-                            {ta.adults} Adults {ta.children ? `• ${ta.children} Ch` : ""}
-                          </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => handleOpenEditActivity(ta)}
+                            disabled={isReadOnly}
+                            className="p-1.5 rounded-md border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          >
+                            <Edit2 className="h-3 w-3" /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTripActivity(ta.id, ta.name)}
+                            disabled={isReadOnly}
+                            className="p-1.5 rounded-md border border-slate-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          >
+                            <Trash2 className="h-3 w-3" /> Remove
+                          </button>
                         </div>
                       </div>
 
-                      {/* Rate Snapshot Banner */}
-                      {ta.rateSnapshot && (
-                        <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                              Unit Activity Rate (Snapshot)
-                            </span>
-                            <div className="font-bold text-emerald-700 text-sm">
-                              ₹{ta.rateSnapshot.baseRate.toLocaleString("en-IN")}{" "}
-                              <span className="text-[11px] font-normal text-slate-500">
-                                /{ta.rateSnapshot.rateType || "person"}
-                              </span>
-                            </div>
-                          </div>
-
-                          {ta.rateSnapshot.supplierName && (
-                            <div className="text-right text-[11px] text-slate-500">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Activity Vendor</span>
-                              <span className="font-semibold text-slate-700">{ta.rateSnapshot.supplierName}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {ta.notes && (
-                        <p className="text-[11px] text-slate-500 italic bg-emerald-50/50 border border-emerald-100 p-2 rounded">
-                          Timing / Notes: {ta.notes}
+                      {ta.description && (
+                        <p className="text-xs text-slate-600 leading-relaxed pt-0.5">
+                          {ta.description}
                         </p>
                       )}
                     </div>
-                  )
+                  );
                 })}
               </div>
             )}
           </div>
         )}
 
-        {/* ─── PHASE 5: COSTING & PRICING ENGINE TAB ───────────────────────── */}
-        {activeTab === "costing" && tripCostingData && (
-          <div className="space-y-6 animate-in fade-in duration-150">
-            {/* Top 5 Hero KPI Summary Cards */}
-            <CostingSummaryCards
-              summary={tripCostingData.summary}
-              settings={tripCostingData.costing.settings}
-              isLocked={tripCostingData.costing.status === "Locked"}
-            />
+        {/* TAB 7: COSTING */}
+        {activeTab === "costing" && (
+          <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div className="flex items-start gap-3.5">
+                  <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 shrink-0">
+                    <Calculator className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Trip Costing & Margin Sheet
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Itemized supplier costs, rate sheet matches, and agency profit margins for this trip.
+                    </p>
+                  </div>
+                </div>
 
-            {/* Commercial Pricing & Margin Control Panel */}
-            <PricingControlPanel
-              settings={tripCostingData.costing.settings}
-              summary={tripCostingData.summary}
-              taxRules={taxRules}
-              isLocked={tripCostingData.costing.status === "Locked"}
-              onUpdateSettings={(settings) => updatePricingSettings(trip.id, settings)}
-              onLockCosting={() => {
-                setLockActionType("lock")
-                setIsLockModalOpen(true)
-              }}
-              onUnlockCosting={() => {
-                setLockActionType("unlock")
-                setIsLockModalOpen(true)
-              }}
-              onRecalculate={() => recalculateTripCosting(trip.id)}
-            />
+                <Link href={`/trips/${trip.id}/costing`}>
+                  <Button
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 px-4 rounded-xl cursor-pointer shadow-xs inline-flex items-center gap-1.5 shrink-0"
+                  >
+                    <Calculator className="h-3.5 w-3.5" />
+                    Open Costing Studio
+                    <ExternalLink className="h-3 w-3 opacity-70" />
+                  </Button>
+                </Link>
+              </div>
 
-            {/* Cost Breakdown & Tariffs Table */}
-            <CostBreakdownTable
-              costItems={tripCostingData.costItems}
-              internalExpenses={tripCostingData.internalExpenses}
-              isLocked={tripCostingData.costing.status === "Locked"}
-              onAddManualCost={() => {
-                setEditingCostItem(null)
-                setIsAddManualCostOpen(true)
-              }}
-              onAddInternalExpense={() => {
-                setEditingExpense(null)
-                setIsAddExpenseOpen(true)
-              }}
-              onEditCostItem={(item) => {
-                setEditingCostItem(item)
-                setIsAddManualCostOpen(true)
-              }}
-              onDeleteCostItem={(itemId) => deleteCostItem(itemId)}
-              onEditInternalExpense={(exp) => {
-                setEditingExpense(exp)
-                setIsAddExpenseOpen(true)
-              }}
-              onDeleteInternalExpense={(expId) => deleteInternalExpense(expId)}
-              onRefreshRateCheck={(item) => {
-                setRateChangeItem(item)
-                setIsRateChangeModalOpen(true)
-              }}
-            />
+              {/* Resource Tally Summary */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-600">Reserved Hotels</span>
+                    <HotelIcon className="h-4 w-4 text-indigo-500" />
+                  </div>
+                  <div className="text-xl font-black text-slate-900">{tripHotels.length}</div>
+                  <span className="text-[11px] text-slate-400">Nightly rates & meal plans</span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-600">Assigned Fleet</span>
+                    <Car className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <div className="text-xl font-black text-slate-900">{tripVehicles.length}</div>
+                  <span className="text-[11px] text-slate-400">Per-KM & fixed vehicle rates</span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-600">Activities & Passes</span>
+                    <Ticket className="h-4 w-4 text-purple-500" />
+                  </div>
+                  <div className="text-xl font-black text-slate-900">{tripActivities.length}</div>
+                  <span className="text-[11px] text-slate-400">Participant tickets & excursions</span>
+                </div>
+              </div>
+
+              {/* Costing Engine Info Callout */}
+              <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100 flex items-start gap-3">
+                <Sparkles className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-indigo-950 space-y-1">
+                  <p className="font-bold">Dynamic Contracted Rate Sheet Resolution</p>
+                  <p className="text-indigo-900/80 leading-relaxed">
+                    Your Travel Desk automatically matches contracted supplier rate sheets for dates, room categories, vehicle types, and participant counts. View itemized supplier outlays, configure agency markups, and calculate final customer selling prices in the Costing Studio.
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-full flex justify-stretch sm:justify-end pt-2">
+                <Link href={`/trips/${trip.id}/costing`} className="w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto justify-center border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold h-auto min-h-9 py-2 px-3 rounded-xl cursor-pointer inline-flex items-center gap-1.5 text-center leading-snug"
+                  >
+                    <span className="sm:hidden">Costing Studio Breakdown</span>
+                    <span className="hidden sm:inline">View Supplier Breakdown in Costing Studio</span>
+                    <ArrowLeft className="h-3 w-3 rotate-180 text-slate-400 shrink-0" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* ─── PHASE 6: CUSTOMER QUOTATION PROPOSAL TAB ────────────────── */}
+        {/* TAB 8: QUOTATIONS */}
         {activeTab === "quotation" && (
-          <div className="space-y-6 animate-in fade-in duration-150">
-            {activeQuotation ? (
-              <div className="space-y-6">
-                {/* Change Alert if live Trip or Costing diverged from saved quotation */}
-                {(() => {
-                  const diff = detectQuotationChanges(
-                    activeQuotation,
-                    trip,
-                    tripCostingData?.costing,
-                    tripItinerary,
-                    thisTripHotels,
-                    thisTripVehicles,
-                    thisTripActivities
-                  )
-                  return (
-                    <QuotationChangeAlert
-                      difference={diff}
-                      onCreateVersion={() => {
-                        setSelectedQuotationForAction(activeQuotation)
-                        setIsQuotationVersionModalOpen(true)
-                      }}
-                    />
-                  )
-                })()}
-
-                {/* Hero Active Quotation Card */}
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-                  <div className="flex items-start gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold font-mono text-base shrink-0">
-                      QT
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono font-black text-slate-900 text-lg">
-                          {activeQuotation.quotationNumber}
-                        </span>
-                        {activeQuotation.version > 1 && (
-                          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
-                            Version {activeQuotation.version}
-                          </span>
-                        )}
-                        <span
-                          className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                            activeQuotation.status === "Sent"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : activeQuotation.status === "Ready"
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
-                              : activeQuotation.status === "Viewed"
-                              ? "bg-purple-50 text-purple-700 border-purple-200"
-                              : "bg-slate-100 text-slate-700 border-slate-200"
-                          }`}
-                        >
-                          {activeQuotation.status}
-                        </span>
-                      </div>
-
-                      <h3 className="font-bold text-slate-800 text-sm">{activeQuotation.title}</h3>
-                      <p className="text-xs text-slate-500 font-medium">
-                        Prepared for <strong className="text-slate-700">{activeQuotation.customerSnapshot.name}</strong> • Valid until {activeQuotation.validUntil}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Selling Price & Quick Action Toolbar */}
-                  <div className="flex flex-col md:items-end gap-3 shrink-0">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block md:text-right">
-                        Final Customer Selling Price
-                      </span>
-                      <div className="text-2xl font-black text-indigo-600 md:text-right">
-                        {formatCurrency(activeQuotation.sellingPrice, activeQuotation.currency)}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Link
-                        href={`/trips/${trip.id}/quotation`}
-                        className="inline-flex items-center justify-center bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold h-8.5 px-3 rounded-xl transition-colors text-slate-700"
-                      >
-                        <Edit2 className="h-3.5 w-3.5 mr-1" />
-                        Open Editor
-                      </Link>
-
-                      <Link
-                        href={`/trips/${trip.id}/quotation/preview`}
-                        className="inline-flex items-center justify-center bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold h-8.5 px-3 rounded-xl transition-colors text-slate-700"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5 mr-1 text-slate-400" />
-                        Preview
-                      </Link>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => exportQuotationPDF(activeQuotation)}
-                        className="bg-white border-slate-200 text-xs font-semibold h-8.5 rounded-xl cursor-pointer"
-                      >
-                        <Download className="h-3.5 w-3.5 mr-1 text-slate-400" />
-                        PDF
-                      </Button>
-
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setSelectedQuotationForAction(activeQuotation)
-                          setIsQuotationShareModalOpen(true)
-                        }}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8.5 px-3.5 rounded-xl shadow-xs cursor-pointer"
-                      >
-                        <Share2 className="h-3.5 w-3.5 mr-1" />
-                        Share Proposal
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* All Quotation Versions for this trip */}
-                {tripQuotations.length > 1 && (
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs space-y-3">
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Proposal Version History
-                    </h4>
-                    <div className="divide-y divide-slate-100 text-xs">
-                      {tripQuotations.map((q) => (
-                        <div key={q.id} className="py-2.5 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-slate-800">{q.quotationNumber}</span>
-                            <span className="text-[10px] px-2 py-0.2 rounded bg-slate-100 text-slate-600 font-semibold">
-                              {q.status}
-                            </span>
-                            <span className="text-[11px] text-slate-400">
-                              Created {q.createdAt.split("T")[0]}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-bold text-slate-900">{formatCurrency(q.sellingPrice, q.currency)}</span>
-                            <Link
-                              href={`/trips/${trip.id}/quotation`}
-                              className="text-indigo-600 hover:underline font-semibold text-[11px]"
-                            >
-                              View
-                            </Link>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+          <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="min-w-0">
+                <h3 className="font-bold text-slate-900 text-sm">
+                  Quotations & Proposals ({tripQuotations.length})
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Manage quotation snapshots, customer proposals, and package options generated for this trip.
+                </p>
               </div>
-            ) : (
-              /* No quotation created yet */
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-10 text-center max-w-xl mx-auto shadow-xs space-y-4 my-4">
-                <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
-                  <FileText className="h-6 w-6 stroke-[1.8]" />
+
+              <Link href={`/trips/${trip.id}/quotation`} className="w-full sm:w-auto shrink-0">
+                <Button
+                  disabled={isReadOnly}
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 rounded-xl cursor-pointer shadow-xs inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Open Quotation Studio
+                </Button>
+              </Link>
+            </div>
+
+            {tripQuotations.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-12 text-center shadow-xs space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto border border-indigo-100">
+                  <FileText className="h-6 w-6" />
                 </div>
-                <div className="space-y-1">
-                  <h3 className="font-extrabold text-slate-900 text-base">
-                    Generate Customer Quotation Proposal
-                  </h3>
-                  <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                    Take your itinerary, selected hotel rooms, private vehicle, and Phase 5 final selling price to compile a customer quotation proposal.
+                <div className="space-y-1 max-w-md mx-auto">
+                  <h4 className="text-sm font-bold text-slate-900">No Quotation Proposals Generated Yet</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Generate professional customer proposals with itemized packages, 30/50/20 payment milestones, and live customer share links from this trip.
                   </p>
                 </div>
                 <div className="pt-2">
-                  <Link
-                    href={`/trips/${trip.id}/quotation`}
-                    className="inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 rounded-xl shadow-xs cursor-pointer transition-colors"
-                  >
-                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                    Open Quotation Builder
+                  <Link href={`/trips/${trip.id}/quotation`}>
+                    <Button
+                      disabled={isReadOnly}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-5 rounded-xl cursor-pointer shadow-xs inline-flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Create Quotation
+                    </Button>
                   </Link>
                 </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {tripQuotations.map((q: any) => {
+                  const finalPrice = Number(q.finalAmount || 0);
+                  const subtotal = Number(q.subtotal || 0);
+
+                  return (
+                    <div
+                      key={q.id}
+                      className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-2xs hover:border-indigo-200 transition-all space-y-4"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <span className="font-black text-sm text-slate-900">
+                            {q.quotationNumber || `Quotation V${q.version}`}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                            V{q.version}
+                          </span>
+                          <QuotationStatusBadge status={q.status} />
+                        </div>
+
+                        <div className="text-left sm:text-right">
+                          <span className="text-[11px] text-slate-400 block font-medium">Final Package Price</span>
+                          <span className="text-base font-black text-slate-900">
+                            ₹{finalPrice.toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
+                        <div className="space-y-1">
+                          <div className="font-medium text-slate-800">
+                            {q.title || `Proposal for ${trip.title}`}
+                          </div>
+                          <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-2">
+                            <span>Created: {formatDateDisplay(q.createdAt)}</span>
+                            {q.validUntil && (
+                              <>
+                                <span>•</span>
+                                <span>Valid Until: {formatDateDisplay(q.validUntil)}</span>
+                              </>
+                            )}
+                            {subtotal > 0 && (
+                              <>
+                                <span>•</span>
+                                <span>Base Cost: ₹{subtotal.toLocaleString("en-IN")}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 sm:pt-0">
+                          {q.shareToken && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const url = `${window.location.origin}/q/${q.shareToken}`;
+                                navigator.clipboard.writeText(url);
+                                toast.success("Public customer proposal link copied!");
+                              }}
+                              className="bg-white hover:bg-slate-50 border-slate-200 h-8 px-2.5 text-xs font-semibold rounded-lg cursor-pointer"
+                            >
+                              <Share2 className="h-3.5 w-3.5 mr-1 text-slate-400" />
+                              Copy Link
+                            </Button>
+                          )}
+
+                          <Link href={`/trips/${trip.id}/quotation/preview`}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="bg-white hover:bg-slate-50 border-slate-200 h-8 px-2.5 text-xs font-semibold rounded-lg cursor-pointer"
+                            >
+                              <Eye className="h-3.5 w-3.5 mr-1 text-slate-400" />
+                              Preview
+                            </Button>
+                          </Link>
+
+                          <Link href={`/trips/${trip.id}/quotation`}>
+                            <Button
+                              size="sm"
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 px-3 text-xs font-semibold rounded-lg cursor-pointer shadow-2xs"
+                            >
+                              Open in Studio
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
-        {/* Documents Tab Placeholder */}
-        {activeTab === "documents" && (
-          <div className="bg-white rounded-xl border border-border p-8 shadow-2xs text-center max-w-2xl mx-auto w-full animate-in zoom-in-98 duration-200">
-            <div className="h-12 w-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-4">
-              <Receipt className="h-6 w-6" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900">Documents & Vouchers</h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto mt-2 leading-relaxed font-medium">
-              Vouchers, hotel confirmations, driver assignment slips and customer invoices will be managed in future phases.
-            </p>
-          </div>
-        )}
+        {/* ─── TRAVELER DIALOGS ─── */}
+        <Dialog open={isAddTravelerOpen} onOpenChange={setIsAddTravelerOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-md p-4 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <form onSubmit={handleSaveAddTraveler}>
+              <DialogHeader>
+                <DialogTitle className="text-slate-900 font-bold text-base">Add Traveler</DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-1">
+                  Add a new passenger to this trip manifest.
+                </DialogDescription>
+              </DialogHeader>
 
-      </div>
-
-      {/* --- ITINERARY DAY DIALOGS --- */}
-
-      {/* Add Day Dialog */}
-      <Dialog open={isAddDayOpen} onOpenChange={setIsAddDayOpen}>
-        <DialogContent className="bg-white border border-slate-200 rounded-xl max-w-md p-6">
-          <form onSubmit={handleSaveDay}>
-            <DialogHeader>
-              <DialogTitle className="text-slate-900 font-bold text-base">Add Itinerary Day</DialogTitle>
-              <DialogDescription className="text-slate-500 text-xs mt-1">
-                Enter details for Day {tripItinerary.length + 1} of the itinerary.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 mt-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3.5 mt-4 text-xs">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Day Number</label>
-                  <Input type="number" value={tripItinerary.length + 1} disabled className="h-9 bg-slate-100" />
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Traveler Name *</label>
+                  <Input
+                    value={travelerName}
+                    onChange={(e) => setTravelerName(e.target.value)}
+                    placeholder="e.g. Rahul Verma"
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Date</label>
-                  <Input type="date" value={dayDate} onChange={(e) => setDayDate(e.target.value)} className={`h-9 bg-slate-50/50 border-slate-200 ${dayErrors.dayDate ? 'border-red-500 focus-visible:ring-red-500' : ''}`} required />
-                  {dayErrors.dayDate && (
-                    <p className="text-[10px] text-red-500 font-semibold mt-0.5">{dayErrors.dayDate}</p>
-                  )}
-                </div>
-              </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Day Title</label>
-                <Input
-                  placeholder="e.g. Arrival & Munnar Transfer"
-                  value={dayTitle}
-                  onChange={(e) => setDayTitle(e.target.value)}
-                  className={`h-9 bg-slate-50/50 border-slate-200 ${dayErrors.dayTitle ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                  required
-                />
-                {dayErrors.dayTitle && (
-                  <p className="text-[10px] text-red-500 font-semibold mt-0.5">{dayErrors.dayTitle}</p>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Day Summary Description</label>
-                <Textarea
-                  placeholder="Sightseeing routes, transfer timelines, check-in instructions..."
-                  value={dayDescription}
-                  onChange={(e) => setDayDescription(e.target.value)}
-                  className={`min-h-[70px] bg-slate-50/50 border-slate-200 ${dayErrors.dayDescription ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                />
-                {dayErrors.dayDescription && (
-                  <p className="text-[10px] text-red-500 font-semibold mt-0.5">{dayErrors.dayDescription}</p>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Internal Operation Notes</label>
-                <Input
-                  placeholder="e.g. Leave resort by 9:00 AM..."
-                  value={dayNotes}
-                  onChange={(e) => setDayNotes(e.target.value)}
-                  className={`h-9 bg-slate-50/50 border-slate-200 ${dayErrors.dayNotes ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                />
-                {dayErrors.dayNotes && (
-                  <p className="text-[10px] text-red-500 font-semibold mt-0.5">{dayErrors.dayNotes}</p>
-                )}
-              </div>
-            </div>
-
-            <DialogFooter className="mt-6 flex justify-end gap-2">
-              <DialogClose
-                render={
-                  <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs">
-                    Cancel
-                  </Button>
-                }
-              />
-              <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4">
-                Add Day
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Day Dialog */}
-      <Dialog open={isEditDayOpen} onOpenChange={setIsEditDayOpen}>
-        <DialogContent className="bg-white border border-slate-200 rounded-xl max-w-md p-6">
-          <form onSubmit={handleSaveEditDay}>
-            <DialogHeader>
-              <DialogTitle className="text-slate-900 font-bold text-base">Edit Itinerary Day</DialogTitle>
-              <DialogDescription className="text-slate-500 text-xs mt-1">
-                Update date, title, details and remarks for this day card.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 mt-4 text-xs">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Date</label>
-                <Input type="date" value={dayDate} onChange={(e) => setDayDate(e.target.value)} className={`h-9 bg-slate-50/50 border-slate-200 ${dayErrors.dayDate ? 'border-red-500 focus-visible:ring-red-500' : ''}`} required />
-                {dayErrors.dayDate && (
-                  <p className="text-[10px] text-red-500 font-semibold mt-0.5">{dayErrors.dayDate}</p>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Day Title</label>
-                <Input value={dayTitle} onChange={(e) => setDayTitle(e.target.value)} className={`h-9 bg-slate-50/50 border-slate-200 ${dayErrors.dayTitle ? 'border-red-500 focus-visible:ring-red-500' : ''}`} required />
-                {dayErrors.dayTitle && (
-                  <p className="text-[10px] text-red-500 font-semibold mt-0.5">{dayErrors.dayTitle}</p>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Day Summary Description</label>
-                <Textarea value={dayDescription} onChange={(e) => setDayDescription(e.target.value)} className={`min-h-[70px] bg-slate-50/50 border-slate-200 ${dayErrors.dayDescription ? 'border-red-500 focus-visible:ring-red-500' : ''}`} />
-                {dayErrors.dayDescription && (
-                  <p className="text-[10px] text-red-500 font-semibold mt-0.5">{dayErrors.dayDescription}</p>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Internal Operation Notes</label>
-                <Input value={dayNotes} onChange={(e) => setDayNotes(e.target.value)} className={`h-9 bg-slate-50/50 border-slate-200 ${dayErrors.dayNotes ? 'border-red-500 focus-visible:ring-red-500' : ''}`} />
-                {dayErrors.dayNotes && (
-                  <p className="text-[10px] text-red-500 font-semibold mt-0.5">{dayErrors.dayNotes}</p>
-                )}
-              </div>
-            </div>
-
-            <DialogFooter className="mt-6 flex justify-end gap-2">
-              <DialogClose
-                render={
-                  <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs">
-                    Cancel
-                  </Button>
-                }
-              />
-              <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4">
-                Save Day
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Place Dialog */}
-      <Dialog open={isAddPlaceOpen} onOpenChange={setIsAddPlaceOpen}>
-        <DialogContent className="bg-white border border-slate-200 rounded-xl max-w-md p-6">
-          <form onSubmit={handleAddPlaceSubmit}>
-            <DialogHeader>
-              <DialogTitle className="text-slate-900 font-bold text-base">Add Sightseeing Location</DialogTitle>
-              <DialogDescription className="text-slate-500 text-xs mt-1">
-                Specify destination, coordinates, visit time and notes for this day itinerary.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 mt-4 text-xs">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Place Name <span className="text-red-500">*</span></label>
-                <Input placeholder="e.g. Mattupetty Dam" value={placeName} onChange={(e) => setPlaceName(e.target.value)} className={`h-9 bg-slate-50/50 border-slate-200 ${placeErrors.placeName ? 'border-red-500 focus-visible:ring-red-500' : ''}`} required />
-                {placeErrors.placeName && (
-                  <p className="text-[10px] text-red-500 font-semibold mt-0.5">{placeErrors.placeName}</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Suggested Visit Time</label>
-                  <Input placeholder="e.g. 10:30 AM" value={placeVisitTime} onChange={(e) => setPlaceVisitTime(e.target.value)} className={`h-9 bg-slate-50/50 border-slate-200 ${placeErrors.placeVisitTime ? 'border-red-500 focus-visible:ring-red-500' : ''}`} />
-                  {placeErrors.placeVisitTime && (
-                    <p className="text-[10px] text-red-500 font-semibold mt-0.5">{placeErrors.placeVisitTime}</p>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Operation Remark</label>
-                  <Input placeholder="e.g. Boat ride" value={placeNotes} onChange={(e) => setPlaceNotes(e.target.value)} className={`h-9 bg-slate-50/50 border-slate-200 ${placeErrors.placeNotes ? 'border-red-500 focus-visible:ring-red-500' : ''}`} />
-                  {placeErrors.placeNotes && (
-                    <p className="text-[10px] text-red-500 font-semibold mt-0.5">{placeErrors.placeNotes}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Location Description</label>
-                <Textarea placeholder="Short overview of sightseeing activities, entrance criteria..." value={placeDescription} onChange={(e) => setPlaceDescription(e.target.value)} className={`min-h-[60px] bg-slate-50/50 border-slate-200 ${placeErrors.placeDescription ? 'border-red-500 focus-visible:ring-red-500' : ''}`} />
-                {placeErrors.placeDescription && (
-                  <p className="text-[10px] text-red-500 font-semibold mt-0.5">{placeErrors.placeDescription}</p>
-                )}
-              </div>
-            </div>
-
-            <DialogFooter className="mt-6 flex justify-end gap-2">
-              <DialogClose
-                render={
-                  <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs">
-                    Cancel
-                  </Button>
-                }
-              />
-              <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4">
-                Add Place
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* ─── ADD HOTEL TO TRIP DIALOG ────────────────────────────────────── */}
-      <Dialog open={isAddHotelToTripOpen} onOpenChange={setIsAddHotelToTripOpen}>
-        <DialogContent className="bg-white border border-slate-200 rounded-xl max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!selectedHotelId) {
-                toast.error("Please select a hotel.")
-                return
-              }
-              const hotel = hotels.find((h) => h.id === selectedHotelId)
-              const availableRooms = hotelRooms.filter((r) => r.hotelId === selectedHotelId)
-              const room = availableRooms.find((r) => r.id === selectedRoomId) || availableRooms[0]
-              const availableRates = hotelRates.filter((hr) => hr.hotelId === selectedHotelId && (!room || hr.roomId === room.id))
-              const matchedRate = availableRates.find((hr) => hr.mealPlan === selectedMealPlan) || availableRates[0]
-              const supplier = hotel?.supplierId ? suppliers.find((s) => s.id === hotel.supplierId) : null
-
-              addTripHotel({
-                tripId: trip.id,
-                hotelId: selectedHotelId,
-                roomId: room?.id,
-                rateId: matchedRate?.id,
-                checkIn: hotelCheckIn,
-                checkOut: hotelCheckOut,
-                rooms: Number(hotelRoomsCount) || 1,
-                adults: Number(hotelAdultsCount) || 2,
-                children: Number(hotelChildrenCount) || 0,
-                notes: hotelBookingNotes.trim() || undefined,
-                rateSnapshot: {
-                  name: hotel?.name || "Hotel",
-                  roomName: room?.name || "Standard Room",
-                  mealPlan: (matchedRate?.mealPlan || selectedMealPlan) as MealPlan,
-                  supplierName: supplier?.name,
-                  supplierId: supplier?.id,
-                  baseRate: matchedRate?.baseRate || 4500,
-                  currency: "INR",
-                  rateType: "Per Room / Night",
-                  validity: matchedRate?.validFrom ? `${matchedRate.validFrom} – ${matchedRate.validTo}` : undefined,
-                },
-              })
-
-              toast.success("Hotel accommodation added to trip.")
-              setIsAddHotelToTripOpen(false)
-            }}
-            className="space-y-4 text-xs"
-          >
-            <DialogHeader>
-              <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
-                <Hotel className="h-5 w-5 text-indigo-600" />
-                <span>Add Hotel to Trip</span>
-              </DialogTitle>
-              <DialogDescription className="text-slate-500 text-xs">
-                Select property, room category, meal plan and stay dates.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3.5 mt-2">
-              {/* Hotel Select */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 uppercase">Select Hotel / Resort *</label>
-                <Select
-                  value={selectedHotelId}
-                  onValueChange={(val) => {
-                    setSelectedHotelId(val || "")
-                    const rooms = hotelRooms.filter((r) => r.hotelId === val)
-                    setSelectedRoomId(rooms[0]?.id || "")
-                  }}
-                >
-                  <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
-                    <SelectValue placeholder="Choose Hotel Property" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200">
-                    {hotels.map((h) => (
-                      <SelectItem key={h.id} value={h.id} className="text-xs">
-                        {h.name} ({h.destination} • {h.starCategory}★)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Room & Meal Plan */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Room Category</label>
-                  <Select
-                    value={selectedRoomId || (hotelRooms.filter((r) => r.hotelId === selectedHotelId)[0]?.id || "")}
-                    onValueChange={(val) => setSelectedRoomId(val || "")}
-                  >
-                    <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
-                      <SelectValue placeholder="Select Room" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-slate-200">
-                      {hotelRooms
-                        .filter((r) => r.hotelId === selectedHotelId)
-                        .map((r) => (
-                          <SelectItem key={r.id} value={r.id} className="text-xs">
-                            {r.name}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Type</label>
+                    <Select value={travelerType} onValueChange={(val) => val && setTravelerType(val as TravelerType)}>
+                      <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        <SelectItem value="ADULT" className="text-xs">Adult (12y+)</SelectItem>
+                        <SelectItem value="CHILD" className="text-xs">Child (&lt;12y)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Gender</label>
+                    <Select value={travelerGender} onValueChange={(val) => setTravelerGender(val || "")}>
+                      <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        {GENDER_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                            {opt.label}
                           </SelectItem>
                         ))}
-                    </SelectContent>
-                  </Select>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Phone</label>
+                    <Input
+                      value={travelerPhone}
+                      onChange={(e) => setTravelerPhone(e.target.value)}
+                      placeholder="+91..."
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Email</label>
+                    <Input
+                      type="email"
+                      value={travelerEmail}
+                      onChange={(e) => setTravelerEmail(e.target.value)}
+                      placeholder="email@example.com"
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={travelerSaving}
+                  size="sm"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
+                >
+                  {travelerSaving ? "Saving..." : "Add Traveler"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditTravelerOpen} onOpenChange={setIsEditTravelerOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-md p-4 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <form onSubmit={handleSaveEditTraveler}>
+              <DialogHeader>
+                <DialogTitle className="text-slate-900 font-bold text-base">Edit Traveler</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-3.5 mt-4 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Traveler Name *</label>
+                  <Input
+                    value={travelerName}
+                    onChange={(e) => setTravelerName(e.target.value)}
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Type</label>
+                    <Select value={travelerType} onValueChange={(val) => val && setTravelerType(val as TravelerType)}>
+                      <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        <SelectItem value="ADULT" className="text-xs">Adult (12y+)</SelectItem>
+                        <SelectItem value="CHILD" className="text-xs">Child (&lt;12y)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Gender</label>
+                    <Select value={travelerGender} onValueChange={(val) => setTravelerGender(val || "")}>
+                      <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        {GENDER_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Phone</label>
+                    <Input
+                      value={travelerPhone}
+                      onChange={(e) => setTravelerPhone(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Email</label>
+                    <Input
+                      type="email"
+                      value={travelerEmail}
+                      onChange={(e) => setTravelerEmail(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={travelerSaving}
+                  size="sm"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
+                >
+                  {travelerSaving ? "Saving..." : "Save"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* ─── ITINERARY DIALOGS ─── */}
+        <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-lg p-4 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <form onSubmit={handleSaveAddItem}>
+              <DialogHeader>
+                <DialogTitle className="text-slate-900 font-bold text-base">Add Itinerary Day Item</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-3.5 mt-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Day Number *</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={itemDayNumber}
+                      onChange={(e) => setItemDayNumber(parseInt(e.target.value) || 1)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Date</label>
+                    <Input
+                      type="date"
+                      value={itemDate}
+                      onChange={(e) => setItemDate(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Meal Plan</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Title / Heading *</label>
+                  <Input
+                    value={itemTitle}
+                    onChange={(e) => setItemTitle(e.target.value)}
+                    placeholder="e.g. Arrival in Cochin & Transfer to Munnar"
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Description / Details</label>
+                  <Textarea
+                    value={itemDescription}
+                    onChange={(e) => setItemDescription(e.target.value)}
+                    placeholder="Describe transfers, stops, hotel check-in..."
+                    rows={3}
+                    className="bg-slate-50/50 border-slate-200 text-xs"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 xs:grid-cols-3 sm:grid-cols-3 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Location</label>
+                    <Input
+                      value={itemLocation}
+                      onChange={(e) => setItemLocation(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Start Time</label>
+                    <Input
+                      value={itemStartTime}
+                      onChange={(e) => setItemStartTime(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">End Time</label>
+                    <Input
+                      value={itemEndTime}
+                      onChange={(e) => setItemEndTime(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={itemSaving}
+                  size="sm"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
+                >
+                  {itemSaving ? "Saving..." : "Add Itinerary Item"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditItemOpen} onOpenChange={setIsEditItemOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-lg p-4 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <form onSubmit={handleSaveEditItem}>
+              <DialogHeader>
+                <DialogTitle className="text-slate-900 font-bold text-base">Edit Itinerary Day Item</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-3.5 mt-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Day Number *</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={itemDayNumber}
+                      onChange={(e) => setItemDayNumber(parseInt(e.target.value) || 1)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Date</label>
+                    <Input
+                      type="date"
+                      value={itemDate}
+                      onChange={(e) => setItemDate(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Title / Heading *</label>
+                  <Input
+                    value={itemTitle}
+                    onChange={(e) => setItemTitle(e.target.value)}
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Description / Details</label>
+                  <Textarea
+                    value={itemDescription}
+                    onChange={(e) => setItemDescription(e.target.value)}
+                    rows={3}
+                    className="bg-slate-50/50 border-slate-200 text-xs"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 xs:grid-cols-3 sm:grid-cols-3 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Location</label>
+                    <Input
+                      value={itemLocation}
+                      onChange={(e) => setItemLocation(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Start Time</label>
+                    <Input
+                      value={itemStartTime}
+                      onChange={(e) => setItemStartTime(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">End Time</label>
+                    <Input
+                      value={itemEndTime}
+                      onChange={(e) => setItemEndTime(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={itemSaving}
+                  size="sm"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
+                >
+                  {itemSaving ? "Saving..." : "Save"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* ─── TRIP HOTEL DIALOGS ─── */}
+        <Dialog open={isAddHotelOpen} onOpenChange={setIsAddHotelOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[calc(100vw-20px)] max-w-sm p-3.5 sm:p-5 shadow-xl min-w-0 overflow-hidden box-border">
+            <form onSubmit={handleSaveAddHotel} className="w-full min-w-0">
+              <DialogHeader className="pb-0.5 min-w-0">
+                <DialogTitle className="text-slate-900 font-bold text-sm sm:text-base truncate pr-6">Attach Hotel to Trip</DialogTitle>
+                <DialogDescription className="text-slate-500 text-[11px] mt-0.5 leading-tight truncate">
+                  Select inventory property and reservation dates.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-2 mt-2 text-xs min-w-0">
+                {/* Hotel Property Selection (Filtered automatically by Trip destinations) */}
+                {(() => {
+                  const filtered = getFilteredHotels();
+                  return (
+                    <div className="space-y-0.5 min-w-0">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase block truncate">Select Hotel Property *</label>
+                      {tripDestinations.length === 0 ? (
+                        <div className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200">
+                          Add destinations to this Trip to see destination Hotels.
+                        </div>
+                      ) : (
+                        <>
+                          <Select
+                            value={hotelFormHotelId}
+                            onValueChange={(val) => {
+                              if (!val) return;
+                              setHotelFormHotelId(val);
+                              fetchApplicableHotelRates(val, hotelFormCheckIn, hotelFormRoomType, hotelFormMealPlan);
+                            }}
+                          >
+                            <SelectTrigger className="h-8 bg-slate-50/50 border-slate-200 text-xs min-w-0 w-full overflow-hidden">
+                              <SelectValue placeholder={filtered.length === 0 ? "No matching hotels..." : "Choose hotel..."}>
+                                {(val: string | null) => {
+                                  if (!val) return undefined;
+                                  const h = masterHotels.find((item) => item.id === val);
+                                  return h ? `${h.name} (${h.destination?.name || h.city || "Destination"})` : val;
+                                }}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="bg-white border-slate-200 max-w-[calc(100vw-30px)] sm:max-w-md">
+                              {filtered.map((h) => (
+                                <SelectItem key={h.id} value={h.id} className="text-xs">
+                                  {h.name} <span className="text-slate-400 font-normal">({h.destination?.name || h.city || "Destination"})</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {filtered.length === 0 && (
+                            <p className="text-[10px] text-amber-600 mt-0.5">
+                              No hotels associated with trip destinations.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* 3. RateSheet Resolution State */}
+                {hotelRateLoading ? (
+                  <div className="flex items-center gap-1.5 text-xs text-indigo-600 bg-indigo-50/60 p-1.5 rounded-lg border border-indigo-100 min-w-0">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600 shrink-0" />
+                    <span className="truncate text-[11px]">Fetching master rate sheets...</span>
+                  </div>
+                ) : hotelRateMessage ? (
+                  <div className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200 truncate">
+                    {hotelRateMessage}
+                  </div>
+                ) : hotelAvailableRates.length > 1 ? (
+                  <div className="space-y-0.5 bg-indigo-50/40 p-1.5 rounded-lg border border-indigo-100 min-w-0">
+                    <label className="text-[9px] font-bold text-indigo-700 uppercase tracking-wider block truncate">
+                      Rate Sheet ({hotelAvailableRates.length} available)
+                    </label>
+                    <Select
+                      value={hotelFormRateSheetId || ""}
+                      onValueChange={(val) => {
+                        if (!val) return;
+                        setHotelFormRateSheetId(val);
+                        const selectedRate = hotelAvailableRates.find((r) => r.id === val);
+                        if (selectedRate) {
+                          if (selectedRate.roomType) setHotelFormRoomType(selectedRate.roomType);
+                          if (selectedRate.mealPlan) setHotelFormMealPlan(selectedRate.mealPlan);
+                          const cost = String(Number(selectedRate.costPrice));
+                          setHotelFormNightlyRate(cost);
+                          const total = computeHotelTotalTariff(hotelFormCheckIn, hotelFormCheckOut, hotelFormRooms, cost);
+                          if (total) setHotelFormTotalAmount(total);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-7.5 bg-white border-indigo-200 text-xs min-w-0 w-full overflow-hidden">
+                        <SelectValue placeholder="Choose rate plan..." className="truncate min-w-0 block text-[11px]">
+                          {(val: string | null) => {
+                            if (!val) return undefined;
+                            const r = hotelAvailableRates.find((item) => item.id === val);
+                            if (!r) return val;
+                            const mealText = r.mealPlan ? `(${r.mealPlan})` : "";
+                            const hasDetails = r.roomType && r.name.toLowerCase().includes(r.roomType.toLowerCase());
+                            return hasDetails
+                              ? `${r.name} ${mealText ? `• ${mealText}` : ""} - ₹${Number(r.costPrice)}/night`
+                              : `${r.name} - ${r.roomType || "Standard"} ${mealText} - ₹${Number(r.costPrice)}/night`;
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200 max-w-[calc(100vw-30px)] sm:max-w-md">
+                        {hotelAvailableRates.map((r) => {
+                          const mealText = r.mealPlan ? `(${r.mealPlan})` : "";
+                          const hasDetails = r.roomType && r.name.toLowerCase().includes(r.roomType.toLowerCase());
+                          const text = hasDetails
+                            ? `${r.name} ${mealText ? `• ${mealText}` : ""} - ₹${Number(r.costPrice)}/night`
+                            : `${r.name} - ${r.roomType || "Standard"} ${mealText} - ₹${Number(r.costPrice)}/night`;
+                          return (
+                            <SelectItem key={r.id} value={r.id} className="text-xs">
+                              {text}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : hotelAvailableRates.length === 1 ? (
+                  <div className="flex items-center justify-between text-[11px] bg-emerald-50/80 text-emerald-800 p-1.5 rounded-lg border border-emerald-200 min-w-0">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                      <span className="truncate">Rate: <strong>{hotelAvailableRates[0].name}</strong> (₹{Number(hotelAvailableRates[0].costPrice)})</span>
+                    </div>
+                    <span className="text-[8px] font-bold uppercase bg-emerald-100 text-emerald-700 px-1 py-0.2 rounded shrink-0">Auto</span>
+                  </div>
+                ) : null}
+
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Check-in *</label>
+                    <Input
+                      type="date"
+                      value={hotelFormCheckIn}
+                      onChange={(e) => handleHotelCheckInChange(e.target.value)}
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-[11px] px-1 w-full min-w-0"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Check-out *</label>
+                    <Input
+                      type="date"
+                      value={hotelFormCheckOut}
+                      onChange={(e) => handleHotelCheckOutChange(e.target.value)}
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-[11px] px-1 w-full min-w-0"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Room Category</label>
+                    <Input
+                      value={hotelFormRoomType}
+                      onChange={(e) => setHotelFormRoomType(e.target.value)}
+                      placeholder="Deluxe Room"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
+                    />
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Rooms Count</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={hotelFormRooms}
+                      onChange={(e) => handleHotelRoomsChange(parseInt(e.target.value) || 1)}
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Meal Plan</label>
+                    <Input
+                      value={hotelFormMealPlan}
+                      onChange={(e) => setHotelFormMealPlan(e.target.value)}
+                      placeholder="CP / MAP / AP"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
+                    />
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Nightly Rate (₹)</label>
+                    <Input
+                      type="number"
+                      value={hotelFormNightlyRate}
+                      onChange={(e) => handleHotelNightlyRateChange(e.target.value)}
+                      placeholder="Rate"
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200 min-w-0">
+                  <span className="text-[11px] font-semibold text-slate-700 truncate">Total Tariff:</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs font-bold text-slate-500">₹</span>
+                    <Input
+                      type="number"
+                      value={hotelFormTotalAmount}
+                      onChange={(e) => setHotelFormTotalAmount(e.target.value)}
+                      placeholder="0"
+                      className="h-6.5 w-24 bg-white border-slate-200 text-xs font-bold text-right text-indigo-700 px-1.5 min-w-0"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-0.5 min-w-0">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Special Inclusions / Notes</label>
+                  <Textarea
+                    value={hotelFormNotes}
+                    onChange={(e) => setHotelFormNotes(e.target.value)}
+                    placeholder="Extra bed, honeymoon inclusions..."
+                    rows={1}
+                    className="bg-slate-50/50 border-slate-200 text-xs min-h-[28px] max-h-[40px] py-1 px-2 resize-none w-full min-w-0"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="mt-3 flex flex-row items-center gap-2 min-w-0">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="flex-1 h-8 bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={hotelSaving}
+                  size="sm"
+                  className="flex-1 h-8 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-3 rounded-xl justify-center shadow-xs truncate"
+                >
+                  {hotelSaving ? "Attaching..." : "Attach Hotel"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditHotelOpen} onOpenChange={setIsEditHotelOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[calc(100vw-20px)] max-w-sm p-3.5 sm:p-5 shadow-xl min-w-0 overflow-hidden box-border">
+            <form onSubmit={handleSaveEditHotel} className="w-full min-w-0">
+              <DialogHeader className="pb-0.5 min-w-0">
+                <DialogTitle className="text-slate-900 font-bold text-sm sm:text-base truncate pr-6">Edit Hotel Reservation</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-2 mt-2 text-xs min-w-0">
+                {/* Hotel Property Selection (Filtered automatically by Trip destinations) */}
+                {(() => {
+                  const filtered = getFilteredHotels();
+                  return (
+                    <div className="space-y-0.5 min-w-0">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase block truncate">Select Hotel Property *</label>
+                      {tripDestinations.length === 0 ? (
+                        <div className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200">
+                          Add destinations to this Trip to see destination Hotels.
+                        </div>
+                      ) : (
+                        <>
+                          <Select
+                            value={hotelFormHotelId}
+                            onValueChange={(val) => {
+                              if (!val) return;
+                              setHotelFormHotelId(val);
+                              fetchApplicableHotelRates(val, hotelFormCheckIn, hotelFormRoomType, hotelFormMealPlan);
+                            }}
+                          >
+                            <SelectTrigger className="h-8 bg-slate-50/50 border-slate-200 text-xs min-w-0 w-full overflow-hidden">
+                              <SelectValue placeholder={filtered.length === 0 ? "No matching hotels..." : "Choose hotel..."}>
+                                {(val: string | null) => {
+                                  if (!val) return undefined;
+                                  const h = masterHotels.find((item) => item.id === val);
+                                  return h ? `${h.name} (${h.destination?.name || h.city || "Destination"})` : val;
+                                }}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="bg-white border-slate-200 max-w-[calc(100vw-30px)] sm:max-w-md">
+                              {filtered.map((h) => (
+                                <SelectItem key={h.id} value={h.id} className="text-xs">
+                                  {h.name} <span className="text-slate-400 font-normal">({h.destination?.name || h.city || "Destination"})</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {filtered.length === 0 && (
+                            <p className="text-[10px] text-amber-600 mt-0.5">
+                              No hotels associated with trip destinations.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* 3. RateSheet Resolution State */}
+                {hotelRateLoading ? (
+                  <div className="flex items-center gap-1.5 text-xs text-indigo-600 bg-indigo-50/60 p-1.5 rounded-lg border border-indigo-100 min-w-0">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600 shrink-0" />
+                    <span className="truncate text-[11px]">Fetching master rate sheets...</span>
+                  </div>
+                ) : hotelRateMessage ? (
+                  <div className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200 truncate">
+                    {hotelRateMessage}
+                  </div>
+                ) : hotelAvailableRates.length > 1 ? (
+                  <div className="space-y-0.5 bg-indigo-50/40 p-1.5 rounded-lg border border-indigo-100 min-w-0">
+                    <label className="text-[9px] font-bold text-indigo-700 uppercase tracking-wider block truncate">
+                      Rate Sheet ({hotelAvailableRates.length} available)
+                    </label>
+                    <Select
+                      value={hotelFormRateSheetId || ""}
+                      onValueChange={(val) => {
+                        if (!val) return;
+                        setHotelFormRateSheetId(val);
+                        const selectedRate = hotelAvailableRates.find((r) => r.id === val);
+                        if (selectedRate) {
+                          if (selectedRate.roomType) setHotelFormRoomType(selectedRate.roomType);
+                          if (selectedRate.mealPlan) setHotelFormMealPlan(selectedRate.mealPlan);
+                          const cost = String(Number(selectedRate.costPrice));
+                          setHotelFormNightlyRate(cost);
+                          const total = computeHotelTotalTariff(hotelFormCheckIn, hotelFormCheckOut, hotelFormRooms, cost);
+                          if (total) setHotelFormTotalAmount(total);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-7.5 bg-white border-indigo-200 text-xs min-w-0 w-full overflow-hidden">
+                        <SelectValue placeholder="Choose rate plan..." className="truncate min-w-0 block text-[11px]">
+                          {(val: string | null) => {
+                            if (!val) return undefined;
+                            const r = hotelAvailableRates.find((item) => item.id === val);
+                            if (!r) return val;
+                            const mealText = r.mealPlan ? `(${r.mealPlan})` : "";
+                            const hasDetails = r.roomType && r.name.toLowerCase().includes(r.roomType.toLowerCase());
+                            return hasDetails
+                              ? `${r.name} ${mealText ? `• ${mealText}` : ""} - ₹${Number(r.costPrice)}/night`
+                              : `${r.name} - ${r.roomType || "Standard"} ${mealText} - ₹${Number(r.costPrice)}/night`;
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200 max-w-[calc(100vw-30px)] sm:max-w-md">
+                        {hotelAvailableRates.map((r) => {
+                          const mealText = r.mealPlan ? `(${r.mealPlan})` : "";
+                          const hasDetails = r.roomType && r.name.toLowerCase().includes(r.roomType.toLowerCase());
+                          const text = hasDetails
+                            ? `${r.name} ${mealText ? `• ${mealText}` : ""} - ₹${Number(r.costPrice)}/night`
+                            : `${r.name} - ${r.roomType || "Standard"} ${mealText} - ₹${Number(r.costPrice)}/night`;
+                          return (
+                            <SelectItem key={r.id} value={r.id} className="text-xs">
+                              {text}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : hotelAvailableRates.length === 1 ? (
+                  <div className="flex items-center justify-between text-[11px] bg-emerald-50/80 text-emerald-800 p-1.5 rounded-lg border border-emerald-200 min-w-0">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                      <span className="truncate">Rate: <strong>{hotelAvailableRates[0].name}</strong> (₹{Number(hotelAvailableRates[0].costPrice)})</span>
+                    </div>
+                    <span className="text-[8px] font-bold uppercase bg-emerald-100 text-emerald-700 px-1 py-0.2 rounded shrink-0">Auto</span>
+                  </div>
+                ) : null}
+
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Check-in *</label>
+                    <Input
+                      type="date"
+                      value={hotelFormCheckIn}
+                      onChange={(e) => handleHotelCheckInChange(e.target.value)}
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-[11px] px-1 w-full min-w-0"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Check-out *</label>
+                    <Input
+                      type="date"
+                      value={hotelFormCheckOut}
+                      onChange={(e) => handleHotelCheckOutChange(e.target.value)}
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-[11px] px-1 w-full min-w-0"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Room Category</label>
+                    <Input
+                      value={hotelFormRoomType}
+                      onChange={(e) => setHotelFormRoomType(e.target.value)}
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
+                    />
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Rooms Count</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={hotelFormRooms}
+                      onChange={(e) => handleHotelRoomsChange(parseInt(e.target.value) || 1)}
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5 min-w-0">
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Meal Plan</label>
+                    <Input
+                      value={hotelFormMealPlan}
+                      onChange={(e) => setHotelFormMealPlan(e.target.value)}
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
+                    />
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Nightly Rate (₹)</label>
+                    <Input
+                      type="number"
+                      value={hotelFormNightlyRate}
+                      onChange={(e) => handleHotelNightlyRateChange(e.target.value)}
+                      className="h-7.5 bg-slate-50/50 border-slate-200 text-xs px-2 w-full min-w-0"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200 min-w-0">
+                  <span className="text-[11px] font-semibold text-slate-700 truncate">Total Tariff:</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs font-bold text-slate-500">₹</span>
+                    <Input
+                      type="number"
+                      value={hotelFormTotalAmount}
+                      onChange={(e) => setHotelFormTotalAmount(e.target.value)}
+                      placeholder="0"
+                      className="h-6.5 w-24 bg-white border-slate-200 text-xs font-bold text-right text-indigo-700 px-1.5 min-w-0"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-0.5 min-w-0">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase truncate block">Notes</label>
+                  <Textarea
+                    value={hotelFormNotes}
+                    onChange={(e) => setHotelFormNotes(e.target.value)}
+                    rows={1}
+                    className="bg-slate-50/50 border-slate-200 text-xs min-h-[28px] max-h-[40px] py-1 px-2 resize-none w-full min-w-0"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="mt-3 flex flex-row items-center gap-2 min-w-0">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="flex-1 h-8 bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={hotelSaving}
+                  size="sm"
+                  className="flex-1 h-8 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-3 rounded-xl justify-center shadow-xs truncate"
+                >
+                  {hotelSaving ? "Saving..." : "Save"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* ─── TRIP VEHICLE DIALOGS ─── */}
+        <Dialog open={isAddVehicleOpen} onOpenChange={setIsAddVehicleOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-md p-4 sm:p-5 shadow-xl max-h-[90vh] overflow-y-auto">
+            <form onSubmit={handleSaveAddVehicle}>
+              <DialogHeader className="pb-1">
+                <DialogTitle className="text-slate-900 font-bold text-base">Assign Vehicle to Trip</DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-0.5">
+                  Select a fleet model or enter transport details manually.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 mt-3 text-xs">
+                {/* 1. Fleet Master Selector (Optional) */}
+                {masterVehicles.length > 0 && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Fleet Master (Optional)
+                    </label>
+                    <Select
+                      value={vehicleFormVehicleId || "manual"}
+                      onValueChange={(val) => {
+                        if (val === "manual") {
+                           setVehicleFormVehicleId("");
+                        } else {
+                          handleSelectMasterVehicle(val);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-8.5 bg-slate-50/50 border-slate-200 text-xs">
+                        <SelectValue placeholder="Manual Entry (No Master)">
+                          {(val: string | null) => {
+                            if (!val || val === "manual") return "Manual Entry (No Master)";
+                            const v = masterVehicles.find((item) => item.id === val);
+                            return v ? `${v.name} (${v.type} • ${v.capacity} Seats)` : val;
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        <SelectItem value="manual" className="text-xs text-slate-500 italic">
+                          Manual Entry (No Master)
+                        </SelectItem>
+                        {masterVehicles.map((v) => (
+                          <SelectItem key={v.id} value={v.id} className="text-xs">
+                            {v.name} ({v.type} • {v.capacity} Seats)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* 2. Vehicle Name */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vehicle Name *</label>
+                  <Input
+                    value={vehicleFormName}
+                    placeholder="e.g. Innova Crysta"
+                    onChange={(e) => setVehicleFormName(e.target.value)}
+                    className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
+                </div>
+
+                {/* Type + Capacity */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vehicle Type *</label>
+                    <Input
+                      value={vehicleFormType}
+                      placeholder="e.g. SUV, Sedan, Bus"
+                      onChange={(e) => setVehicleFormType(e.target.value)}
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Capacity (Seats)</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={vehicleFormCapacity}
+                      onChange={(e) => setVehicleFormCapacity(Number(e.target.value) || 1)}
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* 3 & 4. Rate Basis & Conditional Pricing */}
+                <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Rate Basis *</label>
+                    <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setVehicleFormPricingType(VehiclePricingType.FIXED)}
+                        className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                          vehicleFormPricingType === VehiclePricingType.FIXED
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Fixed
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVehicleFormPricingType(VehiclePricingType.PER_KM)}
+                        className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                          vehicleFormPricingType === VehiclePricingType.PER_KM
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Per KM
+                      </button>
+                    </div>
+                  </div>
+
+                  {vehicleFormPricingType === VehiclePricingType.FIXED ? (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fixed Amount (₹) *</label>
+                      <Input
+                        type="number"
+                        placeholder="e.g. 15000"
+                        value={vehicleFormTotalRate}
+                        onChange={(e) => setVehicleFormTotalRate(e.target.value)}
+                        className="h-8.5 bg-white border-slate-200 text-xs"
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rate / KM (₹) *</label>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 18"
+                          value={vehicleFormRatePerKm}
+                          onChange={(e) => setVehicleFormRatePerKm(e.target.value)}
+                          className="h-8.5 bg-white border-slate-200 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estimated KM *</label>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 650"
+                          value={vehicleFormEstimatedKm}
+                          onChange={(e) => setVehicleFormEstimatedKm(e.target.value)}
+                          className="h-8.5 bg-white border-slate-200 text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 6. Calculated Cost Preview */}
+                  <div className="pt-2 flex items-center justify-between text-[11px] border-t border-slate-200">
+                    <span className="text-slate-500 font-medium">Estimated Cost:</span>
+                    <span className="font-bold text-indigo-700">
+                      {vehicleFormPricingType === VehiclePricingType.FIXED
+                        ? `₹${Number(vehicleFormTotalRate || 0).toLocaleString("en-IN")}`
+                        : `₹${(
+                            Number(vehicleFormRatePerKm || 0) * Number(vehicleFormEstimatedKm || 0)
+                          ).toLocaleString("en-IN")}`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 5. Driver Name + Phone */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Driver Name</label>
+                    <Input
+                      value={vehicleFormDriverName}
+                      placeholder="Driver name (optional)"
+                      onChange={(e) => setVehicleFormDriverName(e.target.value)}
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Driver Phone</label>
+                    <Input
+                      value={vehicleFormDriverPhone}
+                      placeholder="Driver phone (optional)"
+                      onChange={(e) => setVehicleFormDriverPhone(e.target.value)}
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 7. Footer: Cancel / Add Vehicle */}
+              <DialogFooter className="mt-5 flex flex-col-reverse sm:flex-row justify-end gap-2">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={vehicleSaving}
+                  size="sm"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
+                >
+                  {vehicleSaving ? "Assigning..." : "Add Vehicle"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditVehicleOpen} onOpenChange={setIsEditVehicleOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-md p-4 sm:p-5 shadow-xl max-h-[90vh] overflow-y-auto">
+            <form onSubmit={handleSaveEditVehicle}>
+              <DialogHeader className="pb-1">
+                <DialogTitle className="text-slate-900 font-bold text-base">Edit Vehicle Assignment</DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-0.5">
+                  Update vehicle specifications, driver assignment, or commercial rates.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 mt-3 text-xs">
+                {/* Vehicle Name */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vehicle Name *</label>
+                  <Input
+                    value={vehicleFormName}
+                    placeholder="e.g. Innova Crysta"
+                    onChange={(e) => setVehicleFormName(e.target.value)}
+                    className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
+                </div>
+
+                {/* Type + Capacity */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vehicle Type *</label>
+                    <Input
+                      value={vehicleFormType}
+                      placeholder="e.g. SUV, Sedan, Bus"
+                      onChange={(e) => setVehicleFormType(e.target.value)}
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Capacity (Seats)</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={vehicleFormCapacity}
+                      onChange={(e) => setVehicleFormCapacity(Number(e.target.value) || 1)}
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Rate Basis & Conditional Pricing */}
+                <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">Rate Basis *</label>
+                    <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setVehicleFormPricingType(VehiclePricingType.FIXED)}
+                        className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                          vehicleFormPricingType === VehiclePricingType.FIXED
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Fixed
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVehicleFormPricingType(VehiclePricingType.PER_KM)}
+                        className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                          vehicleFormPricingType === VehiclePricingType.PER_KM
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Per KM
+                      </button>
+                    </div>
+                  </div>
+
+                  {vehicleFormPricingType === VehiclePricingType.FIXED ? (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fixed Amount (₹) *</label>
+                      <Input
+                        type="number"
+                        value={vehicleFormTotalRate}
+                        onChange={(e) => setVehicleFormTotalRate(e.target.value)}
+                        className="h-8.5 bg-white border-slate-200 text-xs"
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 xs:grid-cols-3 sm:grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rate / KM (₹) *</label>
+                        <Input
+                          type="number"
+                          value={vehicleFormRatePerKm}
+                          onChange={(e) => setVehicleFormRatePerKm(e.target.value)}
+                          className="h-8.5 bg-white border-slate-200 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Est. KM *</label>
+                        <Input
+                          type="number"
+                          value={vehicleFormEstimatedKm}
+                          onChange={(e) => setVehicleFormEstimatedKm(e.target.value)}
+                          className="h-8.5 bg-white border-slate-200 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Actual KM</label>
+                        <Input
+                          type="number"
+                          placeholder="Post-trip"
+                          value={vehicleFormActualKm}
+                          onChange={(e) => setVehicleFormActualKm(e.target.value)}
+                          className="h-8.5 bg-white border-slate-200 text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Live Cost Calculation Preview */}
+                  <div className="pt-2 flex items-center justify-between text-[11px] border-t border-slate-200">
+                    <span className="text-slate-500 font-medium">
+                      Calculated Vehicle Cost{" "}
+                      {vehicleFormPricingType === VehiclePricingType.PER_KM && vehicleFormActualKm
+                        ? "(from Actual KM)"
+                        : vehicleFormPricingType === VehiclePricingType.PER_KM
+                        ? "(from Est. KM)"
+                        : ""}:
+                    </span>
+                    <span className="font-bold text-indigo-700">
+                      {vehicleFormPricingType === VehiclePricingType.FIXED
+                        ? `₹${Number(vehicleFormTotalRate || 0).toLocaleString("en-IN")}`
+                        : `₹${(
+                            Number(vehicleFormRatePerKm || 0) *
+                            Number(vehicleFormActualKm !== "" ? vehicleFormActualKm : vehicleFormEstimatedKm || 0)
+                          ).toLocaleString("en-IN")}`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Driver Name + Phone */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Driver Name</label>
+                    <Input
+                      value={vehicleFormDriverName}
+                      placeholder="Optional driver name"
+                      onChange={(e) => setVehicleFormDriverName(e.target.value)}
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Driver Phone</label>
+                    <Input
+                      value={vehicleFormDriverPhone}
+                      placeholder="Optional driver phone"
+                      onChange={(e) => setVehicleFormDriverPhone(e.target.value)}
+                      className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-5 flex flex-col-reverse sm:flex-row justify-end gap-2">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={vehicleSaving}
+                  size="sm"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
+                >
+                  {vehicleSaving ? "Saving..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* ─── TRIP ACTIVITY DIALOGS ─── */}
+        <Dialog open={isAddActivityOpen} onOpenChange={setIsAddActivityOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-md p-4 sm:p-5 shadow-xl max-h-[90vh] overflow-y-auto">
+            <form onSubmit={handleSaveAddActivity}>
+              <DialogHeader>
+                <DialogTitle className="text-slate-900 font-bold text-base">Add Activity</DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-0.5">
+                  Select from catalogue or enter a custom activity name.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 mt-3.5 text-xs">
+                {/* Option A: Select from Activity Master */}
+                {(() => {
+                  const filtered = getFilteredActivities();
+                  return filtered.length > 0 ? (
+                    <div className="space-y-1 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80">
+                      <label className="text-[10px] font-bold text-indigo-700 uppercase flex items-center gap-1">
+                        <Ticket className="h-3 w-3" /> Select from Catalogue (Optional)
+                      </label>
+                      <Select value={activityFormActivityId} onValueChange={(val) => handleSelectMasterActivity(val)}>
+                        <SelectTrigger className="h-8.5 bg-white border-slate-200 text-xs">
+                          <SelectValue placeholder="Choose from catalogue...">
+                            {(val: string | null) => {
+                              if (!val) return undefined;
+                              const a = masterActivities.find((item) => item.id === val);
+                              return a ? `${a.name}${a.destination ? ` (${a.destination.name})` : ""}` : val;
+                            }}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-slate-200">
+                          {filtered.map((a) => (
+                            <SelectItem key={a.id} value={a.id} className="text-xs">
+                              {a.name} {a.destination && <span className="text-slate-400 font-normal">({a.destination.name})</span>}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null;
+                })()}
+
+                {/* Option B: Activity Name */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    Activity Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. Sunset Boat Cruise, Museum Entry, Jeep Safari..."
+                    value={activityFormName}
+                    onChange={(e) => {
+                      setActivityFormName(e.target.value);
+                      if (activityFormActivityId) {
+                        const matching = masterActivities.find((a) => a.id === activityFormActivityId);
+                        if (matching && matching.name !== e.target.value) {
+                          setActivityFormActivityId("");
+                        }
+                      }
+                    }}
+                    className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
+                </div>
+
+                {/* Inclusion Status Selector */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Inclusion <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setActivityFormType(ActivityType.INCLUDED)}
+                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                        activityFormType === ActivityType.INCLUDED
+                          ? "bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-500/20 text-emerald-950"
+                          : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <CheckCircle2 className={`h-3.5 w-3.5 ${activityFormType === ActivityType.INCLUDED ? "text-emerald-600" : "text-slate-400"}`} />
+                        <span>Included</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                        Covered in trip package.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActivityFormType(ActivityType.EXCLUDED)}
+                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                        activityFormType === ActivityType.EXCLUDED
+                          ? "bg-amber-50/80 border-amber-300 ring-2 ring-amber-500/20 text-amber-950"
+                          : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <Info className={`h-3.5 w-3.5 ${activityFormType === ActivityType.EXCLUDED ? "text-amber-600" : "text-slate-400"}`} />
+                        <span>Not Included</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                        Customer pays at destination.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Description (Optional)</label>
+                  <Textarea
+                    placeholder="Brief highlights or instructions for customer..."
+                    rows={2}
+                    value={activityFormDescription}
+                    onChange={(e) => setActivityFormDescription(e.target.value)}
+                    className="bg-slate-50/50 border-slate-200 text-xs resize-none"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="mt-5 flex flex-col-reverse sm:flex-row justify-end gap-2">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={activitySaving}
+                  size="sm"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl shadow-xs justify-center"
+                >
+                  {activitySaving ? "Adding..." : "Add Activity"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditActivityOpen} onOpenChange={setIsEditActivityOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-md p-4 sm:p-5 shadow-xl max-h-[90vh] overflow-y-auto">
+            <form onSubmit={handleSaveEditActivity}>
+              <DialogHeader>
+                <DialogTitle className="text-slate-900 font-bold text-base">Edit Activity</DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-0.5">
+                  Update activity name, inclusion status, and description.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 mt-3.5 text-xs">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    Activity Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={activityFormName}
+                    onChange={(e) => setActivityFormName(e.target.value)}
+                    className="h-8.5 bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
+                </div>
+
+                {/* Inclusion Status Selector */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Inclusion <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setActivityFormType(ActivityType.INCLUDED)}
+                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                        activityFormType === ActivityType.INCLUDED
+                          ? "bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-500/20 text-emerald-950"
+                          : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <CheckCircle2 className={`h-3.5 w-3.5 ${activityFormType === ActivityType.INCLUDED ? "text-emerald-600" : "text-slate-400"}`} />
+                        <span>Included</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                        Covered in package.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActivityFormType(ActivityType.EXCLUDED)}
+                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                        activityFormType === ActivityType.EXCLUDED
+                          ? "bg-amber-50/80 border-amber-300 ring-2 ring-amber-500/20 text-amber-950"
+                          : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <Info className={`h-3.5 w-3.5 ${activityFormType === ActivityType.EXCLUDED ? "text-amber-600" : "text-slate-400"}`} />
+                        <span>Not Included</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                        Customer pays at destination.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Description (Optional)</label>
+                  <Textarea
+                    rows={2}
+                    value={activityFormDescription}
+                    onChange={(e) => setActivityFormDescription(e.target.value)}
+                    className="bg-slate-50/50 border-slate-200 text-xs resize-none"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="mt-5 flex flex-col-reverse sm:flex-row justify-end gap-2">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={activitySaving}
+                  size="sm"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl shadow-xs justify-center"
+                >
+                  {activitySaving ? "Saving..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* ─── EDIT TRIP MODAL ─── */}
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl w-[95vw] sm:max-w-lg p-4 sm:p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <form onSubmit={editTripFormik.handleSubmit}>
+              <DialogHeader>
+                <DialogTitle className="text-slate-900 font-bold text-base">Edit Trip Workspace</DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-1">
+                  Update itinerary title, dates, and stage.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3.5 mt-4 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Trip Title *</label>
+                  <Input
+                    {...editTripFormik.getFieldProps("title")}
+                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Destinations</label>
+                  <DestinationMultiSelect
+                    value={editTripFormik.values.destinationIds}
+                    onChange={(val) => editTripFormik.setFieldValue("destinationIds", val)}
+                    placeholder="Select destinations..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Start Date</label>
+                    <Input
+                      type="date"
+                      {...editTripFormik.getFieldProps("startDate")}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">End Date</label>
+                    <Input
+                      type="date"
+                      {...editTripFormik.getFieldProps("endDate")}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Status</label>
                   <Select
-                    value={selectedMealPlan}
-                    onValueChange={(val) => setSelectedMealPlan(val as MealPlan)}
+                    value={editTripFormik.values.status}
+                    onValueChange={(val) => val && editTripFormik.setFieldValue("status", val)}
                   >
                     <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-slate-200">
-                      <SelectItem value="CPAI" className="text-xs">CPAI (Bed & Breakfast)</SelectItem>
-                      <SelectItem value="MAPAI" className="text-xs">MAPAI (Breakfast + Dinner)</SelectItem>
-                      <SelectItem value="APAI" className="text-xs">APAI (All Meals Included)</SelectItem>
-                      <SelectItem value="RO" className="text-xs">RO (Room Only)</SelectItem>
+                      <SelectItem value={TripStatus.DRAFT} className="text-xs">Draft</SelectItem>
+                      <SelectItem value={TripStatus.PLANNING} className="text-xs">Planning</SelectItem>
+                      <SelectItem value={TripStatus.QUOTED} className="text-xs">Quoted</SelectItem>
+                      <SelectItem value={TripStatus.BOOKED} className="text-xs">Booked</SelectItem>
+                      <SelectItem value={TripStatus.ONGOING} className="text-xs">Ongoing</SelectItem>
+                      <SelectItem value={TripStatus.COMPLETED} className="text-xs">Completed</SelectItem>
+                      <SelectItem value={TripStatus.CANCELLED} className="text-xs">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
 
-              {/* CheckIn & CheckOut */}
-              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Check-in Date</label>
-                  <Input
-                    type="date"
-                    value={hotelCheckIn}
-                    onChange={(e) => setHotelCheckIn(e.target.value)}
-                    className="h-9 text-xs bg-slate-50/50 border-slate-200"
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Check-out Date</label>
-                  <Input
-                    type="date"
-                    value={hotelCheckOut}
-                    onChange={(e) => setHotelCheckOut(e.target.value)}
-                    className="h-9 text-xs bg-slate-50/50 border-slate-200"
-                    required
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Planning Notes</label>
+                  <Textarea
+                    {...editTripFormik.getFieldProps("notes")}
+                    rows={3}
+                    className="bg-slate-50/50 border-slate-200 text-xs"
                   />
                 </div>
               </div>
 
-              {/* Rooms & Pax */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Rooms</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={hotelRoomsCount}
-                    onChange={(e) => setHotelRoomsCount(parseInt(e.target.value) || 1)}
-                    className="h-9 text-xs bg-slate-50/50 border-slate-200"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Adults</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={hotelAdultsCount}
-                    onChange={(e) => setHotelAdultsCount(parseInt(e.target.value) || 1)}
-                    className="h-9 text-xs bg-slate-50/50 border-slate-200"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Children</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={hotelChildrenCount}
-                    onChange={(e) => setHotelChildrenCount(parseInt(e.target.value) || 0)}
-                    className="h-9 text-xs bg-slate-50/50 border-slate-200"
-                  />
-                </div>
-              </div>
-
-              {/* Booking Notes */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 uppercase">Special Requests / Room Notes</label>
-                <Input
-                  placeholder="e.g. Valley facing room, early check-in requested..."
-                  value={hotelBookingNotes}
-                  onChange={(e) => setHotelBookingNotes(e.target.value)}
-                  className="h-9 text-xs bg-slate-50/50 border-slate-200"
+              <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2.5">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto bg-white border-slate-200 text-xs font-semibold rounded-xl justify-center">
+                      Cancel
+                    </Button>
+                  }
                 />
-              </div>
-            </div>
-
-            <DialogFooter className="mt-6 flex justify-end gap-2">
-              <DialogClose
-                render={
-                  <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs">
-                    Cancel
-                  </Button>
-                }
-              />
-              <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4">
-                Add Hotel to Trip
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* ─── ADD VEHICLE TO TRIP DIALOG ──────────────────────────────────── */}
-      <Dialog open={isAddVehicleToTripOpen} onOpenChange={setIsAddVehicleToTripOpen}>
-        <DialogContent className="bg-white border border-slate-200 rounded-xl max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!selectedVehicleId) {
-                toast.error("Please select a vehicle.")
-                return
-              }
-              const veh = vehicles.find((v) => v.id === selectedVehicleId)
-              const availableRates = vehicleRates.filter((vr) => vr.vehicleId === selectedVehicleId)
-              const matchedRate = availableRates.find((vr) => vr.id === selectedVehicleRateId) || availableRates[0]
-              const supplier = veh?.supplierId ? suppliers.find((s) => s.id === veh.supplierId) : null
-
-              addTripVehicle({
-                tripId: trip.id,
-                vehicleId: selectedVehicleId,
-                rateId: matchedRate?.id,
-                startDate: vehicleStartDate,
-                endDate: vehicleEndDate,
-                notes: vehicleBookingNotes.trim() || undefined,
-                rateSnapshot: {
-                  name: veh?.name || "Vehicle",
-                  vehicleType: veh?.vehicleType,
-                  supplierName: supplier?.name,
-                  supplierId: supplier?.id,
-                  baseRate: matchedRate?.baseRate || 3500,
-                  currency: "INR",
-                  rateType: `${matchedRate?.pricingType || "PerDay"} (${matchedRate?.includedKm || 200} KM/day)`,
-                },
-              })
-
-              toast.success("Transport service added to trip.")
-              setIsAddVehicleToTripOpen(false)
-            }}
-            className="space-y-4 text-xs"
-          >
-            <DialogHeader>
-              <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
-                <Car className="h-5 w-5 text-blue-600" />
-                <span>Add Vehicle / Transport</span>
-              </DialogTitle>
-              <DialogDescription className="text-slate-500 text-xs">
-                Select fleet model, contracted rate structure and travel duration.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3.5 mt-2">
-              {/* Vehicle Select */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 uppercase">Select Vehicle Model *</label>
-                <Select
-                  value={selectedVehicleId}
-                  onValueChange={(val) => {
-                    setSelectedVehicleId(val || "")
-                    const vRates = vehicleRates.filter((vr) => vr.vehicleId === val)
-                    setSelectedVehicleRateId(vRates[0]?.id || "")
-                  }}
+                <Button
+                  type="submit"
+                  disabled={editSaving}
+                  size="sm"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 rounded-xl justify-center"
                 >
-                  <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
-                    <SelectValue placeholder="Choose Vehicle" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200">
-                    {vehicles.map((v) => (
-                      <SelectItem key={v.id} value={v.id} className="text-xs">
-                        {v.name} ({v.vehicleType} • {v.seatingCapacity} Seats • {v.baseLocation})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  {editSaving ? "Saving..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
-              {/* Start & End Dates */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Service Start Date</label>
-                  <Input
-                    type="date"
-                    value={vehicleStartDate}
-                    onChange={(e) => setVehicleStartDate(e.target.value)}
-                    className="h-9 text-xs bg-slate-50/50 border-slate-200"
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Service End Date</label>
-                  <Input
-                    type="date"
-                    value={vehicleEndDate}
-                    onChange={(e) => setVehicleEndDate(e.target.value)}
-                    className="h-9 text-xs bg-slate-50/50 border-slate-200"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 uppercase">Route / Pickup Notes</label>
-                <Input
-                  placeholder="e.g. Airport pickup to Munnar resort, sightseeing & drop..."
-                  value={vehicleBookingNotes}
-                  onChange={(e) => setVehicleBookingNotes(e.target.value)}
-                  className="h-9 text-xs bg-slate-50/50 border-slate-200"
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="mt-6 flex justify-end gap-2">
-              <DialogClose
-                render={
-                  <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs">
-                    Cancel
-                  </Button>
-                }
-              />
-              <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4">
-                Add Vehicle to Trip
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* ─── ADD ACTIVITY TO TRIP DIALOG ─────────────────────────────────── */}
-      <Dialog open={isAddActivityToTripOpen} onOpenChange={setIsAddActivityToTripOpen}>
-        <DialogContent className="bg-white border border-slate-200 rounded-xl max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!selectedActivityId) {
-                toast.error("Please select an activity.")
-                return
-              }
-              const act = invActivities.find((a) => a.id === selectedActivityId)
-              const availableRates = activityRates.filter((ar) => ar.activityId === selectedActivityId)
-              const matchedRate = availableRates.find((ar) => ar.id === selectedActivityRateId) || availableRates[0]
-              const supplier = act?.supplierId ? suppliers.find((s) => s.id === act.supplierId) : null
-
-              addTripActivity({
-                tripId: trip.id,
-                activityId: selectedActivityId,
-                rateId: matchedRate?.id,
-                date: activityDate,
-                adults: Number(activityAdultsCount) || 2,
-                children: Number(activityChildrenCount) || 0,
-                notes: activityBookingNotes.trim() || undefined,
-                rateSnapshot: {
-                  name: act?.name || "Activity",
-                  supplierName: supplier?.name,
-                  supplierId: supplier?.id,
-                  baseRate: matchedRate?.adultRate || matchedRate?.bookingRate || 1000,
-                  currency: "INR",
-                  rateType: matchedRate?.pricingType || "PerPerson",
-                },
-              })
-
-              toast.success("Sightseeing activity added to trip.")
-              setIsAddActivityToTripOpen(false)
-            }}
-            className="space-y-4 text-xs"
-          >
-            <DialogHeader>
-              <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
-                <Ticket className="h-5 w-5 text-emerald-600" />
-                <span>Add Sightseeing / Activity</span>
-              </DialogTitle>
-              <DialogDescription className="text-slate-500 text-xs">
-                Attach excursion, adventure sport or cultural experience from inventory.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3.5 mt-2">
-              {/* Activity Select */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 uppercase">Select Activity *</label>
-                <Select
-                  value={selectedActivityId}
-                  onValueChange={(val) => {
-                    setSelectedActivityId(val || "")
-                    const aRates = activityRates.filter((ar) => ar.activityId === val)
-                    setSelectedActivityRateId(aRates[0]?.id || "")
-                  }}
-                >
-                  <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
-                    <SelectValue placeholder="Choose Activity" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200">
-                    {invActivities.map((a) => (
-                      <SelectItem key={a.id} value={a.id} className="text-xs">
-                        {a.name} ({a.destination} • {a.category})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Date & Participants */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Date</label>
-                  <Input
-                    type="date"
-                    value={activityDate}
-                    onChange={(e) => setActivityDate(e.target.value)}
-                    className="h-9 text-xs bg-slate-50/50 border-slate-200"
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Adults</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={activityAdultsCount}
-                    onChange={(e) => setActivityAdultsCount(parseInt(e.target.value) || 1)}
-                    className="h-9 text-xs bg-slate-50/50 border-slate-200"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Children</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={activityChildrenCount}
-                    onChange={(e) => setActivityChildrenCount(parseInt(e.target.value) || 0)}
-                    className="h-9 text-xs bg-slate-50/50 border-slate-200"
-                  />
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 uppercase">Timing / Slot Notes</label>
-                <Input
-                  placeholder="e.g. Morning 06:30 AM sunrise slot..."
-                  value={activityBookingNotes}
-                  onChange={(e) => setActivityBookingNotes(e.target.value)}
-                  className="h-9 text-xs bg-slate-50/50 border-slate-200"
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="mt-6 flex justify-end gap-2">
-              <DialogClose
-                render={
-                  <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs">
-                    Cancel
-                  </Button>
-                }
-              />
-              <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4">
-                Add Activity to Trip
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* ─── PHASE 5: COSTING MODALS ──────────────────────────────────────── */}
-      <AddManualCostModal
-        open={isAddManualCostOpen}
-        onOpenChange={setIsAddManualCostOpen}
-        tripId={trip.id}
-        suppliers={suppliers}
-        editingItem={editingCostItem}
-        onSubmitCost={(data) => addCostItem(data)}
-        onUpdateCost={(itemId, updates) => updateCostItem(itemId, updates)}
-      />
-
-      <AddInternalExpenseModal
-        open={isAddExpenseOpen}
-        onOpenChange={setIsAddExpenseOpen}
-        tripId={trip.id}
-        editingExpense={editingExpense}
-        onSubmitExpense={(data) => addInternalExpense(data)}
-        onUpdateExpense={(expId, updates) => updateInternalExpense(expId, updates)}
-      />
-
-      <LockCostingModal
-        open={isLockModalOpen}
-        onOpenChange={setIsLockModalOpen}
-        actionType={lockActionType}
-        onConfirm={() => {
-          if (lockActionType === "lock") {
-            lockCosting(trip.id)
-          } else {
-            unlockCosting(trip.id)
-          }
-        }}
-      />
-
-      <RateChangeModal
-        open={isRateChangeModalOpen}
-        onOpenChange={setIsRateChangeModalOpen}
-        costItem={rateChangeItem}
-        currentInventoryRate={
-          rateChangeItem?.serviceType === "Hotel"
-            ? hotelRates.find((hr) => hr.id === rateChangeItem.rateId)?.baseRate || rateChangeItem.unitCost
-            : rateChangeItem?.serviceType === "Vehicle"
-            ? vehicleRates.find((vr) => vr.id === rateChangeItem.rateId)?.baseRate || rateChangeItem.unitCost
-            : rateChangeItem?.serviceType === "Activity"
-            ? activityRates.find((ar) => ar.id === rateChangeItem.rateId)?.adultRate || rateChangeItem.unitCost
-            : rateChangeItem?.unitCost || 0
-        }
-        onUpdateRate={(costItemId, newRate) => refreshRateSnapshot(costItemId, newRate)}
-      />
-
-      {/* ─── PHASE 6: QUOTATION MODALS ───────────────────────────────────── */}
-      <QuotationShareModal
-        open={isQuotationShareModalOpen}
-        onOpenChange={setIsQuotationShareModalOpen}
-        quotation={selectedQuotationForAction || activeQuotation}
-        onMarkSent={(id) => markQuotationSent(id)}
-      />
-
-      <QuotationVersionModal
-        open={isQuotationVersionModalOpen}
-        onOpenChange={setIsQuotationVersionModalOpen}
-        quotation={selectedQuotationForAction || activeQuotation}
-        onConfirmVersion={() => {
-          const target = selectedQuotationForAction || activeQuotation
-          if (target) {
-            createQuotationVersion(
-              target.id,
-              trip,
-              customer,
-              tripItinerary,
-              thisTripHotels,
-              thisTripVehicles,
-              thisTripActivities,
-              tripCostingData?.costing,
-              { hotels, hotelRooms, vehicles, activities: invActivities }
-            )
-          }
-        }}
-      />
+        {/* Global Action Confirmation Modal */}
+        <ConfirmDialog
+          open={!!confirmAction}
+          onOpenChange={(open) => !open && setConfirmAction(null)}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (!confirmAction) return;
+            setActionLoading(true);
+            try {
+              await confirmAction.action();
+              setConfirmAction(null);
+            } finally {
+              setActionLoading(false);
+            }
+          }}
+        />
       </div>
     </div>
-  )
+  );
 }
-
-

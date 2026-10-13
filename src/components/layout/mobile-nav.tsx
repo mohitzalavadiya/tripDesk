@@ -1,23 +1,27 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import {
-  Home,
-  Users,
-  Compass,
-  Plus,
-  Menu,
-  X,
-  PlaneTakeoff,
-  ShieldCheck,
-  Building,
-  CreditCard,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { agencyNavigationConfig, adminNavigationConfig } from "@/lib/navigation";
 import { useAuth } from "@/context/auth-context";
+import { EntitlementsState,useSubscription } from "@/context/subscription-context";
+import { usePlatformChatUnreadCount } from "@/hooks/use-platform-chat";
+import { adminNavigationConfig,agencyNavigationConfig } from "@/lib/navigation";
+import { useModalScrollLock } from "@/lib/scroll-lock";
+import { cn } from "@/lib/utils";
+import {
+Building,
+Compass,
+CreditCard,
+Home,
+Lock,
+Menu,
+PlaneTakeoff,
+Plus,
+ShieldCheck,
+Users,
+X,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname,useRouter } from "next/navigation";
+import * as React from "react";
 
 interface MobileNavProps {
   open: boolean;
@@ -25,14 +29,26 @@ interface MobileNavProps {
 }
 
 export function MobileNav({ open, setOpen }: MobileNavProps) {
+  useModalScrollLock(open);
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser } = useAuth();
-  const isPlatformOwner = currentUser.role === "TRIPDESK_OWNER";
-  const navSections = isPlatformOwner ? adminNavigationConfig : agencyNavigationConfig;
+  const { isPlatformOwner } = useAuth();
+  const isPlatform = isPlatformOwner || pathname.startsWith("/admin");
+  const navSections = isPlatform ? adminNavigationConfig : agencyNavigationConfig;
+  const { unreadCount: chatUnreadCount } = usePlatformChatUnreadCount();
+  const { isFeatureAllowed } = useSubscription();
+
+  interface BottomNavItem {
+    label: string;
+    href?: string;
+    onClick?: () => void;
+    icon: React.ComponentType<{ className?: string }>;
+    isCreate?: boolean;
+    badge?: string;
+  }
 
   // Bottom navigation items for mobile
-  const bottomNavItems = isPlatformOwner
+  const bottomNavItems: BottomNavItem[] = isPlatform
     ? [
         { label: "Admin", href: "/admin", icon: Home },
         { label: "Agencies", href: "/admin/agencies", icon: Building },
@@ -48,7 +64,7 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
           icon: Plus,
           isCreate: true,
         },
-        { label: "Trips", href: "/trips", icon: Compass, badge: "9" },
+        { label: "Trips", href: "/trips", icon: Compass },
         { label: "More", onClick: () => setOpen(true), icon: Menu },
       ];
 
@@ -68,23 +84,23 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
             {/* Header branding & close button */}
             <div className="flex items-center justify-between pb-4 border-b border-sidebar-border/30 mb-4">
               <Link
-                href={isPlatformOwner ? "/admin" : "/dashboard"}
+                href={isPlatform ? "/admin" : "/dashboard"}
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-2 font-bold tracking-tight text-white"
               >
                 <div
                   className={`flex h-8 w-8 items-center justify-center rounded ${
-                    isPlatformOwner ? "bg-purple-600" : "bg-indigo-600"
+                    isPlatform ? "bg-purple-600" : "bg-indigo-600"
                   }`}
                 >
-                  {isPlatformOwner ? (
+                  {isPlatform ? (
                     <ShieldCheck className="h-4.5 w-4.5 text-white" />
                   ) : (
                     <PlaneTakeoff className="h-4.5 w-4.5 text-white" />
                   )}
                 </div>
-                <span className="text-base font-black">
-                  Trip<span className={isPlatformOwner ? "text-purple-400" : "text-indigo-400"}>Desk</span>
+                <span className="text-sm font-black">
+                  Your Travel <span className={isPlatform ? "text-purple-400" : "text-indigo-400"}>Desk</span>
                 </span>
               </Link>
 
@@ -110,6 +126,10 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                       const isActive =
                         pathname === item.href ||
                         (item.href !== "/admin" && item.href !== "/dashboard" && pathname.startsWith(item.href));
+                      const isSupportChat = item.href === "/support" || item.href === "/admin/chat";
+                      const hasUnread = isSupportChat && chatUnreadCount > 0;
+                      const isFeatureGated = !isPlatform && Boolean(item.featureKey);
+                      const isLocked = isFeatureGated && !isFeatureAllowed(item.featureKey as keyof EntitlementsState);
 
                       return (
                         <Link
@@ -119,24 +139,34 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                           className={cn(
                             "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group",
                             isActive
-                              ? isPlatformOwner
+                              ? isPlatform
                                 ? "bg-purple-600/20 text-white font-semibold"
                                 : "bg-indigo-600/20 text-white font-semibold"
                               : "text-slate-400 hover:text-white hover:bg-sidebar-accent/50"
                           )}
                         >
-                          <Icon
-                            className={cn(
-                              "h-4 w-4 shrink-0 transition-colors",
-                              isActive
-                                ? isPlatformOwner
-                                  ? "text-purple-400"
-                                  : "text-indigo-400"
-                                : "text-slate-400 group-hover:text-white"
+                          <div className="relative shrink-0 flex items-center justify-center">
+                            <Icon
+                              className={cn(
+                                "h-4 w-4 shrink-0 transition-colors",
+                                isActive
+                                  ? isPlatform
+                                    ? "text-purple-400"
+                                    : "text-indigo-400"
+                                  : "text-slate-400 group-hover:text-white"
+                              )}
+                            />
+                            {hasUnread && (
+                              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-purple-500 ring-1 ring-sidebar animate-pulse" />
                             )}
-                          />
+                          </div>
                           <span className="truncate flex-1">{item.label}</span>
-                          {item.badge && (
+                          {hasUnread ? (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 leading-none bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+                              {chatUnreadCount > 1 ? `${chatUnreadCount} new` : "New"}
+                            </span>
+                          ) : item.badge ? (
                             <span
                               className={cn(
                                 "text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0 leading-none select-none",
@@ -148,7 +178,14 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                             >
                               {item.badge}
                             </span>
-                          )}
+                          ) : isLocked ? (
+                            <span
+                              className="inline-flex items-center text-slate-400 group-hover:text-amber-400 transition-colors shrink-0"
+                              title="Available with Professional Plan"
+                            >
+                              <Lock className="h-3.5 w-3.5" />
+                            </span>
+                          ) : null}
                         </Link>
                       );
                     })}
@@ -184,9 +221,14 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
               <button
                 key={idx}
                 onClick={item.onClick}
-                className="flex flex-1 flex-col items-center justify-center py-1 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+                className="flex flex-1 flex-col items-center justify-center py-1 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer relative"
               >
-                <Icon className="h-5 w-5" />
+                <div className="relative">
+                  <Icon className="h-5 w-5" />
+                  {item.label === "More" && chatUnreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-purple-600 ring-2 ring-white" />
+                  )}
+                </div>
                 <span className="text-[10px] font-medium mt-1">{item.label}</span>
               </button>
             );

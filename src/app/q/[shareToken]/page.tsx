@@ -1,44 +1,153 @@
 "use client";
 
-import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
-import { Quotation, PublicQuotation } from "@/types";
-import { QuotationRenderer } from "@/components/quotation/quotation-renderer";
-import { QuotationProvider, useQuotation } from "@/context/quotation-context";
-import { exportQuotationPDF } from "@/lib/quotation/pdf-service";
-import { openWhatsAppShare, shareQuotationNative } from "@/lib/quotation/share-helpers";
-import { formatCurrency } from "@/lib/costing-engine";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import {
-  Download,
-  Share2,
-  Phone,
-  MessageSquare,
-  AlertTriangle,
-  Compass,
-  CheckCircle2,
-  Clock,
-  Sparkles,
-  Mail,
-  ExternalLink,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { PublicQuotationPayload,quotationClient } from "@/lib/api-client";
+import { formatCurrency } from "@/lib/costing-engine";
+import {
+AlertTriangle,
+Building,
+Calendar,
+Car,
+Check,
+CheckCircle2,
+Compass,
+Download,
+Hotel,
+Info,
+Loader2,
+Mail,
+MessageSquare,
+Phone,
+Printer,
+ShieldCheck,
+Sparkles,
+Ticket,
+X
 } from "lucide-react";
+import { useParams } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
 
-function PublicQuotationContent() {
+export default function PublicQuotationPage() {
   const params = useParams();
   const shareToken = params.shareToken as string;
-  const { quotations, getPublicQuotation, markQuotationViewed } = useQuotation();
 
-  const publicQuotation = getPublicQuotation(shareToken);
+  const [quotation, setQuotation] = React.useState<PublicQuotationPayload | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  // Track view on initial mount
-  React.useEffect(() => {
-    if (shareToken) {
-      markQuotationViewed(shareToken);
+  // Modals
+  const [isAcceptModalOpen, setIsAcceptModalOpen] = React.useState(false);
+  const [accepting, setAccepting] = React.useState(false);
+  const [acceptComments, setAcceptComments] = React.useState("");
+
+  const [isChangeModalOpen, setIsChangeModalOpen] = React.useState(false);
+  const [submittingChanges, setSubmittingChanges] = React.useState(false);
+  const [changeMessage, setChangeMessage] = React.useState("");
+
+  const loadPublicQuote = React.useCallback(async () => {
+    if (!shareToken) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await quotationClient.getPublicQuotation(shareToken);
+      if (res.success && res.data) {
+        setQuotation(res.data);
+        quotationClient.markQuotationViewed(shareToken).catch(() => {});
+      }
+    } catch (err: any) {
+      setError(err?.message || "Quotation proposal not found or link has expired.");
+    } finally {
+      setLoading(false);
     }
-  }, [shareToken, markQuotationViewed]);
+  }, [shareToken]);
 
-  if (!publicQuotation) {
+  React.useEffect(() => {
+    loadPublicQuote();
+  }, [loadPublicQuote]);
+
+  const handleAcceptProposal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shareToken) return;
+
+    try {
+      setAccepting(true);
+      const res = await quotationClient.acceptPublicQuotation(shareToken, {
+        customerName: quotation?.customer.name,
+        customerEmail: quotation?.customer.email,
+        customerPhone: quotation?.customer.phone,
+        comments: acceptComments || undefined,
+      });
+
+      if (res.success) {
+        toast.success("Thank you! You have accepted this holiday proposal.");
+        setIsAcceptModalOpen(false);
+        await loadPublicQuote();
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to accept proposal.");
+    } finally {
+      setAccepting(false);
+    }
+  };
+
+  const handleRequestChanges = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shareToken || !changeMessage) return;
+
+    try {
+      setSubmittingChanges(true);
+      const res = await quotationClient.requestChangesPublicQuotation(shareToken, {
+        message: changeMessage,
+        customerName: quotation?.customer.name,
+        customerPhone: quotation?.customer.phone,
+      });
+
+      if (res.success) {
+        toast.success("Your revision request has been submitted to your travel advisor.");
+        setIsChangeModalOpen(false);
+        await loadPublicQuote();
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to submit revision request.");
+    } finally {
+      setSubmittingChanges(false);
+    }
+  };
+
+  const handleWhatsAppContact = () => {
+    if (!quotation) return;
+    const phone = quotation.agency.phone?.replace(/[^0-9]/g, "");
+    const text = `Hi ${quotation.agency.name}! I am reviewing quotation ${quotation.quotationNumber} (${quotation.title}). I would like to discuss and confirm this trip.`;
+    const url = phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-6">
+        <div className="text-center space-y-3">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-400 mx-auto" />
+          <p className="text-xs text-slate-400">Loading holiday proposal...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !quotation) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-slate-800/80 border border-slate-700 rounded-3xl p-8 text-center space-y-4 shadow-xl">
@@ -48,7 +157,7 @@ function PublicQuotationContent() {
           <div className="space-y-1">
             <h2 className="text-xl font-bold text-white">Quotation Not Found</h2>
             <p className="text-xs text-slate-400">
-              The proposal link you accessed may have expired or is invalid. Please reach out to your travel consultant.
+              {error || "The proposal link you accessed may have expired or is invalid. Please reach out to your travel consultant."}
             </p>
           </div>
         </div>
@@ -56,163 +165,688 @@ function PublicQuotationContent() {
     );
   }
 
-  const isExpired = publicQuotation.isExpired;
+  const isExpired = quotation.isExpired;
+  const isAccepted = quotation.status === "ACCEPTED";
 
-  const handleWhatsAppContact = () => {
-    const phone = publicQuotation.agency.phone.replace(/[^0-9]/g, "") || "919847012345";
-    const text = `Hi ${publicQuotation.agency.name}! I am reviewing quotation ${publicQuotation.quotationNumber} (${publicQuotation.title}). I would like to discuss and confirm this trip.`;
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
-  };
+  const effectiveFinalAmount = quotation.finalAmount;
 
-  const handleCallContact = () => {
-    window.location.href = `tel:${publicQuotation.agency.phone}`;
-  };
+  // Duration calculation
+  let durationText = "";
+  if (quotation.trip.startDate && quotation.trip.endDate) {
+    const start = new Date(quotation.trip.startDate);
+    const end = new Date(quotation.trip.endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const nights = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
+    durationText = `${nights} Nights / ${nights + 1} Days`;
+  }
+
+  // Highlights & services
+  const hotelsList = quotation.trip.tripHotels || [];
+  const vehiclesList = quotation.trip.tripVehicles || [];
+  const activitiesList = quotation.trip.tripActivities || [];
+  const itineraryItems = quotation.trip.itineraryItems || [];
+  const destinations = (quotation.trip as any).tripDestinations || [];
+  const sortedDestinations = [...destinations].sort((a: any, b: any) => a.sequence - b.sequence);
+
+  const inclusions = quotation.proposalItems?.filter((p) => p.type === "INCLUSION") || [];
+  const exclusions = quotation.proposalItems?.filter((p) => p.type === "EXCLUSION") || [];
+  const importantNotes = quotation.proposalItems?.filter((p) => p.type === "IMPORTANT_NOTE") || [];
+  const milestones = quotation.paymentMilestones || [];
+
+  // Dynamic agency contact line & Proposal label
+  const agencyContacts = [quotation.agency?.phone, quotation.agency?.email].filter(Boolean);
+  const agencySubtext = agencyContacts.length > 0 ? agencyContacts.join(" | ") : "TRIP PROPOSAL";
+  const tierName = quotation.tier || "Deluxe";
+  const proposalBadgeText = `TIER: ${tierName.toUpperCase()}`;
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 pb-28 sm:pb-20">
+    <div className="min-h-screen bg-slate-100/90 text-slate-900 pb-28 sm:pb-20 font-sans">
       {/* Top Floating Brand Navigation Bar */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs px-4 sm:px-8 py-3 transition-all">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-9 w-9 rounded-xl bg-purple-600 text-white flex items-center justify-center font-black shadow-xs shrink-0">
-              <Compass className="h-5 w-5" />
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs px-3 sm:px-8 py-2.5 sm:py-3 transition-all print:hidden">
+        <div className="max-w-5xl mx-auto flex items-center justify-between gap-2.5 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <div className="h-8 sm:h-9 w-8 sm:w-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-xs shrink-0">
+              <Compass className="h-4 sm:h-5 w-4 sm:w-5" />
             </div>
-            <div className="truncate">
+            <div className="min-w-0 truncate">
               <span className="text-xs font-black tracking-tight text-slate-900 block truncate">
-                {publicQuotation.agency.name}
+                {quotation.agency.name}
               </span>
-              <span className="text-[10px] text-slate-500 font-mono">
-                {publicQuotation.quotationNumber}
+              <span className="text-[10px] text-slate-500 font-mono block truncate">
+                {quotation.quotationNumber} • V{quotation.version}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportQuotationPDF(publicQuotation)}
-              className="text-xs font-semibold h-8.5 px-3 rounded-xl cursor-pointer bg-white hidden sm:inline-flex"
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <a
+              href={`/api/quotations/public/${encodeURIComponent(shareToken)}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold h-8 sm:h-8.5 px-2.5 sm:px-3 rounded-xl transition-colors text-slate-700 shadow-2xs"
             >
               <Download className="h-3.5 w-3.5 mr-1 text-slate-500" />
-              Download PDF
-            </Button>
+              <span className="hidden xs:inline">Download </span>PDF
+            </a>
 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => shareQuotationNative(publicQuotation)}
-              className="text-xs font-semibold h-8.5 px-3 rounded-xl cursor-pointer bg-white hidden sm:inline-flex"
+              onClick={() => window.print()}
+              className="text-xs font-semibold h-8 sm:h-8.5 px-3 rounded-xl cursor-pointer bg-white hidden sm:inline-flex"
             >
-              <Share2 className="h-3.5 w-3.5 mr-1 text-slate-500" />
-              Share
+              <Printer className="h-3.5 w-3.5 mr-1 text-slate-500" />
+              Print
             </Button>
 
-            <Button
-              size="sm"
-              onClick={handleWhatsAppContact}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8.5 px-4 rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              <span>Contact on WhatsApp</span>
-            </Button>
+            {!isExpired && !isAccepted && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsChangeModalOpen(true)}
+                  className="bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 sm:h-8.5 px-3 rounded-xl cursor-pointer hidden md:inline-flex"
+                >
+                  <MessageSquare className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                  Request Changes
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() => setIsAcceptModalOpen(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8 sm:h-8.5 px-3 sm:px-4 rounded-xl shadow-xs gap-1 cursor-pointer"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  <span>Accept<span className="hidden sm:inline"> Proposal</span></span>
+                </Button>
+              </>
+            )}
+
+            {isAccepted && (
+              <Badge className="bg-emerald-500 text-white font-bold text-xs h-8 sm:h-8.5 px-2.5 sm:px-3 gap-1 rounded-xl shadow-xs">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Accepted
+              </Badge>
+            )}
           </div>
         </div>
       </header>
 
-      {/* ─── MAIN QUOTATION PROPOSAL CONTAINER ─────────────────────────── */}
-      <main className="max-w-4xl mx-auto px-3 sm:px-6 pt-6 sm:pt-8">
-        <QuotationRenderer
-          quotation={publicQuotation}
-          isPublicView={true}
-          previewMode="desktop"
-        />
+      {/* Main Document Layout */}
+      <main className="max-w-5xl mx-auto px-2.5 sm:px-6 lg:px-8 pt-4 sm:pt-6 space-y-6">
+        <div className="bg-white text-slate-900 shadow-sm rounded-2xl sm:rounded-3xl border border-slate-200/90 overflow-hidden font-sans">
+          {/* 1. Header Hero */}
+          <div className="relative bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-5 sm:p-10 lg:p-12 overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 sm:pb-6 mb-6 sm:mb-8 gap-3">
+              <div className="min-w-0">
+                <div className="text-xs sm:text-base font-black tracking-wider text-indigo-300 uppercase truncate">
+                  {quotation.agency.name}
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-slate-300 tracking-wide mt-0.5 break-words">
+                  {agencySubtext}
+                </div>
+              </div>
 
-        {/* Bottom Contact & Booking Discussion Banner (V1 Locked Workflow) */}
-        {!isExpired && (
-          <div className="mt-8 bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-xl">
-            <div className="h-12 w-12 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center mx-auto">
-              <Sparkles className="h-6 w-6" />
+              <div className="self-start sm:self-auto shrink-0">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 text-[10px] sm:text-xs font-mono font-semibold tracking-wider text-indigo-200 border border-white/15">
+                  <span>{quotation.quotationNumber}</span>
+                  <span>•</span>
+                  <span>V{quotation.version}</span>
+                </div>
+                {isExpired && (
+                  <div className="text-[9px] sm:text-[10px] font-bold text-rose-400 uppercase tracking-widest mt-1">
+                    Expired Proposal
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="max-w-md mx-auto space-y-1">
-              <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white">
-                Ready to customize or book this journey?
-              </h2>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Connect directly with your travel consultant at <strong>{publicQuotation.agency.name}</strong> to finalize dates, customize inclusions, and confirm your booking.
-              </p>
+
+            <div className="space-y-2.5 sm:space-y-3">
+              <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest text-indigo-400 bg-indigo-500/20 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border border-indigo-400/30 inline-block">
+                {proposalBadgeText}
+              </span>
+              <h1 className="text-xl sm:text-3xl lg:text-5xl font-black text-white tracking-tight leading-tight break-words">
+                {quotation.title}
+              </h1>
+              {quotation.proposalSubtitle && (
+                <p className="text-xs sm:text-base text-slate-300 font-medium break-words leading-relaxed">
+                  {quotation.proposalSubtitle}
+                </p>
+              )}
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-              <Button
-                size="lg"
-                onClick={handleWhatsAppContact}
-                className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs sm:text-sm h-10 sm:h-11 px-6 rounded-2xl shadow-lg cursor-pointer transition-all hover:scale-[1.02] flex items-center gap-2"
-              >
-                <MessageSquare className="h-4 w-4" />
-                Chat on WhatsApp
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={handleCallContact}
-                className="bg-white/10 hover:bg-white/20 text-white border-white/20 font-bold text-xs sm:text-sm h-10 sm:h-11 px-6 rounded-2xl cursor-pointer"
-              >
-                <Phone className="h-4 w-4 mr-2" />
-                Call {publicQuotation.agency.phone}
-              </Button>
+
+            {/* 2. Trip Overview Metadata Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/10 text-xs">
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Prepared For</span>
+                <span className="font-bold text-white text-xs sm:text-sm truncate block">{quotation.customer.name}</span>
+              </div>
+
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Travel Dates</span>
+                <span className="font-bold text-white text-xs sm:text-sm block break-words">
+                  {new Date(quotation.trip.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} –{" "}
+                  {new Date(quotation.trip.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </span>
+                {durationText && <span className="text-[9px] sm:text-[10px] text-indigo-300 block font-medium mt-0.5">{durationText}</span>}
+              </div>
+
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Travelers</span>
+                <span className="font-bold text-white text-xs sm:text-sm block">
+                  {quotation.trip.travelers.length || 1} Person(s)
+                </span>
+              </div>
+
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Valid Until</span>
+                <span className="font-bold text-indigo-300 text-xs sm:text-sm block break-words">
+                  {quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Upon confirmation"}
+                </span>
+              </div>
             </div>
           </div>
-        )}
-      </main>
 
-      {/* ─── MOBILE STICKY FLOATING ACTION DOCK (390px Optimized) ──────── */}
-      <div className="fixed bottom-3 inset-x-3 max-w-md mx-auto z-40 sm:hidden print:hidden">
-        <div className="bg-slate-900/95 backdrop-blur-md text-white p-2.5 rounded-2xl shadow-xl border border-white/10 flex items-center justify-between gap-2">
-          <div className="pl-2">
-            <span className="text-[9px] text-slate-400 uppercase font-bold tracking-wider block">Investment</span>
-            <span className="text-sm font-black text-indigo-300">
-              {formatCurrency(publicQuotation.sellingPrice, publicQuotation.currency)}
-            </span>
-          </div>
+          <div className="p-4 sm:p-8 lg:p-12 space-y-8 sm:space-y-10">
+            {/* Welcome Message */}
+            {quotation.customerMessage && (
+              <div className="p-4 sm:p-6 bg-slate-50 rounded-2xl border border-slate-200/80 leading-relaxed text-slate-700 text-xs sm:text-sm">
+                <h3 className="font-bold text-slate-900 text-[11px] sm:text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                  Greeting from your Travel Advisor
+                </h3>
+                <p className="whitespace-pre-wrap break-words">{quotation.customerMessage}</p>
+              </div>
+            )}
 
-          <div className="flex items-center gap-1.5">
-            <Button
-              size="sm"
-              onClick={handleWhatsAppContact}
-              className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs h-8 px-3 rounded-xl cursor-pointer"
-            >
-              <MessageSquare className="h-3.5 w-3.5 mr-1" />
-              WhatsApp
-            </Button>
+            {/* 3. Tour Highlights Bar */}
+            <div className="p-3 sm:p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-3 sm:gap-6 text-[11px] sm:text-xs text-slate-700 font-semibold">
+                {hotelsList.length > 0 && (
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Hotel className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-indigo-600 shrink-0" />
+                    <span className="truncate">{hotelsList.length} Premium Stay{hotelsList.length > 1 ? "s" : ""}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Car className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-indigo-600 shrink-0" />
+                  <span className="truncate">{vehiclesList.length > 0 ? "Private Vehicle" : "Transfers"}</span>
+                </div>
+                {activitiesList.length > 0 && (
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Ticket className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-indigo-600 shrink-0" />
+                    <span className="truncate">{activitiesList.length} Experience{activitiesList.length > 1 ? "s" : ""}</span>
+                  </div>
+                )}
+                {itineraryItems.length > 0 && (
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Calendar className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-indigo-600 shrink-0" />
+                    <span className="truncate">{itineraryItems.length} Days Tour</span>
+                  </div>
+                )}
+              </div>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => exportQuotationPDF(publicQuotation)}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-              title="Download PDF"
-            >
-              <Download className="h-4 w-4" />
-            </button>
+            {/* 5. Day-by-Day Itinerary Schedule */}
+            {quotation.trip.itineraryItems.length > 0 && (
+              <div className="space-y-3 sm:space-y-4">
+                <div className="border-b border-slate-200 pb-2 sm:pb-3">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Day-by-Day Itinerary Schedule</h2>
+                  <p className="text-[11px] sm:text-xs text-slate-500">Planned sightseeing, transfers, and experiences</p>
+                </div>
 
-            <button
-              type="button"
-              onClick={() => shareQuotationNative(publicQuotation)}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-              title="Share Link"
-            >
-              <Share2 className="h-4 w-4" />
-            </button>
+                <div className="space-y-3 sm:space-y-4">
+                  {quotation.trip.itineraryItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col sm:flex-row gap-3 sm:gap-4"
+                    >
+                      <div className="shrink-0 flex sm:flex-col items-center justify-start gap-1 sm:w-20">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md sm:rounded-lg shrink-0">
+                          Day {item.dayNumber}
+                        </span>
+                        {item.date && (
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 sm:gap-2">
+                          <h4 className="font-extrabold text-slate-900 text-xs sm:text-base break-words">{item.title}</h4>
+                          {item.location && (
+                            <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md self-start sm:self-auto shrink-0">
+                              {item.location}
+                            </span>
+                          )}
+                        </div>
+                        {item.description && (
+                          <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{item.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 6. Accommodation & Stay Details (NO PRICING) */}
+            {hotelsList.length > 0 && (
+              <div className="space-y-3 sm:space-y-4">
+                <div className="border-b border-slate-200 pb-2 sm:pb-3">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <Hotel className="h-4 sm:h-5 w-4 sm:w-5 text-indigo-600 shrink-0" />
+                    Hotel Accommodations
+                  </h2>
+                  <p className="text-[11px] sm:text-xs text-slate-500">Handpicked luxury and comfortable stays</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  {hotelsList.map((h) => {
+                    const hotelName = h.hotel?.name || "Selected Hotel";
+                    const cityName = h.hotel?.city || "";
+                    const nights = Math.max(1, Math.round((new Date(h.checkOut).getTime() - new Date(h.checkIn).getTime()) / (1000 * 60 * 60 * 24)));
+
+                    return (
+                      <div key={h.id} className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2 text-xs">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <h4 className="font-extrabold text-slate-900 text-xs sm:text-base break-words">{hotelName}</h4>
+                            {cityName && <span className="text-[11px] sm:text-xs text-indigo-600 font-semibold block">{cityName}</span>}
+                          </div>
+                          <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-slate-100 text-slate-700 font-bold text-[10px] sm:text-xs rounded-md sm:rounded-lg shrink-0">
+                            {nights} Night{nights > 1 ? "s" : ""}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1 text-slate-600 text-xs pt-1">
+                          <div className="break-words"><strong className="text-slate-800">Room Category:</strong> {h.roomType}</div>
+                          {h.mealPlan && <div className="break-words"><strong className="text-slate-800">Meal Plan:</strong> {h.mealPlan}</div>}
+                          <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                            <span><strong className="text-slate-800">Check-in:</strong> {new Date(h.checkIn).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                            <span>•</span>
+                            <span><strong className="text-slate-800">Check-out:</strong> {new Date(h.checkOut).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 7. Transportation & Logistics (NO PRICING) */}
+            {vehiclesList.length > 0 && (
+              <div className="space-y-3 sm:space-y-4">
+                <div className="border-b border-slate-200 pb-2 sm:pb-3">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <Car className="h-4 sm:h-5 w-4 sm:w-5 text-indigo-600 shrink-0" />
+                    Transportation & Transfers
+                  </h2>
+                  <p className="text-[11px] sm:text-xs text-slate-500">Private vehicle arrangements and chauffeured transit</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  {vehiclesList.map((v) => (
+                    <div key={v.id} className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-2 text-xs">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-extrabold text-slate-900 text-xs sm:text-base break-words min-w-0">{v.vehicleName || v.vehicle?.name || "Private Vehicle"}</h4>
+                        {v.vehicle?.capacity && (
+                          <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-indigo-50 text-indigo-700 font-bold text-[10px] sm:text-xs rounded-md sm:rounded-lg shrink-0">
+                            {v.vehicle.capacity} Seater
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-slate-600 text-xs break-words">
+                        {v.vehicleType || v.vehicle?.type || "Dedicated Private Transport"} • {v.notes || "Airport transfers, sightseeing, and intercity transit as per itinerary"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 8. Sightseeing & Activities (NO PRICING) */}
+            {activitiesList.length > 0 && (
+              <div className="space-y-3 sm:space-y-4">
+                <div className="border-b border-slate-200 pb-2 sm:pb-3">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <Ticket className="h-4 sm:h-5 w-4 sm:w-5 text-indigo-600 shrink-0" />
+                    Sightseeing & Activities
+                  </h2>
+                  <p className="text-[11px] sm:text-xs text-slate-500">Curated experiences and entry excursions</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  {activitiesList.map((act) => {
+                    const isExcluded = act.type === "EXCLUDED" || act.type === "OPTIONAL";
+                    return (
+                      <div key={act.id} className="p-3.5 sm:p-4 bg-white border border-slate-200 shadow-2xs rounded-2xl space-y-2 text-xs">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm break-words">{act.name || act.activity?.name || "Excursion"}</h4>
+                            {act.description && (
+                              <p className="text-slate-600 text-[11px] sm:text-xs leading-relaxed mt-1 break-words">{act.description}</p>
+                            )}
+                          </div>
+                          <span
+                            className={`px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-full text-[10px] font-bold shrink-0 border ${
+                              isExcluded
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            }`}
+                          >
+                            {isExcluded ? "Not Included" : "Included"}
+                          </span>
+                        </div>
+                        {isExcluded && (
+                          <p className="text-[10px] sm:text-[11px] text-amber-700 bg-amber-50/50 rounded-lg p-1.5 sm:p-2 border border-amber-100 break-words">
+                            Ticket/admission payable directly on location by guest.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 9. Structured Inclusions & Exclusions */}
+            {(inclusions.length > 0 || exclusions.length > 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                {/* Inclusions */}
+                <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-emerald-50/40 border border-emerald-100 space-y-3 sm:space-y-4">
+                  <div className="flex items-center gap-2 border-b border-emerald-200/60 pb-2 sm:pb-3">
+                    <div className="h-6 sm:h-7 w-6 sm:w-7 rounded-lg sm:rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0">
+                      <Check className="h-3.5 sm:h-4 w-3.5 sm:w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-extrabold text-emerald-950 text-xs sm:text-sm">Package Inclusions</h3>
+                      <p className="text-[10px] sm:text-[11px] text-emerald-700 truncate">{quotation.inclusionsIntro || "Covered in this proposal"}</p>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-2.5 sm:space-y-3 text-xs">
+                    {inclusions.map((inc) => (
+                      <li key={inc.id} className="flex items-start gap-2 sm:gap-2.5">
+                        <CheckCircle2 className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <strong className="text-emerald-950 font-bold block break-words">{inc.title}</strong>
+                          {inc.description && <p className="text-emerald-800 text-[11px] mt-0.5 break-words">{inc.description}</p>}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Exclusions */}
+                <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-rose-50/40 border border-rose-100 space-y-3 sm:space-y-4">
+                  <div className="flex items-center gap-2 border-b border-rose-200/60 pb-2 sm:pb-3">
+                    <div className="h-6 sm:h-7 w-6 sm:w-7 rounded-lg sm:rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold shrink-0">
+                      <X className="h-3.5 sm:h-4 w-3.5 sm:w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-extrabold text-rose-950 text-xs sm:text-sm">Package Exclusions</h3>
+                      <p className="text-[10px] sm:text-[11px] text-rose-700 truncate">{quotation.exclusionsIntro || "Not covered in this package"}</p>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-2.5 sm:space-y-3 text-xs">
+                    {exclusions.map((exc) => (
+                      <li key={exc.id} className="flex items-start gap-2.5">
+                        <X className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <strong className="text-rose-950 font-bold block break-words">{exc.title}</strong>
+                          {exc.description && <p className="text-rose-800 text-[11px] mt-0.5 break-words">{exc.description}</p>}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* 11. Important Notes & Policies */}
+            {(importantNotes.length > 0 || quotation.importantNotes || quotation.cancellationPolicy || quotation.terms || quotation.privacyPolicy) && (
+              <div className="space-y-3 sm:space-y-4">
+                <div className="border-b border-slate-200 pb-2 sm:pb-3">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <ShieldCheck className="h-4 sm:h-5 w-4 sm:w-5 text-indigo-600 shrink-0" />
+                    Important Notes & Policy Terms
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
+                  {(importantNotes.length > 0 || quotation.importantNotes) && (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Traveler Advisories</h4>
+                      {quotation.importantNotes && (
+                        <p className="text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{quotation.importantNotes}</p>
+                      )}
+                      {importantNotes.length > 0 && (
+                        <ul className="space-y-2">
+                          {importantNotes.map((n) => (
+                            <li key={n.id} className="flex items-start gap-2">
+                              <Info className="h-3.5 w-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                              <div className="min-w-0">
+                                <strong className="text-slate-900 break-words">{n.title}:</strong>{" "}
+                                <span className="text-slate-600 break-words">{n.description}</span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
+                  {quotation.cancellationPolicy && (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Cancellation Policy</h4>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{quotation.cancellationPolicy}</p>
+                    </div>
+                  )}
+
+                  {quotation.terms && (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Terms & Conditions</h4>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{quotation.terms}</p>
+                    </div>
+                  )}
+
+                  {quotation.privacyPolicy && (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Privacy Policy</h4>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{quotation.privacyPolicy}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 12. Total Commercial Package Price Summary - Final Amount ONLY */}
+            <div className="p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-slate-900 text-white space-y-4 sm:space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 sm:gap-4 text-center sm:text-left">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-400">
+                    Total Package Investment
+                  </span>
+                  <h3 className="text-lg sm:text-2xl font-black text-white mt-0.5 sm:mt-1">
+                    Complete Tour Price
+                  </h3>
+                </div>
+
+                <div className="sm:text-right">
+                  <div className="text-2xl sm:text-5xl font-black text-emerald-400 tracking-tight">
+                    {formatCurrency(effectiveFinalAmount)}
+                  </div>
+                  <span className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 sm:mt-1 block">
+                    All-inclusive customer package price ({quotation.currency})
+                  </span>
+                </div>
+              </div>
+
+              {/* Bottom Interactive Decision Action Bar */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 pt-3 sm:pt-4 border-t border-slate-800 print:hidden">
+                <div className="text-xs text-slate-300 flex items-center gap-2 text-center sm:text-left">
+                  <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+                  <span>Transparent Pricing • Direct Advisor Support</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                  <a
+                    href={`/api/quotations/public/${encodeURIComponent(shareToken)}/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-semibold h-9 sm:h-10 px-3 sm:px-4 rounded-xl cursor-pointer"
+                  >
+                    <Download className="h-4 w-4 mr-1.5 text-indigo-300" />
+                    PDF
+                  </a>
+
+                  <Button
+                    variant="outline"
+                    onClick={handleWhatsAppContact}
+                    className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs font-semibold h-9 sm:h-10 px-3 sm:px-4 rounded-xl cursor-pointer"
+                  >
+                    <MessageSquare className="h-4 w-4 mr-1.5 text-emerald-400" />
+                    WhatsApp
+                  </Button>
+
+                  {!isAccepted && !isExpired && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsChangeModalOpen(true)}
+                        className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs font-semibold h-9 sm:h-10 px-3 sm:px-4 rounded-xl cursor-pointer"
+                      >
+                        Revisions
+                      </Button>
+
+                      <Button
+                        onClick={() => setIsAcceptModalOpen(true)}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs h-9 sm:h-10 px-4 sm:px-6 rounded-xl shadow-lg cursor-pointer"
+                      >
+                        <Check className="h-4 w-4 mr-1.5" />
+                        Accept
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 13. Agency Contact Footer */}
+            <div className="pt-6 border-t border-slate-200 text-center text-xs text-slate-500 space-y-2">
+              <p className="font-bold text-slate-700">{quotation.agency.name}</p>
+              <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[11px]">
+                {quotation.agency.phone && (
+                  <span className="flex items-center gap-1"><Phone className="h-3 w-3 shrink-0" /> {quotation.agency.phone}</span>
+                )}
+                {quotation.agency.email && (
+                  <span className="flex items-center gap-1"><Mail className="h-3 w-3 shrink-0" /> {quotation.agency.email}</span>
+                )}
+                {quotation.agency.address && (
+                  <span className="flex items-center gap-1"><Building className="h-3 w-3 shrink-0" /> {quotation.agency.address}</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      </main>
 
-export default function PublicQuotationPage() {
-  return (
-    <QuotationProvider>
-      <PublicQuotationContent />
-    </QuotationProvider>
+      {/* ─── ACCEPT PROPOSAL MODAL ─── */}
+      <Dialog open={isAcceptModalOpen} onOpenChange={setIsAcceptModalOpen}>
+        <DialogContent className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl max-w-[94vw] sm:max-w-md p-4 sm:p-6 shadow-2xl">
+          <form onSubmit={handleAcceptProposal}>
+            <DialogHeader>
+              <div className="h-10 sm:h-12 w-10 sm:w-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
+                <Check className="h-5 sm:h-6 w-5 sm:w-6" />
+              </div>
+              <DialogTitle className="text-slate-900 font-bold text-base sm:text-lg">Accept Itinerary Proposal</DialogTitle>
+              <DialogDescription className="text-slate-500 text-xs mt-1">
+                Confirm your acceptance of quotation {quotation.quotationNumber}.
+                Your travel advisor will be notified immediately to proceed with reservation bookings.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 mt-3 sm:mt-4 text-xs">
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Traveler Name</label>
+                <Input value={quotation.customer.name} disabled className="h-8 sm:h-9 bg-slate-50 text-xs" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Optional Notes / Requests</label>
+                <Textarea
+                  value={acceptComments}
+                  onChange={(e) => setAcceptComments(e.target.value)}
+                  placeholder="e.g. Please proceed with booking. We prefer king-bed rooms."
+                  rows={3}
+                  className="text-xs bg-slate-50/50 border-slate-200 resize-none"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="mt-4 sm:mt-6 flex flex-row justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsAcceptModalOpen(false)} className="h-8 sm:h-9 text-xs">
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={accepting}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8 sm:h-9 px-4 sm:px-5 font-bold"
+              >
+                {accepting ? "Confirming..." : "Confirm & Accept"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── REQUEST CHANGES MODAL ─── */}
+      <Dialog open={isChangeModalOpen} onOpenChange={setIsChangeModalOpen}>
+        <DialogContent className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl max-w-[94vw] sm:max-w-md p-4 sm:p-6 shadow-2xl">
+          <form onSubmit={handleRequestChanges}>
+            <DialogHeader>
+              <div className="h-10 sm:h-12 w-10 sm:w-12 rounded-xl sm:rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-2">
+                <MessageSquare className="h-5 sm:h-6 w-5 sm:w-6" />
+              </div>
+              <DialogTitle className="text-slate-900 font-bold text-base sm:text-lg">Request Revisions</DialogTitle>
+              <DialogDescription className="text-slate-500 text-xs mt-1">
+                Let your advisor know what changes or adjustments you would like in hotels, dates, or activities.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 mt-3 sm:mt-4 text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Requested Adjustments *</label>
+                <Textarea
+                  value={changeMessage}
+                  onChange={(e) => setChangeMessage(e.target.value)}
+                  placeholder="e.g. Could we upgrade the hotel to a 5-star resort and add an extra day in the itinerary?"
+                  rows={4}
+                  className="text-xs bg-slate-50/50 border-slate-200 resize-none"
+                  required
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="mt-4 sm:mt-6 flex flex-row justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsChangeModalOpen(false)} className="h-8 sm:h-9 text-xs">
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={submittingChanges || !changeMessage}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-8 sm:h-9 px-4 sm:px-5 font-bold"
+              >
+                {submittingChanges ? "Submitting..." : "Send to Advisor"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

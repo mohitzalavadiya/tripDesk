@@ -1,956 +1,1933 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useBooking } from "@/context/booking-context";
-import { BookingItem, BookingDocument } from "@/types";
-import { BookingStatusBadge, PaymentStatusBadge, ItemStatusBadge } from "@/components/booking/booking-status-badge";
-import { AddPaymentModal } from "@/components/booking/add-payment-modal";
-import { SupplierPaymentModal } from "@/components/booking/supplier-payment-modal";
-import { ConfirmItemModal } from "@/components/booking/confirm-item-modal";
-import { CancelBookingModal } from "@/components/booking/cancel-booking-modal";
-import { DocumentPreviewModal } from "@/components/booking/document-preview-modal";
-import { formatCurrency } from "@/lib/costing-engine";
-import { generatePaymentReminderMessage, generateBookingShareMessage } from "@/lib/booking/document-templates";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import {
-  CalendarCheck,
-  ArrowLeft,
-  Share2,
-  Download,
-  IndianRupee,
-  Hotel,
-  Car,
-  Ticket,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  FileText,
-  MessageSquare,
-  Copy,
-  Printer,
-  ShieldCheck,
-  RotateCcw,
-  ExternalLink,
-  ChevronRight,
-  User,
-  Phone,
-  Mail,
-  MapPin,
-  Calendar,
-  Users,
-  Building,
-  CreditCard,
-  History,
-  Lock,
-  Compass,
+BookingStatusBadge,
+PaymentStatusBadge,
+} from "@/components/booking/booking-status-badge";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
+import {
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuGroup,
+DropdownMenuItem,
+DropdownMenuLabel,
+DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import {
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import {
+bookingClient,
+BookingPaymentScheduleResult,
+BookingWithRelations,
+documentClient,
+DocumentItem,
+financeClient,
+paymentClient,
+} from "@/lib/api-client";
+import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
+import { formatCurrency } from "@/lib/costing-engine";
+import { getErrorMessage } from "@/lib/utils";
+import {
+BookingStatus,
+NotificationChannel,
+PaymentMethod
+} from "@prisma/client";
+import {
+AlertCircle,
+AlertTriangle,
+ArrowLeft,
+Calendar,
+CalendarCheck,
+Car,
+CheckCircle2,
+ChevronDown,
+ChevronRight,
+Clock,
+Compass,
+CreditCard,
+Download,
+ExternalLink,
+FileText,
+History,
+Hotel,
+IndianRupee,
+Layers,
+Loader2,
+Lock,
+Mail,
+Phone,
+Plus,
+Receipt,
+RefreshCw,
+Send,
+ShieldCheck,
+Sparkles,
+Ticket,
+Trash2,
+User
 } from "lucide-react";
+import Link from "next/link";
+import { useParams,useRouter } from "next/navigation";
+import * as React from "react";
+import { toast } from "sonner";
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  BANK_TRANSFER: "Bank Transfer",
+  UPI: "UPI",
+  CASH: "Cash",
+  CARD: "Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other",
+};
+
+const TRAVELER_TYPE_LABELS: Record<string, string> = {
+  ADULT: "Adult",
+  CHILD: "Child",
+  INFANT: "Infant",
+};
+
+const PAYMENT_METHOD_MODAL_LABELS: Record<string, string> = {
+  UPI: "UPI / GPay / PhonePe",
+  BANK_TRANSFER: "Bank Transfer (NEFT/RTGS)",
+  CASH: "Cash Deposit",
+  CARD: "Credit / Debit Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other Method",
+};
+
+function formatDispatchStatus(status?: string | null): string {
+  if (!status) return "Unassigned";
+  switch (status) {
+    case "ON_DUTY":
+      return "On Duty";
+    case "IN_TRANSIT":
+      return "In Transit";
+    case "ASSIGNED":
+      return "Assigned";
+    case "CONFIRMED":
+      return "Confirmed";
+    case "COMPLETED":
+      return "Completed";
+    case "PENDING":
+      return "Pending";
+    case "UNINITIALIZED":
+      return "Unassigned";
+    case "CANCELLED":
+      return "Cancelled";
+    case "DELAYED":
+      return "Delayed";
+    default:
+      return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+}
 
 export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
   const bookingId = params.id as string;
-  const { getBooking } = useBooking();
 
-  const booking = getBooking(bookingId);
+  // Data states
+  const [booking, setBooking] = React.useState<BookingWithRelations | null>(null);
+  const [schedule, setSchedule] = React.useState<BookingPaymentScheduleResult | null>(null);
+  const [bookingDocs, setBookingDocs] = React.useState<DocumentItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = React.useState(false);
+  const [generatingDocs, setGeneratingDocs] = React.useState(false);
+  const [generatingInvoice, setGeneratingInvoice] = React.useState(false);
+  const [confirmAction, setConfirmAction] = React.useState<{
+    title: string;
+    description: string;
+    confirmText: string;
+    variant?: "destructive" | "default" | "warning";
+    action: () => Promise<void>;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = React.useState(false);
 
-  // Active Tab
-  const [activeTab, setActiveTab] = React.useState<
-    "overview" | "items" | "itinerary" | "payments" | "financials" | "documents" | "timeline"
-  >("overview");
+  const handleGenerateInvoice = async () => {
+    setGeneratingInvoice(true);
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error?.message || json.message || "Failed to generate invoice.");
+      }
+      const inv = json.data || json;
+      router.push(`/invoices/${inv.id}`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to generate invoice.");
+    } finally {
+      setGeneratingInvoice(false);
+    }
+  };
 
-  // Modal States
+  // Add Payment Modal State
   const [isAddPaymentOpen, setIsAddPaymentOpen] = React.useState(false);
-  const [isSupplierPaymentOpen, setIsSupplierPaymentOpen] = React.useState(false);
-  const [isCancelModalOpen, setIsCancelModalOpen] = React.useState(false);
-  const [selectedItemForConfirm, setSelectedItemForConfirm] = React.useState<BookingItem | null>(null);
-  const [previewDocType, setPreviewDocType] = React.useState<BookingDocument["type"] | null>(null);
-  const [previewItem, setPreviewItem] = React.useState<BookingItem | null>(null);
+  const [paymentAmount, setPaymentAmount] = React.useState("");
+  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>(PaymentMethod.UPI);
+  const [referenceNumber, setReferenceNumber] = React.useState("");
+  const [receiptNumber, setReceiptNumber] = React.useState("");
+  const [paymentNotes, setPaymentNotes] = React.useState("");
+  const [savingPayment, setSavingPayment] = React.useState(false);
 
-  if (!booking) {
+  // Cancel Booking Modal State
+  const [isCancelModalOpen, setIsCancelModalOpen] = React.useState(false);
+  const [cancelReason, setCancelReason] = React.useState("");
+  const [cancelling, setCancelling] = React.useState(false);
+
+  // Fetch real booking from database API
+  const fetchBooking = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [res, schedRes, docsRes] = await Promise.all([
+        bookingClient.getBooking(bookingId),
+        financeClient.getBookingPaymentSchedule(bookingId).catch(() => null),
+        documentClient.list({ bookingId, limit: 50 }).catch(() => ({ data: [] })),
+      ]);
+      if (res.success && res.data) {
+        setBooking(res.data);
+      }
+      if (schedRes && (schedRes as any).data) {
+        setSchedule((schedRes as any).data);
+      }
+      if (docsRes && docsRes.data) {
+        setBookingDocs(docsRes.data);
+      }
+    } catch (err: any) {
+      if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
+        setIsReadOnly(true);
+      }
+      setError(err?.message || "Failed to load booking details.");
+    } finally {
+      setLoading(false);
+    }
+  }, [bookingId]);
+
+  React.useEffect(() => {
+    if (bookingId) fetchBooking();
+  }, [bookingId, fetchBooking]);
+
+  // Update Status
+  const handleStatusChange = async (newStatus: BookingStatus) => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Read-only mode is active.");
+      return;
+    }
+
+    if (newStatus === BookingStatus.CANCELLED) {
+      setIsCancelModalOpen(true);
+      return;
+    }
+
+    try {
+      await bookingClient.updateBooking(bookingId, { status: newStatus });
+      toast.success(`Booking status updated to ${newStatus}.`);
+      await fetchBooking();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update booking status.");
+    }
+  };
+
+  // Confirm Cancellation
+  const handleConfirmCancel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setCancelling(true);
+      await bookingClient.cancelBooking(bookingId, cancelReason.trim() || "Cancelled by agency staff.");
+      toast.success("Booking cancelled successfully.");
+      setIsCancelModalOpen(false);
+      await fetchBooking();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to cancel booking.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  // Add Payment
+  const handleOpenAddPayment = () => {
+    if (!booking) return;
+    const remaining = Number(booking.balanceAmount);
+    setPaymentAmount(remaining > 0 ? String(remaining) : "1000");
+    setPaymentMethod(PaymentMethod.UPI);
+    setReferenceNumber("");
+    setReceiptNumber("");
+    setPaymentNotes("");
+    setIsAddPaymentOpen(true);
+  };
+
+  const handleSavePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!booking) return;
+    const amt = Number(paymentAmount);
+    if (amt <= 0) {
+      toast.error("Please enter a valid positive payment amount.");
+      return;
+    }
+    const currentBalance = Number(booking.balanceAmount);
+    if (amt > currentBalance + 0.001) {
+      toast.error(`Payment amount cannot exceed the outstanding due of ${formatCurrency(currentBalance)}.`);
+      return;
+    }
+
+    try {
+      setSavingPayment(true);
+      const res = await paymentClient.createPayment({
+        bookingId,
+        amount: amt,
+        paymentMethod,
+        referenceNumber: referenceNumber.trim() || undefined,
+        receiptNumber: receiptNumber.trim() || undefined,
+        notes: paymentNotes.trim() || undefined,
+      });
+
+      if (res.success && res.data) {
+        toast.success(`Payment ${res.data.paymentNumber} recorded successfully!`);
+        setIsAddPaymentOpen(false);
+        await fetchBooking();
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to record payment.");
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  // Archive / Delete Payment
+  const handleDeletePayment = (paymentId: string, paymentNumber: string) => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Read-only mode is active.");
+      return;
+    }
+
+    setConfirmAction({
+      title: "Archive payment record?",
+      description: `Archive payment ${paymentNumber}? This will recalculate the booking balance.`,
+      confirmText: "Archive Payment",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setActionLoading(true);
+          await paymentClient.deletePayment(paymentId);
+          toast.success(`Payment ${paymentNumber} archived.`);
+          setConfirmAction(null);
+          await fetchBooking();
+        } catch (err: any) {
+          toast.error(getErrorMessage(err, "We couldn't archive the payment record. Please try again."));
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
+  };
+
+  // Generate Booking Documents
+  const handleGenerateDocuments = async () => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Read-only mode is active.");
+      return;
+    }
+    setGeneratingDocs(true);
+    try {
+      const res = await documentClient.generateForBooking(bookingId);
+      toast.success(`Generated ${res.generatedCount} travel documents!`);
+      await fetchBooking();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to generate documents.");
+    } finally {
+      setGeneratingDocs(false);
+    }
+  };
+
+  // Issue Document
+  const handleIssueDoc = async (docId: string, docNum: string) => {
+    try {
+      await documentClient.issue(docId, { notifyCustomer: false });
+      toast.success(`Document ${docNum} issued.`);
+      await fetchBooking();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to issue document.");
+    }
+  };
+
+  // Resend Document
+  const handleResendDoc = async (docId: string, docNum: string) => {
+    try {
+      const doc = bookingDocs.find((d) => d.id === docId);
+      const docTitle = doc?.title || docNum;
+      const portalUrl = typeof window !== "undefined" && booking?.tripId ? `${window.location.origin}/customer/trips/${booking.tripId}/documents` : (typeof window !== "undefined" ? `${window.location.origin}/customer` : "");
+      const message = `*Travel Document: ${docTitle}*\n\nHello ${booking?.customer?.name || "Traveler"},\nYour travel document (${docNum}) for booking #${booking?.bookingNumber} is available in your traveler portal:\n${portalUrl}`;
+      const res = openWhatsAppChat(booking?.customer?.phone, message);
+      if (!res.success) {
+        toast.error(res.error || "Customer does not have a valid WhatsApp phone number.");
+        return;
+      }
+      await documentClient.resend(docId, { channel: NotificationChannel.WHATSAPP });
+      toast.success(`WhatsApp chat opened for document ${docNum}. Action recorded.`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to send document.");
+    }
+  };
+
+  const formatDateDisplay = (date: Date | string | null | undefined) => {
+    if (!date) return "TBD";
+    return new Date(date).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 max-w-md w-full text-center space-y-4 shadow-sm">
-          <CalendarCheck className="h-12 w-12 text-slate-300 mx-auto" />
-          <h2 className="text-lg font-bold text-slate-900">Booking File Not Found</h2>
-          <p className="text-xs text-slate-500">
-            The booking with ID &quot;{bookingId}&quot; does not exist or has been archived.
-          </p>
-          <Button
-            variant="outline"
-            onClick={() => router.push("/bookings")}
-            className="text-xs font-semibold cursor-pointer"
-          >
-            Back to Bookings
-          </Button>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-slate-50/50">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
+        <h3 className="text-xs font-bold text-slate-700">Loading booking workspace...</h3>
       </div>
     );
   }
 
-  // Calculate Confirmation Progress
-  const totalItems = booking.items.length;
-  const confirmedItems = booking.items.filter((i) => i.status === "Confirmed").length;
-  const confirmationProgress = totalItems > 0 ? Math.round((confirmedItems / totalItems) * 100) : 0;
+  if (error || !booking) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-slate-50/50">
+        <AlertCircle className="h-12 w-12 text-slate-400 mb-3" />
+        <h3 className="text-lg font-bold text-slate-800">Booking Record Not Found</h3>
+        <p className="text-xs text-slate-500 max-w-md mt-1">
+          {error || "The requested booking record does not exist or has been archived."}
+        </p>
+        <Link href="/bookings" className="mt-4">
+          <Button variant="outline" size="sm" className="bg-white border-slate-200 cursor-pointer">
+            Back to Bookings
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
-  // Copy WhatsApp Reminder
-  const handleCopyPaymentReminder = () => {
-    const msg = generatePaymentReminderMessage(booking, booking.agencySnapshot?.phone);
-    navigator.clipboard.writeText(msg);
-    toast.success("Payment reminder message copied to clipboard!");
-  };
+  const total = Number(booking.totalAmount);
+  const paid = Number(booking.paidAmount);
+  const balance = Number(booking.balanceAmount);
+  const paidPercentage = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
 
-  // Copy Public Customer Portal Link
-  const handleCopyCustomerLink = () => {
-    const url = `${window.location.origin}/trip/${booking.secureToken}`;
-    navigator.clipboard.writeText(url);
-    toast.success("Customer booking portal link copied!");
-  };
+  const readiness = booking.operationalReadiness;
+  const readinessScore = readiness?.score ?? 0;
+  const isReady = readiness?.isReady ?? false;
+
+  const activeInvoice = booking.invoices?.[0];
+
+  const hotelConfirmations = booking.tripOperation?.hotelConfirmations || [];
+  const vehicleDispatches = booking.tripOperation?.vehicleDispatches || [];
+  const activityConfirmations = booking.tripOperation?.activityConfirmations || [];
+  const events = booking.tripOperation?.events || [];
+
+  const tripHotels = booking.trip?.tripHotels || [];
+  const tripVehicles = booking.trip?.tripVehicles || [];
+  const tripActivities = booking.trip?.tripActivities || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
-        {/* ─── TOP BREADCRUMB & ACTION BAR ─────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-              <Link href="/bookings" className="hover:text-indigo-600 transition-colors flex items-center gap-1">
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Bookings
-              </Link>
-              <span>/</span>
-              <span className="font-mono text-slate-700">{booking.bookingNumber}</span>
-            </div>
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
+      <div className="max-w-[1550px] mx-auto px-2.5 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6">
+        {isReadOnly && <ReadOnlyBanner moduleName="Booking Workspace" />}
 
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                {booking.title}
-              </h1>
+        {/* Top Hero Command Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4 bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-6 shadow-xs relative overflow-hidden">
+          <div className="space-y-3 z-10">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+              <Link
+                href="/bookings"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors shrink-0"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+              </Link>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0 whitespace-nowrap">
+                <CalendarCheck className="h-3 w-3 text-emerald-500" />
+                Booking Record
+              </span>
+              <span className="text-slate-300 hidden min-[380px]:inline">•</span>
               <BookingStatusBadge status={booking.status} />
               <PaymentStatusBadge status={booking.paymentStatus} />
+              {readiness && (
+                <Badge
+                  className={`text-[10px] font-bold shrink-0 whitespace-nowrap ${
+                    isReady
+                      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                      : readinessScore >= 50
+                      ? "bg-amber-100 text-amber-800 border-amber-200"
+                      : "bg-rose-100 text-rose-800 border-rose-200"
+                  }`}
+                >
+                  <ShieldCheck className="h-3 w-3 mr-1" />
+                  Readiness: {readinessScore}%
+                </Badge>
+              )}
             </div>
 
-            <p className="text-xs text-slate-500 flex items-center gap-2">
-              <span>Customer: <strong>{booking.customerSnapshot.name}</strong></span>
-              <span>•</span>
-              <span>{booking.startDate} → {booking.endDate}</span>
-              <span>•</span>
-              <span>{booking.adults} Adults {booking.children > 0 && `+ ${booking.children} Kids`}</span>
-            </p>
+            <div className="flex flex-wrap items-baseline gap-3">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900">
+                {booking.bookingNumber}
+              </h1>
+              <span className="text-xs font-semibold text-slate-500">
+                {booking.trip?.title} ({booking.customer?.name})
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                <span>Travel: <strong>{formatDateDisplay(booking.travelStartDate || booking.trip?.startDate)} → {formatDateDisplay(booking.travelEndDate || booking.trip?.endDate)}</strong></span>
+              </span>
+              <span className="text-slate-300 hidden min-[380px]:inline">•</span>
+              <span className="flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                <span>Booked on: {formatDateDisplay(booking.bookingDate)}</span>
+              </span>
+            </div>
           </div>
 
-          {/* Top Quick Actions */}
-          <div className="flex items-center gap-2 flex-wrap self-end sm:self-center">
-            {/* Customer Portal Link */}
+          {/* Action Buttons */}
+          <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 sm:gap-2.5 z-10 w-full lg:w-auto">
             <Button
               variant="outline"
               size="sm"
-              onClick={handleCopyCustomerLink}
-              className="text-xs font-semibold h-8.5 rounded-xl cursor-pointer bg-white"
-              title="Copy public customer portal link"
+              onClick={() => router.push(`/operations/${booking.tripId}`)}
+              className="w-full sm:w-auto justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
             >
-              <ExternalLink className="h-3.5 w-3.5 mr-1 text-indigo-600" />
-              Customer Link
+              <Compass className="h-3.5 w-3.5 mr-1 text-indigo-600 shrink-0" />
+              Operations Workspace
             </Button>
 
-            {/* Add Payment */}
-            <Button
-              size="sm"
-              onClick={() => setIsAddPaymentOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8.5 px-3.5 rounded-xl cursor-pointer shadow-2xs"
-            >
-              <IndianRupee className="h-3.5 w-3.5 mr-1" />
-              Add Payment
-            </Button>
-
-            {/* Document Preview */}
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                setPreviewDocType("Booking Confirmation");
-                setPreviewItem(null);
-              }}
-              className="text-xs font-semibold h-8.5 rounded-xl cursor-pointer bg-white"
+              onClick={() => router.push(`/trips/${booking.tripId}`)}
+              className="w-full sm:w-auto justify-center bg-white hover:bg-slate-50 border-slate-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
             >
-              <Download className="h-3.5 w-3.5 mr-1" />
-              Voucher / Docs
+              <Layers className="h-3.5 w-3.5 mr-1 text-slate-400 shrink-0" />
+              Trip Overview
             </Button>
 
-            {/* Cancel Booking */}
-            {booking.status !== "Cancelled" && (
+            {booking.quotationId && (
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
-                onClick={() => setIsCancelModalOpen(true)}
-                className="text-xs font-semibold h-8.5 rounded-xl cursor-pointer"
+                onClick={() => router.push(`/trips/${booking.tripId}/quotation/preview`)}
+                className="w-full sm:w-auto justify-center bg-white hover:bg-slate-50 border-slate-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer"
               >
-                Cancel Booking
+                <FileText className="h-3.5 w-3.5 mr-1 text-slate-400 shrink-0" />
+                Proposal View
               </Button>
             )}
-          </div>
-        </div>
 
-        {/* ─── NAVIGATION TABS ────────────────────────────────────────────── */}
-        <div className="flex items-center gap-1.5 overflow-x-auto border-b border-slate-200 pb-px no-scrollbar">
-          {[
-            { id: "overview", label: "Overview" },
-            { id: "items", label: `Bookings (${booking.items.length})` },
-            { id: "itinerary", label: "Itinerary" },
-            { id: "payments", label: `Payments (${booking.payments.length})` },
-            { id: "financials", label: "Financials (Internal)", isInternal: true },
-            { id: "documents", label: `Documents (${booking.documents.length})` },
-            { id: "timeline", label: "Timeline" },
-          ].map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold transition-all border-b-2 whitespace-nowrap cursor-pointer ${
-                  isActive
-                    ? "border-indigo-600 text-indigo-600 bg-indigo-50/40 rounded-t-xl"
-                    : "border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300"
-                }`}
+            <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
+              <Button
+                onClick={handleOpenAddPayment}
+                disabled={isReadOnly}
+                className="w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer disabled:opacity-50"
               >
-                {tab.isInternal && <Lock className="h-3 w-3 text-amber-500" />}
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+                <CreditCard className="h-4 w-4 shrink-0" />
+                Add Payment
+              </Button>
+
+              {/* Booking & Invoice Actions Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full sm:w-auto justify-center bg-white hover:bg-slate-50 border-slate-200 h-9 px-3 font-semibold text-xs rounded-xl shadow-2xs gap-1 cursor-pointer"
+                    >
+                      Actions
+                      <ChevronDown className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                    </Button>
+                  }
+                />
+              <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md rounded-xl p-1 w-52">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="text-[10px] font-bold uppercase text-slate-400 px-2 py-1">
+                    Invoice Actions
+                  </DropdownMenuLabel>
+                  {activeInvoice ? (
+                    <>
+                      <DropdownMenuItem
+                        onClick={() => router.push(`/invoices/${activeInvoice.id}`)}
+                        className="text-xs cursor-pointer rounded-md"
+                      >
+                        <FileText className="mr-2 h-3.5 w-3.5 text-slate-500" />
+                        View Invoice ({activeInvoice.invoiceNumber || "Draft"})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => window.open(`/api/invoices/${activeInvoice.id}/pdf`, "_blank")}
+                        className="text-xs cursor-pointer rounded-md"
+                      >
+                        <Download className="mr-2 h-3.5 w-3.5 text-slate-500" />
+                        Download Invoice PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setConfirmAction({
+                            title: "Regenerate Invoice?",
+                            description: "This will refresh the invoice using the latest booking details and financial values. The existing invoice number will remain unchanged.",
+                            confirmText: "Regenerate Invoice",
+                            variant: "default",
+                            action: async () => {
+                              try {
+                                setActionLoading(true);
+                                const res = await fetch(`/api/invoices/${activeInvoice.id}/regenerate`, {
+                                  method: "POST",
+                                });
+                                const json = await res.json();
+                                if (!res.ok) {
+                                  throw new Error(json.error?.message || json.message || "Failed to regenerate invoice.");
+                                }
+                                toast.success("Invoice regenerated successfully with latest booking values.");
+                                setConfirmAction(null);
+                                await fetchBooking();
+                              } catch (err: any) {
+                                toast.error(err?.message || "Failed to regenerate invoice.");
+                              } finally {
+                                setActionLoading(false);
+                              }
+                            },
+                          });
+                        }}
+                        disabled={isReadOnly || actionLoading || activeInvoice.status === "CANCELLED"}
+                        className="text-xs cursor-pointer rounded-md"
+                      >
+                        <RefreshCw className="mr-2 h-3.5 w-3.5 text-slate-500" />
+                        Regenerate Invoice
+                      </DropdownMenuItem>
+                    </>
+                  ) : (booking.status === BookingStatus.CONFIRMED ||
+                      booking.status === BookingStatus.ONGOING ||
+                      booking.status === BookingStatus.COMPLETED) ? (
+                    <DropdownMenuItem
+                      onClick={handleGenerateInvoice}
+                      disabled={generatingInvoice || isReadOnly}
+                      className="text-xs cursor-pointer rounded-md font-medium text-indigo-600 hover:bg-indigo-50"
+                    >
+                      {generatingInvoice ? (
+                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Receipt className="mr-2 h-3.5 w-3.5 text-indigo-600" />
+                      )}
+                      Generate Invoice
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem disabled className="text-xs text-slate-400">
+                      <Lock className="mr-2 h-3.5 w-3.5 text-slate-300" />
+                      Invoice Not Available
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            </div>
+          </div>
         </div>
 
-        {/* ─── TAB 1: OVERVIEW ────────────────────────────────────────────── */}
-        {activeTab === "overview" && (
-          <div className="space-y-6 animate-in fade-in-0">
-            {/* Operational Alerts Banner */}
-            {booking.pendingAmount > 0 && (
-              <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-2xs">
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
-                    <Clock className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-amber-900">
-                      Payment Pending: {formatCurrency(booking.pendingAmount)} Outstanding
-                    </h4>
-                    <p className="text-[11px] text-amber-700">
-                      Send a reminder or record payment when received from {booking.customerSnapshot.name}.
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={handleCopyPaymentReminder}
-                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-8 px-3 rounded-xl cursor-pointer shrink-0"
-                >
-                  <MessageSquare className="h-3.5 w-3.5 mr-1" />
-                  Copy WhatsApp Reminder
-                </Button>
-              </div>
-            )}
-
-            {/* 3 Metric Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Customer Card */}
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Customer Information
-                  </span>
-                  <User className="h-4 w-4 text-slate-400" />
-                </div>
-                <div className="space-y-1.5 text-xs">
-                  <p className="font-bold text-slate-900 text-sm">{booking.customerSnapshot.name}</p>
-                  <p className="text-slate-600 flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-slate-400" />
-                    {booking.customerSnapshot.phone || "-"}
-                  </p>
-                  {booking.customerSnapshot.email && (
-                    <p className="text-slate-600 flex items-center gap-1.5">
-                      <Mail className="h-3.5 w-3.5 text-slate-400" />
-                      {booking.customerSnapshot.email}
-                    </p>
-                  )}
-                  {booking.customerSnapshot.city && (
-                    <p className="text-slate-600 flex items-center gap-1.5">
-                      <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                      {booking.customerSnapshot.city}
-                    </p>
-                  )}
-                </div>
+        {/* Operational Readiness Banner */}
+        {readiness && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-5 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <ShieldCheck className={`h-4 w-4 ${isReady ? "text-emerald-600" : "text-amber-500"} shrink-0`} />
+                  <span>Operational Readiness Check</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Automated service confirmations and blocker validation for departure readiness.
+                </p>
               </div>
 
-              {/* Trip Card */}
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Trip Overview
-                  </span>
-                  <Compass className="h-4 w-4 text-slate-400" />
-                </div>
-                <div className="space-y-1.5 text-xs">
-                  <p className="font-bold text-slate-900 text-sm">{booking.destination}</p>
-                  <p className="text-slate-600 flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                    {booking.startDate} → {booking.endDate}
-                  </p>
-                  <p className="text-slate-600 flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-slate-400" />
-                    {booking.adults} Adults{booking.children > 0 ? `, ${booking.children} Children` : ""}
-                  </p>
-                  <p className="text-[11px] text-indigo-600 font-semibold pt-1">
-                    Quotation Ref: {booking.quotationId ? "QT-Linked" : "Direct"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Payment Card */}
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Customer Payment Status
-                  </span>
-                  <IndianRupee className="h-4 w-4 text-slate-400" />
-                </div>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-slate-500">Total Price:</span>
-                    <span className="font-black text-slate-900 text-base">{formatCurrency(booking.totalAmount)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Collected:</span>
-                    <span className="font-bold text-emerald-600">{formatCurrency(booking.paidAmount)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Pending:</span>
-                    <span className="font-bold text-amber-600">{formatCurrency(booking.pendingAmount)}</span>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden mt-2">
-                    <div
-                      className="bg-emerald-500 h-2 rounded-full transition-all"
-                      style={{
-                        width: `${
-                          booking.totalAmount > 0
-                            ? Math.min(100, (booking.paidAmount / booking.totalAmount) * 100)
-                            : 0
-                        }%`,
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Booking Services Confirmation Progress */}
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Supplier Confirmation Progress</h3>
-                  <p className="text-xs text-slate-500">
-                    {confirmedItems} of {totalItems} travel services confirmed by suppliers
-                  </p>
-                </div>
-                <span className="text-sm font-black text-indigo-600 font-mono">
-                  {confirmationProgress}% Complete
+              <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3 w-full sm:w-auto">
+                <span className="text-xs font-bold text-slate-700 font-mono shrink-0">
+                  {readinessScore}% Ready
                 </span>
-              </div>
-
-              <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                <div
-                  className={`h-2.5 rounded-full transition-all ${
-                    confirmationProgress === 100 ? "bg-emerald-500" : "bg-indigo-600"
-                  }`}
-                  style={{ width: `${confirmationProgress}%` }}
-                ></div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
-                {booking.items.map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => {
-                      setSelectedItemForConfirm(item);
-                    }}
-                    className="border border-slate-100 rounded-xl p-3 bg-slate-50/60 hover:bg-slate-100/80 hover:border-slate-200 transition-all cursor-pointer flex items-center justify-between gap-2"
-                  >
-                    <div className="min-w-0">
-                      <span className="font-bold text-xs text-slate-800 truncate block">{item.title}</span>
-                      <span className="text-[11px] text-slate-400 block truncate">
-                        {item.type} • {item.supplierName || "Direct"}
-                      </span>
-                    </div>
-                    <ItemStatusBadge status={item.status} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ─── TAB 2: BOOKINGS (ITEMS) ────────────────────────────────────── */}
-        {activeTab === "items" && (
-          <div className="space-y-6 animate-in fade-in-0">
-            {/* Hotels Section */}
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <Hotel className="h-5 w-5 text-indigo-600" />
-                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                    Hotel & Resort Bookings
-                  </h3>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {booking.items
-                  .filter((i) => i.type === "Hotel")
-                  .map((hotel) => (
-                    <div
-                      key={hotel.id}
-                      className="border border-slate-200 rounded-xl p-4.5 bg-slate-50/40 space-y-3"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-sm text-slate-900">{hotel.title}</h4>
-                            <ItemStatusBadge status={hotel.status} />
-                          </div>
-                          <p className="text-xs text-slate-500">
-                            {hotel.destination} • {hotel.roomType} ({hotel.numberOfRooms} Room{hotel.numberOfRooms && hotel.numberOfRooms > 1 ? "s" : ""}) • {hotel.mealPlan}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {hotel.confirmationNumber && (
-                            <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/80">
-                              Ref: {hotel.confirmationNumber}
-                            </span>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelectedItemForConfirm(hotel)}
-                            className="h-8 text-xs font-semibold cursor-pointer bg-white"
-                          >
-                            Update / Confirm
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setPreviewDocType("Hotel Voucher");
-                              setPreviewItem(hotel);
-                            }}
-                            className="h-8 text-xs font-semibold cursor-pointer"
-                            title="Generate Hotel Voucher"
-                          >
-                            <FileText className="h-3.5 w-3.5 mr-1" />
-                            Voucher
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white border border-slate-100 rounded-lg p-3 text-xs text-slate-600">
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Check-in</span>
-                          <span className="font-bold text-slate-800">{hotel.startDate || booking.startDate}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Check-out</span>
-                          <span className="font-bold text-slate-800">{hotel.endDate || booking.endDate}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Duration</span>
-                          <span className="font-bold text-slate-800">{hotel.nights || 2} Nights</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Supplier Partner</span>
-                          <span className="font-bold text-indigo-600">{hotel.supplierName || "Direct"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-
-            {/* Vehicles Section */}
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <Car className="h-5 w-5 text-emerald-600" />
-                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                    Vehicle & Fleet Bookings
-                  </h3>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {booking.items
-                  .filter((i) => i.type === "Vehicle")
-                  .map((veh) => (
-                    <div
-                      key={veh.id}
-                      className="border border-slate-200 rounded-xl p-4.5 bg-slate-50/40 space-y-3"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-sm text-slate-900">{veh.title}</h4>
-                            <ItemStatusBadge status={veh.status} />
-                          </div>
-                          <p className="text-xs text-slate-500">{veh.subtitle || "Private AC Vehicle"}</p>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {veh.confirmationNumber && (
-                            <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/80">
-                              Slip: {veh.confirmationNumber}
-                            </span>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelectedItemForConfirm(veh)}
-                            className="h-8 text-xs font-semibold cursor-pointer bg-white"
-                          >
-                            Update / Assign Driver
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setPreviewDocType("Vehicle Confirmation");
-                              setPreviewItem(veh);
-                            }}
-                            className="h-8 text-xs font-semibold cursor-pointer"
-                          >
-                            <FileText className="h-3.5 w-3.5 mr-1" />
-                            Voucher
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white border border-slate-100 rounded-lg p-3 text-xs text-slate-600">
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Pickup</span>
-                          <span className="font-bold text-slate-800">{veh.pickupLocation || booking.destination}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Drop</span>
-                          <span className="font-bold text-slate-800">{veh.dropLocation || booking.destination}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Driver</span>
-                          <span className="font-bold text-slate-800">{veh.driverName || "Pending Assignment"}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Driver Phone</span>
-                          <span className="font-bold text-slate-800">{veh.driverPhone || "-"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-
-            {/* Activities Section */}
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <Ticket className="h-5 w-5 text-amber-600" />
-                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                    Activities & Excursions
-                  </h3>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {booking.items
-                  .filter((i) => i.type === "Activity")
-                  .map((act) => (
-                    <div
-                      key={act.id}
-                      className="border border-slate-200 rounded-xl p-4 bg-slate-50/40 flex items-center justify-between gap-4"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-xs text-slate-900">{act.title}</h4>
-                          <ItemStatusBadge status={act.status} />
-                        </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {act.destination} • {act.guests || booking.adults} Guests • {act.time || "Scheduled Slot"}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {act.confirmationNumber && (
-                          <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/80">
-                            {act.confirmationNumber}
-                          </span>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedItemForConfirm(act)}
-                          className="h-8 text-xs font-semibold cursor-pointer bg-white"
-                        >
-                          Confirm
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ─── TAB 3: ITINERARY ───────────────────────────────────────────── */}
-        {activeTab === "itinerary" && (
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4 animate-in fade-in-0">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3">
-              Confirmed Travel Itinerary
-            </h3>
-
-            {booking.itinerarySnapshot && booking.itinerarySnapshot.length > 0 ? (
-              <div className="space-y-4">
-                {booking.itinerarySnapshot.map((day) => (
-                  <div
-                    key={day.dayNumber}
-                    className="flex gap-4 border-l-2 border-indigo-500 pl-4 py-1"
-                  >
-                    <div className="shrink-0 font-bold text-xs text-indigo-600">
-                      Day {day.dayNumber}
-                    </div>
-                    <div className="space-y-0.5">
-                      <h4 className="font-bold text-xs text-slate-900">{day.title}</h4>
-                      <p className="text-xs text-slate-600 leading-relaxed">{day.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400 py-6 text-center">
-                No day-by-day itinerary snapshot available for this booking.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* ─── TAB 4: PAYMENTS ────────────────────────────────────────────── */}
-        {activeTab === "payments" && (
-          <div className="space-y-6 animate-in fade-in-0">
-            {/* Customer Payments Table */}
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                    Customer Payment Transactions
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Collected {formatCurrency(booking.paidAmount)} of {formatCurrency(booking.totalAmount)}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => setIsAddPaymentOpen(true)}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8.5 px-3 rounded-xl cursor-pointer"
-                  >
-                    <IndianRupee className="h-3.5 w-3.5 mr-1" />
-                    + Add Payment
+                <Link href={`/operations/${booking.tripId}`} className="shrink-0">
+                  <Button size="sm" variant="outline" className="text-xs h-7.5 bg-slate-50 border-slate-200 cursor-pointer">
+                    Manage Operations <ChevronRight className="h-3 w-3 ml-1" />
                   </Button>
-                </div>
+                </Link>
               </div>
-
-              {booking.payments.length === 0 ? (
-                <div className="text-center py-8 text-xs text-slate-400">
-                  No customer payments recorded yet. Click &quot;+ Add Payment&quot; above.
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100 text-xs">
-                  {booking.payments.map((p) => (
-                    <div key={p.id} className="py-3 flex items-center justify-between gap-4">
-                      <div className="space-y-0.5">
-                        <span className="font-bold text-slate-900 text-sm">
-                          {formatCurrency(p.amount)}
-                        </span>
-                        <p className="text-[11px] text-slate-500">
-                          {p.date} • {p.method} {p.transactionId && `(Ref: ${p.transactionId})`}
-                        </p>
-                        {p.notes && <p className="text-[11px] text-slate-600 italic">{p.notes}</p>}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
-                          {p.receiptNumber}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setPreviewDocType("Payment Receipt");
-                            setPreviewItem(null);
-                          }}
-                          className="h-7.5 text-xs font-semibold cursor-pointer bg-white"
-                        >
-                          <Printer className="h-3 w-3 mr-1" />
-                          Receipt
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
-            {/* Refunds Section (If Any) */}
-            {booking.refunds.length > 0 && (
-              <div className="bg-white border border-rose-200/90 rounded-2xl p-6 shadow-2xs space-y-4">
-                <div className="flex items-center justify-between border-b border-rose-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <RotateCcw className="h-5 w-5 text-rose-600" />
-                    <h3 className="text-sm font-bold text-rose-900 uppercase tracking-wider">
-                      Customer Refund Records
-                    </h3>
+            {/* Progress Bar */}
+            <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden my-3">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  isReady ? "bg-emerald-500" : readinessScore >= 50 ? "bg-amber-500" : "bg-rose-500"
+                }`}
+                style={{ width: `${readinessScore}%` }}
+              />
+            </div>
+
+            {/* Checklist Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 pt-1 text-xs">
+              {readiness.checks.map((c) => (
+                <div
+                  key={c.key}
+                  className={`p-2.5 sm:p-3 rounded-xl border ${
+                    c.passed
+                      ? "bg-emerald-50/50 border-emerald-100 text-emerald-900"
+                      : "bg-amber-50/50 border-amber-100 text-amber-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-bold text-[11px] sm:text-xs">
+                    {c.passed ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                    )}
+                    <span>{c.label}</span>
                   </div>
+                  {c.details && <p className="text-[10px] text-slate-600 mt-1 leading-snug">{c.details}</p>}
                 </div>
-
-                <div className="space-y-3 text-xs">
-                  {booking.refunds.map((ref) => (
-                    <div
-                      key={ref.id}
-                      className="border border-rose-100 bg-rose-50/40 rounded-xl p-3.5 flex justify-between items-center"
-                    >
-                      <div>
-                        <span className="font-black text-rose-700 text-sm">
-                          {formatCurrency(ref.amount)}
-                        </span>
-                        <p className="text-[11px] text-slate-600 mt-0.5">
-                          Status: <strong>{ref.status}</strong> • Date: {ref.date}
-                        </p>
-                        {ref.notes && <p className="text-[11px] text-slate-500 mt-0.5">{ref.notes}</p>}
-                      </div>
-
-                      {ref.status === "Pending" && (
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            const refNo = prompt("Enter Refund Reference / Bank UTR Number:");
-                            if (refNo) {
-                              toast.success("Refund processed successfully!");
-                            }
-                          }}
-                          className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-8 cursor-pointer"
-                        >
-                          Process Refund
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         )}
 
-        {/* ─── TAB 5: FINANCIALS (INTERNAL ONLY) ──────────────────────────── */}
-        {activeTab === "financials" && (
-          <div className="space-y-6 animate-in fade-in-0">
-            <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 flex items-center gap-2.5 text-xs text-amber-900 font-semibold">
-              <Lock className="h-4 w-4 text-amber-600 shrink-0" />
-              <span>Internal Agent Financial Summary — strictly confidential and never visible on customer links.</span>
-            </div>
-
-            {/* Financial Breakdown Table */}
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3">
-                Profit & Loss Breakdown
-              </h3>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Customer Selling</span>
-                  <span className="text-sm font-black text-slate-900">{formatCurrency(booking.totalAmount)}</span>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Customer Paid</span>
-                  <span className="text-sm font-bold text-emerald-600">{formatCurrency(booking.paidAmount)}</span>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Supplier Cost</span>
-                  <span className="text-sm font-bold text-slate-700">{formatCurrency(booking.totalSupplierCost)}</span>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Supplier Paid</span>
-                  <span className="text-sm font-bold text-blue-600">{formatCurrency(booking.paidSupplierCost)}</span>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Supplier Payable</span>
-                  <span className="text-sm font-bold text-amber-600">{formatCurrency(booking.pendingSupplierCost)}</span>
-                </div>
-                <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3">
-                  <span className="text-[10px] text-emerald-800 font-bold uppercase block">Expected Profit</span>
-                  <span className="text-sm font-black text-emerald-700">{formatCurrency(booking.expectedProfit)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Supplier Payables Log */}
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        {/* Main Content Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Col (2 cols): Services + Financials + Timeline */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* 1. Operational Services Section */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                    Supplier Payable Disbursements
+                  <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <Hotel className="h-4 w-4 text-indigo-600 shrink-0" />
+                    <span>Operational Services & Allocations</span>
                   </h3>
-                  <p className="text-xs text-slate-500">
-                    Paid {formatCurrency(booking.paidSupplierCost)} of {formatCurrency(booking.totalSupplierCost)}
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Real-time status of hotel vouchers, chauffeur dispatches, and activity passes.
                   </p>
                 </div>
 
-                <Button
-                  size="sm"
-                  onClick={() => setIsSupplierPaymentOpen(true)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8.5 px-3 rounded-xl cursor-pointer"
-                >
-                  + Record Supplier Payment
-                </Button>
+                <Link href={`/operations/${booking.tripId}`} className="w-full sm:w-auto shrink-0">
+                  <Button size="sm" variant="outline" className="w-full sm:w-auto justify-center text-xs h-8 cursor-pointer">
+                    Operations Desk <ExternalLink className="h-3 w-3 ml-1 shrink-0" />
+                  </Button>
+                </Link>
               </div>
 
-              {booking.supplierPayments.length === 0 ? (
-                <div className="text-center py-6 text-xs text-slate-400">
-                  No supplier disbursements recorded yet.
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100 text-xs">
-                  {booking.supplierPayments.map((sp) => (
-                    <div key={sp.id} className="py-3 flex items-center justify-between">
-                      <div>
-                        <span className="font-bold text-slate-900">{formatCurrency(sp.amount)}</span>
-                        <p className="text-[11px] text-slate-500">
-                          To: <strong>{sp.supplierName}</strong> • {sp.date} • {sp.method}
-                        </p>
-                        {sp.notes && <p className="text-[11px] text-slate-500 italic">{sp.notes}</p>}
-                      </div>
-                      {sp.transactionId && (
-                        <span className="font-mono text-[11px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
-                          {sp.transactionId}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+              {/* Services Sub-Tabs / Tables */}
+              <div className="p-5 space-y-5">
+                {/* Hotels */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2 flex items-center gap-1.5">
+                    <Hotel className="h-3.5 w-3.5 text-slate-400" />
+                    <span>Hotel Accommodations ({tripHotels.length > 0 ? tripHotels.length : hotelConfirmations.length})</span>
+                  </h4>
 
-        {/* ─── TAB 6: DOCUMENTS ───────────────────────────────────────────── */}
-        {activeTab === "documents" && (
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4 animate-in fade-in-0">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3">
-              Generated Vouchers & Documents
-            </h3>
+                  {tripHotels.length === 0 && hotelConfirmations.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-xl">
+                      No hotel accommodations booked for this trip.
+                    </p>
+                  ) : (
+                    <div className="border border-slate-100 rounded-xl overflow-hidden">
+                      <Table>
+                        <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
+                          <TableRow>
+                            <TableHead className="py-2 px-3">Hotel</TableHead>
+                            <TableHead className="py-2 px-3">Room & Meal</TableHead>
+                            <TableHead className="py-2 px-3">Confirmation #</TableHead>
+                            <TableHead className="py-2 px-3 text-right">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tripHotels.length > 0
+                            ? tripHotels.map((th) => {
+                                const conf = hotelConfirmations.find(
+                                  (h) => (h as any).tripHotelId === th.id || h.tripHotel?.id === th.id
+                                );
+                                const hotelName = th.hotel?.name || conf?.tripHotel?.hotel?.name || "Hotel Accommodation";
+                                const hotelCity = th.hotel?.city || conf?.tripHotel?.hotel?.city;
+                                const roomDetails = `${th.rooms ? `${th.rooms} x ` : ""}${th.roomType || conf?.roomDetails || "Standard"} • ${th.mealPlan || conf?.mealPlan || "EP"}`;
+                                const confNumber = conf?.confirmationNumber || "Pending";
+                                const status = conf?.status || (booking.tripOperation ? "PENDING" : "UNINITIALIZED");
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {booking.documents.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="border border-slate-200 rounded-xl p-4 bg-slate-50/40 flex items-center justify-between gap-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center">
-                      <FileText className="h-5 w-5" />
+                                return (
+                                  <TableRow key={th.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                    <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                      {hotelName}
+                                      <span className="text-[10px] text-slate-400 block font-normal">
+                                        {hotelCity ? `${hotelCity} • ` : ""}{formatDateDisplay(th.checkIn)} → {formatDateDisplay(th.checkOut)}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-600">
+                                      {roomDetails}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
+                                      {confNumber}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-right">
+                                      <Badge
+                                        className={`text-[10px] font-bold ${
+                                          status === "CONFIRMED"
+                                            ? "bg-emerald-100 text-emerald-800"
+                                            : status === "UNINITIALIZED"
+                                            ? "bg-slate-100 text-slate-600"
+                                            : "bg-amber-100 text-amber-800"
+                                        }`}
+                                      >
+                                        {status}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            : hotelConfirmations.map((h) => (
+                                <TableRow key={h.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                  <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                    {h.tripHotel?.hotel?.name || "Hotel Accommodation"}
+                                    {h.tripHotel?.hotel?.city && (
+                                      <span className="text-[10px] text-slate-400 block">{h.tripHotel.hotel.city}</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-slate-600">
+                                    {h.roomDetails || h.tripHotel?.roomType || "Standard"} • {h.mealPlan || h.tripHotel?.mealPlan || "EP"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
+                                    {h.confirmationNumber || "Pending"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-right">
+                                    <Badge
+                                      className={`text-[10px] font-bold ${
+                                        h.status === "CONFIRMED"
+                                          ? "bg-emerald-100 text-emerald-800"
+                                          : "bg-amber-100 text-amber-800"
+                                      }`}
+                                    >
+                                      {h.status}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                        </TableBody>
+                      </Table>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-xs text-slate-900">{doc.name}</h4>
-                      <p className="text-[11px] text-slate-400">{doc.type}</p>
+                  )}
+                </div>
+
+                {/* Vehicles */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2 flex items-center gap-1.5">
+                    <Car className="h-3.5 w-3.5 text-slate-400" />
+                    <span>Transport & Fleet Dispatches ({tripVehicles.length > 0 ? tripVehicles.length : vehicleDispatches.length})</span>
+                  </h4>
+
+                  {tripVehicles.length === 0 && vehicleDispatches.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-xl">
+                      No vehicle or transport services booked for this trip.
+                    </p>
+                  ) : (
+                    <div className="border border-slate-100 rounded-xl overflow-hidden">
+                      <Table>
+                        <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
+                          <TableRow>
+                            <TableHead className="py-2 px-3">Vehicle</TableHead>
+                            <TableHead className="py-2 px-3">Driver (Chauffeur)</TableHead>
+                            <TableHead className="py-2 px-3">Plate #</TableHead>
+                            <TableHead className="py-2 px-3 text-right">Dispatch Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tripVehicles.length > 0
+                            ? tripVehicles.map((tv) => {
+                                const disp = vehicleDispatches.find(
+                                  (v) => (v as any).tripVehicleId === tv.id || (v as any).tripVehicle?.id === tv.id || (tv.vehicleId && v.vehicleId === tv.vehicleId)
+                                );
+                                const vehicleName = tv.vehicleName || tv.vehicle?.name || disp?.vehicle?.name || "Private Dedicated Vehicle";
+                                const routeOrDates = tv.pickupLocation && tv.dropLocation
+                                  ? `${tv.pickupLocation} → ${tv.dropLocation}`
+                                  : tv.startDate
+                                  ? formatDateDisplay(tv.startDate)
+                                  : tv.vehicleType || tv.vehicle?.type || "Dedicated Transport";
+                                const driverInfo = disp?.driverName
+                                  ? `${disp.driverName}${disp.driverPhone ? ` (${disp.driverPhone})` : ""}`
+                                  : tv.driverName
+                                  ? `${tv.driverName}${tv.driverPhone ? ` (${tv.driverPhone})` : ""}`
+                                  : "Driver to be assigned";
+                                const plateNumber = disp?.vehicleNumber || "Pending";
+                                const status = disp?.status || (tv.driverName ? "ASSIGNED" : booking.tripOperation ? "PENDING" : "UNINITIALIZED");
+
+                                return (
+                                  <TableRow key={tv.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                    <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                      {vehicleName}
+                                      <span className="text-[10px] text-slate-400 block font-normal">{routeOrDates}</span>
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-600">
+                                      {driverInfo}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
+                                      {plateNumber}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-right">
+                                      <Badge
+                                        className={`text-[10px] font-bold ${
+                                          status === "CONFIRMED" || status === "ASSIGNED" || status === "ON_DUTY" || status === "COMPLETED"
+                                            ? "bg-emerald-100 text-emerald-800"
+                                            : status === "UNINITIALIZED"
+                                            ? "bg-slate-100 text-slate-600"
+                                            : "bg-amber-100 text-amber-800"
+                                        }`}
+                                      >
+                                        {formatDispatchStatus(status)}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            : vehicleDispatches.map((v) => (
+                                <TableRow key={v.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                  <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                    {(v as any).tripVehicle?.vehicleName || v.vehicle?.name || "Private Dedicated Vehicle"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-slate-600">
+                                    {v.driverName ? `${v.driverName} (${v.driverPhone || "N/A"})` : "Driver to be assigned"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-slate-700 font-mono text-[11px]">
+                                    {v.vehicleNumber || "Pending"}
+                                  </TableCell>
+                                  <TableCell className="py-2.5 px-3 text-right">
+                                    <Badge
+                                      className={`text-[10px] font-bold ${
+                                        v.status === "CONFIRMED" || v.status === "ASSIGNED"
+                                          ? "bg-emerald-100 text-emerald-800"
+                                          : "bg-amber-100 text-amber-800"
+                                      }`}
+                                    >
+                                      {formatDispatchStatus(v.status)}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Activities */}
+                {(tripActivities.length > 0 || activityConfirmations.length > 0) && (
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2 flex items-center gap-1.5">
+                      <Ticket className="h-3.5 w-3.5 text-slate-400" />
+                      <span>Sightseeing & Activities ({tripActivities.length > 0 ? tripActivities.length : activityConfirmations.length})</span>
+                    </h4>
+
+                    <div className="border border-slate-100 rounded-xl overflow-hidden">
+                      <Table>
+                        <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
+                          <TableRow>
+                            <TableHead className="py-2 px-3">Activity</TableHead>
+                            <TableHead className="py-2 px-3">Location & Schedule</TableHead>
+                            {/* Operational Pass / Voucher # and Status columns preserved in comments per architecture rules */}
+                            {/* <TableHead className="py-2 px-3">Pass / Voucher #</TableHead> */}
+                            {/* <TableHead className="py-2 px-3 text-right">Status</TableHead> */}
+                            <TableHead className="py-2 px-3 text-right">Inclusion</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tripActivities.length > 0
+                            ? tripActivities.map((ta) => {
+                                const conf = activityConfirmations.find(
+                                  (a) => (a as any).tripActivityId === ta.id || (a as any).tripActivity?.id === ta.id || (ta.activityId && (a as any).activityId === ta.activityId)
+                                );
+                                const actName = ta.name || ta.activity?.name || conf?.activity?.name || "Sightseeing Activity";
+                                const locationAndDate = `${ta.location || ta.activity?.location || conf?.tripActivity?.location || conf?.activity?.location || "Destination"}${ta.date ? ` • ${formatDateDisplay(ta.date)}` : ""}${ta.time ? ` (${ta.time})` : ""}${ta.numberOfParticipants ? ` • ${ta.numberOfParticipants} pax` : ""}`;
+                                const isExcluded = (ta as any).type === "EXCLUDED" || (ta as any).type === "OPTIONAL";
+                                // Operational pass details preserved for backward compatibility
+                                // const voucherNumber = conf?.confirmationNumber || conf?.ticketNumber || (conf as any)?.passNumber || "Pending";
+                                // const status = conf?.status || (booking.tripOperation ? "PENDING" : "UNINITIALIZED");
+
+                                return (
+                                  <TableRow key={ta.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                    <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                      {actName}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-600">
+                                      {locationAndDate}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-right">
+                                      <span
+                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                          isExcluded
+                                            ? "bg-amber-50 text-amber-800 border-amber-200"
+                                            : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                        }`}
+                                      >
+                                        {isExcluded ? "Not Included" : "Included"}
+                                      </span>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            : activityConfirmations.map((a) => {
+                                const isExcluded = (a as any).tripActivity?.type === "EXCLUDED" || (a as any).tripActivity?.type === "OPTIONAL";
+                                return (
+                                  <TableRow key={a.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                                    <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                                      {a.activity?.name || (a as any).tripActivity?.name || "Sightseeing Activity"}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-slate-600">
+                                      {a.activityLocation || a.activity?.location || (a as any).tripActivity?.location || "Destination"}
+                                    </TableCell>
+                                    <TableCell className="py-2.5 px-3 text-right">
+                                      <span
+                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                          isExcluded
+                                            ? "bg-amber-50 text-amber-800 border-amber-200"
+                                            : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                        }`}
+                                      >
+                                        {isExcluded ? "Not Included" : "Included"}
+                                      </span>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                        </TableBody>
+                      </Table>
                     </div>
                   </div>
+                )}
+              </div>
+            </div>
 
+            {/* 2. Official Travel Documents & Vouchers Section */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-indigo-600 shrink-0" />
+                    <span>Official Travel Documents & Vouchers ({bookingDocs.length})</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Official booking confirmations, hotel vouchers, transport passes, and itineraries.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      setPreviewDocType(doc.type);
-                      setPreviewItem(null);
-                    }}
-                    className="text-xs font-semibold h-8 rounded-lg cursor-pointer bg-white"
+                    onClick={handleGenerateDocuments}
+                    disabled={generatingDocs || isReadOnly || booking.status === "CANCELLED"}
+                    className="w-full sm:w-auto justify-center text-xs h-8 border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold cursor-pointer gap-1"
                   >
-                    <Printer className="h-3 w-3 mr-1" />
-                    Print
+                    {generatingDocs ? <Loader2 className="h-3 w-3 animate-spin shrink-0" /> : <Sparkles className="h-3 w-3 shrink-0" />}
+                    {bookingDocs.length === 0 ? "Generate All Documents" : "Re-sync Documents"}
                   </Button>
+
+                  <Link href="/documents" className="w-full sm:w-auto">
+                    <Button size="sm" variant="ghost" className="w-full sm:w-auto justify-center text-xs h-8 text-slate-500 hover:text-slate-900 cursor-pointer">
+                      Document Center <ExternalLink className="h-3 w-3 ml-1 shrink-0" />
+                    </Button>
+                  </Link>
                 </div>
-              ))}
+              </div>
+
+              <div className="p-4 sm:p-5">
+                {bookingDocs.length === 0 ? (
+                  <div className="p-4 sm:p-6 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                    <FileText className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-xs font-bold text-slate-700">No travel documents generated yet</p>
+                    <p className="text-[11px] text-slate-500 max-w-sm mx-auto mt-1 mb-3">
+                      Click "Generate All Documents" to build official booking confirmations, stay vouchers, and itineraries.
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={handleGenerateDocuments}
+                      disabled={generatingDocs || isReadOnly || booking.status === "CANCELLED"}
+                      className="w-full sm:w-auto justify-center text-xs h-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer gap-1"
+                    >
+                      {generatingDocs ? <Loader2 className="h-3 w-3 animate-spin shrink-0" /> : <Sparkles className="h-3 w-3 shrink-0" />}
+                      Generate All Documents
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="border border-slate-100 rounded-xl overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
+                        <TableRow>
+                          <TableHead className="py-2 px-3">Doc # / Ver</TableHead>
+                          <TableHead className="py-2 px-3">Type & Title</TableHead>
+                          <TableHead className="py-2 px-3">Status</TableHead>
+                          <TableHead className="py-2 px-3 text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {bookingDocs.map((doc) => (
+                          <TableRow key={doc.id} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                            <TableCell className="py-2.5 px-3 font-mono font-bold text-slate-900">
+                              <div className="flex items-center gap-1">
+                                <span>{doc.documentNumber}</span>
+                                <span className="text-[9px] font-normal px-1 py-0.5 rounded bg-slate-100 text-slate-600">
+                                  v{doc.version}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3">
+                              <div className="font-bold text-slate-800">{doc.title}</div>
+                              <div className="text-[10px] text-slate-500">{doc.documentType}</div>
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3">
+                              <Badge
+                                className={`text-[9px] font-bold ${
+                                  doc.status === "ISSUED"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : doc.status === "GENERATED"
+                                    ? "bg-amber-100 text-amber-800"
+                                    : doc.status === "REVOKED"
+                                    ? "bg-rose-100 text-rose-800"
+                                    : "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                {doc.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <a
+                                  href={documentClient.getDownloadUrl(doc.id)}
+                                  download
+                                  className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-md transition-colors"
+                                  title="Download PDF"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                </a>
+
+                                {doc.status === "GENERATED" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleIssueDoc(doc.id, doc.documentNumber)}
+                                    className="h-7 px-2 text-[10px] text-emerald-700 border-emerald-200 hover:bg-emerald-50 font-bold cursor-pointer gap-1"
+                                  >
+                                    <CheckCircle2 className="h-3 w-3" /> Issue
+                                  </Button>
+                                )}
+
+                                {doc.status === "ISSUED" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleResendDoc(doc.id, doc.documentNumber)}
+                                    className="h-7 px-2 text-[10px] text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-bold cursor-pointer gap-1"
+                                  >
+                                    <Send className="h-3 w-3" /> WhatsApp
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* ─── TAB 7: TIMELINE ────────────────────────────────────────────── */}
-        {activeTab === "timeline" && (
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4 animate-in fade-in-0">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-3">
-              Booking Activity & Audit Log
-            </h3>
+            {/* 3. Financial Status Summary Card */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-6 shadow-xs space-y-3.5 sm:space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-2">
+                <h3 className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 min-w-0">
+                  <IndianRupee className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="truncate">Commercial Ledger</span>
+                  <span className="hidden sm:inline">Financial</span>
+                </h3>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-700 font-mono shrink-0 whitespace-nowrap bg-slate-100/80 px-2 py-0.5 rounded-md border border-slate-200/60">
+                  {paidPercentage}% Collected
+                </span>
+              </div>
 
-            <div className="space-y-4">
-              {booking.timeline.map((event) => (
-                <div key={event.id} className="flex items-start gap-3 text-xs">
-                  <div className="h-2 w-2 rounded-full bg-indigo-600 mt-1.5 shrink-0"></div>
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{event.title}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">{event.createdAt.split("T")[0]}</span>
+              {/* Progress Bar */}
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${paidPercentage}%` }}
+                />
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-2.5 sm:gap-3 pt-1 text-xs">
+                <div className="p-2.5 sm:p-3.5 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Total Contract</span>
+                  <strong className="text-sm sm:text-base text-slate-900 block font-black tabular-nums">{formatCurrency(total)}</strong>
+                </div>
+
+                <div className="p-2.5 sm:p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-emerald-700">Total Received</span>
+                  <strong className="text-sm sm:text-base text-emerald-900 block font-black tabular-nums">{formatCurrency(paid)}</strong>
+                </div>
+
+                <div className="p-2.5 sm:p-3.5 bg-rose-50 border border-rose-100 rounded-xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-rose-700">Outstanding Due</span>
+                  <strong className="text-sm sm:text-base text-rose-900 block font-black tabular-nums">{formatCurrency(balance)}</strong>
+                </div>
+              </div>
+
+              {/* Tax V1 Snapshot Breakdown */}
+              {booking && (booking.taxRate !== null && booking.taxRate !== undefined || booking.taxAmount !== null && booking.taxAmount !== undefined) && (
+                <div className="p-3.5 bg-slate-50/70 border border-slate-100 rounded-xl text-xs space-y-2">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                      Commercial Tax Snapshot
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-semibold bg-white text-slate-600 border-slate-200">
+                      {booking.gstTreatment === "NON_GST_EXEMPT"
+                        ? "Non-GST Exempt"
+                        : booking.taxMode === "INCLUSIVE"
+                        ? `GST Included (${Number(booking.taxRate ?? 0)}%)`
+                        : `GST Added (${Number(booking.taxRate ?? 0)}%)`}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-slate-600">
+                    <div>
+                      <div className="text-[10px] text-slate-400 font-medium">Taxable Base</div>
+                      <div className="font-bold text-slate-800">{formatCurrency(Number(booking.taxableAmount ?? 0))}</div>
                     </div>
-                    {event.description && <p className="text-slate-600">{event.description}</p>}
-                    {event.actor && <p className="text-[10px] text-indigo-600">By: {event.actor}</p>}
+                    {booking.gstTreatment === "INTRA_STATE" ? (
+                      <>
+                        <div>
+                          <div className="text-[10px] text-slate-400 font-medium">CGST ({(Number(booking.taxRate ?? 0) / 2).toFixed(1)}%)</div>
+                          <div className="font-bold text-slate-800">{formatCurrency(Number(booking.cgstAmount ?? 0))}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-slate-400 font-medium">SGST ({(Number(booking.taxRate ?? 0) / 2).toFixed(1)}%)</div>
+                          <div className="font-bold text-slate-800">{formatCurrency(Number(booking.sgstAmount ?? 0))}</div>
+                        </div>
+                      </>
+                    ) : booking.gstTreatment === "INTER_STATE" ? (
+                      <div className="col-span-2">
+                        <div className="text-[10px] text-slate-400 font-medium">IGST ({Number(booking.taxRate ?? 0)}%)</div>
+                        <div className="font-bold text-slate-800">{formatCurrency(Number(booking.igstAmount ?? 0))}</div>
+                      </div>
+                    ) : (
+                      <div className="col-span-2">
+                        <div className="text-[10px] text-slate-400 font-medium">Tax Status</div>
+                        <div className="font-bold text-slate-800">₹0.00 (Exempt)</div>
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-[10px] text-slate-400 font-medium">Total GST</div>
+                      <div className="font-black text-slate-900">{formatCurrency(Number(booking.taxAmount ?? 0))}</div>
+                    </div>
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* Payment Milestones & Schedule Breakdown (Temporarily hidden from UI per Phase Cleanup) */}
+              {/* {schedule && schedule.milestones && schedule.milestones.length > 0 && (
+                <div className="pt-2 border-t border-slate-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-slate-500" />
+                      <span>Payment Milestone Schedule & Allocation ({schedule.milestones.length})</span>
+                    </h4>
+                    {schedule.overdueMilestonesCount > 0 && (
+                      <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px] font-bold">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        {schedule.overdueMilestonesCount} Overdue ({formatCurrency(schedule.overdueMilestonesAmount)})
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="border border-slate-100 rounded-xl overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
+                        <TableRow>
+                          <TableHead className="py-2 px-3">Milestone</TableHead>
+                          <TableHead className="py-2 px-3">Due Date</TableHead>
+                          <TableHead className="py-2 px-3 text-right">Planned</TableHead>
+                          <TableHead className="py-2 px-3 text-right">Allocated</TableHead>
+                          <TableHead className="py-2 px-3 text-right">Remaining</TableHead>
+                          <TableHead className="py-2 px-3 text-center">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {schedule.milestones.map((m, idx) => (
+                          <TableRow key={m.id || idx} className="text-xs border-b border-slate-50 hover:bg-slate-50/50">
+                            <TableCell className="py-2.5 px-3 font-semibold text-slate-900">
+                              <div className="flex items-center gap-1.5">
+                                <span>{m.title}</span>
+                                {m.percentage > 0 && (
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 font-mono">
+                                    {m.percentage}%
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3 text-slate-600">
+                              {m.dueDate ? (
+                                <span className={m.isOverdue ? "text-rose-600 font-semibold flex items-center gap-1" : ""}>
+                                  {m.isOverdue && <AlertCircle className="h-3 w-3 inline" />}
+                                  {formatDateDisplay(m.dueDate)}
+                                </span>
+                              ) : (
+                                "Upon Confirmation"
+                              )}
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3 text-right font-medium text-slate-800 font-mono">
+                              {formatCurrency(m.plannedAmount)}
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3 text-right font-bold text-emerald-700 font-mono">
+                              {formatCurrency(m.allocatedAmount)}
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3 text-right font-medium text-slate-700 font-mono">
+                              {formatCurrency(m.remainingAmount)}
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3 text-center">
+                              <Badge
+                                className={`text-[10px] font-bold ${
+                                  m.status === "PAID"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : m.status === "PARTIALLY_PAID"
+                                    ? "bg-amber-100 text-amber-800"
+                                    : m.isOverdue
+                                    ? "bg-rose-100 text-rose-800 border-rose-300"
+                                    : "bg-slate-100 text-slate-700"
+                                }`}
+                              >
+                                {m.isOverdue && m.status !== "PAID" ? "OVERDUE" : m.status.replace("_", " ")}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )} */}
+            </div>
+
+            {/* 3. Payment Transactions Table */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Payment Transactions ({booking.payments?.length || 0})</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Real-time payment logs, advance deposits, and settlement entries.
+                  </p>
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={handleOpenAddPayment}
+                  disabled={isReadOnly}
+                  className="w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> Log Payment
+                </Button>
+              </div>
+
+              {booking.payments?.length === 0 ? (
+                <div className="p-10 text-center space-y-2">
+                  <CreditCard className="h-8 w-8 text-slate-300 mx-auto" />
+                  <p className="text-xs text-slate-500 font-medium">No payments recorded against this booking yet.</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleOpenAddPayment}
+                    className="text-xs h-8 cursor-pointer mt-2"
+                  >
+                    Record First Deposit
+                  </Button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
+                      <TableRow>
+                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">Payment Ref</TableHead>
+                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">Date</TableHead>
+                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">Method</TableHead>
+                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">Status</TableHead>
+                        <TableHead className="py-2.5 px-4 font-bold text-slate-600">Amount</TableHead>
+                        <TableHead className="py-2.5 px-4 text-right font-bold text-slate-600">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {booking.payments.map((p) => (
+                        <TableRow key={p.id} className="border-b border-slate-100 text-xs hover:bg-slate-50/50">
+                          <TableCell className="py-3 px-4 font-semibold text-slate-900">
+                            <div>
+                              <span>{p.paymentNumber}</span>
+                              {p.referenceNumber && (
+                                <p className="text-[10px] text-slate-400">Ref: {p.referenceNumber}</p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3 px-4 text-slate-700">
+                            {formatDateDisplay(p.paymentDate)}
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <Badge variant="outline" className="text-[10px] font-bold">
+                              {PAYMENT_METHOD_LABELS[p.paymentMethod] ?? p.paymentMethod}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <PaymentStatusBadge status={p.status} />
+                          </TableCell>
+                          <TableCell className="py-3 px-4 font-extrabold text-emerald-700">
+                            {formatCurrency(Number(p.amount))}
+                          </TableCell>
+                          <TableCell className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => handleDeletePayment(p.id, p.paymentNumber)}
+                              disabled={isReadOnly}
+                              title="Archive Payment"
+                              className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer disabled:opacity-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Chronological Operational Timeline */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+              <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2 flex items-center gap-2">
+                <History className="h-4 w-4 text-indigo-600" />
+                <span>Booking & Operations Audit Timeline</span>
+              </h3>
+
+              {events.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No operational events recorded yet.</p>
+              ) : (
+                <div className="overflow-x-auto -mx-2 px-2">
+                  <div className="space-y-4 pt-1 min-w-[360px]">
+                    {events.map((e, idx) => (
+                      <div key={e.id} className="flex gap-3 text-xs">
+                        <div className="flex flex-col items-center">
+                          <div className="h-6 w-6 rounded-full bg-indigo-50 border border-indigo-200 flex items-center justify-center shrink-0">
+                            <Sparkles className="h-3 w-3 text-indigo-600" />
+                          </div>
+                          {idx < events.length - 1 && <div className="w-px flex-1 bg-slate-200 my-1" />}
+                        </div>
+                        <div className="pb-3 flex-1 min-w-0">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <strong className="text-slate-900 truncate">{e.title}</strong>
+                            <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                              {new Date(e.createdAt).toLocaleString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          {e.description && <p className="text-slate-600 mt-0.5 break-words">{e.description}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
+
+          {/* Right Col: Operations Status & Customer Profile */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Status Control Card */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+              <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">
+                Operational Status
+              </h3>
+
+              <div className="space-y-1.5 text-xs">
+                <label className="font-bold text-slate-700">Booking Lifecycle Status</label>
+                <Select
+                  value={booking.status}
+                  onValueChange={(val) => val && handleStatusChange(val as BookingStatus)}
+                >
+                  <SelectTrigger className="h-9 text-xs bg-slate-50 border-slate-200">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-slate-200">
+                    <SelectItem value={BookingStatus.DRAFT}>Draft</SelectItem>
+                    <SelectItem value={BookingStatus.CONFIRMED}>Confirmed</SelectItem>
+                    <SelectItem value={BookingStatus.ONGOING}>On Trip / Active</SelectItem>
+                    <SelectItem value={BookingStatus.COMPLETED}>Completed</SelectItem>
+                    <SelectItem value={BookingStatus.CANCELLED}>Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {booking.cancellationReason && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs space-y-1">
+                  <span className="font-bold text-rose-800 uppercase text-[10px]">Cancellation Reason</span>
+                  <p className="text-rose-700 leading-relaxed">{booking.cancellationReason}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Invoice Card */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-indigo-600 shrink-0" />
+                  <span>Invoice</span>
+                </h3>
+                {activeInvoice && (
+                  <Badge
+                    className={`text-[10px] font-bold shrink-0 whitespace-nowrap ${
+                      activeInvoice.status === "PAID"
+                        ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                        : activeInvoice.status === "PARTIALLY_PAID"
+                        ? "bg-amber-100 text-amber-800 border-amber-200"
+                        : activeInvoice.status === "CANCELLED"
+                        ? "bg-rose-100 text-rose-800 border-rose-200"
+                        : "bg-indigo-100 text-indigo-800 border-indigo-200"
+                    }`}
+                  >
+                    {activeInvoice.status.replace("_", " ")}
+                  </Badge>
+                )}
+              </div>
+
+              {activeInvoice ? (
+                <div className="space-y-3.5 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Invoice Number</span>
+                    <strong className="text-slate-900 block font-mono text-sm">{activeInvoice.invoiceNumber}</strong>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Invoice Date</span>
+                      <p className="text-slate-700 font-medium">{formatDateDisplay(activeInvoice.invoiceDate)}</p>
+                    </div>
+                    {activeInvoice.dueDate && (
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Due Date</span>
+                        <p className="text-slate-700 font-medium">{formatDateDisplay(activeInvoice.dueDate)}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 font-mono">
+                    <div className="flex justify-between text-slate-600 text-xs">
+                      <span>Total:</span>
+                      <span className="font-bold text-slate-900">{formatCurrency(Number(activeInvoice.totalAmount))}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-700 text-xs">
+                      <span>Paid:</span>
+                      <span className="font-bold">{formatCurrency(Number(activeInvoice.paidAmount))}</span>
+                    </div>
+                    <div className="flex justify-between text-rose-700 text-xs pt-1 border-t border-slate-200">
+                      <span>Balance:</span>
+                      <span className="font-bold">{formatCurrency(Number(activeInvoice.balanceAmount))}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2">
+                      <Link href={`/invoices/${activeInvoice.id}`} className="w-full">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-center bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                        >
+                          <FileText className="h-3.5 w-3.5 mr-1 text-slate-500 shrink-0" />
+                          View Invoice
+                        </Button>
+                      </Link>
+                      <a
+                        href={`/api/invoices/${activeInvoice.id}/pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full"
+                      >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-center bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                        >
+                          <Download className="h-3.5 w-3.5 mr-1 text-slate-500 shrink-0" />
+                          Download PDF
+                        </Button>
+                      </a>
+                    </div>
+
+                    {activeInvoice.status !== "CANCELLED" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setConfirmAction({
+                            title: "Regenerate Invoice?",
+                            description:
+                              "This will refresh the invoice using the latest booking details and financial values. The existing invoice number will remain unchanged.",
+                            confirmText: "Regenerate Invoice",
+                            variant: "default",
+                            action: async () => {
+                              try {
+                                setActionLoading(true);
+                                const res = await fetch(`/api/invoices/${activeInvoice.id}/regenerate`, {
+                                  method: "POST",
+                                });
+                                const json = await res.json();
+                                if (!res.ok) {
+                                  throw new Error(json.error?.message || json.message || "Failed to regenerate invoice.");
+                                }
+                                toast.success("Invoice regenerated successfully with latest booking values.");
+                                setConfirmAction(null);
+                                await fetchBooking();
+                              } catch (err: any) {
+                                toast.error(err?.message || "Failed to regenerate invoice.");
+                              } finally {
+                                setActionLoading(false);
+                              }
+                            },
+                          });
+                        }}
+                        disabled={isReadOnly || actionLoading}
+                        className="w-full justify-center bg-white hover:bg-slate-50 border-slate-200 text-xs font-semibold h-8 rounded-lg cursor-pointer text-slate-700"
+                        title="Refresh invoice snapshot from latest booking/quotation state while keeping the same invoice number"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5 mr-1 text-slate-500 shrink-0" />
+                        Regenerate Invoice
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (booking.status === BookingStatus.CONFIRMED ||
+                  booking.status === BookingStatus.ONGOING ||
+                  booking.status === BookingStatus.COMPLETED) ? (
+                <div className="space-y-3 text-xs">
+                  <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-1">
+                    <span className="font-bold text-amber-900 flex items-center gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+                      Invoice Not Generated
+                    </span>
+                    <p className="text-amber-800 text-[11px] leading-relaxed">
+                      Generate an official customer invoice for this booking.
+                    </p>
+                  </div>
+
+                  <Button
+                    onClick={handleGenerateInvoice}
+                    disabled={generatingInvoice || isReadOnly}
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs h-9 rounded-xl shadow-xs gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {generatingInvoice ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Receipt className="h-3.5 w-3.5" />
+                    )}
+                    Generate Invoice
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2 text-xs">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <Lock className="h-3.5 w-3.5 text-slate-400" />
+                      Invoice Not Available
+                    </span>
+                    <p className="text-slate-500 text-[11px] leading-relaxed">
+                      {booking.status === BookingStatus.CANCELLED
+                        ? "Invoice generation is unavailable for cancelled bookings."
+                        : "Invoice generation will be available after confirming this booking."}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Customer Contact Card */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-3.5">
+              <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2 flex items-center gap-2">
+                <User className="h-4 w-4 text-indigo-600 shrink-0" />
+                <span>Customer Profile</span>
+              </h3>
+
+              <div className="space-y-2 text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Lead Passenger</span>
+                  <strong className="text-slate-900 block">{booking.customer?.name}</strong>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Phone Contact</span>
+                  <p className="text-slate-700 flex items-center gap-1.5 mt-0.5">
+                    <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <a href={`tel:${booking.customer?.phone}`} className="hover:underline text-indigo-600 font-semibold break-all">
+                      {booking.customer?.phone}
+                    </a>
+                  </p>
+                </div>
+
+                {booking.customer?.email && (
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Email Address</span>
+                    <p className="text-slate-700 flex items-center gap-1.5 mt-0.5">
+                      <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <a href={`mailto:${booking.customer?.email}`} className="hover:underline text-indigo-600 break-all">
+                        {booking.customer?.email}
+                      </a>
+                    </p>
+                  </div>
+                )}
+
+                {booking.trip?.travelers && booking.trip.travelers.length > 0 && (
+                  <div className="pt-2 border-t border-slate-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Travelers ({booking.trip.travelers.length})</span>
+                    <div className="mt-1 space-y-1">
+                      {booking.trip.travelers.map((t) => (
+                        <div key={t.id} className="text-slate-600 flex justify-between">
+                          <span>{t.name}</span>
+                          <span className="text-slate-400 text-[10px]">{TRAVELER_TYPE_LABELS[t.type] ?? t.type}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Notes & Remarks Card */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
+              <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">
+                Booking Remarks
+              </h3>
+              <div className="space-y-3 text-xs">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Customer Remarks</label>
+                  <p className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    {booking.notes || "No custom remarks recorded."}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Internal Agency Notes</label>
+                  <p className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    {booking.internalNotes || "No internal staff notes recorded."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── ADD PAYMENT MODAL ─── */}
+        <Dialog open={isAddPaymentOpen} onOpenChange={setIsAddPaymentOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-6 shadow-xl">
+            <form onSubmit={handleSavePayment}>
+              <DialogHeader>
+                <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-emerald-600" />
+                  <span>Record Customer Payment</span>
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-1">
+                  Log deposit or full payment for booking {booking.bookingNumber}.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3.5 mt-4 text-xs">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center">
+                  <span className="text-slate-500 font-semibold">Outstanding Due:</span>
+                  <strong className="text-rose-600 font-extrabold text-sm">{formatCurrency(balance)}</strong>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Amount (₹) *</label>
+                    <Input
+                      type="number"
+                      min={0.01}
+                      step="any"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs font-bold"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Payment Method</label>
+                    <Select
+                      value={paymentMethod}
+                      onValueChange={(val) => val && setPaymentMethod(val as PaymentMethod)}
+                    >
+                      <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                        <SelectValue placeholder="Payment Method">
+                          {(val) => PAYMENT_METHOD_MODAL_LABELS[val] ?? val}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border-slate-200">
+                        <SelectItem value={PaymentMethod.UPI}>UPI / GPay / PhonePe</SelectItem>
+                        <SelectItem value={PaymentMethod.BANK_TRANSFER}>Bank Transfer (NEFT/RTGS)</SelectItem>
+                        <SelectItem value={PaymentMethod.CASH}>Cash Deposit</SelectItem>
+                        <SelectItem value={PaymentMethod.CARD}>Credit / Debit Card</SelectItem>
+                        <SelectItem value={PaymentMethod.CHEQUE}>Cheque</SelectItem>
+                        <SelectItem value={PaymentMethod.OTHER}>Other Method</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Transaction Ref / UTR</label>
+                    <Input
+                      value={referenceNumber}
+                      onChange={(e) => setReferenceNumber(e.target.value)}
+                      placeholder="e.g. UTR123456789"
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Receipt # (Optional)</label>
+                    <Input
+                      value={receiptNumber}
+                      onChange={(e) => setReceiptNumber(e.target.value)}
+                      placeholder="e.g. REC-001"
+                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Notes</label>
+                  <Textarea
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    placeholder="Payment notes or remarks..."
+                    rows={2}
+                    className="bg-slate-50/50 border-slate-200 text-xs"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                      Cancel
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={savingPayment}
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 rounded-xl"
+                >
+                  {savingPayment ? "Recording..." : "Record Payment"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* ─── CANCEL BOOKING MODAL ─── */}
+        <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-6 shadow-xl">
+            <form onSubmit={handleConfirmCancel}>
+              <DialogHeader>
+                <DialogTitle className="text-slate-900 font-bold text-base text-rose-700">Cancel Booking</DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-1">
+                  Are you sure you want to mark booking {booking.bookingNumber} as cancelled?
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 mt-4 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Reason for Cancellation</label>
+                  <Textarea
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    placeholder="e.g. Customer emergency, date reschedule..."
+                    rows={3}
+                    className="bg-slate-50/50 border-slate-200 text-xs"
+                    required
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="mt-6 flex justify-end gap-2.5">
+                <DialogClose
+                  render={
+                    <Button type="button" variant="outline" size="sm" className="bg-white border-slate-200 text-xs font-semibold rounded-xl">
+                      Back
+                    </Button>
+                  }
+                />
+                <Button
+                  type="submit"
+                  disabled={cancelling}
+                  size="sm"
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-4 rounded-xl"
+                >
+                  {cancelling ? "Cancelling..." : "Confirm Cancellation"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Confirmation Dialog */}
+        <ConfirmDialog
+          open={confirmAction !== null}
+          onOpenChange={(open) => {
+            if (!open && !actionLoading) setConfirmAction(null);
+          }}
+          title={confirmAction?.title || ""}
+          description={confirmAction?.description || ""}
+          confirmText={confirmAction?.confirmText || "Confirm"}
+          variant={confirmAction?.variant || "destructive"}
+          loading={actionLoading}
+          onConfirm={async () => {
+            if (confirmAction?.action) {
+              await confirmAction.action();
+            }
+          }}
+        />
       </div>
-
-      {/* ─── MODALS ──────────────────────────────────────────────────────── */}
-      <AddPaymentModal
-        booking={booking}
-        isOpen={isAddPaymentOpen}
-        onClose={() => setIsAddPaymentOpen(false)}
-      />
-
-      <SupplierPaymentModal
-        booking={booking}
-        isOpen={isSupplierPaymentOpen}
-        onClose={() => setIsSupplierPaymentOpen(false)}
-      />
-
-      <ConfirmItemModal
-        bookingId={booking.id}
-        item={selectedItemForConfirm}
-        isOpen={!!selectedItemForConfirm}
-        onClose={() => setSelectedItemForConfirm(null)}
-      />
-
-      <CancelBookingModal
-        booking={booking}
-        isOpen={isCancelModalOpen}
-        onClose={() => setIsCancelModalOpen(false)}
-      />
-
-      <DocumentPreviewModal
-        booking={booking}
-        docType={previewDocType || "Booking Confirmation"}
-        selectedItem={previewItem}
-        isOpen={!!previewDocType}
-        onClose={() => setPreviewDocType(null)}
-      />
     </div>
   );
 }
+

@@ -1,10 +1,11 @@
 "use client"
 
-import * as React from "react"
 import { Select as SelectPrimitive } from "@base-ui/react/select"
+import * as React from "react"
 
 import { cn } from "@/lib/utils"
-import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
+import { formatEnumLabel } from "@/lib/utils/enum-formatters"
+import { CheckIcon,ChevronDownIcon,ChevronUpIcon } from "lucide-react"
 
 const Select = SelectPrimitive.Root
 
@@ -18,13 +19,19 @@ function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   )
 }
 
-function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
+function SelectValue({ className, children, ...props }: SelectPrimitive.Value.Props) {
   return (
     <SelectPrimitive.Value
       data-slot="select-value"
-      className={cn("flex flex-1 text-left", className)}
+      className={cn("flex-1 text-left truncate min-w-0 block", className)}
       {...props}
-    />
+    >
+      {typeof children === "function"
+        ? children
+        : children !== undefined
+        ? children
+        : (value: any) => (value ? formatEnumLabel(value) : undefined)}
+    </SelectPrimitive.Value>
   )
 }
 
@@ -41,7 +48,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white/80 hover:bg-white px-3 py-2 text-xs text-slate-800 transition-colors outline-none select-none focus:border-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 data-placeholder:text-slate-400 data-[size=default]:h-9 data-[size=sm]:h-7.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+        "flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white/80 hover:bg-white px-3 py-2 text-xs text-slate-800 transition-colors outline-none select-none focus:border-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 data-placeholder:text-slate-400 data-[size=default]:h-9 data-[size=sm]:h-7.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 overflow-hidden",
         className
       )}
       {...props}
@@ -49,7 +56,7 @@ function SelectTrigger({
       {children}
       <SelectPrimitive.Icon
         render={
-          <ChevronDownIcon className="pointer-events-none size-3.5 text-slate-400" />
+          <ChevronDownIcon className="pointer-events-none size-3.5 text-slate-400 shrink-0" />
         }
       />
     </SelectPrimitive.Trigger>
@@ -191,14 +198,14 @@ function SelectScrollDownButton({
 }
 
 export {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectScrollDownButton,
-  SelectScrollUpButton,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectGroup,
+SelectItem,
+SelectLabel,
+SelectScrollDownButton,
+SelectScrollUpButton,
+SelectSeparator,
+SelectTrigger,
+SelectValue
 }

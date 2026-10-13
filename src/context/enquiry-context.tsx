@@ -1,22 +1,22 @@
 "use client"
 
-import * as React from "react"
 import {
-  Customer,
-  Enquiry,
-  EnquiryStatus,
-  FollowUp,
-  TimelineActivity,
-  Trip,
-  TimelineActivityType,
-  FollowUpStatus,
-  TripStatus,
-  ContactMethod,
-  ItineraryDay,
-  ItineraryPlace,
-  CustomerNote,
-  TripNote
+ContactMethod,
+Customer,
+CustomerNote,
+Enquiry,
+EnquiryStatus,
+FollowUp,
+FollowUpStatus,
+ItineraryDay,
+ItineraryPlace,
+TimelineActivity,
+TimelineActivityType,
+Trip,
+TripNote,
+TripStatus
 } from "@/types"
+import * as React from "react"
 
 interface EnquiryContextType {
   customers: Customer[]

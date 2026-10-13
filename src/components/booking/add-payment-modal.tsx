@@ -1,23 +1,24 @@
 "use client";
 
-import * as React from "react";
-import { useFormik } from "formik";
-import * as Yup from "yup";
-import { Booking, PaymentMethod } from "@/types";
-import { useBooking } from "@/context/booking-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useBooking } from "@/context/booking-context";
 import { formatCurrency } from "@/lib/costing-engine";
+import { useModalScrollLock } from "@/lib/scroll-lock";
+import { Booking,PaymentMethod } from "@/types";
+import { useFormik } from "formik";
+import { Calendar,Hash,IndianRupee,X } from "lucide-react";
+import * as React from "react";
 import { toast } from "sonner";
-import { X, IndianRupee, CreditCard, Calendar, Hash, FileText } from "lucide-react";
+import * as Yup from "yup";
 
 interface AddPaymentModalProps {
   booking: Booking;
@@ -25,21 +26,28 @@ interface AddPaymentModalProps {
   onClose: () => void;
 }
 
-const paymentValidationSchema = Yup.object({
-  amount: Yup.number()
-    .required("Amount is required")
-    .positive("Amount must be greater than 0"),
-  date: Yup.string().required("Date is required"),
-  method: Yup.string().required("Payment method is required"),
-  transactionId: Yup.string().optional(),
-  notes: Yup.string().optional(),
-});
+const getPaymentValidationSchema = (pendingAmount: number) =>
+  Yup.object({
+    amount: Yup.number()
+      .required("Amount is required")
+      .positive("Amount must be greater than 0")
+      .test(
+        "max-outstanding",
+        `Payment amount cannot exceed the outstanding due of ${formatCurrency(pendingAmount)}`,
+        (val) => val === undefined || val === null || val <= pendingAmount
+      ),
+    date: Yup.string().required("Date is required"),
+    method: Yup.string().required("Payment method is required"),
+    transactionId: Yup.string().optional(),
+    notes: Yup.string().optional(),
+  });
 
 export function AddPaymentModal({
   booking,
   isOpen,
   onClose,
 }: AddPaymentModalProps) {
+  useModalScrollLock(isOpen);
   const { addCustomerPayment } = useBooking();
 
   const formik = useFormik({
@@ -50,7 +58,7 @@ export function AddPaymentModal({
       transactionId: "",
       notes: "",
     },
-    validationSchema: paymentValidationSchema,
+    validationSchema: React.useMemo(() => getPaymentValidationSchema(booking.pendingAmount), [booking.pendingAmount]),
     enableReinitialize: true,
     onSubmit: (values) => {
       try {
@@ -82,6 +90,11 @@ export function AddPaymentModal({
     return formik.touched[field] && formik.errors[field]
       ? formik.errors[field]
       : undefined;
+  };
+
+  const inputCls = (field: keyof typeof formik.values, base: string = "h-9.5 text-xs") => {
+    const err = fieldError(field);
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`;
   };
 
   return (
@@ -139,13 +152,11 @@ export function AddPaymentModal({
                   type="number"
                   placeholder="e.g. 20000"
                   {...formik.getFieldProps("amount")}
-                  className={`pl-9 h-9.5 text-xs font-semibold ${
-                    fieldError("amount") ? "border-rose-500" : ""
-                  }`}
+                  className={inputCls("amount", "pl-9 h-9.5 text-xs font-semibold")}
                 />
               </div>
               {fieldError("amount") && (
-                <p className="text-[11px] text-rose-500 font-medium">{fieldError("amount")}</p>
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("amount")}</p>
               )}
             </div>
 
@@ -159,9 +170,12 @@ export function AddPaymentModal({
                 <Input
                   type="date"
                   {...formik.getFieldProps("date")}
-                  className="pl-9 h-9.5 text-xs font-medium"
+                  className={inputCls("date", "pl-9 h-9.5 text-xs font-medium")}
                 />
               </div>
+              {fieldError("date") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("date")}</p>
+              )}
             </div>
           </div>
 
@@ -173,9 +187,14 @@ export function AddPaymentModal({
               </label>
               <Select
                 value={formik.values.method}
-                onValueChange={(val) => formik.setFieldValue("method", val)}
+                onValueChange={(val) => {
+                  if (val) {
+                    formik.setFieldValue("method", val);
+                    formik.setFieldTouched("method", true);
+                  }
+                }}
               >
-                <SelectTrigger className="h-9.5 text-xs font-medium">
+                <SelectTrigger className={`h-9.5 text-xs font-medium ${fieldError("method") ? "border-red-500 focus:ring-red-500" : ""}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-slate-200">
@@ -186,6 +205,9 @@ export function AddPaymentModal({
                   <SelectItem value="Other">Other Mode</SelectItem>
                 </SelectContent>
               </Select>
+              {fieldError("method") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("method")}</p>
+              )}
             </div>
 
             {/* Transaction ID */}
@@ -198,9 +220,12 @@ export function AddPaymentModal({
                 <Input
                   placeholder="e.g. UPI/2026/8812903"
                   {...formik.getFieldProps("transactionId")}
-                  className="pl-9 h-9.5 text-xs font-mono"
+                  className={inputCls("transactionId", "pl-9 h-9.5 text-xs font-mono")}
                 />
               </div>
+              {fieldError("transactionId") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("transactionId")}</p>
+              )}
             </div>
           </div>
 
@@ -211,8 +236,11 @@ export function AddPaymentModal({
               placeholder="e.g. Advance deposit for flight & hotel confirmation"
               rows={2}
               {...formik.getFieldProps("notes")}
-              className="text-xs min-h-[60px]"
+              className={`text-xs min-h-[60px] ${fieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
+            {fieldError("notes") && (
+              <p className="text-[11px] text-red-500 font-semibold mt-0.5">{fieldError("notes")}</p>
+            )}
           </div>
 
           {/* Action Buttons */}

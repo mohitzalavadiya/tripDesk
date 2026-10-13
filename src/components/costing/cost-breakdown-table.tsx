@@ -1,35 +1,33 @@
 "use client"
 
-import * as React from "react"
-import Link from "next/link"
-import {
-  CostItem,
-  InternalExpense,
-  CostCategory,
-  RateSnapshot,
-} from "@/types"
-import { formatCurrency } from "@/lib/costing-engine"
-import {
-  Hotel,
-  Car,
-  Ticket,
-  Plus,
-  Edit,
-  Trash2,
-  Search,
-  Building2,
-  Calendar,
-  Layers,
-  ArrowUpDown,
-  FileSpreadsheet,
-  AlertCircle,
-  Clock,
-  RefreshCw,
-  Info,
-} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select"
+import { formatCurrency } from "@/lib/costing-engine"
+import {
+CostItem,
+InternalExpense
+} from "@/types"
+import {
+Building2,
+Calendar,
+Car,
+Edit,
+FileSpreadsheet,
+Hotel,
+Layers,
+Plus,
+Search,
+Ticket,
+Trash2
+} from "lucide-react"
+import * as React from "react"
 
 interface CostBreakdownTableProps {
   costItems: CostItem[]
@@ -43,6 +41,12 @@ interface CostBreakdownTableProps {
   onDeleteInternalExpense: (id: string) => void
   onRefreshRateCheck?: (item: CostItem) => void
 }
+
+const SORT_BY_LABELS: Record<string, string> = {
+  default: "Sort: Default",
+  "high-to-low": "Highest Cost",
+  "low-to-high": "Lowest Cost",
+};
 
 export function CostBreakdownTable({
   costItems,
@@ -257,15 +261,21 @@ export function CostBreakdownTable({
             />
           </div>
 
-          <select
+          <Select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="h-8.5 text-xs bg-slate-50/60 border border-slate-200 rounded-xl px-2.5 font-medium text-slate-700 cursor-pointer focus:outline-none"
+            onValueChange={(val) => val && setSortBy(val as any)}
           >
-            <option value="default">Sort: Default</option>
-            <option value="high-to-low">Highest Cost</option>
-            <option value="low-to-high">Lowest Cost</option>
-          </select>
+            <SelectTrigger className="h-8.5 text-xs bg-slate-50/60 border-slate-200 hover:border-slate-300 rounded-xl px-2.5 font-medium text-slate-700 w-[140px] focus-visible:ring-indigo-500">
+              <SelectValue placeholder="Sort: Default">
+                {(val) => SORT_BY_LABELS[val] ?? "Sort: Default"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
+              <SelectItem value="default">Sort: Default</SelectItem>
+              <SelectItem value="high-to-low">Highest Cost</SelectItem>
+              <SelectItem value="low-to-high">Lowest Cost</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -323,18 +333,9 @@ export function CostBreakdownTable({
                   {/* Supplier */}
                   <td className="py-3.5 px-4">
                     {item.supplierName ? (
-                      <div className="text-slate-800 font-semibold">
-                        {item.supplierId ? (
-                          <Link
-                            href={`/suppliers/${item.supplierId}`}
-                            className="text-indigo-600 hover:underline flex items-center gap-1"
-                          >
-                            <Building2 className="h-3 w-3 text-indigo-400" />
-                            <span>{item.supplierName}</span>
-                          </Link>
-                        ) : (
-                          item.supplierName
-                        )}
+                      <div className="text-slate-800 font-semibold flex items-center gap-1">
+                        <Building2 className="h-3 w-3 text-slate-400" />
+                        <span>{item.supplierName}</span>
                       </div>
                     ) : (
                       <span className="text-slate-400 italic">Direct / In-house</span>

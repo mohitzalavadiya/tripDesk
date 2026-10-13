@@ -1,64 +1,51 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/context/auth-context";
-import { useSaaS } from "@/context/saas-context";
-import { Clock, AlertTriangle, ShieldAlert, Lock, Phone, CreditCard, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/auth-context";
+import { AlertTriangle,Clock,CreditCard,Lock,Phone,ShieldAlert } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function AgencyLifecycleBanner() {
   const router = useRouter();
-  const { currentUser } = useAuth();
-  const { agencies, subscriptions } = useSaaS();
+  const { currentUser, currentAgency, subscriptionAccess, isPlatformOwner } = useAuth();
 
-  // If user is TripDesk Owner, lifecycle banner is not applicable
-  if (currentUser.role === "TRIPDESK_OWNER" || !currentUser.agencyId) {
+  // If user is Platform Owner or has no subscription context, banner is not applicable
+  if (isPlatformOwner || !currentUser.agencyId || !subscriptionAccess) {
     return null;
   }
 
-  const currentAgency = agencies.find((a) => a.id === currentUser.agencyId);
-  const currentSub = subscriptions.find((s) => s.agencyId === currentUser.agencyId);
-
-  if (!currentAgency) return null;
-
-  // Calculate days remaining if in trial
-  let trialDaysRemaining = 5;
-  if (currentSub?.trialEnd) {
-    const end = new Date(currentSub.trialEnd).getTime();
-    const now = new Date().getTime();
-    const diffDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-    trialDaysRemaining = Math.max(0, diffDays);
-  }
+  const agencyName = currentAgency.name || currentUser.agencyName || "Agency";
+  const status = subscriptionAccess.status;
+  const trialDaysRemaining = subscriptionAccess.trialDaysRemaining ?? 0;
 
   const handleContactSupport = () => {
     window.open(
       `https://wa.me/919847099000?text=${encodeURIComponent(
-        `Hi TripDesk Support! I am ${currentUser.name} from ${currentAgency.name}. I need assistance with our SaaS account status.`
+        `Hi Your Travel Desk Support! I am ${currentUser.name} from ${agencyName}. I need assistance with our SaaS account status.`
       )}`,
       "_blank"
     );
   };
 
   // 1. Account Suspended State Banner
-  if (currentAgency.status === "SUSPENDED") {
+  if (status === "SUSPENDED") {
     return (
-      <div className="bg-rose-600 text-white px-4 py-2.5 shadow-md sticky top-16 z-30 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
-        <div className="flex items-center gap-2 font-medium">
+      <div className="bg-rose-600 text-white px-2.5 sm:px-4 py-2 sm:py-2.5 shadow-md sticky top-16 z-30 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-1.5 sm:gap-2 font-medium text-[11px] sm:text-xs leading-snug w-full sm:w-auto">
           <ShieldAlert className="h-4 w-4 shrink-0 text-rose-200" />
           <span>
-            <strong>Account Suspended:</strong> Your TripDesk agency workspace is currently suspended. Please contact TripDesk support to reactivate your account.
+            <strong>Account Suspended:</strong> Your agency workspace is currently suspended. Please contact Your Travel Desk support to reactivate your account.
           </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 w-full sm:w-auto">
           <Button
             size="sm"
             onClick={handleContactSupport}
-            className="bg-white text-rose-700 hover:bg-rose-50 font-bold text-xs h-7 px-3 rounded-lg cursor-pointer"
+            className="w-full sm:w-auto justify-center bg-white text-rose-700 hover:bg-rose-50 font-bold text-[11px] sm:text-xs h-7 sm:h-7 px-3 rounded-lg cursor-pointer whitespace-nowrap"
           >
-            <Phone className="h-3 w-3 mr-1" />
-            Contact TripDesk
+            <Phone className="h-3 w-3 mr-1 shrink-0" />
+            <span className="sm:hidden">Contact Support</span>
+            <span className="hidden sm:inline">Contact Your Travel Desk</span>
           </Button>
         </div>
       </div>
@@ -66,30 +53,32 @@ export function AgencyLifecycleBanner() {
   }
 
   // 2. Read Only Mode Banner
-  if (currentAgency.status === "READ_ONLY") {
+  if (status === "READ_ONLY" || subscriptionAccess.isReadOnly) {
     return (
-      <div className="bg-blue-600 text-white px-4 py-2.5 shadow-md sticky top-16 z-30 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
-        <div className="flex items-center gap-2 font-medium">
+      <div className="bg-blue-600 text-white px-2.5 sm:px-4 py-2 sm:py-2.5 shadow-md sticky top-16 z-30 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-1.5 sm:gap-2 font-medium text-[11px] sm:text-xs leading-snug w-full sm:w-auto">
           <Lock className="h-4 w-4 shrink-0 text-blue-200" />
           <span>
             <strong>Read Only Mode:</strong> Your subscription is inactive. You can view existing data, but creating or editing operations is disabled.
           </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 w-full sm:w-auto">
           <Button
             size="sm"
             onClick={() => router.push("/subscription")}
-            className="bg-white text-blue-700 hover:bg-blue-50 font-bold text-xs h-7 px-3 rounded-lg cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center bg-white text-blue-700 hover:bg-blue-50 font-bold text-[11px] sm:text-xs h-7 sm:h-7 px-3 rounded-lg cursor-pointer whitespace-nowrap"
           >
-            <CreditCard className="h-3 w-3 mr-1" />
-            Renew Subscription
+            <CreditCard className="h-3 w-3 mr-1 shrink-0" />
+            <span className="sm:hidden">Renew Plan</span>
+            <span className="hidden sm:inline">Renew Subscription</span>
           </Button>
           <Button
             size="sm"
             onClick={handleContactSupport}
-            className="bg-blue-700 text-white hover:bg-blue-800 font-bold text-xs h-7 px-3 rounded-lg cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center bg-blue-700 text-white hover:bg-blue-800 font-bold text-[11px] sm:text-xs h-7 sm:h-7 px-2.5 rounded-lg cursor-pointer whitespace-nowrap"
           >
-            Contact TripDesk
+            <span className="sm:hidden">Contact Support</span>
+            <span className="hidden sm:inline">Contact Your Travel Desk</span>
           </Button>
         </div>
       </div>
@@ -97,29 +86,30 @@ export function AgencyLifecycleBanner() {
   }
 
   // 3. Trial Expiring Tomorrow Banner
-  if (currentAgency.status === "TRIAL" && trialDaysRemaining <= 1) {
+  if (status === "TRIAL" && trialDaysRemaining <= 1) {
     return (
-      <div className="bg-amber-600 text-white px-4 py-2.5 shadow-md sticky top-16 z-30 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
-        <div className="flex items-center gap-2 font-medium">
+      <div className="bg-amber-600 text-white px-2.5 sm:px-4 py-2 sm:py-2.5 shadow-md sticky top-16 z-30 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-1.5 sm:gap-2 font-medium text-[11px] sm:text-xs leading-snug w-full sm:w-auto">
           <AlertTriangle className="h-4 w-4 shrink-0 text-amber-200" />
           <span>
-            <strong>Trial Expiring Tomorrow:</strong> Your 7-day TripDesk free trial ends tomorrow. Contact TripDesk to activate your full plan.
+            <strong>Trial Expiring {trialDaysRemaining === 0 ? "Today" : "Tomorrow"}:</strong> Your 7-day free trial ends {trialDaysRemaining === 0 ? "today" : "tomorrow"}. Upgrade your plan to prevent service interruption.
           </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 w-full sm:w-auto">
           <Button
             size="sm"
             onClick={() => router.push("/subscription")}
-            className="bg-white text-amber-800 hover:bg-amber-50 font-bold text-xs h-7 px-3 rounded-lg cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center bg-white text-amber-800 hover:bg-amber-50 font-bold text-[11px] sm:text-xs h-7 sm:h-7 px-3 rounded-lg cursor-pointer whitespace-nowrap"
           >
             View Plans
           </Button>
           <Button
             size="sm"
             onClick={handleContactSupport}
-            className="bg-amber-700 text-white hover:bg-amber-800 font-bold text-xs h-7 px-3 rounded-lg cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center bg-amber-700 text-white hover:bg-amber-800 font-bold text-[11px] sm:text-xs h-7 sm:h-7 px-2.5 rounded-lg cursor-pointer whitespace-nowrap"
           >
-            Contact TripDesk
+            <span className="sm:hidden">Contact Support</span>
+            <span className="hidden sm:inline">Contact Your Travel Desk</span>
           </Button>
         </div>
       </div>
@@ -127,30 +117,32 @@ export function AgencyLifecycleBanner() {
   }
 
   // 4. Standard 7-Day Free Trial Banner
-  if (currentAgency.status === "TRIAL") {
+  if (status === "TRIAL") {
     return (
-      <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-900 text-white px-4 py-2 shadow-xs sticky top-16 z-30 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs border-b border-indigo-700/50">
-        <div className="flex items-center gap-2 font-medium">
+      <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-900 text-white px-2.5 sm:px-4 py-2 shadow-xs sticky top-16 z-30 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs border-b border-indigo-700/50">
+        <div className="flex items-center gap-1.5 sm:gap-2 font-medium text-[11px] sm:text-xs leading-snug w-full sm:w-auto">
           <Clock className="h-3.5 w-3.5 shrink-0 text-amber-300" />
           <span>
-            You are currently on your <strong>7-day free trial</strong> ({trialDaysRemaining} days remaining).
+            You are currently on your <strong>7-day free trial</strong> ({trialDaysRemaining} {trialDaysRemaining === 1 ? "day" : "days"} remaining).
           </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 w-full sm:w-auto">
           <Button
             size="sm"
             onClick={() => router.push("/subscription")}
-            className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs h-6.5 px-3 rounded-lg cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-[11px] sm:text-xs h-7 sm:h-6.5 px-2.5 sm:px-3 rounded-lg cursor-pointer whitespace-nowrap"
           >
-            View Plans & Upgrade
+            <span className="sm:hidden">Upgrade Plan</span>
+            <span className="hidden sm:inline">View Plans & Upgrade</span>
           </Button>
           <Button
             size="sm"
             variant="ghost"
             onClick={handleContactSupport}
-            className="text-white hover:bg-white/10 text-xs h-6.5 px-2.5 rounded-lg cursor-pointer"
+            className="flex-1 sm:flex-initial justify-center text-white hover:bg-white/10 text-[11px] sm:text-xs h-7 sm:h-6.5 px-2 rounded-lg cursor-pointer whitespace-nowrap border border-white/20 sm:border-0"
           >
-            Contact TripDesk
+            <span className="sm:hidden">Contact Desk</span>
+            <span className="hidden sm:inline">Contact Your Travel Desk</span>
           </Button>
         </div>
       </div>

@@ -1,29 +1,29 @@
 "use client"
 
-import * as React from "react"
-import { useFormik } from "formik"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select"
-import { manualCostItemSchema } from "@/lib/validation-schemas"
-import { CostCategory, CostItem, Supplier } from "@/types"
+import { Textarea } from "@/components/ui/textarea"
 import { formatCurrency } from "@/lib/costing-engine"
-import { Plus, Edit, Calculator } from "lucide-react"
+import { manualCostItemSchema } from "@/lib/validation-schemas"
+import { CostCategory,CostItem,Supplier } from "@/types"
+import { useFormik } from "formik"
+import { Calculator,Edit,Plus } from "lucide-react"
+import * as React from "react"
 
 interface AddManualCostModalProps {
   open: boolean
@@ -143,6 +143,11 @@ export function AddManualCostModal({
     return touched && error ? (error as string) : undefined
   }
 
+  const inputCls = (field: string, base: string = "h-9 text-xs bg-slate-50/50 border-slate-200") => {
+    const err = getFieldError(field)
+    return `${base} ${err ? "border-red-500 focus-visible:ring-red-500" : ""}`
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 max-h-[90vh] overflow-y-auto">
@@ -164,9 +169,14 @@ export function AddManualCostModal({
                 <label className="text-[11px] font-bold text-slate-700 uppercase">Category *</label>
                 <Select
                   value={formik.values.category}
-                  onValueChange={(val) => formik.setFieldValue("category", val as CostCategory)}
+                  onValueChange={(val) => {
+                    if (val) {
+                      formik.setFieldValue("category", val as CostCategory)
+                      formik.setFieldTouched("category", true)
+                    }
+                  }}
                 >
-                  <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                  <SelectTrigger className={`h-9 text-xs bg-slate-50/50 border-slate-200 ${getFieldError("category") ? "border-red-500 focus:ring-red-500" : ""}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-white border-slate-200">
@@ -177,16 +187,28 @@ export function AddManualCostModal({
                     ))}
                   </SelectContent>
                 </Select>
+                {getFieldError("category") && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("category")}</p>
+                )}
               </div>
 
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-700 uppercase">Supplier Partner</label>
                 <Select
                   value={formik.values.supplierId}
-                  onValueChange={(val) => formik.setFieldValue("supplierId", val)}
+                  onValueChange={(val) => {
+                    formik.setFieldValue("supplierId", val)
+                    formik.setFieldTouched("supplierId", true)
+                  }}
                 >
-                  <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
-                    <SelectValue placeholder="Direct / None" />
+                  <SelectTrigger className={`h-9 text-xs bg-slate-50/50 border-slate-200 ${getFieldError("supplierId") ? "border-red-500 focus:ring-red-500" : ""}`}>
+                    <SelectValue placeholder="Direct / None">
+                      {(val) => {
+                        if (!val) return "None / Direct";
+                        const sup = suppliers.find((s) => s.id === val);
+                        return sup ? sup.name : val;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-white border-slate-200">
                     <SelectItem value="" className="text-xs">None / Direct</SelectItem>
@@ -197,6 +219,9 @@ export function AddManualCostModal({
                     ))}
                   </SelectContent>
                 </Select>
+                {getFieldError("supplierId") && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("supplierId")}</p>
+                )}
               </div>
             </div>
 
@@ -206,12 +231,10 @@ export function AddManualCostModal({
               <Input
                 placeholder="e.g. Driver Daily Bata, Fastag Tolls, Tea Museum Entry..."
                 {...formik.getFieldProps("name")}
-                className={`h-9 text-xs bg-slate-50/50 border-slate-200 ${
-                  getFieldError("name") ? "border-red-500" : ""
-                }`}
+                className={inputCls("name")}
               />
               {getFieldError("name") && (
-                <p className="text-[10px] text-red-500 font-semibold">{getFieldError("name")}</p>
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("name")}</p>
               )}
             </div>
 
@@ -223,10 +246,11 @@ export function AddManualCostModal({
                   type="number"
                   min={0}
                   {...formik.getFieldProps("unitCost")}
-                  className={`h-9 text-xs font-bold bg-slate-50/50 border-slate-200 ${
-                    getFieldError("unitCost") ? "border-red-500" : ""
-                  }`}
+                  className={inputCls("unitCost", "h-9 text-xs font-bold bg-slate-50/50 border-slate-200")}
                 />
+                {getFieldError("unitCost") && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("unitCost")}</p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -235,8 +259,11 @@ export function AddManualCostModal({
                   type="number"
                   min={1}
                   {...formik.getFieldProps("quantity")}
-                  className="h-9 text-xs bg-slate-50/50 border-slate-200"
+                  className={inputCls("quantity")}
                 />
+                {getFieldError("quantity") && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("quantity")}</p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -245,8 +272,11 @@ export function AddManualCostModal({
                   type="number"
                   min={1}
                   {...formik.getFieldProps("duration")}
-                  className="h-9 text-xs bg-slate-50/50 border-slate-200"
+                  className={inputCls("duration")}
                 />
+                {getFieldError("duration") && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("duration")}</p>
+                )}
               </div>
             </div>
 
@@ -257,8 +287,11 @@ export function AddManualCostModal({
                 <Input
                   placeholder="e.g. Day, Person, Room, Lump Sum"
                   {...formik.getFieldProps("unit")}
-                  className="h-9 text-xs bg-slate-50/50 border-slate-200"
+                  className={inputCls("unit")}
                 />
+                {getFieldError("unit") && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("unit")}</p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -266,8 +299,11 @@ export function AddManualCostModal({
                 <Input
                   type="date"
                   {...formik.getFieldProps("dateFrom")}
-                  className="h-9 text-xs bg-slate-50/50 border-slate-200"
+                  className={inputCls("dateFrom")}
                 />
+                {getFieldError("dateFrom") && (
+                  <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("dateFrom")}</p>
+                )}
               </div>
             </div>
 
@@ -288,8 +324,11 @@ export function AddManualCostModal({
               <Textarea
                 placeholder="Optional supplier payment terms or booking reference..."
                 {...formik.getFieldProps("notes")}
-                className="min-h-[60px] text-xs bg-slate-50/50 border-slate-200"
+                className={`min-h-[60px] text-xs bg-slate-50/50 border-slate-200 ${getFieldError("notes") ? "border-red-500 focus-visible:ring-red-500" : ""}`}
               />
+              {getFieldError("notes") && (
+                <p className="text-[11px] text-red-500 font-semibold mt-0.5">{getFieldError("notes")}</p>
+              )}
             </div>
           </div>
 

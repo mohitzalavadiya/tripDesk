@@ -1,42 +1,36 @@
 "use client"
 
-import * as React from "react"
-import { useRouter } from "next/navigation"
-import {
-  Quotation,
-  QuotationSection,
-  QuotationSectionType,
-} from "@/types"
-import { QuotationRenderer } from "./quotation-renderer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  ArrowUp,
-  ArrowDown,
-  Eye,
-  EyeOff,
-  Save,
-  Share2,
-  Download,
-  ExternalLink,
-  Plus,
-  Trash2,
-  Check,
-  Smartphone,
-  Monitor,
-  Tablet,
-  CheckCircle2,
-  Sparkles,
-  Layers,
-  FileText,
-  Clock,
-  RotateCcw,
-  CalendarCheck,
-} from "lucide-react"
-import { toast } from "sonner"
 import { exportQuotationPDF } from "@/lib/quotation/pdf-service"
+import {
+Quotation
+} from "@/types"
+import {
+ArrowDown,
+ArrowUp,
+CalendarCheck,
+Check,
+Download,
+ExternalLink,
+Eye,
+EyeOff,
+FileText,
+Layers,
+Monitor,
+Plus,
+Save,
+Share2,
+Smartphone,
+Sparkles,
+Tablet,
+Trash2
+} from "lucide-react"
+import { useRouter } from "next/navigation"
+import * as React from "react"
+import { QuotationRenderer } from "./quotation-renderer"
 
 interface QuotationEditorProps {
   initialQuotation: Quotation
