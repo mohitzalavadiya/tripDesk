@@ -1,5 +1,7 @@
 import { PublicBookingPayload } from "@/lib/services/booking-public-service";
-import { PublicTripPayload } from "@/lib/services/trip-public-service";
+import { PublicTripDocumentPayload, PublicTripPayload } from "@/lib/services/trip-public-service";
+
+export type PublicTripDocumentItem = PublicTripDocumentPayload;
 
 export const tripPublicClient = {
   async getByToken(token: string): Promise<PublicTripPayload> {
@@ -77,6 +79,21 @@ export const tripPublicClient = {
     const json = await res.json();
     if (!res.ok || !json.success) {
       throw new Error(json.error || "Unable to mark notification as read.");
+    }
+
+    return json.data;
+  },
+
+  async getDocuments(token: string): Promise<PublicTripDocumentItem[]> {
+    const res = await fetch(`/api/trips/public/${encodeURIComponent(token)}/documents`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || "Unable to fetch trip documents.");
     }
 
     return json.data;

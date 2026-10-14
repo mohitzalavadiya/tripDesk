@@ -101,11 +101,19 @@ export const bookingPublicService = {
 
     const trimmed = token.trim();
 
-    // 1. Try finding directly by bookingNumber or bookingId
-    let booking = await prisma.booking.findFirst({
-      where: {
-        OR: [{ id: trimmed }, { bookingNumber: trimmed }],
-      },
+    // Public access is strictly authorized via active, unrevoked PublicShareLink
+    const shareLink = await prisma.publicShareLink.findFirst({
+      where: { tokenHash: trimmed, status: "ACTIVE", revokedAt: null },
+      select: { tripId: true },
+    });
+
+    if (!shareLink?.tripId) {
+      return null;
+    }
+
+    const booking = await prisma.booking.findFirst({
+      where: { tripId: shareLink.tripId, status: { not: "CANCELLED" } },
+      orderBy: { createdAt: "desc" },
       include: {
         agency: { select: { name: true, phone: true, email: true, address: true, logo: true } },
         customer: { select: { name: true, phone: true, email: true } },
@@ -135,49 +143,6 @@ export const bookingPublicService = {
         },
       },
     });
-
-    // 2. Fallback: Lookup via trip PublicShareLink
-    if (!booking) {
-      const shareLink = await prisma.publicShareLink.findFirst({
-        where: { tokenHash: trimmed, status: "ACTIVE", revokedAt: null },
-        select: { tripId: true },
-      });
-
-      if (shareLink?.tripId) {
-        booking = await prisma.booking.findFirst({
-          where: { tripId: shareLink.tripId, status: { not: "CANCELLED" } },
-          orderBy: { createdAt: "desc" },
-          include: {
-            agency: { select: { name: true, phone: true, email: true, address: true, logo: true } },
-            customer: { select: { name: true, phone: true, email: true } },
-            trip: {
-              include: {
-                travelers: { select: { id: true, name: true, type: true, specialRequirements: true } },
-                itineraryItems: {
-                  orderBy: [{ dayNumber: "asc" }, { sortOrder: "asc" }],
-                },
-                tripHotels: {
-                  include: { hotel: { select: { name: true, city: true } } },
-                  orderBy: { checkIn: "asc" },
-                },
-                tripVehicles: {
-                  include: { vehicle: { select: { name: true, type: true } } },
-                  orderBy: { startDate: "asc" },
-                },
-                tripActivities: {
-                  include: { activity: { select: { name: true, type: true, location: true } } },
-                  orderBy: { date: "asc" },
-                },
-              },
-            },
-            payments: {
-              where: { status: "COMPLETED" },
-              orderBy: { paymentDate: "desc" },
-            },
-          },
-        });
-      }
-    }
 
     if (!booking) {
       return null;

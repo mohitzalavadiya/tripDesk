@@ -1,6 +1,17 @@
 import { prisma } from "@/lib/prisma";
-import { TripStatus } from "@prisma/client";
+import { TravelDocumentStatus, TravelDocumentType, TripStatus } from "@prisma/client";
 import "server-only";
+import { travelDocumentService } from "./travel-document-service";
+
+export interface PublicTripDocumentPayload {
+  id: string;
+  documentNumber: string;
+  documentType: TravelDocumentType;
+  title: string;
+  version: number;
+  issuedAt: Date | string | null;
+  downloadUrl: string;
+}
 
 export interface PublicTripPayload {
   id: string;
@@ -130,41 +141,7 @@ export const tripPublicService = {
       },
     });
 
-    let trip: any = shareLink?.trip;
-
-    // 2. Fallback: Lookup directly by tripId or tripNumber
-    if (!trip) {
-      trip = await prisma.trip.findFirst({
-        where: {
-          OR: [{ id: trimmed }, { tripNumber: trimmed }],
-        },
-        include: {
-          agency: { select: { name: true, phone: true, email: true, address: true, logo: true } },
-          customer: { select: { name: true, phone: true, email: true } },
-          travelers: { select: { id: true, name: true, type: true, specialRequirements: true } },
-          itineraryItems: {
-            orderBy: [{ dayNumber: "asc" }, { sortOrder: "asc" }],
-          },
-          tripHotels: {
-            include: { hotel: { select: { name: true, city: true, category: true } } },
-            orderBy: { checkIn: "asc" },
-          },
-          tripVehicles: {
-            include: { vehicle: { select: { name: true, type: true } } },
-            orderBy: { startDate: "asc" },
-          },
-          tripActivities: {
-            include: { activity: { select: { name: true, type: true, location: true, duration: true } } },
-            orderBy: { date: "asc" },
-          },
-          bookings: {
-            where: { status: { not: "CANCELLED" } },
-            orderBy: { createdAt: "desc" },
-            take: 1,
-          },
-        },
-      });
-    }
+    const trip: any = shareLink?.trip;
 
     if (!trip) {
       return null;
@@ -259,5 +236,132 @@ export const tripPublicService = {
           }
         : null,
     };
+  },
+
+  /**
+   * Lists traveler-facing issued travel documents for a trip authorized via active PublicShareLink.
+   */
+  async getPublicTripDocumentsByToken(
+    token: string
+  ): Promise<PublicTripDocumentPayload[] | null> {
+    if (!token || typeof token !== "string" || token.trim().length === 0) {
+      return null;
+    }
+
+    const trimmed = token.trim();
+
+    // 1. Verify active, unrevoked PublicShareLink
+    const shareLink = await prisma.publicShareLink.findFirst({
+      where: {
+        tokenHash: trimmed,
+        status: "ACTIVE",
+        revokedAt: null,
+      },
+      select: {
+        id: true,
+        tripId: true,
+        agencyId: true,
+      },
+    });
+
+    if (!shareLink) {
+      return null;
+    }
+
+    // 2. Touch lastAccessedAt non-blockingly
+    await prisma.publicShareLink
+      .update({
+        where: { id: shareLink.id },
+        data: { lastAccessedAt: new Date() },
+      })
+      .catch(() => {});
+
+    // 3. Query traveler-eligible documents strictly scoped to this trip and agency
+    const documents = await prisma.travelDocument.findMany({
+      where: {
+        tripId: shareLink.tripId,
+        agencyId: shareLink.agencyId,
+        status: TravelDocumentStatus.ISSUED,
+        documentType: { not: TravelDocumentType.SUPPLIER_VOUCHER },
+      },
+      orderBy: [{ issuedAt: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        documentNumber: true,
+        documentType: true,
+        title: true,
+        version: true,
+        issuedAt: true,
+      },
+    });
+
+    return documents.map((doc) => ({
+      id: doc.id,
+      documentNumber: doc.documentNumber,
+      documentType: doc.documentType,
+      title: doc.title,
+      version: doc.version,
+      issuedAt: doc.issuedAt,
+      downloadUrl: `/api/trips/public/${encodeURIComponent(trimmed)}/documents/${encodeURIComponent(doc.id)}/pdf`,
+    }));
+  },
+
+  /**
+   * Retrieves and renders a traveler document PDF strictly scoped to an authorized trip.
+   */
+  async getPublicTripDocumentPdf(
+    token: string,
+    documentId: string
+  ): Promise<{ buffer: Buffer; filename: string; contentType: string } | null> {
+    if (
+      !token ||
+      typeof token !== "string" ||
+      !token.trim() ||
+      !documentId ||
+      typeof documentId !== "string" ||
+      !documentId.trim()
+    ) {
+      return null;
+    }
+
+    const trimmedToken = token.trim();
+    const trimmedDocId = documentId.trim();
+
+    // 1. Verify active, unrevoked PublicShareLink
+    const shareLink = await prisma.publicShareLink.findFirst({
+      where: {
+        tokenHash: trimmedToken,
+        status: "ACTIVE",
+        revokedAt: null,
+      },
+      select: {
+        id: true,
+        tripId: true,
+        agencyId: true,
+      },
+    });
+
+    if (!shareLink) {
+      return null;
+    }
+
+    // 2. Verify document exists, belongs to this trip and agency, and is in ISSUED status
+    const document = await prisma.travelDocument.findFirst({
+      where: {
+        id: trimmedDocId,
+        tripId: shareLink.tripId,
+        agencyId: shareLink.agencyId,
+        status: TravelDocumentStatus.ISSUED,
+        documentType: { not: TravelDocumentType.SUPPLIER_VOUCHER },
+      },
+      select: { id: true },
+    });
+
+    if (!document) {
+      return null;
+    }
+
+    // 3. Render PDF binary with server-authoritative details
+    return travelDocumentService.renderDocumentPdf(shareLink.agencyId, document.id);
   },
 };

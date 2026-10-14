@@ -1,28 +1,30 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { bookingPublicClient,tripPublicClient } from "@/lib/api-client";
+import { bookingPublicClient, PublicTripDocumentItem, tripPublicClient } from "@/lib/api-client";
 import { useModalScrollLock } from "@/lib/scroll-lock";
 import { PublicBookingPayload } from "@/lib/services/booking-public-service";
 import { PublicTripPayload } from "@/lib/services/trip-public-service";
 import {
-AlertTriangle,
-Car,
-CheckCircle2,
-ChevronDown,
-ChevronUp,
-Clock,
-Compass,
-Edit3,
-ExternalLink,
-Hotel,
-Loader2,
-MessageSquare,
-Sparkles,
-Star,
-ThumbsUp,
-Ticket,
-X,
+  AlertTriangle,
+  Car,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Compass,
+  Download,
+  Edit3,
+  ExternalLink,
+  FileText,
+  Hotel,
+  Loader2,
+  MessageSquare,
+  Sparkles,
+  Star,
+  ThumbsUp,
+  Ticket,
+  X,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import * as React from "react";
@@ -43,6 +45,11 @@ export default function CustomerTripPortalPage() {
   // Post-Trip Feedback States
   const [feedbackStatus, setFeedbackStatus] = React.useState<any | null>(null);
   const [feedbackSubmitting, setFeedbackSubmitting] = React.useState(false);
+
+  // Documents & Vouchers States
+  const [documents, setDocuments] = React.useState<PublicTripDocumentItem[]>([]);
+  const [loadingDocs, setLoadingDocs] = React.useState(true);
+  const [docsError, setDocsError] = React.useState<string | null>(null);
   const [isFeedbackEditing, setIsFeedbackEditing] = React.useState(false);
   const [showCategoryRatings, setShowCategoryRatings] = React.useState(false);
   const [rating, setRating] = React.useState(5);
@@ -140,6 +147,18 @@ export default function CustomerTripPortalPage() {
           }
         } catch {
           // Non-critical: feedback check fails silently if route error
+        }
+
+        // Fetch documents for authorized trip
+        try {
+          setLoadingDocs(true);
+          const docsData = await tripPublicClient.getDocuments(secureToken);
+          setDocuments(docsData || []);
+        } catch (docErr: any) {
+          // Non-critical: if documents fail to load, keep portal operational
+          setDocsError(docErr?.message || "Unable to load travel documents.");
+        } finally {
+          setLoadingDocs(false);
         }
       } catch (err: any) {
         console.error("Failed to load public portal:", err);
@@ -363,6 +382,112 @@ export default function CustomerTripPortalPage() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* ─── TRAVEL DOCUMENTS & VOUCHERS SECTION ─────────────────────── */}
+        <div id="documents" className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-xl space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-extrabold text-slate-900">
+                  Travel Documents & Vouchers
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Official vouchers, booking receipts, and travel documents issued for your trip.
+                </p>
+              </div>
+            </div>
+            {documents.length > 0 && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                {documents.length} Available
+              </span>
+            )}
+          </div>
+
+          {loadingDocs ? (
+            <div className="py-8 flex flex-col items-center justify-center space-y-2 text-slate-400">
+              <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+              <p className="text-xs font-medium">Loading verified documents...</p>
+            </div>
+          ) : docsError ? (
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-600 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>{docsError}</span>
+            </div>
+          ) : documents.length === 0 ? (
+            <div className="p-6 text-center bg-slate-50/60 rounded-2xl border border-slate-100 space-y-2">
+              <FileText className="w-8 h-8 text-slate-300 mx-auto" />
+              <h3 className="text-xs font-bold text-slate-700">No Documents Available Yet</h3>
+              <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                Official vouchers and confirmation passes will appear here once service confirmations are issued by suppliers.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {documents.map((doc) => {
+                const getBadge = (type: string) => {
+                  switch (type) {
+                    case "HOTEL_VOUCHER":
+                      return { label: "Hotel Voucher", color: "bg-purple-50 text-purple-700 border-purple-200", icon: <Hotel className="w-3.5 h-3.5 text-purple-600" /> };
+                    case "VEHICLE_VOUCHER":
+                      return { label: "Transfer Voucher", color: "bg-blue-50 text-blue-700 border-blue-200", icon: <Car className="w-3.5 h-3.5 text-blue-600" /> };
+                    case "ACTIVITY_VOUCHER":
+                      return { label: "Activity Pass", color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <Ticket className="w-3.5 h-3.5 text-emerald-600" /> };
+                    case "BOOKING_CONFIRMATION":
+                      return { label: "Booking Confirmation", color: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" /> };
+                    case "PAYMENT_RECEIPT":
+                      return { label: "Payment Receipt", color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <FileText className="w-3.5 h-3.5 text-emerald-600" /> };
+                    default:
+                      return { label: "Travel Document", color: "bg-slate-50 text-slate-700 border-slate-200", icon: <FileText className="w-3.5 h-3.5 text-slate-600" /> };
+                  }
+                };
+                const badge = getBadge(doc.documentType);
+                return (
+                  <div
+                    key={doc.id}
+                    className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-indigo-400/50 hover:bg-white transition-all duration-200 flex flex-col justify-between space-y-3"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${badge.color}`}>
+                          {badge.icon}
+                          {badge.label}
+                        </span>
+                        {doc.version > 1 && (
+                          <span className="text-[10px] font-mono text-slate-400">v{doc.version}</span>
+                        )}
+                      </div>
+                      <h3 className="text-xs font-bold text-slate-900 leading-snug line-clamp-1">
+                        {doc.title}
+                      </h3>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400">
+                        <span className="font-mono text-slate-500">{doc.documentNumber}</span>
+                        {doc.issuedAt && <span>{formatDate(doc.issuedAt)}</span>}
+                      </div>
+                    </div>
+
+                    <a
+                      href={doc.downloadUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex w-full"
+                    >
+                      <Button
+                        size="sm"
+                        className="w-full h-8.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 shadow-2xs cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download PDF</span>
+                      </Button>
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* ─── POST-TRIP GUEST FEEDBACK ──────────────────────────────────── */}

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { cookies,headers } from "next/headers";
+import { headers } from "next/headers";
 import "server-only";
 
 export interface AuthenticatedCustomerContext {
@@ -9,7 +9,7 @@ export interface AuthenticatedCustomerContext {
   name: string;
   email?: string | null;
   phone: string;
-  authMethod: "COOKIE" | "SECURE_TOKEN";
+  authMethod: "SECURE_TOKEN";
   tokenTripId?: string | null;
 }
 
@@ -19,105 +19,30 @@ export interface CustomerAuthOptions {
    */
   tripId?: string;
   /**
-   * If true, strictly requires a full customer portal account session (COOKIE),
-   * disallowing any token-based access regardless of resource scope.
+   * If true, strictly requires a full customer portal account session.
+   * Since customer accounts and login are retired, this always resolves to null.
    */
   requireAccountSession?: boolean;
 }
 
 /**
- * Resolves the authenticated customer context from the established session cookie
- * or an active PublicShareLink token (strictly scoped to its associated trip).
+ * Resolves the authenticated customer context from an active PublicShareLink token
+ * (strictly scoped to its associated trip).
  *
- * SECURITY (DISC-02): Unauthenticated request headers (x-customer-id, x-agency-id)
- * are NEVER trusted or evaluated as credentials.
+ * NOTE: Customer login and customer account sessions are retired per product scope.
+ * Stateless guest access is authorized exclusively via active, unrevoked PublicShareLink tokens.
  */
 export async function getAuthenticatedCustomer(
   request?: Request,
   options?: CustomerAuthOptions
 ): Promise<AuthenticatedCustomerContext | null> {
   try {
-    // 1. Check customer cookie session (Primary / Account-Wide Access)
-    try {
-      let sessionCookie: string | undefined;
-
-      // Check request cookie header if request object is provided
-      if (request) {
-        const cookieHeader = request.headers.get("cookie");
-        if (cookieHeader) {
-          const match = cookieHeader.match(/(?:^|;\s*)tripdesk_customer_session=([^;]+)/);
-          if (match) {
-            sessionCookie = decodeURIComponent(match[1]);
-          }
-        }
-      }
-
-      // Check Next.js cookie store
-      if (!sessionCookie) {
-        try {
-          const cookieStore = await cookies();
-          sessionCookie = cookieStore.get("tripdesk_customer_session")?.value;
-        } catch {
-          // Cookie store might not be available in standalone / external contexts
-        }
-      }
-
-      if (sessionCookie) {
-        let parsed: any = null;
-        try {
-          parsed = JSON.parse(sessionCookie);
-        } catch {
-          // Malformed JSON - treat as invalid session
-          parsed = null;
-        }
-
-        if (
-          parsed &&
-          typeof parsed === "object" &&
-          typeof parsed.customerId === "string" &&
-          parsed.customerId.trim() !== "" &&
-          typeof parsed.agencyId === "string" &&
-          parsed.agencyId.trim() !== ""
-        ) {
-          const customer = await prisma.customer.findFirst({
-            where: {
-              id: parsed.customerId.trim(),
-              agencyId: parsed.agencyId.trim(),
-              archivedAt: null,
-            },
-            select: {
-              id: true,
-              agencyId: true,
-              customerNumber: true,
-              name: true,
-              email: true,
-              phone: true,
-            },
-          });
-
-          if (customer) {
-            return {
-              customerId: customer.id,
-              agencyId: customer.agencyId,
-              customerNumber: customer.customerNumber,
-              name: customer.name,
-              email: customer.email,
-              phone: customer.phone,
-              authMethod: "COOKIE",
-            };
-          }
-        }
-      }
-    } catch {
-      // Cookie parsing or lookup error - proceed to token check
-    }
-
-    // 2. If a full customer account session is strictly required, stop here.
+    // 1. Account-wide sessions are not supported (customer accounts are retired)
     if (options?.requireAccountSession) {
       return null;
     }
 
-    // 3. Check Public Share Link token (Narrowly scoped to a specific trip)
+    // 2. Check Public Share Link token (Narrowly scoped to a specific trip)
     // Only evaluate token if options.tripId is explicitly provided for a trip-scoped route.
     // Unscoped/account-wide endpoints (profile, all bookings, notifications) cannot be authenticated via token.
     if (options?.tripId) {

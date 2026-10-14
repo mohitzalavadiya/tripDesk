@@ -1,7 +1,12 @@
 import { handleApiError } from "@/lib/api";
+import {
+  getRateLimitHeaders,
+  getTrustedClientIp,
+  limitEndpoint,
+} from "@/lib/security/rate-limiter";
 import { quotationPdfService } from "@/lib/services/quotation-pdf-service";
 import { quotationService } from "@/lib/services/quotation-service";
-import { NextRequest,NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -16,15 +21,31 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { token } = await params;
+    if (!token || typeof token !== "string" || !token.trim()) {
+      return NextResponse.json(
+        { success: false, error: "Quotation token is required." },
+        { status: 400 }
+      );
+    }
+
+    // Rate limiting: 60 requests per minute per IP (fail-open)
+    const clientIp = getTrustedClientIp(request);
+    const rateLimitResult = await limitEndpoint("public-read", clientIp, request);
+
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { success: false, error: "Too many requests. Please try again later." },
+        { status: 429, headers: getRateLimitHeaders(rateLimitResult) }
+      );
+    }
 
     const quotation = await quotationService.getPublicQuotationByToken(token);
 
     if (!quotation) {
-      return handleApiError({
-        statusCode: 404,
-        code: "NOT_FOUND",
-        message: "Quotation proposal not found or link has expired.",
-      });
+      return NextResponse.json(
+        { success: false, error: "Quotation proposal not found or link has expired." },
+        { status: 404, headers: getRateLimitHeaders(rateLimitResult) }
+      );
     }
 
     // Generate sanitized PDF
@@ -102,6 +123,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${filename}"`,
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
+        ...getRateLimitHeaders(rateLimitResult),
       },
     });
   } catch (error) {
