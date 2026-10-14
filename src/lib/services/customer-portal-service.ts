@@ -2,11 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { operationsDocumentService } from "@/lib/services/operations-document-service";
 import { travelDocumentService } from "@/lib/services/travel-document-service";
 import {
-BookingPaymentStatus,
-BookingStatus,
-OperationStatus,
-PaymentMethod,
-TripStatus,
+  BookingPaymentStatus,
+  BookingStatus,
+  OperationStatus,
+  PaymentMethod,
+  TravelDocumentType,
+  TripStatus,
 } from "@prisma/client";
 import "server-only";
 
@@ -623,7 +624,9 @@ export class CustomerPortalService {
           id: docId,
           customerId,
           agencyId,
+          tripId,
           status: "ISSUED",
+          documentType: { not: TravelDocumentType.SUPPLIER_VOUCHER },
         },
       });
 

@@ -1,16 +1,57 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  handleApiError,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { communicationService } from "@/lib/services/communication-service";
 import { runAutomationSchema } from "@/lib/validation/communication-schema";
+import { timingSafeEqual } from "crypto";
 import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Validates whether the incoming request contains an authorized server-side CRON secret.
+ * Enforces timing-safe comparison and requires minimum entropy (>= 16 characters).
+ */
+export function isAuthorizedCronRequest(request: Request): boolean {
+  const cronSecret = process.env.CRON_SECRET?.trim();
+  if (!cronSecret || cronSecret.length < 16) {
+    return false;
+  }
+
+  const authHeader = request.headers.get("authorization")?.trim();
+  const cronHeader = request.headers.get("x-cron-secret")?.trim();
+
+  const expectedBearerBuffer = Buffer.from(`Bearer ${cronSecret}`);
+  if (authHeader) {
+    const authBuffer = Buffer.from(authHeader);
+    if (authBuffer.length === expectedBearerBuffer.length) {
+      try {
+        if (timingSafeEqual(authBuffer, expectedBearerBuffer)) {
+          return true;
+        }
+      } catch {}
+    }
+  }
+
+  const cronSecretBuffer = Buffer.from(cronSecret);
+  if (cronHeader) {
+    const cronBuffer = Buffer.from(cronHeader);
+    if (cronBuffer.length === cronSecretBuffer.length) {
+      try {
+        if (timingSafeEqual(cronBuffer, cronSecretBuffer)) {
+          return true;
+        }
+      } catch {}
+    }
+  }
+
+  return false;
+}
 
 /**
  * POST /api/communication/automation/run
@@ -24,13 +65,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization");
-    const cronHeader = request.headers.get("x-cron-secret");
-    const cronSecret = process.env.CRON_SECRET;
-
-    const isBearerCron = !!cronSecret && authHeader === `Bearer ${cronSecret}`;
-    const isHeaderCron = !!cronSecret && cronHeader === cronSecret;
-    const isCronAuthorized = isBearerCron || isHeaderCron;
+    const isCronAuthorized = isAuthorizedCronRequest(request);
 
     const body = await validateJson(runAutomationSchema, request).catch(() => ({ scope: "all" as const }));
 

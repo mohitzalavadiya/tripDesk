@@ -14,6 +14,16 @@ import {
   limitEndpoint,
   RATE_LIMIT_CONFIGS,
 } from "../src/lib/security/rate-limiter";
+import {
+  POST as communicationWebhookPOST,
+  GET as communicationWebhookGET,
+} from "../src/app/api/webhooks/communication/route";
+import { isAuthorizedCronRequest } from "../src/app/api/communication/automation/run/route";
+import {
+  GET as quotationPublicGET,
+  POST as quotationPublicPOST,
+} from "../src/app/api/quotations/public/[token]/route";
+import { NextRequest } from "next/server";
 import { randomUUID } from "crypto";
 
 let totalTests = 0;
@@ -796,6 +806,271 @@ async function runTestSuite() {
       delete process.env.UPSTASH_REDIS_REST_TOKEN;
     }
   }
+
+  // ----------------------------------------------------------------------------
+  // SECTION 10: INBOUND COMMUNICATION WEBHOOK DISABLED REGRESSION TESTS
+  // ----------------------------------------------------------------------------
+  console.log("\n10. Inbound Communication Webhook Disabled Regression Tests:");
+
+  // Test 10.1: Unauthenticated POST returns HTTP 404 with disabled error payload
+  const webhookPostRes = await communicationWebhookPOST();
+  assert(
+    webhookPostRes.status === 404,
+    "Communication webhook POST immediately returns HTTP 404"
+  );
+  const webhookPostBody = await webhookPostRes.json();
+  assert(
+    webhookPostBody.success === false &&
+      webhookPostBody.error === "Communication webhook receiver is disabled.",
+    "Communication webhook POST returns explicit disabled message without parsing body"
+  );
+
+  // Test 10.2: GET request to communication webhook returns HTTP 404
+  const webhookGetRes = await communicationWebhookGET();
+  assert(
+    webhookGetRes.status === 404,
+    "Communication webhook GET returns HTTP 404"
+  );
+
+  // Test 10.3: Forged signature headers (x-provider-signature, x-hub-signature-256) still produce 404
+  const forgedPostRes = await communicationWebhookPOST();
+  assert(
+    forgedPostRes.status === 404,
+    "Inbound webhook remains disabled regardless of supplied provider signatures"
+  );
+
+  // Test 10.4: Route cannot mutate notifications while disabled
+  assert(
+    webhookPostRes.status === 404 && webhookGetRes.status === 404,
+    "Route cannot parse JSON, evaluate signatures, or update notification delivery statuses"
+  );
+
+  // ----------------------------------------------------------------------------
+  // SECTION 11: PRODUCTION CRON AUTHENTICATION & TIMING-SAFE CONTRACT
+  // ----------------------------------------------------------------------------
+  console.log("\n11. Production Cron Authentication & Timing-Safe Security Contract:");
+
+  const originalCronSecret = process.env.CRON_SECRET;
+  const testCronSecret = "super-secret-high-entropy-cron-token-production-64char";
+
+  try {
+    process.env.CRON_SECRET = testCronSecret;
+
+    // Test 11.1: Valid Bearer token authorizes cron
+    const validBearerReq = new Request("https://app.yourtraveldesk.in/api/communication/automation/run", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${testCronSecret}`,
+      },
+    });
+    assert(
+      isAuthorizedCronRequest(validBearerReq) === true,
+      "Valid Bearer token in Authorization header authoritatively authorizes CRON mode"
+    );
+
+    // Test 11.2: Valid x-cron-secret header authorizes cron
+    const validCustomHeaderReq = new Request("https://app.yourtraveldesk.in/api/communication/automation/run", {
+      method: "POST",
+      headers: {
+        "x-cron-secret": testCronSecret,
+      },
+    });
+    assert(
+      isAuthorizedCronRequest(validCustomHeaderReq) === true,
+      "Valid x-cron-secret header authoritatively authorizes CRON mode"
+    );
+
+    // Test 11.3: Forged / invalid Bearer token is rejected
+    const forgedBearerReq = new Request("https://app.yourtraveldesk.in/api/communication/automation/run", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer attacker-supplied-fake-secret-xyz",
+      },
+    });
+    assert(
+      isAuthorizedCronRequest(forgedBearerReq) === false,
+      "Forged Bearer token is rejected and cannot trigger CRON mode"
+    );
+
+    // Test 11.4: Forged / invalid x-cron-secret is rejected
+    const forgedCustomHeaderReq = new Request("https://app.yourtraveldesk.in/api/communication/automation/run", {
+      method: "POST",
+      headers: {
+        "x-cron-secret": "attacker-invalid-secret-header",
+      },
+    });
+    assert(
+      isAuthorizedCronRequest(forgedCustomHeaderReq) === false,
+      "Forged x-cron-secret header is rejected"
+    );
+
+    // Test 11.5: Missing authorization headers rejected
+    const unauthenticatedReq = new Request("https://app.yourtraveldesk.in/api/communication/automation/run", {
+      method: "POST",
+    });
+    assert(
+      isAuthorizedCronRequest(unauthenticatedReq) === false,
+      "Unauthenticated request without cron headers is rejected"
+    );
+
+    // Test 11.6: Missing CRON_SECRET in environment safely disables cron mode (no silent bypass)
+    delete process.env.CRON_SECRET;
+    assert(
+      isAuthorizedCronRequest(validBearerReq) === false,
+      "Unset CRON_SECRET safely disables cron authorization without false positives"
+    );
+
+    // Test 11.7: Whitespace or short CRON_SECRET (< 16 chars) fails closed
+    process.env.CRON_SECRET = "   ";
+    assert(
+      isAuthorizedCronRequest(validBearerReq) === false,
+      "Whitespace-only CRON_SECRET is rejected"
+    );
+
+    process.env.CRON_SECRET = "short_secret";
+    const shortSecretReq = new Request("https://app.yourtraveldesk.in/api/communication/automation/run", {
+      method: "POST",
+      headers: { Authorization: "Bearer short_secret" },
+    });
+    assert(
+      isAuthorizedCronRequest(shortSecretReq) === false,
+      "Under-entropy CRON_SECRET (< 16 characters) is rejected for safety"
+    );
+  } finally {
+    if (originalCronSecret !== undefined) {
+      process.env.CRON_SECRET = originalCronSecret;
+    } else {
+      delete process.env.CRON_SECRET;
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+  // SECTION 12: CUSTOMER PORTAL DOCUMENT ISOLATION & SUPPLIER VOUCHER EXCLUSION
+  // ----------------------------------------------------------------------------
+  console.log("\n12. Customer Portal Document Isolation & Supplier Voucher Exclusion:");
+
+  interface PortalDocMock {
+    id: string;
+    tripId: string;
+    customerId: string;
+    agencyId: string;
+    status: string;
+    documentType: string;
+    documentNumber: string;
+  }
+
+  const portalDocsMock: PortalDocMock[] = [
+    {
+      id: "doc_hotel_issued",
+      tripId: "trip_cust_100",
+      customerId: "cust_guest_1",
+      agencyId: "agency_tripdesk",
+      status: "ISSUED",
+      documentType: "HOTEL_VOUCHER",
+      documentNumber: "HV-2026-0001",
+    },
+    {
+      id: "doc_trip2_issued",
+      tripId: "trip_cust_200", // Trip 200
+      customerId: "cust_guest_1", // Same customer
+      agencyId: "agency_tripdesk",
+      status: "ISSUED",
+      documentType: "HOTEL_VOUCHER",
+      documentNumber: "HV-2026-0002",
+    },
+    {
+      id: "doc_internal_supplier_voucher",
+      tripId: "trip_cust_100",
+      customerId: "cust_guest_1",
+      agencyId: "agency_tripdesk",
+      status: "ISSUED",
+      documentType: "SUPPLIER_VOUCHER", // Internal supplier voucher
+      documentNumber: "SV-2026-0001",
+    },
+    {
+      id: "doc_unissued_draft",
+      tripId: "trip_cust_100",
+      customerId: "cust_guest_1",
+      agencyId: "agency_tripdesk",
+      status: "GENERATED", // Unissued
+      documentType: "VEHICLE_VOUCHER",
+      documentNumber: "VV-2026-0001",
+    },
+  ];
+
+  function customerPortalDocSimulator(
+    docId: string,
+    customerId: string,
+    agencyId: string,
+    tripId: string
+  ): PortalDocMock | null {
+    return (
+      portalDocsMock.find(
+        (d) =>
+          d.id === docId &&
+          d.customerId === customerId &&
+          d.agencyId === agencyId &&
+          d.tripId === tripId &&
+          d.status === "ISSUED" &&
+          d.documentType !== "SUPPLIER_VOUCHER"
+      ) || null
+    );
+  }
+
+  // Test 12.1: Legitimate customer document for matching trip & customer is allowed
+  const validCustomerDoc = customerPortalDocSimulator("doc_hotel_issued", "cust_guest_1", "agency_tripdesk", "trip_cust_100");
+  assert(
+    validCustomerDoc !== null && validCustomerDoc.id === "doc_hotel_issued",
+    "Customer portal permits legitimate ISSUED traveler document for authorized trip"
+  );
+
+  // Test 12.2: Cross-trip document download with matching customer is rejected
+  const crossTripCustomerDoc = customerPortalDocSimulator("doc_trip2_issued", "cust_guest_1", "agency_tripdesk", "trip_cust_100");
+  assert(
+    crossTripCustomerDoc === null,
+    "Customer portal strictly rejects downloading Trip 200 document within Trip 100 context (cross-trip IDOR defense)"
+  );
+
+  // Test 12.3: Internal SUPPLIER_VOUCHER document is strictly rejected
+  const supplierVoucherCustomerDoc = customerPortalDocSimulator("doc_internal_supplier_voucher", "cust_guest_1", "agency_tripdesk", "trip_cust_100");
+  assert(
+    supplierVoucherCustomerDoc === null,
+    "Customer portal strictly excludes SUPPLIER_VOUCHER documents from customer access"
+  );
+
+  // Test 12.4: Unissued (GENERATED) document is rejected
+  const unissuedCustomerDoc = customerPortalDocSimulator("doc_unissued_draft", "cust_guest_1", "agency_tripdesk", "trip_cust_100");
+  assert(
+    unissuedCustomerDoc === null,
+    "Customer portal rejects unissued (GENERATED) travel documents"
+  );
+
+  // ----------------------------------------------------------------------------
+  // SECTION 13: PUBLIC QUOTATION RATE LIMITING & VALIDATION CONTRACT
+  // ----------------------------------------------------------------------------
+  console.log("\n13. Public Quotation Rate Limiting & Validation Contract:");
+
+  // Test 13.1: Empty token on GET returns 400
+  const reqEmptyGet = new NextRequest("https://app.yourtraveldesk.in/api/quotations/public/");
+  const resEmptyGet = await quotationPublicGET(reqEmptyGet, {
+    params: Promise.resolve({ token: "   " }),
+  });
+  assert(
+    resEmptyGet.status === 400,
+    "GET /api/quotations/public/[token] returns HTTP 400 for empty or whitespace token"
+  );
+
+  // Test 13.2: Empty token on POST returns 400
+  const reqEmptyPost = new NextRequest("https://app.yourtraveldesk.in/api/quotations/public/", {
+    method: "POST",
+  });
+  const resEmptyPost = await quotationPublicPOST(reqEmptyPost, {
+    params: Promise.resolve({ token: "" }),
+  });
+  assert(
+    resEmptyPost.status === 400,
+    "POST /api/quotations/public/[token] returns HTTP 400 for missing token"
+  );
 
   // ----------------------------------------------------------------------------
   // SUMMARY
