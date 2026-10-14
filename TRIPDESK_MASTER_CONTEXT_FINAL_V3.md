@@ -15866,6 +15866,135 @@ When recording a payable disbursement from an Operations card (Accommodations, F
 
 ---
 
+# 254. SECURITY REMEDIATION PASS & POST-DEPLOYMENT STAGING VERIFICATION (OCTOBER 14, 2026)
+
+## 254.1 Commit & Repository Baseline
+- **Date:** October 14, 2026
+- **Branch:** `qa`
+- **Commit:** `8c93584ecbd6a40452eea3a7d2ea01cc6980cab1` (`fix issue`)
+- **Files Modified & Deployed:**
+  1. `src/app/api/webhooks/communication/route.ts`: Inbound communication webhook receiver explicitly disabled. Returns sanitized HTTP 404 immediately on `GET` and `POST` prior to header checks, body parsing, or database queries.
+  2. `src/app/api/communication/automation/run/route.ts`: Extracted and hardened `isAuthorizedCronRequest()` with `crypto.timingSafeEqual`. Requires `CRON_SECRET` >= 16 characters and validates exact buffer byte lengths (`authBuffer.length === expectedBearerBuffer.length` and `cronBuffer.length === cronSecretBuffer.length`) before timing-safe comparison to prevent `RangeError` exceptions. Preserves authenticated agency-owner session fallback under `requireWriteAccess()`.
+  3. `src/app/api/quotations/public/[token]/route.ts`: Added token validation (rejecting empty or whitespace tokens with HTTP 400). Applied sliding-window rate limiting (`limitEndpoint("public-read", clientIp, request)`) returning HTTP 429 with `X-RateLimit-*` and `Retry-After` headers, following standard fail-open policy for Redis outages.
+  4. `src/lib/services/customer-portal-service.ts`: Enforced `tripId` scoping and excluded internal supplier vouchers (`documentType: { not: TravelDocumentType.SUPPLIER_VOUCHER }`) in `downloadCustomerDocument`, eliminating cross-trip IDOR while keeping customer travel vouchers accessible.
+  5. `prisma/test-security-remediation.ts`: Expanded regression test suite with Sections 10 (webhook disabled tests), 11 (timing-safe CRON authentication contracts), 12 (customer portal document isolation and voucher exclusion), and 13 (public quotation route rate limiting and token validation).
+  6. `src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx`: Fixed floating action bar layout by removing conflicting `sticky top-0 z-30` inside dashboard `AppShell`, preventing overlapping collisions with `Topbar` and `AgencyLifecycleBanner`. Added `print:hidden`.
+
+## 254.2 Pre-Deployment Verification & Quality Gates
+- **Security Remediation Suite (`prisma/test-security-remediation.ts`):** 71/71 assertions passed (100%).
+- **Click-to-Chat Unit Suite (`prisma/test-click-to-chat.ts`):** 30/30 assertions passed (100%).
+- **Password Recovery OTP QA Suite (`prisma/test-qa-22-password-recovery-otp.ts`):** 70/70 assertions passed (100%).
+- **TypeScript Compilation:** `npx tsc --noEmit` passed with 0 errors.
+- **Production Build:** `npm run build` passed with exit code 0.
+- **Git Diff Hygiene:** `git diff --check` passed cleanly with 0 whitespace or formatting errors.
+
+## 254.3 Post-Deployment Live Staging Verification
+- **Target Staging Domain:** `https://staging.yourtraveldesk.in`
+- **Observed Live Checks:**
+  1. Root/login page loads cleanly (HTTP 200). Dashboard UI, topbar, and layout render without visual flaws.
+  2. `GET /api/webhooks/communication`: HTTP 404 (`{"success":false,"error":"Communication webhook receiver is disabled."}`).
+  3. `POST /api/webhooks/communication`: HTTP 404 (`{"success":false,"error":"Communication webhook receiver is disabled."}`).
+  4. `GET /api/quotations/public/invalid-test-token-psl-9999999`: HTTP 404 (`{"success":false,"error":"Quotation proposal not found or link has expired."}`).
+  5. Public quotation rate-limiting headers observed live: `x-ratelimit-limit: 60`, `x-ratelimit-remaining: 59`.
+  6. `GET /api/quotations/public/%20%20%20` (whitespace token): HTTP 400 (`{"success":false,"error":"Quotation token is required."}`).
+  7. `POST /api/communication/automation/run` (unauthenticated / forged secret): HTTP 401 (`{"success":false,"error":{"code":"UNAUTHORIZED","message":"Authentication required to access this endpoint."}}`).
+- **Safety Invariant Confirmation:**
+  - Zero database mutations, migrations, or customer data modifications occurred during testing.
+  - Zero test fixtures were created in the database.
+  - Baseline trip `TRP-202610-4787` and all QA baseline records remain untouched.
+  - Zero outgoing communications (email, SMS, WhatsApp) or scheduled automation jobs were triggered.
+
+## 254.4 Distinctions, Limitations & Unverified Items
+- **Confirmed Facts:**
+  - The security remediation code is merged into `qa` at commit `8c93584ecbd6a40452eea3a7d2ea01cc6980cab1` and pushed to `origin/qa`.
+  - Staging live endpoints match the behavioral contract and rate-limiting headers of commit `8c93584ecbd6a40452eea3a7d2ea01cc6980cab1`.
+- **Items Not Verified / Out of Scope:**
+  - Vercel CLI metadata could not independently verify the deployed commit SHA because local CLI credentials are not configured for device OAuth; verification was established via runtime endpoint behavior and response headers.
+  - Production environment variables remain unverified (no production dashboard access or secrets accessed from local CLI).
+  - Live customer document delivery remains unverified on staging because no suitable pre-existing staging test fixtures were available, and no test fixtures were created to maintain data safety.
+  - External communication integrations (email/WhatsApp/SMS third-party delivery webhooks) remain deferred.
+  - No production deployment was performed as part of this verification pass.
+
+# 255. PLATFORM OWNER REPLACEMENT PREPARATION (CODE CHANGES ONLY) — OCTOBER 14, 2026
+
+## 255.1 Objective & Context
+- **Objective:** Prepare the codebase for a controlled Platform Owner replacement on the production-target Supabase project (`qypkowejgqrmilckemcr`) without performing any database, Auth, or account mutations.
+- **New Target Platform Owner:**
+  - Email: `supportyourtraveldesk@gmail.com`
+  - Display Name: `Your Travel Desk Platform Owner`
+- **Preserved Existing Baseline Identities:**
+  - Local/QA Supabase Platform Owner: `mzpatel14@gmail.com` (UUID `de5c1377-0e7c-4747-b3ed-aaee8b7e32a9`)
+  - Staging/Production-Target Platform Owner: `mzpatel14@gmail.com` (UUID `e03a6a21-a355-4afe-ab3e-c8097b6be773`)
+- **Safety Restriction:** ZERO database migrations, seeds, deletions, Auth account creations, or password mutations executed.
+
+## 255.2 Code Changes Implemented
+1. `src/lib/auth/platform-owner-guard.ts`:
+   - Added target email `supportyourtraveldesk@gmail.com` to `KNOWN_PLATFORM_OWNER_EMAILS`.
+   - Added `isValidPlatformOwnerUuid()` helper with standard UUID v4 format regex validation.
+   - Added `getProtectedPlatformOwnerIds()` resolving canonical IDs (`de5c1377...`, `e03a6a21...`) and dynamic `process.env.PLATFORM_OWNER_USER_ID` with strict UUID validation.
+   - Updated `isPlatformOwnerTargetSync()` to normalize IDs/emails to lowercase and check against both static and dynamic protected sets.
+2. `src/lib/api/context.ts`:
+   - Hardened `isPlatformOwner` calculation in `getRequestContext()`: requires `dbUser.role === UserRole.PLATFORM_OWNER && !dbUser.agencyId` (enforcing invariant that Platform Owner must have `agencyId = null`).
+3. `src/lib/auth/index.ts`:
+   - Hardened `isPlatformOwner` calculation in `getCurrentUser()`: requires `dbUser.role === "PLATFORM_OWNER" && !dbUser.agencyId`.
+4. `prisma/bootstrap-owner.ts`:
+   - Updated default target identity to `supportyourtraveldesk@gmail.com` and `Your Travel Desk Platform Owner`.
+   - Added email format validation (`EMAIL_REGEX`) and password length verification (minimum 8 characters).
+   - Added `findAuthUserByEmail()` helper with full pagination to eliminate Supabase Auth single-page limitation.
+   - Added Safe Singleton Protection: Aborts if an existing unrelated Platform Owner is detected unless `ALLOW_PLATFORM_OWNER_REPLACEMENT=true` is explicitly provided.
+   - Added distinct, explicit handling for all four identity states (both exist aligned, DB exists without Auth [fails closed], Auth exists without DB [links safely], neither exists [provisions both]).
+   - Exported `bootstrapPlatformOwner()` with `BootstrapOwnerOptions` to enable isolated mock-based testing without real database writes.
+   - Verified zero passwords, tokens, or secrets are ever logged or printed.
+5. `prisma/test-platform-owner-replacement.ts`:
+   - Added comprehensive isolated test suite covering all 11 required authorization, protection, and replacement scenarios.
+
+## 255.3 Quality Gates & Verification Evidence
+- **Platform Owner Replacement Suite (`prisma/test-platform-owner-replacement.ts`):** 11/11 scenarios passed (100%).
+- **Platform Owner Guard Security Suite (`prisma/test-platform-owner-guard.ts`):** 7/7 tests passed (100%).
+- **Security Remediation Suite (`prisma/test-security-remediation.ts`):** 71/71 assertions passed (100%).
+- **Click-to-Chat Unit Suite (`prisma/test-click-to-chat.ts`):** 30/30 passed (100%).
+- **TypeScript Compilation:** `npx tsc --noEmit` passed with 0 errors.
+- **Production Build:** `npm run build` passed with exit code 0.
+- **Git Diff Hygiene:** `git diff --check` passed cleanly with 0 whitespace errors.
+- **Safety Confirmation:** Zero database, Auth, environment, or deployment operations executed.
+
+# 256. BOOTSTRAP ENVIRONMENT SAFETY LOCK IMPLEMENTATION — OCTOBER 14, 2026
+
+## 256.1 Objective & Context
+- **Objective:** Add a fail-closed environment-target validation to `prisma/bootstrap-owner.ts` before any Supabase Auth or Prisma write can occur.
+- **Intended Target Supabase Project:** Project ref `qypkowejgqrmilckemcr` (Production target).
+- **Protected Local/QA Supabase Project:** Project ref `nsqarlegqxymqfyvfrjw` (Local/QA baseline).
+- **Target Platform Owner Identity:** `supportyourtraveldesk@gmail.com` (`Your Travel Desk Platform Owner`).
+- **Safety Restriction:** ZERO database migrations, seeds, deletions, Auth account creations, or password mutations executed.
+
+## 256.2 Code Changes Implemented
+1. `prisma/bootstrap-owner.ts`:
+   - Added canonical project reference constants: `PRODUCTION_TARGET_SUPABASE_PROJECT_REF = "qypkowejgqrmilckemcr"` and `LOCAL_QA_SUPABASE_PROJECT_REF = "nsqarlegqxymqfyvfrjw"`.
+   - Added `extractSupabaseProjectRef()`: Structurally parses the Supabase URL using `new URL().hostname`, requiring exact `<project-ref>.supabase.co` structure. Rejects substring spoofing attempts, non-Supabase hosts, or malformed strings.
+   - Added `validateBootstrapEnvironment()`:
+     - Enforces target-mode authorization: Provisioning the production Platform Owner requires explicit `BOOTSTRAP_TARGET_MODE="production"` (or `options.targetMode === "production"`). Note: `NODE_ENV=production` alone is explicitly rejected.
+     - Structural URL check: Rejects missing or malformed URLs.
+     - Local/QA project lock: Rejects any attempt to target Local/QA project ref `nsqarlegqxymqfyvfrjw`.
+     - Target project matching: Confirms detected project ref matches expected target ref `qypkowejgqrmilckemcr`.
+   - Placed `validateBootstrapEnvironment()` at the start of `bootstrapPlatformOwner()` to guarantee immediate fail-closed abort BEFORE resolving `DATABASE_URL`, creating PostgreSQL pools, instantiating Prisma/Supabase clients, or issuing database/Auth queries.
+   - Guaranteed zero secret, database URL, password, or token leakage in console output.
+2. `prisma/test-platform-owner-replacement.ts`:
+   - Configured Scenarios 8, 9, 10A, 10B with explicit mock target environment parameters.
+   - Added Scenario 12: Missing target-mode authorization fails closed (including validation that `NODE_ENV=production` alone is rejected).
+   - Added Scenario 13: Malformed or missing Supabase URL rejected (missing URL, invalid host, substring spoofing).
+   - Added Scenario 14: Wrong project reference fails closed (blocking Local/QA `nsqarlegqxymqfyvfrjw` and arbitrary refs).
+   - Added Scenario 15: Valid target configuration passes safety lock (structural extraction across ports, paths, and trailing slashes).
+
+## 256.3 Quality Gates & Verification Evidence
+- **Platform Owner Guard Security Suite (`prisma/test-platform-owner-guard.ts`):** 7/7 tests passed (100%).
+- **Platform Owner Replacement Suite (`prisma/test-platform-owner-replacement.ts`):** 15/15 scenarios passed (100%).
+- **TypeScript Compilation:** `npx tsc --noEmit` passed with 0 errors.
+- **Production Build:** `npm run build` passed with exit code 0 (162 routes generated).
+- **Git Diff Hygiene:** `git diff --check` passed cleanly with 0 whitespace errors.
+- **Strict Invariant Confirmation:** Zero database connections, Auth account modifications, or `.env` modifications performed.
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

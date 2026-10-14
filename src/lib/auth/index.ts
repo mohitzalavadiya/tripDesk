@@ -65,7 +65,7 @@ export async function getCurrentUser(): Promise<AuthenticatedContext | null> {
     const agency = dbUser.agency || null;
     const subscription = agency?.subscriptions[0] || null;
 
-    const isPlatformOwner = dbUser.role === "PLATFORM_OWNER";
+    const isPlatformOwner = dbUser.role === "PLATFORM_OWNER" && !dbUser.agencyId;
     const isAgencyOwner = dbUser.role === "AGENCY_OWNER" && !!dbUser.agencyId;
 
     // Determine subscription access
