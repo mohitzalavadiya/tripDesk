@@ -439,38 +439,7 @@ export const feedbackService = {
       return shareLink.trip;
     }
 
-    // 2. Direct lookup fallback (by tripId or tripNumber)
-    const trip = await prisma.trip.findFirst({
-      where: {
-        OR: [{ id: trimmed }, { tripNumber: trimmed }],
-        archivedAt: null,
-      },
-      include: {
-        agency: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-            email: true,
-            communicationSetting: {
-              select: {
-                googleReviewUrl: true,
-                tripAdvisorReviewUrl: true,
-              },
-            },
-          },
-        },
-        customer: { select: { id: true, name: true, phone: true, email: true } },
-        tripOperation: true,
-        bookings: {
-          where: { status: { not: "CANCELLED" } },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-      },
-    });
-
-    return trip || null;
+    return null;
   },
 
   /**

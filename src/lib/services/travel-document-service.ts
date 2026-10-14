@@ -583,7 +583,22 @@ export class TravelDocumentService {
     // Optional dispatch via Phase 15 communication service
     if (input.notifyCustomer && document.customer) {
       const channel = input.channel || NotificationChannel.WHATSAPP;
-      const downloadUrl = `/customer/trips/${document.tripId}/documents`;
+      let downloadUrl: string | undefined = undefined;
+      if (document.tripId) {
+        const shareLink = await prisma.publicShareLink.findFirst({
+          where: {
+            tripId: document.tripId,
+            agencyId,
+            status: "ACTIVE",
+            revokedAt: null,
+          },
+          orderBy: { createdAt: "desc" },
+          select: { tokenHash: true },
+        });
+        if (shareLink?.tokenHash) {
+          downloadUrl = `/trip/${shareLink.tokenHash}#documents`;
+        }
+      }
 
       communicationService.sendCommunication(agencyId, {
         agencyId,
@@ -730,6 +745,23 @@ export class TravelDocumentService {
       throw new ValidationError(`Customer does not have a valid recipient address for ${channel}.`);
     }
 
+    let downloadUrl: string | undefined = undefined;
+    if (document.tripId) {
+      const shareLink = await prisma.publicShareLink.findFirst({
+        where: {
+          tripId: document.tripId,
+          agencyId,
+          status: "ACTIVE",
+          revokedAt: null,
+        },
+        orderBy: { createdAt: "desc" },
+        select: { tokenHash: true },
+      });
+      if (shareLink?.tokenHash) {
+        downloadUrl = `/trip/${shareLink.tokenHash}#documents`;
+      }
+    }
+
     const result = await communicationService.sendCommunication(agencyId, {
       agencyId,
       customerId: document.customerId,
@@ -739,7 +771,7 @@ export class TravelDocumentService {
       channel,
       title: `Travel Document: ${document.title}`,
       message: `Your travel document (${document.title} - ${document.documentNumber}) is attached and available in your portal.`,
-      linkUrl: `/customer/trips/${document.tripId}/documents`,
+      linkUrl: downloadUrl,
       recipient: {
         name: document.customer.name,
         email: channel === NotificationChannel.EMAIL ? recipient : undefined,
