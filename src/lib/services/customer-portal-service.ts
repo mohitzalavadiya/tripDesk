@@ -2,11 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { operationsDocumentService } from "@/lib/services/operations-document-service";
 import { travelDocumentService } from "@/lib/services/travel-document-service";
 import {
-BookingPaymentStatus,
-BookingStatus,
-OperationStatus,
-PaymentMethod,
-TripStatus,
+  BookingPaymentStatus,
+  BookingStatus,
+  OperationStatus,
+  PaymentMethod,
+  TravelDocumentType,
+  TripStatus,
 } from "@prisma/client";
 import "server-only";
 
@@ -623,7 +624,9 @@ export class CustomerPortalService {
           id: docId,
           customerId,
           agencyId,
+          tripId,
           status: "ISSUED",
+          documentType: { not: TravelDocumentType.SUPPLIER_VOUCHER },
         },
       });
 
@@ -1050,36 +1053,41 @@ export class CustomerPortalService {
     });
 
     if (bookings.length > 0) {
-      if (phoneOrEmail) {
-        const cleanInput = phoneOrEmail.trim().toLowerCase();
-        for (const booking of bookings) {
-          if (booking.customer) {
-            const custPhone = booking.customer.phone.trim().toLowerCase();
-            const custEmail = (booking.customer.email || "").trim().toLowerCase();
-            if (custPhone === cleanInput || custEmail === cleanInput) {
-              return {
-                customerId: booking.customer.id,
-                agencyId: booking.customer.agencyId,
-                customerName: booking.customer.name,
-              };
-            }
+      // Mandatory contact verification: single-booking bypass without secondary contact verification is removed.
+      if (!phoneOrEmail || !phoneOrEmail.trim()) {
+        return null;
+      }
+
+      const cleanInput = phoneOrEmail.trim().toLowerCase();
+      const normalizedInput = cleanInput.replace(/[\s\-\(\)\+]/g, "");
+
+      for (const booking of bookings) {
+        if (booking.customer && !booking.customer.archivedAt) {
+          const custPhone = booking.customer.phone.trim().toLowerCase();
+          const custEmail = (booking.customer.email || "").trim().toLowerCase();
+          const normalizedCustPhone = custPhone.replace(/[\s\-\(\)\+]/g, "");
+
+          const isPhoneMatch =
+            custPhone === cleanInput ||
+            normalizedCustPhone === normalizedInput ||
+            (normalizedInput.length >= 10 && normalizedCustPhone.endsWith(normalizedInput)) ||
+            (normalizedCustPhone.length >= 10 && normalizedInput.endsWith(normalizedCustPhone));
+
+          const isEmailMatch = custEmail.length > 0 && custEmail === cleanInput;
+
+          if (isPhoneMatch || isEmailMatch) {
+            return {
+              customerId: booking.customer.id,
+              agencyId: booking.customer.agencyId,
+              customerName: booking.customer.name,
+            };
           }
         }
-        return null; // Phone or email verification failed for all matching booking candidates
-      } else {
-        // Direct ID / unambiguous single booking lookup without secondary contact verification
-        const first = bookings[0];
-        if (bookings.length === 1 && first?.customer) {
-          return {
-            customerId: first.customer.id,
-            agencyId: first.customer.agencyId,
-            customerName: first.customer.name,
-          };
-        }
       }
+      return null; // Phone or email verification failed for all matching booking candidates
     }
 
-    // 2. Public share link lookup
+    // 2. Public share link lookup (scoped to active, unrevoked share link)
     const shareLink = await prisma.publicShareLink.findFirst({
       where: {
         tokenHash: trimmed,
@@ -1093,12 +1101,23 @@ export class CustomerPortalService {
       },
     });
 
-    if (shareLink?.trip?.customer) {
-      if (phoneOrEmail) {
+    if (shareLink?.trip?.customer && !shareLink.trip.customer.archivedAt) {
+      if (phoneOrEmail && phoneOrEmail.trim()) {
         const cleanInput = phoneOrEmail.trim().toLowerCase();
+        const normalizedInput = cleanInput.replace(/[\s\-\(\)\+]/g, "");
         const custPhone = shareLink.trip.customer.phone.trim().toLowerCase();
         const custEmail = (shareLink.trip.customer.email || "").trim().toLowerCase();
-        if (custPhone !== cleanInput && custEmail !== cleanInput) {
+        const normalizedCustPhone = custPhone.replace(/[\s\-\(\)\+]/g, "");
+
+        const isPhoneMatch =
+          custPhone === cleanInput ||
+          normalizedCustPhone === normalizedInput ||
+          (normalizedInput.length >= 10 && normalizedCustPhone.endsWith(normalizedInput)) ||
+          (normalizedCustPhone.length >= 10 && normalizedInput.endsWith(normalizedCustPhone));
+
+        const isEmailMatch = custEmail.length > 0 && custEmail === cleanInput;
+
+        if (!isPhoneMatch && !isEmailMatch) {
           return null;
         }
       }

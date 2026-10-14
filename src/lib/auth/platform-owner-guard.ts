@@ -4,7 +4,22 @@ export const PROTECTED_PLATFORM_OWNER_ERROR =
   "Blocked: QA/test automation cannot mutate a protected Platform Owner account.";
 
 /**
+ * Standard UUID format validation regex (UUID v4 / standard 8-4-4-4-12 hex).
+ */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Validates whether a given string is a valid UUID format.
+ */
+export function isValidPlatformOwnerUuid(id?: string | null): boolean {
+  if (!id || typeof id !== "string") return false;
+  return UUID_REGEX.test(id.trim());
+}
+
+/**
  * Authoritative, permanent Platform Owner User IDs across TripDesk environments.
+ * - de5c1377-0e7c-4747-b3ed-aaee8b7e32a9: Local / QA Supabase project (nsqarlegqxymqfyvfrjw)
+ * - e03a6a21-a355-4afe-ab3e-c8097b6be773: Current Staging / Production-target project (qypkowejgqrmilckemcr)
  */
 export const KNOWN_PLATFORM_OWNER_IDS = new Set<string>([
   "de5c1377-0e7c-4747-b3ed-aaee8b7e32a9", // Local / QA Supabase project (nsqarlegqxymqfyvfrjw)
@@ -13,9 +28,12 @@ export const KNOWN_PLATFORM_OWNER_IDS = new Set<string>([
 
 /**
  * Authoritative, permanent Platform Owner Emails across TripDesk environments.
+ * - mzpatel14@gmail.com: Existing Platform Owner across Local/QA and Staging
+ * - supportyourtraveldesk@gmail.com: Target Production Platform Owner
  */
 export const KNOWN_PLATFORM_OWNER_EMAILS = new Set<string>([
   "mzpatel14@gmail.com",
+  "supportyourtraveldesk@gmail.com",
 ]);
 
 export interface PlatformOwnerTargetIdentifier {
@@ -32,10 +50,31 @@ export interface GuardOptions {
 }
 
 /**
+ * Resolves all currently known permanent and dynamically configured Platform Owner User IDs.
+ * Dynamically includes process.env.PLATFORM_OWNER_USER_ID if present and valid UUID format.
+ */
+export function getProtectedPlatformOwnerIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const id of KNOWN_PLATFORM_OWNER_IDS) {
+    ids.add(id.trim().toLowerCase());
+  }
+
+  const envOwnerId = process.env.PLATFORM_OWNER_USER_ID?.trim();
+  if (envOwnerId && isValidPlatformOwnerUuid(envOwnerId)) {
+    ids.add(envOwnerId.toLowerCase());
+  }
+
+  return ids;
+}
+
+/**
  * Resolves all currently known permanent Platform Owner emails, including environment configurations.
  */
 export function getProtectedPlatformOwnerEmails(): Set<string> {
-  const emails = new Set<string>(KNOWN_PLATFORM_OWNER_EMAILS);
+  const emails = new Set<string>();
+  for (const email of KNOWN_PLATFORM_OWNER_EMAILS) {
+    emails.add(email.trim().toLowerCase());
+  }
 
   const envBootstrapOwner = process.env.BOOTSTRAP_OWNER_EMAIL?.trim().toLowerCase();
   if (envBootstrapOwner) {
@@ -54,8 +93,12 @@ export function getProtectedPlatformOwnerEmails(): Set<string> {
  * Synchronous check for known Platform Owner identity or role.
  */
 export function isPlatformOwnerTargetSync(target: PlatformOwnerTargetIdentifier): boolean {
-  if (target.userId && KNOWN_PLATFORM_OWNER_IDS.has(target.userId)) {
-    return true;
+  if (target.userId) {
+    const normalizedId = target.userId.trim().toLowerCase();
+    const protectedIds = getProtectedPlatformOwnerIds();
+    if (protectedIds.has(normalizedId)) {
+      return true;
+    }
   }
 
   if (target.email) {

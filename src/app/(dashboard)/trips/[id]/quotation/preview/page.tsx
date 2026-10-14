@@ -115,8 +115,8 @@ export default function TripQuotationPreviewPage() {
 
   return (
     <div className="min-h-screen bg-slate-100/70 pb-16 font-sans">
-      {/* Top Floating Action Bar */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs py-2.5 px-3 sm:px-8">
+      {/* Top Action Bar */}
+      <div className="bg-white border-b border-slate-200 shadow-2xs py-2.5 px-3 sm:px-8 print:hidden">
         <div className="max-w-[1200px] mx-auto flex items-center justify-between gap-2.5 sm:gap-4 flex-wrap">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <Link

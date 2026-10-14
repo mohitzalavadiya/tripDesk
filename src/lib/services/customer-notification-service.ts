@@ -532,6 +532,17 @@ export class CustomerNotificationService {
 
     const booking = trip.bookings[0] || null;
 
+    const shareLink = await prisma.publicShareLink.findFirst({
+      where: {
+        tripId,
+        agencyId,
+        status: "ACTIVE",
+        revokedAt: null,
+      },
+      orderBy: { createdAt: "desc" },
+      select: { tokenHash: true },
+    });
+
     return this.createNotification(agencyId, {
       customerId: trip.customerId,
       tripId: trip.id,
@@ -539,7 +550,7 @@ export class CustomerNotificationService {
       type: CustomerNotificationType.DOCUMENT_READY,
       title: `Document Ready: ${docTitle}`,
       message: `Your ${docTitle} is now ready to download in your traveler document center.`,
-      linkUrl: `/customer/trips/${trip.id}/documents`,
+      linkUrl: shareLink?.tokenHash ? `/trip/${shareLink.tokenHash}#documents` : null,
       idempotencyKey: `doc-ready-${trip.id}-${docType}`,
     });
   }

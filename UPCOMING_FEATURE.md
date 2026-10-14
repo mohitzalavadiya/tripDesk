@@ -87,10 +87,12 @@ seperate database for prod and local
 forgot password
 RLS disabled in public error in staging
 in numnber field we can not add alphabetic value
+Test hotel payable case in opration page
 
 **TODO**
 
-Test hotel payable case in opration page
+trips/cmuzi8fru000006l3jpe5peov/quotation/preview
+preview page UI issue
 
 scroll
 

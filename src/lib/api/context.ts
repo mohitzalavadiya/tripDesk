@@ -101,7 +101,7 @@ export async function getRequestContext(): Promise<RequestContext | null> {
     const agency = dbUser.agency || null;
     const subscription = agency?.subscriptions[0] || null;
 
-    const isPlatformOwner = dbUser.role === UserRole.PLATFORM_OWNER;
+    const isPlatformOwner = dbUser.role === UserRole.PLATFORM_OWNER && !dbUser.agencyId;
     const isAgencyOwner = dbUser.role === UserRole.AGENCY_OWNER && !!dbUser.agencyId;
     const isSuspendedAgency = isAgencyOwner && agency?.status === AgencyStatus.SUSPENDED;
 
