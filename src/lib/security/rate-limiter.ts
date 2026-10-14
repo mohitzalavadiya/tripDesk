@@ -98,23 +98,28 @@ function checkInMemorySlidingWindow(
 
 /**
  * Extracts the trusted client IP according to verified edge proxy contracts.
- * Prioritizes verified platform headers (Cloudflare, Vercel/proxy x-real-ip)
- * over client-controlled forwarding headers.
+ * In the direct-to-Vercel deployment topology, Vercel's edge proxy authoritatively
+ * sets 'x-real-ip' to the remote connecting IP.
+ * Client-supplied 'cf-connecting-ip' headers are NOT trusted unless the deployment
+ * is explicitly configured to be fronted by Cloudflare (TRUST_CLOUDFLARE_PROXY === "true").
  */
 export function getTrustedClientIp(request: Request): string {
-  // 1. Cloudflare edge connecting IP (set authoritatively when reverse-proxied via Cloudflare)
-  const cfConnectingIp = request.headers.get("cf-connecting-ip");
-  if (cfConnectingIp && cfConnectingIp.trim().length > 0) {
-    return cfConnectingIp.trim();
+  // 1. Cloudflare edge connecting IP ONLY when explicitly configured as a trusted upstream proxy
+  const isCloudflareTrusted = process.env.TRUST_CLOUDFLARE_PROXY === "true";
+  if (isCloudflareTrusted) {
+    const cfConnectingIp = request.headers.get("cf-connecting-ip");
+    if (cfConnectingIp && cfConnectingIp.trim().length > 0) {
+      return cfConnectingIp.trim();
+    }
   }
 
-  // 2. Direct upstream proxy IP (standard on Vercel, AWS ALB, Nginx, Caddy)
+  // 2. Direct upstream proxy IP (authoritatively injected by Vercel edge, AWS ALB, Nginx)
   const realIp = request.headers.get("x-real-ip");
   if (realIp && realIp.trim().length > 0) {
     return realIp.trim();
   }
 
-  // 3. Fallback to nearest edge gateway hop from x-forwarded-for
+  // 3. Fallback to nearest edge gateway hop from x-forwarded-for (right-most entry appended by direct upstream proxy)
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
     const hops = forwarded
@@ -122,7 +127,7 @@ export function getTrustedClientIp(request: Request): string {
       .map((h) => h.trim())
       .filter((h) => h.length > 0);
     if (hops.length > 0) {
-      return hops[hops.length - 1]; // Right-most entry injected by edge proxy
+      return hops[hops.length - 1]; // Right-most entry injected by direct upstream proxy
     }
   }
 
@@ -139,7 +144,7 @@ export function hashRateLimitIdentifier(rawIdentifier: string): string {
 
 /**
  * Core atomic distributed rate limiter using Upstash Redis REST pipeline with atomic Lua script.
- * Implements deliberate fail-closed (for high-risk mutations) and fail-open (for public reads/feedback) policies.
+ * Implements deliberate fail-closed (for mutations such as public feedback) and fail-open (for public reads) policies.
  */
 export async function checkRateLimit(options: RateLimitOptions): Promise<RateLimitResult> {
   const { key, limit, windowMs, failClosed = false } = options;
@@ -222,7 +227,7 @@ export async function checkRateLimit(options: RateLimitOptions): Promise<RateLim
       };
     }
 
-    // Public read and feedback endpoints fail-open: allow traffic during transient Redis outages
+    // Public read endpoints fail-open: allow guest document traffic during transient Redis outages
     return {
       allowed: true,
       limit,
@@ -236,12 +241,12 @@ export const RATE_LIMIT_CONFIGS = {
   "public-feedback": {
     limit: 5,
     windowMs: 60 * 1000, // 1 minute
-    failClosed: false, // Fails open to prevent blocking legitimate customer reviews during Redis outages
+    failClosed: true, // Fails closed to protect review mutations against spam/abuse during Redis outages
   },
   "public-read": {
     limit: 60,
     windowMs: 60 * 1000, // 1 minute
-    failClosed: false,
+    failClosed: false, // Fails open to ensure legitimate travelers can access itineraries and documents during Redis outages
   },
 } as const;
 

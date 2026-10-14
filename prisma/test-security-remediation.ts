@@ -11,6 +11,7 @@ import {
   getRateLimitHeaders,
   getTrustedClientIp,
   hashRateLimitIdentifier,
+  limitEndpoint,
   RATE_LIMIT_CONFIGS,
 } from "../src/lib/security/rate-limiter";
 import { randomUUID } from "crypto";
@@ -40,20 +41,34 @@ async function runTestSuite() {
   // ----------------------------------------------------------------------------
   console.log("1. Trusted Client IP Extraction Contract:");
 
-  // Test 1.1: Cloudflare edge connecting IP (cf-connecting-ip)
-  const cfReq = new Request("https://app.yourtraveldesk.in/api/test", {
+  // Test 1.1: Direct-to-Vercel Anti-Spoofing: spoofed cf-connecting-ip is ignored when x-real-ip is present
+  const spoofedCfReq = new Request("https://app.yourtraveldesk.in/api/test", {
     headers: {
-      "cf-connecting-ip": "198.51.100.75",
-      "x-real-ip": "10.0.0.1",
-      "x-forwarded-for": "10.0.0.2",
+      "cf-connecting-ip": "1.2.3.4 (spoofed)",
+      "x-real-ip": "198.51.100.50",
+      "x-forwarded-for": "10.0.0.1, 10.0.0.2",
     },
   });
   assert(
-    getTrustedClientIp(cfReq) === "198.51.100.75",
-    "cf-connecting-ip is prioritized when upstream edge is Cloudflare"
+    getTrustedClientIp(spoofedCfReq) === "198.51.100.50",
+    "Anti-spoofing: Direct-to-Vercel topology trusts authoritative x-real-ip and ignores client-supplied cf-connecting-ip"
   );
 
-  // Test 1.2: Direct upstream proxy IP (x-real-ip)
+  // Test 1.2: Future compatibility: cf-connecting-ip is trusted only when TRUST_CLOUDFLARE_PROXY='true'
+  process.env.TRUST_CLOUDFLARE_PROXY = "true";
+  const cfTrustedReq = new Request("https://app.yourtraveldesk.in/api/test", {
+    headers: {
+      "cf-connecting-ip": "198.51.100.75",
+      "x-real-ip": "10.0.0.1",
+    },
+  });
+  assert(
+    getTrustedClientIp(cfTrustedReq) === "198.51.100.75",
+    "Compatibility: cf-connecting-ip is prioritized when TRUST_CLOUDFLARE_PROXY is explicitly enabled"
+  );
+  delete process.env.TRUST_CLOUDFLARE_PROXY;
+
+  // Test 1.3: Direct upstream proxy IP (x-real-ip)
   const realIpReq = new Request("https://app.yourtraveldesk.in/api/test", {
     headers: {
       "x-real-ip": "198.51.100.50",
@@ -62,10 +77,10 @@ async function runTestSuite() {
   });
   assert(
     getTrustedClientIp(realIpReq) === "198.51.100.50",
-    "x-real-ip is prioritized when cf-connecting-ip is absent"
+    "x-real-ip is prioritized as authoritative in direct reverse proxy setup"
   );
 
-  // Test 1.3: Anti-spoofing: Take right-most IP from x-forwarded-for when direct headers absent
+  // Test 1.4: Anti-spoofing: Take right-most IP from x-forwarded-for when direct headers absent
   const forwardedReq = new Request("https://app.yourtraveldesk.in/api/test", {
     headers: {
       "x-forwarded-for": "1.2.3.4 (spoofed), 5.6.7.8 (spoofed), 203.0.113.88",
@@ -73,10 +88,10 @@ async function runTestSuite() {
   });
   assert(
     getTrustedClientIp(forwardedReq) === "203.0.113.88",
-    "Anti-spoofing: Untrusted left-most headers are ignored, nearest edge hop selected"
+    "Anti-spoofing: Untrusted left-most headers are ignored, nearest edge hop selected from x-forwarded-for"
   );
 
-  // Test 1.4: Default fallback to 127.0.0.1 when no IP headers exist
+  // Test 1.5: Default fallback to 127.0.0.1 when no IP headers exist
   const emptyReq = new Request("https://app.yourtraveldesk.in/api/test");
   assert(
     getTrustedClientIp(emptyReq) === "127.0.0.1",
@@ -137,8 +152,8 @@ async function runTestSuite() {
   // Verify retained policy configurations
   assert(
     RATE_LIMIT_CONFIGS["public-feedback"].limit === 5 &&
-      RATE_LIMIT_CONFIGS["public-feedback"].failClosed === false,
-    "public-feedback configured for 5 requests / 1m, fail-open policy"
+      RATE_LIMIT_CONFIGS["public-feedback"].failClosed === true,
+    "public-feedback configured for 5 requests / 1m, fail-closed policy"
   );
   assert(
     RATE_LIMIT_CONFIGS["public-read"].limit === 60 &&
@@ -494,6 +509,293 @@ async function runTestSuite() {
     unlinkedTripUrl === undefined,
     "Trip without active share link produces undefined (never redirects to retired customer login)"
   );
+
+  // ----------------------------------------------------------------------------
+  // SECTION 9: RATE LIMITER OUTAGE SIMULATION & FAILURE-MODE REGRESSION TESTS
+  // ----------------------------------------------------------------------------
+  console.log("\n9. Rate Limiter Outage Simulation & Failure-Mode Regression Tests:");
+
+  // Save real environment and global fetch
+  const savedEnvNodeEnv = process.env.NODE_ENV;
+  const savedRedisUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const savedRedisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    // Test 9.1: Missing Redis credentials in Production
+    process.env.NODE_ENV = "production";
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+
+    const noCredsRead = await checkRateLimit({
+      key: "test:missing_creds:read",
+      limit: 60,
+      windowMs: 60000,
+      failClosed: false,
+    });
+    assert(
+      noCredsRead.allowed === true && noCredsRead.remaining === 60,
+      "Production missing credentials: public-read policy fails open (availability preserved)"
+    );
+
+    const noCredsFeedback = await checkRateLimit({
+      key: "test:missing_creds:feedback",
+      limit: 5,
+      windowMs: 60000,
+      failClosed: true,
+    });
+    assert(
+      noCredsFeedback.allowed === false &&
+        noCredsFeedback.isServiceUnavailable === true &&
+        noCredsFeedback.retryAfterSeconds === 60,
+      "Production missing credentials: public-feedback policy fails closed (503 Service Unavailable path)"
+    );
+
+    // Setup mock credentials for fetch-interception tests
+    process.env.UPSTASH_REDIS_REST_URL = "https://mock-redis.upstash.io";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "mock-token-xyz";
+
+    // Test 9.2: Redis Timeout (AbortSignal.timeout / DOMException TimeoutError)
+    globalThis.fetch = async () => {
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    };
+
+    const timeoutRead = await checkRateLimit({
+      key: "test:timeout:read",
+      limit: 60,
+      windowMs: 60000,
+      failClosed: false,
+    });
+    assert(
+      timeoutRead.allowed === true && timeoutRead.remaining === 60,
+      "Redis timeout: public-read fails open gracefully without unhandled exception"
+    );
+
+    const timeoutFeedback = await checkRateLimit({
+      key: "test:timeout:feedback",
+      limit: 5,
+      windowMs: 60000,
+      failClosed: true,
+    });
+    assert(
+      timeoutFeedback.allowed === false &&
+        timeoutFeedback.isServiceUnavailable === true &&
+        timeoutFeedback.retryAfterSeconds === 60,
+      "Redis timeout: public-feedback fails closed with isServiceUnavailable=true"
+    );
+
+    // Test 9.3: Network Rejection / Connection Refusal
+    globalThis.fetch = async () => {
+      throw new Error("fetch failed: connect ECONNREFUSED 127.0.0.1:443");
+    };
+
+    const netErrorRead = await checkRateLimit({
+      key: "test:net_err:read",
+      limit: 60,
+      windowMs: 60000,
+      failClosed: false,
+    });
+    assert(
+      netErrorRead.allowed === true,
+      "Network connection failure: public-read fails open gracefully"
+    );
+
+    const netErrorFeedback = await checkRateLimit({
+      key: "test:net_err:feedback",
+      limit: 5,
+      windowMs: 60000,
+      failClosed: true,
+    });
+    assert(
+      netErrorFeedback.allowed === false && netErrorFeedback.isServiceUnavailable === true,
+      "Network connection failure: public-feedback fails closed (protected mutation)"
+    );
+
+    // Test 9.4: Upstash HTTP 500 Internal Server Error
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ error: "Internal Server Error" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+
+    const http500Read = await checkRateLimit({
+      key: "test:http500:read",
+      limit: 60,
+      windowMs: 60000,
+      failClosed: false,
+    });
+    assert(
+      http500Read.allowed === true,
+      "Upstash HTTP 500: public-read fails open"
+    );
+
+    const http500Feedback = await checkRateLimit({
+      key: "test:http500:feedback",
+      limit: 5,
+      windowMs: 60000,
+      failClosed: true,
+    });
+    assert(
+      http500Feedback.allowed === false && http500Feedback.isServiceUnavailable === true,
+      "Upstash HTTP 500: public-feedback fails closed"
+    );
+
+    // Test 9.5: Upstash HTTP 429 Daily Quota Exceeded
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ error: "Daily request limit exceeded" }), {
+        status: 429,
+        headers: { "Content-Type": "application/json" },
+      });
+
+    const http429Read = await checkRateLimit({
+      key: "test:http429:read",
+      limit: 60,
+      windowMs: 60000,
+      failClosed: false,
+    });
+    assert(
+      http429Read.allowed === true,
+      "Upstash HTTP 429 quota exhaustion: public-read fails open"
+    );
+
+    const http429Feedback = await checkRateLimit({
+      key: "test:http429:feedback",
+      limit: 5,
+      windowMs: 60000,
+      failClosed: true,
+    });
+    assert(
+      http429Feedback.allowed === false && http429Feedback.isServiceUnavailable === true,
+      "Upstash HTTP 429 quota exhaustion: public-feedback fails closed"
+    );
+
+    // Test 9.6: Malformed Non-JSON Response (e.g. HTML gateway error)
+    globalThis.fetch = async () =>
+      new Response("<html><body>502 Bad Gateway</body></html>", {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
+      });
+
+    const malformedJsonRead = await checkRateLimit({
+      key: "test:malformed:read",
+      limit: 60,
+      windowMs: 60000,
+      failClosed: false,
+    });
+    assert(
+      malformedJsonRead.allowed === true,
+      "Malformed non-JSON gateway response: public-read fails open"
+    );
+
+    const malformedJsonFeedback = await checkRateLimit({
+      key: "test:malformed:feedback",
+      limit: 5,
+      windowMs: 60000,
+      failClosed: true,
+    });
+    assert(
+      malformedJsonFeedback.allowed === false && malformedJsonFeedback.isServiceUnavailable === true,
+      "Malformed non-JSON gateway response: public-feedback fails closed"
+    );
+
+    // Test 9.7: Redis Lua Script Error Structure ([{ error: "ERR syntax error" }])
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify([{ error: "ERR syntax error in script" }]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+
+    const luaErrorRead = await checkRateLimit({
+      key: "test:lua_err:read",
+      limit: 60,
+      windowMs: 60000,
+      failClosed: false,
+    });
+    assert(
+      luaErrorRead.allowed === true,
+      "Redis Lua error: public-read fails open"
+    );
+
+    const luaErrorFeedback = await checkRateLimit({
+      key: "test:lua_err:feedback",
+      limit: 5,
+      windowMs: 60000,
+      failClosed: true,
+    });
+    assert(
+      luaErrorFeedback.allowed === false && luaErrorFeedback.isServiceUnavailable === true,
+      "Redis Lua error: public-feedback fails closed"
+    );
+
+    // Test 9.8: Healthy Redis Response Under Quota
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify([{ result: [1, 45, 60] }]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+
+    const healthyUnderQuota = await checkRateLimit({
+      key: "test:healthy:under_quota",
+      limit: 60,
+      windowMs: 60000,
+      failClosed: true,
+    });
+    assert(
+      healthyUnderQuota.allowed === true &&
+        healthyUnderQuota.remaining === 45 &&
+        healthyUnderQuota.retryAfterSeconds === 60,
+      "Healthy Redis response: accurately returns allowed=true, remaining=45, retryAfterSeconds=60"
+    );
+
+    // Test 9.9: Healthy Redis Response Quota Exceeded (Blocked)
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify([{ result: [0, 0, 37] }]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+
+    const healthyExceeded = await checkRateLimit({
+      key: "test:healthy:exceeded",
+      limit: 5,
+      windowMs: 60000,
+      failClosed: true,
+    });
+    assert(
+      healthyExceeded.allowed === false &&
+        healthyExceeded.remaining === 0 &&
+        healthyExceeded.retryAfterSeconds === 37 &&
+        healthyExceeded.isServiceUnavailable !== true,
+      "Healthy Redis rate limit exceeded: accurately returns allowed=false, retryAfterSeconds=37, isServiceUnavailable unset"
+    );
+
+    // Test 9.10: Rate Limit Headers for Fail-Closed Outage Response (503 path)
+    const outageHeaders = getRateLimitHeaders(timeoutFeedback);
+    assert(
+      outageHeaders["X-RateLimit-Limit"] === "5" &&
+        outageHeaders["X-RateLimit-Remaining"] === "0" &&
+        outageHeaders["Retry-After"] === "60",
+      "Outage response headers: properly formats X-RateLimit-Limit: 5, Remaining: 0, Retry-After: 60"
+    );
+
+  } finally {
+    // Restore environment and fetch
+    globalThis.fetch = originalFetch;
+    if (savedEnvNodeEnv !== undefined) {
+      process.env.NODE_ENV = savedEnvNodeEnv;
+    } else {
+      delete process.env.NODE_ENV;
+    }
+    if (savedRedisUrl !== undefined) {
+      process.env.UPSTASH_REDIS_REST_URL = savedRedisUrl;
+    } else {
+      delete process.env.UPSTASH_REDIS_REST_URL;
+    }
+    if (savedRedisToken !== undefined) {
+      process.env.UPSTASH_REDIS_REST_TOKEN = savedRedisToken;
+    } else {
+      delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    }
+  }
 
   // ----------------------------------------------------------------------------
   // SUMMARY
