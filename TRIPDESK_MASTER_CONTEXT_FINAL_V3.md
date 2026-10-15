@@ -15993,6 +15993,120 @@ When recording a payable disbursement from an Operations card (Accommodations, F
 - **Git Diff Hygiene:** `git diff --check` passed cleanly with 0 whitespace errors.
 - **Strict Invariant Confirmation:** Zero database connections, Auth account modifications, or `.env` modifications performed.
 
+# 257. PRODUCTION SUBSCRIPTION CATALOG REPAIR & VERIFICATION — OCTOBER 15, 2026
+
+## 257.1 Incident Objective & Context
+- **Incident Description:** Creating an agency in Production failed with `"Starter subscription plan is currently unavailable in the catalog"`, and the Platform Owner observed `"No subscription plans found in database"` at `/admin/plans`.
+- **Target Production Environment:**
+  - Application URL: `https://app.yourtraveldesk.in`
+  - Supabase Project Reference: `qypkowejgqrmilckemcr` (Host: `aws-0-ap-northeast-2.pooler.supabase.com`, region `ap-northeast-2`).
+  - Environment Configuration: `.env.production`
+- **Protected Staging Environment:**
+  - Supabase Project Reference: `nsqarlegqxymqfyvfrjw` (Host: `aws-0-ap-northeast-1.pooler.supabase.com`, region `ap-northeast-1`).
+- **Target Mode & Authorization:** Explicit `REPAIR_TARGET_MODE="production"` and `ALLOW_PRODUCTION_CATALOG_REPAIR="true"`.
+
+## 257.2 Root Cause Analysis
+1. **Empty Production Catalogs:** A read-only database inventory revealed that `subscription_plans`, `plan_feature_entitlements`, `plan_usage_limits`, and `tax_rates` had exactly 0 records in Production (`qypkowejgqrmilckemcr`).
+2. **Post-Bootstrap Catalog Omission:** When the Platform Owner was replaced and bootstrapped via `prisma/bootstrap-owner.ts`, only the singleton `User` record with role `PLATFORM_OWNER` was initialized. The catalog seed (`prisma/seed.ts`) was never run against Production.
+3. **Agency Onboarding Gate Failure:** In `src/lib/services/onboarding-service.ts:L151-L166`, `provisionOnboardedAgencyOwner()` attempted to look up the `Starter` plan (`findFirst({ where: { name: "Starter" } })`). Because the catalog was empty, it returned `{ success: false, error: "plan_unavailable" }`, which mapped to `"Starter subscription plan is currently unavailable in the catalog."` in `src/actions/auth-actions.ts:L658`.
+4. **Admin UI Empty State:** In `src/lib/services/admin-service.ts:L741`, `listPlans()` queried `prisma.subscriptionPlan.findMany()`, returning `[]`, which rendered `"No subscription plans found in database."` at `/admin/plans`.
+
+## 257.3 Implementation & Production Safety Guards
+1. **Guarded Idempotent Repair Script (`prisma/repair-subscription-catalog.ts`):**
+   - Implemented `validateRepairEnvironment()` enforcing fail-closed protection:
+     - Requires explicit `REPAIR_TARGET_MODE="production"` (`NODE_ENV=production` alone is strictly rejected).
+     - Requires explicit `ALLOW_PRODUCTION_CATALOG_REPAIR="true"`.
+     - Validates Supabase URL hostname strictly matches `<project-ref>.supabase.co`.
+     - Validates Database URL username strictly matches `postgres.<project-ref>`.
+     - Cross-target check verifies Auth URL project ref equals Database URL project ref.
+     - Rejects protected Staging/QA project ref `nsqarlegqxymqfyvfrjw`.
+     - Confirms project ref strictly equals `qypkowejgqrmilckemcr`.
+   - Idempotently reconciles canonical records:
+     - `SubscriptionPlan`: `Starter` (₹499/mo, ₹4,999/yr, 30d, active, order 1) and `Professional` (₹999/mo, ₹9,999/yr, 30d, active, order 2).
+     - `PlanFeatureEntitlement`: 4 gated features (`CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, `REPORTS_ANALYTICS`) disabled for Starter, enabled for Professional.
+     - `PlanUsageLimit`: Starter limited to 20 Trips, 20 Quotations, 20 Bookings; Professional unlimited (`null`).
+     - `TaxRate`: 5 standard presets (0% default, 5%, 12%, 18%, 28%).
+   - Zero destructive operations: Never deletes or truncates; pre- and post-flight checks enforce invariant preservation of Platform Owners, Agencies, and Subscriptions.
+2. **Automated Unit & Safety Test Suite (`prisma/test-catalog-repair.ts`):**
+   - Added 12 comprehensive scenarios verifying target-mode rejection, authorization gating, staging rejection, cross-target mismatch rejection, arbitrary ref rejection, canonical specifications, and idempotent execution.
+3. **Package Scripts (`package.json`):**
+   - Added `"repair:catalog:production": "tsx --env-file=.env.production prisma/repair-subscription-catalog.ts"`.
+   - Added `"test:catalog:repair": "tsx prisma/test-catalog-repair.ts"`.
+
+## 257.4 Quality Gates & Verification Evidence
+- **Catalog Repair Safety Suite (`prisma/test-catalog-repair.ts`):** 12/12 scenarios passed (100%).
+- **Platform Owner Replacement Suite (`prisma/test-platform-owner-replacement.ts`):** 22/22 scenarios passed (100%).
+- **TypeScript Static Verification (`npx tsc --noEmit`):** PASS (0 errors).
+- **Production Build (`npm run build`):** PASS (162 routes generated with Turbopack, exit code 0).
+- **Git Diff Hygiene (`git diff --check`):** PASS (0 whitespace errors).
+
+## 257.5 Production Execution & Live Database Audit
+- **Execution Command:** `$env:REPAIR_TARGET_MODE="production"; $env:ALLOW_PRODUCTION_CATALOG_REPAIR="true"; npm run repair:catalog:production`
+- **Before vs. After Database Record Counts (Production Project `qypkowejgqrmilckemcr`):**
+  | Model / Table | Before Repair | After Repair | Action Taken |
+  |---|:---:|:---:|---|
+  | `subscription_plans` | **0** | **2** | Created `Starter` (`cmv9bi4kg00002cferrjxe1mu`) and `Professional` (`cmv9bi6le00082cfe6nkbvgdf`) |
+  | `plan_feature_entitlements` | **0** | **8** | Created 4 per plan matching canonical gating |
+  | `plan_usage_limits` | **0** | **6** | Created 3 per plan (20/20/20 for Starter, null for Professional) |
+  | `tax_rates` | **0** | **5** | Created 5 presets (0%, 5%, 12%, 18%, 28%) |
+  | `users` (Platform Owner) | **1** | **1** | Preserved `supportyourtraveldesk@gmail.com` (`02cb045f-8c9d-432c-832e-5867192ff84e`) |
+  | `agencies` | **0** | **0** | Preserved (zero modifications) |
+  | `subscriptions` | **0** | **0** | Preserved (zero modifications) |
+- **Live Idempotency Verification:** Second execution against Production confirmed 100% `verified_existing` with zero writes and zero mutations.
+
+---
+
+# 258. SUBSCRIPTION TRIAL UX, USAGE LIMITS & PLAN FEATURES RECONCILIATION — OCTOBER 15, 2026
+
+## 258.1 Objectives & Scope
+- **Incidents Addressed:**
+  1. *Issue 1 (Trial Identity & Access):* Agency Subscription page displayed "Starter Plan" with "Status: Trial" and 4 Pro features "Included", but lacked clear hero messaging that the 7-day Starter trial incorporates full Professional-level feature access and unlimited creation.
+  2. *Issue 2 (Usage Meters Displaying `0 / 0`):* Trips, Quotations, and Bookings meters rendered `0 / 0` because `subscriptionService` omitted `unlimited: u.limit === null` in its usage DTO mapping, and the frontend fell back to `${currentUsage} / ${limit ?? 0}` when `limit` was `null`.
+  3. *Issue 3 (Empty Plan-Card Feature Lists):* Both Starter and Professional cards displayed empty bullet points under "Included Features & Capabilities" because the `SubscriptionPlan.features` JSON column was null in the database and lacked service-level fallback.
+- **Approved Business Rules Enforced:**
+  - 7-day trial remains linked to the Starter commercial plan with status `TRIAL`.
+  - Trial provides full Professional-level access to all 4 gated features (`CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, `REPORTS_ANALYTICS`).
+  - Trial usage limits are unlimited (null limit in DB, `unlimited: true` in DTO, rendered as `UNLIMITED`).
+  - Starter paid quotas remain 20 Trips, 20 Quotations, and 20 Bookings per monthly billing period.
+  - Professional paid quotas remain unlimited.
+  - Commercial marketing bullets are decoupled from machine-readable entitlement keys.
+  - Marketing copy eliminates unsupported claims: Pro support wording aligned to truthful "Priority Email & Helpdesk Support" (no 24/7 phone SLA claim).
+
+## 258.2 Root Cause Analysis & Architecture Decisions
+1. **Commercial Identity vs Effective Access:** Preserved existing onboarding architecture where new agencies receive a Starter plan trial (`status: "TRIAL"`). `entitlementService.resolveAgencySubscription` maps `TRIAL` to effective Professional plan ID. UI hero section updated to clearly display `Starter Plan — 7-Day Free Trial` with explanatory copy confirming Professional-level features and unlimited quotas.
+2. **DTO Contract & Defensive Rendering:** Updated `subscriptionService.formatUsage` to emit `unlimited: u.limit === null`. Updated `subscription/page.tsx` with defensive logic recognizing `unlimited: true`, `item.limit === null`, or legacy responses without crashing or evaluating to `0 / 0`. Finite limits render proper denominators (e.g., `0 / 20`).
+3. **Canonical Feature Catalog Authority:** Established `src/lib/constants/subscription-catalog.ts` as the single source of truth for canonical plan capabilities. Added service-level fallback in `subscriptionService.getAgencySubscription` and `listActivePlans` ensuring non-empty feature arrays even if database rows are null.
+4. **Truthful Commercial Copy:** Verified all 7 Starter and 9 Professional bullets against implemented functionality. Replaced legacy unsupported "Priority 24/7 WhatsApp & Phone Support" with truthful "Priority Email & Helpdesk Support". Documented that external communication delivery operates via simulated ledgers/stubs without claiming active live SMS/WhatsApp gateway delivery.
+
+## 258.3 Database Reconciliation & Safety Verification
+- **Target Production Environment:** `qypkowejgqrmilckemcr` (`.env.production`).
+- **Protected Staging Environment:** `nsqarlegqxymqfyvfrjw` (`.env.staging`).
+- **Safety Lock & Execution:** Run via `$env:REPAIR_TARGET_MODE="production"; $env:ALLOW_PRODUCTION_CATALOG_REPAIR="true"; npm run repair:catalog:production`.
+- **Field-Level Mutation Scope:** Updated **ONLY** the `features` JSON column for Starter and Professional `SubscriptionPlan` records in Production. Zero mutations to prices, yearly prices, duration days, IDs, active flags, entitlements, usage limits, tax rates, platform owners, agencies, or subscriptions.
+- **Before vs After Database Verification:**
+  | Plan | Field | Before | After | Action |
+  |---|---|:---:|:---:|---|
+  | Starter (`cmv9bi4kg00002cferrjxe1mu`) | `features` | `null` | `7 canonical items` | Updated |
+  | Starter (`cmv9bi4kg00002cferrjxe1mu`) | `price` | `₹499.00` | `₹499.00` | Preserved |
+  | Professional (`cmv9bi6le00082cfe6nkbvgdf`) | `features` | `null` | `9 canonical items` | Updated |
+  | Professional (`cmv9bi6le00082cfe6nkbvgdf`) | `price` | `₹999.00` | `₹999.00` | Preserved |
+- **Entity Invariant Verification:**
+  - `users` (Platform Owner): 1 (Preserved)
+  - `agencies`: 1 (Preserved)
+  - `subscriptions`: 1 (Preserved)
+  - `plan_feature_entitlements`: 8 (Preserved)
+  - `plan_usage_limits`: 6 (Preserved)
+  - `tax_rates`: 5 (Preserved)
+- **Live Idempotency:** Second run verified 100% `verified_existing` with zero database writes.
+
+## 258.4 Quality Gates & Test Suite Results
+- **Subscription Trial UX Suite (`prisma/test-subscription-trial-ux.ts`):** 13/13 tests passed (100%).
+- **Catalog Repair Safety Suite (`prisma/test-catalog-repair.ts`):** 15/15 scenarios passed (100%).
+- **Platform Owner Replacement Suite (`prisma/test-platform-owner-replacement.ts`):** 22/22 scenarios passed (100%).
+- **TypeScript Static Verification (`npx tsc --noEmit`):** PASS (0 errors).
+- **Production Build (`npm run build`):** PASS (162 routes generated with Turbopack, exit code 0).
+- **Git Diff Hygiene (`git diff --check`):** PASS (0 whitespace errors).
+
 ---
 
 # END OF MASTER HANDOVER V3
