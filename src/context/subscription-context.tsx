@@ -18,6 +18,7 @@ export interface EntitlementUsageItem {
   periodStart: string;
   periodEnd: string;
   isExceeded: boolean;
+  unlimited?: boolean;
 }
 
 export interface UsageState {

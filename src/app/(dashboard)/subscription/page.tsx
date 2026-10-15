@@ -391,10 +391,18 @@ export default function AgencySubscriptionPage() {
               </div>
 
               <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                {sub?.planName || "Starter"} Plan
+                {isTrial && !isTrialExpired
+                  ? "Starter Plan — 7-Day Free Trial"
+                  : isTrial && isTrialExpired
+                  ? "Starter Plan — Trial Expired"
+                  : `${sub?.planName || "Starter"} Plan`}
               </h2>
               <p className="text-xs text-slate-300 max-w-xl">
-                {sub?.planDescription || "Complete cloud workspace for modern travel agencies and boutique tour operators."}
+                {isTrial && !isTrialExpired
+                  ? "Your 7-day trial includes full Professional-level access with all advanced features and unlimited trips, quotations, and bookings."
+                  : isTrial && isTrialExpired
+                  ? "Your 7-day trial has ended. Select and activate a paid plan below to restore write access and continue creating trips."
+                  : sub?.planDescription || "Complete cloud workspace for modern travel agencies and boutique tour operators."}
               </p>
             </div>
 
@@ -515,7 +523,10 @@ export default function AgencySubscriptionPage() {
                 { key: "BOOKINGS", label: "Bookings", icon: PackageCheck },
               ].map(({ key, label, icon: Icon }) => {
                 const item = data?.usage?.[key];
-                const isUnlimited = item?.unlimited ?? false;
+                const isUnlimited =
+                  item?.unlimited === true ||
+                  (item?.unlimited === undefined && item?.limit === null) ||
+                  item?.limit === null;
                 const limit = item?.limit;
                 const currentUsage = item?.currentUsage ?? 0;
                 const remaining = item?.remaining;
@@ -572,7 +583,7 @@ export default function AgencySubscriptionPage() {
                     <div className="space-y-1">
                       <div className="flex justify-between items-baseline text-xs">
                         <span className="text-xl font-black text-slate-900 font-mono">
-                          {isUnlimited ? currentUsage : `${currentUsage} / ${limit ?? 0}`}
+                          {isUnlimited ? currentUsage : `${currentUsage} / ${limit !== null && limit !== undefined ? limit : 20}`}
                         </span>
                         {!isUnlimited && (
                           <span className="text-[11px] font-medium text-slate-500">
@@ -780,12 +791,18 @@ export default function AgencySubscriptionPage() {
                         Included Features & Capabilities
                       </p>
                       <ul className="space-y-2.5 text-xs text-slate-700">
-                        {plan.features.map((feat, fIdx) => (
-                          <li key={fIdx} className="flex items-start gap-2.5">
-                            <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                            <span>{feat}</span>
+                        {plan.features && plan.features.length > 0 ? (
+                          plan.features.map((feat, fIdx) => (
+                            <li key={fIdx} className="flex items-start gap-2.5">
+                              <Check className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                              <span>{feat}</span>
+                            </li>
+                          ))
+                        ) : (
+                          <li className="text-xs text-slate-400 italic">
+                            Standard plan features and platform access included.
                           </li>
-                        ))}
+                        )}
                       </ul>
                     </div>
                   </div>
