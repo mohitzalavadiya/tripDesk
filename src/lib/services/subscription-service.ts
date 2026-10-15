@@ -20,6 +20,9 @@ export interface PublicPlatformBillingSettings {
   qrCodeUrl: string | null;
 }
 
+import { CANONICAL_PLAN_FEATURES } from "@/lib/constants/subscription-catalog";
+export { CANONICAL_PLAN_FEATURES };
+
 export interface EntitlementUsageItem {
   resourceKey: string;
   limit: number | null;
@@ -28,6 +31,7 @@ export interface EntitlementUsageItem {
   periodStart: string;
   periodEnd: string;
   isExceeded: boolean;
+  unlimited: boolean;
 }
 
 export interface AgencySubscriptionOverview {
@@ -248,11 +252,15 @@ export const subscriptionService = {
       createdAt: p.createdAt.toISOString(),
     }));
 
-    const featuresList = sub.plan.features
+    const rawFeatures = sub.plan.features
       ? Array.isArray(sub.plan.features)
         ? (sub.plan.features as string[])
         : []
       : [];
+    const featuresList =
+      rawFeatures.length > 0
+        ? rawFeatures
+        : CANONICAL_PLAN_FEATURES[sub.plan.name] || [];
 
     const activePlans = await prisma.subscriptionPlan.findMany({
       where: { isActive: true },
@@ -260,22 +268,34 @@ export const subscriptionService = {
     });
 
     const availablePlans = activePlans
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        price: Number(p.price),
-        yearlyPrice: p.yearlyPrice ? Number(p.yearlyPrice) : null,
-        durationDays: p.durationDays,
-        features: p.features ? (Array.isArray(p.features) ? (p.features as string[]) : []) : [],
-        isPopular: !!p.isPopular,
-        displayOrder: typeof p.displayOrder === "number" ? p.displayOrder : 0,
-        isActive: p.isActive,
-      }))
+      .map((p) => {
+        const rawPlanFeatures = p.features
+          ? Array.isArray(p.features)
+            ? (p.features as string[])
+            : []
+          : [];
+        const features =
+          rawPlanFeatures.length > 0
+            ? rawPlanFeatures
+            : CANONICAL_PLAN_FEATURES[p.name] || [];
+
+        return {
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          price: Number(p.price),
+          yearlyPrice: p.yearlyPrice ? Number(p.yearlyPrice) : null,
+          durationDays: p.durationDays,
+          features,
+          isPopular: !!p.isPopular,
+          displayOrder: typeof p.displayOrder === "number" ? p.displayOrder : 0,
+          isActive: p.isActive,
+        };
+      })
       .sort((a, b) => a.displayOrder - b.displayOrder || a.price - b.price);
 
     // Fetch real-time usage & entitlement metrics safely for Agency Owner UX
-    const formatUsage = (u: any) =>
+    const formatUsage = (u: any): EntitlementUsageItem | null =>
       u
         ? {
             resourceKey: u.resourceKey,
@@ -285,6 +305,7 @@ export const subscriptionService = {
             periodStart: u.periodStart.toISOString(),
             periodEnd: u.periodEnd.toISOString(),
             isExceeded: u.isExceeded,
+            unlimited: u.limit === null,
           }
         : null;
 
@@ -393,18 +414,30 @@ export const subscriptionService = {
     });
 
     return plans
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        price: Number(p.price),
-        yearlyPrice: p.yearlyPrice ? Number(p.yearlyPrice) : null,
-        durationDays: p.durationDays,
-        features: p.features ? (Array.isArray(p.features) ? (p.features as string[]) : []) : [],
-        isPopular: !!p.isPopular,
-        displayOrder: typeof p.displayOrder === "number" ? p.displayOrder : 0,
-        isActive: p.isActive,
-      }))
+      .map((p) => {
+        const rawPlanFeatures = p.features
+          ? Array.isArray(p.features)
+            ? (p.features as string[])
+            : []
+          : [];
+        const features =
+          rawPlanFeatures.length > 0
+            ? rawPlanFeatures
+            : CANONICAL_PLAN_FEATURES[p.name] || [];
+
+        return {
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          price: Number(p.price),
+          yearlyPrice: p.yearlyPrice ? Number(p.yearlyPrice) : null,
+          durationDays: p.durationDays,
+          features,
+          isPopular: !!p.isPopular,
+          displayOrder: typeof p.displayOrder === "number" ? p.displayOrder : 0,
+          isActive: p.isActive,
+        };
+      })
       .sort((a, b) => a.displayOrder - b.displayOrder || a.price - b.price);
   },
 
