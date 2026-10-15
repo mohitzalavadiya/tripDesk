@@ -19,7 +19,7 @@ import {
   PRODUCTION_TARGET_SUPABASE_PROJECT_REF,
   LOCAL_QA_SUPABASE_PROJECT_REF,
 } from "./bootstrap-owner";
-import { UserRole } from "@prisma/client";
+import { UserRole, Prisma } from "@prisma/client";
 
 async function runReplacementTestSuite() {
   console.log("===============================================================================");
@@ -1006,6 +1006,81 @@ async function runReplacementTestSuite() {
     );
   } catch (e: any) {
     recordFail("Scenario 21", e.message);
+  }
+
+  // -------------------------------------------------------------------------
+  // Scenario 22: otherDbOwner query filter matches Prisma Client capabilities
+  // -------------------------------------------------------------------------
+  console.log("▶ SCENARIO 22: otherDbOwner Query Filter Prisma Compatibility & Semantics");
+  try {
+    // 1. Static validator check: Ensure UserWhereInput supports { role: "PLATFORM_OWNER", email: { not: string, mode: "insensitive" } }
+    const validPrismaFilter: Prisma.UserWhereInput = {
+      role: UserRole.PLATFORM_OWNER,
+      email: {
+        not: "supportyourtraveldesk@gmail.com",
+        mode: "insensitive",
+      },
+    };
+    assert(validPrismaFilter.role === UserRole.PLATFORM_OWNER, "Role must be PLATFORM_OWNER");
+    assert(typeof (validPrismaFilter.email as any)?.not === "string", "email.not must be string");
+    assert((validPrismaFilter.email as any)?.mode === "insensitive", "email.mode must be 'insensitive'");
+
+    // 2. Behavioral verification: Ensure bootstrap passes exact supported filter to prisma.user.findFirst
+    let capturedWhere: any = null;
+    const mockPrisma = {
+      user: {
+        findFirst: async ({ where }: any) => {
+          if (where?.role === "PLATFORM_OWNER") {
+            capturedWhere = where;
+            return null; // Return null so bootstrap continues to Auth check
+          }
+          return null;
+        },
+      },
+    };
+
+    const mockSupabase = {
+      auth: {
+        admin: {
+          listUsers: async () => ({ data: { users: [] }, error: null }),
+          createUser: async () => ({
+            data: { user: { id: "new-auth-uuid-9999", email: "supportyourtraveldesk@gmail.com" } },
+            error: null,
+          }),
+        },
+      },
+    };
+
+    // Run bootstrap in production mode with mock clients
+    await bootstrapPlatformOwner({
+      email: "supportyourtraveldesk@gmail.com",
+      password: "TestPassword123!",
+      name: "Your Travel Desk Platform Owner",
+      allowReplacement: false,
+      targetMode: "production",
+      supabaseUrl: "https://qypkowejgqrmilckemcr.supabase.co",
+      databaseUrl: "postgresql://postgres.qypkowejgqrmilckemcr:mock-pass@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres",
+      serviceRoleKey: "mock-service-role-key-for-test",
+      prismaClient: {
+        user: {
+          findFirst: mockPrisma.user.findFirst,
+          create: async ({ data }: any) => ({ ...data, createdAt: new Date(), updatedAt: new Date() }),
+        },
+      },
+      supabaseClient: mockSupabase,
+    });
+
+    assert(capturedWhere !== null, "otherDbOwner query must be executed");
+    assert(capturedWhere.role === "PLATFORM_OWNER", "Queried role must be PLATFORM_OWNER");
+    assert(capturedWhere.email?.not === "supportyourtraveldesk@gmail.com", "Queried email.not must be the target email");
+    assert(capturedWhere.email?.mode === "insensitive", "Queried email.mode must be 'insensitive'");
+
+    recordPass(
+      "Scenario 22 — otherDbOwner query filter Prisma compatibility & semantics",
+      `Filter { role: "PLATFORM_OWNER", email: { not: email, mode: "insensitive" } } is fully typed, valid under Prisma DMMF, and verified during bootstrap.`
+    );
+  } catch (e: any) {
+    recordFail("Scenario 22", e.message);
   }
 
   console.log("===============================================================================");

@@ -386,7 +386,7 @@ export async function bootstrapPlatformOwner(
     const otherDbOwner = await prisma.user.findFirst({
       where: {
         role: "PLATFORM_OWNER",
-        email: { not: { equals: email, mode: "insensitive" } },
+        email: { not: email, mode: "insensitive" },
       },
     });
 
