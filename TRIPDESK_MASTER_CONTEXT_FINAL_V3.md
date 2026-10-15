@@ -16109,6 +16109,62 @@ When recording a payable disbursement from an Operations card (Accommodations, F
 
 ---
 
+# 259. Support Contact Standardization & Dynamic Platform Contacts Architecture
+
+## 259.1 Executive Summary & Problem Analysis
+Following comprehensive audit of support contact behavior across the SaaS application, two primary architectural defects were resolved:
+1. **Direct WhatsApp Support Bypasses:** Multiple internal SaaS lifecycle and billing support buttons ("Contact Your Travel Desk Support", "Contact Support", "Contact Billing Support", and lifecycle banners) opened external WhatsApp links using a hardcoded phone number (`wa.me/919847099000`) instead of routing authenticated Agency Owners to the in-app helpdesk (`/support`).
+2. **Missing Platform Support Information on Agency Support Page:** While Platform Owner chat (`/admin/chat`) rendered agency contact details, the Agency Owner support page (`/support`) lacked the official Platform Owner support phone and email configured in Platform Settings.
+3. **Hardcoded Platform Settings Default:** `src/app/admin/settings/page.tsx` had an initial state containing the hardcoded number `+91 98470 99000`, which could inadvertently persist obsolete data or display fabricated fallbacks if unconfigured.
+
+## 259.2 Architectural Source of Truth & Data Access Model
+- **Platform Settings Source:** Key-value storage in `public.platform_settings` table (Prisma model `PlatformSetting`), managed via `adminService.getPlatformSettings()` and `adminService.updatePlatformSettings()`.
+- **Authoritative Contact Keys:**
+  - `supportEmail`: Configured support email address (e.g., `enterprise@tripdesk.io` in staging; official product domain `support@yourtraveldesk.in`).
+  - `supportPhone`: Configured official support telephone number (dynamically managed by Platform Administration).
+- **Tenant Isolation & Security Boundary:**
+  - Agency Owners are strictly forbidden from calling `/api/admin/settings` (which requires `requirePlatformOwnerContext()`).
+  - To provide authoritative support contact information without leaking sensitive platform administration records (such as UPI IDs, bank account numbers, IFSC codes, or administrative flags), `PlatformChatService.getOrCreateConversation()` queries only the public support contact keys (`supportEmail`, `supportPhone`) from `platform_settings` and attaches them to `ConversationView`.
+  - Sensitive platform settings remain 100% inaccessible to Agency Owners.
+
+## 259.3 Audit Occurrence Inventory & Classification
+Every contact, phone, and WhatsApp reference across the repository was audited and classified:
+
+| File Location | Label / Element | Old Behavior | Corrected Behavior | Classification |
+|---|---|---|---|---|
+| `src/components/layout/agency-lifecycle-banner.tsx` | "Contact Your Travel Desk" | Hardcoded `wa.me/919847099000` | `router.push("/support")`; suppressed if on `/support` | **Internal Support (Issue A)** |
+| `src/components/shared/read-only-mode-dialog.tsx` | "Contact Support" | Hardcoded `wa.me/919847099000` | `onOpenChange(false); router.push("/support")` | **Internal Support (Issue A)** |
+| `src/components/shared/read-only-mode-card.tsx` | "Contact Your Travel Desk Support" | Hardcoded `wa.me/919847099000` | `<Link href="/support">` | **Internal Support (Issue A)** |
+| `src/app/(dashboard)/subscription/page.tsx` | "Contact Billing Support" | Hardcoded `wa.me/919847099000` | `router.push("/support")` | **Internal Support (Issue A)** |
+| `src/app/admin/settings/page.tsx` | Support Phone Input Initial State | Hardcoded `+91 98470 99000` | `React.useState("")` (populated from DB only) | **Platform Settings (Issue C)** |
+| `src/app/(dashboard)/support/page.tsx` | Support Page Header Card | No phone or email displayed | Dynamic `supportEmail` & `supportPhone` with `Mail`/`Phone` icons | **Agency Support UI (Issue B)** |
+| `src/app/q/[shareToken]/page.tsx` | "Chat with Us" | Opens `wa.me/${phone}` | Preserved (traveler-to-agency quotation chat) | **Customer / Agency Contact (Preserved)** |
+| `src/app/trip/[secureToken]/page.tsx` | "Chat on WhatsApp" | Opens `wa.me/${phoneClean}` | Preserved (traveler-to-agency trip assistance) | **Customer / Agency Contact (Preserved)** |
+| `src/lib/communication/whatsapp/click-to-chat.ts` | WhatsApp Click-to-Chat utility | `https://wa.me/...` | Preserved (shared utility for customer communication) | **System Communication Utility (Preserved)** |
+| `src/lib/quotation/share-helpers.ts` | WhatsApp quotation share | `https://wa.me/?text=...` | Preserved (agency proposal sharing) | **Customer / Agency Contact (Preserved)** |
+| `src/app/not-found.tsx` | "Contact Support" | `<Link href="/support">` | Preserved (already compliant internal navigation) | **Internal Support (Compliant)** |
+
+## 259.4 UI Implementation & Graceful Degradation
+- **Visual Design Reference Alignment:** The Agency Owner support page (`src/app/(dashboard)/support/page.tsx`) reuses the exact visual presentation tokens from Platform Owner support chat (`src/app/admin/chat/page.tsx`), rendering an inline row of contact badges using `Mail` and `Phone` icons (`h-3 w-3 text-slate-400`) with hover transitions (`hover:text-purple-700`).
+- **Interactive Protocols:** Email links render `mailto:${conversation.supportEmail}` and phone links render `tel:${conversation.supportPhone}` for instant 1-click communication.
+- **Defensive Rendering & Zero Fabrications:**
+  - If a setting is absent or empty in the database, the corresponding contact badge is omitted cleanly without rendering empty labels or fabricated fallback numbers.
+  - If settings retrieval fails, the chat view gracefully falls back to displaying the chat interface without interrupting the user.
+
+## 259.5 Quality Gates & Regression Verification
+- **Automated Regression Suite (`prisma/test-support-contacts.ts`):** 20/20 tests passed (100%).
+  - Verified 0 occurrences of `919847099000` or `+91 98470 99000` in audited components.
+  - Verified routing to `/support` across lifecycle banner, dialog, card, and billing headers.
+  - Verified dynamic retrieval of `supportEmail` (`enterprise@tripdesk.io`) and `supportPhone` (`null` when unconfigured) from `platform_settings`.
+  - Verified zero leakage of administrative fields (`upiId`, `bankName`, `accountNumber`).
+- **Read-Only Mode & Suspension Suite (`prisma/test-phase-217-read-only-hardening.ts`):** 43/43 tests passed (100%).
+- **Subscription Trial UX Suite (`prisma/test-subscription-trial-ux.ts`):** 13/13 tests passed (100%).
+- **TypeScript Static Verification (`npx tsc --noEmit`):** PASS (0 errors).
+- **Production Build (`npm run build`):** PASS (162 routes generated with Turbopack, exit code 0).
+- **Git Diff Hygiene (`git diff --check`):** PASS (0 whitespace errors).
+
+---
+
 # END OF MASTER HANDOVER V3
 
 **Final filename:** `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md`

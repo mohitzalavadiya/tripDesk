@@ -29,6 +29,8 @@ export interface ConversationView {
   hasUnreadForPlatform: boolean;
   createdAt: string;
   updatedAt: string;
+  supportEmail?: string | null;
+  supportPhone?: string | null;
 }
 
 export interface ChatMessageView {
@@ -97,7 +99,32 @@ export class PlatformChatService {
       throw new Error("Failed to initialize support conversation.");
     }
 
-    return this.mapConversation(conv, agency);
+    // 3. Retrieve authoritative platform support contact settings
+    let supportEmail: string | null = null;
+    let supportPhone: string | null = null;
+
+    try {
+      const platformSettings = await prisma.platformSetting.findMany({
+        where: {
+          key: {
+            in: ["supportEmail", "supportPhone"],
+          },
+        },
+      });
+
+      for (const s of platformSettings) {
+        if (s.key === "supportEmail" && s.value?.trim()) {
+          supportEmail = s.value.trim();
+        }
+        if (s.key === "supportPhone" && s.value?.trim()) {
+          supportPhone = s.value.trim();
+        }
+      }
+    } catch (settingsErr) {
+      console.error("[PlatformChatService] Failed to load platform support contact settings:", settingsErr);
+    }
+
+    return this.mapConversation(conv, agency, { supportEmail, supportPhone });
   }
 
   /**
@@ -465,7 +492,11 @@ export class PlatformChatService {
   /**
    * Map conversation database entity to clean view.
    */
-  private mapConversation(conv: any, agency: any): ConversationView {
+  private mapConversation(
+    conv: any,
+    agency: any,
+    platformContacts?: { supportEmail?: string | null; supportPhone?: string | null }
+  ): ConversationView {
     const owner = agency.users?.[0] || null;
     const sub = agency.subscriptions?.[0] || null;
 
@@ -507,6 +538,8 @@ export class PlatformChatService {
       hasUnreadForPlatform,
       createdAt: new Date(conv.createdAt).toISOString(),
       updatedAt: new Date(conv.updatedAt).toISOString(),
+      supportEmail: platformContacts?.supportEmail ?? null,
+      supportPhone: platformContacts?.supportPhone ?? null,
     };
   }
 

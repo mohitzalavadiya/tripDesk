@@ -30,8 +30,8 @@ export default function AdminSettingsPage() {
   // General Settings
   const [platformName, setPlatformName] = React.useState("Your Travel Desk SaaS Platform");
   const [defaultTrialDays, setDefaultTrialDays] = React.useState("7");
-  const [supportEmail, setSupportEmail] = React.useState("support@yourtraveldesk.in");
-  const [supportPhone, setSupportPhone] = React.useState("+91 98470 99000");
+  const [supportEmail, setSupportEmail] = React.useState("");
+  const [supportPhone, setSupportPhone] = React.useState("");
   const [maintenanceMode, setMaintenanceMode] = React.useState("false");
   const [platformNotice, setPlatformNotice] = React.useState("");
 
@@ -59,8 +59,8 @@ export default function AdminSettingsPage() {
         const s = generalRes.data;
         if (s.platformName) setPlatformName(s.platformName);
         if (s.defaultTrialDays) setDefaultTrialDays(s.defaultTrialDays);
-        if (s.supportEmail) setSupportEmail(s.supportEmail);
-        if (s.supportPhone) setSupportPhone(s.supportPhone);
+        if (s.supportEmail !== undefined) setSupportEmail(s.supportEmail || "");
+        if (s.supportPhone !== undefined) setSupportPhone(s.supportPhone || "");
         if (s.maintenanceMode) setMaintenanceMode(s.maintenanceMode);
         if (s.platformNotice) setPlatformNotice(s.platformNotice);
       }

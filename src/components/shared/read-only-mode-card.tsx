@@ -24,14 +24,6 @@ export function ReadOnlyModeCard({
 }: ReadOnlyModeCardProps) {
   const isSuspended = reason === "SUSPENDED";
 
-  const handleContactSupport = () => {
-    window.open(
-      `https://wa.me/919847099000?text=${encodeURIComponent(
-        `Hi Your Travel Desk Support! Our agency workspace is currently suspended and we cannot create new ${resourceName}s. Please assist us in reactivating our account.`
-      )}`,
-      "_blank"
-    );
-  };
 
   return (
     <div className="w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-10 text-center text-white shadow-xl relative overflow-hidden my-6 max-w-2xl mx-auto">
@@ -125,14 +117,15 @@ export function ReadOnlyModeCard({
           </Link>
 
           {isSuspended ? (
-            <Button
-              size="lg"
-              onClick={handleContactSupport}
-              className="w-full sm:w-auto bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm px-6 h-11 rounded-xl shadow-lg shadow-rose-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <Phone className="h-4 w-4" />
-              <span>Contact Your Travel Desk Support</span>
-            </Button>
+            <Link href="/support" className="w-full sm:w-auto">
+              <Button
+                size="lg"
+                className="w-full sm:w-auto bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm px-6 h-11 rounded-xl shadow-lg shadow-rose-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Phone className="h-4 w-4" />
+                <span>Contact Your Travel Desk Support</span>
+              </Button>
+            </Link>
           ) : (
             <Link href="/subscription" className="w-full sm:w-auto">
               <Button

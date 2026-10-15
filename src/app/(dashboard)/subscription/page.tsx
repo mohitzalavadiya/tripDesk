@@ -27,6 +27,7 @@ QrCode,
 X,
 Zap
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -146,6 +147,7 @@ interface PlanItem {
 }
 
 export default function AgencySubscriptionPage() {
+  const router = useRouter();
   const { refreshSubscription } = useSubscription();
   const [data, setData] = React.useState<AgencySubscriptionData | null>(null);
   const [plans, setPlans] = React.useState<PlanItem[]>([]);
@@ -199,13 +201,7 @@ export default function AgencySubscriptionPage() {
   }, [fetchData]);
 
   const handleContactSupport = () => {
-    const agencyName = data?.agency.name || "Agency";
-    window.open(
-      `https://wa.me/919847099000?text=${encodeURIComponent(
-        `Hi Your Travel Desk Billing Support! I am from ${agencyName}. I need assistance with our SaaS subscription & plan upgrade.`
-      )}`,
-      "_blank"
-    );
+    router.push("/support");
   };
 
   const handleOpenPurchase = (plan: PlanItem) => {

@@ -3,10 +3,11 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
 import { AlertTriangle,Clock,CreditCard,Lock,Phone,ShieldAlert } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export function AgencyLifecycleBanner() {
   const router = useRouter();
+  const pathname = usePathname();
   const { currentUser, currentAgency, subscriptionAccess, isPlatformOwner } = useAuth();
 
   // If user is Platform Owner or has no subscription context, banner is not applicable
@@ -19,12 +20,8 @@ export function AgencyLifecycleBanner() {
   const trialDaysRemaining = subscriptionAccess.trialDaysRemaining ?? 0;
 
   const handleContactSupport = () => {
-    window.open(
-      `https://wa.me/919847099000?text=${encodeURIComponent(
-        `Hi Your Travel Desk Support! I am ${currentUser.name} from ${agencyName}. I need assistance with our SaaS account status.`
-      )}`,
-      "_blank"
-    );
+    if (pathname === "/support") return;
+    router.push("/support");
   };
 
   // 1. Account Suspended State Banner
@@ -37,17 +34,19 @@ export function AgencyLifecycleBanner() {
             <strong>Account Suspended:</strong> Your agency workspace is currently suspended. Please contact Your Travel Desk support to reactivate your account.
           </span>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 w-full sm:w-auto">
-          <Button
-            size="sm"
-            onClick={handleContactSupport}
-            className="w-full sm:w-auto justify-center bg-white text-rose-700 hover:bg-rose-50 font-bold text-[11px] sm:text-xs h-7 sm:h-7 px-3 rounded-lg cursor-pointer whitespace-nowrap"
-          >
-            <Phone className="h-3 w-3 mr-1 shrink-0" />
-            <span className="sm:hidden">Contact Support</span>
-            <span className="hidden sm:inline">Contact Your Travel Desk</span>
-          </Button>
-        </div>
+        {pathname !== "/support" && (
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 w-full sm:w-auto">
+            <Button
+              size="sm"
+              onClick={handleContactSupport}
+              className="w-full sm:w-auto justify-center bg-white text-rose-700 hover:bg-rose-50 font-bold text-[11px] sm:text-xs h-7 sm:h-7 px-3 rounded-lg cursor-pointer whitespace-nowrap"
+            >
+              <Phone className="h-3 w-3 mr-1 shrink-0" />
+              <span className="sm:hidden">Contact Support</span>
+              <span className="hidden sm:inline">Contact Your Travel Desk</span>
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -72,14 +71,16 @@ export function AgencyLifecycleBanner() {
             <span className="sm:hidden">Renew Plan</span>
             <span className="hidden sm:inline">Renew Subscription</span>
           </Button>
-          <Button
-            size="sm"
-            onClick={handleContactSupport}
-            className="flex-1 sm:flex-initial justify-center bg-blue-700 text-white hover:bg-blue-800 font-bold text-[11px] sm:text-xs h-7 sm:h-7 px-2.5 rounded-lg cursor-pointer whitespace-nowrap"
-          >
-            <span className="sm:hidden">Contact Support</span>
-            <span className="hidden sm:inline">Contact Your Travel Desk</span>
-          </Button>
+          {pathname !== "/support" && (
+            <Button
+              size="sm"
+              onClick={handleContactSupport}
+              className="flex-1 sm:flex-initial justify-center bg-blue-700 text-white hover:bg-blue-800 font-bold text-[11px] sm:text-xs h-7 sm:h-7 px-2.5 rounded-lg cursor-pointer whitespace-nowrap"
+            >
+              <span className="sm:hidden">Contact Support</span>
+              <span className="hidden sm:inline">Contact Your Travel Desk</span>
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -103,14 +104,16 @@ export function AgencyLifecycleBanner() {
           >
             View Plans
           </Button>
-          <Button
-            size="sm"
-            onClick={handleContactSupport}
-            className="flex-1 sm:flex-initial justify-center bg-amber-700 text-white hover:bg-amber-800 font-bold text-[11px] sm:text-xs h-7 sm:h-7 px-2.5 rounded-lg cursor-pointer whitespace-nowrap"
-          >
-            <span className="sm:hidden">Contact Support</span>
-            <span className="hidden sm:inline">Contact Your Travel Desk</span>
-          </Button>
+          {pathname !== "/support" && (
+            <Button
+              size="sm"
+              onClick={handleContactSupport}
+              className="flex-1 sm:flex-initial justify-center bg-amber-700 text-white hover:bg-amber-800 font-bold text-[11px] sm:text-xs h-7 sm:h-7 px-2.5 rounded-lg cursor-pointer whitespace-nowrap"
+            >
+              <span className="sm:hidden">Contact Support</span>
+              <span className="hidden sm:inline">Contact Your Travel Desk</span>
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -135,15 +138,17 @@ export function AgencyLifecycleBanner() {
             <span className="sm:hidden">Upgrade Plan</span>
             <span className="hidden sm:inline">View Plans & Upgrade</span>
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleContactSupport}
-            className="flex-1 sm:flex-initial justify-center text-white hover:bg-white/10 text-[11px] sm:text-xs h-7 sm:h-6.5 px-2 rounded-lg cursor-pointer whitespace-nowrap border border-white/20 sm:border-0"
-          >
-            <span className="sm:hidden">Contact Desk</span>
-            <span className="hidden sm:inline">Contact Your Travel Desk</span>
-          </Button>
+          {pathname !== "/support" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleContactSupport}
+              className="flex-1 sm:flex-initial justify-center text-white hover:bg-white/10 text-[11px] sm:text-xs h-7 sm:h-6.5 px-2 rounded-lg cursor-pointer whitespace-nowrap border border-white/20 sm:border-0"
+            >
+              <span className="sm:hidden">Contact Desk</span>
+              <span className="hidden sm:inline">Contact Your Travel Desk</span>
+            </Button>
+          )}
         </div>
       </div>
     );

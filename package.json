@@ -15,7 +15,8 @@
     "prisma:seed:staging": "tsx --env-file=.env.staging prisma/seed.ts",
     "repair:catalog:production": "tsx --env-file=.env.production prisma/repair-subscription-catalog.ts",
     "test:catalog:repair": "tsx prisma/test-catalog-repair.ts",
-    "test:subscription:ux": "tsx prisma/test-subscription-trial-ux.ts"
+    "test:subscription:ux": "tsx prisma/test-subscription-trial-ux.ts",
+    "test:support:contacts": "tsx prisma/test-support-contacts.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

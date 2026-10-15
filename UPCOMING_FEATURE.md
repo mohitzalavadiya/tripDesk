@@ -91,6 +91,9 @@ Test hotel payable case in opration page
 
 **TODO**
 
+Create a msg for user
+
+
 trips/cmuzi8fru000006l3jpe5peov/quotation/preview
 preview page UI issue
 
