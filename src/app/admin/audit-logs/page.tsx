@@ -71,7 +71,7 @@ export default function AdminAuditLogsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+      <div className="max-w-[1600px] mx-auto px-2.5 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6 min-w-0">
         {/* Top Header */}
         <PageHeader
           title="Platform Governance & Audit Logs"
