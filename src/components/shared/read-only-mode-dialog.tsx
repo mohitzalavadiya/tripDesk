@@ -35,12 +35,7 @@ export function ReadOnlyModeDialog({
 
   const handleContactSupport = () => {
     onOpenChange(false);
-    window.open(
-      `https://wa.me/919847099000?text=${encodeURIComponent(
-        "Hi Your Travel Desk Support! Our agency workspace is currently suspended. Please assist us in reactivating our account."
-      )}`,
-      "_blank"
-    );
+    router.push("/support");
   };
 
   const handleRenew = () => {

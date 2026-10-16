@@ -380,8 +380,8 @@ async function main() {
       title: isSuspended ? "Agency Workspace Suspended" : "Read-Only Subscription Mode",
       badgeText: isSuspended ? "Account Suspended" : "Read-Only Mode",
       primaryCta: isSuspended ? "Contact Platform Support" : "Upgrade / Renew Plan",
-      primaryHref: isSuspended ? "https://wa.me/918320494489" : "/subscription",
-      isExternalCta: isSuspended,
+      primaryHref: isSuspended ? "/support" : "/subscription",
+      isExternalCta: false,
     };
   }
 
@@ -389,8 +389,8 @@ async function main() {
   assert(suspendedConfig.title.includes("Suspended"), "Suspended Dialog title mentions Suspended");
   assert(suspendedConfig.badgeText === "Account Suspended", "Suspended Dialog badge is 'Account Suspended'");
   assert(suspendedConfig.primaryCta === "Contact Platform Support", "Suspended CTA is 'Contact Platform Support'");
-  assert(suspendedConfig.primaryHref.includes("wa.me"), "Suspended CTA routes to WhatsApp Support");
-  assert(suspendedConfig.isExternalCta === true, "Suspended CTA is external");
+  assert(suspendedConfig.primaryHref === "/support", "Suspended CTA routes internally to /support");
+  assert(suspendedConfig.isExternalCta === false, "Suspended CTA is internal");
 
   const expiredConfig = getReadOnlyDialogConfig("EXPIRED");
   assert(expiredConfig.title.includes("Read-Only"), "Expired Dialog title mentions Read-Only");
