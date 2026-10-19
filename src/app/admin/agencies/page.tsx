@@ -134,7 +134,7 @@ export default function AdminAgenciesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+      <div className="max-w-[1600px] mx-auto px-2.5 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6 min-w-0">
         {/* Top Header */}
         <PageHeader
           title="Agency Directory"
@@ -148,7 +148,7 @@ export default function AdminAgenciesPage() {
         />
 
         {/* ─── FILTERS & SEARCH ───────────────────────────────────────────── */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch sm:items-center justify-between min-w-0">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <Input
@@ -158,11 +158,11 @@ export default function AdminAgenciesPage() {
                 setSearchQuery(e.target.value);
                 setPage(1);
               }}
-              className="pl-9 h-9 text-xs"
+              className="pl-9 h-8 sm:h-9 text-xs"
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
             {/* Account Status Filter */}
             <Select
               value={statusFilter}
@@ -173,7 +173,7 @@ export default function AdminAgenciesPage() {
                 }
               }}
             >
-              <SelectTrigger className="h-9 text-xs w-[140px]">
+              <SelectTrigger className="h-8 sm:h-9 text-xs w-full min-[360px]:w-35 flex-1 min-[360px]:flex-initial">
                 <SelectValue placeholder="Agency Status" />
               </SelectTrigger>
               <SelectContent>
@@ -194,7 +194,7 @@ export default function AdminAgenciesPage() {
                 }
               }}
             >
-              <SelectTrigger className="h-9 text-xs w-[150px]">
+              <SelectTrigger className="h-8 sm:h-9 text-xs w-full min-[360px]:w-37.5 flex-1 min-[360px]:flex-initial">
                 <SelectValue placeholder="Subscription" />
               </SelectTrigger>
               <SelectContent>
@@ -426,8 +426,8 @@ export default function AdminAgenciesPage() {
 
       {/* ─── EXTEND TRIAL MODAL ─────────────────────────────────────────── */}
       {extendAgency && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-2.5 sm:p-4 overflow-y-auto animate-in fade-in-0">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-6 space-y-4 animate-in zoom-in-95 duration-150 max-h-[92dvh] overflow-y-auto overscroll-contain">
             <div>
               <h3 className="text-base font-bold text-slate-900">Extend Agency Trial</h3>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -438,7 +438,7 @@ export default function AdminAgenciesPage() {
             <form onSubmit={handleExtendTrial} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Days to Add</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 min-[360px]:grid-cols-4 gap-1.5 sm:gap-2">
                   {[7, 14, 30, 60].map((d) => (
                     <button
                       key={d}
@@ -467,13 +467,14 @@ export default function AdminAgenciesPage() {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-col-reverse min-[360px]:flex-row min-[360px]:items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setExtendAgency(null)}
                   disabled={extending}
+                  className="w-full min-[360px]:w-auto rounded-xl h-8.5 text-xs"
                 >
                   Cancel
                 </Button>
@@ -481,7 +482,7 @@ export default function AdminAgenciesPage() {
                   type="submit"
                   size="sm"
                   disabled={extending}
-                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
+                  className="w-full min-[360px]:w-auto bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-xl h-8.5 px-4 cursor-pointer justify-center"
                 >
                   {extending ? "Extending..." : "Confirm Extension"}
                 </Button>
@@ -493,21 +494,21 @@ export default function AdminAgenciesPage() {
 
       {/* ─── SUSPEND AGENCY MODAL ───────────────────────────────────────── */}
       {suspendAgencyTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-2.5 sm:p-4 overflow-y-auto animate-in fade-in-0">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-6 space-y-4 animate-in zoom-in-95 duration-150 max-h-[92dvh] overflow-y-auto overscroll-contain">
             <div className="flex items-center gap-3 text-rose-600">
               <div className="h-10 w-10 rounded-xl bg-rose-50 flex items-center justify-center shrink-0">
                 <Ban className="h-5 w-5 text-rose-600" />
               </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900">Suspend Agency Access</h3>
-                <p className="text-xs text-slate-500">
+              <div className="min-w-0">
+                <h3 className="text-base font-bold text-slate-900 truncate">Suspend Agency Access</h3>
+                <p className="text-xs text-slate-500 truncate">
                   Suspend <span className="font-semibold text-rose-700">{suspendAgencyTarget.name}</span>
                 </p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-600 bg-rose-50/50 p-3 rounded-xl border border-rose-100">
+            <p className="text-xs text-slate-600 bg-rose-50/50 p-3 rounded-xl border border-rose-100 leading-relaxed">
               Suspension blocks agency owners and staff from logging in and modifying records. Existing customer bookings, financial records, and operational vouchers are <strong>preserved without data deletion</strong>.
             </p>
 
@@ -523,13 +524,14 @@ export default function AdminAgenciesPage() {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-col-reverse min-[360px]:flex-row min-[360px]:items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setSuspendAgencyTarget(null)}
                   disabled={suspending}
+                  className="w-full min-[360px]:w-auto rounded-xl h-8.5 text-xs"
                 >
                   Cancel
                 </Button>
@@ -537,7 +539,7 @@ export default function AdminAgenciesPage() {
                   type="submit"
                   size="sm"
                   disabled={suspending}
-                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold"
+                  className="w-full min-[360px]:w-auto bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl h-8.5 px-4 cursor-pointer justify-center"
                 >
                   {suspending ? "Suspending..." : "Confirm Suspension"}
                 </Button>

@@ -247,23 +247,23 @@ export default function AdminPlansPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+      <div className="max-w-[1550px] mx-auto px-2.5 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6 min-w-0">
         {/* Top Header */}
         <PageHeader
           title="SaaS Plans & Pricing"
           description="Manage subscription tiers, pricing parameters, machine feature entitlements, and active agency usage quotas."
           breadcrumbs={[{ label: "SaaS Platform", href: "/admin" }, { label: "Plans & Pricing" }]}
           primaryAction={{
-            label: "+ Create Plan",
+            label: "Create Plan",
             onClick: handleOpenCreate,
             icon: Plus,
           }}
         />
 
         {/* Informational Banner */}
-        <div className="bg-purple-50/80 border border-purple-200/80 rounded-2xl p-4 flex items-center gap-3 text-xs text-purple-900 shadow-2xs">
-          <Sparkles className="h-5 w-5 text-purple-600 shrink-0" />
-          <span>
+        <div className="bg-purple-50/80 border border-purple-200/80 rounded-2xl p-3 sm:p-4 flex items-start sm:items-center gap-2.5 sm:gap-3 text-xs text-purple-900 shadow-2xs">
+          <Sparkles className="h-5 w-5 text-purple-600 shrink-0 mt-0.5 sm:mt-0" />
+          <span className="leading-relaxed">
             <strong>Your Travel Desk Subscription Engine:</strong> Pricing plans define agency billing options, feature entitlements, and creation usage limits. Changes updated here take effect immediately across all active agency subscriptions.
           </span>
         </div>
@@ -275,7 +275,7 @@ export default function AdminPlansPage() {
             Loading subscription plans...
           </div>
         ) : plans.length === 0 ? (
-          <div className="text-center p-12 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+          <div className="text-center p-8 sm:p-12 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
             <Layers className="h-10 w-10 text-slate-300 mx-auto" />
             <p className="text-sm font-semibold text-slate-600">No subscription plans found in database.</p>
             <Button size="sm" onClick={handleOpenCreate} className="bg-purple-600 text-white text-xs">
@@ -283,7 +283,7 @@ export default function AdminPlansPage() {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-6xl">
             {plans.map((p) => {
               const featuresList = Array.isArray(p.features) ? p.features : [];
               const ent = p.entitlements || {};
@@ -292,73 +292,73 @@ export default function AdminPlansPage() {
               return (
                 <div
                   key={p.id}
-                  className={`bg-white rounded-3xl p-6 shadow-2xs border flex flex-col justify-between space-y-6 relative transition-all ${
+                  className={`bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 shadow-2xs border flex flex-col justify-between space-y-4 sm:space-y-6 relative transition-all min-w-0 ${
                     p.isPopular
                       ? "border-purple-300 ring-2 ring-purple-500/20"
                       : "border-slate-200/90 hover:border-purple-200"
                   }`}
                 >
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-black text-xl text-slate-900">{p.name}</h3>
+                  <div className="space-y-3.5 sm:space-y-4 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <h3 className="font-black text-lg sm:text-xl text-slate-900 break-words">{p.name}</h3>
                           {p.isPopular && (
-                            <span className="text-[10px] font-black uppercase tracking-wider bg-purple-600 text-white px-2 py-0.5 rounded-full">
+                            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-purple-600 text-white px-2 py-0.5 rounded-full shrink-0">
                               Popular
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">{p.description || "Full platform features"}</p>
+                        <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 break-words">{p.description || "Full platform features"}</p>
                       </div>
-                      <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100 shrink-0">
+                      <span className="text-[10px] sm:text-[11px] font-bold text-purple-700 bg-purple-50 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-purple-100 shrink-0">
                         {p.subscriptionsCount} Active
                       </span>
                     </div>
 
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
-                      <div className="flex items-baseline justify-between">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Monthly Rate</span>
-                          <span className="text-2xl font-black text-slate-900">
+                    <div className="bg-slate-50 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100 space-y-2">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block">Monthly Rate</span>
+                          <span className="text-xl sm:text-2xl font-black text-slate-900">
                             ₹{p.price.toLocaleString("en-IN")}
                           </span>
-                          <span className="text-xs text-slate-500 font-medium"> / mo</span>
+                          <span className="text-[11px] sm:text-xs text-slate-500 font-medium"> / mo</span>
                         </div>
                         {p.yearlyPrice && (
-                          <div className="text-right">
-                            <span className="text-[10px] uppercase font-bold text-slate-400 block">Yearly Rate</span>
-                            <span className="text-xl font-black text-purple-700">
+                          <div className="text-right min-w-0">
+                            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block">Yearly Rate</span>
+                            <span className="text-lg sm:text-xl font-black text-purple-700">
                               ₹{p.yearlyPrice.toLocaleString("en-IN")}
                             </span>
-                            <span className="text-xs text-slate-500 font-medium"> / yr</span>
+                            <span className="text-[11px] sm:text-xs text-slate-500 font-medium"> / yr</span>
                           </div>
                         )}
                       </div>
                     </div>
 
                     {/* Machine Usage Quotas */}
-                    <div className="space-y-2 text-xs bg-purple-50/40 p-3.5 rounded-2xl border border-purple-100/60">
+                    <div className="space-y-1.5 sm:space-y-2 text-xs bg-purple-50/40 p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border border-purple-100/60">
                       <div className="flex items-center gap-1.5 font-bold text-purple-900 uppercase tracking-wider text-[10px]">
-                        <Gauge className="h-3.5 w-3.5 text-purple-600" />
+                        <Gauge className="h-3.5 w-3.5 text-purple-600 shrink-0" />
                         <span>Resource Creation Quotas</span>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                        <div className="bg-white p-2 rounded-xl border border-purple-100 shadow-2xs">
-                          <span className="text-[10px] font-bold text-slate-500 block">Trips</span>
-                          <span className="text-xs font-black text-slate-900">
+                      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center pt-1">
+                        <div className="bg-white p-1.5 sm:p-2 rounded-xl border border-purple-100 shadow-2xs min-w-0">
+                          <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 block truncate">Trips</span>
+                          <span className="text-[11px] sm:text-xs font-black text-slate-900 block truncate">
                             {lim.TRIPS === null ? "Unlimited" : lim.TRIPS}
                           </span>
                         </div>
-                        <div className="bg-white p-2 rounded-xl border border-purple-100 shadow-2xs">
-                          <span className="text-[10px] font-bold text-slate-500 block">Quotations</span>
-                          <span className="text-xs font-black text-slate-900">
+                        <div className="bg-white p-1.5 sm:p-2 rounded-xl border border-purple-100 shadow-2xs min-w-0">
+                          <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 block truncate">Quotations</span>
+                          <span className="text-[11px] sm:text-xs font-black text-slate-900 block truncate">
                             {lim.QUOTATIONS === null ? "Unlimited" : lim.QUOTATIONS}
                           </span>
                         </div>
-                        <div className="bg-white p-2 rounded-xl border border-purple-100 shadow-2xs">
-                          <span className="text-[10px] font-bold text-slate-500 block">Bookings</span>
-                          <span className="text-xs font-black text-slate-900">
+                        <div className="bg-white p-1.5 sm:p-2 rounded-xl border border-purple-100 shadow-2xs min-w-0">
+                          <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 block truncate">Bookings</span>
+                          <span className="text-[11px] sm:text-xs font-black text-slate-900 block truncate">
                             {lim.BOOKINGS === null ? "Unlimited" : lim.BOOKINGS}
                           </span>
                         </div>
@@ -366,12 +366,12 @@ export default function AdminPlansPage() {
                     </div>
 
                     {/* Machine Feature Entitlements */}
-                    <div className="space-y-2 text-xs">
+                    <div className="space-y-1.5 sm:space-y-2 text-xs">
                       <div className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[10px]">
-                        <ShieldCheck className="h-3.5 w-3.5 text-purple-600" />
+                        <ShieldCheck className="h-3.5 w-3.5 text-purple-600 shrink-0" />
                         <span>Feature Access Flags</span>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-1.5 sm:gap-2 text-[11px]">
                         <div className={`flex items-center gap-1.5 p-2 rounded-xl border ${ent.CUSTOM_AGENCY_LOGO ? "bg-emerald-50/60 border-emerald-200/60 text-emerald-900" : "bg-slate-50 border-slate-200/60 text-slate-400 opacity-70"}`}>
                           {ent.CUSTOM_AGENCY_LOGO ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> : <XCircle className="h-3.5 w-3.5 text-slate-400 shrink-0" />}
                           <span className="font-semibold truncate">Agency Logo</span>
@@ -396,7 +396,7 @@ export default function AdminPlansPage() {
 
                     {/* Marketing Text Features */}
                     {featuresList.length > 0 && (
-                      <div className="space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
+                      <div className="space-y-1.5 sm:space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
                         <p className="font-semibold text-slate-700 uppercase tracking-wider text-[10px]">
                           Marketing Bullets ({featuresList.length})
                         </p>
@@ -404,7 +404,7 @@ export default function AdminPlansPage() {
                           {featuresList.map((feat: string, fIdx: number) => (
                             <li key={fIdx} className="flex items-center gap-2">
                               <CheckCircle2 className="h-3.5 w-3.5 text-purple-500 shrink-0" />
-                              <span>{feat}</span>
+                              <span className="break-words">{feat}</span>
                             </li>
                           ))}
                         </ul>
@@ -412,9 +412,9 @@ export default function AdminPlansPage() {
                     )}
                   </div>
 
-                  <div className="border-t border-slate-100 pt-4 flex items-center justify-between">
+                  <div className="border-t border-slate-100 pt-3.5 sm:pt-4 flex items-center justify-between gap-2">
                     <span
-                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
                         p.isActive
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                           : "bg-slate-100 text-slate-500"
@@ -426,7 +426,7 @@ export default function AdminPlansPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => handleOpenEdit(p)}
-                      className="h-8 text-xs font-semibold hover:border-purple-300"
+                      className="h-8 text-xs font-semibold hover:border-purple-300 rounded-xl cursor-pointer shrink-0"
                     >
                       <Edit2 className="h-3.5 w-3.5 mr-1" /> Edit Tier
                     </Button>
@@ -440,16 +440,16 @@ export default function AdminPlansPage() {
 
       {/* ─── CREATE / EDIT MODAL ────────────────────────────────────────── */}
       {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-2.5 sm:p-4 overflow-y-auto animate-in fade-in-0">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xl max-w-xl w-full p-4 sm:p-6 space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-150 max-h-[92dvh] overflow-y-auto overscroll-contain">
             <div className="border-b border-slate-100 pb-3">
-              <h3 className="text-lg font-bold text-slate-900">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">
                 {modalMode === "CREATE" ? "Create Subscription Plan" : "Edit Plan Parameters"}
               </h3>
               <p className="text-xs text-slate-500">Configure pricing, usage limits, and platform feature access.</p>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-5">
+            <form onSubmit={handleSave} className="space-y-4 sm:space-y-5">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Plan Name</label>
                 <Input
@@ -471,7 +471,7 @@ export default function AdminPlansPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2.5 sm:gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">Monthly Price (₹)</label>
                   <Input
@@ -495,7 +495,7 @@ export default function AdminPlansPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2.5 sm:gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">Display Order</label>
                   <Input
@@ -520,15 +520,15 @@ export default function AdminPlansPage() {
               </div>
 
               {/* ─── MACHINE USAGE QUOTAS SECTION ────────────────── */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3">
+              <div className="bg-slate-50 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                  <Gauge className="h-4 w-4 text-purple-600" />
+                  <Gauge className="h-4 w-4 text-purple-600 shrink-0" />
                   <span>Resource Creation Quotas (per Billing Period)</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
                   {/* TRIPS */}
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                  <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200 space-y-2">
                     <label className="text-[11px] font-bold text-slate-700 block">Trips Limit</label>
                     <div className="flex items-center gap-2">
                       <Input
@@ -563,7 +563,7 @@ export default function AdminPlansPage() {
                   </div>
 
                   {/* QUOTATIONS */}
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                  <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200 space-y-2">
                     <label className="text-[11px] font-bold text-slate-700 block">Quotations Limit</label>
                     <div className="flex items-center gap-2">
                       <Input
@@ -598,7 +598,7 @@ export default function AdminPlansPage() {
                   </div>
 
                   {/* BOOKINGS */}
-                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                  <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200 space-y-2">
                     <label className="text-[11px] font-bold text-slate-700 block">Bookings Limit</label>
                     <div className="flex items-center gap-2">
                       <Input
@@ -635,14 +635,14 @@ export default function AdminPlansPage() {
               </div>
 
               {/* ─── MACHINE FEATURE ENTITLEMENTS SECTION ────────── */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-3">
+              <div className="bg-slate-50 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                  <ShieldCheck className="h-4 w-4 text-purple-600" />
+                  <ShieldCheck className="h-4 w-4 text-purple-600 shrink-0" />
                   <span>Platform Feature Access Flags</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-purple-200 transition-all">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  <label className="flex items-center justify-between p-2.5 sm:p-3 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-purple-200 transition-all">
                     <span className="text-xs font-semibold text-slate-800">Custom Agency Logo</span>
                     <input
                       type="checkbox"
@@ -657,7 +657,7 @@ export default function AdminPlansPage() {
                     />
                   </label>
 
-                  <label className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-purple-200 transition-all">
+                  <label className="flex items-center justify-between p-2.5 sm:p-3 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-purple-200 transition-all">
                     <span className="text-xs font-semibold text-slate-800">Feedback & Reviews</span>
                     <input
                       type="checkbox"
@@ -672,7 +672,7 @@ export default function AdminPlansPage() {
                     />
                   </label>
 
-                  <label className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-purple-200 transition-all">
+                  <label className="flex items-center justify-between p-2.5 sm:p-3 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-purple-200 transition-all">
                     <span className="text-xs font-semibold text-slate-800">Customer Insights</span>
                     <input
                       type="checkbox"
@@ -687,7 +687,7 @@ export default function AdminPlansPage() {
                     />
                   </label>
 
-                  <label className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-purple-200 transition-all">
+                  <label className="flex items-center justify-between p-2.5 sm:p-3 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-purple-200 transition-all">
                     <span className="text-xs font-semibold text-slate-800">Reports & Analytics</span>
                     <input
                       type="checkbox"
@@ -717,7 +717,7 @@ export default function AdminPlansPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-6 pt-1">
+              <div className="flex flex-col min-[380px]:flex-row min-[380px]:items-center gap-2.5 min-[380px]:gap-6 pt-1">
                 <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
@@ -739,13 +739,14 @@ export default function AdminPlansPage() {
                 </label>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex flex-col-reverse min-[360px]:flex-row min-[360px]:items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setModalMode(null)}
                   disabled={saving}
+                  className="w-full min-[360px]:w-auto rounded-xl h-8.5 text-xs"
                 >
                   Cancel
                 </Button>
@@ -753,7 +754,7 @@ export default function AdminPlansPage() {
                   type="submit"
                   size="sm"
                   disabled={saving}
-                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
+                  className="w-full min-[360px]:w-auto bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-xl h-8.5 px-4 cursor-pointer justify-center"
                 >
                   {saving ? "Saving..." : "Save Plan"}
                 </Button>
