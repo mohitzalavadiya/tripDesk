@@ -16,7 +16,7 @@ export function AppShell({ children }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   return (
-    <div className="flex min-h-screen w-full bg-background overflow-x-hidden">
+    <div className="flex min-h-screen w-full bg-background overflow-x-clip">
       {/* Desktop Sidebar */}
       <Sidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
 
@@ -24,7 +24,7 @@ export function AppShell({ children }: AppShellProps) {
       <MobileNav open={mobileMenuOpen} setOpen={setMobileMenuOpen} />
 
       {/* Main workspace area */}
-      <div className="flex flex-col flex-1 min-w-0 pb-16 md:pb-0 overflow-x-hidden">
+      <div className="flex flex-col flex-1 min-w-0 pb-16 md:pb-0 overflow-x-clip">
         {/* Top Navbar */}
         <Topbar
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
