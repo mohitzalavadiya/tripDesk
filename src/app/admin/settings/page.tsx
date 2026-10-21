@@ -191,7 +191,7 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+      <div className="max-w-[1550px] mx-auto px-2.5 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6 min-w-0">
         {/* Top Header */}
         <PageHeader
           title="Your Travel Desk Platform Settings"
@@ -210,38 +210,38 @@ export default function AdminSettingsPage() {
             Loading settings...
           </div>
         ) : (
-          <div className="space-y-8 max-w-4xl">
+          <div className="space-y-6 sm:space-y-8 max-w-4xl min-w-0">
             {/* ═══════════════════════════════════════════════════════════════════ */}
             {/* 1. PLATFORM BILLING & PAYMENT SETTINGS (SUBSCRIPTION INSTRUCTIONS) */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            <form onSubmit={handleSaveBilling} className="space-y-6">
-              <div className="bg-white border border-indigo-200/80 rounded-2xl p-6 shadow-sm space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
-                  <div>
+            <form onSubmit={handleSaveBilling} className="space-y-4 sm:space-y-6">
+              <div className="bg-white border border-indigo-200/80 rounded-2xl p-3.5 sm:p-6 shadow-sm space-y-4 sm:space-y-6 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3.5 sm:pb-4 gap-2">
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                      <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg shrink-0">
                         <Landmark className="h-4 w-4" />
                       </span>
-                      <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">
+                      <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 truncate">
                         Platform Billing & Payment Instructions
                       </h3>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-relaxed">
                       Official payment details displayed to Agency Owners when purchasing or renewing subscriptions.
                     </p>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full w-fit">
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full w-fit shrink-0">
                     Global SaaS Singleton
                   </span>
                 </div>
 
                 {/* UPI Configuration */}
-                <div className="space-y-3">
+                <div className="space-y-2.5 sm:space-y-3">
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
-                    <Smartphone className="h-4 w-4 text-indigo-600" />
+                    <Smartphone className="h-4 w-4 text-indigo-600 shrink-0" />
                     <span>Official UPI Configuration</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700">
                         Your Travel Desk Official UPI ID <span className="text-rose-500">*</span>
@@ -274,12 +274,12 @@ export default function AdminSettingsPage() {
                 </div>
 
                 {/* Bank Details Configuration */}
-                <div className="space-y-3 pt-4 border-t border-slate-100">
+                <div className="space-y-2.5 sm:space-y-3 pt-3.5 sm:pt-4 border-t border-slate-100">
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
-                    <Landmark className="h-4 w-4 text-indigo-600" />
+                    <Landmark className="h-4 w-4 text-indigo-600 shrink-0" />
                     <span>Direct Bank Transfer Details (NEFT / IMPS / RTGS)</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
                     <div className="space-y-1.5">
                       <label className="font-bold text-slate-700">
                         Account Holder / Beneficiary Name <span className="text-rose-500">*</span>
@@ -345,32 +345,32 @@ export default function AdminSettingsPage() {
                 </div>
 
                 {/* QR Code Management */}
-                <div className="space-y-4 pt-4 border-t border-slate-100">
+                <div className="space-y-3 sm:space-y-4 pt-3.5 sm:pt-4 border-t border-slate-100">
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
-                    <QrCode className="h-4 w-4 text-indigo-600" />
+                    <QrCode className="h-4 w-4 text-indigo-600 shrink-0" />
                     <span>Official Billing QR Code</span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 items-start">
                     {/* QR Preview */}
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[160px]">
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center text-center min-h-[140px] sm:min-h-[160px]">
                       {qrCodeUrl ? (
                         <div className="space-y-2 flex flex-col items-center">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={qrCodeUrl}
                             alt="Billing QR Code"
-                            className="w-32 h-32 object-contain bg-white p-2 rounded-xl border border-slate-200 shadow-2xs"
+                            className="w-28 h-28 sm:w-32 sm:h-32 object-contain bg-white p-2 rounded-xl border border-slate-200 shadow-2xs"
                           />
                           <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
                             <CheckCircle2 className="h-3 w-3" /> Active Official QR
                           </span>
                         </div>
                       ) : (
-                        <div className="space-y-2 py-4 text-slate-400">
-                          <QrCode className="h-10 w-10 mx-auto text-slate-300 stroke-[1.5]" />
+                        <div className="space-y-1.5 sm:space-y-2 py-3 sm:py-4 text-slate-400">
+                          <QrCode className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-slate-300 stroke-[1.5]" />
                           <p className="text-[11px] font-medium">No QR Code Uploaded</p>
-                          <p className="text-[10px] text-slate-400">
+                          <p className="text-[10px] text-slate-400 leading-tight">
                             Payment modal will show UPI & Bank details only.
                           </p>
                         </div>
@@ -378,12 +378,12 @@ export default function AdminSettingsPage() {
                     </div>
 
                     {/* QR Actions */}
-                    <div className="md:col-span-2 space-y-3 text-xs">
+                    <div className="md:col-span-2 space-y-2.5 sm:space-y-3 text-xs">
                       <p className="text-slate-600 leading-relaxed text-[11px]">
                         Upload your official bank or UPI merchant QR code image (PNG, JPG, or WEBP, max 2MB). When uploaded, Agency Owners can scan this QR code directly inside their subscription payment modal.
                       </p>
 
-                      <div className="flex flex-wrap items-center gap-3 pt-2">
+                      <div className="flex flex-col min-[360px]:flex-row flex-wrap items-stretch min-[360px]:items-center gap-2 sm:gap-3 pt-1 sm:pt-2">
                         <input
                           type="file"
                           ref={fileInputRef}
@@ -397,9 +397,9 @@ export default function AdminSettingsPage() {
                           variant="outline"
                           disabled={uploadingQr}
                           onClick={() => fileInputRef.current?.click()}
-                          className="h-9 text-xs font-semibold rounded-xl cursor-pointer"
+                          className="w-full min-[360px]:w-auto h-9 text-xs font-semibold rounded-xl cursor-pointer justify-center"
                         >
-                          <UploadCloud className="h-4 w-4 mr-1.5 text-indigo-600" />
+                          <UploadCloud className="h-4 w-4 mr-1.5 text-indigo-600 shrink-0" />
                           {uploadingQr
                             ? "Uploading..."
                             : qrCodeUrl
@@ -413,9 +413,9 @@ export default function AdminSettingsPage() {
                             variant="destructive"
                             disabled={removingQr}
                             onClick={() => setConfirmDeleteQrOpen(true)}
-                            className="h-9 text-xs font-semibold rounded-xl cursor-pointer"
+                            className="w-full min-[360px]:w-auto h-9 text-xs font-semibold rounded-xl cursor-pointer justify-center"
                           >
-                            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                            <Trash2 className="h-3.5 w-3.5 mr-1.5 shrink-0" />
                             {removingQr ? "Removing..." : "Remove QR"}
                           </Button>
                         )}
@@ -425,13 +425,13 @@ export default function AdminSettingsPage() {
                 </div>
 
                 {/* Save Billing Settings Button */}
-                <div className="flex justify-end pt-2 border-t border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:justify-end pt-2 border-t border-slate-100">
                   <Button
                     type="submit"
                     disabled={savingBilling}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-6 py-2 h-9 rounded-xl shadow-sm cursor-pointer"
+                    className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 sm:px-6 py-2 h-9 rounded-xl shadow-sm cursor-pointer justify-center"
                   >
-                    <Save className="h-4 w-4 mr-1.5" />
+                    <Save className="h-4 w-4 mr-1.5 shrink-0" />
                     {savingBilling ? "Saving Instructions..." : "Save Billing & Payment Settings"}
                   </Button>
                 </div>
@@ -441,14 +441,14 @@ export default function AdminSettingsPage() {
             {/* ═══════════════════════════════════════════════════════════════════ */}
             {/* 2. CORE SAAS & MAINTENANCE SETTINGS */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            <form onSubmit={handleSaveGeneral} className="space-y-6">
+            <form onSubmit={handleSaveGeneral} className="space-y-4 sm:space-y-6">
               {/* General Config Card */}
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-3">
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-6 shadow-2xs space-y-3.5 sm:space-y-4 min-w-0">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-2.5 sm:pb-3">
                   Core SaaS Configuration
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Platform Brand Name</label>
                     <Input
@@ -492,12 +492,12 @@ export default function AdminSettingsPage() {
               </div>
 
               {/* Platform Banner & Maintenance Mode */}
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-3">
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-6 shadow-2xs space-y-3.5 sm:space-y-4 min-w-0">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-2.5 sm:pb-3">
                   Maintenance & System Notices
                 </h3>
 
-                <div className="space-y-4 text-xs">
+                <div className="space-y-3 sm:space-y-4 text-xs">
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-700">Global Header Banner Notice</label>
                     <Textarea
@@ -512,13 +512,13 @@ export default function AdminSettingsPage() {
               </div>
 
               {/* Save Button */}
-              <div className="flex justify-end">
+              <div className="flex flex-col sm:flex-row sm:justify-end">
                 <Button
                   type="submit"
                   disabled={savingGeneral}
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs px-6 py-2 h-9 rounded-xl shadow-sm cursor-pointer"
+                  className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs px-4 sm:px-6 py-2 h-9 rounded-xl shadow-sm cursor-pointer justify-center"
                 >
-                  <Save className="h-4 w-4 mr-1.5" />
+                  <Save className="h-4 w-4 mr-1.5 shrink-0" />
                   {savingGeneral ? "Saving Changes..." : "Save Platform Settings"}
                 </Button>
               </div>

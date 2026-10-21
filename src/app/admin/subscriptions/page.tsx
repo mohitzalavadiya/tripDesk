@@ -100,7 +100,7 @@ export default function AdminSubscriptionsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+      <div className="max-w-[1600px] mx-auto px-2.5 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6 min-w-0">
         {/* Top Header */}
         <PageHeader
           title="Subscription Management"
@@ -114,55 +114,55 @@ export default function AdminSubscriptionsPage() {
         />
 
         {/* ─── 3 KPI TILES ────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
+          <div className="bg-white border border-slate-200/90 rounded-xl sm:rounded-2xl p-3 sm:p-4.5 shadow-2xs space-y-1 min-w-0">
             <div className="flex items-center justify-between text-emerald-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Active Paid Plans</span>
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">Active Paid Plans</span>
+              <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
             </div>
-            <p className="text-2xl font-black text-emerald-700 tracking-tight">{activeCount}</p>
-            <p className="text-xs text-slate-500 font-medium">Paying subscriber agencies</p>
+            <p className="text-xl sm:text-2xl font-black text-emerald-700 tracking-tight truncate">{activeCount}</p>
+            <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">Paying subscriber agencies</p>
           </div>
 
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
+          <div className="bg-white border border-slate-200/90 rounded-xl sm:rounded-2xl p-3 sm:p-4.5 shadow-2xs space-y-1 min-w-0">
             <div className="flex items-center justify-between text-amber-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Active Free Trials</span>
-              <Clock className="h-4 w-4 text-amber-500" />
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">Active Free Trials</span>
+              <Clock className="h-4 w-4 text-amber-500 shrink-0" />
             </div>
-            <p className="text-2xl font-black text-amber-700 tracking-tight">{trialCount}</p>
-            <p className="text-xs text-slate-500 font-medium">Under 7-day evaluation</p>
+            <p className="text-xl sm:text-2xl font-black text-amber-700 tracking-tight truncate">{trialCount}</p>
+            <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">Under 7-day evaluation</p>
           </div>
 
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-1">
+          <div className="bg-white border border-slate-200/90 rounded-xl sm:rounded-2xl p-3 sm:p-4.5 shadow-2xs space-y-1 min-w-0">
             <div className="flex items-center justify-between text-rose-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Expired / Past Due</span>
-              <AlertTriangle className="h-4 w-4 text-rose-500" />
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">Expired / Past Due</span>
+              <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0" />
             </div>
-            <p className="text-2xl font-black text-rose-700 tracking-tight">{expiredCount}</p>
-            <p className="text-xs text-slate-500 font-medium">Requires renewal or conversion</p>
+            <p className="text-xl sm:text-2xl font-black text-rose-700 tracking-tight truncate">{expiredCount}</p>
+            <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">Requires renewal or conversion</p>
           </div>
         </div>
 
         {/* ─── FILTER CONTROLS ────────────────────────────────────────────── */}
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <div className="bg-white border border-slate-200/90 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch sm:items-center justify-between min-w-0">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search Agency Name, Email, Plan..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-xs"
+              className="pl-9 h-8.5 sm:h-9 text-xs"
             />
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
             <Select
               value={statusFilter}
               onValueChange={(val) => {
                 if (val) setStatusFilter(val);
               }}
             >
-              <SelectTrigger className="h-9 text-xs w-[160px]">
+              <SelectTrigger className="h-8.5 sm:h-9 text-xs flex-1 sm:w-[160px] sm:flex-initial">
                 <SelectValue placeholder="Filter Status" />
               </SelectTrigger>
               <SelectContent>
@@ -174,7 +174,7 @@ export default function AdminSubscriptionsPage() {
               </SelectContent>
             </Select>
 
-            <span className="text-xs text-slate-500 font-medium">
+            <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
               ({filteredSubscriptions.length} Records)
             </span>
           </div>
@@ -301,17 +301,19 @@ export default function AdminSubscriptionsPage() {
 
       {/* ─── EXTEND TRIAL MODAL ─────────────────────────────────────────── */}
       {extendSub && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-150">
-            <h3 className="text-base font-bold text-slate-900">Extend Trial Access</h3>
-            <p className="text-xs text-slate-500">
-              Agency: <span className="font-semibold text-purple-700">{extendSub.agencyName}</span>
-            </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-2.5 sm:p-4 overflow-y-auto animate-in fade-in-0">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-6 space-y-4 animate-in zoom-in-95 duration-150 max-h-[92dvh] overflow-y-auto overscroll-contain">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Extend Trial Access</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Agency: <span className="font-semibold text-purple-700">{extendSub.agencyName}</span>
+              </p>
+            </div>
 
             <form onSubmit={handleExtendTrial} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Days to Add</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 min-[360px]:grid-cols-4 gap-1.5 sm:gap-2">
                   {[7, 14, 30, 60].map((d) => (
                     <button
                       key={d}
@@ -340,13 +342,14 @@ export default function AdminSubscriptionsPage() {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-col-reverse min-[360px]:flex-row min-[360px]:items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setExtendSub(null)}
                   disabled={extending}
+                  className="w-full min-[360px]:w-auto rounded-xl h-8.5 text-xs"
                 >
                   Cancel
                 </Button>
@@ -354,7 +357,7 @@ export default function AdminSubscriptionsPage() {
                   type="submit"
                   size="sm"
                   disabled={extending}
-                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
+                  className="w-full min-[360px]:w-auto bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-xl h-8.5 px-4 cursor-pointer justify-center"
                 >
                   {extending ? "Extending..." : "Confirm Extension"}
                 </Button>

@@ -16,7 +16,7 @@ export function AppShell({ children }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="flex min-h-screen w-full bg-background overflow-x-hidden">
       {/* Desktop Sidebar */}
       <Sidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
 
@@ -24,7 +24,7 @@ export function AppShell({ children }: AppShellProps) {
       <MobileNav open={mobileMenuOpen} setOpen={setMobileMenuOpen} />
 
       {/* Main workspace area */}
-      <div className="flex flex-col flex-1 min-w-0 pb-16 md:pb-0">
+      <div className="flex flex-col flex-1 min-w-0 pb-16 md:pb-0 overflow-x-hidden">
         {/* Top Navbar */}
         <Topbar
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
@@ -35,7 +35,7 @@ export function AppShell({ children }: AppShellProps) {
         <AgencyLifecycleBanner />
 
         {/* Centered responsive main content area */}
-        <main className="flex-1 w-full max-w-[1550px] mx-auto focus-visible:outline-none">
+        <main className="flex-1 w-full max-w-[1550px] mx-auto focus-visible:outline-none min-w-0">
           {children}
         </main>
       </div>
