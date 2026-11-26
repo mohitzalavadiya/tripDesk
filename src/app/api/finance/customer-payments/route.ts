@@ -51,9 +51,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
-    if (!context.isAgencyOwner) {
-      throw new ForbiddenError("Recording settled customer payments is restricted to Agency Owners.");
-    }
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "PAYMENTS",
+      "recordReceipt",
+      "You do not have permission to record customer payments."
+    );
     const body = await validateJson(recordCustomerPaymentSchema, request);
 
     const payment = await financeService.recordCustomerPayment(

@@ -2,7 +2,6 @@ import {
   apiSuccess,
   enforceStaffPermission,
   handleApiError,
-  requireAgencyOwnerContext,
   requireWriteAccess,
   validateJson,
 } from "@/lib/api";
@@ -52,7 +51,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "FINANCE",
+      "DELETE"
+    );
     const { id } = await params;
 
     const deleted = await financeService.deleteExpense(

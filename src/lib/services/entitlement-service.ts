@@ -302,9 +302,9 @@ export const entitlementService = {
         },
       });
     } else if (resourceKey === "STAFF_MEMBERS") {
-      // Active staff count (excluding owner) + pending unexpired invitations
+      // Active staff count (excluding owner and deactivated staff) + pending unexpired invitations
       const activeStaff = await client.user.count({
-        where: { agencyId, role: "AGENCY_STAFF" },
+        where: { agencyId, role: "AGENCY_STAFF", isActive: true },
       });
       let pendingInvites = 0;
       if ((client as any).agencyInvitation?.count) {

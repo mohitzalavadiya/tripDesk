@@ -1,9 +1,10 @@
 import {
-apiSuccess,
-handleApiError,
-requireAgencyOwnerContext,
-requireReadAccess,
-validateJson,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import { taxProfileService } from "@/lib/services/tax-profile-service";
 import { updateAgencyTaxProfileSchema } from "@/lib/validation/tax-schema";
@@ -32,7 +33,14 @@ export async function GET() {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "SETTINGS",
+      "UPDATE"
+    );
     const body = await validateJson(updateAgencyTaxProfileSchema, request);
 
     const updated = await taxProfileService.updateAgencyTaxProfile(

@@ -13,28 +13,19 @@ import {
 } from "@/components/ui/dialog";
 import {
   DEFAULT_STAFF_PERMISSIONS,
-  DELEGABLE_STAFF_DELETE_MODULES,
-  IMMUTABLE_OWNER_ONLY_MODULES,
   PAGE_PERMISSIONS_REGISTRY,
   PagePermissionConfig,
   StaffModulePermissions,
   StaffPermissionsProfileMap,
 } from "@/lib/auth/permissions";
 import {
-  CheckCheck,
   Eye,
-  Info,
   Loader2,
-  Lock,
   Minus,
   RotateCcw,
-  ShieldAlert,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  ToggleLeft,
-  ToggleRight,
-  Trash2,
   XCircle,
 } from "lucide-react";
 import * as React from "react";
@@ -75,7 +66,10 @@ export function StaffPermissionsModal({
     if (!isOpen || !staffMember) return;
 
     let isMounted = true;
-    setLoading(true);
+
+    Promise.resolve().then(() => {
+      if (isMounted) setLoading(true);
+    });
 
     fetch(`/api/team/members/${staffMember.id}/permissions`)
       .then((res) => res.json())
@@ -143,67 +137,64 @@ export function StaffPermissionsModal({
     setPermissions((prev) => {
       const updated: StaffPermissionsProfileMap = { ...prev };
       PAGE_PERMISSIONS_REGISTRY.forEach((page) => {
-        if (!page.isOwnerOnly) {
-          updated[page.moduleKey] = {
-            ...(updated[page.moduleKey] || {}),
-            view: true,
-          };
-        }
+        updated[page.moduleKey] = {
+          ...(updated[page.moduleKey] || {}),
+          view: true,
+        };
       });
       return updated;
     });
-    toast.info("Enabled View permission on all delegable operational pages.");
+    toast.info("Enabled View permission on all agency pages.");
   };
 
   const handleApplyReadOnly = () => {
     setPermissions((prev) => {
       const updated: StaffPermissionsProfileMap = { ...prev };
       PAGE_PERMISSIONS_REGISTRY.forEach((page) => {
-        if (!page.isOwnerOnly) {
-          const cleared: StaffModulePermissions = { view: true };
-          for (const k of Object.keys(updated[page.moduleKey] || {})) {
-            if (k !== "view") cleared[k] = false;
-          }
-          cleared.create = false;
-          cleared.update = false;
-          cleared.delete = false;
-          cleared.recordReceipt = false;
-          cleared.logInteraction = false;
-          cleared.export = false;
-          updated[page.moduleKey] = cleared;
+        const cleared: StaffModulePermissions = { view: true };
+        for (const k of Object.keys(updated[page.moduleKey] || {})) {
+          if (k !== "view") cleared[k] = false;
         }
+        cleared.create = false;
+        cleared.update = false;
+        cleared.delete = false;
+        cleared.recordReceipt = false;
+        cleared.verify = false;
+        cleared.void = false;
+        cleared.logInteraction = false;
+        cleared.export = false;
+        updated[page.moduleKey] = cleared;
       });
       return updated;
     });
-    toast.info("Applied Read-Only Mode across all delegable pages.");
+    toast.info("Applied Read-Only Mode across all pages.");
   };
 
   const handleRevokeAll = () => {
     setPermissions((prev) => {
       const updated: StaffPermissionsProfileMap = { ...prev };
       PAGE_PERMISSIONS_REGISTRY.forEach((page) => {
-        if (!page.isOwnerOnly) {
-          const cleared: StaffModulePermissions = {};
-          for (const k of Object.keys(updated[page.moduleKey] || {})) {
-            cleared[k] = false;
-          }
-          cleared.view = false;
-          cleared.create = false;
-          cleared.update = false;
-          cleared.delete = false;
-          cleared.recordReceipt = false;
-          cleared.logInteraction = false;
-          cleared.export = false;
-          updated[page.moduleKey] = cleared;
+        const cleared: StaffModulePermissions = {};
+        for (const k of Object.keys(updated[page.moduleKey] || {})) {
+          cleared[k] = false;
         }
+        cleared.view = false;
+        cleared.create = false;
+        cleared.update = false;
+        cleared.delete = false;
+        cleared.recordReceipt = false;
+        cleared.verify = false;
+        cleared.void = false;
+        cleared.logInteraction = false;
+        cleared.export = false;
+        updated[page.moduleKey] = cleared;
       });
       return updated;
     });
-    toast.warning("Revoked all delegable permissions for this staff member.");
+    toast.warning("Revoked all permissions for this staff member.");
   };
 
   const handleToggleRow = (page: PagePermissionConfig) => {
-    if (page.isOwnerOnly) return;
     const current = permissions[page.moduleKey] || {};
     const isCurrentlyView = Boolean(current.view);
 
@@ -255,8 +246,9 @@ export function StaffPermissionsModal({
       }
       toast.success(`Permissions updated for ${staffMember.name}`);
       onClose();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save permissions");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to save permissions";
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -283,8 +275,9 @@ export function StaffPermissionsModal({
         `Permissions reset to standard defaults for ${staffMember.name}`
       );
       setConfirmResetOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to reset permissions");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to reset permissions";
+      toast.error(msg);
     } finally {
       setResetting(false);
     }
@@ -315,7 +308,7 @@ export function StaffPermissionsModal({
                     <span className="font-semibold text-slate-700">
                       {staffMember.name}
                     </span>{" "}
-                    ({staffMember.email}). Commercial margins, financial accounts, and billing remain permanently restricted to Agency Owners.
+                    ({staffMember.email}).
                   </DialogDescription>
                 </div>
               </div>
@@ -427,15 +420,13 @@ export function StaffPermissionsModal({
                               const isViewEnabled = Boolean(modulePerms.view);
                               const isAddDelegable = page.delegableActions.includes("create") || page.moduleKey === "PAYMENTS";
                               const isEditDelegable = page.delegableActions.includes("update");
-                              const isDeleteDelegable = DELEGABLE_STAFF_DELETE_MODULES.has(page.moduleKey);
+                              const isDeleteDelegable = page.delegableActions.includes("delete");
 
                               return (
                                 <tr
                                   key={page.moduleKey}
                                   className={`transition-colors hover:bg-slate-50/80 ${
-                                    page.isOwnerOnly
-                                      ? "bg-slate-50/40"
-                                      : isViewEnabled
+                                    isViewEnabled
                                       ? "bg-white"
                                       : "bg-slate-50/20 text-slate-400"
                                   }`}
@@ -449,14 +440,6 @@ export function StaffPermissionsModal({
                                       <code className="text-[10px] text-slate-500 font-mono bg-slate-100 px-1 py-0.5 rounded border border-slate-200/60">
                                         {page.route}
                                       </code>
-                                      {page.isOwnerOnly && (
-                                        <Badge
-                                          variant="secondary"
-                                          className="text-[9px] font-semibold bg-amber-50 text-amber-700 border-amber-200/70"
-                                        >
-                                          Owner Exclusive
-                                        </Badge>
-                                      )}
                                     </div>
                                     <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
                                       {page.description}
@@ -465,37 +448,28 @@ export function StaffPermissionsModal({
 
                                   {/* View Column */}
                                   <td className="py-2.5 px-2 text-center">
-                                    {page.isOwnerOnly ? (
-                                      <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 select-none">
-                                        <Lock className="h-2.5 w-2.5" />
-                                        Owner
-                                      </span>
-                                    ) : (
-                                      <label className="inline-flex items-center justify-center p-1 cursor-pointer">
-                                        <input
-                                          type="checkbox"
-                                          checked={isViewEnabled}
-                                          onChange={(e) =>
-                                            handleToggle(page.moduleKey, "view", e.target.checked)
-                                          }
-                                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
-                                        />
-                                      </label>
-                                    )}
+                                    <label className="inline-flex items-center justify-center p-1 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={isViewEnabled}
+                                        onChange={(e) =>
+                                          handleToggle(page.moduleKey, "view", e.target.checked)
+                                        }
+                                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
+                                      />
+                                    </label>
                                   </td>
 
                                   {/* Add / Create Column */}
                                   <td className="py-2.5 px-2 text-center">
-                                    {page.isOwnerOnly ? (
-                                      <span className="text-slate-300 select-none">—</span>
-                                    ) : page.moduleKey === "PAYMENTS" ? (
+                                    {page.moduleKey === "PAYMENTS" ? (
                                       <label
                                         className={`inline-flex items-center gap-1 text-[11px] select-none ${
                                           isViewEnabled
                                             ? "text-slate-700 cursor-pointer"
                                             : "text-slate-300 cursor-not-allowed"
                                         }`}
-                                        title="Record pending payment receipt"
+                                        title="Record payment receipt"
                                       >
                                         <input
                                           type="checkbox"
@@ -533,8 +507,47 @@ export function StaffPermissionsModal({
 
                                   {/* Edit / Update Column */}
                                   <td className="py-2.5 px-2 text-center">
-                                    {page.isOwnerOnly ? (
-                                      <span className="text-slate-300 select-none">—</span>
+                                    {page.moduleKey === "PAYMENTS" ? (
+                                      <div className="inline-flex items-center justify-center gap-2">
+                                        <label
+                                          className={`inline-flex items-center gap-1 text-[11px] select-none ${
+                                            isViewEnabled
+                                              ? "text-slate-700 cursor-pointer"
+                                              : "text-slate-300 cursor-not-allowed opacity-40"
+                                          }`}
+                                          title="Verify payment receipts"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            disabled={!isViewEnabled}
+                                            checked={Boolean(isViewEnabled && modulePerms.verify)}
+                                            onChange={(e) =>
+                                              handleToggle(page.moduleKey, "verify", e.target.checked)
+                                            }
+                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer disabled:cursor-not-allowed"
+                                          />
+                                          <span className="text-[10px] font-medium">Verify</span>
+                                        </label>
+                                        <label
+                                          className={`inline-flex items-center gap-1 text-[11px] select-none ${
+                                            isViewEnabled
+                                              ? "text-slate-700 cursor-pointer"
+                                              : "text-slate-300 cursor-not-allowed opacity-40"
+                                          }`}
+                                          title="Void or refund payments"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            disabled={!isViewEnabled}
+                                            checked={Boolean(isViewEnabled && modulePerms.void)}
+                                            onChange={(e) =>
+                                              handleToggle(page.moduleKey, "void", e.target.checked)
+                                            }
+                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 cursor-pointer disabled:cursor-not-allowed"
+                                          />
+                                          <span className="text-[10px] font-medium">Void</span>
+                                        </label>
+                                      </div>
                                     ) : page.moduleKey === "REPORTS" ? (
                                       <label
                                         className={`inline-flex items-center gap-1 text-[11px] select-none ${
@@ -580,14 +593,8 @@ export function StaffPermissionsModal({
 
                                   {/* Delete Column */}
                                   <td className="py-2.5 px-2 text-center">
-                                    {page.isOwnerOnly || !isDeleteDelegable ? (
-                                      <span
-                                        className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-50/80 px-2 py-0.5 rounded border border-amber-200/50 select-none"
-                                        title="Destructive deletion is permanently restricted to Agency Owners"
-                                      >
-                                        <Lock className="h-2.5 w-2.5 text-amber-600" />
-                                        Owner Only
-                                      </span>
+                                    {!isDeleteDelegable ? (
+                                      <span className="text-slate-300 select-none">—</span>
                                     ) : (
                                       <label
                                         className={`inline-flex items-center justify-center p-1 select-none ${
@@ -616,23 +623,19 @@ export function StaffPermissionsModal({
 
                                   {/* Row Quick Toggle Column */}
                                   <td className="py-2.5 px-3 text-right">
-                                    {page.isOwnerOnly ? (
-                                      <span className="text-slate-300 select-none text-[11px]">Locked</span>
-                                    ) : (
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleToggleRow(page)}
-                                        className={`h-6 px-2 text-[10px] font-medium cursor-pointer transition-colors ${
-                                          isViewEnabled
-                                            ? "text-red-600 hover:text-red-700 hover:bg-red-50"
-                                            : "text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                                        }`}
-                                      >
-                                        {isViewEnabled ? "Disable" : "Enable"}
-                                      </Button>
-                                    )}
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleToggleRow(page)}
+                                      className={`h-6 px-2 text-[10px] font-medium cursor-pointer transition-colors ${
+                                        isViewEnabled
+                                          ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                                          : "text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                                      }`}
+                                    >
+                                      {isViewEnabled ? "Disable" : "Enable"}
+                                    </Button>
                                   </td>
                                 </tr>
                               );
@@ -643,17 +646,6 @@ export function StaffPermissionsModal({
                     </div>
                   );
                 })}
-
-                {/* Permanent Owner Boundary Banner */}
-                <div className="p-4 rounded-xl border border-amber-200/80 bg-amber-50/50 space-y-1.5">
-                  <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
-                    <Lock className="h-4 w-4 text-amber-700" />
-                    <span>Permanent Agency Owner-Only Security Boundaries</span>
-                  </div>
-                  <p className="text-[11px] text-amber-800/90 leading-relaxed">
-                    Financial ledger entries, supplier net contract rates, gross profit margins, payment verification/voiding, tax configuration (GST), and subscription billing can NEVER be delegated to staff accounts. Any attempt to access these routes directly is blocked server-side.
-                  </p>
-                </div>
               </>
             )}
           </div>

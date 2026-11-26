@@ -2,14 +2,12 @@ import {
 apiSuccess,
 handleApiError,
 requireReadAccess,
-requireAgencyOwnerContext,
+enforceStaffPermission,
 requireWriteAccess,
 validateJson,
 } from "@/lib/api";
 import prisma from "@/lib/prisma";
 import { financeService } from "@/lib/services/finance-service";
-import { ForbiddenError } from "@/lib/api/errors";
-import { canAccessFinancialMargins } from "@/lib/auth/permissions";
 import { updateSupplierPayableSchema } from "@/lib/validation/finance-schema";
 import { NextRequest } from "next/server";
 
@@ -26,9 +24,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
-    if (!canAccessFinancialMargins(context.dbUser.role)) {
-      throw new ForbiddenError("You do not have permission to view supplier payables.");
-    }
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FINANCE", "VIEW", "You do not have permission to view supplier payables.");
     const { id } = await params;
 
     const payable = await prisma.supplierPayable.findFirst({
@@ -65,9 +61,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
-    if (!canAccessFinancialMargins(context.dbUser.role)) {
-      throw new ForbiddenError("You do not have permission to manage supplier payables.");
-    }
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FINANCE", "UPDATE", "You do not have permission to manage supplier payables.");
     const { id } = await params;
     const body = await validateJson(updateSupplierPayableSchema, request);
 
@@ -90,7 +84,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FINANCE", "DELETE", "You do not have permission to delete supplier payables.");
     const { id } = await params;
     let reason: string | undefined;
     try {

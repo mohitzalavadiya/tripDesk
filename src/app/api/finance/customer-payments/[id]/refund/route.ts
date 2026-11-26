@@ -1,6 +1,6 @@
 import {
   apiSuccess,
-  ForbiddenError,
+  enforceStaffPermission,
   handleApiError,
   requireWriteAccess,
   validateJson,
@@ -22,9 +22,14 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
-    if (!context.isAgencyOwner) {
-      throw new ForbiddenError("Processing customer refunds is restricted to Agency Owners.");
-    }
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "PAYMENTS",
+      "void",
+      "You do not have permission to process customer refunds."
+    );
     const { id } = await params;
     const body = await validateJson(refundCustomerPaymentSchema, request);
 

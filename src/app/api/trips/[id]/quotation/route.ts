@@ -8,12 +8,11 @@ requireWriteAccess,
 validateJson,
 } from "@/lib/api";
 import {
-  canAccessFinancialMargins,
   redactStaffFinancials,
   toStaffSafeQuotationListDTO,
 } from "@/lib/auth/permissions";
 import { quotationService } from "@/lib/services/quotation-service";
-import { staffPermissionService } from "@/lib/services/staff-permission-service";
+import { hasFinancialMarginsAccess, staffPermissionService } from "@/lib/services/staff-permission-service";
 import { tripCostingService } from "@/lib/services/trip-costing-service";
 import { generateTripQuotationSchema } from "@/lib/validation/quotation-schema";
 import { NextRequest } from "next/server";
@@ -37,8 +36,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATIONS", "VIEW");
     const { id: tripId } = await params;
     const { searchParams } = new URL(request.url);
-    const hasMarginAccess = canAccessFinancialMargins(context.dbUser.role);
-    // Staff never receive internal rate-sheet supplier costing
+    const hasMarginAccess = await hasFinancialMarginsAccess(context.dbUser.role, context.agencyId, context.dbUser.id);
     const includeCosting = hasMarginAccess && searchParams.get("includeCosting") !== "false";
 
     if (!includeCosting) {

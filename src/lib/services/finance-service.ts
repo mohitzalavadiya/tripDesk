@@ -470,7 +470,15 @@ export const financeService = {
     actor?: { role: string; userId: string }
   ): Promise<Payment> {
     if (actor?.role === "AGENCY_STAFF") {
-      throw new Error("Staff members cannot record settled customer payments directly. Submit a pending receipt via /api/payments.");
+      const { enforceStaffPermission } = await import("./staff-permission-service");
+      await enforceStaffPermission(
+        actor.role,
+        agencyId,
+        actor.userId,
+        "PAYMENTS",
+        "recordReceipt",
+        "You do not have permission to record customer payments."
+      );
     }
 
     // 1. Verify booking exists and belongs to agency

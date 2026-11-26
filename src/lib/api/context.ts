@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { isDbUserSessionValid } from "@/lib/auth/session-validation";
 import { createClient } from "@/lib/supabase/server";
 import {
 Agency,
@@ -102,6 +103,11 @@ export async function getRequestContext(): Promise<RequestContext | null> {
     });
 
     if (!dbUser) {
+      return null;
+    }
+
+    const sessionValid = await isDbUserSessionValid(dbUser, supabase, user);
+    if (!sessionValid) {
       return null;
     }
 

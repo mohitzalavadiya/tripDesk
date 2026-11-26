@@ -1,11 +1,10 @@
 import {
   apiSuccess,
-  ForbiddenError,
+  enforceStaffPermission,
   handleApiError,
   requireWriteAccess,
   validateJson,
 } from "@/lib/api";
-import { hasPermission } from "@/lib/auth/permissions";
 import { enquiryService } from "@/lib/services/enquiry-service";
 import { assignLeadSchema } from "@/lib/validation/enquiry-schema";
 import { NextRequest } from "next/server";
@@ -25,9 +24,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
 
-    if (!hasPermission(context.dbUser.role, "LEAD_ASSIGNMENT", "REASSIGN")) {
-      throw new ForbiddenError("You do not have permission to reassign enquiries.");
-    }
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "ENQUIRIES",
+      "UPDATE",
+      "You do not have permission to reassign enquiries."
+    );
 
     const { id } = await params;
     const body = await validateJson(assignLeadSchema, request);

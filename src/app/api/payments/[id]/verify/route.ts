@@ -1,7 +1,8 @@
 import {
   apiSuccess,
+  enforceStaffPermission,
   handleApiError,
-  requireAgencyOwnerContext,
+  requireWriteAccess,
 } from "@/lib/api";
 import { paymentService } from "@/lib/services/payment-service";
 import { NextRequest } from "next/server";
@@ -15,11 +16,19 @@ interface RouteParams {
 /**
  * PATCH /api/payments/[id]/verify
  * Verifies a pending customer payment receipt.
- * Agency Owner only. Updates status to COMPLETED, recalculates booking balance, and sends customer receipt.
+ * Updates status to COMPLETED, recalculates booking balance, and sends customer receipt.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "PAYMENTS",
+      "verify",
+      "You do not have permission to verify payment receipts."
+    );
     const { id } = await params;
 
     const verified = await paymentService.verifyPaymentReceipt(

@@ -6,7 +6,7 @@ import { tripHotelService } from "../src/lib/services/trip-hotel-service";
 import { tripService } from "../src/lib/services/trip-service";
 import { rateSheetService } from "../src/lib/services/rate-sheet-service";
 import { ValidationError, NotFoundError } from "../src/lib/api";
-import * as XLSX from "xlsx";
+import writeXlsxFile from "write-excel-file/node";
 
 const BOOTSTRAP_AGENCY_EMAIL = "tripmadeeasy.in@gmail.com";
 
@@ -182,11 +182,11 @@ async function runQA19() {
     console.log("\n--- SECTION 2: HOTEL EXCEL IMPORT WITH MANDATORY DESTINATION ---");
 
     // Helper to generate Excel buffer
-    function buildHotelExcel(rows: any[][]) {
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      XLSX.utils.book_append_sheet(wb, ws, "Hotels");
-      return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    async function buildHotelExcel(rows: any[][]) {
+      return await writeXlsxFile(
+        rows.map((row) => row.map((v) => ({ value: v ?? null }))),
+        { sheet: "Hotels" }
+      ).toBuffer();
     }
 
     const excelHeaders = [
@@ -204,7 +204,7 @@ async function runQA19() {
     ];
 
     // Test 6: Valid Hotel row with valid Destination -> imports
-    const validExcelBuf = buildHotelExcel([
+    const validExcelBuf = await buildHotelExcel([
       excelHeaders,
       [
         `Grand Hyatt QA ${timestamp}`,
@@ -248,7 +248,7 @@ async function runQA19() {
     );
 
     // Test 7: Missing Hotel Name in Excel -> rejected
-    const missingNameExcel = buildHotelExcel([
+    const missingNameExcel = await buildHotelExcel([
       excelHeaders,
       ["", "Goa", "4 Star", "Address 1", "Panaji", "Goa", "India", "", "", "", ""],
     ]);
@@ -260,7 +260,7 @@ async function runQA19() {
     );
 
     // Test 8: Missing Destination in Excel -> rejected
-    const missingDestExcel = buildHotelExcel([
+    const missingDestExcel = await buildHotelExcel([
       excelHeaders,
       [`Resort No Dest QA ${timestamp}`, "", "4 Star", "Address 1", "Calangute", "Goa", "India", "", "", "", ""],
     ]);
@@ -272,7 +272,7 @@ async function runQA19() {
     );
 
     // Test 9: Unknown Destination in Excel -> rejected
-    const unknownDestExcel = buildHotelExcel([
+    const unknownDestExcel = await buildHotelExcel([
       excelHeaders,
       [`Resort Unknown Dest QA ${timestamp}`, "NonExistentDestinationXYZ", "4 Star", "Address 1", "City", "State", "India", "", "", "", ""],
     ]);
@@ -284,7 +284,7 @@ async function runQA19() {
     );
 
     // Test 10: Destination matching ignores leading/trailing whitespace
-    const whitespaceDestExcel = buildHotelExcel([
+    const whitespaceDestExcel = await buildHotelExcel([
       excelHeaders,
       [`Resort Whitespace Dest QA ${timestamp}`, "   Goa   ", "4 Star", "Beach Road", "Candolim", "Goa", "India", "", "", "", ""],
     ]);
@@ -296,7 +296,7 @@ async function runQA19() {
     );
 
     // Test 11: Destination matching is case-insensitive
-    const caseDestExcel = buildHotelExcel([
+    const caseDestExcel = await buildHotelExcel([
       excelHeaders,
       [`Resort Case Dest QA ${timestamp}`, "gOa", "4 Star", "Beach Road", "Candolim", "Goa", "India", "", "", "", ""],
     ]);
@@ -308,7 +308,7 @@ async function runQA19() {
     );
 
     // Test 12: Panaji does not automatically map to Goa
-    const panajiExcel = buildHotelExcel([
+    const panajiExcel = await buildHotelExcel([
       excelHeaders,
       [`Hotel Panaji QA ${timestamp}`, "Panaji", "3 Star", "MG Road", "Panaji", "Goa", "India", "", "", "", ""],
     ]);

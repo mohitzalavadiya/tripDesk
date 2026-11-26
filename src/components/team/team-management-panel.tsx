@@ -28,6 +28,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   UserCheck,
+  UserMinus,
   UserPlus,
   Users,
   XCircle,
@@ -42,6 +43,8 @@ export interface TeamMember {
   email: string;
   phone?: string | null;
   role: string;
+  isActive?: boolean;
+  deactivatedAt?: string | Date | null;
   createdAt: string | Date;
 }
 
@@ -61,10 +64,14 @@ export interface TeamInvitation {
 
 export function TeamManagementPanel() {
   const { isReadOnly } = useSubscription();
-  const { isAgencyOwner, hasStaffPermission } = useAuth();
+  const { isAgencyOwner, hasStaffPermission, currentUser } = useAuth();
   const canInvite = isAgencyOwner || hasStaffPermission("TEAM", "create");
   const canUpdate = isAgencyOwner || hasStaffPermission("TEAM", "update");
   const canDelete = isAgencyOwner || hasStaffPermission("TEAM", "delete");
+  const canManagePermissions =
+    isAgencyOwner ||
+    hasStaffPermission("TEAM", "update") ||
+    hasStaffPermission("TEAM", "managePermissions");
 
   const [members, setMembers] = React.useState<TeamMember[]>([]);
   const [invitations, setInvitations] = React.useState<TeamInvitation[]>([]);
@@ -88,6 +95,17 @@ export function TeamManagementPanel() {
 
   // Permissions Modal State
   const [permissionsTarget, setPermissionsTarget] = React.useState<TeamMember | null>(null);
+
+  // Deactivate / Reactivate Dialog State
+  const [lifecycleTarget, setLifecycleTarget] = React.useState<TeamMember | null>(null);
+  const [lifecycleAction, setLifecycleAction] = React.useState<"deactivate" | "reactivate" | null>(null);
+  const [lifecycleSubmitting, setLifecycleSubmitting] = React.useState(false);
+
+  const activeMembersCount = React.useMemo(
+    () => members.filter((m) => m.isActive !== false).length,
+    [members]
+  );
+  const inactiveMembersCount = members.length - activeMembersCount;
 
   const fetchTeamData = React.useCallback(async (isRefresh = false) => {
     try {
@@ -150,6 +168,43 @@ export function TeamManagementPanel() {
       toast.error(err.message || "Failed to invite staff member.");
     } finally {
       setInviting(false);
+    }
+  };
+
+  // Handle Confirm Deactivate / Reactivate
+  const handleConfirmLifecycleAction = async () => {
+    if (!lifecycleTarget || !lifecycleAction || lifecycleSubmitting) return;
+
+    setLifecycleSubmitting(true);
+    try {
+      const res = await fetch(
+        `/api/team/members/${lifecycleTarget.id}/${lifecycleAction}`,
+        { method: "POST" }
+      );
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        const msg =
+          json.error?.message ||
+          (typeof json.error === "string"
+            ? json.error
+            : `Failed to ${lifecycleAction} staff member.`);
+        throw new Error(msg);
+      }
+
+      toast.success(
+        lifecycleAction === "deactivate"
+          ? `${lifecycleTarget.name} has been deactivated and active sessions revoked.`
+          : `${lifecycleTarget.name} has been reactivated. They can now sign in with a fresh session.`
+      );
+      setLifecycleTarget(null);
+      setLifecycleAction(null);
+      await fetchTeamData(true);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : `Failed to ${lifecycleAction} staff member.`;
+      toast.error(msg);
+    } finally {
+      setLifecycleSubmitting(false);
     }
   };
 
@@ -310,7 +365,8 @@ export function TeamManagementPanel() {
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
-              Current Team Members ({members.length})
+              Current Team Members ({activeMembersCount} active
+              {inactiveMembersCount > 0 ? `, ${inactiveMembersCount} deactivated` : ""})
             </h3>
           </div>
           <span className="text-[11px] text-slate-400">Authenticated workspace users</span>
@@ -341,8 +397,14 @@ export function TeamManagementPanel() {
               <tbody className="divide-y divide-slate-100">
                 {members.map((member) => {
                   const isOwner = member.role === "AGENCY_OWNER";
+                  const isMemberActive = member.isActive !== false;
                   return (
-                    <tr key={member.id} className="hover:bg-slate-50/60 transition-colors">
+                    <tr
+                      key={member.id}
+                      className={`hover:bg-slate-50/60 transition-colors ${
+                        !isMemberActive ? "bg-slate-50/40 opacity-80" : ""
+                      }`}
+                    >
                       <td className="py-3 px-4 font-semibold text-slate-900">
                         <div className="flex items-center gap-2.5">
                           <div className="h-7 w-7 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-[11px] shrink-0">
@@ -375,24 +437,67 @@ export function TeamManagementPanel() {
                         {member.createdAt ? new Date(member.createdAt).toLocaleDateString("en-IN") : "—"}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <Badge
-                          variant="secondary"
-                          className="bg-emerald-50 text-emerald-700 border-emerald-200/60 font-medium text-[11px]"
-                        >
-                          Active
-                        </Badge>
+                        {isMemberActive ? (
+                          <Badge
+                            variant="secondary"
+                            className="bg-emerald-50 text-emerald-700 border-emerald-200/60 font-medium text-[11px]"
+                          >
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="secondary"
+                            className="bg-slate-100 text-slate-600 border-slate-300/70 font-medium text-[11px]"
+                          >
+                            Deactivated
+                          </Badge>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        {!isOwner && isAgencyOwner && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPermissionsTarget(member)}
-                            className="text-xs h-7 px-2.5 border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-200 gap-1 cursor-pointer"
-                          >
-                            <ShieldCheck className="h-3 w-3" />
-                            Permissions
-                          </Button>
+                        {!isOwner && member.id !== currentUser.id && (
+                          <div className="inline-flex items-center justify-end gap-1.5">
+                            {isMemberActive && canManagePermissions && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPermissionsTarget(member)}
+                                className="text-xs h-7 px-2.5 border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-200 gap-1 cursor-pointer"
+                              >
+                                <ShieldCheck className="h-3 w-3" />
+                                Permissions
+                              </Button>
+                            )}
+                            {isAgencyOwner && isMemberActive && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={lifecycleSubmitting}
+                                onClick={() => {
+                                  setLifecycleTarget(member);
+                                  setLifecycleAction("deactivate");
+                                }}
+                                className="text-xs h-7 px-2.5 border-slate-200 text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200 gap-1 cursor-pointer"
+                              >
+                                <UserMinus className="h-3 w-3" />
+                                Deactivate
+                              </Button>
+                            )}
+                            {isAgencyOwner && !isMemberActive && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={lifecycleSubmitting}
+                                onClick={() => {
+                                  setLifecycleTarget(member);
+                                  setLifecycleAction("reactivate");
+                                }}
+                                className="text-xs h-7 px-2.5 border-emerald-200 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 gap-1 cursor-pointer"
+                              >
+                                <UserCheck className="h-3 w-3" />
+                                Reactivate
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -676,6 +781,46 @@ export function TeamManagementPanel() {
         variant="destructive"
         loading={revoking}
         onConfirm={handleConfirmRevoke}
+      />
+
+      {/* Deactivate / Reactivate Staff Confirm Dialog */}
+      <ConfirmDialog
+        open={Boolean(lifecycleTarget && lifecycleAction)}
+        onOpenChange={(open) => {
+          if (!open && !lifecycleSubmitting) {
+            setLifecycleTarget(null);
+            setLifecycleAction(null);
+          }
+        }}
+        title={
+          lifecycleAction === "deactivate"
+            ? "Deactivate Staff Member"
+            : "Reactivate Staff Member"
+        }
+        description={
+          lifecycleAction === "deactivate" ? (
+            <span>
+              Are you sure you want to deactivate{" "}
+              <strong>{lifecycleTarget?.name}</strong> ({lifecycleTarget?.email})?
+              Their login and active sessions will be disabled immediately, while all
+              historical bookings, trips, quotations, payments, audit logs, and saved
+              permissions are preserved.
+            </span>
+          ) : (
+            <span>
+              Are you sure you want to reactivate{" "}
+              <strong>{lifecycleTarget?.name}</strong> ({lifecycleTarget?.email})?
+              Their saved permissions will be restored and they will need to sign in
+              again with a fresh session. Previously revoked sessions remain invalid.
+            </span>
+          )
+        }
+        confirmText={
+          lifecycleAction === "deactivate" ? "Deactivate Staff" : "Reactivate Staff"
+        }
+        variant={lifecycleAction === "deactivate" ? "destructive" : "default"}
+        loading={lifecycleSubmitting}
+        onConfirm={handleConfirmLifecycleAction}
       />
 
       {/* Staff Permissions Modal */}

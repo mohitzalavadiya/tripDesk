@@ -633,7 +633,7 @@ export class InvitationService {
         // 4b. Re-verify active staff quota limit inside transaction
         if (tx.subscription) {
           const activeStaff = await tx.user.count({
-            where: { agencyId: invitation.agencyId, role: "AGENCY_STAFF" },
+            where: { agencyId: invitation.agencyId, role: "AGENCY_STAFF", isActive: true },
           });
           const planCtx = await entitlementService.resolveAgencySubscription(invitation.agencyId, tx);
           const maxStaff = await entitlementService.getUsageLimit(planCtx.effectivePlanId, "STAFF_MEMBERS", tx);
@@ -774,9 +774,11 @@ export class InvitationService {
         email: true,
         phone: true,
         role: true,
+        isActive: true,
+        deactivatedAt: true,
         createdAt: true,
       },
-      orderBy: [{ role: "asc" }, { name: "asc" }],
+      orderBy: [{ role: "asc" }, { isActive: "desc" }, { name: "asc" }],
     });
 
     return users.map((u: any) => ({
@@ -785,6 +787,8 @@ export class InvitationService {
       email: u.email,
       phone: u.phone,
       role: u.role,
+      isActive: u.isActive !== false,
+      deactivatedAt: u.deactivatedAt ?? null,
       createdAt: u.createdAt,
     }));
   }

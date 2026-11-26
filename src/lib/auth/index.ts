@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { isDbUserSessionValid } from "@/lib/auth/session-validation";
 import { createClient } from "@/lib/supabase/server";
 import { Agency,Subscription,SubscriptionPlan,SubscriptionStatus,User } from "@prisma/client";
 import { redirect } from "next/navigation";
@@ -60,6 +61,11 @@ export async function getCurrentUser(): Promise<AuthenticatedContext | null> {
     });
 
     if (!dbUser) {
+      return null;
+    }
+
+    const sessionValid = await isDbUserSessionValid(dbUser, supabase, user);
+    if (!sessionValid) {
       return null;
     }
 

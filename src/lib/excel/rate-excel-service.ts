@@ -1,9 +1,14 @@
 import { ValidationError } from "@/lib/api";
 import prisma from "@/lib/prisma";
 import { isValidDecimal } from "@/lib/validation/field-validators";
+import readXlsxFile from "read-excel-file/node";
 import "server-only";
-import * as XLSX from "xlsx";
+import writeXlsxFile, { type Cell, type Sheet } from "write-excel-file/node";
 import { ImportMode } from "./hotel-excel-service";
+
+function toSheetData(rows: (string | number | boolean | Date | null | undefined)[][]): Cell[][] {
+  return rows.map((row) => row.map((v) => ({ value: v ?? undefined })));
+}
 
 export interface RatePreviewRow {
   rowNumber: number;
@@ -79,13 +84,13 @@ function parseExcelDate(raw: any): { date: Date | null; error?: string; formatte
   }
 
   // Handle numeric Excel date serial
-  if (typeof raw === "number") {
-    const parsed = XLSX.SSF.parse_date_code(raw);
-    if (parsed) {
-      const normalized = new Date(Date.UTC(parsed.y, parsed.m - 1, parsed.d));
-      const day = String(parsed.d).padStart(2, "0");
-      const month = String(parsed.m).padStart(2, "0");
-      return { date: normalized, formattedStr: `${day}-${month}-${parsed.y}` };
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const utcDays = raw > 59 ? raw - 1 : raw;
+    const normalized = new Date(Date.UTC(1899, 11, 31) + utcDays * 86400000);
+    if (!isNaN(normalized.getTime())) {
+      const day = String(normalized.getUTCDate()).padStart(2, "0");
+      const month = String(normalized.getUTCMonth() + 1).padStart(2, "0");
+      return { date: normalized, formattedStr: `${day}-${month}-${normalized.getUTCFullYear()}` };
     }
   }
 
@@ -175,8 +180,6 @@ export const rateExcelService = {
    * Generates the official sample workbook `Hotel_Rates.xlsx` with Instructions, Rates, and agency-scoped Hotels Reference.
    */
   async generateSampleWorkbook(agencyId: string): Promise<Buffer> {
-    const wb = XLSX.utils.book_new();
-
     // Sheet 1: Instructions
     const instructionsData = [
       ["YOUR TRAVEL DESK — HOTEL RATES IMPORT INSTRUCTIONS"],
@@ -207,15 +210,6 @@ export const rateExcelService = {
       ["5. Hotel Code is mandatory and must exist in your agency's Hotel Master."],
       ["6. Supported file format: .xlsx (Max 5 MB, Max 1,000 rows)."],
     ];
-
-    const wsInstructions = XLSX.utils.aoa_to_sheet(instructionsData);
-    wsInstructions["!cols"] = [
-      { wch: 18 },
-      { wch: 12 },
-      { wch: 45 },
-      { wch: 40 },
-    ];
-    XLSX.utils.book_append_sheet(wb, wsInstructions, "Instructions");
 
     // Fetch agency's actual hotels for reference and realistic examples
     const agencyHotels = await prisma.hotel.findMany({
@@ -304,21 +298,6 @@ export const rateExcelService = {
       ],
     ];
 
-    const wsRates = XLSX.utils.aoa_to_sheet(ratesData);
-    wsRates["!cols"] = [
-      { wch: 14 },
-      { wch: 20 },
-      { wch: 12 },
-      { wch: 18 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 38 },
-    ];
-    XLSX.utils.book_append_sheet(wb, wsRates, "Rates");
-
     // Sheet 3: Hotels Reference (Tenant-scoped reference)
     const hotelRefData: any[][] = [
       ["HOTEL CODE", "HOTEL NAME", "CITY", "CATEGORY"],
@@ -342,16 +321,36 @@ export const rateExcelService = {
       ]);
     }
 
-    const wsHotelRef = XLSX.utils.aoa_to_sheet(hotelRefData);
-    wsHotelRef["!cols"] = [
-      { wch: 16 },
-      { wch: 35 },
-      { wch: 20 },
-      { wch: 18 },
+    const sheets: Sheet<never>[] = [
+      {
+        sheet: "Instructions",
+        data: toSheetData(instructionsData),
+        columns: [{ width: 18 }, { width: 12 }, { width: 45 }, { width: 40 }],
+      },
+      {
+        sheet: "Rates",
+        data: toSheetData(ratesData),
+        columns: [
+          { width: 14 },
+          { width: 20 },
+          { width: 12 },
+          { width: 18 },
+          { width: 14 },
+          { width: 14 },
+          { width: 14 },
+          { width: 14 },
+          { width: 14 },
+          { width: 38 },
+        ],
+      },
+      {
+        sheet: "Hotels Reference",
+        data: toSheetData(hotelRefData),
+        columns: [{ width: 16 }, { width: 35 }, { width: 20 }, { width: 18 }],
+      },
     ];
-    XLSX.utils.book_append_sheet(wb, wsHotelRef, "Hotels Reference");
 
-    return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    return await writeXlsxFile(sheets).toBuffer();
   },
 
   /**
@@ -377,30 +376,23 @@ export const rateExcelService = {
       throw new ValidationError("Invalid .xlsx file signature.");
     }
 
-    const wb = XLSX.read(buffer, {
-      type: "buffer",
-      cellDates: true,
-      cellFormula: false,
-      cellHTML: false,
-      cellStyles: false,
-      sheetStubs: false,
-      sheetRows: 5002,
-    });
+    const parsedSheets = await readXlsxFile(buffer);
 
-    // Target sheet: "Rates" (case-insensitive) or first non-Instructions sheet
-    let sheetName = wb.SheetNames.find((s) => s.trim().toLowerCase() === "rates");
-    if (!sheetName) {
-      sheetName = wb.SheetNames.find(
-        (s) => s.trim().toLowerCase() !== "instructions" && s.trim().toLowerCase() !== "hotels reference"
-      ) || wb.SheetNames[0];
-    }
+    // Target sheet: "Rates" (case-insensitive) or first non-Instructions/Hotels Reference sheet
+    const targetSheet =
+      parsedSheets.find((s) => s.sheet.trim().toLowerCase() === "rates") ||
+      parsedSheets.find(
+        (s) =>
+          s.sheet.trim().toLowerCase() !== "instructions" &&
+          s.sheet.trim().toLowerCase() !== "hotels reference"
+      ) ||
+      parsedSheets[0];
 
-    if (!sheetName) {
+    if (!targetSheet) {
       throw new ValidationError("Workbook contains no readable sheets.");
     }
 
-    const ws = wb.Sheets[sheetName];
-    const rawRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    const rawRows: any[][] = targetSheet.data.map((row) => row.map((cell) => cell ?? ""));
 
     if (!rawRows || rawRows.length === 0) {
       throw new ValidationError("The selected sheet is completely empty.");

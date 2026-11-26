@@ -1,6 +1,6 @@
 import {
   apiSuccess,
-  ForbiddenError,
+  enforceStaffPermission,
   handleApiError,
   requireWriteAccess,
   validateJson,
@@ -21,9 +21,14 @@ export async function POST(
 ) {
   try {
     const context = await requireWriteAccess();
-    if (!context.isAgencyOwner) {
-      throw new ForbiddenError("Voiding invoice payments is restricted to Agency Owners.");
-    }
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "PAYMENTS",
+      "void",
+      "You do not have permission to void invoice payments."
+    );
     const { id, paymentId } = await params;
     const body = await validateJson(voidPaymentSchema, request);
 

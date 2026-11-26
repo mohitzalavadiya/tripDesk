@@ -1,9 +1,10 @@
 import {
   apiSuccess,
+  enforceStaffPermission,
   ForbiddenError,
   handleApiError,
-  requireAgencyOwnerContext,
   requireMemberReadAccess,
+  requireWriteAccess,
   validateJson,
 } from "@/lib/api";
 import { paymentService } from "@/lib/services/payment-service";
@@ -62,7 +63,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "PAYMENTS", "UPDATE");
     const { id } = await params;
     const body = await validateJson(updatePaymentSchema, request);
 
@@ -77,11 +79,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 /**
  * DELETE /api/payments/[id]
  * Soft delete / archive payment and recalculate booking totals.
- * Agency Owner only. Destructive deletion is restricted to Agency Owners.
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "PAYMENTS", "DELETE");
     const { id } = await params;
 
     await paymentService.archivePayment(context.agencyId, id);

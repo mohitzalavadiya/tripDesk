@@ -949,6 +949,14 @@ async function run() {
       ["POST /api/follow-ups/[id]/complete", followUpCompleteRoute.POST(makeNextRequest("http://localhost/api/follow-ups/fu_1/complete", "POST", {}), { params: Promise.resolve({ id: "fu_1" }) })],
       ["GET /api/documents/[id]/download", docDownloadRoute.GET(makeNextRequest("http://localhost/api/documents/doc_1/download"), { params: Promise.resolve({ id: "doc_1" }) })],
       ["POST /api/communication/send-manual", commSendManualRoute.POST(makeNextRequest("http://localhost/api/communication/send-manual", "POST", {}))],
+      ["POST /api/finance/customer-payments", customerPaymentsRoute.POST(makeNextRequest("http://localhost/api/finance/customer-payments", "POST", { bookingId: "book_alpha_confirmed", amount: 500, paymentMethod: "UPI", paymentType: "ADVANCE" }))],
+      ["POST /api/finance/customer-payments/[id]/refund", refundRoute.POST(makeNextRequest("http://localhost/api/finance/customer-payments/pay_1/refund", "POST", { amount: 100, reason: "cancel" }), { params: Promise.resolve({ id: "pay_1" }) })],
+      ["POST /api/invoices/[id]/payments/[paymentId]/void", voidInvoicePaymentRoute.POST(makeNextRequest("http://localhost/api/invoices/inv_1/payments/pay_1/void", "POST", { reason: "mistake" }), { params: Promise.resolve({ id: "inv_1", paymentId: "pay_1" }) })],
+      ["GET /api/operations/analytics/export", opsAnalyticsExportRoute.GET(makeNextRequest("http://localhost/api/operations/analytics/export"))],
+      ["PATCH /api/operations/[id]/closure/reconciliation", opsClosureReconcileRoute.PATCH(makeNextRequest("http://localhost/api/operations/op_alpha_1/closure/reconciliation", "PATCH", { actualCost: 1000 }), { params: Promise.resolve({ id: "op_alpha_1" }) })],
+      ["POST /api/operations/[id]/closure/finalize", opsClosureFinalizeRoute.POST(makeNextRequest("http://localhost/api/operations/op_alpha_1/closure/finalize", "POST", { notes: "seal" }), { params: Promise.resolve({ id: "op_alpha_1" }) })],
+      ["GET /api/operations/[id]/closure/pdf", opsClosurePdfRoute.GET(makeNextRequest("http://localhost/api/operations/op_alpha_1/closure/pdf"), { params: Promise.resolve({ id: "op_alpha_1" }) })],
+      ["POST /api/enquiries/[id]/assign", enquiryAssignRoute.POST(makeNextRequest("http://localhost/api/enquiries/enq_1/assign", "POST", { assignedToId: "staff_alpha" }), { params: Promise.resolve({ id: "enq_1" }) })],
     ];
 
     for (const [label, prom] of deniedChecks) {
@@ -957,7 +965,7 @@ async function run() {
     }
   }
 
-  // 1.3 Owner-only endpoints ALWAYS block staff with 403 even if over-permissive profile rows exist
+  // 1.3 Delegated agency-level permissions allow granted staff through authorization (no permanent owner-only blocks)
   dbState.permissionProfiles.set("staff_alpha", {
     userId: "staff_alpha",
     permissions: {
@@ -966,17 +974,21 @@ async function run() {
       FINANCE: { view: true, create: true, update: true, delete: true },
       INVOICES: { view: true, create: true, update: true, delete: true },
       OPERATIONS: { view: true, update: true, export: true },
+      ENQUIRIES: { view: true, update: true },
+      SETTINGS: { view: true, update: true, delete: true },
+      SUBSCRIPTION: { view: true, manage: true },
+      TEAM: { view: true, create: true, update: true, delete: true },
       REFERRALS: { view: true, create: true },
       BOOKINGS: { view: true },
     },
   });
 
   {
-    const ownerOnlyChecks: Array<[string, Promise<Response>]> = [
+    const delegatedChecks: Array<[string, Promise<Response>]> = [
       ["POST /api/finance/customer-payments", customerPaymentsRoute.POST(makeNextRequest("http://localhost/api/finance/customer-payments", "POST", { bookingId: "book_alpha_confirmed", amount: 500, paymentMethod: "UPI", paymentType: "ADVANCE" }))],
       ["POST /api/finance/customer-payments/[id]/refund", refundRoute.POST(makeNextRequest("http://localhost/api/finance/customer-payments/pay_1/refund", "POST", { amount: 100, reason: "cancel" }), { params: Promise.resolve({ id: "pay_1" }) })],
       ["POST /api/invoices/[id]/payments/[paymentId]/void", voidInvoicePaymentRoute.POST(makeNextRequest("http://localhost/api/invoices/inv_1/payments/pay_1/void", "POST", { reason: "mistake" }), { params: Promise.resolve({ id: "inv_1", paymentId: "pay_1" }) })],
-      ["PATCH /api/finance/expenses/[id] (immutable for staff)", expenseByIdRoute.PATCH(makeNextRequest("http://localhost/api/finance/expenses/exp_1", "PATCH", { title: "x" }), { params: Promise.resolve({ id: "exp_1" }) })],
+      ["PATCH /api/finance/expenses/[id]", expenseByIdRoute.PATCH(makeNextRequest("http://localhost/api/finance/expenses/exp_1", "PATCH", { title: "x" }), { params: Promise.resolve({ id: "exp_1" }) })],
       ["GET /api/operations/analytics/export", opsAnalyticsExportRoute.GET(makeNextRequest("http://localhost/api/operations/analytics/export"))],
       ["PATCH /api/operations/[id]/closure/reconciliation", opsClosureReconcileRoute.PATCH(makeNextRequest("http://localhost/api/operations/op_alpha_1/closure/reconciliation", "PATCH", { actualCost: 1000 }), { params: Promise.resolve({ id: "op_alpha_1" }) })],
       ["POST /api/operations/[id]/closure/finalize", opsClosureFinalizeRoute.POST(makeNextRequest("http://localhost/api/operations/op_alpha_1/closure/finalize", "POST", { notes: "seal" }), { params: Promise.resolve({ id: "op_alpha_1" }) })],
@@ -984,10 +996,19 @@ async function run() {
       ["POST /api/enquiries/[id]/assign", enquiryAssignRoute.POST(makeNextRequest("http://localhost/api/enquiries/enq_1/assign", "POST", { assignedToId: "staff_alpha" }), { params: Promise.resolve({ id: "enq_1" }) })],
     ];
 
-    for (const [label, prom] of ownerOnlyChecks) {
+    for (const [label, prom] of delegatedChecks) {
       const res = await prom;
-      assert(res.status === 403, `Owner-only route rejects granted staff with 403 on ${label} (got ${res.status})`);
+      assert(res.status !== 403 && res.status !== 401, `Delegated staff passes auth on ${label} (got ${res.status})`);
     }
+
+    // Verify self-modification is still blocked even with TEAM: UPDATE
+    let selfModBlocked = false;
+    try {
+      await staffPermissionService.updateStaffPermissions("agency_alpha", "staff_alpha", "staff_alpha", { TEAM: { view: true } }, mockPrisma);
+    } catch {
+      selfModBlocked = true;
+    }
+    assert(selfModBlocked, "Staff cannot modify their own permissions even with TEAM.update");
 
     // Granted delegable endpoints DO succeed (200) for staff
     const invSummaryRes = await invoiceSummaryRoute.GET(makeNextRequest("http://localhost/api/invoices/summary"));
@@ -1307,7 +1328,11 @@ async function run() {
     );
   }
 
-  // 3.3 Staff cannot call financeService.recordCustomerPayment directly
+  // 3.3 Staff without PAYMENTS.recordReceipt permission cannot call financeService.recordCustomerPayment
+  dbState.permissionProfiles.set("staff_alpha", {
+    userId: "staff_alpha",
+    permissions: { PAYMENTS: { view: true, recordReceipt: false } },
+  });
   await assertRejects(
     () =>
       financeService.recordCustomerPayment(
@@ -1321,8 +1346,8 @@ async function run() {
         "staff_alpha",
         { role: "AGENCY_STAFF", userId: "staff_alpha" }
       ),
-    /cannot record settled customer payments directly/i,
-    "financeService.recordCustomerPayment blocks AGENCY_STAFF actor at service boundary"
+    /do not have permission to record customer payments/i,
+    "financeService.recordCustomerPayment blocks unpermitted AGENCY_STAFF actor at service boundary"
   );
 
   // 3.4 Owner records payment with idempotencyKey -> retry is idempotent, balances reach PAID (12,600)

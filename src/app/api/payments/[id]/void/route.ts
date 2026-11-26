@@ -1,7 +1,8 @@
 import {
   apiSuccess,
+  enforceStaffPermission,
   handleApiError,
-  requireAgencyOwnerContext,
+  requireWriteAccess,
   validateJson,
 } from "@/lib/api";
 import { paymentService } from "@/lib/services/payment-service";
@@ -21,11 +22,19 @@ const voidPaymentSchema = z.object({
 /**
  * PATCH /api/payments/[id]/void
  * Rejects or voids a payment receipt.
- * Agency Owner only. Internal notification only, zero customer-facing notification.
+ * Internal notification only, zero customer-facing notification.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "PAYMENTS",
+      "void",
+      "You do not have permission to void payment receipts."
+    );
     const { id } = await params;
     const body = await validateJson(voidPaymentSchema, request);
 

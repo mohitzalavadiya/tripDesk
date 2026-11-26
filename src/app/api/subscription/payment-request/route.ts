@@ -1,11 +1,19 @@
-import { requireAgencyOwnerContext } from "@/lib/api/context";
+import { requireWriteAccess } from "@/lib/api/context";
+import { enforceStaffPermission } from "@/lib/services/staff-permission-service";
 import { subscriptionService } from "@/lib/services/subscription-service";
 import { agencyPaymentRequestSchema } from "@/lib/validation/subscription-schema";
 import { NextRequest,NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "SUBSCRIPTION",
+      "manage"
+    );
     const body = await req.json();
 
     const parsed = agencyPaymentRequestSchema.parse(body);

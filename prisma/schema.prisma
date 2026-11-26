@@ -453,16 +453,20 @@ model Agency {
 // ═════════════════════════════════════════════════════════════════════
 
 model User {
-  id            String    @id
-  agencyId      String?
-  name          String
-  email         String    @unique
-  phone         String?
-  passwordHash  String?
-  role          UserRole  @default(AGENCY_OWNER)
-  emailVerified DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               String    @id
+  agencyId         String?
+  name             String
+  email            String    @unique
+  phone            String?
+  passwordHash     String?
+  role             UserRole  @default(AGENCY_OWNER)
+  isActive         Boolean   @default(true)
+  deactivatedAt    DateTime?
+  sessionRevokedAt DateTime?
+  deactivatedById  String?
+  emailVerified    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   agency               Agency?               @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   createdInvitations   AgencyInvitation[]    @relation("AgencyInvitationsCreated")

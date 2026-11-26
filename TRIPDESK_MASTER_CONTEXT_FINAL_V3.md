@@ -22917,3 +22917,122 @@ In standard viewport heights (900px - 1000px display with top navbar, breadcrumb
 1. **No Isolated PostgreSQL Runtime:** Docker, `psql`, local PostgreSQL (`127.0.0.1:5432`), and WSL Linux distributions are unavailable on this host. `20261027150000_phase_f_staff_permissions`, the 4 DB-backed suites (`test:staff:failures`, `test:crm:correctness`, `test:e2e:integration`, `test-phase3-correctness-closure.ts`), and live PostgreSQL concurrency/lock tests could not be run without risking staging/production.
 2. **No Live Browser E2E Verification:** Blocked on isolated DB availability.
 3. **Production `.env.production` Config:** `NODE_ENV="development"` remains set in `.env.production` (left untouched per policy); hosting environment must enforce `NODE_ENV=production`.
+
+
+---
+
+### § 276.74 Final Database, Runtime and Workflow Verification (`NO-GO`) (2026-11-26)
+
+#### 1. Git Baseline & Host Environment
+- **Branch / HEAD:** `implement-crm` @ `9d1c948`
+- **Initial Working Tree:** `0` entries (clean working tree prior to this V3 update).
+- **Isolated PostgreSQL Status:** Still unavailable on this host (`DOCKER=`, `PSQL=`, `Get-Service *postgres*` empty, `127.0.0.1:5432` `TcpTestSucceeded=False`). No staging or production database was accessed or modified.
+- **Blocked Checks:** Clean-DB `prisma migrate deploy` (`20261027150000_phase_f_staff_permissions`), all 4 DB-backed suites (`test:staff:failures`, `test:crm:correctness`, `test:e2e:integration`, `test-phase3-correctness-closure.ts`), live PostgreSQL locking/concurrency tests, and live browser E2E verification remain blocked until PostgreSQL 16 or Docker Desktop is installed locally.
+
+#### 2. Remaining Advisories & Excel Import Regression
+- **`npm audit --json`:** `4` advisories (`0` critical, `4` high, `0` moderate, `0` low) — `xlsx@0.18.5` (high, no upstream npm patch) and `prisma@7.10.1` / `@prisma/config` / `effect` (high, `effect` ReDoS in Prisma CLI tooling only, not imported by the Next.js runtime).
+- **Excel Import Regression (`6/6` passed):** Verified valid Hotel (`4` sample rows) and Rate (`1` row) `.xlsx` parsing, rejection of non-ZIP signatures (`Invalid .xlsx file signature`), clean rejection of malformed ZIP payloads, and enforcement of the `1,000` data-row limit on both services (alongside `5 MB` upload limits in `/api/hotels/import` and `/api/rate-sheets/import`). Defensive `XLSX.read` options reduce parser exposure but do not eliminate upstream `xlsx@0.18.5` advisories.
+
+#### 3. Release Decision (`NO-GO`)
+- **`NO-GO`** until: (1) local PostgreSQL 16 / Docker is provisioned and `prisma migrate deploy` + all 4 DB-backed suites + live concurrency tests pass, (2) live browser E2E passes against `tripdesk_test`, and (3) hosting env sets `NODE_ENV=production` (overriding `.env.production`'s `NODE_ENV="development"`).
+
+
+---
+
+### § 276.75 Dependency Vulnerability Assessment & Remediation (`xlsx` Replaced) (2026-11-26)
+
+#### 1. Initial vs Final Vulnerability Counts
+- **Initial (`npm audit --json`):** `4` high, `0` critical, `0` moderate, `0` low (`4` total: `xlsx@0.18.5`, `prisma@7.10.1`, `@prisma/config@7.10.1`, `effect@3.20.0`).
+- **Final (`npm audit --json`):** `3` high, `0` critical, `0` moderate, `0` low (`3` total: `prisma@7.10.1`, `@prisma/config@7.10.1`, `effect@3.20.0` — **0 production runtime vulnerabilities**).
+
+#### 2. Changes Made & Exact Versions
+- **Removed:** `xlsx@0.18.5` (unpatched Prototype Pollution `GHSA-4r6h-8v6p-xvw6` and ReDoS `GHSA-5pgg-2g8v-p4x9`).
+- **Added:** `read-excel-file@9.3.20` and `write-excel-file@4.1.1` (`0` npm audit vulnerabilities).
+- **Updated Files (11 code/package files + V3):**
+  - `package.json` & `package-lock.json`
+  - `src/lib/excel/hotel-excel-service.ts`, `src/lib/excel/rate-excel-service.ts`, `src/app/api/hotels/sample/route.ts`, `src/components/excel/excel-import-modal.tsx`
+  - `prisma/test-qa-19-hotel-master-destination-excel.ts`, `prisma/test-qa-20-phase-158d-e2e-qa.ts`, `prisma/test-qa-21-rate-excel-validation-error.ts`, `scratch/test-dev03-excel.ts`, `scratch/test-dev03-qa-matrix.ts`
+
+#### 3. Prisma / Effect Assessment
+- **Chain:** `prisma@7.10.1` (`devDependencies`) -> `@prisma/config@7.10.1` -> `effect@3.20.0` (`GHSA-7589-6fvf-x4pw`, ReDoS in `Schema.TemplateLiteral`, `<=3.22.0`).
+- **Production Exposure:** **Not reachable in production runtime.** `@prisma/client@7.9.1` and `@prisma/adapter-pg@7.9.1` do not depend on `@prisma/config` or `effect`, and zero `src/` files import `effect` or `@prisma/config`. No non-breaking Prisma 7 upgrade exists (`7.10.1` is current `prev`; `8.0.0-rc.35` is pre-release; `npm audit fix --force` would downgrade to `6.12.0`).
+
+#### 4. Verification Results
+- **Excel Import Regression:** `6/6` passed (valid Hotel/Rate workbooks, non-ZIP signature rejection, malformed ZIP rejection, `1,000`-row cap enforcement).
+- `npx prisma validate`: **Passed**.
+- `npx tsc --noEmit`: **Passed** (`0` errors).
+- `git diff --check`: **Passed** (LF/CRLF warnings only).
+- `npm run build` (Next.js `16.4.6` Turbopack): **Passed** (exit `0`, `42/42` static pages).
+
+
+---
+
+### § 276.76 Final Dependency Remediation Verification (2026-11-26)
+
+- **`npm ls xlsx`:** `(empty)` — `xlsx` and all SheetJS packages are completely absent from the dependency tree.
+- **Installed Versions:** `read-excel-file@9.3.20`, `write-excel-file@4.1.1`, `@prisma/client@7.9.1`, `@prisma/adapter-pg@7.9.1`, `prisma@7.10.1`, `@prisma/config@7.10.1`, `effect@3.20.0`.
+- **Audit Results (`npm audit --json` & `npm audit --omit=dev --json`):** Both report `3` high, `0` critical, `0` moderate, `0` low (`prisma` -> `@prisma/config` -> `effect` `GHSA-7589-6fvf-x4pw`). `npm audit --omit=dev` includes `prisma` solely because `@prisma/client@7.9.1` declares `prisma` as a peer dependency; `@prisma/client` and `@prisma/adapter-pg` runtime code and `src/` never import `prisma`, `@prisma/config`, or `effect`.
+- **Excel Compatibility Regression (`7/7` passed):** Verified Hotel & Rate sample workbook round-trip generation/parsing, column mapping, blank cells, apostrophe stripping, `DD-MM-YYYY` and native Excel `Date` cells, invalid dates, duplicate detection, error-report workbook generation, non-ZIP/malformed ZIP rejection, and `1,000`-row limits.
+- **Verification Gate:** `npx prisma validate`, `npx tsc --noEmit`, `git diff --check`, and `npm run build` (Next.js `16.4.6` Turbopack, `42/42` static pages) all passed (`0` errors).
+
+
+---
+
+### § 276.78 Full Team & Staff Permission Flow Audit & Removal of Agency Owner-Only Restrictions (2026-11-26)
+
+#### 1. Team & Staff Lifecycle Audit Summary
+- **Invitation -> Acceptance -> Session -> Navigation -> Permissions:**
+  - `POST /api/team/invitations`, `resend`, `revoke`, `verify`, `accept`, and `GET /api/team` implement SHA-256 hashed 7-day tokens, Platform Owner invitation rejection, atomic single-use acceptance, Supabase Auth linking, and `AGENCY_STAFF` agency assignment.
+  - `GET /api/auth/me` + `AuthProvider` (`cache: "no-store"`) fetch live DB permissions on load/refresh, and all API routes evaluate live DB permissions on every request (revoked/updated permissions take effect immediately server-side).
+  - `sidebar.tsx` and `mobile-nav.tsx` gate agency navigation via `hasStaffPermission(moduleKey, "view")`.
+- **Existing Lifecycle Gaps Identified (Outside Feature-Addition Scope):**
+  - No staff deactivation, reactivation, or member removal endpoint/UI exists in `/api/team/**` or `TeamManagementPanel` (only pending invitation revocation/resend exists).
+  - **Live DB suites (`test:staff:failures`, `test:crm:correctness`, `test:e2e:integration`) NOT RUN** (no local PostgreSQL/Docker runtime available).
+
+#### 2. Agency Owner-Only Restrictions Removed
+- **`src/lib/auth/permissions.ts`:** Cleared `ownerOnlyActions: []` on every `PAGE_PERMISSIONS_REGISTRY` entry, moved `export`, `commercialMargins`, `verify`, `void`, `delete`, `update`, `legalTaxProfile`, `purchaseUpgrade`, `manage`, and `managePermissions` into `delegableActions`, expanded `DELEGABLE_STAFF_DELETE_MODULES` to all agency modules, and removed `isOwnerOnly` / `ownerOnlyActions` blocks in `evaluateStaffPermission`. Added `staffGrants`-aware `canAccessFinancialMargins(role, staffGrants?)`.
+- **`src/components/team/staff-permissions-modal.tsx` & `src/components/team/team-management-panel.tsx`:** Removed the **"Permanent Agency Owner-Only Security Boundaries"** banner, removed `Owner Exclusive` / `Owner` / `Locked` / `Owner Only` badges and disabled states, enabled `PAYMENTS` (`Receipt`, `Verify`, `Void`, `Delete`), `FINANCE`, `TEAM`, `SETTINGS`, and `SUBSCRIPTION` toggles, updated bulk actions across all pages, and enabled the `Permissions` button for delegated `TEAM` managers (excluding self-row).
+- **`src/lib/services/staff-permission-service.ts` & `src/lib/services/finance-service.ts`:** Added `hasFinancialMarginsAccess` / `enforceFinancialMarginsAccess`; replaced hardcoded `actor?.role === "AGENCY_STAFF"` block in `financeService.recordCustomerPayment` with `enforceStaffPermission(..., "PAYMENTS", "recordReceipt")`.
+- **Server-Side API Routes:** Replaced `requireAgencyOwnerContext()`, `if (!context.isAgencyOwner)`, `canAccessFinancialMargins(role)`, and `hasPermission(role, ...)` across `team/members/[id]/permissions`, `finance/customer-payments` (`POST`, `[id]/refund`), `invoices/[id]/payments/[paymentId]/void`, `payments/[id]` (`PATCH`/`DELETE`/`verify`/`void`), `finance/expenses/[id]` (`DELETE`), `finance/supplier-payables` & `[id]`, `finance/supplier-payments`, `finance/summary`, `finance/transactions`, `finance/export`, `dashboard/finance`, `operations/analytics/financial`, `operations/[id]/closure/{reconciliation,finalize,reopen,pdf}`, `trips/[id]/quotation`, `enquiries/[id]/assign`, `agency/logo`, `agency/tax-profile`, and `subscription/payment-request` with `enforceStaffPermission` / `hasFinancialMarginsAccess`; removed unused `requireAgencyOwnerContext` imports in 14 `[id]`/`rate-sheets`/`suppliers` routes.
+
+#### 3. Preserved Role & Tenant Boundaries
+- `PLATFORM_OWNER` remains strictly isolated (`requirePlatformOwnerContext`, `evaluateStaffPermission` returns `false` for `PLATFORM_OWNER`).
+- Server-side `agencyId` comes exclusively from `getRequestContext()`, blocking cross-tenant access and forged `agencyId` payloads.
+- Staff cannot modify their own permissions (`staffPermissionService.updateStaffPermissions` blocks `targetUserId === actorUserId`) or elevate roles (`targetUser` restricted to `AGENCY_STAFF` in same agency).
+
+#### 4. Verification Results
+- `npx prisma validate`: **Passed**.
+- `npx tsc --noEmit`: **Passed** (`0` errors).
+- `git diff --check`: **Passed** (LF/CRLF warnings only).
+- **Targeted ESLint (`0` errors, `0` warnings):** `permissions.ts`, `staff-permissions-modal.tsx`, `team/members/[id]/permissions/route.ts`, `payments/[id]/verify/route.ts`, `payments/[id]/void/route.ts`, `finance/summary/route.ts`, `finance/transactions/route.ts`, `test-phase1-security-financial-stabilization.ts`.
+- **DB-Free Test Suites (`504/504` passed, `0` failed):** `test-phase1-security-financial-stabilization.ts` (`58/58`), `test-staff-invitation-session.ts` (`27/27`), `test-staff-dashboard-authorization.ts` (`54/54`), `test-staff-application-wide-authorization.ts` (`137/137`), `test-phase4-5-6.ts` (`33/33`), `test-phase7-finance.ts` (`82/82`), `test-quotation-usability.ts` (`113/113`).
+- `npm run build` (Next.js `16.4.6` Turbopack): **Passed** (exit `0`, `42/42` static pages).
+
+
+---
+
+### § 276.79 Complete Staff Account Lifecycle (Deactivation, Reactivation & Session Revocation) (2026-11-26)
+
+#### 1. Schema & Migration
+- **`prisma/schema.prisma` (`User` model) & `prisma/migrations/20261126120000_add_staff_lifecycle_fields/migration.sql`:** Added additive fields `isActive` (`Boolean @default(true)`), `deactivatedAt` (`DateTime?`), `sessionRevokedAt` (`DateTime?`), and `deactivatedById` (`String?`).
+- Historical records (bookings, trips, quotations, payments, customers, audit logs, and `StaffPermissionProfile`) are **never** deleted or cascade-modified on deactivation.
+- **Deployment Prerequisite:** Apply `20261126120000_add_staff_lifecycle_fields` via `prisma migrate deploy` before deploying code to staging/production.
+
+#### 2. Deactivation, Reactivation & Immediate Session Revocation
+- **`src/lib/supabase/admin.ts`:** Added `revokeAuthUserSessionsAndBan(userId)` (`ban_duration: "876000h"` via Supabase Admin API, blocking logins and refresh-token renewals) and `unbanAuthUser(userId)` (`ban_duration: "none"`), both guarded by `assertNotPlatformOwner`.
+- **`src/lib/auth/session-validation.ts`, `src/lib/api/context.ts` & `src/lib/auth/index.ts`:** `getRequestContext()` and `getCurrentUser()` enforce `isDbUserSessionValid()`, rejecting any user with `isActive === false`, `deactivatedAt !== null`, or a JWT `iat` (or `last_sign_in_at`) older than `sessionRevokedAt`.
+- **`src/lib/services/staff-permission-service.ts`:** `getStaffPermissions()` returns `{}` (failing closed) when `user.isActive === false || user.deactivatedAt`.
+- **`src/lib/services/staff-lifecycle-service.ts`:**
+  - `deactivateStaffMember`: Enforces `AGENCY_OWNER` actor, same-agency `AGENCY_STAFF` target, blocks self/owner/cross-agency/`PLATFORM_OWNER`, updates DB (`isActive: false`, `deactivatedAt`, `sessionRevokedAt`, `deactivatedById`) + logs `STAFF_DEACTIVATED`, then bans Supabase Auth (returning `502` on auth failure while keeping DB safely blocked and supporting idempotent retry).
+  - `reactivateStaffMember`: Unbans Supabase Auth first (leaving DB inactive on auth failure), restores `isActive: true` / `deactivatedAt: null` while **retaining `sessionRevokedAt`** so pre-deactivation JWTs remain invalid and a fresh login is required, preserves existing `StaffPermissionProfile`, and logs `STAFF_REACTIVATED`.
+- **Active Staff Counts:** `entitlement-service.ts` (`STAFF_MEMBERS`), `invitation-service.ts` (`acceptInvitation` quota & `listAgencyMembers`), and `TeamManagementPanel` count active staff (`isActive: true`).
+
+#### 3. APIs & UI
+- **Routes:** `POST /api/team/members/[id]/deactivate` and `POST /api/team/members/[id]/reactivate` (both `requireAgencyOwnerContext()`).
+- **UI (`src/components/team/team-management-panel.tsx`):** Displays `Active` vs `Deactivated` badges, active/deactivated member counts, `Deactivate` / `Reactivate` buttons, and `ConfirmDialog` confirmations with loading/error/refresh handling.
+
+#### 4. Verification Results
+- `prisma/test-staff-lifecycle.ts`: Passed (`0` failed).
+- All 7 existing DB-free suites (`test-phase1-security-financial-stabilization.ts`, `test-staff-invitation-session.ts`, `test-staff-dashboard-authorization.ts`, `test-staff-application-wide-authorization.ts`, `test-phase4-5-6.ts`, `test-phase7-finance.ts`, `test-quotation-usability.ts`): Passed (`504/504`, `0` failed).
+- `npx prisma validate`, `npx tsc --noEmit`, `git diff --check`, targeted ESLint (`0` errors), and `npm run build` (Next.js `16.4.6` Turbopack): Passed.
+- **Not Run (Blocked):** Live PostgreSQL DB-backed suites & live browser E2E (no local PostgreSQL/Docker runtime available).

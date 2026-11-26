@@ -1,12 +1,11 @@
 import {
   apiSuccess,
-  ForbiddenError,
+  enforceStaffPermission,
   handleApiError,
   requireWriteAccess,
   validateJson,
   validateRouteParams,
 } from "@/lib/api";
-import { canAccessFinancialMargins } from "@/lib/auth/permissions";
 import { operationsService } from "@/lib/services/operations-service";
 import { finalizeOperationSchema } from "@/lib/validation/operations-schema";
 import { NextRequest } from "next/server";
@@ -25,14 +24,18 @@ interface RouteProps {
 /**
  * POST /api/operations/[id]/closure/finalize
  * Finalizes the tour operation and seals it against further mutations.
- * Restricted to Agency Owners.
  */
 export async function POST(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
-    if (!canAccessFinancialMargins(context.dbUser.role)) {
-      throw new ForbiddenError("Finalizing tour operation closure is restricted to Agency Owners.");
-    }
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "OPERATIONS",
+      "UPDATE",
+      "You do not have permission to finalize tour operation closure."
+    );
     const { id } = validateRouteParams(idParamSchema, await props.params);
     const body = await validateJson(finalizeOperationSchema, request);
 

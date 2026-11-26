@@ -52,11 +52,15 @@ export const staffPermissionService = {
     const client = prismaClient || prisma;
     const user = client.user?.findFirst ? await client.user.findFirst({
       where: { id: userId, agencyId, role: "AGENCY_STAFF" },
-      select: { id: true },
-    }) : { id: userId };
+      select: { id: true, isActive: true, deactivatedAt: true },
+    }) : { id: userId, isActive: true, deactivatedAt: null };
 
     if (!user) {
       throw new Error("Staff member not found in this agency.");
+    }
+
+    if (user.isActive === false || user.deactivatedAt) {
+      return {};
     }
 
     // 1. Explicitly verify table presence
@@ -111,9 +115,8 @@ export const staffPermissionService = {
    * Updates a staff member's permissions with audit logging and invariant enforcement.
    * Invariants:
    * 1. Cannot modify own permissions.
-   * 2. Cannot grant DELETE on immutable owner-only modules.
-   * 3. View is a strict prerequisite: if view is false, child actions cannot be true.
-   * 4. Target must be an AGENCY_STAFF user in the same agency.
+   * 2. View is a strict prerequisite: if view is false, child actions cannot be true.
+   * 3. Target must be an AGENCY_STAFF user in the same agency.
    */
   async updateStaffPermissions(
     agencyId: string,
@@ -283,6 +286,45 @@ export async function enforceStaffPermission(
   if (!allowed) {
     throw new ForbiddenError(
       actualMessage || `You do not have permission to ${actionKey.toLowerCase()} ${moduleKey.toLowerCase().replace(/_/g, " ")}.`
+    );
+  }
+}
+
+/**
+ * Checks whether an agency member (Owner or delegated Staff) may access unredacted financial margins.
+ */
+export async function hasFinancialMarginsAccess(
+  role: string | null | undefined,
+  agencyId: string,
+  userId: string,
+  prismaClient: any = prisma
+): Promise<boolean> {
+  if (!role) return false;
+  if (role === "AGENCY_OWNER") return true;
+  if (role !== "AGENCY_STAFF") return false;
+
+  const grants = await staffPermissionService.getStaffPermissions(agencyId, userId, prismaClient);
+  return (
+    evaluateStaffPermission(role, grants, "FINANCE", "view") ||
+    evaluateStaffPermission(role, grants, "FINANCE", "commercialMargins") ||
+    evaluateStaffPermission(role, grants, "QUOTATIONS", "commercialMargins")
+  );
+}
+
+/**
+ * Enforces access to unredacted financial margins / internal cost reconciliation.
+ */
+export async function enforceFinancialMarginsAccess(
+  role: string | null | undefined,
+  agencyId: string,
+  userId: string,
+  deniedMessage?: string,
+  prismaClient: any = prisma
+): Promise<void> {
+  const allowed = await hasFinancialMarginsAccess(role, agencyId, userId, prismaClient);
+  if (!allowed) {
+    throw new ForbiddenError(
+      deniedMessage || "You do not have permission to access financial margins and internal costs."
     );
   }
 }

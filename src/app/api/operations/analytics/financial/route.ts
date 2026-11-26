@@ -1,5 +1,4 @@
-import { apiSuccess, ForbiddenError, handleApiError, requireReadAccess } from "@/lib/api";
-import { canAccessFinancialMargins } from "@/lib/auth/permissions";
+import { apiSuccess, enforceStaffPermission, handleApiError, requireReadAccess } from "@/lib/api";
 import { operationsAnalyticsService } from "@/lib/services/operations-analytics-service";
 import { analyticsFilterSchema } from "@/lib/validation/operations-schema";
 import { NextRequest } from "next/server";
@@ -13,9 +12,14 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
-    if (!canAccessFinancialMargins(context.dbUser.role)) {
-      throw new ForbiddenError("You do not have permission to view operations financial metrics.");
-    }
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "FINANCE",
+      "VIEW",
+      "You do not have permission to view operations financial metrics."
+    );
     const { searchParams } = new URL(request.url);
 
     const rawFilters = {

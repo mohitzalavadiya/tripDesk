@@ -1,5 +1,6 @@
 import "dotenv/config";
-import * as XLSX from "xlsx";
+import readXlsxFile from "read-excel-file/node";
+import writeXlsxFile from "write-excel-file/node";
 import { prisma } from "../src/lib/prisma";
 import { hotelExcelService } from "../src/lib/excel/hotel-excel-service";
 import { rateExcelService } from "../src/lib/excel/rate-excel-service";
@@ -41,12 +42,12 @@ async function runDev03QAMatrix() {
   });
 
   // Helper to generate workbook buffer
-  function makeWorkbookBuffer(sheetName: string, headers: string[], rows: any[][]): Buffer {
-    const wb = XLSX.utils.book_new();
+  async function makeWorkbookBuffer(sheetName: string, headers: string[], rows: any[][]): Promise<Buffer> {
     const wsData = [headers, ...rows];
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    return await writeXlsxFile(
+      wsData.map((row) => row.map((v) => ({ value: v ?? undefined }))),
+      { sheet: sheetName }
+    ).toBuffer();
   }
 
   const HOTEL_HEADERS = ['Hotel Name', 'Category', 'Address', 'City', 'State', 'Country', 'Phone', 'Email', 'Website', 'Notes'];
@@ -56,7 +57,7 @@ async function runDev03QAMatrix() {
     console.log('--- SECTION 1: HOTEL IMPORT TESTS (1 - 22) ---');
 
     // 1. Valid single hotel
-    const wb1 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb1 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['Alpha Grand Hotel', '5 Star', '123 Beach Rd', 'Goa', 'Goa', 'India', '9876543210', 'alpha@hotel.com', 'https://alphahotel.com', 'Test Hotel 1']
     ]);
     const prev1 = await hotelExcelService.parseAndPreview(wb1, agencyA.id, 'SKIP');
@@ -69,7 +70,7 @@ async function runDev03QAMatrix() {
     );
 
     // 2. Valid multiple hotels
-    const wb2 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb2 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['Alpha Ocean View', '4 Star', '456 Cliff Rd', 'Goa', 'Goa', 'India', '9876543211', 'ocean@hotel.com', '', ''],
       ['Alpha Mountain Retreat', 'Resort', '789 Hill Rd', 'Manali', 'HP', 'India', '9876543212', 'hill@hotel.com', '', '']
     ]);
@@ -77,28 +78,28 @@ async function runDev03QAMatrix() {
     assert(exec2.imported === 2, 2, 'Valid multiple hotels import creates multiple records');
 
     // 3. Missing Hotel Name
-    const wb3 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb3 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['', '5 Star', 'Address', 'Goa', 'Goa', 'India', '', '', '', '']
     ]);
     const prev3 = await hotelExcelService.parseAndPreview(wb3, agencyA.id, 'SKIP');
     assert(prev3.summary.errorRows === 1 && prev3.rows[0].errors.some(e => e.includes('Name')), 3, 'Missing Hotel Name is rejected with validation error');
 
     // 4. Missing City
-    const wb4 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb4 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['Alpha No City Hotel', '5 Star', 'Address', '', 'Goa', 'India', '', '', '', '']
     ]);
     const prev4 = await hotelExcelService.parseAndPreview(wb4, agencyA.id, 'SKIP');
     assert(prev4.summary.errorRows === 1 && prev4.rows[0].errors.some(e => e.includes('City')), 4, 'Missing City is rejected with validation error');
 
     // 5. Duplicate hotel in database
-    const wb5 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb5 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['Alpha Grand Hotel', '5 Star', '123 Beach Rd', 'Goa', 'Goa', 'India', '9876543210', 'alpha@hotel.com', 'https://alphahotel.com', '']
     ]);
     const prev5 = await hotelExcelService.parseAndPreview(wb5, agencyA.id, 'SKIP');
     assert(prev5.summary.skipCount === 1 && prev5.rows[0].status === 'SKIP', 5, 'Duplicate hotel in database flagged as SKIP');
 
     // 6. Duplicate hotel in same file
-    const wb6 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb6 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['Alpha File Dup Hotel', '3 Star', 'Road 1', 'Mumbai', 'MH', 'India', '', '', '', ''],
       ['Alpha File Dup Hotel', '3 Star', 'Road 1', 'Mumbai', 'MH', 'India', '', '', '', '']
     ]);
@@ -110,28 +111,28 @@ async function runDev03QAMatrix() {
     );
 
     // 7. Case variation duplicate detection
-    const wb7 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb7 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['ALPHA GRAND HOTEL', '5 Star', '123 Beach Rd', 'GOA', 'Goa', 'India', '', '', '', '']
     ]);
     const prev7 = await hotelExcelService.parseAndPreview(wb7, agencyA.id, 'SKIP');
     assert(prev7.summary.skipCount === 1 && prev7.rows[0].status === 'SKIP', 7, 'Case variation (UPPERCASE) recognized as duplicate');
 
     // 8. Whitespace variation duplicate detection
-    const wb8 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb8 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['  Alpha Grand Hotel  ', '5 Star', '123 Beach Rd', '  Goa  ', 'Goa', 'India', '', '', '', '']
     ]);
     const prev8 = await hotelExcelService.parseAndPreview(wb8, agencyA.id, 'SKIP');
     assert(prev8.summary.skipCount === 1 && prev8.rows[0].status === 'SKIP', 8, 'Whitespace variation normalized and recognized as duplicate');
 
     // 9. Same hotel name, different city (should NOT be duplicate)
-    const wb9 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb9 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['Alpha Grand Hotel', '5 Star', '123 Jaipur Rd', 'Jaipur', 'Rajasthan', 'India', '', '', '', '']
     ]);
     const prev9 = await hotelExcelService.parseAndPreview(wb9, agencyA.id, 'SKIP');
     assert(prev9.summary.validRows === 1 && prev9.summary.createCount === 1, 9, 'Same hotel name in different city is accepted as distinct record');
 
     // 10. Invalid / renamed header
-    const wb10 = makeWorkbookBuffer('Hotels', ['Wrong Name Header', 'Category', 'Address', 'City'], [
+    const wb10 = await makeWorkbookBuffer('Hotels', ['Wrong Name Header', 'Category', 'Address', 'City'], [
       ['Hotel 1', '5 Star', 'Road', 'City']
     ]);
     let headerErr = false;
@@ -143,14 +144,14 @@ async function runDev03QAMatrix() {
     assert(headerErr, 10, 'Invalid/missing required headers in Hotel workbook rejected');
 
     // 11. Missing required sheet
-    const wb11 = makeWorkbookBuffer('Sheet1', HOTEL_HEADERS, [
+    const wb11 = await makeWorkbookBuffer('Sheet1', HOTEL_HEADERS, [
       ['Hotel 1', '5 Star', 'Road', 'Goa', '', '', '', '', '', '']
     ]);
     const prev11 = await hotelExcelService.parseAndPreview(wb11, agencyA.id, 'SKIP');
     assert(prev11.summary.validRows === 1, 11, 'Sheet with non-standard name but valid headers safely parsed via fallback');
 
     // 12. Empty file / sheet with no rows
-    const wb12 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, []);
+    const wb12 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, []);
     let emptyErr = false;
     try {
       await hotelExcelService.parseAndPreview(wb12, agencyA.id, 'SKIP');
@@ -170,7 +171,7 @@ async function runDev03QAMatrix() {
     assert(corruptErr, 13, 'Corrupted Excel buffer gracefully rejected');
 
     // 14. Optional blank fields preserved
-    const wb14 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb14 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['Alpha Bare Minimum Hotel', '', '', 'Delhi', '', '', '', '', '', '']
     ]);
     const exec14 = await hotelExcelService.executeImport(wb14, agencyA.id, 'SKIP');
@@ -178,7 +179,7 @@ async function runDev03QAMatrix() {
     assert(exec14.imported === 1 && hotel14?.category === null && hotel14?.city === 'Delhi', 14, 'Optional blank fields import with nulls correctly');
 
     // 15. UPDATE existing hotel
-    const wb15 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb15 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['Alpha Grand Hotel', 'Luxury 5 Star', 'Updated Beach Rd', 'Goa', 'Goa', 'India', '1112223334', 'new@hotel.com', 'https://newalpha.com', 'Updated notes']
     ]);
     const exec15 = await hotelExcelService.executeImport(wb15, agencyA.id, 'UPDATE');
@@ -190,7 +191,7 @@ async function runDev03QAMatrix() {
     );
 
     // 16. SKIP existing hotel
-    const wb16 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb16 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['Alpha Grand Hotel', 'Should Not Update', 'Ignored Rd', 'Goa', 'Goa', 'India', '9999999999', '', '', '']
     ]);
     const exec16 = await hotelExcelService.executeImport(wb16, agencyA.id, 'SKIP');
@@ -198,7 +199,7 @@ async function runDev03QAMatrix() {
     assert(exec16.skipped === 1 && hotel16?.category === 'Luxury 5 Star', 16, 'SKIP mode keeps existing hotel completely unchanged');
 
     // 17. REJECT existing hotel
-    const wb17 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb17 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['Alpha Grand Hotel', 'Should Reject', 'Ignored Rd', 'Goa', 'Goa', 'India', '', '', '', '']
     ]);
     let rejectErr = false;
@@ -215,7 +216,7 @@ async function runDev03QAMatrix() {
     assert(hotel18?.hotelCode === 'HTL-0001', 18, 'Hotel Code HTL-0001 is strictly immutable across UPDATEs');
 
     // 19. Formula-like text handling
-    const wb19 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
+    const wb19 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, [
       ['=SUM(1,2) Alpha Formula Hotel', '5 Star', '+91 Address', 'Mumbai', '@State', '-India', '', '', '', '=HYPERLINK("cmd")']
     ]);
     const exec19 = await hotelExcelService.executeImport(wb19, agencyA.id, 'SKIP');
@@ -227,7 +228,7 @@ async function runDev03QAMatrix() {
     for (let i = 1; i <= 105; i++) {
       bulkRows.push([`Bulk Hotel ${i}`, '3 Star', `Street ${i}`, `BulkCity`, 'State', 'Country', '', '', '', '']);
     }
-    const wb20 = makeWorkbookBuffer('Hotels', HOTEL_HEADERS, bulkRows);
+    const wb20 = await makeWorkbookBuffer('Hotels', HOTEL_HEADERS, bulkRows);
     const startBulk = Date.now();
     const exec20 = await hotelExcelService.executeImport(wb20, agencyA.id, 'SKIP');
     const bulkDuration = Date.now() - startBulk;
@@ -254,7 +255,7 @@ async function runDev03QAMatrix() {
     const htlCode1 = htl1?.hotelCode || 'HTL-0001';
 
     // 23. Valid single rate
-    const wb23 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb23 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'Summer 2026', '01-05-2026', '31-05-2026', 4500, 1200, 600, 'Standard rate']
     ]);
     const prev23 = await rateExcelService.parseAndPreview(wb23, agencyA.id, 'SKIP');
@@ -267,7 +268,7 @@ async function runDev03QAMatrix() {
     );
 
     // 24. Valid multiple rates
-    const wb24 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb24 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'EP', 'Summer 2026', '01-05-2026', '31-05-2026', 3500, 1000, 500, 'EP rate'],
       [htlCode1, 'Suite Room', 'MAP', 'Summer 2026', '01-05-2026', '31-05-2026', 7500, 1800, 900, 'MAP rate']
     ]);
@@ -275,7 +276,7 @@ async function runDev03QAMatrix() {
     assert(exec24.imported === 2, 24, 'Valid multiple rates import successfully');
 
     // 25. Unknown Hotel Code
-    const wb25 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb25 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       ['HTL-9999', 'Deluxe Room', 'CP', 'Summer 2026', '01-06-2026', '30-06-2026', 5000, 1000, 500, '']
     ]);
     const prev25 = await rateExcelService.parseAndPreview(wb25, agencyA.id, 'SKIP');
@@ -290,98 +291,98 @@ async function runDev03QAMatrix() {
         city: 'Pune'
       }
     });
-    const wb26 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb26 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       ['HTL-8888', 'Deluxe Room', 'CP', 'Summer 2026', '01-06-2026', '30-06-2026', 5000, 1000, 500, '']
     ]);
     const prev26 = await rateExcelService.parseAndPreview(wb26, agencyA.id, 'SKIP');
     assert(prev26.summary.errorRows === 1 && prev26.rows[0].errors.some(e => e.includes('Unknown Hotel Code')), 26, 'Agency A cannot reference Agency B Hotel Code (isolated to Agency A)');
 
     // 27. Invalid Meal Plan
-    const wb27 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb27 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'FULL_BOARD', 'Summer 2026', '01-06-2026', '30-06-2026', 5000, 1000, 500, '']
     ]);
     const prev27 = await rateExcelService.parseAndPreview(wb27, agencyA.id, 'SKIP');
     assert(prev27.summary.errorRows === 1 && prev27.rows[0].errors.some(e => e.includes('Meal Plan')), 27, 'Invalid Meal Plan FULL_BOARD rejected (only EP, CP, MAP, AP allowed)');
 
     // 28. Invalid date (impossible date like 31-02-2026)
-    const wb28 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb28 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'Summer 2026', '31-02-2026', '28-02-2026', 5000, 1000, 500, '']
     ]);
     const prev28 = await rateExcelService.parseAndPreview(wb28, agencyA.id, 'SKIP');
     assert(prev28.summary.errorRows === 1 && prev28.rows[0].errors.some(e => e.includes('Date') || e.includes('date')), 28, 'Impossible date (31-02-2026) rejected');
 
     // 29. Wrong date format (e.g. invalid string)
-    const wb29 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb29 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'Summer 2026', 'INVALID_DATE', '31-05-2026', 5000, 1000, 500, '']
     ]);
     const prev29 = await rateExcelService.parseAndPreview(wb29, agencyA.id, 'SKIP');
     assert(prev29.summary.errorRows === 1 && prev29.rows[0].errors.some(e => e.includes('Date') || e.includes('DD-MM-YYYY')), 29, 'Wrong date format rejected');
 
     // 30. From > To
-    const wb30 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb30 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'Summer 2026', '15-06-2026', '01-06-2026', 5000, 1000, 500, '']
     ]);
     const prev30 = await rateExcelService.parseAndPreview(wb30, agencyA.id, 'SKIP');
     assert(prev30.summary.errorRows === 1 && prev30.rows[0].errors.some(e => e.includes('cannot be after')), 30, 'Valid From > Valid To rejected');
 
     // 31. Negative Cost Price
-    const wb31 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb31 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'Summer 2026', '01-06-2026', '30-06-2026', -100, 1000, 500, '']
     ]);
     const prev31 = await rateExcelService.parseAndPreview(wb31, agencyA.id, 'SKIP');
     assert(prev31.summary.errorRows === 1 && prev31.rows[0].errors.some(e => e.includes('Cost Price')), 31, 'Negative Cost Price rejected');
 
     // 32. Negative Extra Adult
-    const wb32 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb32 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'Summer 2026', '01-06-2026', '30-06-2026', 5000, -500, 500, '']
     ]);
     const prev32 = await rateExcelService.parseAndPreview(wb32, agencyA.id, 'SKIP');
     assert(prev32.summary.errorRows === 1 && prev32.rows[0].errors.some(e => e.includes('Extra Adult')), 32, 'Negative Extra Adult rejected');
 
     // 33. Negative Extra Child
-    const wb33 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb33 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'Summer 2026', '01-06-2026', '30-06-2026', 5000, 1000, -200, '']
     ]);
     const prev33 = await rateExcelService.parseAndPreview(wb33, agencyA.id, 'SKIP');
     assert(prev33.summary.errorRows === 1 && prev33.rows[0].errors.some(e => e.includes('Extra Child')), 33, 'Negative Extra Child rejected');
 
     // 34. Existing exact matching rate
-    const wb34 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb34 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'Summer 2026', '01-05-2026', '31-05-2026', 4500, 1200, 600, 'Standard rate']
     ]);
     const prev34 = await rateExcelService.parseAndPreview(wb34, agencyA.id, 'SKIP');
     assert(prev34.summary.skipCount === 1 && prev34.rows[0].status === 'SKIP', 34, 'Exact matching existing rate flagged as SKIP in SKIP mode');
 
     // 35. Overlapping non-identical rate (e.g. 15-05-2026 to 15-06-2026 overlaps 01-05-2026 to 31-05-2026)
-    const wb35 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb35 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'Summer 2026', '15-05-2026', '15-06-2026', 5200, 1200, 600, '']
     ]);
     const prev35 = await rateExcelService.parseAndPreview(wb35, agencyA.id, 'SKIP');
     assert(prev35.summary.errorRows === 1 && prev35.rows[0].errors.some(e => e.includes('Overlaps with existing active rate period')), 35, 'Overlapping validity period flagged as ERROR');
 
     // 36. Adjacent rate period (01-06-2026 to 30-06-2026 adjacent to 01-05-2026 to 31-05-2026)
-    const wb36 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb36 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'June 2026', '01-06-2026', '30-06-2026', 4800, 1200, 600, 'June rate']
     ]);
     const prev36 = await rateExcelService.parseAndPreview(wb36, agencyA.id, 'SKIP');
     assert(prev36.summary.validRows === 1 && prev36.summary.errorRows === 0, 36, 'Adjacent validity period (01-06-2026 after 31-05-2026) allowed without conflict');
 
     // 37. Different Meal Plan overlap (MAP vs CP on exact same dates)
-    const wb37 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb37 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'MAP', 'Summer 2026', '01-05-2026', '31-05-2026', 5500, 1500, 750, '']
     ]);
     const prev37 = await rateExcelService.parseAndPreview(wb37, agencyA.id, 'SKIP');
     assert(prev37.summary.validRows === 1 && prev37.summary.errorRows === 0, 37, 'Different Meal Plan (MAP vs CP) allows date overlap');
 
     // 38. Different Room Type overlap (Executive vs Deluxe on exact same dates)
-    const wb38 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb38 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Executive Suite', 'CP', 'Summer 2026', '01-05-2026', '31-05-2026', 6500, 1800, 900, '']
     ]);
     const prev38 = await rateExcelService.parseAndPreview(wb38, agencyA.id, 'SKIP');
     assert(prev38.summary.validRows === 1 && prev38.summary.errorRows === 0, 38, 'Different Room Type allows date overlap');
 
     // 39. Same-file exact duplicate
-    const wb39 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb39 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Standard Room', 'EP', 'Winter', '01-11-2026', '30-11-2026', 2500, 500, 250, ''],
       [htlCode1, 'Standard Room', 'EP', 'Winter', '01-11-2026', '30-11-2026', 2500, 500, 250, '']
     ]);
@@ -389,7 +390,7 @@ async function runDev03QAMatrix() {
     assert(prev39.rows[0].errors.some(e => e.includes('Duplicate rate definition in this file')), 39, 'Same-file exact duplicate flagged as ERROR on conflicting rows');
 
     // 40. Same-file overlapping conflict
-    const wb40 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb40 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Premium Room', 'EP', 'Winter', '01-11-2026', '20-11-2026', 3000, 600, 300, ''],
       [htlCode1, 'Premium Room', 'EP', 'Winter', '15-11-2026', '30-11-2026', 3200, 600, 300, '']
     ]);
@@ -397,7 +398,7 @@ async function runDev03QAMatrix() {
     assert(prev40.rows[0].errors.some(e => e.includes('Overlapping validity period conflict within this file')), 40, 'Same-file overlapping period flagged as ERROR on conflicting rows');
 
     // 41. Rate SKIP mode
-    const wb41 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb41 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'Summer 2026', '01-05-2026', '31-05-2026', 9999, 999, 999, 'Changed rate']
     ]);
     const exec41 = await rateExcelService.executeImport(wb41, agencyA.id, 'SKIP');
@@ -405,7 +406,7 @@ async function runDev03QAMatrix() {
     assert(exec41.skipped === 1 && Number(rate41?.costPrice) === 4500, 41, 'Rate SKIP mode skips existing exact record without altering cost price');
 
     // 42. Rate UPDATE mode
-    const wb42 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb42 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'Summer 2026 Updated', '01-05-2026', '31-05-2026', 4900, 1300, 650, 'Updated Notes']
     ]);
     const exec42 = await rateExcelService.executeImport(wb42, agencyA.id, 'UPDATE');
@@ -417,7 +418,7 @@ async function runDev03QAMatrix() {
     );
 
     // 43. Rate REJECT mode
-    const wb43 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb43 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', 'Summer 2026', '01-05-2026', '31-05-2026', 4900, 1300, 650, '']
     ]);
     let rejectRateErr = false;
@@ -430,7 +431,7 @@ async function runDev03QAMatrix() {
     assert(rejectRateErr, 43, 'Rate REJECT mode fails duplicate with error');
 
     // 44. Blank optional fields during Rate UPDATE (preserve vs overwrite)
-    const wb44 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb44 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'Deluxe Room', 'CP', '', '01-05-2026', '31-05-2026', 4950, '', '', '']
     ]);
     const exec44 = await rateExcelService.executeImport(wb44, agencyA.id, 'UPDATE');
@@ -442,7 +443,7 @@ async function runDev03QAMatrix() {
     );
 
     // 45. Execution after DB state changes (Authoritative revalidation on execute)
-    const wb45 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb45 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       [htlCode1, 'State Change Room', 'EP', 'Autumn', '01-09-2026', '30-09-2026', 3000, 500, 200, '']
     ]);
     const prev45 = await rateExcelService.parseAndPreview(wb45, agencyA.id, 'SKIP');
@@ -493,7 +494,7 @@ async function runDev03QAMatrix() {
 
     // 48. Cross-tenant rate manipulation
     // Agency A has HTL-0105 (created in bulk import T20). Agency B does not have HTL-0105.
-    const wb48 = makeWorkbookBuffer('Rates', RATE_HEADERS, [
+    const wb48 = await makeWorkbookBuffer('Rates', RATE_HEADERS, [
       ['HTL-0105', 'Deluxe Room', 'CP', 'Summer 2026', '01-05-2026', '31-05-2026', 4500, 1200, 600, 'Cross-tenant rate attempt']
     ]);
     let exec48Caught = false;
@@ -578,7 +579,7 @@ async function runDev03QAMatrix() {
     assert(attemptedHackedCode.hotelCode === createdHotel1.hotelCode, 55, 'Hotel Code cannot be overwritten via service/API update');
 
     // 56. Excel immutability: Hotel Excel import does not accept or alter hotelCode
-    const wb56 = makeWorkbookBuffer('Hotels', ['Hotel Code', ...HOTEL_HEADERS], [
+    const wb56 = await makeWorkbookBuffer('Hotels', ['Hotel Code', ...HOTEL_HEADERS], [
       ['HTL-9999', 'Alpha Grand Hotel', 'Luxury', 'Beach', 'Goa', 'Goa', 'India', '', '', '', '']
     ]);
     let excelImmSuccess = false;
@@ -594,9 +595,9 @@ async function runDev03QAMatrix() {
     console.log('\n--- SECTION 4: SAMPLE DOWNLOADS & REFERENCE DATA TESTS (57 - 60) ---');
 
     // 57. Hotel sample workbook structure
-    const hotelSampleBuf = hotelExcelService.generateSampleWorkbook();
-    const hotelSampleWb = XLSX.read(hotelSampleBuf, { type: 'buffer' });
-    const hotelSampleSheets = hotelSampleWb.SheetNames;
+    const hotelSampleBuf = await hotelExcelService.generateSampleWorkbook();
+    const hotelSampleSheetsData = await readXlsxFile(hotelSampleBuf);
+    const hotelSampleSheets = hotelSampleSheetsData.map((s) => s.sheet);
     assert(
       hotelSampleSheets.includes('Instructions') && hotelSampleSheets.includes('Hotels'),
       57,
@@ -605,8 +606,8 @@ async function runDev03QAMatrix() {
 
     // 58. Hotel Rate sample workbook structure
     const rateSampleBuf = await rateExcelService.generateSampleWorkbook(agencyA.id);
-    const rateSampleWb = XLSX.read(rateSampleBuf, { type: 'buffer' });
-    const rateSampleSheets = rateSampleWb.SheetNames;
+    const rateSampleSheetsData = await readXlsxFile(rateSampleBuf);
+    const rateSampleSheets = rateSampleSheetsData.map((s) => s.sheet);
     assert(
       rateSampleSheets.includes('Instructions') && rateSampleSheets.includes('Rates') && rateSampleSheets.includes('Hotels Reference'),
       58,
@@ -614,8 +615,8 @@ async function runDev03QAMatrix() {
     );
 
     // 59. Tenant-specific Hotels Reference sheet verification
-    const refSheet = rateSampleWb.Sheets['Hotels Reference'];
-    const refData: any[][] = XLSX.utils.sheet_to_json(refSheet, { header: 1 });
+    const refSheet = rateSampleSheetsData.find((s) => s.sheet === 'Hotels Reference');
+    const refData: any[][] = refSheet?.data ?? [];
     const refHotelCodes = refData.slice(1).map(r => r[0]);
     const containsAlphaHotel = refHotelCodes.includes('HTL-0001');
     const containsBetaHotel = refHotelCodes.includes('HTL-8888'); // belongs to Agency B

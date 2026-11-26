@@ -1,9 +1,12 @@
 import {
   apiSuccess,
+  enforceStaffPermission,
   handleApiError,
-  requireAgencyOwnerContext,
+  requireReadAccess,
+  requireWriteAccess,
   validateJson,
 } from "@/lib/api";
+import { StaffPermissionsProfileMap } from "@/lib/auth/permissions";
 import { staffPermissionService } from "@/lib/services/staff-permission-service";
 import { NextRequest } from "next/server";
 import { z } from "zod";
@@ -24,11 +27,12 @@ const updatePermissionsSchema = z.object({
 /**
  * GET /api/team/members/[id]/permissions
  * Retrieve a staff member's effective permission profile.
- * Agency Owner only.
+ * Requires Agency Owner or delegated TEAM: VIEW access.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TEAM", "VIEW");
     const { id: targetUserId } = await params;
 
     const permissions = await staffPermissionService.getStaffPermissions(
@@ -45,11 +49,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 /**
  * PUT /api/team/members/[id]/permissions
  * Updates a staff member's permissions with audit log tracking.
- * Agency Owner only.
+ * Requires Agency Owner or delegated TEAM: UPDATE access (self-modification always blocked).
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TEAM", "UPDATE");
     const { id: targetUserId } = await params;
     const body = await validateJson(updatePermissionsSchema, request);
 
@@ -60,7 +65,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       context.agencyId,
       targetUserId,
       context.dbUser.id,
-      body.permissions as any,
+      body.permissions as StaffPermissionsProfileMap,
       { ipAddress: clientIp, userAgent }
     );
 
@@ -73,11 +78,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 /**
  * POST /api/team/members/[id]/permissions
  * Resets a staff member's permissions to default.
- * Agency Owner only.
+ * Requires Agency Owner or delegated TEAM: UPDATE access (self-modification always blocked).
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TEAM", "UPDATE");
     const { id: targetUserId } = await params;
 
     const clientIp = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip");

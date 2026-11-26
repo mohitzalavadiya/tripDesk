@@ -110,8 +110,19 @@ export function hasPermission(
 /**
  * Checks if the role can view internal financial margins, net supplier costs, and markup rates.
  */
-export function canAccessFinancialMargins(role: string | null | undefined): boolean {
-  return hasPermission(role, "FINANCIAL_MARGINS", "VIEW");
+export function canAccessFinancialMargins(
+  role: string | null | undefined,
+  staffGrants?: StaffPermissionsProfileMap | null
+): boolean {
+  if (hasPermission(role, "FINANCIAL_MARGINS", "VIEW")) return true;
+  if (staffGrants) {
+    return (
+      evaluateStaffPermission(role, staffGrants, "FINANCE", "view") ||
+      evaluateStaffPermission(role, staffGrants, "FINANCE", "commercialMargins") ||
+      evaluateStaffPermission(role, staffGrants, "QUOTATIONS", "commercialMargins")
+    );
+  }
+  return false;
 }
 
 /**
@@ -151,8 +162,10 @@ export type StaffPermissionsProfileMap = Record<string, StaffModulePermissions>;
  * Default is strictly FALSE (least-privilege).
  */
 export const DELEGABLE_STAFF_DELETE_MODULES = new Set([
+  "DASHBOARD",
   "CUSTOMERS",
   "CUSTOMER_DETAIL",
+  "CUSTOMER_INSIGHTS",
   "ENQUIRIES",
   "ENQUIRY_DETAIL",
   "FOLLOW_UPS",
@@ -166,20 +179,29 @@ export const DELEGABLE_STAFF_DELETE_MODULES = new Set([
   "DOCUMENTS",
   "OPERATIONS",
   "OPERATIONS_ISSUES",
+  "TRIP_COSTING",
   "DESTINATIONS",
   "HOTELS",
   "VEHICLES",
   "ACTIVITIES",
   "INVOICES",
+  "PAYMENTS",
+  "FINANCE",
   "RATE_SHEETS",
   "SUPPLIERS",
   "FEEDBACK",
+  "REPORTS",
+  "COMMUNICATIONS",
   "REFERRALS",
+  "SETTINGS",
+  "SUBSCRIPTION",
+  "TEAM",
+  "SUPPORT_CHAT",
 ]);
 
 /**
  * Modules where capabilities are permanently restricted to the Agency Owner.
- * Cannot be delegated to staff under any circumstances.
+ * Empty: Agency Owners may delegate any agency-level module to staff.
  */
 export const IMMUTABLE_OWNER_ONLY_MODULES = new Set<string>([]);
 
@@ -214,8 +236,8 @@ export const PAGE_PERMISSIONS_REGISTRY: PagePermissionConfig[] = [
     route: "/dashboard",
     category: "CRM & Sales",
     isOwnerOnly: false,
-    delegableActions: ["view"],
-    ownerOnlyActions: ["export"],
+    delegableActions: ["view", "export"],
+    ownerOnlyActions: [],
     defaultPermissions: { view: true, delete: false },
   },
   {
@@ -247,8 +269,8 @@ export const PAGE_PERMISSIONS_REGISTRY: PagePermissionConfig[] = [
     route: "/customer-insights",
     category: "CRM & Sales",
     isOwnerOnly: false,
-    delegableActions: ["view"],
-    ownerOnlyActions: ["export"],
+    delegableActions: ["view", "export"],
+    ownerOnlyActions: [],
     defaultPermissions: { view: false, delete: false },
   },
   {
@@ -322,12 +344,12 @@ export const PAGE_PERMISSIONS_REGISTRY: PagePermissionConfig[] = [
   {
     moduleKey: "QUOTATIONS",
     name: "Quotations & Proposals (List)",
-    description: "Pricing proposals (sensitive net supplier rates and margins redacted)",
+    description: "Pricing proposals, line items, and commercial quotes",
     route: "/quotations",
     category: "Trips & Bookings",
     isOwnerOnly: false,
-    delegableActions: ["view", "create", "update", "delete"],
-    ownerOnlyActions: ["commercialMargins"],
+    delegableActions: ["view", "create", "update", "delete", "commercialMargins"],
+    ownerOnlyActions: [],
     defaultPermissions: { view: true, create: true, update: true, delete: false },
   },
   {
@@ -337,8 +359,8 @@ export const PAGE_PERMISSIONS_REGISTRY: PagePermissionConfig[] = [
     route: "/quotations/[id]",
     category: "Trips & Bookings",
     isOwnerOnly: false,
-    delegableActions: ["view", "update", "delete"],
-    ownerOnlyActions: ["commercialMargins"],
+    delegableActions: ["view", "update", "delete", "commercialMargins"],
+    ownerOnlyActions: [],
     defaultPermissions: { view: true, update: true, delete: false },
   },
   {
@@ -381,7 +403,7 @@ export const PAGE_PERMISSIONS_REGISTRY: PagePermissionConfig[] = [
     route: "/operations",
     category: "Trips & Bookings",
     isOwnerOnly: false,
-    delegableActions: ["view", "update", "delete"],
+    delegableActions: ["view", "update", "delete", "export"],
     ownerOnlyActions: [],
     defaultPermissions: { view: true, create: false, update: true, delete: false },
   },
@@ -404,8 +426,8 @@ export const PAGE_PERMISSIONS_REGISTRY: PagePermissionConfig[] = [
     route: "/trips/[id]/costing",
     category: "Trips & Bookings",
     isOwnerOnly: false,
-    delegableActions: ["view", "update"],
-    ownerOnlyActions: ["commercialMargins"],
+    delegableActions: ["view", "update", "commercialMargins"],
+    ownerOnlyActions: [],
     defaultPermissions: { view: false, update: false },
   },
 
@@ -481,13 +503,13 @@ export const PAGE_PERMISSIONS_REGISTRY: PagePermissionConfig[] = [
   {
     moduleKey: "PAYMENTS",
     name: "Payments & Receipts",
-    description: "View customer receipts and record pending receipts (verification is Owner Only)",
+    description: "Customer receipts, payment verification, voiding, and refunds",
     route: "/payments",
     category: "Finance & Invoicing",
     isOwnerOnly: false,
-    delegableActions: ["view", "recordReceipt"],
-    ownerOnlyActions: ["verify", "void", "delete"],
-    defaultPermissions: { view: true, recordReceipt: false, delete: false },
+    delegableActions: ["view", "recordReceipt", "update", "verify", "void", "delete"],
+    ownerOnlyActions: [],
+    defaultPermissions: { view: true, recordReceipt: false, verify: false, void: false, delete: false },
   },
   {
     moduleKey: "INVOICES",
@@ -503,13 +525,13 @@ export const PAGE_PERMISSIONS_REGISTRY: PagePermissionConfig[] = [
   {
     moduleKey: "FINANCE",
     name: "Financial Margins & Ledger",
-    description: "Operational financial ledger and tour expenses (supplier payables & commercial margins redacted)",
+    description: "Financial ledger, tour expenses, supplier payables, and commercial margins",
     route: "/finance",
     category: "Finance & Invoicing",
     isOwnerOnly: false,
-    delegableActions: ["view", "create"],
-    ownerOnlyActions: ["commercialMargins", "supplierDisbursements", "delete"],
-    defaultPermissions: { view: false, create: false, delete: false },
+    delegableActions: ["view", "create", "update", "delete", "commercialMargins", "supplierDisbursements"],
+    ownerOnlyActions: [],
+    defaultPermissions: { view: false, create: false, update: false, delete: false },
   },
 
   // 5. Engagement & Analytics
@@ -562,34 +584,34 @@ export const PAGE_PERMISSIONS_REGISTRY: PagePermissionConfig[] = [
   {
     moduleKey: "SETTINGS",
     name: "Agency Settings",
-    description: "Company profile, communication templates, and GST settings (team management is Owner Only)",
+    description: "Company profile, communication templates, branding, and GST/tax settings",
     route: "/settings",
     category: "Settings & Admin",
     isOwnerOnly: false,
-    delegableActions: ["view", "update"],
-    ownerOnlyActions: ["teamManagement", "legalTaxProfile"],
+    delegableActions: ["view", "update", "delete", "legalTaxProfile"],
+    ownerOnlyActions: [],
     defaultPermissions: { view: false, create: false, update: false, delete: false },
   },
   {
     moduleKey: "SUBSCRIPTION",
     name: "Subscription & Billing",
-    description: "Plan tiers, usage entitlements, and billing renewals (plan purchase & upgrades are Owner Only)",
+    description: "Plan tiers, usage entitlements, billing renewals, and payment requests",
     route: "/subscription",
     category: "Settings & Admin",
     isOwnerOnly: false,
-    delegableActions: ["view"],
-    ownerOnlyActions: ["purchaseUpgrade", "manage"],
-    defaultPermissions: { view: false },
+    delegableActions: ["view", "create", "update", "delete", "purchaseUpgrade", "manage"],
+    ownerOnlyActions: [],
+    defaultPermissions: { view: false, create: false, update: false, delete: false },
   },
   {
     moduleKey: "TEAM",
     name: "Team & Staff Management",
-    description: "Agency staff directory and onboarding invitations (modifying staff permissions & removing staff are Owner Only)",
+    description: "Agency staff directory, onboarding invitations, and staff permission administration",
     route: "/settings?tab=team",
     category: "Settings & Admin",
     isOwnerOnly: false,
-    delegableActions: ["view", "create"],
-    ownerOnlyActions: ["managePermissions", "transferOwnership"],
+    delegableActions: ["view", "create", "update", "delete", "managePermissions"],
+    ownerOnlyActions: [],
     defaultPermissions: { view: false, create: false, update: false, delete: false },
   },
   {
@@ -718,69 +740,6 @@ export function getParentModuleFallback(moduleKey: string): string | null {
   }
 }
 
-function mapModuleToDomain(moduleKey: string): PermissionDomain | null {
-  const m = moduleKey.toUpperCase();
-  switch (m) {
-    case "DASHBOARD":
-      return "DASHBOARD_CRM";
-    case "CUSTOMERS":
-    case "CUSTOMER_DETAIL":
-      return "CUSTOMER_RECORDS";
-    case "ENQUIRIES":
-    case "ENQUIRY_DETAIL":
-      return "ENQUIRY_MANAGEMENT";
-    case "FOLLOW_UPS":
-      return "FOLLOW_UP_MANAGEMENT";
-    case "TRIPS":
-    case "TRIP_DETAIL":
-    case "ITINERARIES":
-    case "TRIP_COSTING":
-      return "TRIP_ITINERARY";
-    case "QUOTATIONS":
-    case "QUOTATION_DETAIL":
-      return "QUOTATION_MANAGEMENT";
-    case "BOOKINGS":
-    case "BOOKING_DETAIL":
-    case "INVOICES":
-    case "FINANCE":
-      return "BOOKING_MANAGEMENT";
-    case "RATE_SHEETS":
-    case "SUPPLIERS":
-    case "OPERATIONS":
-    case "OPERATIONS_ISSUES":
-    case "SETTINGS":
-      return "TRIP_ITINERARY";
-    case "REPORTS":
-      return "REPORTS_ANALYTICS";
-    case "SUBSCRIPTION":
-      return "AGENCY_SETTINGS_BILLING";
-    case "TEAM":
-      return "TEAM_INVITATIONS";
-    default:
-      return null;
-  }
-}
-
-function mapActionToEnum(actionKey: string): PermissionAction | null {
-  const a = actionKey.toUpperCase();
-  switch (a) {
-    case "VIEW":
-      return "VIEW";
-    case "CREATE":
-    case "RECORDRECEIPT":
-    case "LOGINTERACTION":
-      return "CREATE";
-    case "UPDATE":
-      return "UPDATE";
-    case "DELETE":
-      return "DELETE";
-    case "EXPORT":
-      return "EXPORT";
-    default:
-      return null;
-  }
-}
-
 /**
  * Evaluates effective staff permission by intersecting role ceiling with individual staff grant.
  * Strict Invariants:
@@ -824,31 +783,15 @@ export function evaluateStaffPermission(
     }
   }
 
-  // INVARIANT 3: Role ceiling & page registry check
+  // INVARIANT 3: Page registry check (all agency-level actions in delegableActions are delegable)
   const pageConfig = PAGE_PERMISSIONS_REGISTRY.find(
     (p) => p.moduleKey === normalizedModule
   );
 
   if (pageConfig) {
-    if (pageConfig.isOwnerOnly) {
-      return false;
-    }
-    const lowerOwnerOnly = pageConfig.ownerOnlyActions.map((a) => a.toLowerCase());
-    if (lowerOwnerOnly.includes(normalizedAction)) {
-      return false; // Permanently owner-only
-    }
     const lowerDelegable = pageConfig.delegableActions.map((a) => a.toLowerCase());
     if (!lowerDelegable.includes(normalizedAction)) {
-      return false; // Not delegable to staff
-    }
-  } else {
-    const domainKey = mapModuleToDomain(moduleKey);
-    const actionEnum = mapActionToEnum(actionKey);
-    if (domainKey && actionEnum) {
-      const roleAllowed = hasPermission("AGENCY_STAFF", domainKey, actionEnum);
-      if (!roleAllowed) {
-        return false; // Role ceiling blocked
-      }
+      return false;
     }
   }
 

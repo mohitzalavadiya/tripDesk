@@ -1,6 +1,5 @@
-import { ForbiddenError } from "@/lib/api/errors";
 import { requireReadAccess } from "@/lib/api/context";
-import { canAccessFinancialMargins } from "@/lib/auth/permissions";
+import { enforceStaffPermission } from "@/lib/services/staff-permission-service";
 import { dashboardService } from "@/lib/services/dashboard-service";
 import { DashboardFilterSchema } from "@/lib/validation/dashboard-schema";
 import { NextRequest,NextResponse } from "next/server";
@@ -8,9 +7,14 @@ import { NextRequest,NextResponse } from "next/server";
 export async function GET(req: NextRequest) {
   try {
     const context = await requireReadAccess();
-    if (!canAccessFinancialMargins(context.dbUser.role)) {
-      throw new ForbiddenError("You do not have permission to view financial dashboard metrics.");
-    }
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "FINANCE",
+      "VIEW",
+      "You do not have permission to view financial dashboard metrics."
+    );
     const agencyId = context.agencyId;
 
     const { searchParams } = new URL(req.url);

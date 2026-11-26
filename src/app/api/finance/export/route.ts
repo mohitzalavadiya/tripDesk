@@ -1,10 +1,9 @@
 import {
-handleApiError,
-requireReadAccess,
-validateQueryParams,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  validateQueryParams,
 } from "@/lib/api";
-import { ForbiddenError } from "@/lib/api/errors";
-import { canAccessFinancialMargins } from "@/lib/auth/permissions";
 import { financeService } from "@/lib/services/finance-service";
 import { financeFilterSchema } from "@/lib/validation/finance-schema";
 import { NextRequest,NextResponse } from "next/server";
@@ -13,15 +12,19 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/finance/export
- * Downloads sanitized financial CSV report.
- * Strictly restricted to Agency Owners and roles with FINANCIAL_MARGINS EXPORT permission.
+ * Downloads financial CSV report.
  */
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
-    if (!canAccessFinancialMargins(context.dbUser.role)) {
-      throw new ForbiddenError("You do not have permission to export financial data.");
-    }
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "FINANCE",
+      "VIEW",
+      "You do not have permission to export financial data."
+    );
     const query = validateQueryParams(financeFilterSchema, request.nextUrl.searchParams);
 
     const csvData = await financeService.generateFinanceCsv(context.agencyId, query);
