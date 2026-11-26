@@ -491,12 +491,12 @@ export default function EnquiriesPage() {
           </div>
 
           {/* Right Action Controls (View Switcher + New Enquiry) */}
-          <div className="flex items-center gap-2.5 z-10 shrink-0">
+          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 z-10 w-full sm:w-auto min-w-0">
             {/* View Mode Toggle (Board-first order) */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 shrink-0">
               <button
                 onClick={() => handleViewChange("pipeline")}
-                className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   view === "pipeline"
                     ? "bg-white text-slate-900 shadow-2xs font-bold"
                     : "text-slate-500 hover:text-slate-900"
@@ -507,7 +507,7 @@ export default function EnquiriesPage() {
               </button>
               <button
                 onClick={() => handleViewChange("list")}
-                className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   view === "list"
                     ? "bg-white text-slate-900 shadow-2xs font-bold"
                     : "text-slate-500 hover:text-slate-900"
@@ -521,9 +521,9 @@ export default function EnquiriesPage() {
             <Button
               onClick={() => router.push("/enquiries/new")}
               disabled={isReadOnly}
-              className="bg-teal-700 hover:bg-teal-800 text-white font-semibold text-xs h-9 px-3.5 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50 justify-center whitespace-nowrap"
+              className="bg-teal-700 hover:bg-teal-800 text-white font-semibold text-xs h-9 px-3 sm:px-3.5 rounded-xl shadow-xs gap-1.5 cursor-pointer transition-all disabled:opacity-50 justify-center whitespace-nowrap flex-1 min-[360px]:flex-initial"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 shrink-0" />
               New Enquiry
             </Button>
           </div>
@@ -535,9 +535,9 @@ export default function EnquiriesPage() {
           <div className="p-3 border-b border-slate-100 bg-white">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
               {/* Left: Search Bar & Segmented Toggle (All vs My Enquiries) */}
-              <div className="flex flex-wrap items-center gap-2 flex-1">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 flex-1 min-w-0">
                 {/* Search Input */}
-                <div className="relative flex-1 min-w-[200px] max-w-md">
+                <div className="relative w-full sm:flex-1 sm:min-w-[200px] sm:max-w-md min-w-0">
                   <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
                   <Input
                     placeholder="Search enquiry #, customer, phone, destination..."
@@ -556,7 +556,7 @@ export default function EnquiriesPage() {
                 </div>
 
                 {/* Segmented Control: All Enquiries vs My Enquiries */}
-                <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 shrink-0">
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 w-full sm:w-auto shrink-0">
                   <button
                     type="button"
                     onClick={() => {
@@ -564,7 +564,7 @@ export default function EnquiriesPage() {
                       setPage(1);
                       setPipelinePage(1);
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    className={`flex-1 sm:flex-initial px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap text-center ${
                       scopeFilter === "all"
                         ? "bg-white text-slate-900 shadow-2xs font-bold"
                         : "text-slate-500 hover:text-slate-900"
@@ -579,22 +579,22 @@ export default function EnquiriesPage() {
                       setPage(1);
                       setPipelinePage(1);
                     }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                       scopeFilter === "my"
                         ? "bg-white text-teal-800 shadow-2xs font-bold"
                         : "text-slate-500 hover:text-slate-900"
                     }`}
                   >
-                    <UserCheck className="h-3.5 w-3.5 text-teal-700" />
+                    <UserCheck className="h-3.5 w-3.5 text-teal-700 shrink-0" />
                     <span>My Enquiries</span>
                   </button>
                 </div>
               </div>
 
               {/* Right: Urgency Filter & Secondary Filters Popover */}
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 w-full md:w-auto md:shrink-0 min-w-0">
                 {/* Urgency Filter Dropdown */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-1 md:flex-initial min-w-0">
                   <Select
                     value={urgencyFilter}
                     onValueChange={(val) => {
@@ -604,7 +604,7 @@ export default function EnquiriesPage() {
                       }
                     }}
                   >
-                    <SelectTrigger className="h-9 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-[135px]">
+                    <SelectTrigger className="h-9 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none w-full md:w-[135px]">
                       <SelectValue placeholder="All Follow-ups">
                         {(val) => URGENCY_FILTER_LABELS[val] ?? "All Follow-ups"}
                       </SelectValue>
@@ -623,7 +623,7 @@ export default function EnquiriesPage() {
                 {/* Secondary Filters Popover */}
                 <Popover>
                   <PopoverTrigger
-                    className={`inline-flex items-center justify-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-all ${
+                    className={`inline-flex items-center justify-center gap-1.5 h-9 px-3 text-xs font-semibold rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-all shrink-0 ${
                       secondaryFiltersCount > 0 ? "border-teal-400 bg-teal-50/40 text-teal-900" : "text-slate-700 bg-white"
                     }`}
                   >
@@ -635,7 +635,7 @@ export default function EnquiriesPage() {
                       </span>
                     )}
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="w-80 p-4 space-y-3 bg-white border border-slate-200 shadow-xl rounded-2xl z-50">
+                  <PopoverContent align="end" className="w-[calc(100vw-2rem)] sm:w-80 p-4 space-y-3 bg-white border border-slate-200 shadow-xl rounded-2xl z-50">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                       <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Secondary Filters</span>
                       {secondaryFiltersCount > 0 && (

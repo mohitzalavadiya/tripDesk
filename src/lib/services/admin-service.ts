@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { evaluateEffectiveSubscriptionState } from "@/lib/auth/subscription-state";
 import { internalNotificationService } from "@/lib/services/internal-notification-service";
 import { getAdminClient } from "@/lib/supabase/admin";
 import {
@@ -281,29 +282,24 @@ export const adminService = {
     const expiringTrials: PlatformOverviewStats["expiringTrials"] = [];
 
     subscriptions.forEach((sub) => {
+      const evalState = evaluateEffectiveSubscriptionState({ subscription: sub }, now);
       if (sub.status === SubscriptionStatus.TRIAL) {
-        if (sub.trialEnd) {
-          const end = new Date(sub.trialEnd).getTime();
-          const daysLeft = Math.ceil((end - now.getTime()) / (1000 * 60 * 60 * 24));
-          if (daysLeft > 0) {
-            trialAgencies++;
-            if (daysLeft <= 3 && sub.agency) {
-              expiringTrials.push({
-                id: sub.agency.id,
-                name: sub.agency.name,
-                email: sub.agency.email,
-                ownerName: sub.agency.name,
-                trialEnd: sub.trialEnd.toISOString(),
-                daysRemaining: daysLeft,
-              });
-            }
-          } else {
-            expiredTrialAgencies++;
+        if (!evalState.isTrialExpired) {
+          trialAgencies++;
+          if (evalState.daysRemaining <= 3 && sub.agency) {
+            expiringTrials.push({
+              id: sub.agency.id,
+              name: sub.agency.name,
+              email: sub.agency.email,
+              ownerName: sub.agency.name,
+              trialEnd: sub.trialEnd ? sub.trialEnd.toISOString() : now.toISOString(),
+              daysRemaining: evalState.daysRemaining,
+            });
           }
         } else {
-          trialAgencies++;
+          expiredTrialAgencies++;
         }
-      } else if (sub.status === SubscriptionStatus.ACTIVE) {
+      } else if (evalState.effectiveStatus === SubscriptionStatus.ACTIVE) {
         const price = sub.plan ? Number(sub.plan.price) : 0;
         platformSubscriptionRevenue += price;
       }
@@ -426,14 +422,11 @@ export const adminService = {
       const owner = a.users[0] || null;
       const sub = a.subscriptions[0] || null;
 
-      let daysRemaining = 0;
-      let isTrialExpired = false;
-
-      if (sub && sub.status === SubscriptionStatus.TRIAL && sub.trialEnd) {
-        const end = new Date(sub.trialEnd).getTime();
-        daysRemaining = Math.max(0, Math.ceil((end - now.getTime()) / (1000 * 60 * 60 * 24)));
-        isTrialExpired = daysRemaining <= 0;
-      }
+      const evalState = sub
+        ? evaluateEffectiveSubscriptionState({ agencyStatus: a.status, subscription: sub }, now)
+        : null;
+      const daysRemaining = evalState?.daysRemaining ?? 0;
+      const isTrialExpired = evalState?.isTrialExpired ?? false;
 
       return {
         id: a.id,
@@ -454,7 +447,7 @@ export const adminService = {
         subscription: sub
           ? {
               id: sub.id,
-              status: sub.status,
+              status: evalState!.effectiveStatus,
               planName: sub.plan?.name || "Standard",
               planPrice: sub.plan ? Number(sub.plan.price) : 0,
               trialEnd: sub.trialEnd ? sub.trialEnd.toISOString() : null,
@@ -527,14 +520,11 @@ export const adminService = {
     const sub = agency.subscriptions[0] || null;
     const now = new Date();
 
-    let daysRemaining = 0;
-    let isTrialExpired = false;
-
-    if (sub && sub.status === SubscriptionStatus.TRIAL && sub.trialEnd) {
-      const end = new Date(sub.trialEnd).getTime();
-      daysRemaining = Math.max(0, Math.ceil((end - now.getTime()) / (1000 * 60 * 60 * 24)));
-      isTrialExpired = daysRemaining <= 0;
-    }
+    const evalState = sub
+      ? evaluateEffectiveSubscriptionState({ agencyStatus: agency.status, subscription: sub }, now)
+      : null;
+    const daysRemaining = evalState?.daysRemaining ?? 0;
+    const isTrialExpired = evalState?.isTrialExpired ?? false;
 
     return {
       identity: {
@@ -561,7 +551,7 @@ export const adminService = {
       subscription: sub
         ? {
             id: sub.id,
-            status: sub.status,
+            status: evalState!.effectiveStatus,
             trialStart: sub.trialStart ? sub.trialStart.toISOString() : null,
             trialEnd: sub.trialEnd ? sub.trialEnd.toISOString() : null,
             subscriptionStart: sub.subscriptionStart ? sub.subscriptionStart.toISOString() : null,
@@ -1053,14 +1043,10 @@ export const adminService = {
     const now = new Date();
 
     return subscriptions.map((s) => {
-      let daysRemaining = 0;
-      let isTrialExpired = false;
-
-      if (s.status === SubscriptionStatus.TRIAL && s.trialEnd) {
-        const end = new Date(s.trialEnd).getTime();
-        daysRemaining = Math.max(0, Math.ceil((end - now.getTime()) / (1000 * 60 * 60 * 24)));
-        isTrialExpired = daysRemaining <= 0;
-      }
+      const evalState = evaluateEffectiveSubscriptionState(
+        { agencyStatus: s.agency.status, subscription: s },
+        now
+      );
 
       return {
         id: s.id,
@@ -1071,13 +1057,13 @@ export const adminService = {
         planId: s.planId,
         planName: s.plan.name,
         planPrice: Number(s.plan.price),
-        status: s.status,
+        status: evalState.effectiveStatus,
         trialStart: s.trialStart ? s.trialStart.toISOString() : null,
         trialEnd: s.trialEnd ? s.trialEnd.toISOString() : null,
         subscriptionStart: s.subscriptionStart ? s.subscriptionStart.toISOString() : null,
         subscriptionEnd: s.subscriptionEnd ? s.subscriptionEnd.toISOString() : null,
-        daysRemaining,
-        isTrialExpired,
+        daysRemaining: evalState.daysRemaining,
+        isTrialExpired: evalState.isTrialExpired,
         createdAt: s.createdAt.toISOString(),
       };
     });

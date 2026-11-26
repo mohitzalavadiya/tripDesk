@@ -23036,3 +23036,198 @@ In standard viewport heights (900px - 1000px display with top navbar, breadcrumb
 - All 7 existing DB-free suites (`test-phase1-security-financial-stabilization.ts`, `test-staff-invitation-session.ts`, `test-staff-dashboard-authorization.ts`, `test-staff-application-wide-authorization.ts`, `test-phase4-5-6.ts`, `test-phase7-finance.ts`, `test-quotation-usability.ts`): Passed (`504/504`, `0` failed).
 - `npx prisma validate`, `npx tsc --noEmit`, `git diff --check`, targeted ESLint (`0` errors), and `npm run build` (Next.js `16.4.6` Turbopack): Passed.
 - **Not Run (Blocked):** Live PostgreSQL DB-backed suites & live browser E2E (no local PostgreSQL/Docker runtime available).
+
+
+---
+
+### § 276.80 Staff Lifecycle Integration Verification (`NO-GO` — Blocked on Isolated DB & Supabase) (2026-11-26)
+
+#### 1. Safety Preflight Result (STOPPED Before Any Live DB/Supabase Write)
+- **Local PostgreSQL Runtime:** Unavailable (`DOCKER=`, `PSQL=`, `Get-Service *postgres*` empty, `127.0.0.1:5432` `TcpTestSucceeded=False`).
+- **Configured `.env*` Targets (All Non-Isolated):**
+  - `.env` / `.env.staging`: `TRIPDESK_ENV="staging"`, Supabase `nsqarlegqxymqfyvfrjw.supabase.co` (**Staging**).
+  - `.env.production`: `TRIPDESK_ENV="production"`, Supabase `qypkowejgqrmilckemcr.supabase.co` (**Production**, `NODE_ENV="production"`).
+  - `.env.qa`: `TRIPDESK_ENV="qa"`, Supabase `nsqarlegqxymqfyvfrjw.supabase.co` (**Staging**).
+- **Action Taken:** Stopped immediately per mandatory safety preflight; **zero** live DB queries, migrations, or Supabase Auth mutations were executed.
+
+#### 2. Static & Mocked Verification vs Blocked Live Checks
+- **Migration Static Review (`20261126120000_add_staff_lifecycle_fields/migration.sql`):** Verified additive `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS` for `isActive` (`BOOLEAN NOT NULL DEFAULT true`), `deactivatedAt`, `sessionRevokedAt`, and `deactivatedById`, matching `prisma/schema.prisma` (`npx prisma validate` passed). Live `prisma migrate deploy` & `prisma migrate status`: **NOT RUN**.
+- **Real Supabase Session Lifecycle, Refresh-Token Rejection, Login Ban, Live DB Concurrency & Data Preservation:** **NOT RUN** (no isolated PostgreSQL or dedicated test Supabase project).
+- **Previously Verified Mocked/DB-Free Suites (unchanged since `§ 276.79`):** `test-staff-lifecycle.ts` (`23/23`), `test-phase1-security-financial-stabilization.ts` (`58/58`), `test-staff-invitation-session.ts` (`27/27`), `test-staff-dashboard-authorization.ts` (`54/54`), `test-staff-application-wide-authorization.ts` (`137/137`), `test-phase4-5-6.ts` (`33/33`), `test-phase7-finance.ts` (`82/82`), `test-quotation-usability.ts` (`113/113`); `npx tsc --noEmit`, `git diff --check`, and `npm run build` passed.
+
+
+---
+
+### § 276.81 Staff Lifecycle Migration Applied to Staging (2026-11-26)
+
+- **Environment Verified:** `.env` confirmed `TRIPDESK_ENV="staging"`, `NEXT_PUBLIC_SUPABASE_URL="https://nsqarlegqxymqfyvfrjw.supabase.co"`, and `DATABASE_URL` / `DIRECT_URL` host `aws-0-ap-northeast-1.pooler.supabase.com` (Staging). No `.env.production` values or shell overrides were active.
+- **Pre-Migration Status (`npx prisma migrate status`):** Sole pending local migration was `20261126120000_add_staff_lifecycle_fields` (last common migration `20261027150000_phase_f_staff_permissions`; 13 older historical migrations already recorded in Staging `_prisma_migrations` were not present locally).
+- **Migration Execution (`npx prisma migrate deploy`):** Applied `20261126120000_add_staff_lifecycle_fields` cleanly with exit code `0`.
+- **Post-Migration Verification:**
+  - `npx prisma migrate status` reported `Database schema is up to date!`.
+  - `_prisma_migrations` recorded `20261126120000_add_staff_lifecycle_fields` (`finished_at: 2026-11-26T10:50:02.749Z`, `rolled_back_at: null`).
+  - Read-only `information_schema.columns` inspection on `public.users` confirmed `isActive` (`boolean`, `is_nullable: NO`, `column_default: true`), `deactivatedAt` (`timestamp without time zone`, `YES`), `sessionRevokedAt` (`timestamp without time zone`, `YES`), and `deactivatedById` (`text`, `YES`).
+- **Application Compatibility:** `npx prisma validate` and `npx prisma generate` (`v7.10.1`) passed. Restarted `next dev` on port `3001`; `GET /` (`307 -> /login`), `GET /login` (`200`), and `GET /settings` (`307 -> /login?redirectTo=%2Fsettings`) completed with zero `P2022` errors. Production and unrelated data were untouched.
+
+
+---
+
+### § 276.82 Production Staff Lifecycle Migration — STOPPED at Preflight (2026-11-26)
+
+- **Environment Verified:** `.env.production` confirmed `TRIPDESK_ENV="production"`, `NEXT_PUBLIC_SUPABASE_URL="https://qypkowejgqrmilckemcr.supabase.co"`, and `DATABASE_URL` / `DIRECT_URL` host `aws-0-ap-northeast-2.pooler.supabase.com` (Production). No shell overrides were active.
+- **Pre-Migration Status (`DOTENV_CONFIG_PATH=.env.production npx prisma migrate status`):**
+  - `FAILED_OR_UNFINISHED: []` (no failed or rolled-back rows in `_prisma_migrations`).
+  - **6 pending local migrations** (not just `20261126120000_add_staff_lifecycle_fields`):
+    1. `20261021120000_add_booking_enquiry_relation`
+    2. `20261023180000_add_itinerary_templates`
+    3. `20261026140000_add_agency_staff_user_role`
+    4. `20261026150000_add_agency_invitations_and_enquiry_assignment`
+    5. `20261027150000_phase_f_staff_permissions`
+    6. `20261126120000_add_staff_lifecycle_fields`
+  - Unlike Staging, Production did **not** report missing historical migrations.
+- **Backup / PITR Check:** `supabase` CLI is not installed and `SUPABASE_ACCESS_TOKEN` is unset, so Supabase backup / PITR availability on `qypkowejgqrmilckemcr.supabase.co` could not be verified from this environment (`wal_level = logical` was observed in PostgreSQL).
+- **Action Taken:** **STOPPED before `npx prisma migrate deploy`**. Zero Production migrations, schema changes, or data modifications were executed.
+
+
+---
+
+### § 276.84 Authorized Production Migration Executed (`GO` / Complete) (2026-11-26)
+
+- **Target Verified:** `.env.production` (`TRIPDESK_ENV="production"`, `qypkowejgqrmilckemcr.supabase.co`, `aws-0-ap-northeast-2.pooler.supabase.com`), no shell overrides.
+- **Preflight (`DOTENV_CONFIG_PATH=.env.production npx prisma migrate status`):** Confirmed **exactly** the 6 authorized migrations pending and no failed/unfinished rows.
+- **Execution (`DOTENV_CONFIG_PATH=.env.production npx prisma migrate deploy`):** Exit code `0`; all 6 migrations applied in chronological order:
+  1. `20261021120000_add_booking_enquiry_relation`
+  2. `20261023180000_add_itinerary_templates`
+  3. `20261026140000_add_agency_staff_user_role`
+  4. `20261026150000_add_agency_invitations_and_enquiry_assignment`
+  5. `20261027150000_phase_f_staff_permissions`
+  6. `20261126120000_add_staff_lifecycle_fields`
+- **Post-Migration Verification:**
+  - `npx prisma migrate status`: `Database schema is up to date!`; all 6 rows in `_prisma_migrations` have `finished = true, rolled_back = false`.
+  - Read-only `information_schema` / `pg_indexes` / `pg_constraint` / `pg_enum` inspection confirmed **100% parity** with Staging across all 4 new tables (`itinerary_templates`, `agency_invitations`, `staff_permission_profiles`, `agency_audit_logs`), all 3 enums (`ItineraryTemplateType`, `InvitationStatus`, `UserRole` including `AGENCY_STAFF`), all 9 added columns (`bookings.enquiryId`, `enquiries.assignedToUserId`, `agency_invitations.initialPermissions`, `payments.verifiedById`, `payments.verifiedAt`, `users.isActive` `BOOLEAN NOT NULL DEFAULT true`, `users.deactivatedAt`, `users.sessionRevokedAt`, `users.deactivatedById`), all 19 indexes, and all 9 foreign keys.
+- **Prisma Checks:** `npx prisma validate` and `npx prisma generate` (`v7.10.1`) passed.
+- **Scope Preserved:** Zero unrelated database/data modifications, zero Supabase Auth or staff lifecycle actions, zero app/env/Git changes, and Production app was not deployed or restarted.
+
+
+---
+
+### § 276.85 Complete Subscription & Plan Expiry Audit — READ-ONLY (2026-11-26)
+
+> **INVESTIGATION ONLY:** Zero database writes (`INSERT`/`UPDATE`/`DELETE`), zero subscription/payment/account mutations, zero source/env/Git changes, and zero credential exposure.
+
+- **Verified Environment & Account Scope:**
+  - Local dev (`http://localhost:3001`) connects via `.env` (`TRIPDESK_ENV="staging"`) to Staging Supabase `nsqarlegqxymqfyvfrjw.supabase.co` (`aws-0-ap-northeast-1.pooler.supabase.com`). Production was **not** touched.
+  - Existing Agency Owner `tripmadeeasy.in@gmail.com` (`id: 1a5b8334-aef6-4754-83bc-8eb8b0c54151`) → Agency `cmu2g9rgq0000swtqbr5aie7x` ("TripDesk Offical Test Agnecy", `agencies.status = "ACTIVE"`).
+
+- **Actual Database State vs. Expiry Calculation:**
+  - `subscriptions` row `cmu2g9ros0001swtqzxccuj57`: Plan `"Professional"` (`₹999/mo`, `₹9,999/yr`, `durationDays: 30`), stored `status = "ACTIVE"`, `billingCycle = "MONTHLY"`, `trialStart = 2026-09-15T03:39:01.583Z`, `trialEnd = 2026-09-22T03:39:01.583Z`, `subscriptionStart = 2026-10-24T05:43:26.912Z`, **`subscriptionEnd = 2026-11-23T05:43:26.912Z`**.
+  - Latest `subscription_payments` row: `cmvmauoxu0005xstqnpo1mvdl` (`₹999.00`, `MONTHLY`, `UPI`, `VERIFIED` at `2026-10-24T05:43:26.912Z`). No newer pending or verified renewal exists.
+  - Read-only `DB NOW()`: `2026-11-26T11:34:20.294Z` → Subscription expired **~3 days 5 hours 51 minutes ago** (`now.getTime() >= subscriptionEnd.getTime()`). Note: comparisons use exact UTC `Date` timestamps (`getTime()`), not local/UTC midnight truncation.
+
+- **Exact Root Cause (Split-Brain Expiry Enforcement & Missing Transition Job):**
+  1. **No Scheduled or Lazy Expiry Transition:** Zero cron routes (`vercel.json` absent) or DB jobs exist to transition `Subscription.status` from `ACTIVE` → `EXPIRED` when `now >= subscriptionEnd`, so PostgreSQL permanently stores `status = "ACTIVE"`.
+  2. **Auth/Request Context Ignores `subscriptionEnd` on `ACTIVE` Plans:**
+     - `src/lib/api/context.ts:132-140` (`getRequestContext`) checks `trialEnd` when `status === TRIAL`, but when `status === ACTIVE` sets `canWrite = !isSuspendedAgency` without checking `subscriptionEnd`.
+     - `src/lib/auth/index.ts:86-97` (`getCurrentUser`) and `227-232` (`getSubscriptionAccess`) contain the exact same omission (`hasFullAccess = true; isReadOnly = false` whenever `status === "ACTIVE"`).
+     - As a result, `/api/auth/me`, `Topbar`, `AgencyLifecycleBanner` (`src/components/layout/agency-lifecycle-banner.tsx:55`), and **all non-quota `requireWriteAccess()` / `requireMemberWriteAccess()` API routes** (among 130 write-guarded routes across customers, enquiries, follow-ups, inventory, suppliers, invoices, finance payments, team, settings, and edits to trips/quotations/bookings) continue permitting writes as if active.
+  3. **`subscriptionService`, `SubscriptionProvider`, and `/subscription` UI Report `ACTIVE` Professional Plan:**
+     - `src/lib/services/subscription-service.ts:196-199, 312-324, 336, 350` computes `daysRemaining = 0` for expired `ACTIVE` subscriptions, but returns `status: "ACTIVE"`, `isActive: true`, and no `isSubscriptionExpired` flag; meanwhile `.catch(() => null)` swallows `ReadOnlyAccessError` from `entitlementService.getResourceUsage()`, producing `usage: { TRIPS: null, QUOTATIONS: null, BOOKINGS: null }`.
+     - `src/context/subscription-context.tsx:167, 209-229` ignores `subscriptionEnd` when `status === "ACTIVE"` (`isReadOnly = false`, `canWrite = true`) and treats `usage[resourceKey] === null` as `allowed: true, limit: null` (unlimited) in `canCreate()`.
+     - `src/app/(dashboard)/subscription/page.tsx:301, 387-399, 448, 739-742, 825-832` renders `ACTIVE SUBSCRIPTION`, `Professional Plan`, green `Active`, and disables renewing `Professional (MONTHLY)` (`Current Active Plan`).
+  4. **Asymmetric Backend Enforcement (`entitlementService` vs. `requireWriteAccess`):**
+     - `entitlementService.resolveAgencySubscription()` (`src/lib/services/entitlement-service.ts:118-122`) **does** check `now >= periodEnd` and throws `ReadOnlyAccessError` (`403 READ_ONLY_ACCESS`), so endpoints calling `checkQuota()` (Trip/Quotation/Booking creation, staff invites) and `checkFeatureAllowed()` (`GET /api/reports*`, `/api/customer-insights`, `/api/feedback*`, `/api/agency/logo`, PDF logo helper) fail closed on the backend, while all other write routes do not.
+  5. **Secondary Renewal Catch-22 (`src/app/api/subscription/payment-request/route.ts:9`):**
+     - Uses `requireWriteAccess()`, which will block renewal payment submission once `getRequestContext()` properly marks expired `ACTIVE` subscriptions as read-only (must allow authenticated non-suspended owner/permitted staff via `requireAgencyMemberContext()`).
+  6. **Grace Period & Caching:** Zero intentional grace period exists anywhere in `src/` (`SubscriptionStatus` has only `TRIAL | ACTIVE | EXPIRED | CANCELLED`; `PAST_DUE` only appears in legacy client mock/type files). Neither `getRequestContext()` nor `/api/auth/me` caches entitlements server-side; reload/re-login does not fix access because the backend context itself omits the `subscriptionEnd` check.
+
+- **V3 Compliance Mismatches:**
+  - Expired `ACTIVE` paid subscriptions do not transition into `EXPIRED` / `Read-Only Mode` UX or block non-quota writes in `requireWriteAccess()`/`requireMemberWriteAccess()`.
+  - Staging DB `plan_usage_limits` for `Starter` currently stores `25 / 25 / 25` (`TRIPS`, `QUOTATIONS`, `BOOKINGS`), differing from `prisma/seed.ts:45-48` & V3 §160/§258 (`20 / 20 / 20`) and user checklist (`5 / 10 / 5`); `STAFF_MEMBERS` row is absent from Staging `plan_usage_limits` (falls back to `5` Starter / `20` Pro in `entitlement-service.ts:246-248`).
+  - `POST /api/subscription/payment-request` uses `requireWriteAccess()` instead of remaining exempted for expired renewals (V3 §150+/§13745).
+
+- **Live Browser Verification Status:**
+  - `http://localhost:3001/login` returned HTTP `200`, but interactive Chrome verification via browser subagent (`14742ae1-ffba-414e-b06a-208b33e61438`) was **blocked (`NOT VERIFIED`)** because Chrome DevTools remote debugging is not active (`DevToolsActivePort` ENOENT).
+
+
+---
+
+### § 276.86 Subscription Expiry Enforcement — Production-Safe Correctness Fix (2026-11-26)
+
+- **Root Cause Addressed:** Fixed the split-brain expiry bug (`§ 276.85`) where `ACTIVE` paid subscriptions with `subscriptionEnd <= now` still returned `status: "ACTIVE"`, `canWrite: true`, `hasFullAccess: true`, `isReadOnly: false` from `getRequestContext()`, `getCurrentUser()`, `getSubscriptionAccess()`, `subscriptionService`, `SubscriptionProvider`, `/subscription`, and `adminService`, and where `POST /api/subscription/payment-request` used `requireWriteAccess()`.
+- **Shared Authoritative Evaluator (`src/lib/auth/subscription-state.ts`):**
+  - Added `evaluateEffectiveSubscriptionState(input, now)` using exact UTC millisecond timestamps (`trialEnd` / `subscriptionEnd`), zero grace period, and fail-closed `EXPIRED` + `canWrite: false` + `isReadOnly: true` whenever `now >= end` or `end` is missing/invalid (recording safe diagnostic reasons).
+- **Server Auth, Entitlements, Renewal & Admin Reporting:**
+  - `src/lib/api/context.ts`: Updated `getRequestContext()` to use `evaluateEffectiveSubscriptionState()`, and added `requireBillingRenewalAccess()` (blocks `SUSPENDED` agencies, allows `EXPIRED`/`CANCELLED` agencies to reach renewal).
+  - `src/lib/auth/index.ts`: Updated `getCurrentUser()` and `getSubscriptionAccess()` to use `evaluateEffectiveSubscriptionState()`.
+  - `src/lib/services/entitlement-service.ts`: Updated `resolveAgencySubscription(agencyId, client, now)` to delegate to `evaluateEffectiveSubscriptionState()` and fail closed with `ReadOnlyAccessError` when `subscriptionEnd` is missing, invalid, or reached.
+  - `src/app/api/subscription/payment-request/route.ts`: Switched from `requireWriteAccess()` to `requireBillingRenewalAccess()` while keeping `enforceStaffPermission(..., "SUBSCRIPTION", "manage")`, Zod validation, and Platform Owner approval workflow.
+  - `src/lib/services/subscription-service.ts`: `getAgencySubscription()` now returns effective `status`, `isActive`, `isSubscriptionExpired`, `isExpired`, `isTrialExpired`, `daysRemaining`, and `storedStatus`.
+  - `src/lib/services/admin-service.ts`: Updated `getPlatformOverview()`, `listAgencies()`, `getAgency360()`, and `listSubscriptions()` so expired `ACTIVE` subscriptions are reported as `EXPIRED` and excluded from active MRR/revenue.
+- **UI & Client Fail-Closed State:**
+  - `src/context/subscription-context.tsx`: Uses `evaluateEffectiveSubscriptionState()` for `isReadOnly` / `readOnlyReason`, and `canCreate()` fails closed (`allowed: false`) when usage data is missing instead of granting unlimited access.
+  - `src/app/(dashboard)/subscription/page.tsx`: Displays `SUBSCRIPTION EXPIRED`, rose `Expired` status, `Expired On` date, `Read-Only` / `—` for unavailable usage meters, and enables `Renew <Plan> (<Cycle>)` instead of disabling the expired plan as `Current Active Plan`.
+- **Verification:**
+  - `prisma/test-subscription-expiry-enforcement.ts`: `34/34` passed (`1s` future, `=== now`, `1s` past, missing/invalid `subscriptionEnd`, trial boundaries, expired owner & staff read-only/write blocking, renewal route owner/staff/suspended/validation checks, active & Platform Owner regression).
+  - `prisma/test-staff-lifecycle.ts` (`23/23`), `prisma/test-staff-application-wide-authorization.ts` (`137/137`), `prisma/test-staff-invitation-session.ts`, `prisma/test-phase1-security-financial-stabilization.ts`, `npx prisma validate`, `npx tsc --noEmit`, `git diff --check`, targeted `eslint`, and `npm run build` all exited `0`.
+  - Existing Staging agency records (`tripmadeeasy.in@gmail.com`) and Production were untouched.
+
+
+---
+
+### § 276.87 Staging Subscription Expiry — Verification Report (2026-11-26)
+
+> **VERIFICATION ONLY:** Zero database writes, zero subscription/payment/account mutations, zero source/env/Git changes, and Production (`qypkowejgqrmilckemcr`) was not accessed.
+
+- **Staging Environment Confirmed:** `.env` (`TRIPDESK_ENV="staging"`) points to `nsqarlegqxymqfyvfrjw.supabase.co` and `aws-0-ap-northeast-1.pooler.supabase.com` with no shell overrides.
+- **Existing Agency Subscription State (`tripmadeeasy.in@gmail.com` → `cmu2g9rgq0000swtqbr5aie7x`):**
+  - Stored DB state: `planName = "Professional"`, `status = "ACTIVE"`, `billingCycle = "MONTHLY"`, `subscriptionStart = 2026-10-24T05:43:26.912Z`, `subscriptionEnd = 2026-11-23T05:43:26.912Z`; latest verified payment `cmvmauoxu0005xstqnpo1mvdl` (`₹999.00`, `2026-10-24T05:43:26.912Z`).
+  - Live Staging evaluation (`evaluateEffectiveSubscriptionState`, `subscriptionService.getAgencySubscription`, `entitlementService.resolveAgencySubscription`):
+    - `storedStatus: "ACTIVE"`, **`effectiveStatus: "EXPIRED"`**, `canRead: true`, `canWrite: false`, `hasFullAccess: false`, `isReadOnly: true`, `isSubscriptionExpired: true`, `isExpired: true`, `daysRemaining: 0`, `diagnosticReason: "SUBSCRIPTION_ENDED"`.
+    - `entitlements`: all 4 Pro keys `false`; `usage`: `{ TRIPS: null, QUOTATIONS: null, BOOKINGS: null }`; `entitlementService.resolveAgencySubscription()` threw `403 READ_ONLY_ACCESS`.
+- **Authenticated Browser Verification:** **`NOT VERIFIED`** — Chrome DevTools remote debugging is not active (`DevToolsActivePort` ENOENT), so interactive login/reload/re-login and live browser `/api/auth/me` & `/api/subscription` network checks could not be executed.
+- **Regression & Static Checks:**
+  - `prisma/test-staff-lifecycle.ts`: `23/23` passed.
+  - `prisma/test-staff-application-wide-authorization.ts`: `137/137` passed.
+  - `npx prisma validate`, `git diff --check`, and focused `eslint` (`subscription-state.ts`, `context.ts`, `auth/index.ts`, `payment-request/route.ts`): passed (`0` errors).
+  - `prisma/test-subscription-expiry-enforcement.ts`: failed at line 338 (`Starter 20/20 TRIPS quota`) because its hardcoded `oneSecFuture` (`2026-11-26T12:00:01Z`) had already become past real UTC wall-clock time (`12:07Z`) when `checkQuota` defaulted `now = new Date()`.
+  - `npx tsc --noEmit`: failed on `src/app/(dashboard)/follow-ups/page.tsx` (`TS17008`/`TS1005` around lines `604–917` & `1752–1753`; unrelated to subscription expiry, left untouched).
+
+
+---
+
+## § 276.88 Subscription Expiry — Final Local Correctness & Browser Verification (2026-11-26)
+
+> **VERIFICATION & MINIMAL FIXES ONLY:** Fixed only the Follow-ups JSX syntax defect and the flaky timestamp in `prisma/test-subscription-expiry-enforcement.ts`. Zero database writes, zero subscription/payment/account mutations, zero `.env*`/Git changes, and Production (`qypkowejgqrmilckemcr`) was not accessed.
+
+- **Part A — Follow-ups JSX Syntax Fix (`src/app/(dashboard)/follow-ups/page.tsx`):**
+  - Removed 18 duplicated JSX opening/attribute lines left behind by earlier edits around lines `621–914` (`<div className="grid grid-cols-2 md:grid-cols-4 gap-4">`, 4 KPI card label/icon pairs, Controls outer/inner wrapper divs, duplicated `className={...}` attributes on scope buttons / `Reset` / `Refresh`, and duplicated `<SelectTrigger>` lines) that caused `TS17008`/`TS1005`.
+  - Preserved all layout, filters, follow-up workflows, and permissions without redesign.
+- **Part B — Deterministic Subscription Expiry Test (`prisma/test-subscription-expiry-enforcement.ts`):**
+  - Replaced hardcoded `oneSecFuture` in `entitlementService.checkQuota` assertions (lines `333–339`, where `checkQuota` defaults `now = new Date()`) with `const activeFutureEnd = new Date(Date.now() + 86_400_000);` while preserving `baseNow` for all deterministic `evaluateEffectiveSubscriptionState` and `resolveAgencySubscription(..., baseNow)` tests.
+- **Part C — Full Regression, Typecheck & Build Results (all exited `0`):**
+  - `npx tsx prisma/test-subscription-expiry-enforcement.ts` (run 1 & run 2): **`34 passed, 0 failed (total 34)`** each.
+  - `npx tsx prisma/test-staff-lifecycle.ts`: **`23 passed, 0 failed (total 23)`**.
+  - `npx tsx prisma/test-staff-application-wide-authorization.ts`: **`137/137`** passed (`100%`).
+  - `npx tsx prisma/test-staff-invitation-session.ts`: **`27/27`** passed (`100%`).
+  - `npx tsx prisma/test-phase1-security-financial-stabilization.ts`: **`58 passed, 0 failed (total 58)`**.
+  - `npx prisma validate`, `npx tsc --noEmit`, `git diff --check`, focused `npx eslint src/lib/auth/subscription-state.ts src/lib/api/context.ts src/lib/auth/index.ts src/app/api/subscription/payment-request/route.ts`, and `npm run build`: all passed (`0` errors).
+- **Part D — Staging Environment & Authenticated Browser Verification:**
+  - `.env` confirmed as `TRIPDESK_ENV="staging"` pointing to `nsqarlegqxymqfyvfrjw.supabase.co`, with existing local server healthy on `http://localhost:3001/login` (`HTTP 200`, `PID 32128`).
+  - **Authenticated Browser Verification:** **`NOT VERIFIED`** — Chrome DevTools remote debugging is not active (`$env:LOCALAPPDATA\Google\Chrome\User Data\DevToolsActivePort` is `False`), and the owner's normal Chrome profile was not modified. Interactive browser login/reload/re-login, `/api/auth/me` & `/api/subscription` browser network inspection, and live UI write-block checks require manual verification in the local browser with `tripmadeeasy.in@gmail.com`.
+
+
+---
+
+## § 276.89 Production Subscription Expiry Release — Preflight & Blocker Report (2026-11-26)
+
+> **STOPPED AT PREFLIGHT (NO DEPLOYMENT EXECUTED):** Zero source-code changes, zero schema migrations, zero database writes, zero subscription/payment/account mutations, zero Git staging/commits/branch switches, and Production app was **not** deployed.
+
+- **Git & Commit Inspection:**
+  - Current branch: `implement-crm`; `HEAD`: `8c6378e` (`add role base`).
+  - **Blocker 1 — No Committed Release:** All subscription-expiry changes (`src/lib/auth/subscription-state.ts`, `src/lib/api/context.ts`, `src/lib/auth/index.ts`, `src/lib/services/entitlement-service.ts`, `src/lib/services/subscription-service.ts`, `src/app/api/subscription/payment-request/route.ts`, `src/context/subscription-context.tsx`, `src/app/(dashboard)/subscription/page.tsx`, `src/lib/services/admin-service.ts`, `prisma/test-subscription-expiry-enforcement.ts`) remain **uncommitted** in the working tree alongside unrelated uncommitted modifications (`AGENTS.md`, `src/app/(dashboard)/enquiries/page.tsx`, `src/app/(dashboard)/follow-ups/page.tsx`, `src/components/dashboard/revenue-chart.tsx`, `src/components/dashboard/todays-follow-ups-card.tsx`, `src/components/enquiries/enquiry-pipeline.tsx`). Note: actual paths in this repo are `src/lib/services/entitlement-service.ts`, `src/lib/services/subscription-service.ts`, and `src/context/subscription-context.tsx`.
+  - **Blocker 2 — Isolation & Deployment Tooling:** Under the release rules (*do not deploy unrelated working-tree changes; do not discard/reset/stage/commit unrelated user modifications; do not switch branches or rewrite Git history*), a clean isolated release cannot be produced from the current dirty working tree. Additionally, `vercel` CLI is not installed locally and `.vercel/` / `vercel.json` are absent.
+  - **Blocker 3 — Prior Browser Verification Gap:** Staging authenticated browser verification remains `NOT VERIFIED` (`DevToolsActivePort` ENOENT).
+- **Production Database Schema Check (Read-Only):**
+  - `DOTENV_CONFIG_PATH=.env.production npx prisma migrate status` against `aws-0-ap-northeast-2.pooler.supabase.com:5432`: `8 migrations found in prisma/migrations`, **`Database schema is up to date!`**
+- **Latest Verified Local Test & Build Status (from § 276.88, no code edits since):**
+  - `test-subscription-expiry-enforcement.ts`: `34/34` passed (run twice); `test-staff-lifecycle.ts`: `23/23`; `test-staff-application-wide-authorization.ts`: `137/137`; `test-staff-invitation-session.ts`: `27/27`; `test-phase1-security-financial-stabilization.ts`: `58/58`; `npx prisma validate`, `npx tsc --noEmit`, `git diff --check`, focused `eslint`, and `npm run build`: all exited `0`.

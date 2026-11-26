@@ -56,7 +56,7 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
           <div className="h-5 w-44 bg-slate-200 rounded" />
           <div className="h-8 w-28 bg-slate-100 rounded-xl" />
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-20 bg-slate-100 rounded-xl" />
           ))}
@@ -67,7 +67,8 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
   }
 
   // Calculate SVG scales
-  const svgWidth = 800;
+  const pointsCount = timeSeries.length;
+  const svgWidth = Math.max(800, pointsCount * 46);
   const svgHeight = 220;
   const paddingLeft = 55;
   const paddingRight = 30;
@@ -85,8 +86,6 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
     ...timeSeries.map((t) => t.bookingsCount || 0),
     5
   );
-
-  const pointsCount = timeSeries.length;
 
   const getX = (index: number) => {
     if (pointsCount <= 1) return paddingLeft + plotWidth / 2;
@@ -170,31 +169,31 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end min-w-0">
           {/* Mode switch */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 text-xs font-semibold">
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 text-[11px] sm:text-xs font-semibold flex-1 sm:flex-initial min-w-0">
             <button
               type="button"
               onClick={() => setChartMode("FINANCIAL")}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex-1 sm:flex-initial ${
                 chartMode === "FINANCIAL"
                   ? "bg-white text-slate-900 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <LineChart className="h-3.5 w-3.5 text-indigo-600" />
+              <LineChart className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
               <span>Revenue (₹)</span>
             </button>
             <button
               type="button"
               onClick={() => setChartMode("VOLUME")}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex-1 sm:flex-initial ${
                 chartMode === "VOLUME"
                   ? "bg-white text-slate-900 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <BarChart3 className="h-3.5 w-3.5 text-teal-600" />
+              <BarChart3 className="h-3.5 w-3.5 text-teal-600 shrink-0" />
               <span>Bookings (#)</span>
             </button>
           </div>
@@ -203,7 +202,7 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
             <a
               href={dashboardClient.getExportUrl()}
               download
-              className="flex items-center justify-center h-8 px-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold transition-colors cursor-pointer gap-1 shadow-2xs whitespace-nowrap"
+              className="flex items-center justify-center h-8 px-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold transition-colors cursor-pointer gap-1 shadow-2xs whitespace-nowrap shrink-0"
               title="Download CSV"
             >
               <FileDown className="h-3.5 w-3.5 text-slate-500" />
@@ -215,14 +214,14 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
 
       {/* 2. Top Summary KPI Strip */}
       {summary && (
-        <div className={`grid gap-2.5 sm:gap-3.5 ${hasGrossProfit ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-2"}`}>
+        <div className={`grid gap-2.5 sm:gap-3.5 ${hasGrossProfit ? "grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 min-[380px]:grid-cols-2"}`}>
           {/* Revenue */}
           <div className="p-3 sm:p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 min-w-0">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] uppercase font-bold text-slate-500 tracking-wider">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] uppercase font-bold text-slate-500 tracking-wider truncate">
                 Total Revenue
               </span>
-              <span className="h-2 w-2 rounded-full bg-indigo-600" />
+              <span className="h-2 w-2 rounded-full bg-indigo-600 shrink-0" />
             </div>
             <strong className="text-base sm:text-lg font-mono font-black text-slate-900 block mt-1 tabular-nums whitespace-nowrap truncate">
               {formatRupees(summary.totalRevenue)}
@@ -231,11 +230,11 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
 
           {/* Collected */}
           <div className="p-3 sm:p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 min-w-0">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] uppercase font-bold text-slate-500 tracking-wider">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] uppercase font-bold text-slate-500 tracking-wider truncate">
                 Total Collected
               </span>
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
             </div>
             <strong className="text-base sm:text-lg font-mono font-black text-emerald-700 block mt-1 tabular-nums whitespace-nowrap truncate">
               {formatRupees(summary.totalCollected)}
@@ -246,11 +245,11 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
           {hasGrossProfit && (
             <>
               <div className="p-3 sm:p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase font-bold text-slate-500 tracking-wider">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] uppercase font-bold text-slate-500 tracking-wider truncate">
                     Gross Profit
                   </span>
-                  <span className="h-2 w-2 rounded-full bg-purple-500" />
+                  <span className="h-2 w-2 rounded-full bg-purple-500 shrink-0" />
                 </div>
                 <strong className="text-base sm:text-lg font-mono font-black text-purple-700 block mt-1 tabular-nums whitespace-nowrap truncate">
                   {formatRupees(summary.totalGrossProfit)}
@@ -259,11 +258,11 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
 
               {/* Gross Margin % */}
               <div className="p-3 sm:p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase font-bold text-slate-500 tracking-wider">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] uppercase font-bold text-slate-500 tracking-wider truncate">
                     Gross Margin
                   </span>
-                  <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-1.5 py-0.2 rounded border border-teal-200">
+                  <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200 shrink-0">
                     Healthy
                   </span>
                 </div>
@@ -315,11 +314,16 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
             No booking or financial activity recorded for the selected time filter.
           </div>
         ) : (
-          <div className="relative rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50/40 p-2 sm:p-4 shadow-2xs overflow-hidden">
+          <div className="relative rounded-2xl border border-slate-200/80 bg-gradient-to-b from-white via-white to-slate-50/40 p-2 sm:p-4 shadow-2xs overflow-x-auto">
+            <div
+              className="relative"
+              style={{
+                minWidth: pointsCount > 6 ? `${Math.max(560, pointsCount * 42)}px` : "100%",
+              }}
+            >
             <svg
               viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-              className="w-full h-auto select-none overflow-visible"
-              style={{ minHeight: "200px" }}
+              className="w-full h-[190px] sm:h-auto select-none overflow-visible"
             >
               <defs>
                 <linearGradient id="chartRevenueGrad" x1="0" y1="0" x2="0" y2="1">
@@ -564,6 +568,7 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
                 </div>
               </div>
             )}
+            </div>
           </div>
         )}
       </div>
@@ -573,16 +578,16 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
         <button
           type="button"
           onClick={() => setShowTable(!showTable)}
-          className="flex items-center justify-between w-full text-left text-xs font-bold text-slate-700 hover:text-slate-900 transition-colors py-1 cursor-pointer"
+          className="flex items-center justify-between gap-2 w-full text-left text-xs font-bold text-slate-700 hover:text-slate-900 transition-colors py-1 cursor-pointer"
         >
-          <span className="flex items-center gap-1.5">
-            <TableIcon className="h-3.5 w-3.5 text-slate-400" />
-            <span>Tabular Financial Breakdown</span>
-            <span className="text-[10px] font-normal text-slate-400 font-mono">
+          <span className="flex items-center gap-1.5 min-w-0">
+            <TableIcon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            <span className="truncate">Tabular Financial Breakdown</span>
+            <span className="text-[10px] font-normal text-slate-400 font-mono shrink-0">
               ({timeSeries.length} rows)
             </span>
           </span>
-          <span className="flex items-center gap-1 text-[11px] text-teal-700 font-medium">
+          <span className="flex items-center gap-1 text-[11px] text-teal-700 font-medium shrink-0 whitespace-nowrap">
             <span>{showTable ? "Hide Table" : "Show Table"}</span>
             {showTable ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </span>

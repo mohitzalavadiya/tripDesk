@@ -206,11 +206,11 @@ export function TodaysFollowUpsCard({
 
         {/* Filter pills & CRM link */}
         <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
-          <div className="flex items-center bg-slate-100/80 p-0.5 rounded-xl text-xs font-medium">
+          <div className="flex items-center bg-slate-100/80 p-0.5 rounded-xl text-xs font-medium max-w-full overflow-x-auto">
             <button
               type="button"
               onClick={() => setFilterScope("all")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                 filterScope === "all"
                   ? "bg-white text-slate-900 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -221,7 +221,7 @@ export function TodaysFollowUpsCard({
             <button
               type="button"
               onClick={() => setFilterScope("overdue")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
                 filterScope === "overdue"
                   ? "bg-white text-rose-700 shadow-2xs"
                   : "text-slate-600 hover:text-rose-600"
@@ -232,7 +232,7 @@ export function TodaysFollowUpsCard({
             <button
               type="button"
               onClick={() => setFilterScope("today")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                 filterScope === "today"
                   ? "bg-white text-amber-800 shadow-2xs"
                   : "text-slate-600 hover:text-amber-700"
@@ -282,7 +282,7 @@ export function TodaysFollowUpsCard({
           </div>
         </div>
       ) : (
-        <div className="space-y-2.5">
+        <div className="space-y-2.5 max-h-[420px] sm:max-h-[480px] overflow-y-auto pr-1">
           {displayedItems.map((item) => {
             const isItemOverdue = item.isOverdue;
             const typeConfig = TYPE_CONFIG[item.type] || {

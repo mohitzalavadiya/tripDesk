@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { isDbUserSessionValid } from "@/lib/auth/session-validation";
+import { evaluateEffectiveSubscriptionState } from "@/lib/auth/subscription-state";
 import { createClient } from "@/lib/supabase/server";
 import {
 Agency,
@@ -117,43 +118,27 @@ export async function getRequestContext(): Promise<RequestContext | null> {
     const isPlatformOwner = dbUser.role === UserRole.PLATFORM_OWNER && !dbUser.agencyId;
     const isAgencyOwner = dbUser.role === UserRole.AGENCY_OWNER && !!dbUser.agencyId;
     const isAgencyStaff = dbUser.role === UserRole.AGENCY_STAFF && !!dbUser.agencyId;
-    const isSuspendedAgency = (isAgencyOwner || isAgencyStaff) && agency?.status === AgencyStatus.SUSPENDED;
 
-    // Calculate subscription access
-    let status: SubscriptionStatus = SubscriptionStatus.TRIAL;
-    let canWrite = isPlatformOwner;
-    const canRead = true;
-    let trialDaysRemaining = 0;
+    // Calculate authoritative effective subscription access (never trusts stored ACTIVE if subscriptionEnd has passed)
+    const evalState = evaluateEffectiveSubscriptionState({
+      agencyStatus: agency?.status,
+      subscription,
+      isPlatformOwner,
+    });
 
-    if (subscription) {
-      status = subscription.status;
-      const now = Date.now();
-
-      if (subscription.status === SubscriptionStatus.TRIAL && subscription.trialEnd) {
-        const end = new Date(subscription.trialEnd).getTime();
-        trialDaysRemaining = Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)));
-        canWrite = !isSuspendedAgency && trialDaysRemaining > 0;
-      } else if (subscription.status === SubscriptionStatus.ACTIVE) {
-        canWrite = !isSuspendedAgency;
-      } else {
-        canWrite = false;
-      }
-    } else if (isAgencyOwner || isAgencyStaff) {
-      status = SubscriptionStatus.EXPIRED;
-      canWrite = false;
-    }
-
-    if (isSuspendedAgency) {
-      canWrite = false;
+    if (evalState.diagnosticReason && evalState.diagnosticReason !== "PLATFORM_OWNER" && evalState.isExpired) {
+      console.info(
+        `[getRequestContext] Agency ${agency?.id ?? "unknown"} restricted (${evalState.diagnosticReason})`
+      );
     }
 
     const subscriptionAccess: SubscriptionAccessInfo = {
-      status,
-      hasFullAccess: canWrite,
-      isReadOnly: !canWrite,
-      canRead,
-      canWrite,
-      trialDaysRemaining,
+      status: evalState.effectiveStatus,
+      hasFullAccess: evalState.hasFullAccess,
+      isReadOnly: evalState.isReadOnly,
+      canRead: evalState.canRead,
+      canWrite: evalState.canWrite,
+      trialDaysRemaining: evalState.daysRemaining,
       trialStart: subscription?.trialStart,
       trialEnd: subscription?.trialEnd,
       subscriptionEnd: subscription?.subscriptionEnd,
@@ -267,6 +252,21 @@ export async function requireAgencyOwnerChatAccess(): Promise<AgencyMemberReques
 }
 
 export const requireAgencyMemberChatAccess = requireAgencyOwnerChatAccess;
+
+/**
+ * Guard: Allows authenticated non-suspended Agency Members to submit subscription renewal payment requests
+ * even when the agency's trial or paid subscription is EXPIRED or CANCELLED.
+ * Strictly blocks SUSPENDED agencies and relies on route-level role/permission checks.
+ */
+export async function requireBillingRenewalAccess(): Promise<AgencyMemberRequestContext> {
+  const context = await requireAgencyMemberContext();
+  if (context.agency.status === AgencyStatus.SUSPENDED) {
+    throw new ReadOnlyAccessError(
+      "Your agency workspace is currently suspended. Subscription renewal requests are disabled. Please contact Your Travel Desk support."
+    );
+  }
+  return context;
+}
 
 /**
  * Guard: Requires an authenticated Agency Member (Owner or Staff) with a valid agency assignment.

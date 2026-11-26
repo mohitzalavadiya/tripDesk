@@ -618,7 +618,8 @@ export default function FollowUpsPage() {
 
         <div className="space-y-6 max-w-7xl mx-auto w-full">
         {/* KPI TELEMETRY CARDS */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <button
             type="button"
             onClick={() => handleScopeChange("overdue")}
@@ -629,8 +630,10 @@ export default function FollowUpsPage() {
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-rose-600 tracking-wider uppercase">Overdue</span>
-              <div className="p-2 rounded-lg bg-rose-100/70 text-rose-600">
+
+
+              <span className="text-xs font-semibold text-rose-600 tracking-wider uppercase truncate">Overdue</span>
+              <div className="p-2 rounded-lg bg-rose-100/70 text-rose-600 shrink-0 ml-2">
                 <AlertTriangle className="h-4 w-4" />
               </div>
             </div>
@@ -650,8 +653,10 @@ export default function FollowUpsPage() {
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-amber-600 tracking-wider uppercase">Today</span>
-              <div className="p-2 rounded-lg bg-amber-100/70 text-amber-600">
+
+
+              <span className="text-xs font-semibold text-amber-600 tracking-wider uppercase truncate">Today</span>
+              <div className="p-2 rounded-lg bg-amber-100/70 text-amber-600 shrink-0 ml-2">
                 <CalendarDays className="h-4 w-4" />
               </div>
             </div>
@@ -671,8 +676,10 @@ export default function FollowUpsPage() {
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-blue-600 tracking-wider uppercase">Upcoming</span>
-              <div className="p-2 rounded-lg bg-blue-100/70 text-blue-600">
+
+
+              <span className="text-xs font-semibold text-blue-600 tracking-wider uppercase truncate">Upcoming</span>
+              <div className="p-2 rounded-lg bg-blue-100/70 text-blue-600 shrink-0 ml-2">
                 <Clock className="h-4 w-4" />
               </div>
             </div>
@@ -692,8 +699,10 @@ export default function FollowUpsPage() {
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-emerald-600 tracking-wider uppercase">Completed</span>
-              <div className="p-2 rounded-lg bg-emerald-100/70 text-emerald-600">
+
+
+              <span className="text-xs font-semibold text-emerald-600 tracking-wider uppercase truncate">Completed</span>
+              <div className="p-2 rounded-lg bg-emerald-100/70 text-emerald-600 shrink-0 ml-2">
                 <CheckCircle2 className="h-4 w-4" />
               </div>
             </div>
@@ -705,15 +714,18 @@ export default function FollowUpsPage() {
         </div>
 
         {/* CONTROLS & FILTER BAR */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+
+
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar pb-0.5 md:pb-0 md:flex-wrap w-full lg:w-auto">
             {(["today", "overdue", "upcoming", "completed", "all"] as const).map((tab) => (
               <Button
                 key={tab}
                 variant={scope === tab ? "default" : "outline"}
                 size="sm"
                 onClick={() => handleScopeChange(tab)}
-                className={`capitalize text-xs font-medium cursor-pointer ${
+
+                className={`capitalize text-xs font-medium cursor-pointer shrink-0 whitespace-nowrap ${
                   scope === tab
                     ? "bg-slate-900 text-white"
                     : "text-slate-600 hover:text-slate-900 border-slate-200"
@@ -728,8 +740,10 @@ export default function FollowUpsPage() {
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-            <div className="relative flex-1 md:w-56">
+
+
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-2.5 w-full lg:w-auto">
+            <div className="relative col-span-2 sm:flex-1 sm:min-w-[200px] md:w-56">
               <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
               <Input
                 placeholder="Search lead or customer..."
@@ -755,7 +769,8 @@ export default function FollowUpsPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-9.5 w-32 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+
+              <SelectTrigger className="h-9.5 w-full sm:w-32 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
                 <SelectValue placeholder="All Channels">
                   {(val) => TYPE_FILTER_LABELS[val] ?? "All Channels"}
                 </SelectValue>
@@ -777,7 +792,8 @@ export default function FollowUpsPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-9.5 w-32 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+
+              <SelectTrigger className="h-9.5 w-full sm:w-32 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
                 <SelectValue placeholder="All Priorities">
                   {(val) => PRIORITY_FILTER_LABELS[val] ?? "All Priorities"}
                 </SelectValue>
@@ -798,7 +814,8 @@ export default function FollowUpsPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-9.5 w-32 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+
+              <SelectTrigger className="h-9.5 w-full sm:w-32 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
                 <SelectValue placeholder="All Statuses">
                   {(val) => STATUS_FILTER_LABELS[val] ?? "All Statuses"}
                 </SelectValue>
@@ -819,7 +836,8 @@ export default function FollowUpsPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-9.5 w-36 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+
+              <SelectTrigger className="h-9.5 w-full sm:w-36 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
                 <SelectValue placeholder="All Consultants" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
@@ -861,7 +879,8 @@ export default function FollowUpsPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-9.5 w-32 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
+
+              <SelectTrigger className="h-9.5 w-full sm:w-32 text-xs rounded-xl bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-800 font-medium focus-visible:ring-2 focus-visible:ring-indigo-500/20 focus-visible:border-indigo-500 transition-all select-none">
                 <SelectValue placeholder="All Dates" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl bg-white/95 backdrop-blur-md p-1.5 text-slate-800 shadow-xl border border-slate-200/90 z-50">
@@ -877,7 +896,8 @@ export default function FollowUpsPage() {
                 variant="ghost"
                 size="sm"
                 onClick={handleResetFilters}
-                className="h-9.5 text-xs text-slate-600 hover:text-rose-600 hover:bg-rose-50 gap-1 px-2.5 rounded-xl cursor-pointer"
+
+                className="h-9.5 w-full sm:w-auto justify-center text-xs text-slate-600 hover:text-rose-600 hover:bg-rose-50 gap-1 px-2.5 rounded-xl border border-slate-200 sm:border-transparent cursor-pointer"
                 title="Reset all filters"
               >
                 <X className="h-3.5 w-3.5" />
@@ -890,7 +910,8 @@ export default function FollowUpsPage() {
               size="icon"
               onClick={() => fetchData()}
               title="Refresh"
-              className="h-9.5 w-9.5 text-slate-600 border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer"
+
+              className={`h-9.5 w-full sm:w-9.5 text-slate-600 border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer ${hasActiveFilters ? "col-span-2 sm:col-span-1" : ""}`}
             >
               <RotateCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </Button>

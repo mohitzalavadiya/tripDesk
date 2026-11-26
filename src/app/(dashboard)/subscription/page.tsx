@@ -74,6 +74,7 @@ interface AgencySubscriptionData {
   };
   subscription: {
     id: string;
+    storedStatus?: "TRIAL" | "ACTIVE" | "EXPIRED" | "CANCELLED";
     status: "TRIAL" | "ACTIVE" | "EXPIRED" | "CANCELLED";
     billingCycle: "MONTHLY" | "YEARLY" | string;
     planId: string;
@@ -88,6 +89,8 @@ interface AgencySubscriptionData {
     subscriptionEnd: string | null;
     daysRemaining: number;
     isTrialExpired: boolean;
+    isSubscriptionExpired?: boolean;
+    isExpired?: boolean;
     isActive: boolean;
   };
   usage?: Record<string, ResourceUsageItem>;
@@ -296,9 +299,10 @@ export default function AgencySubscriptionPage() {
   }
 
   const sub = data?.subscription;
-  const isTrial = sub?.status === "TRIAL";
-  const isTrialExpired = sub?.isTrialExpired;
-  const isActivePaid = sub?.status === "ACTIVE";
+  const isTrial = sub?.status === "TRIAL" || sub?.storedStatus === "TRIAL";
+  const isTrialExpired = Boolean(sub?.isTrialExpired);
+  const isSubscriptionExpired = Boolean(sub?.isSubscriptionExpired || (!isTrial && (sub?.status === "EXPIRED" || sub?.isExpired)));
+  const isActivePaid = sub?.status === "ACTIVE" && !isSubscriptionExpired;
   const pendingPayment = data?.latestPendingPayment;
   const rejectedPayments = (data?.paymentHistory || []).filter((p) => p.status === "REJECTED");
   const latestRejected = rejectedPayments.length > 0 ? rejectedPayments[0] : null;
@@ -396,7 +400,7 @@ export default function AgencySubscriptionPage() {
                     ? "ACTIVE SUBSCRIPTION"
                     : isTrial && !isTrialExpired
                     ? "7-DAY FREE TRIAL"
-                    : "TRIAL EXPIRED"}
+                    : isTrial && isTrialExpired ? "TRIAL EXPIRED" : sub?.status === "CANCELLED" ? "SUBSCRIPTION CANCELLED" : "SUBSCRIPTION EXPIRED"}
                 </span>
                 <span className="text-xs text-slate-400 font-mono">
                   Agency: {data?.agency.name}
@@ -408,20 +412,20 @@ export default function AgencySubscriptionPage() {
                   ? "Starter Plan — 7-Day Free Trial"
                   : isTrial && isTrialExpired
                   ? "Starter Plan — Trial Expired"
-                  : `${sub?.planName || "Starter"} Plan`}
+                  : isSubscriptionExpired ? `${sub?.planName || "Starter"} Plan — Expired` : `${sub?.planName || "Starter"} Plan`}
               </h2>
               <p className="text-xs text-slate-300 max-w-xl">
                 {isTrial && !isTrialExpired
                   ? "Your 7-day trial includes full Professional-level access with all advanced features and unlimited trips, quotations, and bookings."
                   : isTrial && isTrialExpired
                   ? "Your 7-day trial has ended. Select and activate a paid plan below to restore write access and continue creating trips."
-                  : sub?.planDescription || "Complete cloud workspace for modern travel agencies and boutique tour operators."}
+                  : isSubscriptionExpired ? "Your subscription period has ended. Existing records are preserved in read-only mode. Renew below to restore full write and Professional access." : sub?.planDescription || "Complete cloud workspace for modern travel agencies and boutique tour operators."}
               </p>
             </div>
 
             <div className="text-left sm:text-right shrink-0">
               <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                {isActivePaid ? `Billed ${BILLING_CYCLE_LABELS[sub?.billingCycle] ?? sub?.billingCycle}` : "Trial Pricing"}
+                {(isActivePaid || isSubscriptionExpired) ? `Billed ${BILLING_CYCLE_LABELS[sub?.billingCycle || ""] ?? sub?.billingCycle}` : "Trial Pricing"}
               </span>
               <span className="text-2xl sm:text-3xl font-black text-amber-300 font-mono">
                 {isActivePaid
@@ -444,8 +448,8 @@ export default function AgencySubscriptionPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/10 backdrop-blur-xs rounded-2xl p-4 text-xs border border-white/15 relative z-10">
             <div>
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Status</span>
-              <span className="font-bold text-emerald-400 flex items-center gap-1 mt-0.5">
-                <CheckCircle2 className="h-3.5 w-3.5" /> {sub?.status === "TRIAL" ? "Trial" : sub?.status === "ACTIVE" ? "Active" : sub?.status === "EXPIRED" ? "Expired" : "Cancelled"}
+              <span className={`font-bold flex items-center gap-1 mt-0.5 ${isActivePaid ? "text-emerald-400" : isTrial && !isTrialExpired ? "text-amber-300" : "text-rose-400"}`}>
+                <CheckCircle2 className="h-3.5 w-3.5" /> {isActivePaid ? "Active" : isTrial && !isTrialExpired ? "Trial" : sub?.status === "CANCELLED" ? "Cancelled" : "Expired"}
               </span>
             </div>
 
@@ -487,7 +491,7 @@ export default function AgencySubscriptionPage() {
 
             <div>
               <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                {isTrial ? "Trial Ends / Expires" : "Next Renewal Date"}
+                {isTrial ? "Trial Ends / Expires" : isSubscriptionExpired ? "Expired On" : "Next Renewal Date"}
               </span>
               <span className="font-bold text-amber-300 font-mono mt-0.5 block">
                 {isTrial
@@ -536,19 +540,22 @@ export default function AgencySubscriptionPage() {
                 { key: "BOOKINGS", label: "Bookings", icon: PackageCheck },
               ].map(({ key, label, icon: Icon }) => {
                 const item = data?.usage?.[key];
-                const isUnlimited =
-                  item?.unlimited === true ||
-                  (item?.unlimited === undefined && item?.limit === null) ||
-                  item?.limit === null;
+                const isUnavailable = !item;
+                const isUnlimited = Boolean(item) && (item?.unlimited === true || item?.limit === null);
+
+
+
+
                 const limit = item?.limit;
                 const currentUsage = item?.currentUsage ?? 0;
                 const remaining = item?.remaining;
                 const isExceeded = item?.isExceeded ?? false;
                 const isApproaching = !isUnlimited && remaining !== null && remaining !== undefined && remaining <= 2 && remaining > 0;
 
-                const percent = isUnlimited || !limit || limit <= 0
-                  ? 100
-                  : Math.min(100, Math.round((currentUsage / limit) * 100));
+                const percent = isUnavailable ? 0 : isUnlimited || !limit || limit <= 0 ? 100 : Math.min(100, Math.round((currentUsage / limit) * 100));
+
+
+
 
                 return (
                   <div
@@ -574,7 +581,7 @@ export default function AgencySubscriptionPage() {
                         </div>
                         <span className="text-xs font-bold text-slate-900">{label}</span>
                       </div>
-                      {isUnlimited ? (
+                      {isUnavailable ? (<span className="text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">Read-Only</span>) : isUnlimited ? (
                         <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
                           UNLIMITED
                         </span>
@@ -596,9 +603,9 @@ export default function AgencySubscriptionPage() {
                     <div className="space-y-1">
                       <div className="flex justify-between items-baseline text-xs">
                         <span className="text-xl font-black text-slate-900 font-mono">
-                          {isUnlimited ? currentUsage : `${currentUsage} / ${limit !== null && limit !== undefined ? limit : 20}`}
+                          {isUnavailable ? "—" : isUnlimited ? currentUsage : `${currentUsage} / ${limit !== null && limit !== undefined ? limit : 20}`}
                         </span>
-                        {!isUnlimited && (
+                        {!isUnavailable && !isUnlimited && (
                           <span className="text-[11px] font-medium text-slate-500">
                             {percent}% used
                           </span>
@@ -839,7 +846,11 @@ export default function AgencySubscriptionPage() {
                             : "bg-slate-900 hover:bg-slate-800 text-white"
                         }`}
                       >
-                        <span>Choose {plan.name} ({billingCycle})</span>
+                        <span>
+                          {isSubscriptionExpired && sub?.planId === plan.id
+                            ? `Renew ${plan.name} (${billingCycle})`
+                            : `Choose ${plan.name} (${billingCycle})`}
+                        </span>
                         <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                       </Button>
                     )}

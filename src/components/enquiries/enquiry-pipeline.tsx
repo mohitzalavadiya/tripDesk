@@ -350,7 +350,7 @@ function KanbanDroppableColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 min-w-[280px] max-w-[340px] rounded-2xl border flex flex-col select-none shrink-0 shadow-2xs overflow-hidden h-[calc(100vh-215px)] min-h-[480px] transition-colors duration-150 ${stage.columnBg} ${columnHighlightClass}`}
+      className={`flex-1 min-w-[260px] sm:min-w-[280px] max-w-[340px] rounded-2xl border flex flex-col select-none shrink-0 shadow-2xs overflow-hidden h-[calc(100vh-215px)] min-h-[480px] transition-colors duration-150 ${stage.columnBg} ${columnHighlightClass}`}
     >
       {/* Top Color Accent Bar */}
       <div className={`h-1.5 w-full shrink-0 ${stage.headerAccent}`} />
@@ -509,12 +509,12 @@ function DraggableEnquiryCard({
             <h5 className="text-xs font-bold text-slate-900 truncate group-hover:text-teal-700 transition-colors">
               {customerName}
             </h5>
-            <div className="flex items-center gap-1 text-[9px] text-slate-400 font-mono">
-              <span>{enq.enquiryNumber}</span>
+            <div className="flex items-center gap-1 text-[9px] text-slate-400 font-mono min-w-0">
+              <span className="whitespace-nowrap shrink-0">{enq.enquiryNumber}</span>
               {enq.source && (
                 <>
-                  <span>•</span>
-                  <span className="text-slate-500 font-sans font-medium">
+                  <span className="shrink-0">•</span>
+                  <span className="text-slate-500 font-sans font-medium truncate">
                     {formatEnumLabel(enq.source)}
                   </span>
                 </>

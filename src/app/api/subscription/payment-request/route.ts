@@ -1,4 +1,4 @@
-import { requireWriteAccess } from "@/lib/api/context";
+import { requireBillingRenewalAccess } from "@/lib/api/context";
 import { enforceStaffPermission } from "@/lib/services/staff-permission-service";
 import { subscriptionService } from "@/lib/services/subscription-service";
 import { agencyPaymentRequestSchema } from "@/lib/validation/subscription-schema";
@@ -6,7 +6,7 @@ import { NextRequest,NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const context = await requireWriteAccess();
+    const context = await requireBillingRenewalAccess();
     await enforceStaffPermission(
       context.dbUser.role,
       context.agencyId,
@@ -28,16 +28,17 @@ export async function POST(req: NextRequest) {
       data: result,
       message: "Subscription payment request submitted for verification.",
     });
-  } catch (error: any) {
-    if (error.statusCode) {
+  } catch (error: unknown) {
+    const err = error as { statusCode?: number; message?: string };
+    if (err.statusCode) {
       return NextResponse.json(
-        { success: false, error: error.message },
-        { status: error.statusCode }
+        { success: false, error: err.message },
+        { status: err.statusCode }
       );
     }
     console.error("POST /api/subscription/payment-request error:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to submit subscription payment request" },
+      { success: false, error: err.message || "Failed to submit subscription payment request" },
       { status: 400 }
     );
   }
