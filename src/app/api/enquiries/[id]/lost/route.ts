@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiSuccess,
 handleApiError,
 requireWriteAccess,
@@ -21,10 +22,16 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "ENQUIRIES", "UPDATE");
     const { id } = await params;
     const body = await validateJson(markEnquiryLostSchema, request);
 
-    const updated = await enquiryService.markEnquiryLost(context.agencyId, id, body);
+    const actor = {
+      userId: context.dbUser.id,
+      userName: context.dbUser.name || context.dbUser.email || (context.isAgencyOwner ? "Agency Owner" : "Staff Member"),
+      role: context.dbUser.role,
+    };
+    const updated = await enquiryService.markEnquiryLost(context.agencyId, id, body, actor);
 
     return apiSuccess(updated);
   } catch (error) {

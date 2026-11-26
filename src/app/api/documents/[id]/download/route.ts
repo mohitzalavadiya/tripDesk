@@ -1,4 +1,4 @@
-import { handleApiError,requireReadAccess } from "@/lib/api";
+import { enforceStaffPermission, handleApiError, requireReadAccess } from "@/lib/api";
 import { travelDocumentService } from "@/lib/services/travel-document-service";
 import { NextRequest,NextResponse } from "next/server";
 
@@ -15,6 +15,13 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "DOCUMENTS",
+      "VIEW"
+    );
     const { id } = await params;
 
     const { buffer, filename, contentType } = await travelDocumentService.renderDocumentPdf(

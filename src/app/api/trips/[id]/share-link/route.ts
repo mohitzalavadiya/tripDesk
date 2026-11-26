@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiSuccess,
 handleApiError,
 requireWriteAccess,
@@ -26,6 +27,7 @@ interface RouteProps {
 export async function POST(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TRIPS", "UPDATE");
     const { id } = validateRouteParams(tripIdParamSchema, await props.params);
 
     const shareLink = await tripService.getOrCreateFeedbackLink(context.agencyId, id);

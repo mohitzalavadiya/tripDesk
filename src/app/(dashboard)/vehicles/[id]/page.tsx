@@ -1,5 +1,7 @@
 "use client";
 
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+import { useAuth } from "@/context/auth-context";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
@@ -48,6 +50,7 @@ const editVehicleSchema = Yup.object().shape({
 });
 
 export default function VehicleProfilePage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
   const params = useParams();
   const router = useRouter();
   const vehicleId = params.id as string;

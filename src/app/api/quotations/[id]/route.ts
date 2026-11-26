@@ -1,10 +1,12 @@
 import {
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
+import { toStaffSafeQuotationDTO } from "@/lib/auth/permissions";
 import { quotationService } from "@/lib/services/quotation-service";
 import { updateQuotationSchema } from "@/lib/validation/quotation-schema";
 import { NextRequest } from "next/server";
@@ -18,10 +20,12 @@ interface RouteParams {
 /**
  * GET /api/quotations/[id]
  * Get single quotation with line items and relations.
+ * Strips markup, net costs, and internal notes for staff callers.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATION_DETAIL", "VIEW");
     const { id } = await params;
 
     const quotation = await quotationService.getQuotation(context.agencyId, id);
@@ -33,7 +37,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    return apiSuccess(quotation);
+    const safeQuotation = context.isAgencyStaff
+      ? toStaffSafeQuotationDTO(quotation)
+      : quotation;
+
+    return apiSuccess(safeQuotation);
   } catch (error) {
     return handleApiError(error);
   }
@@ -46,12 +54,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATION_DETAIL", "UPDATE");
     const { id } = await params;
     const body = await validateJson(updateQuotationSchema, request);
 
     const updated = await quotationService.updateQuotation(context.agencyId, id, body);
 
-    return apiSuccess(updated);
+    const safeUpdated = context.isAgencyStaff
+      ? toStaffSafeQuotationDTO(updated)
+      : updated;
+
+    return apiSuccess(safeUpdated);
   } catch (error) {
     return handleApiError(error);
   }
@@ -60,10 +73,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 /**
  * DELETE /api/quotations/[id]
  * Soft delete quotation.
+ * Agency Owner only. Destructive deletion is strictly restricted to Agency Owners.
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATION_DETAIL", "DELETE");
     const { id } = await params;
 
     await quotationService.deleteQuotation(context.agencyId, id);

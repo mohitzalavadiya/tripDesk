@@ -3,10 +3,13 @@ apiSuccess,
 handleApiError,
 NotFoundError,
 requireReadAccess,
+enforceStaffPermission,
+  requireAgencyOwnerContext,
 requireWriteAccess,
 validateJson,
 validateRouteParams,
 } from "@/lib/api";
+import { redactStaffFinancials } from "@/lib/auth/permissions";
 import { supplierService } from "@/lib/services/supplier-service";
 import {
 supplierIdParamSchema,
@@ -27,6 +30,7 @@ interface RouteProps {
 export async function GET(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "SUPPLIERS", "VIEW");
     const { id } = validateRouteParams(supplierIdParamSchema, await props.params);
 
     const supplier = await supplierService.getSupplierDetails(context.agencyId, id);
@@ -35,7 +39,8 @@ export async function GET(request: NextRequest, props: RouteProps) {
       throw new NotFoundError("Supplier");
     }
 
-    return apiSuccess(supplier);
+    const data = context.isAgencyStaff ? redactStaffFinancials(supplier, context.dbUser.role) : supplier;
+    return apiSuccess(data);
   } catch (error) {
     return handleApiError(error);
   }
@@ -48,6 +53,7 @@ export async function GET(request: NextRequest, props: RouteProps) {
 export async function PATCH(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "SUPPLIERS", "UPDATE");
     const { id } = validateRouteParams(supplierIdParamSchema, await props.params);
     const body = await validateJson(updateSupplierSchema, request);
 
@@ -66,6 +72,7 @@ export async function PATCH(request: NextRequest, props: RouteProps) {
 export async function DELETE(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "SUPPLIERS", "DELETE");
     const { id } = validateRouteParams(supplierIdParamSchema, await props.params);
 
     const archivedSupplier = await supplierService.archiveSupplier(context.agencyId, id);

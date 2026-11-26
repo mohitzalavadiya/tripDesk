@@ -1,5 +1,6 @@
 import {
   apiSuccess,
+  enforceStaffPermission,
   handleApiError,
   requireWriteAccess,
   validateJson,
@@ -82,6 +83,13 @@ export async function POST(request: NextRequest) {
       targetAgencyIds = activeAgencies.map((a) => a.id);
     } else {
       const context = await requireWriteAccess();
+      await enforceStaffPermission(
+        context.dbUser.role,
+        context.agencyId,
+        context.dbUser.id,
+        "SETTINGS",
+        "UPDATE"
+      );
       targetAgencyIds = [context.agencyId];
     }
 

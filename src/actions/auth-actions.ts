@@ -206,6 +206,67 @@ export async function loginAction(
 }
 
 /**
+ * Server-side sign-in action executed immediately after staff invitation acceptance.
+ * Establishes complete SSR Supabase session cookies (including chunked cookies) via Next.js response headers,
+ * verifies that the active database user profile exists, and returns status without throwing redirects.
+ */
+export async function signInAfterInvitationAction(input: {
+  email: string;
+  password: string;
+}): Promise<AuthActionResult> {
+  const email = input.email?.trim()?.toLowerCase();
+  const password = input.password;
+
+  if (!email || !password) {
+    return { success: false, error: "Please enter your email and password." };
+  }
+
+  const supabase = await createClient();
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (authError || !authData.user) {
+    const classified = await classifyLoginError(authError, email);
+    return {
+      success: false,
+      error: classified.error || "Authentication failed. Please sign in with your password.",
+      rateLimited: classified.rateLimited,
+      unverified: classified.unverified,
+      email,
+    };
+  }
+
+  // Fetch DB User to verify workspace profile
+  const dbUser = await prisma.user.findUnique({
+    where: { id: authData.user.id },
+    include: { agency: true },
+  });
+
+  if (!dbUser) {
+    // Explicitly destroy session to prevent orphaned access
+    await supabase.auth.signOut();
+    return {
+      success: false,
+      error:
+        "Your authentication credentials are valid, but no workspace profile was found. Please contact your agency administrator.",
+    };
+  }
+
+  if (dbUser.agency && dbUser.agency.status === "SUSPENDED") {
+    await supabase.auth.signOut();
+    return {
+      success: false,
+      error:
+        "Your agency workspace is currently suspended. Please contact your agency administrator.",
+    };
+  }
+
+  return { success: true };
+}
+
+/**
  * Classifies Supabase Auth sign-in errors and maps them to safe, structured user-facing messages.
  */
 export async function classifyLoginError(
@@ -236,7 +297,10 @@ export async function classifyLoginError(
     authError?.message?.toLowerCase().includes("security purposes");
 
   if (isRateLimit) {
-    return { error: "Too many sign-in attempts. Please wait a moment before trying again." };
+    return {
+      error: "Too many sign-in attempts. Please wait a moment before trying again.",
+      rateLimited: true,
+    };
   }
 
   // 3. Invalid credentials or generic auth error

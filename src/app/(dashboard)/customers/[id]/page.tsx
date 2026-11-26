@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +40,9 @@ TableHeader,
 TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { customerClient,CustomerDetails360 } from "@/lib/api-client";
+import { QuickLogModal } from "@/components/enquiries/quick-log-modal";
+import { stripIdempotencyMarker } from "@/lib/utils/crm-urgency";
+import { customerClient,CustomerDetails360, enquiryClient, EnquiryWithRelations } from "@/lib/api-client";
 import { communicationClient,CommunicationLogItem } from "@/lib/api-client/communication-client";
 import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
 import { formatCurrency } from "@/lib/costing-engine";
@@ -120,6 +125,19 @@ function getGradient(name: string) {
 }
 
 export default function CustomerDetailPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("CUSTOMER_DETAIL", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Customer Details"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
@@ -201,7 +219,7 @@ export default function CustomerDetailPage() {
         if (res.success) {
           toast.success("Customer profile updated successfully!");
           setIsEditOpen(false);
-          await loadCustomer();
+          await loadCustomer(true);
         }
       } catch (err: any) {
         toast.error(err?.message || "Failed to update customer.");
@@ -228,9 +246,10 @@ export default function CustomerDetailPage() {
   }, [id]);
 
   // Load real customer 360 profile from PostgreSQL API
-  const loadCustomer = React.useCallback(async () => {
+  const loadCustomer = React.useCallback(async (isSilent = false) => {
+    const silent = isSilent || Boolean(customer);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
 
       const res = await customerClient.getCustomer(id);
@@ -243,7 +262,7 @@ export default function CustomerDetailPage() {
       }
       setError(err?.message || "Failed to load customer record.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [id]);
 
@@ -253,6 +272,64 @@ export default function CustomerDetailPage() {
       loadCommunications();
     }
   }, [id, loadCustomer, loadCommunications]);
+
+  // Quick-Log Modal & Target Enquiry Selection States
+  const [quickLogEnquiry, setQuickLogEnquiry] = React.useState<EnquiryWithRelations | null>(null);
+  const [isQuickLogOpen, setIsQuickLogOpen] = React.useState(false);
+  const [isSelectEnquiryOpen, setIsSelectEnquiryOpen] = React.useState(false);
+  const [isNoEnquiryAlertOpen, setIsNoEnquiryAlertOpen] = React.useState(false);
+  const [loadingQuickLogId, setLoadingQuickLogId] = React.useState<string | null>(null);
+
+  // Active enquiries eligible for Quick Log activity
+  const activeEnquiries = React.useMemo(() => {
+    if (!customer?.enquiries) return [];
+    const nonActive = new Set(["CONVERTED", "LOST", "CANCELLED"]);
+    return customer.enquiries.filter((e: any) => !nonActive.has(e.status));
+  }, [customer?.enquiries]);
+
+  // Open Quick Log for a specific enquiry record
+  const handleQuickLogForEnquiry = async (enq: any) => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Read-only mode is active.");
+      return;
+    }
+    try {
+      setLoadingQuickLogId(enq.id);
+      const res = await enquiryClient.getEnquiry(enq.id);
+      if (res.success && res.data) {
+        setQuickLogEnquiry(res.data);
+        setIsSelectEnquiryOpen(false);
+        setIsQuickLogOpen(true);
+      } else {
+        toast.error(res.error?.message || "Failed to load enquiry details.");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load enquiry details.");
+    } finally {
+      setLoadingQuickLogId(null);
+    }
+  };
+
+  // Open Quick Log from general button: handles 0, 1, or multiple active enquiries
+  const handleOpenQuickLog = async () => {
+    if (isReadOnly) {
+      toast.error("Subscription expired. Read-only mode is active.");
+      return;
+    }
+    if (activeEnquiries.length === 0) {
+      setIsNoEnquiryAlertOpen(true);
+      return;
+    }
+    if (activeEnquiries.length === 1) {
+      await handleQuickLogForEnquiry(activeEnquiries[0]);
+      return;
+    }
+    setIsSelectEnquiryOpen(true);
+  };
+
+  const handleQuickLogSuccess = async () => {
+    await loadCustomer();
+  };
 
   const handleSendCustomMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -358,7 +435,7 @@ export default function CustomerDetailPage() {
     });
   };
 
-  if (loading) {
+  if (loading && !customer) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-slate-50/50">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
@@ -501,6 +578,15 @@ export default function CustomerDetailPage() {
               >
                 <Edit2 className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                 Edit Profile
+              </Button>
+
+              <Button
+                onClick={handleOpenQuickLog}
+                disabled={isReadOnly}
+                className="flex-1 sm:flex-initial justify-center bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs h-8.5 px-3 rounded-xl shadow-xs cursor-pointer gap-1.5 whitespace-nowrap disabled:opacity-50"
+              >
+                <Phone className="h-4 w-4 shrink-0" />
+                Log Interaction
               </Button>
 
               <Button
@@ -691,7 +777,18 @@ export default function CustomerDetailPage() {
                     <Clock className="h-4 w-4 text-indigo-600" />
                     <span>CRM Activity Timeline ({customer.timeline?.length || 0})</span>
                   </h3>
-                  <span className="text-xs text-slate-400 font-medium">All historical touchpoints</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleOpenQuickLog}
+                      disabled={isReadOnly}
+                      className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold h-7.5 px-2.5 rounded-lg cursor-pointer disabled:opacity-50 gap-1"
+                    >
+                      <Phone className="h-3 w-3 shrink-0" />
+                      <span>Log Interaction</span>
+                    </Button>
+                    <span className="text-xs text-slate-400 font-medium hidden sm:inline">All historical touchpoints</span>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -700,8 +797,22 @@ export default function CustomerDetailPage() {
                       key={ev.id}
                       className="flex items-start gap-3.5 p-3 rounded-xl border border-slate-100 bg-slate-50/40 hover:bg-slate-50 transition-colors text-xs"
                     >
-                      <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 font-bold">
-                        <Clock className="h-4 w-4" />
+                      <div
+                        className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 font-bold ${
+                          ev.type === "FOLLOW_UP_COMPLETED"
+                            ? "bg-emerald-50 text-emerald-600"
+                            : ev.type === "ENQUIRY_CONVERTED" || ev.type === "BOOKING_CONFIRMED"
+                            ? "bg-teal-50 text-teal-600"
+                            : "bg-indigo-50 text-indigo-600"
+                        }`}
+                      >
+                        {ev.type === "FOLLOW_UP_COMPLETED" ? (
+                          <Phone className="h-4 w-4" />
+                        ) : ev.type === "ENQUIRY_CONVERTED" || ev.type === "BOOKING_CONFIRMED" ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : (
+                          <Clock className="h-4 w-4" />
+                        )}
                       </div>
 
                       <div className="space-y-1 flex-1 min-w-0">
@@ -739,13 +850,23 @@ export default function CustomerDetailPage() {
                 <Inbox className="h-4 w-4 text-blue-600 shrink-0" />
                 <span>Captured Inquiries ({customer.enquiries.length})</span>
               </h3>
-              <Button
-                size="sm"
-                onClick={() => router.push(`/enquiries/new?customerId=${customer.id}`)}
-                className="w-full xs:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> New Enquiry
-              </Button>
+              <div className="flex items-center gap-2 w-full xs:w-auto">
+                <Button
+                  size="sm"
+                  onClick={handleOpenQuickLog}
+                  disabled={isReadOnly}
+                  className="w-full xs:w-auto justify-center bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer disabled:opacity-50"
+                >
+                  <Phone className="h-3.5 w-3.5 mr-1 shrink-0" /> Quick Log
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => router.push(`/enquiries/new?customerId=${customer.id}`)}
+                  className="w-full xs:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> New Enquiry
+                </Button>
+              </div>
             </div>
 
             {customer.enquiries.length === 0 ? (
@@ -761,6 +882,8 @@ export default function CustomerDetailPage() {
                     <TableHead>Dates</TableHead>
                     <TableHead>Pax & Budget</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Assigned Consultant</TableHead>
+                    <TableHead>Next Follow-up</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -786,10 +909,82 @@ export default function CustomerDetailPage() {
                           {enq.status}
                         </Badge>
                       </TableCell>
+
+                      <TableCell>
+                        {enq.assignedToUser?.name || enq.assignedTo ? (
+                          <span className="inline-flex items-center gap-1.5 font-medium text-slate-800">
+                            <span className="h-4 w-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[9px] font-bold shrink-0">
+                              {(enq.assignedToUser?.name || enq.assignedTo).slice(0, 1).toUpperCase()}
+                            </span>
+                            <span className="truncate max-w-[110px]">{enq.assignedToUser?.name || enq.assignedTo}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                            Unassigned
+                          </span>
+                        )}
+                      </TableCell>
+
+                      <TableCell>
+                        {(() => {
+                          const pendingFollowUps = enq.followUps?.filter(
+                            (f: any) => f.status === "PENDING" && !f.archivedAt
+                          ) || [];
+                          if (pendingFollowUps.length > 0) {
+                            const nextFu = pendingFollowUps[0];
+                            const isPast = new Date(nextFu.scheduledAt) < new Date();
+                            return (
+                              <div className="flex flex-col gap-0.5">
+                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold w-fit ${
+                                  isPast
+                                    ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                    : "bg-sky-50 text-sky-800 border border-sky-200"
+                                }`}>
+                                  <Clock className="h-2.5 w-2.5" />
+                                  {nextFu.type} • {formatDateDisplay(nextFu.scheduledAt)}
+                                </span>
+                                {nextFu.notes && (
+                                  <span className="text-[10px] text-slate-400 italic truncate max-w-[140px]">
+                                    {stripIdempotencyMarker(nextFu.notes)}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          }
+                          if (["CONVERTED", "LOST", "CANCELLED"].includes(enq.status)) {
+                            return <span className="text-slate-400 text-[10px] italic">Completed</span>;
+                          }
+                          return (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                              No follow-up set
+                            </span>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/enquiries/${enq.id}`} className="text-indigo-600 font-semibold hover:underline">
-                          View
-                        </Link>
+                        <div className="flex items-center justify-end gap-2.5">
+                          {!["CONVERTED", "LOST", "CANCELLED"].includes(enq.status) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleQuickLogForEnquiry(enq);
+                              }}
+                              disabled={isReadOnly || loadingQuickLogId === enq.id}
+                              className="text-teal-600 hover:text-teal-800 font-semibold inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            >
+                              {loadingQuickLogId === enq.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Phone className="h-3 w-3" />
+                              )}
+                              <span>Log</span>
+                            </button>
+                          )}
+                          <Link href={`/enquiries/${enq.id}`} className="text-indigo-600 font-semibold hover:underline">
+                            View
+                          </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1417,6 +1612,149 @@ export default function CustomerDetailPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* ─── NO ACTIVE ENQUIRY DIALOG ─── */}
+        <Dialog open={isNoEnquiryAlertOpen} onOpenChange={setIsNoEnquiryAlertOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-6 shadow-xl">
+            <DialogHeader>
+              <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                <span>No Active Enquiry Found</span>
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 text-xs mt-2 leading-relaxed">
+                Interactions must be linked to an active enquiry record. Currently,{" "}
+                <span className="font-semibold text-slate-800">{customer.name}</span> has no
+                open enquiries (or all existing enquiries are converted/closed).
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-200/80 my-3 text-xs text-amber-900 leading-relaxed">
+              To log customer interactions, notes, or next follow-ups, please create a new enquiry first or navigate to an existing enquiry from the history table.
+            </div>
+
+            <DialogFooter className="mt-4 flex flex-col sm:flex-row items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsNoEnquiryAlertOpen(false)}
+                className="w-full sm:w-auto text-xs font-semibold rounded-xl"
+              >
+                Dismiss
+              </Button>
+              <Link href={`/enquiries/new?customerId=${customer.id}`} className="w-full sm:w-auto">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={isReadOnly}
+                  className="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs px-4 rounded-xl gap-1.5 shadow-xs"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Create New Enquiry
+                </Button>
+              </Link>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ─── SELECT ACTIVE ENQUIRY MODAL ─── */}
+        <Dialog open={isSelectEnquiryOpen} onOpenChange={setIsSelectEnquiryOpen}>
+          <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-lg p-6 shadow-xl">
+            <DialogHeader>
+              <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-teal-600" />
+                <span>Select Target Enquiry</span>
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 text-xs mt-1">
+                {customer.name} has multiple active enquiries. Choose which enquiry to record this interaction against.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-2.5 mt-3 max-h-[380px] overflow-y-auto pr-1">
+              {activeEnquiries.map((enq: any) => (
+                <div
+                  key={enq.id}
+                  className="p-3.5 rounded-xl border border-slate-200/90 hover:border-teal-300 hover:bg-teal-50/20 transition-all flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-xs text-slate-900 truncate">
+                        {enq.destination || "Custom Trip / Enquiry"}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-bold bg-slate-50 text-slate-700 border-slate-200"
+                      >
+                        {formatEnumLabel(enq.status)}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                      {enq.startDate && (
+                        <span>
+                          Travel: {new Date(enq.startDate).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+                        </span>
+                      )}
+                      {enq.budget != null && (
+                        <span className="font-mono font-semibold text-slate-700">
+                          {formatCurrency(enq.budget)}
+                        </span>
+                      )}
+                      {enq.source && (
+                        <span>Source: {formatEnumLabel(enq.source)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={loadingQuickLogId === enq.id || isReadOnly}
+                    onClick={() => handleQuickLogForEnquiry(enq)}
+                    className="shrink-0 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs px-3 rounded-lg gap-1.5 shadow-2xs cursor-pointer"
+                  >
+                    {loadingQuickLogId === enq.id ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="h-3 w-3" />
+                        Log Here
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            <DialogFooter className="mt-4 flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsSelectEnquiryOpen(false)}
+                className="text-xs font-semibold rounded-xl"
+              >
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ─── QUICK LOG INTERACTION MODAL ─── */}
+        {quickLogEnquiry && (
+          <QuickLogModal
+            enquiry={quickLogEnquiry}
+            customerId={customer.id}
+            isOpen={isQuickLogOpen}
+            onClose={() => {
+              setIsQuickLogOpen(false);
+              setQuickLogEnquiry(null);
+            }}
+            onSuccess={handleQuickLogSuccess}
+            isReadOnly={isReadOnly}
+          />
+        )}
 
         {/* Confirmation Dialog */}
         <ConfirmDialog

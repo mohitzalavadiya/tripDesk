@@ -1,4 +1,4 @@
-import { requireAgencyOwnerContext } from "@/lib/api/context";
+import { enforceStaffPermission, requireReadAccess, requireWriteAccess } from "@/lib/api";
 import { referralService } from "@/lib/services/referral-service";
 import { referralStatusUpdateSchema } from "@/lib/validation/referral-schema";
 import { NextRequest,NextResponse } from "next/server";
@@ -14,7 +14,14 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authContext = await requireAgencyOwnerContext();
+    const authContext = await requireReadAccess();
+    await enforceStaffPermission(
+      authContext.dbUser.role,
+      authContext.agencyId,
+      authContext.dbUser.id,
+      "REFERRALS",
+      "VIEW"
+    );
     const { id } = await context.params;
 
     const referral = await referralService.getReferral(authContext.agencyId, id);
@@ -29,11 +36,12 @@ export async function GET(
       success: true,
       data: referral,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("GET /api/referrals/[id] error:", error);
-    const status = error.statusCode || 500;
+    const err = error as { statusCode?: number; message?: string };
+    const status = err.statusCode || 500;
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to fetch referral" },
+      { success: false, error: err.message || "Failed to fetch referral" },
       { status }
     );
   }
@@ -48,7 +56,14 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authContext = await requireAgencyOwnerContext();
+    const authContext = await requireWriteAccess();
+    await enforceStaffPermission(
+      authContext.dbUser.role,
+      authContext.agencyId,
+      authContext.dbUser.id,
+      "REFERRALS",
+      "UPDATE"
+    );
     const { id } = await context.params;
 
     const body = await request.json();
@@ -65,11 +80,12 @@ export async function PATCH(
       data: updated,
       message: "Referral status updated.",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("PATCH /api/referrals/[id] error:", error);
-    const status = error.statusCode || (error.name === "ZodError" ? 400 : 500);
+    const err = error as { statusCode?: number; name?: string; message?: string };
+    const status = err.statusCode || (err.name === "ZodError" ? 400 : 500);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to update referral" },
+      { success: false, error: err.message || "Failed to update referral" },
       { status }
     );
   }

@@ -211,7 +211,25 @@ export const hotelExcelService = {
       throw new Error("Agency ID is required.");
     }
 
-    const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
+    if (
+      buffer.length < 4 ||
+      buffer[0] !== 0x50 ||
+      buffer[1] !== 0x4b ||
+      buffer[2] !== 0x03 ||
+      buffer[3] !== 0x04
+    ) {
+      throw new Error("Invalid .xlsx file signature.");
+    }
+
+    const wb = XLSX.read(buffer, {
+      type: "buffer",
+      cellDates: true,
+      cellFormula: false,
+      cellHTML: false,
+      cellStyles: false,
+      sheetStubs: false,
+      sheetRows: 5002,
+    });
 
     // Look for sheet named "Hotels" (case-insensitive) or fallback to first sheet
     let sheetName = wb.SheetNames.find((s) => s.trim().toLowerCase() === "hotels");

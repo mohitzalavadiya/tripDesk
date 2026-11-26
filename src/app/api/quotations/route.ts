@@ -1,16 +1,19 @@
 import {
-apiCreated,
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-validateJson,
-validateQueryParams,
+  apiCreated,
+  apiSuccess,
+  ForbiddenError,
+  handleApiError,
+  requireMemberReadAccess,
+  requireMemberWriteAccess,
+  validateJson,
+  validateQueryParams,
 } from "@/lib/api";
+import { toStaffSafeQuotationDTO, toStaffSafeQuotationListDTO } from "@/lib/auth/permissions";
 import { quotationService } from "@/lib/services/quotation-service";
+import { staffPermissionService } from "@/lib/services/staff-permission-service";
 import {
-createQuotationSchema,
-quotationQuerySchema,
+  createQuotationSchema,
+  quotationQuerySchema,
 } from "@/lib/validation/quotation-schema";
 import { NextRequest } from "next/server";
 
@@ -19,15 +22,33 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/quotations
  * List quotations with search, status filters, and pagination.
+ * Strips markup, net costs, and internal notes for staff callers.
  */
 export async function GET(request: NextRequest) {
   try {
-    const context = await requireReadAccess();
-    const queryParams = validateQueryParams(quotationQuerySchema, request.nextUrl.searchParams);
+    const context = await requireMemberReadAccess();
 
+    if (context.isAgencyStaff) {
+      const canView = await staffPermissionService.hasStaffPermission(
+        context.dbUser.role,
+        context.agencyId,
+        context.dbUser.id,
+        "QUOTATIONS",
+        "VIEW"
+      );
+      if (!canView) {
+        throw new ForbiddenError("You do not have permission to view quotations.");
+      }
+    }
+
+    const queryParams = validateQueryParams(quotationQuerySchema, request.nextUrl.searchParams);
     const result = await quotationService.getQuotations(context.agencyId, queryParams);
 
-    return apiSuccess(result.data, 200, result.meta);
+    const safeData = context.isAgencyStaff
+      ? toStaffSafeQuotationListDTO(result.data)
+      : result.data;
+
+    return apiSuccess(safeData, 200, result.meta);
   } catch (error) {
     return handleApiError(error);
   }
@@ -39,12 +60,29 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const context = await requireWriteAccess();
-    const body = await validateJson(createQuotationSchema, request);
+    const context = await requireMemberWriteAccess();
 
+    if (context.isAgencyStaff) {
+      const canCreate = await staffPermissionService.hasStaffPermission(
+        context.dbUser.role,
+        context.agencyId,
+        context.dbUser.id,
+        "QUOTATIONS",
+        "CREATE"
+      );
+      if (!canCreate) {
+        throw new ForbiddenError("You do not have permission to create quotations.");
+      }
+    }
+
+    const body = await validateJson(createQuotationSchema, request);
     const newQuotation = await quotationService.createQuotation(context.agencyId, body);
 
-    return apiCreated(newQuotation);
+    const safeQuotation = context.isAgencyStaff
+      ? toStaffSafeQuotationDTO(newQuotation)
+      : newQuotation;
+
+    return apiCreated(safeQuotation);
   } catch (error) {
     return handleApiError(error);
   }

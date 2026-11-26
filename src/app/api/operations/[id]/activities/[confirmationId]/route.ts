@@ -1,10 +1,11 @@
 import {
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-validateJson,
-validateRouteParams,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  requireWriteAccess,
+  validateJson,
+  validateRouteParams,
 } from "@/lib/api";
 import { operationsService } from "@/lib/services/operations-service";
 import { updateActivityConfirmationSchema } from "@/lib/validation/operations-schema";
@@ -29,6 +30,7 @@ interface RouteProps {
 export async function GET(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "OPERATIONS", "VIEW");
     const { id, confirmationId } = validateRouteParams(
       paramsSchema,
       await props.params
@@ -53,6 +55,7 @@ export async function GET(request: NextRequest, props: RouteProps) {
 export async function PATCH(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "OPERATIONS", "UPDATE");
     const { id, confirmationId } = validateRouteParams(
       paramsSchema,
       await props.params

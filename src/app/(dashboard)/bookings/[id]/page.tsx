@@ -5,6 +5,8 @@ BookingStatusBadge,
 PaymentStatusBadge,
 } from "@/components/booking/booking-status-badge";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,6 +46,7 @@ TableRow,
 import { Textarea } from "@/components/ui/textarea";
 import {
 bookingClient,
+BookingFinanceBreakdown,
 BookingPaymentScheduleResult,
 BookingWithRelations,
 documentClient,
@@ -70,6 +73,7 @@ CheckCircle2,
 ChevronDown,
 ChevronRight,
 Clock,
+Coins,
 Compass,
 CreditCard,
 Download,
@@ -78,6 +82,7 @@ FileText,
 History,
 Hotel,
 IndianRupee,
+Info,
 Layers,
 Loader2,
 Lock,
@@ -91,6 +96,7 @@ ShieldCheck,
 Sparkles,
 Ticket,
 Trash2,
+TrendingUp,
 User
 } from "lucide-react";
 import Link from "next/link";
@@ -149,6 +155,19 @@ function formatDispatchStatus(status?: string | null): string {
 }
 
 export default function BookingDetailPage() {
+  const { isAgencyOwner, isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("BOOKING_DETAIL", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Booking Dossier"
+          badgeText="Access Restricted"
+          description="You do not have permission to view booking details. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const params = useParams();
   const router = useRouter();
   const bookingId = params.id as string;
@@ -156,6 +175,7 @@ export default function BookingDetailPage() {
   // Data states
   const [booking, setBooking] = React.useState<BookingWithRelations | null>(null);
   const [schedule, setSchedule] = React.useState<BookingPaymentScheduleResult | null>(null);
+  const [financeBreakdown, setFinanceBreakdown] = React.useState<BookingFinanceBreakdown | null>(null);
   const [bookingDocs, setBookingDocs] = React.useState<DocumentItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -207,14 +227,15 @@ export default function BookingDetailPage() {
   const [cancelling, setCancelling] = React.useState(false);
 
   // Fetch real booking from database API
-  const fetchBooking = React.useCallback(async () => {
+  const fetchBooking = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
-      const [res, schedRes, docsRes] = await Promise.all([
+      const [res, schedRes, docsRes, finRes] = await Promise.all([
         bookingClient.getBooking(bookingId),
         financeClient.getBookingPaymentSchedule(bookingId).catch(() => null),
         documentClient.list({ bookingId, limit: 50 }).catch(() => ({ data: [] })),
+        financeClient.getBookingFinanceBreakdown(bookingId).catch(() => null),
       ]);
       if (res.success && res.data) {
         setBooking(res.data);
@@ -225,13 +246,16 @@ export default function BookingDetailPage() {
       if (docsRes && docsRes.data) {
         setBookingDocs(docsRes.data);
       }
+      if (finRes && (finRes as any).data) {
+        setFinanceBreakdown((finRes as any).data);
+      }
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
       }
       setError(err?.message || "Failed to load booking details.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [bookingId]);
 
@@ -254,7 +278,7 @@ export default function BookingDetailPage() {
     try {
       await bookingClient.updateBooking(bookingId, { status: newStatus });
       toast.success(`Booking status updated to ${newStatus}.`);
-      await fetchBooking();
+      await fetchBooking(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to update booking status.");
     }
@@ -268,7 +292,7 @@ export default function BookingDetailPage() {
       await bookingClient.cancelBooking(bookingId, cancelReason.trim() || "Cancelled by agency staff.");
       toast.success("Booking cancelled successfully.");
       setIsCancelModalOpen(false);
-      await fetchBooking();
+      await fetchBooking(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to cancel booking.");
     } finally {
@@ -316,7 +340,7 @@ export default function BookingDetailPage() {
       if (res.success && res.data) {
         toast.success(`Payment ${res.data.paymentNumber} recorded successfully!`);
         setIsAddPaymentOpen(false);
-        await fetchBooking();
+        await fetchBooking(true);
       }
     } catch (err: any) {
       toast.error(err?.message || "Failed to record payment.");
@@ -343,7 +367,7 @@ export default function BookingDetailPage() {
           await paymentClient.deletePayment(paymentId);
           toast.success(`Payment ${paymentNumber} archived.`);
           setConfirmAction(null);
-          await fetchBooking();
+          await fetchBooking(true);
         } catch (err: any) {
           toast.error(getErrorMessage(err, "We couldn't archive the payment record. Please try again."));
         } finally {
@@ -363,7 +387,7 @@ export default function BookingDetailPage() {
     try {
       const res = await documentClient.generateForBooking(bookingId);
       toast.success(`Generated ${res.generatedCount} travel documents!`);
-      await fetchBooking();
+      await fetchBooking(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to generate documents.");
     } finally {
@@ -376,7 +400,7 @@ export default function BookingDetailPage() {
     try {
       await documentClient.issue(docId, { notifyCustomer: false });
       toast.success(`Document ${docNum} issued.`);
-      await fetchBooking();
+      await fetchBooking(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to issue document.");
     }
@@ -401,6 +425,22 @@ export default function BookingDetailPage() {
     }
   };
 
+  // Milestone Payment WhatsApp Reminder (Phase 4A)
+  const handleSendMilestoneReminder = (milestone: any) => {
+    if (!booking?.customer?.phone) {
+      toast.error("Customer does not have a phone number recorded.");
+      return;
+    }
+    const dueStr = milestone.dueDate ? formatDateDisplay(milestone.dueDate) : "Upon confirmation";
+    const msg = `*Payment Reminder: ${milestone.title}*\n\nHello ${booking.customer.name},\nThis is a friendly payment reminder for your booking #${booking.bookingNumber} (${booking.trip?.title}).\n\n- Milestone: ${milestone.title}\n- Outstanding Amount: ${formatCurrency(milestone.remainingAmount)}\n- Due Date: ${dueStr}\n\nPlease let us know once the transfer is initiated. Thank you!`;
+    const res = openWhatsAppChat(booking.customer.phone, msg);
+    if (!res.success) {
+      toast.error(res.error || "Could not open WhatsApp chat.");
+      return;
+    }
+    toast.success(`WhatsApp reminder opened for ${milestone.title}.`);
+  };
+
   const formatDateDisplay = (date: Date | string | null | undefined) => {
     if (!date) return "TBD";
     return new Date(date).toLocaleDateString("en-IN", {
@@ -410,7 +450,7 @@ export default function BookingDetailPage() {
     });
   };
 
-  if (loading) {
+  if (loading && !booking) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-slate-50/50">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
@@ -614,7 +654,7 @@ export default function BookingDetailPage() {
                                 }
                                 toast.success("Invoice regenerated successfully with latest booking values.");
                                 setConfirmAction(null);
-                                await fetchBooking();
+                                await fetchBooking(true);
                               } catch (err: any) {
                                 toast.error(err?.message || "Failed to regenerate invoice.");
                               } finally {
@@ -1114,13 +1154,16 @@ export default function BookingDetailPage() {
                                     ? "bg-emerald-100 text-emerald-800"
                                     : doc.status === "GENERATED"
                                     ? "bg-amber-100 text-amber-800"
+                                    : doc.status === "SUPERSEDED"
+                                    ? "bg-amber-50 text-amber-900 border border-amber-300"
                                     : doc.status === "REVOKED"
                                     ? "bg-rose-100 text-rose-800"
                                     : "bg-slate-100 text-slate-600"
                                 }`}
                               >
-                                {doc.status}
+                                {doc.status === "SUPERSEDED" ? `SUPERSEDED (v${doc.version})` : doc.status}
                               </Badge>
+
                             </TableCell>
                             <TableCell className="py-2.5 px-3 text-right">
                               <div className="flex items-center justify-end gap-1.5">
@@ -1255,16 +1298,139 @@ export default function BookingDetailPage() {
                 </div>
               )}
 
-              {/* Payment Milestones & Schedule Breakdown (Temporarily hidden from UI per Phase Cleanup) */}
-              {/* {schedule && schedule.milestones && schedule.milestones.length > 0 && (
+              {/* Commercial Performance & Margin Analysis (Phase 7D) */}
+              <div className="pt-2 border-t border-slate-100 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <TrendingUp className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <span>Commercial & Financial Performance</span>
+                  </h4>
+                  {financeBreakdown?.supplierCostActual !== undefined && financeBreakdown?.isCostComplete !== undefined && (
+                    <Badge
+                      className={`text-[10px] font-bold ${
+                        financeBreakdown.isCostComplete
+                          ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                          : "bg-amber-100 text-amber-800 border-amber-200"
+                      }`}
+                    >
+                      {financeBreakdown.isCostComplete ? "Definitive Gross Margin (Audited)" : "Estimated Gross Margin (Provisional)"}
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 min-[480px]:grid-cols-3 sm:grid-cols-5 gap-2 pt-1 text-xs">
+                  <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl space-y-0.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Quoted Amount</span>
+                    <strong className="text-xs sm:text-sm text-slate-800 block font-bold tabular-nums">
+                      {formatCurrency(financeBreakdown?.quotedAmount ?? total)}
+                    </strong>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl space-y-0.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Confirmed Value</span>
+                    <strong className="text-xs sm:text-sm text-slate-900 block font-bold tabular-nums">
+                      {formatCurrency(total)}
+                    </strong>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl space-y-0.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Invoiced Total</span>
+                    <strong className="text-xs sm:text-sm text-slate-800 block font-bold tabular-nums">
+                      {formatCurrency(financeBreakdown?.invoicedAmount ?? 0)}
+                    </strong>
+                  </div>
+                  <div className="p-2.5 bg-emerald-50/70 border border-emerald-100 rounded-xl space-y-0.5">
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 block">Verified Received</span>
+                    <strong className="text-xs sm:text-sm text-emerald-900 block font-bold tabular-nums">
+                      {formatCurrency(financeBreakdown?.customerPaid ?? paid)}
+                    </strong>
+                  </div>
+                  <div className="p-2.5 bg-rose-50/70 border border-rose-100 rounded-xl space-y-0.5 col-span-2 min-[480px]:col-span-1">
+                    <span className="text-[10px] uppercase font-bold text-rose-700 block">Customer Balance</span>
+                    <strong className="text-xs sm:text-sm text-rose-900 block font-bold tabular-nums">
+                      {formatCurrency(financeBreakdown?.customerOutstanding ?? balance)}
+                    </strong>
+                  </div>
+                </div>
+
+                {financeBreakdown && financeBreakdown.supplierCostActual !== undefined ? (
+                  <div className="p-3.5 bg-gradient-to-br from-slate-50 to-emerald-50/20 border border-slate-200/80 rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60">
+                      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                        <Coins className="h-3.5 w-3.5 text-emerald-600" />
+                        Supplier Cost & Commercial Contribution
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-medium italic">
+                        {financeBreakdown.isCostComplete ? "Audited Gross Margin (Pre-Overheads)" : "Provisional Gross Margin (Pre-Overheads)"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-medium">Recorded Supplier Obligations</div>
+                        <div className="font-bold text-slate-800 tabular-nums">
+                          {formatCurrency(financeBreakdown.supplierCostActual)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-medium">Settled to Suppliers</div>
+                        <div className="font-bold text-emerald-700 tabular-nums">
+                          {formatCurrency(financeBreakdown.supplierPaid)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-medium">Outstanding Payables</div>
+                        <div className="font-bold text-amber-700 tabular-nums">
+                          {formatCurrency(financeBreakdown.supplierOutstanding)}
+                        </div>
+                      </div>
+                      <div className="bg-white/80 p-2 rounded-lg border border-slate-200/60">
+                        <div className="text-[10px] text-slate-500 font-bold uppercase">
+                          {financeBreakdown.isCostComplete ? "Definitive Gross Margin" : "Estimated Gross Margin"}
+                        </div>
+                        <div className="font-black text-slate-900 text-sm tabular-nums flex items-center gap-1">
+                          <span>{formatCurrency(financeBreakdown.grossMargin ?? financeBreakdown.grossProfit)}</span>
+                          <span className="text-[11px] text-emerald-600 font-bold">
+                            ({financeBreakdown.profitMarginPercent}%)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {financeBreakdown.costCompletenessReason && (
+                      <div className={`p-2 rounded-lg border text-[11px] flex items-center gap-1.5 ${
+                        financeBreakdown.isCostComplete
+                          ? "bg-emerald-50/60 border-emerald-200/80 text-emerald-800"
+                          : "bg-amber-50/80 border-amber-200/80 text-amber-800"
+                      }`}>
+                        <Info className="h-3.5 w-3.5 shrink-0" />
+                        <span><strong>Cost Base Status:</strong> {financeBreakdown.costCompletenessReason}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-start gap-1.5 pt-1 text-[10px] text-slate-500">
+                      <Info className="h-3 w-3 text-slate-400 shrink-0 mt-0.5" />
+                      <span>
+                        Gross margin reflects commercial trading contribution (Confirmed Booking Value minus confirmed supplier cost obligations and direct operational expenses) before fixed agency overheads, office administration, and net income taxes. It must never be construed as net agency profit.
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center gap-2 text-xs text-slate-500">
+                    <Lock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <span>Internal supplier costs and commercial profit margins are confidential to Agency Owners.</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Payment Milestones & Schedule Breakdown (Phase 4A) */}
+              {schedule && schedule.milestones && schedule.milestones.length > 0 ? (
                 <div className="pt-2 border-t border-slate-100 space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-slate-500" />
+                      <Clock className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                       <span>Payment Milestone Schedule & Allocation ({schedule.milestones.length})</span>
                     </h4>
                     {schedule.overdueMilestonesCount > 0 && (
-                      <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px] font-bold">
+                      <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px] font-bold shrink-0">
                         <AlertTriangle className="h-3 w-3 mr-1" />
                         {schedule.overdueMilestonesCount} Overdue ({formatCurrency(schedule.overdueMilestonesAmount)})
                       </Badge>
@@ -1281,6 +1447,7 @@ export default function BookingDetailPage() {
                           <TableHead className="py-2 px-3 text-right">Allocated</TableHead>
                           <TableHead className="py-2 px-3 text-right">Remaining</TableHead>
                           <TableHead className="py-2 px-3 text-center">Status</TableHead>
+                          <TableHead className="py-2 px-3 text-right">Action</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1330,13 +1497,37 @@ export default function BookingDetailPage() {
                                 {m.isOverdue && m.status !== "PAID" ? "OVERDUE" : m.status.replace("_", " ")}
                               </Badge>
                             </TableCell>
+                            <TableCell className="py-2.5 px-3 text-right">
+                              {m.status !== "PAID" && booking.customer?.phone ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleSendMilestoneReminder(m)}
+                                  className="h-7 px-2 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg gap-1"
+                                  title="Send WhatsApp payment reminder"
+                                >
+                                  <Send className="h-3 w-3 text-emerald-600" />
+                                  <span>Remind</span>
+                                </Button>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 italic">—</span>
+                              )}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
                 </div>
-              )} */}
+              ) : schedule && schedule.milestones && schedule.milestones.length === 0 ? (
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-600">
+                    <Clock className="h-4 w-4 text-slate-400 shrink-0" />
+                    <span>No milestone schedule defined for this booking. Full balance is due per standard booking terms.</span>
+                  </div>
+                </div>
+              ) : null}
+
             </div>
 
             {/* 3. Payment Transactions Table */}
@@ -1616,7 +1807,7 @@ export default function BookingDetailPage() {
                                 }
                                 toast.success("Invoice regenerated successfully with latest booking values.");
                                 setConfirmAction(null);
-                                await fetchBooking();
+                                await fetchBooking(true);
                               } catch (err: any) {
                                 toast.error(err?.message || "Failed to regenerate invoice.");
                               } finally {
@@ -1714,19 +1905,60 @@ export default function BookingDetailPage() {
                   </div>
                 )}
 
-                {booking.trip?.travelers && booking.trip.travelers.length > 0 && (
-                  <div className="pt-2 border-t border-slate-100">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Travelers ({booking.trip.travelers.length})</span>
-                    <div className="mt-1 space-y-1">
-                      {booking.trip.travelers.map((t) => (
-                        <div key={t.id} className="text-slate-600 flex justify-between">
-                          <span>{t.name}</span>
-                          <span className="text-slate-400 text-[10px]">{TRAVELER_TYPE_LABELS[t.type] ?? t.type}</span>
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">
+                      Travelers ({booking.trip?.travelers?.length || 0})
+                    </span>
+                    {booking.tripId && (
+                      <Link
+                        href={`/trips/${booking.tripId}`}
+                        className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-700 hover:underline inline-flex items-center gap-0.5"
+                      >
+                        Edit <ExternalLink className="h-2.5 w-2.5" />
+                      </Link>
+                    )}
+                  </div>
+
+                  {booking.trip?.travelers && booking.trip.travelers.length > 0 ? (
+                    <div className="space-y-2">
+                      {!booking.trip.travelers.some((t: any) => t.isPrimary) && (
+                        <p className="text-[11px] text-slate-400 italic">Primary traveller not selected</p>
+                      )}
+                      {booking.trip.travelers.map((t: any) => (
+                        <div key={t.id} className="p-2 rounded-lg bg-slate-50 border border-slate-100 space-y-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-semibold text-slate-800">{t.name}</span>
+                            <div className="flex items-center gap-1">
+                              {t.isPrimary && (
+                                <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 text-[9px] px-1.5 py-0 font-bold">
+                                  Primary
+                                </Badge>
+                              )}
+                              <span className="text-slate-500 text-[10px]">{TRAVELER_TYPE_LABELS[t.type] ?? t.type}</span>
+                            </div>
+                          </div>
+                          {(t.phone || t.email) && (
+                            <div className="text-[10px] text-slate-500 flex flex-wrap gap-2">
+                              {t.phone && <span>📞 {t.phone}</span>}
+                              {t.email && <span>✉️ {t.email}</span>}
+                            </div>
+                          )}
+                          {t.specialRequirements && (
+                            <div className="text-[10px] text-amber-700 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200/60">
+                              Req: {t.specialRequirements}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-[11px] text-slate-400 italic">
+                      No individual travellers recorded on this trip yet.
+                    </p>
+                  )}
+                </div>
+
               </div>
             </div>
 

@@ -53,10 +53,10 @@ export interface DashboardOperationsApiResponse {
 }
 
 export interface DashboardCRMApiResponse {
-  crmKPIs: DashboardCRMKPIs;
-  communicationKPIs: DashboardCommunicationKPIs;
   followUps: CRMAndFollowUpAnalytics;
-  topCustomers: TopCustomerItem[];
+  crmKPIs?: DashboardCRMKPIs;
+  communicationKPIs?: DashboardCommunicationKPIs;
+  topCustomers?: TopCustomerItem[];
 }
 
 export class DashboardClient {

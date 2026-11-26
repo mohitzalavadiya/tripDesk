@@ -1,0 +1,2304 @@
+
+=== FILE: src/actions/auth-actions.ts (1 matches) ===
+[Line 194] Match for /AGENCY_OWNER/:
+   192:     redirect("/admin");
+   193:   } else {
+>> 194:     // Agency User (AGENCY_OWNER, etc.)
+   195:     if (
+   196:       redirectTo &&
+
+=== FILE: src/app/(dashboard)/activities/new/page.tsx (4 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: import { useAuth } from "@/context/auth-context";
+   5: import { DestinationSelect } from "@/components/shared/destination-select";
+[Line 32] Match for /isAgencyOwner/:
+   30: 
+   31: export default function NewActivityPage() {
+>> 32:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   33: 
+   34:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("ACTIVITIES", "create"))) {
+[Line 34] Match for /isAgencyOwner/:
+   32:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   33: 
+>> 34:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("ACTIVITIES", "create"))) {
+   35:     return (
+   36:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 37] Match for /OwnerRestrictedCard/:
+   35:     return (
+   36:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 37:         <OwnerRestrictedCard
+   38:           featureName="Create Activity"
+   39:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/activities/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+[Line 56] Match for /OwnerRestrictedCard/:
+   54:     return (
+   55:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 56:         <OwnerRestrictedCard
+   57:           featureName="Activities Catalog"
+   58:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/activities/[id]/page.tsx (2 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: import { useAuth } from "@/context/auth-context";
+   5: import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+[Line 45] Match for /isAgencyOwner/:
+   43: 
+   44: export default function ActivityProfilePage() {
+>> 45:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   46:   const params = useParams();
+   47:   const router = useRouter();
+
+=== FILE: src/app/(dashboard)/bookings/new/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: import { PageHeader } from "@/components/shared/page-header";
+   6: import { QuotaExceededCard } from "@/components/shared/quota-exceeded-card";
+[Line 47] Match for /OwnerRestrictedCard/:
+   45:     return (
+   46:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 47:         <OwnerRestrictedCard
+   48:           featureName="Booking Creation"
+   49:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/bookings/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import {
+[Line 76] Match for /OwnerRestrictedCard/:
+   74:     return (
+   75:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 76:         <OwnerRestrictedCard
+   77:           featureName="Bookings Workspace"
+   78:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/bookings/[id]/page.tsx (2 matches) ===
+[Line 9] Match for /OwnerRestrictedCard/:
+   7: import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+   8: import { useAuth } from "@/context/auth-context";
+>> 9: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   10: import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+   11: import { Badge } from "@/components/ui/badge";
+[Line 158] Match for /OwnerRestrictedCard/:
+   156:     return (
+   157:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 158:         <OwnerRestrictedCard
+   159:           featureName="Booking Dossier"
+   160:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/communications/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { PageHeader } from "@/components/shared/page-header";
+[Line 140] Match for /OwnerRestrictedCard/:
+   138:     return (
+   139:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 140:         <OwnerRestrictedCard
+   141:           featureName="Client Communications"
+   142:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/customer-insights/page.tsx (4 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
+[Line 31] Match for /isAgencyOwner/:
+   29: 
+   30: export default function CustomerInsightsPage() {
+>> 31:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   32: 
+   33:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("CUSTOMER_INSIGHTS", "view"))) {
+[Line 33] Match for /isAgencyOwner/:
+   31:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   32: 
+>> 33:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("CUSTOMER_INSIGHTS", "view"))) {
+   34:     return (
+   35:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 36] Match for /OwnerRestrictedCard/:
+   34:     return (
+   35:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 36:         <OwnerRestrictedCard
+   37:           featureName="Customer Insights & Lifetime Analytics"
+   38:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/customers/new/page.tsx (2 matches) ===
+[Line 5] Match for /OwnerRestrictedCard/:
+   3: import { PageHeader } from "@/components/shared/page-header";
+   4: import { useAuth } from "@/context/auth-context";
+>> 5: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   6: import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+   7: import { Button } from "@/components/ui/button";
+[Line 63] Match for /OwnerRestrictedCard/:
+   61:     return (
+   62:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 63:         <OwnerRestrictedCard
+   64:           featureName="Customer Creation"
+   65:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/customers/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+[Line 87] Match for /OwnerRestrictedCard/:
+   85:     return (
+   86:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 87:         <OwnerRestrictedCard
+   88:           featureName="Customer Records"
+   89:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/customers/[id]/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+[Line 131] Match for /OwnerRestrictedCard/:
+   129:     return (
+   130:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 131:         <OwnerRestrictedCard
+   132:           featureName="Customer Details"
+   133:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/dashboard/page.tsx (4 matches) ===
+[Line 45] Match for /isAgencyOwner/:
+   43: export default function DashboardPage() {
+   44:   const router = useRouter();
+>> 45:   const { isAgencyOwner } = useAuth();
+   46: 
+   47:   // Filter state
+[Line 105] Match for /isAgencyOwner/:
+   103:         const [summaryRes, finRes, opsRes] = await Promise.allSettled([
+   104:           dashboardClient.getSummary(filter),
+>> 105:           isAgencyOwner ? dashboardClient.getFinance(filter) : Promise.resolve(null),
+   106:           dashboardClient.getOperations(15),
+   107:         ]);
+[Line 135] Match for /isAgencyOwner/:
+   133:       }
+   134:     },
+>> 135:     [preset, startDate, endDate, isAgencyOwner]
+   136:   );
+   137: 
+[Line 268] Match for /isAgencyOwner/:
+   266:                 </Button>
+   267: 
+>> 268:                 {isAgencyOwner && (
+   269:                   <Button
+   270:                     variant="outline"
+
+=== FILE: src/app/(dashboard)/destinations/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { DestinationDialog } from "@/components/destinations/destination-dialog";
+[Line 66] Match for /OwnerRestrictedCard/:
+   64:     return (
+   65:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 66:         <OwnerRestrictedCard
+   67:           featureName="Destinations Catalog"
+   68:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/documents/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { TableSkeleton } from "@/components/shared/loading-skeletons";
+[Line 92] Match for /OwnerRestrictedCard/:
+   90:     return (
+   91:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 92:         <OwnerRestrictedCard
+   93:           featureName="Travel Documents"
+   94:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/enquiries/new/page.tsx (2 matches) ===
+[Line 35] Match for /OwnerRestrictedCard/:
+   33: import { useRouter } from "next/navigation";
+   34: import { useAuth } from "@/context/auth-context";
+>> 35: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   36: import * as React from "react";
+   37: import { toast } from "sonner";
+[Line 120] Match for /OwnerRestrictedCard/:
+   118:     return (
+   119:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 120:         <OwnerRestrictedCard
+   121:           featureName="Enquiry Creation"
+   122:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/enquiries/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { AssignLeadModal } from "@/components/enquiries/assign-lead-modal";
+[Line 97] Match for /OwnerRestrictedCard/:
+   95:     return (
+   96:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 97:         <OwnerRestrictedCard
+   98:           featureName="Enquiries Pipeline"
+   99:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/enquiries/[id]/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { AssignLeadModal } from "@/components/enquiries/assign-lead-modal";
+[Line 89] Match for /OwnerRestrictedCard/:
+   87:     return (
+   88:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 89:         <OwnerRestrictedCard
+   90:           featureName="Enquiry Details"
+   91:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/feedback/page.tsx (6 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: 
+   5: import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
+[Line 49] Match for /OwnerRestrictedCard/:
+   47:     return (
+   48:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 49:         <OwnerRestrictedCard
+   50:           featureName="Feedback & Reviews"
+   51:           badgeText="Access Restricted"
+[Line 58] Match for /isAgencyOwner/:
+   56:   }
+   57: 
+>> 58:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   59:   const canManageSettings = isAgencyOwner || (isAgencyStaff && hasStaffPermission("FEEDBACK", "update"));
+   60:   const router = useRouter();
+[Line 59] Match for /isAgencyOwner/:
+   57: 
+   58:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+>> 59:   const canManageSettings = isAgencyOwner || (isAgencyStaff && hasStaffPermission("FEEDBACK", "update"));
+   60:   const router = useRouter();
+   61:   const { isFeatureAllowed, loading: subLoading } = useSubscription();
+[Line 143] Match for /isAgencyOwner/:
+   141:     if (isAllowed) {
+   142:       fetchFeedbacks();
+>> 143:       if (isAgencyOwner) {
+   144:         fetchSettings();
+   145:       }
+[Line 147] Match for /isAgencyOwner/:
+   145:       }
+   146:     }
+>> 147:   }, [isAllowed, fetchFeedbacks, fetchSettings, isAgencyOwner]);
+   148: 
+   149:   // Compute star distribution from live feedbacks
+
+=== FILE: src/app/(dashboard)/finance/page.tsx (9 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { CreateExpenseDialog } from "@/components/finance/create-expense-dialog";
+[Line 43] Match for /isAgencyOwner/:
+   41: 
+   42: export default function FinanceDashboardPage() {
+>> 43:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   44: 
+   45:   const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("FINANCE", "view"));
+[Line 45] Match for /isAgencyOwner/:
+   43:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   44: 
+>> 45:   const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("FINANCE", "view"));
+   46: 
+   47:   if (!isViewAllowed) {
+[Line 50] Match for /OwnerRestrictedCard/:
+   48:     return (
+   49:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 50:         <OwnerRestrictedCard
+   51:           featureName="Financial Management"
+   52:           badgeText="Access Restricted"
+[Line 264] Match for /isAgencyOwner/:
+   262:         {data && (
+   263:           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+>> 264:             {isAgencyOwner ? (
+   265:               <ProfitabilityCard profitability={data.profitability} />
+   266:             ) : (
+[Line 279] Match for /isAgencyOwner/:
+   277:             <OutstandingBalancesCard
+   278:               customerReceivables={data.customerReceivables}
+>> 279:               supplierPayables={isAgencyOwner ? data.supplierPayables : { totalOutstanding: 0, overdueCount: 0, overdueAmount: 0, items: [] }}
+   280:               onRecordCustomerPayment={handleRecordCustomerPayment}
+   281:               onRecordSupplierPayment={isAgencyOwner ? handleRecordSupplierPayment : () => {}}
+[Line 281] Match for /isAgencyOwner/:
+   279:               supplierPayables={isAgencyOwner ? data.supplierPayables : { totalOutstanding: 0, overdueCount: 0, overdueAmount: 0, items: [] }}
+   280:               onRecordCustomerPayment={handleRecordCustomerPayment}
+>> 281:               onRecordSupplierPayment={isAgencyOwner ? handleRecordSupplierPayment : () => {}}
+   282:               onRecordPayable={isAgencyOwner ? handleRecordPayable : () => {}}
+   283:               onEditPayable={isAgencyOwner ? handleEditPayable : () => {}}
+[Line 282] Match for /isAgencyOwner/:
+   280:               onRecordCustomerPayment={handleRecordCustomerPayment}
+   281:               onRecordSupplierPayment={isAgencyOwner ? handleRecordSupplierPayment : () => {}}
+>> 282:               onRecordPayable={isAgencyOwner ? handleRecordPayable : () => {}}
+   283:               onEditPayable={isAgencyOwner ? handleEditPayable : () => {}}
+   284:             />
+[Line 283] Match for /isAgencyOwner/:
+   281:               onRecordSupplierPayment={isAgencyOwner ? handleRecordSupplierPayment : () => {}}
+   282:               onRecordPayable={isAgencyOwner ? handleRecordPayable : () => {}}
+>> 283:               onEditPayable={isAgencyOwner ? handleEditPayable : () => {}}
+   284:             />
+   285:           </div>
+
+=== FILE: src/app/(dashboard)/follow-ups/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { PageHeader } from "@/components/shared/page-header";
+[Line 105] Match for /OwnerRestrictedCard/:
+   103:     return (
+   104:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 105:         <OwnerRestrictedCard
+   106:           featureName="Follow-ups & CRM Activity"
+   107:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/hotels/new/page.tsx (4 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: import { useAuth } from "@/context/auth-context";
+   5: import { DestinationSelect } from "@/components/shared/destination-select";
+[Line 43] Match for /isAgencyOwner/:
+   41: 
+   42: export default function NewHotelPage() {
+>> 43:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   44: 
+   45:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("HOTELS", "create"))) {
+[Line 45] Match for /isAgencyOwner/:
+   43:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   44: 
+>> 45:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("HOTELS", "create"))) {
+   46:     return (
+   47:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 48] Match for /OwnerRestrictedCard/:
+   46:     return (
+   47:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 48:         <OwnerRestrictedCard
+   49:           featureName="Create Hotel"
+   50:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/hotels/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { ExcelImportModal } from "@/components/excel/excel-import-modal";
+[Line 69] Match for /OwnerRestrictedCard/:
+   67:     return (
+   68:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 69:         <OwnerRestrictedCard
+   70:           featureName="Hotels Directory"
+   71:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/hotels/[id]/page.tsx (2 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: import { useAuth } from "@/context/auth-context";
+   5: import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+[Line 56] Match for /isAgencyOwner/:
+   54: 
+   55: export default function HotelProfilePage() {
+>> 56:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   57:   const params = useParams();
+   58:   const router = useRouter();
+
+=== FILE: src/app/(dashboard)/invoices/page.tsx (4 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: import { Button } from "@/components/ui/button";
+   6: import { CalendarCheck, Loader2 } from "lucide-react";
+[Line 13] Match for /isAgencyOwner/:
+   11: export default function InvoicesRedirectPage() {
+   12:   const router = useRouter();
+>> 13:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   14: 
+   15:   const isAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("INVOICES", "view"));
+[Line 15] Match for /isAgencyOwner/:
+   13:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   14: 
+>> 15:   const isAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("INVOICES", "view"));
+   16: 
+   17:   React.useEffect(() => {
+[Line 26] Match for /OwnerRestrictedCard/:
+   24:     return (
+   25:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 26:         <OwnerRestrictedCard
+   27:           featureName="Invoices & Billing"
+   28:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/operations/analytics/page.tsx (6 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: import { useAuth } from "@/context/auth-context";
+   5: import { OperationsAnalyticsKpiGrid } from "@/components/operations/analytics/operations-analytics-kpi-grid";
+[Line 45] Match for /isAgencyOwner/:
+   43: 
+   44: export default function OperationsAnalyticsPage() {
+>> 45:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   46: 
+   47:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("OPERATIONS", "view"))) {
+[Line 47] Match for /isAgencyOwner/:
+   45:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   46: 
+>> 47:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("OPERATIONS", "view"))) {
+   48:     return (
+   49:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 50] Match for /OwnerRestrictedCard/:
+   48:     return (
+   49:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 50:         <OwnerRestrictedCard
+   51:           featureName="Operations Analytics"
+   52:           badgeText="Access Restricted"
+[Line 105] Match for /isAgencyOwner/:
+   103: 
+   104:   const handleExportCsv = () => {
+>> 105:     if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("OPERATIONS", "export"))) {
+   106:       toast.error("You do not have permission to export operations analytics.");
+   107:       return;
+[Line 232] Match for /isAgencyOwner/:
+   230:         {/* Section 3: Financial Variance & Guest Satisfaction */}
+   231:         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+>> 232:           {isAgencyOwner ? (
+   233:             <OperationsFinancialAnalyticsCard financialData={data?.financial} loading={loading} />
+   234:           ) : (
+
+=== FILE: src/app/(dashboard)/operations/issues/page.tsx (2 matches) ===
+[Line 8] Match for /OwnerRestrictedCard/:
+   6: import { EmptyState } from "@/components/shared/empty-state";
+   7: import { useAuth } from "@/context/auth-context";
+>> 8: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   9: import { ErrorState } from "@/components/shared/error-state";
+   10: import { TableSkeleton } from "@/components/shared/loading-skeletons";
+[Line 63] Match for /OwnerRestrictedCard/:
+   61:     return (
+   62:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 63:         <OwnerRestrictedCard
+   64:           featureName="Operations Issues"
+   65:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/operations/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { CreateIssueModal } from "@/components/operations/create-issue-modal";
+[Line 50] Match for /OwnerRestrictedCard/:
+   48:     return (
+   49:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 50:         <OwnerRestrictedCard
+   51:           featureName="Operations & Dispatch"
+   52:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/operations/[tripId]/page.tsx (4 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: import { useAuth } from "@/context/auth-context";
+   5: import { EditPayableDialog } from "@/components/finance/edit-payable-dialog";
+[Line 90] Match for /isAgencyOwner/:
+   88: 
+   89: export default function TripOperationsDetailPage() {
+>> 90:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   91:   const params = useParams();
+   92:   const router = useRouter();
+[Line 428] Match for /isAgencyOwner/:
+   426:   }
+   427: 
+>> 428:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("OPERATIONS", "view"))) {
+   429:     return (
+   430:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 431] Match for /OwnerRestrictedCard/:
+   429:     return (
+   430:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 431:         <OwnerRestrictedCard
+   432:           featureName="Operations Workspace"
+   433:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/payments/page.tsx (5 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: 
+   5: import { useAuth } from "@/context/auth-context";
+[Line 102] Match for /isAgencyOwner/:
+   100: 
+   101: export default function PaymentsPage() {
+>> 102:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   103: 
+   104:   if (isAgencyStaff && !hasStaffPermission("PAYMENTS", "view")) {
+[Line 107] Match for /OwnerRestrictedCard/:
+   105:     return (
+   106:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 107:         <OwnerRestrictedCard
+   108:           featureName="Payments & Receipts"
+   109:           badgeText="Access Restricted"
+[Line 167] Match for /isAgencyOwner/:
+   165:         sortOrder: "desc",
+   166:       });
+>> 167:       const suppPromise = isAgencyOwner
+   168:         ? financeClient.getSupplierPayments({
+   169:             search: debouncedSearch || undefined,
+[Line 189] Match for /isAgencyOwner/:
+   187:       setLoading(false);
+   188:     }
+>> 189:   }, [debouncedSearch, isAgencyOwner]);
+   190: 
+   191:   React.useEffect(() => {
+
+=== FILE: src/app/(dashboard)/quotations/new/page.tsx (2 matches) ===
+[Line 23] Match for /OwnerRestrictedCard/:
+   21: import { useRouter } from "next/navigation";
+   22: import { useAuth } from "@/context/auth-context";
+>> 23: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   24: import * as React from "react";
+   25: import { toast } from "sonner";
+[Line 42] Match for /OwnerRestrictedCard/:
+   40:     return (
+   41:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 42:         <OwnerRestrictedCard
+   43:           featureName="Quotation Creation"
+   44:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/quotations/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+[Line 120] Match for /OwnerRestrictedCard/:
+   118:     return (
+   119:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 120:         <OwnerRestrictedCard
+   121:           featureName="Quotations & Proposals"
+   122:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/rate-sheets/new/page.tsx (4 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { PageHeader } from "@/components/shared/page-header";
+[Line 39] Match for /isAgencyOwner/:
+   37: function NewRateSheetForm() {
+   38:   const router = useRouter();
+>> 39:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   40: 
+   41:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("RATE_SHEETS", "create"))) {
+[Line 41] Match for /isAgencyOwner/:
+   39:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   40: 
+>> 41:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("RATE_SHEETS", "create"))) {
+   42:     return (
+   43:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 44] Match for /OwnerRestrictedCard/:
+   42:     return (
+   43:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 44:         <OwnerRestrictedCard
+   45:           featureName="Create Rate Sheet"
+   46:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/rate-sheets/page.tsx (4 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { ExcelImportModal } from "@/components/excel/excel-import-modal";
+[Line 57] Match for /isAgencyOwner/:
+   55: 
+   56: export default function RateSheetsPage() {
+>> 57:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   58: 
+   59:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("RATE_SHEETS", "view"))) {
+[Line 59] Match for /isAgencyOwner/:
+   57:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   58: 
+>> 59:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("RATE_SHEETS", "view"))) {
+   60:     return (
+   61:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 62] Match for /OwnerRestrictedCard/:
+   60:     return (
+   61:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 62:         <OwnerRestrictedCard
+   63:           featureName="Supplier Rate Sheets"
+   64:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/rate-sheets/[id]/page.tsx (4 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+[Line 51] Match for /isAgencyOwner/:
+   49: export default function RateSheetDetailPage() {
+   50:   const router = useRouter();
+>> 51:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   52: 
+   53:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("RATE_SHEETS", "view"))) {
+[Line 53] Match for /isAgencyOwner/:
+   51:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   52: 
+>> 53:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("RATE_SHEETS", "view"))) {
+   54:     return (
+   55:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 56] Match for /OwnerRestrictedCard/:
+   54:     return (
+   55:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 56:         <OwnerRestrictedCard
+   57:           featureName="Rate Sheet Details"
+   58:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/referrals/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { PageHeader } from "@/components/shared/page-header";
+[Line 52] Match for /OwnerRestrictedCard/:
+   50:     return (
+   51:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 52:         <OwnerRestrictedCard
+   53:           featureName="Referrals & Rewards"
+   54:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/reports/page.tsx (4 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
+[Line 51] Match for /isAgencyOwner/:
+   49: 
+   50: export default function ReportsPage() {
+>> 51:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   52: 
+   53:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("REPORTS", "view"))) {
+[Line 53] Match for /isAgencyOwner/:
+   51:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   52: 
+>> 53:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("REPORTS", "view"))) {
+   54:     return (
+   55:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 56] Match for /OwnerRestrictedCard/:
+   54:     return (
+   55:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 56:         <OwnerRestrictedCard
+   57:           featureName="Reports & BI Analytics"
+   58:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/settings/page.tsx (7 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+[Line 54] Match for /isAgencyOwner/:
+   52: 
+   53: export default function SettingsPage() {
+>> 54:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   55: 
+   56:   const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("SETTINGS", "view"));
+[Line 56] Match for /isAgencyOwner/:
+   54:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   55: 
+>> 56:   const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("SETTINGS", "view"));
+   57: 
+   58:   if (!isViewAllowed) {
+[Line 61] Match for /OwnerRestrictedCard/:
+   59:     return (
+   60:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 61:         <OwnerRestrictedCard
+   62:           featureName="Agency Settings"
+   63:           badgeText="Access Restricted"
+[Line 468] Match for /isAgencyOwner/:
+   466:             )}
+   467:           </button>
+>> 468:           {(isAgencyOwner || hasStaffPermission("TEAM", "view")) && (
+   469:             <button
+   470:               onClick={() => setActiveTab("team")}
+[Line 1318] Match for /isAgencyOwner/:
+   1316:         ) : (
+   1317:           /* ─── AGENCY TEAM & STAFF MANAGEMENT TAB ─── */
+>> 1318:           (isAgencyOwner || hasStaffPermission("TEAM", "view")) ? (
+   1319:             <TeamManagementPanel />
+   1320:           ) : (
+[Line 1321] Match for /OwnerRestrictedCard/:
+   1319:             <TeamManagementPanel />
+   1320:           ) : (
+>> 1321:             <OwnerRestrictedCard
+   1322:               featureName="Team Management"
+   1323:               badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/subscription/page.tsx (4 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { PageHeader } from "@/components/shared/page-header";
+[Line 155] Match for /isAgencyOwner/:
+   153:   const router = useRouter();
+   154:   const { refreshSubscription } = useSubscription();
+>> 155:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   156:   const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("SUBSCRIPTION", "view"));
+   157:   const [data, setData] = React.useState<AgencySubscriptionData | null>(null);
+[Line 156] Match for /isAgencyOwner/:
+   154:   const { refreshSubscription } = useSubscription();
+   155:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+>> 156:   const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("SUBSCRIPTION", "view"));
+   157:   const [data, setData] = React.useState<AgencySubscriptionData | null>(null);
+   158:   const [plans, setPlans] = React.useState<PlanItem[]>([]);
+[Line 211] Match for /OwnerRestrictedCard/:
+   209:     return (
+   210:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 211:         <OwnerRestrictedCard
+   212:           featureName="Subscription & Billing"
+   213:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/suppliers/new/page.tsx (4 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { PageHeader } from "@/components/shared/page-header";
+[Line 35] Match for /isAgencyOwner/:
+   33: export default function NewSupplierPage() {
+   34:   const router = useRouter();
+>> 35:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   36: 
+   37:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("SUPPLIERS", "create"))) {
+[Line 37] Match for /isAgencyOwner/:
+   35:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   36: 
+>> 37:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("SUPPLIERS", "create"))) {
+   38:     return (
+   39:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 40] Match for /OwnerRestrictedCard/:
+   38:     return (
+   39:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 40:         <OwnerRestrictedCard
+   41:           featureName="Create Supplier"
+   42:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/suppliers/page.tsx (4 matches) ===
+[Line 9] Match for /OwnerRestrictedCard/:
+   7: import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+   8: import { StatusBadge } from "@/components/shared/status-badge";
+>> 9: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   10: import { useAuth } from "@/context/auth-context";
+   11: import { Button } from "@/components/ui/button";
+[Line 78] Match for /isAgencyOwner/:
+   76: export default function SuppliersPage() {
+   77:   const router = useRouter();
+>> 78:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   79: 
+   80:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("SUPPLIERS", "view"))) {
+[Line 80] Match for /isAgencyOwner/:
+   78:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   79: 
+>> 80:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("SUPPLIERS", "view"))) {
+   81:     return (
+   82:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 83] Match for /OwnerRestrictedCard/:
+   81:     return (
+   82:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 83:         <OwnerRestrictedCard
+   84:           featureName="Supplier Management"
+   85:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/suppliers/[id]/page.tsx (4 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+[Line 93] Match for /isAgencyOwner/:
+   91: export default function SupplierDetailPage() {
+   92:   const router = useRouter();
+>> 93:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   94: 
+   95:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("SUPPLIERS", "view"))) {
+[Line 95] Match for /isAgencyOwner/:
+   93:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   94: 
+>> 95:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("SUPPLIERS", "view"))) {
+   96:     return (
+   97:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 98] Match for /OwnerRestrictedCard/:
+   96:     return (
+   97:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 98:         <OwnerRestrictedCard
+   99:           featureName="Supplier Details"
+   100:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/support/page.tsx (4 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: 
+   5: import { Button } from "@/components/ui/button";
+[Line 31] Match for /OwnerRestrictedCard/:
+   29:     return (
+   30:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 31:         <OwnerRestrictedCard
+   32:           featureName="Support Chat"
+   33:           badgeText="Access Restricted"
+[Line 83] Match for /AGENCY_OWNER/:
+   81:     conversationId: conversation?.id || null,
+   82:     agencyId: currentUser?.agencyId || undefined,
+>> 83:     currentUserRole: currentUser?.role || "AGENCY_OWNER",
+   84:   });
+   85: 
+[Line 243] Match for /AGENCY_OWNER/:
+   241:           ) : (
+   242:             messages.map((msg) => {
+>> 243:               const isMe = msg.senderRole === "AGENCY_OWNER";
+   244:               const formattedTime = formatChatTime(msg.createdAt);
+   245: 
+
+=== FILE: src/app/(dashboard)/trips/new/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: import { DestinationMultiSelect } from "@/components/shared/destination-multi-select";
+   6: import { PageHeader } from "@/components/shared/page-header";
+[Line 70] Match for /OwnerRestrictedCard/:
+   68:     return (
+   69:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 70:         <OwnerRestrictedCard
+   71:           featureName="Trip Creation"
+   72:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/trips/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { EmptyState } from "@/components/shared/empty-state";
+[Line 200] Match for /OwnerRestrictedCard/:
+   198:     return (
+   199:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 200:         <OwnerRestrictedCard
+   201:           featureName="Trips Planning"
+   202:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/trips/[id]/costing/page.tsx (4 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+[Line 34] Match for /isAgencyOwner/:
+   32: 
+   33: export default function TripCostingDedicatedPage() {
+>> 34:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   35:   const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("TRIP_COSTING", "view"));
+   36: 
+[Line 35] Match for /isAgencyOwner/:
+   33: export default function TripCostingDedicatedPage() {
+   34:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+>> 35:   const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("TRIP_COSTING", "view"));
+   36: 
+   37:   const params = useParams();
+[Line 73] Match for /OwnerRestrictedCard/:
+   71:     return (
+   72:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 73:         <OwnerRestrictedCard
+   74:           featureName="Trip Costing Studio"
+   75:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/trips/[id]/page.tsx (5 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: 
+   5: import { useAuth } from "@/context/auth-context";
+[Line 111] Match for /OwnerRestrictedCard/:
+   109:     return (
+   110:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 111:         <OwnerRestrictedCard
+   112:           featureName="Trip Dossier"
+   113:           badgeText="Access Restricted"
+[Line 120] Match for /isAgencyOwner/:
+   118:   }
+   119: 
+>> 120:   const { isAgencyOwner } = useAuth();
+   121:   const params = useParams();
+   122:   const router = useRouter();
+[Line 1440] Match for /isAgencyOwner/:
+   1438:               { id: "costing", label: "Costing", icon: DollarSign },
+   1439:               { id: "quotation", label: "Quotations", icon: CheckCircle2, count: tripQuotations.length },
+>> 1440:             ].filter((tab) => tab.id !== "costing" || isAgencyOwner).map((tab) => {
+   1441:               const Icon = tab.icon;
+   1442:               const isActive = activeTab === tab.id;
+[Line 2152] Match for /isAgencyOwner/:
+   2150: 
+   2151:         {/* TAB 7: COSTING */}
+>> 2152:         {activeTab === "costing" && isAgencyOwner && (
+   2153:           <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
+   2154:             <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+
+=== FILE: src/app/(dashboard)/trips/[id]/quotation/page.tsx (6 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: import { useAuth } from "@/context/auth-context";
+   5: import { QuotationStatusBadge } from "@/app/(dashboard)/quotations/page";
+[Line 88] Match for /isAgencyOwner/:
+   86: 
+   87: export default function TripQuotationEditorPage() {
+>> 88:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   89:   const params = useParams();
+   90:   const router = useRouter();
+[Line 180] Match for /isAgencyOwner/:
+   178:   // Load trip quotations & live costing
+   179:   const fetchTripQuotationData = React.useCallback(async () => {
+>> 180:     if (!isAgencyOwner && (!isAgencyStaff || (!hasStaffPermission("QUOTATIONS", "view") && !hasStaffPermission("QUOTATION_DETAIL", "view")))) {
+   181:       setLoading(false);
+   182:       return;
+[Line 207] Match for /isAgencyOwner/:
+   205:   // Load active tax rates catalog from DB
+   206:   const loadTaxRates = React.useCallback(async () => {
+>> 207:     if (!isAgencyOwner && (!isAgencyStaff || (!hasStaffPermission("QUOTATIONS", "view") && !hasStaffPermission("QUOTATION_DETAIL", "view")))) {
+   208:       setTaxRatesLoading(false);
+   209:       return;
+[Line 756] Match for /isAgencyOwner/:
+   754:   const milestones = activeQuote?.paymentMilestones || [];
+   755: 
+>> 756:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("QUOTATIONS", "view"))) {
+   757:     return (
+   758:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 759] Match for /OwnerRestrictedCard/:
+   757:     return (
+   758:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 759:         <OwnerRestrictedCard
+   760:           featureName="Trip Quotation"
+   761:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx (4 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: import { useAuth } from "@/context/auth-context";
+   5: import { Button } from "@/components/ui/button";
+[Line 67] Match for /isAgencyOwner/:
+   65: 
+   66: function TripQuotationPreviewContent() {
+>> 67:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   68:   const isViewAllowed = isAgencyOwner || (isAgencyStaff && (hasStaffPermission("QUOTATIONS", "view") || hasStaffPermission("QUOTATION_DETAIL", "view")));
+   69:   const params = useParams();
+[Line 68] Match for /isAgencyOwner/:
+   66: function TripQuotationPreviewContent() {
+   67:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+>> 68:   const isViewAllowed = isAgencyOwner || (isAgencyStaff && (hasStaffPermission("QUOTATIONS", "view") || hasStaffPermission("QUOTATION_DETAIL", "view")));
+   69:   const params = useParams();
+   70:   const searchParams = useSearchParams();
+[Line 278] Match for /OwnerRestrictedCard/:
+   276:     return (
+   277:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 278:         <OwnerRestrictedCard
+   279:           featureName="Quotation Preview"
+   280:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/vehicles/new/page.tsx (4 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: import { useAuth } from "@/context/auth-context";
+   5: import { PageHeader } from "@/components/shared/page-header";
+[Line 43] Match for /isAgencyOwner/:
+   41: 
+   42: export default function NewVehiclePage() {
+>> 43:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   44: 
+   45:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("VEHICLES", "create"))) {
+[Line 45] Match for /isAgencyOwner/:
+   43:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   44: 
+>> 45:   if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("VEHICLES", "create"))) {
+   46:     return (
+   47:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+[Line 48] Match for /OwnerRestrictedCard/:
+   46:     return (
+   47:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 48:         <OwnerRestrictedCard
+   49:           featureName="Create Vehicle"
+   50:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/vehicles/page.tsx (2 matches) ===
+[Line 4] Match for /OwnerRestrictedCard/:
+   2: 
+   3: import { useAuth } from "@/context/auth-context";
+>> 4: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   5: 
+   6: import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+[Line 56] Match for /OwnerRestrictedCard/:
+   54:     return (
+   55:       <div className="max-w-7xl mx-auto p-4 sm:p-6">
+>> 56:         <OwnerRestrictedCard
+   57:           featureName="Vehicles Fleet"
+   58:           badgeText="Access Restricted"
+
+=== FILE: src/app/(dashboard)/vehicles/[id]/page.tsx (2 matches) ===
+[Line 3] Match for /OwnerRestrictedCard/:
+   1: "use client";
+   2: 
+>> 3: import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+   4: import { useAuth } from "@/context/auth-context";
+   5: import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+[Line 53] Match for /isAgencyOwner/:
+   51: 
+   52: export default function VehicleProfilePage() {
+>> 53:   const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   54:   const params = useParams();
+   55:   const router = useRouter();
+
+=== FILE: src/app/api/auth/me/route.ts (1 matches) ===
+[Line 55] Match for /isAgencyOwner/:
+   53:         subscriptionAccess: context.subscriptionAccess,
+   54:         isPlatformOwner: context.isPlatformOwner,
+>> 55:         isAgencyOwner: context.isAgencyOwner,
+   56:         staffPermissions,
+   57:       },
+
+=== FILE: src/app/api/bookings/[id]/route.ts (1 matches) ===
+[Line 96] Match for /Owner Only/i:
+   94:  * DELETE /api/bookings/[id]
+   95:  * Soft delete / archive booking and recalculate totals.
+>> 96:  * Agency Owner only. Destructive deletion is restricted to Agency Owners.
+   97:  */
+   98: export async function DELETE(request: NextRequest, { params }: RouteParams) {
+
+=== FILE: src/app/api/customers/[id]/route.ts (1 matches) ===
+[Line 98] Match for /Owner Only/i:
+   96:  * DELETE /api/customers/[id]
+   97:  * Soft-deletes (archives) a customer record by setting archivedAt.
+>> 98:  * Agency Owner only. Destructive deletion is restricted to Agency Owners.
+   99:  */
+   100: export async function DELETE(request: NextRequest, props: RouteProps) {
+
+=== FILE: src/app/api/enquiries/[id]/route.ts (1 matches) ===
+[Line 94] Match for /Owner Only/i:
+   92: /**
+   93:  * DELETE /api/enquiries/[id]
+>> 94:  * Soft delete / archive enquiry. Agency Owner only.
+   95:  */
+   96: export async function DELETE(request: NextRequest, { params }: RouteParams) {
+
+=== FILE: src/app/api/payments/[id]/route.ts (2 matches) ===
+[Line 61] Match for /Owner Only/i:
+   59:  * PATCH /api/payments/[id]
+   60:  * Update payment status, notes, or refund amount.
+>> 61:  * Agency Owner only. Staff cannot modify existing payment records.
+   62:  */
+   63: export async function PATCH(request: NextRequest, { params }: RouteParams) {
+[Line 80] Match for /Owner Only/i:
+   78:  * DELETE /api/payments/[id]
+   79:  * Soft delete / archive payment and recalculate booking totals.
+>> 80:  * Agency Owner only. Destructive deletion is restricted to Agency Owners.
+   81:  */
+   82: export async function DELETE(request: NextRequest, { params }: RouteParams) {
+
+=== FILE: src/app/api/payments/[id]/verify/route.ts (1 matches) ===
+[Line 18] Match for /Owner Only/i:
+   16:  * PATCH /api/payments/[id]/verify
+   17:  * Verifies a pending customer payment receipt.
+>> 18:  * Agency Owner only. Updates status to COMPLETED, recalculates booking balance, and sends customer receipt.
+   19:  */
+   20: export async function PATCH(request: NextRequest, { params }: RouteParams) {
+
+=== FILE: src/app/api/payments/[id]/void/route.ts (1 matches) ===
+[Line 24] Match for /Owner Only/i:
+   22:  * PATCH /api/payments/[id]/void
+   23:  * Rejects or voids a payment receipt.
+>> 24:  * Agency Owner only. Internal notification only, zero customer-facing notification.
+   25:  */
+   26: export async function PATCH(request: NextRequest, { params }: RouteParams) {
+
+=== FILE: src/app/api/quotations/[id]/route.ts (1 matches) ===
+[Line 73] Match for /Owner Only/i:
+   71:  * DELETE /api/quotations/[id]
+   72:  * Soft delete quotation.
+>> 73:  * Agency Owner only. Destructive deletion is strictly restricted to Agency Owners.
+   74:  */
+   75: export async function DELETE(request: NextRequest, { params }: RouteParams) {
+
+=== FILE: src/app/api/team/invitations/route.ts (1 matches) ===
+[Line 18] Match for /AGENCY_OWNER/:
+   16:   try {
+   17:     const context = await requireWriteAccess();
+>> 18:     if (context.dbUser.role !== "AGENCY_OWNER") {
+   19:       await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TEAM", "CREATE", "Only authorized users can invite new team members.");
+   20:     }
+
+=== FILE: src/app/api/team/invitations/[id]/resend/route.ts (1 matches) ===
+[Line 20] Match for /AGENCY_OWNER/:
+   18:   try {
+   19:     const authContext = await requireWriteAccess();
+>> 20:     if (authContext.dbUser.role !== "AGENCY_OWNER") {
+   21:       await enforceStaffPermission(authContext.dbUser.role, authContext.agencyId, authContext.dbUser.id, "TEAM", "UPDATE", "Only authorized users can resend invitations.");
+   22:     }
+
+=== FILE: src/app/api/team/invitations/[id]/revoke/route.ts (1 matches) ===
+[Line 20] Match for /AGENCY_OWNER/:
+   18:   try {
+   19:     const authContext = await requireWriteAccess();
+>> 20:     if (authContext.dbUser.role !== "AGENCY_OWNER") {
+   21:       await enforceStaffPermission(authContext.dbUser.role, authContext.agencyId, authContext.dbUser.id, "TEAM", "DELETE", "Only authorized users can revoke invitations.");
+   22:     }
+
+=== FILE: src/app/api/team/members/[id]/permissions/route.ts (3 matches) ===
+[Line 27] Match for /Owner Only/i:
+   25:  * GET /api/team/members/[id]/permissions
+   26:  * Retrieve a staff member's effective permission profile.
+>> 27:  * Agency Owner only.
+   28:  */
+   29: export async function GET(request: NextRequest, { params }: RouteParams) {
+[Line 48] Match for /Owner Only/i:
+   46:  * PUT /api/team/members/[id]/permissions
+   47:  * Updates a staff member's permissions with audit log tracking.
+>> 48:  * Agency Owner only.
+   49:  */
+   50: export async function PUT(request: NextRequest, { params }: RouteParams) {
+[Line 76] Match for /Owner Only/i:
+   74:  * POST /api/team/members/[id]/permissions
+   75:  * Resets a staff member's permissions to default.
+>> 76:  * Agency Owner only.
+   77:  */
+   78: export async function POST(request: NextRequest, { params }: RouteParams) {
+
+=== FILE: src/app/api/trips/[id]/route.ts (1 matches) ===
+[Line 96] Match for /Owner Only/i:
+   94:  * DELETE /api/trips/[id]
+   95:  * Soft-deletes (archives) a trip record by setting archivedAt.
+>> 96:  * Agency Owner only. Destructive deletion is restricted to Agency Owners.
+   97:  */
+   98: export async function DELETE(request: NextRequest, props: RouteProps) {
+
+=== FILE: src/components/dashboard/revenue-chart.tsx (2 matches) ===
+[Line 24] Match for /isAgencyOwner/:
+   22: 
+   23: export function RevenueChart({ analytics, loading = false }: RevenueChartProps) {
+>> 24:   const { isAgencyOwner } = useAuth();
+   25:   const [chartMode, setChartMode] = React.useState<"FINANCIAL" | "VOLUME">("FINANCIAL");
+   26:   const [showTable, setShowTable] = React.useState(false);
+[Line 202] Match for /isAgencyOwner/:
+   200:           </div>
+   201: 
+>> 202:           {isAgencyOwner && (
+   203:             <a
+   204:               href={dashboardClient.getExportUrl()}
+
+=== FILE: src/components/layout/mobile-nav.tsx (3 matches) ===
+[Line 35] Match for /isAgencyOwner/:
+   33:   const pathname = usePathname();
+   34:   const router = useRouter();
+>> 35:   const { isPlatformOwner, isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   36:   const isPlatform = isPlatformOwner || pathname.startsWith("/admin");
+   37:   const navSections = isPlatform ? adminNavigationConfig : agencyNavigationConfig;
+[Line 121] Match for /ownerOnly/:
+   119:                 const visibleItems = isPlatform
+   120:                   ? section.items.filter((item) => {
+>> 121:                       if (item.ownerOnly && !isAgencyOwner && !isPlatformOwner) return false;
+   122:                       return true;
+   123:                     })
+[Line 142] Match for /ownerOnly/:
+   140:                       const isEntitlementLocked = isFeatureGated && !isFeatureAllowed(item.featureKey as keyof EntitlementsState);
+   141:                       const isStaffRestricted = !isPlatform && isAgencyStaff && item.moduleKey ? !hasStaffPermission(item.moduleKey, "view") : false;
+>> 142:                       const isOwnerRestricted = !isPlatform && !isAgencyOwner && Boolean(item.ownerOnly);
+   143:                       const isLocked = isEntitlementLocked || isStaffRestricted || isOwnerRestricted;
+   144: 
+
+=== FILE: src/components/layout/sidebar.tsx (3 matches) ===
+[Line 25] Match for /isAgencyOwner/:
+   23: export function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
+   24:   const pathname = usePathname();
+>> 25:   const { isPlatformOwner, isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+   26:   const isPlatform = isPlatformOwner || pathname.startsWith("/admin");
+   27:   const navSections = isPlatform ? adminNavigationConfig : agencyNavigationConfig;
+[Line 84] Match for /ownerOnly/:
+   82:             const visibleItems = isPlatform
+   83:               ? section.items.filter((item) => {
+>> 84:                   if (item.ownerOnly && !isAgencyOwner && !isPlatformOwner) return false;
+   85:                   return true;
+   86:                 })
+[Line 105] Match for /ownerOnly/:
+   103:                   const isEntitlementLocked = isFeatureGated && !isFeatureAllowed(item.featureKey as keyof EntitlementsState);
+   104:                   const isStaffRestricted = !isPlatform && isAgencyStaff && item.moduleKey ? !hasStaffPermission(item.moduleKey, "view") : false;
+>> 105:                   const isOwnerRestricted = !isPlatform && !isAgencyOwner && Boolean(item.ownerOnly);
+   106:                   const isLocked = isEntitlementLocked || isStaffRestricted || isOwnerRestricted;
+   107: 
+
+=== FILE: src/components/shared/owner-restricted-card.tsx (3 matches) ===
+[Line 8] Match for /OwnerRestrictedCard/:
+   6: import * as React from "react";
+   7: 
+>> 8: interface OwnerRestrictedCardProps {
+   9:   featureName: string;
+   10:   badgeText?: string;
+[Line 14] Match for /OwnerRestrictedCard/:
+   12: }
+   13: 
+>> 14: export function OwnerRestrictedCard({
+   15:   featureName,
+   16:   badgeText = "Owner Restricted",
+[Line 18] Match for /OwnerRestrictedCard/:
+   16:   badgeText = "Owner Restricted",
+   17:   description = "This module contains commercial margins, financial administration, or workspace settings restricted to the Agency Owner.",
+>> 18: }: OwnerRestrictedCardProps) {
+   19:   return (
+   20:     <div className="w-full max-w-2xl mx-auto my-12 p-8 bg-white border border-amber-200/80 rounded-2xl shadow-sm text-center">
+
+=== FILE: src/components/team/staff-permissions-modal.tsx (13 matches) ===
+[Line 17] Match for /IMMUTABLE_OWNER_ONLY_MODULES/:
+   15:   DEFAULT_STAFF_PERMISSIONS,
+   16:   DELEGABLE_STAFF_DELETE_MODULES,
+>> 17:   IMMUTABLE_OWNER_ONLY_MODULES,
+   18:   PAGE_PERMISSIONS_REGISTRY,
+   19:   PagePermissionConfig,
+[Line 146] Match for /isOwnerOnly/:
+   144:       const updated: StaffPermissionsProfileMap = { ...prev };
+   145:       PAGE_PERMISSIONS_REGISTRY.forEach((page) => {
+>> 146:         if (!page.isOwnerOnly) {
+   147:           updated[page.moduleKey] = {
+   148:             ...(updated[page.moduleKey] || {}),
+[Line 162] Match for /isOwnerOnly/:
+   160:       const updated: StaffPermissionsProfileMap = { ...prev };
+   161:       PAGE_PERMISSIONS_REGISTRY.forEach((page) => {
+>> 162:         if (!page.isOwnerOnly) {
+   163:           const cleared: StaffModulePermissions = { view: true };
+   164:           for (const k of Object.keys(updated[page.moduleKey] || {})) {
+[Line 185] Match for /isOwnerOnly/:
+   183:       const updated: StaffPermissionsProfileMap = { ...prev };
+   184:       PAGE_PERMISSIONS_REGISTRY.forEach((page) => {
+>> 185:         if (!page.isOwnerOnly) {
+   186:           const cleared: StaffModulePermissions = {};
+   187:           for (const k of Object.keys(updated[page.moduleKey] || {})) {
+[Line 206] Match for /isOwnerOnly/:
+   204: 
+   205:   const handleToggleRow = (page: PagePermissionConfig) => {
+>> 206:     if (page.isOwnerOnly) return;
+   207:     const current = permissions[page.moduleKey] || {};
+   208:     const isCurrentlyView = Boolean(current.view);
+[Line 436] Match for /isOwnerOnly/:
+   434:                                   key={page.moduleKey}
+   435:                                   className={`transition-colors hover:bg-slate-50/80 ${
+>> 436:                                     page.isOwnerOnly
+   437:                                       ? "bg-slate-50/40"
+   438:                                       : isViewEnabled
+[Line 452] Match for /isOwnerOnly/:
+   450:                                         {page.route}
+   451:                                       </code>
+>> 452:                                       {page.isOwnerOnly && (
+   453:                                         <Badge
+   454:                                           variant="secondary"
+[Line 468] Match for /isOwnerOnly/:
+   466:                                   {/* View Column */}
+   467:                                   <td className="py-2.5 px-2 text-center">
+>> 468:                                     {page.isOwnerOnly ? (
+   469:                                       <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 select-none">
+   470:                                         <Lock className="h-2.5 w-2.5" />
+[Line 489] Match for /isOwnerOnly/:
+   487:                                   {/* Add / Create Column */}
+   488:                                   <td className="py-2.5 px-2 text-center">
+>> 489:                                     {page.isOwnerOnly ? (
+   490:                                       <span className="text-slate-300 select-none">—</span>
+   491:                                     ) : page.moduleKey === "PAYMENTS" ? (
+[Line 536] Match for /isOwnerOnly/:
+   534:                                   {/* Edit / Update Column */}
+   535:                                   <td className="py-2.5 px-2 text-center">
+>> 536:                                     {page.isOwnerOnly ? (
+   537:                                       <span className="text-slate-300 select-none">—</span>
+   538:                                     ) : page.moduleKey === "REPORTS" ? (
+[Line 583] Match for /isOwnerOnly/:
+   581:                                   {/* Delete Column */}
+   582:                                   <td className="py-2.5 px-2 text-center">
+>> 583:                                     {page.isOwnerOnly || !isDeleteDelegable ? (
+   584:                                       <span
+   585:                                         className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-50/80 px-2 py-0.5 rounded border border-amber-200/50 select-none"
+[Line 589] Match for /Owner Only/i:
+   587:                                       >
+   588:                                         <Lock className="h-2.5 w-2.5 text-amber-600" />
+>> 589:                                         Owner Only
+   590:                                       </span>
+   591:                                     ) : (
+[Line 619] Match for /isOwnerOnly/:
+   617:                                   {/* Row Quick Toggle Column */}
+   618:                                   <td className="py-2.5 px-3 text-right">
+>> 619:                                     {page.isOwnerOnly ? (
+   620:                                       <span className="text-slate-300 select-none text-[11px]">Locked</span>
+   621:                                     ) : (
+
+=== FILE: src/components/team/team-management-panel.tsx (7 matches) ===
+[Line 64] Match for /isAgencyOwner/:
+   62: export function TeamManagementPanel() {
+   63:   const { isReadOnly } = useSubscription();
+>> 64:   const { isAgencyOwner, hasStaffPermission } = useAuth();
+   65:   const canInvite = isAgencyOwner || hasStaffPermission("TEAM", "create");
+   66:   const canUpdate = isAgencyOwner || hasStaffPermission("TEAM", "update");
+[Line 65] Match for /isAgencyOwner/:
+   63:   const { isReadOnly } = useSubscription();
+   64:   const { isAgencyOwner, hasStaffPermission } = useAuth();
+>> 65:   const canInvite = isAgencyOwner || hasStaffPermission("TEAM", "create");
+   66:   const canUpdate = isAgencyOwner || hasStaffPermission("TEAM", "update");
+   67:   const canDelete = isAgencyOwner || hasStaffPermission("TEAM", "delete");
+[Line 66] Match for /isAgencyOwner/:
+   64:   const { isAgencyOwner, hasStaffPermission } = useAuth();
+   65:   const canInvite = isAgencyOwner || hasStaffPermission("TEAM", "create");
+>> 66:   const canUpdate = isAgencyOwner || hasStaffPermission("TEAM", "update");
+   67:   const canDelete = isAgencyOwner || hasStaffPermission("TEAM", "delete");
+   68: 
+[Line 67] Match for /isAgencyOwner/:
+   65:   const canInvite = isAgencyOwner || hasStaffPermission("TEAM", "create");
+   66:   const canUpdate = isAgencyOwner || hasStaffPermission("TEAM", "update");
+>> 67:   const canDelete = isAgencyOwner || hasStaffPermission("TEAM", "delete");
+   68: 
+   69:   const [members, setMembers] = React.useState<TeamMember[]>([]);
+[Line 270] Match for /AGENCY_OWNER/:
+   268:           <div className="mt-2 text-2xl font-bold text-slate-900">{members.length}</div>
+   269:           <p className="mt-1 text-[11px] text-slate-500">
+>> 270:             {members.filter((m) => m.role === "AGENCY_OWNER").length} Owner(s) •{" "}
+   271:             {members.filter((m) => m.role === "AGENCY_STAFF").length} Staff
+   272:           </p>
+[Line 343] Match for /AGENCY_OWNER/:
+   341:               <tbody className="divide-y divide-slate-100">
+   342:                 {members.map((member) => {
+>> 343:                   const isOwner = member.role === "AGENCY_OWNER";
+   344:                   return (
+   345:                     <tr key={member.id} className="hover:bg-slate-50/60 transition-colors">
+[Line 386] Match for /isAgencyOwner/:
+   384:                       </td>
+   385:                       <td className="py-3 px-4 text-right">
+>> 386:                         {!isOwner && isAgencyOwner && (
+   387:                           <Button
+   388:                             variant="outline"
+
+=== FILE: src/context/auth-context.tsx (6 matches) ===
+[Line 12] Match for /AGENCY_OWNER/:
+   10: import { toast } from "sonner";
+   11: 
+>> 12: export type PlatformRole = "PLATFORM_OWNER" | "AGENCY_OWNER" | "AGENCY_STAFF" | "TRIPDESK_OWNER";
+   13: 
+   14: export interface UserProfile {
+[Line 61] Match for /isAgencyOwner/:
+   59:   isLoading: boolean;
+   60:   isPlatformOwner: boolean;
+>> 61:   isAgencyOwner: boolean;
+   62:   isAgencyStaff: boolean;
+   63:   staffPermissions: StaffPermissionsProfileMap | null;
+[Line 78] Match for /AGENCY_OWNER/:
+   76:   name: "Loading...",
+   77:   email: "",
+>> 78:   role: "AGENCY_OWNER",
+   79:   agencyId: null,
+   80: };
+[Line 242] Match for /isAgencyOwner/:
+   240:   const isPlatformOwner =
+   241:     currentUser.role === "PLATFORM_OWNER" || currentUser.role === "TRIPDESK_OWNER";
+>> 242:   const isAgencyOwner = currentUser.role === "AGENCY_OWNER" && !isPlatformOwner;
+   243:   const isAgencyStaff = currentUser.role === "AGENCY_STAFF";
+   244: 
+[Line 247] Match for /AGENCY_OWNER/:
+   245:   const hasStaffPermission = React.useCallback(
+   246:     (moduleKey: string, actionKey: string = "view"): boolean => {
+>> 247:       if (currentUser.role === "AGENCY_OWNER") return true;
+   248:       if (currentUser.role !== "AGENCY_STAFF") return false;
+   249:       return evaluateStaffPermission(
+[Line 268] Match for /isAgencyOwner/:
+   266:         isLoading,
+   267:         isPlatformOwner,
+>> 268:         isAgencyOwner,
+   269:         isAgencyStaff,
+   270:         staffPermissions,
+
+=== FILE: src/hooks/use-platform-chat.ts (1 matches) ===
+[Line 21] Match for /AGENCY_OWNER/:
+   19:   agencyId?: string;
+   20:   autoMarkAsRead?: boolean;
+>> 21:   currentUserRole?: "PLATFORM_OWNER" | "AGENCY_OWNER" | string;
+   22: }
+   23: 
+
+=== FILE: src/lib/api/context.ts (7 matches) ===
+[Line 42] Match for /isAgencyOwner/:
+   40:   subscriptionAccess: SubscriptionAccessInfo;
+   41:   isPlatformOwner: boolean;
+>> 42:   isAgencyOwner: boolean;
+   43:   isAgencyStaff: boolean;
+   44: }
+[Line 112] Match for /isAgencyOwner/:
+   110: 
+   111:     const isPlatformOwner = dbUser.role === UserRole.PLATFORM_OWNER && !dbUser.agencyId;
+>> 112:     const isAgencyOwner = dbUser.role === UserRole.AGENCY_OWNER && !!dbUser.agencyId;
+   113:     const isAgencyStaff = dbUser.role === UserRole.AGENCY_STAFF && !!dbUser.agencyId;
+   114:     const isSuspendedAgency = (isAgencyOwner || isAgencyStaff) && agency?.status === AgencyStatus.SUSPENDED;
+[Line 114] Match for /isAgencyOwner/:
+   112:     const isAgencyOwner = dbUser.role === UserRole.AGENCY_OWNER && !!dbUser.agencyId;
+   113:     const isAgencyStaff = dbUser.role === UserRole.AGENCY_STAFF && !!dbUser.agencyId;
+>> 114:     const isSuspendedAgency = (isAgencyOwner || isAgencyStaff) && agency?.status === AgencyStatus.SUSPENDED;
+   115: 
+   116:     // Calculate subscription access
+[Line 135] Match for /isAgencyOwner/:
+   133:         canWrite = false;
+   134:       }
+>> 135:     } else if (isAgencyOwner || isAgencyStaff) {
+   136:       status = SubscriptionStatus.EXPIRED;
+   137:       canWrite = false;
+[Line 167] Match for /isAgencyOwner/:
+   165:       subscriptionAccess,
+   166:       isPlatformOwner,
+>> 167:       isAgencyOwner,
+   168:       isAgencyStaff,
+   169:     };
+[Line 195] Match for /isAgencyOwner/:
+   193:   const context = await requireAuthenticatedUser();
+   194: 
+>> 195:   if (!context.isAgencyOwner || !context.agency || !context.dbUser.agencyId) {
+   196:     throw new ForbiddenError("This endpoint requires an active Agency Owner workspace session.");
+   197:   }
+[Line 272] Match for /isAgencyOwner/:
+   270:   const context = await requireAuthenticatedUser();
+   271: 
+>> 272:   if ((!context.isAgencyOwner && !context.isAgencyStaff) || !context.agency || !context.dbUser.agencyId) {
+   273:     throw new ForbiddenError("This endpoint requires an active Agency workspace session.");
+   274:   }
+
+=== FILE: src/lib/auth/index.ts (8 matches) ===
+[Line 15] Match for /isAgencyOwner/:
+   13:   subscription: (Subscription & { plan: SubscriptionPlan }) | null;
+   14:   isPlatformOwner: boolean;
+>> 15:   isAgencyOwner: boolean;
+   16:   isAgencyStaff: boolean;
+   17:   hasFullAccess: boolean;
+[Line 70] Match for /isAgencyOwner/:
+   68: 
+   69:     const isPlatformOwner = dbUser.role === "PLATFORM_OWNER" && !dbUser.agencyId;
+>> 70:     const isAgencyOwner = dbUser.role === "AGENCY_OWNER" && !!dbUser.agencyId;
+   71:     const isAgencyStaff = dbUser.role === "AGENCY_STAFF" && !!dbUser.agencyId;
+   72: 
+[Line 92] Match for /isAgencyOwner/:
+   90:         isReadOnly = true;
+   91:       }
+>> 92:     } else if (isAgencyOwner || isAgencyStaff) {
+   93:       // If agency has no subscription record, default to read-only
+   94:       hasFullAccess = false;
+[Line 107] Match for /isAgencyOwner/:
+   105:       subscription,
+   106:       isPlatformOwner,
+>> 107:       isAgencyOwner,
+   108:       isAgencyStaff,
+   109:       hasFullAccess,
+[Line 146] Match for /AGENCY_OWNER/:
+   144: 
+   145: /**
+>> 146:  * Server-side guard: Ensures the user is an AGENCY_OWNER with a valid agency.
+   147:  * Redirects unauthenticated users to /login and PLATFORM_OWNER to /admin.
+   148:  */
+[Line 157] Match for /isAgencyOwner/:
+   155:     redirect("/admin");
+   156:   }
+>> 157:   if (!auth.isAgencyOwner || !auth.agency) {
+   158:     redirect("/login");
+   159:   }
+[Line 164] Match for /AGENCY_OWNER/:
+   162: 
+   163: /**
+>> 164:  * Server-side guard: Ensures the user is an AGENCY_OWNER or AGENCY_STAFF with a valid agency.
+   165:  * Redirects unauthenticated users to /login and PLATFORM_OWNER to /admin.
+   166:  */
+[Line 175] Match for /isAgencyOwner/:
+   173:     redirect("/admin");
+   174:   }
+>> 175:   if ((!auth.isAgencyOwner && !auth.isAgencyStaff) || !auth.agency) {
+   176:     redirect("/login");
+   177:   }
+
+=== FILE: src/lib/auth/permissions.ts (85 matches) ===
+[Line 5] Match for /AGENCY_OWNER/:
+   3:  *
+   4:  * Implements a strict, least-privilege capability matrix across business domains and application pages.
+>> 5:  * Differentiates PLATFORM_OWNER (SaaS admin), AGENCY_OWNER (tenant administrator),
+   6:  * and AGENCY_STAFF (least-privilege travel consultant / operations operator).
+   7:  */
+[Line 9] Match for /AGENCY_OWNER/:
+   7:  */
+   8: 
+>> 9: export type AppRole = "PLATFORM_OWNER" | "AGENCY_OWNER" | "AGENCY_STAFF";
+   10: 
+   11: export type PermissionDomain =
+[Line 63] Match for /AGENCY_OWNER/:
+   61:     PLATFORM_ADMIN: ["VIEW", "CREATE", "UPDATE", "DELETE", "MANAGE", "EXPORT"],
+   62:   },
+>> 63:   AGENCY_OWNER: {
+   64:     DASHBOARD_CRM: ["VIEW", "EXPORT"],
+   65:     ENQUIRY_MANAGEMENT: ["VIEW", "CREATE", "UPDATE", "DELETE", "EXPORT"],
+[Line 184] Match for /IMMUTABLE_OWNER_ONLY_MODULES/:
+   182:  * Cannot be delegated to staff under any circumstances.
+   183:  */
+>> 184: export const IMMUTABLE_OWNER_ONLY_MODULES = new Set<string>([]);
+   185: 
+   186: export interface PagePermissionConfig {
+[Line 198] Match for /isOwnerOnly/:
+   196:     | "Engagement & Analytics"
+   197:     | "Settings & Admin";
+>> 198:   isOwnerOnly: boolean;
+   199:   delegableActions: string[];
+   200:   ownerOnlyActions: string[];
+[Line 200] Match for /ownerOnly/:
+   198:   isOwnerOnly: boolean;
+   199:   delegableActions: string[];
+>> 200:   ownerOnlyActions: string[];
+   201:   defaultPermissions: StaffModulePermissions;
+   202: }
+[Line 216] Match for /isOwnerOnly/:
+   214:     route: "/dashboard",
+   215:     category: "CRM & Sales",
+>> 216:     isOwnerOnly: false,
+   217:     delegableActions: ["view"],
+   218:     ownerOnlyActions: ["export"],
+[Line 218] Match for /ownerOnly/:
+   216:     isOwnerOnly: false,
+   217:     delegableActions: ["view"],
+>> 218:     ownerOnlyActions: ["export"],
+   219:     defaultPermissions: { view: true, delete: false },
+   220:   },
+[Line 227] Match for /isOwnerOnly/:
+   225:     route: "/customers",
+   226:     category: "CRM & Sales",
+>> 227:     isOwnerOnly: false,
+   228:     delegableActions: ["view", "create", "update", "delete"],
+   229:     ownerOnlyActions: [],
+[Line 229] Match for /ownerOnly/:
+   227:     isOwnerOnly: false,
+   228:     delegableActions: ["view", "create", "update", "delete"],
+>> 229:     ownerOnlyActions: [],
+   230:     defaultPermissions: { view: true, create: true, update: true, delete: false },
+   231:   },
+[Line 238] Match for /isOwnerOnly/:
+   236:     route: "/customers/[id]",
+   237:     category: "CRM & Sales",
+>> 238:     isOwnerOnly: false,
+   239:     delegableActions: ["view", "update", "delete"],
+   240:     ownerOnlyActions: [],
+[Line 240] Match for /ownerOnly/:
+   238:     isOwnerOnly: false,
+   239:     delegableActions: ["view", "update", "delete"],
+>> 240:     ownerOnlyActions: [],
+   241:     defaultPermissions: { view: true, update: true, delete: false },
+   242:   },
+[Line 249] Match for /isOwnerOnly/:
+   247:     route: "/customer-insights",
+   248:     category: "CRM & Sales",
+>> 249:     isOwnerOnly: false,
+   250:     delegableActions: ["view"],
+   251:     ownerOnlyActions: ["export"],
+[Line 251] Match for /ownerOnly/:
+   249:     isOwnerOnly: false,
+   250:     delegableActions: ["view"],
+>> 251:     ownerOnlyActions: ["export"],
+   252:     defaultPermissions: { view: false, delete: false },
+   253:   },
+[Line 260] Match for /isOwnerOnly/:
+   258:     route: "/enquiries",
+   259:     category: "CRM & Sales",
+>> 260:     isOwnerOnly: false,
+   261:     delegableActions: ["view", "create", "update", "delete"],
+   262:     ownerOnlyActions: [],
+[Line 262] Match for /ownerOnly/:
+   260:     isOwnerOnly: false,
+   261:     delegableActions: ["view", "create", "update", "delete"],
+>> 262:     ownerOnlyActions: [],
+   263:     defaultPermissions: { view: true, create: true, update: true, delete: false },
+   264:   },
+[Line 271] Match for /isOwnerOnly/:
+   269:     route: "/enquiries/[id]",
+   270:     category: "CRM & Sales",
+>> 271:     isOwnerOnly: false,
+   272:     delegableActions: ["view", "update", "delete"],
+   273:     ownerOnlyActions: [],
+[Line 273] Match for /ownerOnly/:
+   271:     isOwnerOnly: false,
+   272:     delegableActions: ["view", "update", "delete"],
+>> 273:     ownerOnlyActions: [],
+   274:     defaultPermissions: { view: true, update: true, delete: false },
+   275:   },
+[Line 282] Match for /isOwnerOnly/:
+   280:     route: "/follow-ups",
+   281:     category: "CRM & Sales",
+>> 282:     isOwnerOnly: false,
+   283:     delegableActions: ["view", "create", "update", "delete", "logInteraction"],
+   284:     ownerOnlyActions: [],
+[Line 284] Match for /ownerOnly/:
+   282:     isOwnerOnly: false,
+   283:     delegableActions: ["view", "create", "update", "delete", "logInteraction"],
+>> 284:     ownerOnlyActions: [],
+   285:     defaultPermissions: { view: true, create: true, update: true, delete: false, logInteraction: true },
+   286:   },
+[Line 295] Match for /isOwnerOnly/:
+   293:     route: "/trips",
+   294:     category: "Trips & Bookings",
+>> 295:     isOwnerOnly: false,
+   296:     delegableActions: ["view", "create", "update", "delete"],
+   297:     ownerOnlyActions: [],
+[Line 297] Match for /ownerOnly/:
+   295:     isOwnerOnly: false,
+   296:     delegableActions: ["view", "create", "update", "delete"],
+>> 297:     ownerOnlyActions: [],
+   298:     defaultPermissions: { view: true, create: true, update: true, delete: false },
+   299:   },
+[Line 306] Match for /isOwnerOnly/:
+   304:     route: "/trips/[id]",
+   305:     category: "Trips & Bookings",
+>> 306:     isOwnerOnly: false,
+   307:     delegableActions: ["view", "update", "delete"],
+   308:     ownerOnlyActions: [],
+[Line 308] Match for /ownerOnly/:
+   306:     isOwnerOnly: false,
+   307:     delegableActions: ["view", "update", "delete"],
+>> 308:     ownerOnlyActions: [],
+   309:     defaultPermissions: { view: true, update: true, delete: false },
+   310:   },
+[Line 317] Match for /isOwnerOnly/:
+   315:     route: "/trips",
+   316:     category: "Trips & Bookings",
+>> 317:     isOwnerOnly: false,
+   318:     delegableActions: ["view", "create", "update", "delete"],
+   319:     ownerOnlyActions: [],
+[Line 319] Match for /ownerOnly/:
+   317:     isOwnerOnly: false,
+   318:     delegableActions: ["view", "create", "update", "delete"],
+>> 319:     ownerOnlyActions: [],
+   320:     defaultPermissions: { view: true, create: true, update: true, delete: false },
+   321:   },
+[Line 328] Match for /isOwnerOnly/:
+   326:     route: "/quotations",
+   327:     category: "Trips & Bookings",
+>> 328:     isOwnerOnly: false,
+   329:     delegableActions: ["view", "create", "update", "delete"],
+   330:     ownerOnlyActions: ["commercialMargins"],
+[Line 330] Match for /ownerOnly/:
+   328:     isOwnerOnly: false,
+   329:     delegableActions: ["view", "create", "update", "delete"],
+>> 330:     ownerOnlyActions: ["commercialMargins"],
+   331:     defaultPermissions: { view: true, create: true, update: true, delete: false },
+   332:   },
+[Line 339] Match for /isOwnerOnly/:
+   337:     route: "/quotations/[id]",
+   338:     category: "Trips & Bookings",
+>> 339:     isOwnerOnly: false,
+   340:     delegableActions: ["view", "update", "delete"],
+   341:     ownerOnlyActions: ["commercialMargins"],
+[Line 341] Match for /ownerOnly/:
+   339:     isOwnerOnly: false,
+   340:     delegableActions: ["view", "update", "delete"],
+>> 341:     ownerOnlyActions: ["commercialMargins"],
+   342:     defaultPermissions: { view: true, update: true, delete: false },
+   343:   },
+[Line 350] Match for /isOwnerOnly/:
+   348:     route: "/bookings",
+   349:     category: "Trips & Bookings",
+>> 350:     isOwnerOnly: false,
+   351:     delegableActions: ["view", "create", "update", "delete"],
+   352:     ownerOnlyActions: [],
+[Line 352] Match for /ownerOnly/:
+   350:     isOwnerOnly: false,
+   351:     delegableActions: ["view", "create", "update", "delete"],
+>> 352:     ownerOnlyActions: [],
+   353:     defaultPermissions: { view: true, create: true, update: true, delete: false },
+   354:   },
+[Line 361] Match for /isOwnerOnly/:
+   359:     route: "/bookings/[id]",
+   360:     category: "Trips & Bookings",
+>> 361:     isOwnerOnly: false,
+   362:     delegableActions: ["view", "update", "delete"],
+   363:     ownerOnlyActions: [],
+[Line 363] Match for /ownerOnly/:
+   361:     isOwnerOnly: false,
+   362:     delegableActions: ["view", "update", "delete"],
+>> 363:     ownerOnlyActions: [],
+   364:     defaultPermissions: { view: true, update: true, delete: false },
+   365:   },
+[Line 372] Match for /isOwnerOnly/:
+   370:     route: "/documents",
+   371:     category: "Trips & Bookings",
+>> 372:     isOwnerOnly: false,
+   373:     delegableActions: ["view", "create", "update", "delete"],
+   374:     ownerOnlyActions: [],
+[Line 374] Match for /ownerOnly/:
+   372:     isOwnerOnly: false,
+   373:     delegableActions: ["view", "create", "update", "delete"],
+>> 374:     ownerOnlyActions: [],
+   375:     defaultPermissions: { view: true, create: true, update: true, delete: false },
+   376:   },
+[Line 383] Match for /isOwnerOnly/:
+   381:     route: "/operations",
+   382:     category: "Trips & Bookings",
+>> 383:     isOwnerOnly: false,
+   384:     delegableActions: ["view", "update", "delete"],
+   385:     ownerOnlyActions: [],
+[Line 385] Match for /ownerOnly/:
+   383:     isOwnerOnly: false,
+   384:     delegableActions: ["view", "update", "delete"],
+>> 385:     ownerOnlyActions: [],
+   386:     defaultPermissions: { view: true, create: false, update: true, delete: false },
+   387:   },
+[Line 394] Match for /isOwnerOnly/:
+   392:     route: "/operations/issues",
+   393:     category: "Trips & Bookings",
+>> 394:     isOwnerOnly: false,
+   395:     delegableActions: ["view", "create", "update", "delete"],
+   396:     ownerOnlyActions: [],
+[Line 396] Match for /ownerOnly/:
+   394:     isOwnerOnly: false,
+   395:     delegableActions: ["view", "create", "update", "delete"],
+>> 396:     ownerOnlyActions: [],
+   397:     defaultPermissions: { view: true, create: true, update: true, delete: false },
+   398:   },
+[Line 406] Match for /isOwnerOnly/:
+   404:     route: "/trips/[id]/costing",
+   405:     category: "Trips & Bookings",
+>> 406:     isOwnerOnly: false,
+   407:     delegableActions: ["view", "update"],
+   408:     ownerOnlyActions: ["commercialMargins"],
+[Line 408] Match for /ownerOnly/:
+   406:     isOwnerOnly: false,
+   407:     delegableActions: ["view", "update"],
+>> 408:     ownerOnlyActions: ["commercialMargins"],
+   409:     defaultPermissions: { view: false, update: false },
+   410:   },
+[Line 419] Match for /isOwnerOnly/:
+   417:     route: "/destinations",
+   418:     category: "Catalog & Inventory",
+>> 419:     isOwnerOnly: false,
+   420:     delegableActions: ["view", "create", "update", "delete"],
+   421:     ownerOnlyActions: [],
+[Line 421] Match for /ownerOnly/:
+   419:     isOwnerOnly: false,
+   420:     delegableActions: ["view", "create", "update", "delete"],
+>> 421:     ownerOnlyActions: [],
+   422:     defaultPermissions: { view: true, create: false, update: false, delete: false },
+   423:   },
+[Line 430] Match for /isOwnerOnly/:
+   428:     route: "/hotels",
+   429:     category: "Catalog & Inventory",
+>> 430:     isOwnerOnly: false,
+   431:     delegableActions: ["view", "create", "update", "delete"],
+   432:     ownerOnlyActions: [],
+[Line 432] Match for /ownerOnly/:
+   430:     isOwnerOnly: false,
+   431:     delegableActions: ["view", "create", "update", "delete"],
+>> 432:     ownerOnlyActions: [],
+   433:     defaultPermissions: { view: true, create: false, update: false, delete: false },
+   434:   },
+[Line 441] Match for /isOwnerOnly/:
+   439:     route: "/vehicles",
+   440:     category: "Catalog & Inventory",
+>> 441:     isOwnerOnly: false,
+   442:     delegableActions: ["view", "create", "update", "delete"],
+   443:     ownerOnlyActions: [],
+[Line 443] Match for /ownerOnly/:
+   441:     isOwnerOnly: false,
+   442:     delegableActions: ["view", "create", "update", "delete"],
+>> 443:     ownerOnlyActions: [],
+   444:     defaultPermissions: { view: true, create: false, update: false, delete: false },
+   445:   },
+[Line 452] Match for /isOwnerOnly/:
+   450:     route: "/activities",
+   451:     category: "Catalog & Inventory",
+>> 452:     isOwnerOnly: false,
+   453:     delegableActions: ["view", "create", "update", "delete"],
+   454:     ownerOnlyActions: [],
+[Line 454] Match for /ownerOnly/:
+   452:     isOwnerOnly: false,
+   453:     delegableActions: ["view", "create", "update", "delete"],
+>> 454:     ownerOnlyActions: [],
+   455:     defaultPermissions: { view: true, create: false, update: false, delete: false },
+   456:   },
+[Line 463] Match for /isOwnerOnly/:
+   461:     route: "/rate-sheets",
+   462:     category: "Catalog & Inventory",
+>> 463:     isOwnerOnly: false,
+   464:     delegableActions: ["view", "create", "update", "delete"],
+   465:     ownerOnlyActions: [],
+[Line 465] Match for /ownerOnly/:
+   463:     isOwnerOnly: false,
+   464:     delegableActions: ["view", "create", "update", "delete"],
+>> 465:     ownerOnlyActions: [],
+   466:     defaultPermissions: { view: false, create: false, update: false, delete: false },
+   467:   },
+[Line 471] Match for /Owner Only/i:
+   469:     moduleKey: "SUPPLIERS",
+   470:     name: "Suppliers Directory",
+>> 471:     description: "Supplier contacts, directory profiles, and service listings (unredacted ledger is Owner Only)",
+   472:     route: "/suppliers",
+   473:     category: "Catalog & Inventory",
+[Line 474] Match for /isOwnerOnly/:
+   472:     route: "/suppliers",
+   473:     category: "Catalog & Inventory",
+>> 474:     isOwnerOnly: false,
+   475:     delegableActions: ["view", "create", "update", "delete"],
+   476:     ownerOnlyActions: [],
+[Line 476] Match for /ownerOnly/:
+   474:     isOwnerOnly: false,
+   475:     delegableActions: ["view", "create", "update", "delete"],
+>> 476:     ownerOnlyActions: [],
+   477:     defaultPermissions: { view: false, create: false, update: false, delete: false },
+   478:   },
+[Line 484] Match for /Owner Only/i:
+   482:     moduleKey: "PAYMENTS",
+   483:     name: "Payments & Receipts",
+>> 484:     description: "View customer receipts and record pending receipts (verification is Owner Only)",
+   485:     route: "/payments",
+   486:     category: "Finance & Invoicing",
+[Line 487] Match for /isOwnerOnly/:
+   485:     route: "/payments",
+   486:     category: "Finance & Invoicing",
+>> 487:     isOwnerOnly: false,
+   488:     delegableActions: ["view", "recordReceipt"],
+   489:     ownerOnlyActions: ["verify", "void", "delete"],
+[Line 489] Match for /ownerOnly/:
+   487:     isOwnerOnly: false,
+   488:     delegableActions: ["view", "recordReceipt"],
+>> 489:     ownerOnlyActions: ["verify", "void", "delete"],
+   490:     defaultPermissions: { view: true, recordReceipt: false, delete: false },
+   491:   },
+[Line 498] Match for /isOwnerOnly/:
+   496:     route: "/invoices",
+   497:     category: "Finance & Invoicing",
+>> 498:     isOwnerOnly: false,
+   499:     delegableActions: ["view", "create", "update", "delete"],
+   500:     ownerOnlyActions: [],
+[Line 500] Match for /ownerOnly/:
+   498:     isOwnerOnly: false,
+   499:     delegableActions: ["view", "create", "update", "delete"],
+>> 500:     ownerOnlyActions: [],
+   501:     defaultPermissions: { view: false, create: false, update: false, delete: false },
+   502:   },
+[Line 509] Match for /isOwnerOnly/:
+   507:     route: "/finance",
+   508:     category: "Finance & Invoicing",
+>> 509:     isOwnerOnly: false,
+   510:     delegableActions: ["view", "create"],
+   511:     ownerOnlyActions: ["commercialMargins", "supplierDisbursements", "delete"],
+[Line 511] Match for /ownerOnly/:
+   509:     isOwnerOnly: false,
+   510:     delegableActions: ["view", "create"],
+>> 511:     ownerOnlyActions: ["commercialMargins", "supplierDisbursements", "delete"],
+   512:     defaultPermissions: { view: false, create: false, delete: false },
+   513:   },
+[Line 522] Match for /isOwnerOnly/:
+   520:     route: "/feedback",
+   521:     category: "Engagement & Analytics",
+>> 522:     isOwnerOnly: false,
+   523:     delegableActions: ["view", "create", "update", "delete"],
+   524:     ownerOnlyActions: [],
+[Line 524] Match for /ownerOnly/:
+   522:     isOwnerOnly: false,
+   523:     delegableActions: ["view", "create", "update", "delete"],
+>> 524:     ownerOnlyActions: [],
+   525:     defaultPermissions: { view: true, create: false, update: false, delete: false },
+   526:   },
+[Line 533] Match for /isOwnerOnly/:
+   531:     route: "/reports",
+   532:     category: "Engagement & Analytics",
+>> 533:     isOwnerOnly: false,
+   534:     delegableActions: ["view", "export"],
+   535:     ownerOnlyActions: [],
+[Line 535] Match for /ownerOnly/:
+   533:     isOwnerOnly: false,
+   534:     delegableActions: ["view", "export"],
+>> 535:     ownerOnlyActions: [],
+   536:     defaultPermissions: { view: false, export: false },
+   537:   },
+[Line 544] Match for /isOwnerOnly/:
+   542:     route: "/communications",
+   543:     category: "Engagement & Analytics",
+>> 544:     isOwnerOnly: false,
+   545:     delegableActions: ["view", "create"],
+   546:     ownerOnlyActions: [],
+[Line 546] Match for /ownerOnly/:
+   544:     isOwnerOnly: false,
+   545:     delegableActions: ["view", "create"],
+>> 546:     ownerOnlyActions: [],
+   547:     defaultPermissions: { view: true, create: true, update: false, delete: false },
+   548:   },
+[Line 555] Match for /isOwnerOnly/:
+   553:     route: "/referrals",
+   554:     category: "Engagement & Analytics",
+>> 555:     isOwnerOnly: false,
+   556:     delegableActions: ["view", "create", "update", "delete"],
+   557:     ownerOnlyActions: [],
+[Line 557] Match for /ownerOnly/:
+   555:     isOwnerOnly: false,
+   556:     delegableActions: ["view", "create", "update", "delete"],
+>> 557:     ownerOnlyActions: [],
+   558:     defaultPermissions: { view: true, create: true, update: false, delete: false },
+   559:   },
+[Line 565] Match for /Owner Only/i:
+   563:     moduleKey: "SETTINGS",
+   564:     name: "Agency Settings",
+>> 565:     description: "Company profile, communication templates, and GST settings (team management is Owner Only)",
+   566:     route: "/settings",
+   567:     category: "Settings & Admin",
+[Line 568] Match for /isOwnerOnly/:
+   566:     route: "/settings",
+   567:     category: "Settings & Admin",
+>> 568:     isOwnerOnly: false,
+   569:     delegableActions: ["view", "update"],
+   570:     ownerOnlyActions: ["teamManagement", "legalTaxProfile"],
+[Line 570] Match for /ownerOnly/:
+   568:     isOwnerOnly: false,
+   569:     delegableActions: ["view", "update"],
+>> 570:     ownerOnlyActions: ["teamManagement", "legalTaxProfile"],
+   571:     defaultPermissions: { view: false, create: false, update: false, delete: false },
+   572:   },
+[Line 576] Match for /Owner Only/i:
+   574:     moduleKey: "SUBSCRIPTION",
+   575:     name: "Subscription & Billing",
+>> 576:     description: "Plan tiers, usage entitlements, and billing renewals (plan purchase & upgrades are Owner Only)",
+   577:     route: "/subscription",
+   578:     category: "Settings & Admin",
+[Line 579] Match for /isOwnerOnly/:
+   577:     route: "/subscription",
+   578:     category: "Settings & Admin",
+>> 579:     isOwnerOnly: false,
+   580:     delegableActions: ["view"],
+   581:     ownerOnlyActions: ["purchaseUpgrade", "manage"],
+[Line 581] Match for /ownerOnly/:
+   579:     isOwnerOnly: false,
+   580:     delegableActions: ["view"],
+>> 581:     ownerOnlyActions: ["purchaseUpgrade", "manage"],
+   582:     defaultPermissions: { view: false },
+   583:   },
+[Line 587] Match for /Owner Only/i:
+   585:     moduleKey: "TEAM",
+   586:     name: "Team & Staff Management",
+>> 587:     description: "Agency staff directory and onboarding invitations (modifying staff permissions & removing staff are Owner Only)",
+   588:     route: "/settings?tab=team",
+   589:     category: "Settings & Admin",
+[Line 590] Match for /isOwnerOnly/:
+   588:     route: "/settings?tab=team",
+   589:     category: "Settings & Admin",
+>> 590:     isOwnerOnly: false,
+   591:     delegableActions: ["view", "create"],
+   592:     ownerOnlyActions: ["managePermissions", "transferOwnership"],
+[Line 592] Match for /ownerOnly/:
+   590:     isOwnerOnly: false,
+   591:     delegableActions: ["view", "create"],
+>> 592:     ownerOnlyActions: ["managePermissions", "transferOwnership"],
+   593:     defaultPermissions: { view: false, create: false, update: false, delete: false },
+   594:   },
+[Line 601] Match for /isOwnerOnly/:
+   599:     route: "/support",
+   600:     category: "Settings & Admin",
+>> 601:     isOwnerOnly: false,
+   602:     delegableActions: ["view", "create"],
+   603:     ownerOnlyActions: [],
+[Line 603] Match for /ownerOnly/:
+   601:     isOwnerOnly: false,
+   602:     delegableActions: ["view", "create"],
+>> 603:     ownerOnlyActions: [],
+   604:     defaultPermissions: { view: true, create: true, update: false, delete: false },
+   605:   },
+[Line 614] Match for /isOwnerOnly/:
+   612: export const DEFAULT_STAFF_PERMISSIONS: StaffPermissionsProfileMap = PAGE_PERMISSIONS_REGISTRY.reduce(
+   613:   (acc, page) => {
+>> 614:     if (!page.isOwnerOnly) {
+   615:       acc[page.moduleKey] = { ...page.defaultPermissions };
+   616:     }
+[Line 642] Match for /IMMUTABLE_OWNER_ONLY_MODULES/:
+   640: 
+   641:     // Owner-only domains can never be delegated to staff: strictly omitted
+>> 642:     if (IMMUTABLE_OWNER_ONLY_MODULES.has(cleanKey)) {
+   643:       continue;
+   644:     }
+[Line 803] Match for /AGENCY_OWNER/:
+   801: 
+   802:   // Agency Owner has full authority for agency operations
+>> 803:   if (normalizedRole === "AGENCY_OWNER") {
+   804:     return true;
+   805:   }
+[Line 816] Match for /IMMUTABLE_OWNER_ONLY_MODULES/:
+   814: 
+   815:   // INVARIANT 1: Immutable owner-only modules are NEVER accessible to staff
+>> 816:   if (IMMUTABLE_OWNER_ONLY_MODULES.has(normalizedModule)) {
+   817:     return false;
+   818:   }
+
+=== FILE: src/lib/navigation.ts (3 matches) ===
+[Line 35] Match for /ownerOnly/:
+   33:   badgeVariant?: "default" | "warning" | "success" | "info" | "travel";
+   34:   featureKey?: string;
+>> 35:   ownerOnly?: boolean;
+   36:   moduleKey?: string;
+   37: }
+[Line 222] Match for /ownerOnly/:
+   220:         label: "Subscription",
+   221:         href: "/subscription",
+>> 222:         ownerOnly: true,
+   223:         icon: CreditCard,
+   224:         moduleKey: "SUBSCRIPTION",
+[Line 267] Match for /ownerOnly/:
+   265:         href: "/admin/payments",
+   266:         icon: IndianRupee,
+>> 267:         ownerOnly: true,
+   268:       },
+   269:       {
+
+=== FILE: src/lib/services/admin-service.ts (5 matches) ===
+[Line 253] Match for /AGENCY_OWNER/:
+   251:       prisma.agency.count({ where: { status: AgencyStatus.CANCELLED } }),
+   252:       prisma.user.count(),
+>> 253:       prisma.user.count({ where: { role: UserRole.AGENCY_OWNER } }),
+   254:       prisma.customer.count(),
+   255:       prisma.booking.count(),
+[Line 265] Match for /AGENCY_OWNER/:
+   263:         orderBy: { createdAt: "desc" },
+   264:         include: {
+>> 265:           users: { where: { role: UserRole.AGENCY_OWNER }, take: 1 },
+   266:           subscriptions: {
+   267:             include: { plan: true },
+[Line 401] Match for /AGENCY_OWNER/:
+   399:         include: {
+   400:           users: {
+>> 401:             where: { role: UserRole.AGENCY_OWNER },
+   402:             take: 1,
+   403:             select: { id: true, name: true, email: true, phone: true },
+[Line 494] Match for /AGENCY_OWNER/:
+   492:       include: {
+   493:         users: {
+>> 494:           where: { role: UserRole.AGENCY_OWNER },
+   495:           take: 1,
+   496:         },
+[Line 1568] Match for /AGENCY_OWNER/:
+   1566:       prisma.user.findMany({
+   1567:         where: {
+>> 1568:           role: UserRole.AGENCY_OWNER,
+   1569:           OR: [
+   1570:             { name: { contains: q, mode: "insensitive" } },
+
+=== FILE: src/lib/services/internal-notification-service.ts (6 matches) ===
+[Line 141] Match for /AGENCY_OWNER/:
+   139: 
+   140:   /**
+>> 141:    * Notify the AGENCY_OWNER(s) of a specific agency
+   142:    */
+   143:   async notifyAgencyOwner(
+[Line 158] Match for /AGENCY_OWNER/:
+   156:     try {
+   157:       const agencyOwners = await prisma.user.findMany({
+>> 158:         where: { agencyId, role: UserRole.AGENCY_OWNER },
+   159:         select: { id: true },
+   160:       });
+[Line 168] Match for /AGENCY_OWNER/:
+   166:           userId: owner.id,
+   167:           agencyId,
+>> 168:           role: UserRole.AGENCY_OWNER,
+   169:           type: payload.type,
+   170:           title: payload.title,
+[Line 185] Match for /AGENCY_OWNER/:
+   183: 
+   184:   /**
+>> 185:    * Broadcast an internal notification to all active AGENCY_OWNER users (e.g. Platform Announcements)
+   186:    */
+   187:   async notifyAllAgencyOwners(payload: {
+[Line 200] Match for /AGENCY_OWNER/:
+   198:       const agencyOwners = await prisma.user.findMany({
+   199:         where: {
+>> 200:           role: UserRole.AGENCY_OWNER,
+   201:           agency: { status: "ACTIVE" },
+   202:         },
+[Line 213] Match for /AGENCY_OWNER/:
+   211:           userId: owner.id,
+   212:           agencyId: owner.agencyId,
+>> 213:           role: UserRole.AGENCY_OWNER,
+   214:           type: payload.type,
+   215:           title: payload.title,
+
+=== FILE: src/lib/services/invitation-service.ts (4 matches) ===
+[Line 137] Match for /AGENCY_OWNER/:
+   135:    * Creates an invitation for an agency staff member.
+   136:    * Enforces:
+>> 137:    * 1. Actor must be an AGENCY_OWNER.
+   138:    * 2. Target role must be AGENCY_STAFF.
+   139:    * 3. Target email must not belong to a Platform Owner.
+[Line 149] Match for /AGENCY_OWNER/:
+   147:     prismaClient: any = prisma
+   148:   ): Promise<CreateInvitationResult> {
+>> 149:     if (actor.role !== "AGENCY_OWNER") {
+   150:       throw new ForbiddenError("Only Agency Owners can invite new team members.");
+   151:     }
+[Line 284] Match for /AGENCY_OWNER/:
+   282:     prismaClient: any = prisma
+   283:   ): Promise<SanitizedInvitation> {
+>> 284:     if (actor.role !== "AGENCY_OWNER") {
+   285:       throw new ForbiddenError("Only Agency Owners can revoke invitations.");
+   286:     }
+[Line 342] Match for /AGENCY_OWNER/:
+   340:     prismaClient: any = prisma
+   341:   ): Promise<CreateInvitationResult> {
+>> 342:     if (actor.role !== "AGENCY_OWNER") {
+   343:       throw new ForbiddenError("Only Agency Owners can resend invitations.");
+   344:     }
+
+=== FILE: src/lib/services/onboarding-service.ts (5 matches) ===
+[Line 71] Match for /AGENCY_OWNER/:
+   69: 
+   70:     // ROLE INTEGRITY GUARD: If user has a non-owner role (e.g. AGENCY_USER staff), fail closed
+>> 71:     if (existingUser.role !== "AGENCY_OWNER") {
+   72:       console.error(`User ${existingUser.email} has role ${existingUser.role}; cannot onboard or re-link as AGENCY_OWNER.`);
+   73:       return { success: false, error: "account_already_registered_with_different_role" };
+[Line 72] Match for /AGENCY_OWNER/:
+   70:     // ROLE INTEGRITY GUARD: If user has a non-owner role (e.g. AGENCY_USER staff), fail closed
+   71:     if (existingUser.role !== "AGENCY_OWNER") {
+>> 72:       console.error(`User ${existingUser.email} has role ${existingUser.role}; cannot onboard or re-link as AGENCY_OWNER.`);
+   73:       return { success: false, error: "account_already_registered_with_different_role" };
+   74:     }
+[Line 204] Match for /AGENCY_OWNER/:
+   202:           throw new Error("Cannot mutate Platform Owner account in onboarding transaction");
+   203:         }
+>> 204:         if (existingInTx.role !== "AGENCY_OWNER") {
+   205:           throw new Error("Cannot reassign account with different role");
+   206:         }
+[Line 214] Match for /AGENCY_OWNER/:
+   212:             name: ownerName,
+   213:             phone: phone,
+>> 214:             role: "AGENCY_OWNER",
+   215:             emailVerified: now,
+   216:           },
+[Line 226] Match for /AGENCY_OWNER/:
+   224:             email: user.email!,
+   225:             phone: phone,
+>> 226:             role: "AGENCY_OWNER",
+   227:             emailVerified: now,
+   228:           },
+
+=== FILE: src/lib/services/platform-chat-service.ts (8 matches) ===
+[Line 59] Match for /AGENCY_OWNER/:
+   57:       include: {
+   58:         users: {
+>> 59:           where: { role: UserRole.AGENCY_OWNER },
+   60:           take: 1,
+   61:         },
+[Line 176] Match for /AGENCY_OWNER/:
+   174:         platformChatConversation: true,
+   175:         users: {
+>> 176:           where: { role: UserRole.AGENCY_OWNER },
+   177:           take: 1,
+   178:         },
+[Line 384] Match for /AGENCY_OWNER/:
+   382:           lastMessageSenderRole: senderRole,
+   383:           // Sender automatically marks their own side as read up to this message
+>> 384:           ...(senderRole === UserRole.AGENCY_OWNER
+   385:             ? { agencyLastReadAt: now }
+   386:             : { platformLastReadAt: now }),
+[Line 399] Match for /AGENCY_OWNER/:
+   397:       const agencyName = agency?.name || "Travel Agency";
+   398: 
+>> 399:       if (senderRole === UserRole.AGENCY_OWNER) {
+   400:         await internalNotificationService.notifyPlatformOwners({
+   401:           type: UserNotificationType.PLATFORM_CHAT_MESSAGE,
+[Line 435] Match for /AGENCY_OWNER/:
+   433:       where: { id: conversationId },
+   434:       data: {
+>> 435:         ...(role === UserRole.AGENCY_OWNER
+   436:           ? { agencyLastReadAt: now }
+   437:           : { platformLastReadAt: now }),
+[Line 458] Match for /AGENCY_OWNER/:
+   456:       const conversations = await prisma.platformChatConversation.findMany({
+   457:         where: {
+>> 458:           lastMessageSenderRole: UserRole.AGENCY_OWNER,
+   459:         },
+   460:         select: {
+[Line 473] Match for /AGENCY_OWNER/:
+   471:     }
+   472: 
+>> 473:     if (params.role === UserRole.AGENCY_OWNER && params.agencyId) {
+   474:       const conv = await prisma.platformChatConversation.findUnique({
+   475:         where: { agencyId: params.agencyId },
+[Line 517] Match for /AGENCY_OWNER/:
+   515: 
+   516:     const hasUnreadForPlatform =
+>> 517:       conv.lastMessageSenderRole === UserRole.AGENCY_OWNER && lastMsgTime > platformReadTime;
+   518: 
+   519:     return {
+
+=== FILE: src/lib/services/staff-permission-service.ts (1 matches) ===
+[Line 239] Match for /AGENCY_OWNER/:
+   237:   ): Promise<boolean> {
+   238:     if (!role) return false;
+>> 239:     if (role === "AGENCY_OWNER") return true;
+   240:     if (role !== "AGENCY_STAFF") return false;
+   241: 
+
+=== FILE: src/lib/validation/invitation-schema.ts (1 matches) ===
+[Line 6] Match for /AGENCY_OWNER/:
+   4:  * Zod schema for inviting a staff member to an agency.
+   5:  * Strictly restricts the invited role to AGENCY_STAFF.
+>> 6:  * Agency owners cannot invite PLATFORM_OWNER or AGENCY_OWNER.
+   7:  */
+   8: export const createInvitationSchema = z.object({

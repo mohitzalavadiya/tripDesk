@@ -1,11 +1,13 @@
+import { enforceStaffPermission } from "@/lib/api";
 import { requireReadAccess } from "@/lib/api/context";
 import { dashboardService } from "@/lib/services/dashboard-service";
 import { DashboardFilterSchema } from "@/lib/validation/dashboard-schema";
-import { NextRequest,NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "DASHBOARD", "EXPORT");
     const agencyId = context.agencyId;
 
     const { searchParams } = new URL(req.url);
@@ -25,11 +27,12 @@ export async function GET(req: NextRequest) {
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
       },
     });
-  } catch (error: any) {
-    if (error.statusCode) {
+  } catch (error: unknown) {
+    const err = error as { statusCode?: number; message?: string };
+    if (err.statusCode) {
       return NextResponse.json(
-        { success: false, error: error.message },
-        { status: error.statusCode }
+        { success: false, error: err.message },
+        { status: err.statusCode }
       );
     }
     console.error("GET /api/dashboard/export error:", error);

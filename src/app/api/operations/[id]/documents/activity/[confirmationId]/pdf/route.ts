@@ -1,4 +1,4 @@
-import { handleApiError,requireReadAccess } from "@/lib/api";
+import { enforceStaffPermission, handleApiError, requireReadAccess } from "@/lib/api";
 import { operationsDocumentService } from "@/lib/services/operations-document-service";
 import { NextRequest,NextResponse } from "next/server";
 
@@ -15,6 +15,13 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "OPERATIONS",
+      "VIEW"
+    );
     const { id, confirmationId } = await params;
 
     const { buffer, filename } =

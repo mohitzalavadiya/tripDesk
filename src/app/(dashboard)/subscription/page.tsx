@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
@@ -149,6 +152,8 @@ interface PlanItem {
 export default function AgencySubscriptionPage() {
   const router = useRouter();
   const { refreshSubscription } = useSubscription();
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+  const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("SUBSCRIPTION", "view"));
   const [data, setData] = React.useState<AgencySubscriptionData | null>(null);
   const [plans, setPlans] = React.useState<PlanItem[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -199,6 +204,18 @@ export default function AgencySubscriptionPage() {
   React.useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  if (!isViewAllowed) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Subscription & Billing"
+          badgeText="Access Restricted"
+          description="Plan tiers, usage entitlements, billing renewals, and invoice receipts are restricted. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
 
   const handleContactSupport = () => {
     router.push("/support");

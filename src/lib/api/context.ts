@@ -40,9 +40,16 @@ export interface RequestContext {
   subscriptionAccess: SubscriptionAccessInfo;
   isPlatformOwner: boolean;
   isAgencyOwner: boolean;
+  isAgencyStaff: boolean;
 }
 
 export interface AgencyOwnerRequestContext extends RequestContext {
+  dbUser: User & { agencyId: string };
+  agency: Agency;
+  agencyId: string;
+}
+
+export interface AgencyMemberRequestContext extends RequestContext {
   dbUser: User & { agencyId: string };
   agency: Agency;
   agencyId: string;
@@ -103,7 +110,8 @@ export async function getRequestContext(): Promise<RequestContext | null> {
 
     const isPlatformOwner = dbUser.role === UserRole.PLATFORM_OWNER && !dbUser.agencyId;
     const isAgencyOwner = dbUser.role === UserRole.AGENCY_OWNER && !!dbUser.agencyId;
-    const isSuspendedAgency = isAgencyOwner && agency?.status === AgencyStatus.SUSPENDED;
+    const isAgencyStaff = dbUser.role === UserRole.AGENCY_STAFF && !!dbUser.agencyId;
+    const isSuspendedAgency = (isAgencyOwner || isAgencyStaff) && agency?.status === AgencyStatus.SUSPENDED;
 
     // Calculate subscription access
     let status: SubscriptionStatus = SubscriptionStatus.TRIAL;
@@ -124,7 +132,7 @@ export async function getRequestContext(): Promise<RequestContext | null> {
       } else {
         canWrite = false;
       }
-    } else if (isAgencyOwner) {
+    } else if (isAgencyOwner || isAgencyStaff) {
       status = SubscriptionStatus.EXPIRED;
       canWrite = false;
     }
@@ -157,6 +165,7 @@ export async function getRequestContext(): Promise<RequestContext | null> {
       subscriptionAccess,
       isPlatformOwner,
       isAgencyOwner,
+      isAgencyStaff,
     };
   } catch (err) {
     console.error("Error evaluating request context:", err);
@@ -214,10 +223,10 @@ export async function requirePlatformOwnerContext(): Promise<PlatformOwnerReques
 }
 
 /**
- * Guard: Enforces read permissions on an agency workspace.
+ * Guard: Enforces read permissions on an agency workspace for any agency member (Owner or Staff).
  */
-export async function requireReadAccess(): Promise<AgencyOwnerRequestContext> {
-  const context = await requireAgencyOwnerContext();
+export async function requireReadAccess(): Promise<AgencyMemberRequestContext> {
+  const context = await requireAgencyMemberContext();
   if (!context.subscriptionAccess.canRead) {
     throw new ForbiddenError("Access to this workspace data has been suspended.");
   }
@@ -225,11 +234,11 @@ export async function requireReadAccess(): Promise<AgencyOwnerRequestContext> {
 }
 
 /**
- * Guard: Enforces write/mutation permissions on an agency workspace.
+ * Guard: Enforces write/mutation permissions on an agency workspace for any agency member (Owner or Staff).
  * Throws 403 ReadOnlyAccessError if agency is suspended or subscription has expired/cancelled.
  */
-export async function requireWriteAccess(): Promise<AgencyOwnerRequestContext> {
-  const context = await requireAgencyOwnerContext();
+export async function requireWriteAccess(): Promise<AgencyMemberRequestContext> {
+  const context = await requireAgencyMemberContext();
   if (context.agency.status === AgencyStatus.SUSPENDED) {
     throw new ReadOnlyAccessError(
       "Your agency workspace is currently suspended. Creating or modifying business records is restricted. Please contact Your Travel Desk support to reactivate your workspace."
@@ -244,10 +253,61 @@ export async function requireWriteAccess(): Promise<AgencyOwnerRequestContext> {
 }
 
 /**
- * Guard: Enforces Agency Owner access to Platform Support Chat.
- * Allows authenticated Agency Owners to chat with Platform Support even if trial/subscription is EXPIRED or CANCELLED.
+ * Guard: Enforces access to Platform Support Chat for Agency Members (Owner or Staff).
+ * Allows authenticated Agency Members to chat with Platform Support even if trial/subscription is EXPIRED or CANCELLED.
  */
-export async function requireAgencyOwnerChatAccess(): Promise<AgencyOwnerRequestContext> {
-  return requireAgencyOwnerContext();
+export async function requireAgencyOwnerChatAccess(): Promise<AgencyMemberRequestContext> {
+  return requireAgencyMemberContext();
+}
+
+export const requireAgencyMemberChatAccess = requireAgencyOwnerChatAccess;
+
+/**
+ * Guard: Requires an authenticated Agency Member (Owner or Staff) with a valid agency assignment.
+ * Throws 401 if not logged in, or 403 if user is not an agency owner or staff member.
+ */
+export async function requireAgencyMemberContext(): Promise<AgencyMemberRequestContext> {
+  const context = await requireAuthenticatedUser();
+
+  if ((!context.isAgencyOwner && !context.isAgencyStaff) || !context.agency || !context.dbUser.agencyId) {
+    throw new ForbiddenError("This endpoint requires an active Agency workspace session.");
+  }
+
+  return {
+    ...context,
+    agency: context.agency,
+    agencyId: context.dbUser.agencyId,
+    dbUser: context.dbUser as User & { agencyId: string },
+  };
+}
+
+/**
+ * Guard: Enforces read permissions on an agency workspace for any agency member (Owner or Staff).
+ */
+export async function requireMemberReadAccess(): Promise<AgencyMemberRequestContext> {
+  const context = await requireAgencyMemberContext();
+  if (!context.subscriptionAccess.canRead) {
+    throw new ForbiddenError("Access to this workspace data has been suspended.");
+  }
+  return context;
+}
+
+/**
+ * Guard: Enforces write/mutation permissions on an agency workspace for any agency member (Owner or Staff).
+ * Throws 403 ReadOnlyAccessError if agency is suspended or subscription has expired/cancelled.
+ */
+export async function requireMemberWriteAccess(): Promise<AgencyMemberRequestContext> {
+  const context = await requireAgencyMemberContext();
+  if (context.agency.status === AgencyStatus.SUSPENDED) {
+    throw new ReadOnlyAccessError(
+      "Your agency workspace is currently suspended. Creating or modifying business records is restricted. Please contact Your Travel Desk support to reactivate your workspace."
+    );
+  }
+  if (!context.subscriptionAccess.canWrite) {
+    throw new ReadOnlyAccessError(
+      "Your subscription or free trial has expired. Existing data is accessible in read-only mode. Renew to resume creating or modifying business records."
+    );
+  }
+  return context;
 }
 

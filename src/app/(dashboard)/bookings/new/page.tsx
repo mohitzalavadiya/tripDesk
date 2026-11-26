@@ -1,5 +1,7 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { QuotaExceededCard } from "@/components/shared/quota-exceeded-card";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
@@ -38,6 +40,19 @@ import * as React from "react";
 import { toast } from "sonner";
 
 export default function NewBookingPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("BOOKINGS", "create")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Booking Creation"
+          badgeText="Access Restricted"
+          description="You do not have permission to create bookings. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   return (
     <React.Suspense
       fallback={

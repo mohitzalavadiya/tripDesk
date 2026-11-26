@@ -7,6 +7,8 @@ RescheduleFollowUpInput,
 } from "@/lib/validation/follow-up-schema";
 import {
 EnquiryFollowUp,
+EnquiryPriority,
+FollowUpType,
 } from "@prisma/client";
 import {
 ApiClientError,
@@ -39,6 +41,13 @@ export type FollowUpWithRelations = EnquiryFollowUp & {
     budget?: number | null;
     startDate?: Date | string | null;
     endDate?: Date | string | null;
+    assignedTo?: string | null;
+    assignedToUserId?: string | null;
+    assignedToUser?: {
+      id: string;
+      name: string;
+      email: string;
+    } | null;
     customer: {
       id: string;
       name: string;
@@ -73,6 +82,7 @@ export const followUpClient = {
     if (params?.search) searchParams.set("search", params.search);
     if (params?.enquiryId) searchParams.set("enquiryId", params.enquiryId);
     if (params?.customerId) searchParams.set("customerId", params.customerId);
+    if (params?.assignedToUserId) searchParams.set("assignedToUserId", params.assignedToUserId);
     if (params?.startDate) searchParams.set("startDate", params.startDate);
     if (params?.endDate) searchParams.set("endDate", params.endDate);
     if (params?.sortBy) searchParams.set("sortBy", params.sortBy);
@@ -90,9 +100,26 @@ export const followUpClient = {
 
   /**
    * Get follow-up telemetry summary counts
+   * Supports active filters across the full authorized dataset.
    */
-  async getSummary(): Promise<SingleResponse<FollowUpSummaryStats>> {
-    const res = await fetch("/api/follow-ups/summary", {
+  async getSummary(params?: {
+    type?: FollowUpType;
+    priority?: EnquiryPriority;
+    search?: string;
+    assignedToUserId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<SingleResponse<FollowUpSummaryStats>> {
+    const searchParams = new URLSearchParams();
+    if (params?.type) searchParams.set("type", params.type);
+    if (params?.priority) searchParams.set("priority", params.priority);
+    if (params?.search) searchParams.set("search", params.search);
+    if (params?.assignedToUserId) searchParams.set("assignedToUserId", params.assignedToUserId);
+    if (params?.startDate) searchParams.set("startDate", params.startDate);
+    if (params?.endDate) searchParams.set("endDate", params.endDate);
+
+    const queryStr = searchParams.toString();
+    const res = await fetch(`/api/follow-ups/summary${queryStr ? `?${queryStr}` : ""}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",

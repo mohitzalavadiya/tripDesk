@@ -32,7 +32,7 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
   useModalScrollLock(open);
   const pathname = usePathname();
   const router = useRouter();
-  const { isPlatformOwner } = useAuth();
+  const { isPlatformOwner, isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
   const isPlatform = isPlatformOwner || pathname.startsWith("/admin");
   const navSections = isPlatform ? adminNavigationConfig : agencyNavigationConfig;
   const { unreadCount: chatUnreadCount } = usePlatformChatUnreadCount();
@@ -115,13 +115,21 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
 
             {/* Navigation item groups */}
             <div className="flex-1 overflow-y-auto space-y-4 no-scrollbar">
-              {navSections.map((section) => (
+              {navSections.map((section) => {
+                const visibleItems = isPlatform
+                  ? section.items.filter((item) => {
+                      if (item.ownerOnly && !isAgencyOwner && !isPlatformOwner) return false;
+                      return true;
+                    })
+                  : section.items;
+                if (visibleItems.length === 0) return null;
+                return (
                 <div key={section.title} className="space-y-1">
                   <h4 className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 select-none">
                     {section.title}
                   </h4>
                   <div className="space-y-0.5">
-                    {section.items.map((item) => {
+                    {visibleItems.map((item) => {
                       const Icon = item.icon;
                       const isActive =
                         pathname === item.href ||
@@ -129,7 +137,10 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                       const isSupportChat = item.href === "/support" || item.href === "/admin/chat";
                       const hasUnread = isSupportChat && chatUnreadCount > 0;
                       const isFeatureGated = !isPlatform && Boolean(item.featureKey);
-                      const isLocked = isFeatureGated && !isFeatureAllowed(item.featureKey as keyof EntitlementsState);
+                      const isEntitlementLocked = isFeatureGated && !isFeatureAllowed(item.featureKey as keyof EntitlementsState);
+                      const isStaffRestricted = !isPlatform && isAgencyStaff && item.moduleKey ? !hasStaffPermission(item.moduleKey, "view") : false;
+                      const isOwnerRestricted = !isPlatform && !isAgencyOwner && Boolean(item.ownerOnly);
+                      const isLocked = isEntitlementLocked || isStaffRestricted || isOwnerRestricted;
 
                       return (
                         <Link
@@ -191,7 +202,7 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                     })}
                   </div>
                 </div>
-              ))}
+              );})}`
             </div>
           </div>
         </div>

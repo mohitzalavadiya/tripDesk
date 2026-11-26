@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -77,6 +80,19 @@ function getGradient(name: string) {
 }
 
 export default function CustomersPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("CUSTOMERS", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Customer Records"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
 
@@ -120,9 +136,9 @@ export default function CustomersPage() {
   }, [search]);
 
   // Fetch real customers from PostgreSQL API
-  const fetchCustomers = React.useCallback(async () => {
+  const fetchCustomers = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       const res = await customerClient.getCustomers({
@@ -145,7 +161,7 @@ export default function CustomersPage() {
       }
       setError(getErrorMessage(err, "Unable to load customer directory. Please try again."));
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [debouncedSearch, cityFilter, includeArchived, page]);
 
@@ -195,7 +211,7 @@ export default function CustomersPage() {
           await customerClient.archiveCustomer(id);
           toast.success(`Customer ${ref} archived successfully.`);
           setConfirmAction(null);
-          await fetchCustomers();
+          await fetchCustomers(true);
         } catch (err: any) {
           if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
             setLocalReadOnly(true);
@@ -227,8 +243,8 @@ export default function CustomersPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Read-Only Banner */}
         {isReadOnly && <ReadOnlyBanner moduleName="Customer Directory" />}
 
@@ -352,14 +368,14 @@ export default function CustomersPage() {
           </div>
 
           {/* Loading State */}
-          {loading && (
+          {loading && customers.length === 0 && (
             <div className="p-4">
               <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
-          {!loading && error && (
+          {!loading && error && customers.length === 0 && (
             <div className="p-8">
               <ErrorState
                 title="Unable to load customers"
@@ -370,7 +386,7 @@ export default function CustomersPage() {
           )}
 
           {/* Table View */}
-          {!loading && !error && customers.length === 0 ? (
+          {(!loading || customers.length > 0) && !error && customers.length === 0 ? (
             <div className="p-12 text-center">
               <EmptyState
                 icon={Users}
@@ -384,10 +400,10 @@ export default function CustomersPage() {
                 onAction={isFilterActive ? handleClearFilters : handleAddCustomer}
               />
             </div>
-          ) : !loading && !error && (
+          ) : (!loading || customers.length > 0) && !error && (
             <div>
               {/* Desktop Table */}
-              <div className="hidden lg:block overflow-x-auto max-h-[620px] overflow-y-auto">
+              <div className="hidden lg:block overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">

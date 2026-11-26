@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -87,6 +90,19 @@ function getGradient(name: string) {
 
 export default function SupplierDetailPage() {
   const router = useRouter();
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+
+  if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("SUPPLIERS", "view"))) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Supplier Details"
+          badgeText="Access Restricted"
+          description="You do not have permission to view supplier details. Contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
   const params = useParams();
   const id = params.id as string;
 
@@ -316,6 +332,12 @@ export default function SupplierDetailPage() {
     );
   }
 
+  const canViewFinancials = isAgencyOwner || Boolean(supplier?.financialSummary && supplier?.payables);
+  const totalConfirmationsCount =
+    (supplier.hotelConfirmations?.length || 0) +
+    (supplier.vehicleDispatches?.length || 0) +
+    (supplier.activityConfirmations?.length || 0);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
       <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
@@ -525,41 +547,49 @@ export default function SupplierDetailPage() {
             </div>
             <div className="min-w-0">
               <span className="text-[10px] font-bold text-slate-400 uppercase truncate block">Confirmations</span>
-              <h4 className="text-base font-black text-slate-900">{supplier.hotelConfirmations?.length || 0}</h4>
+              <h4 className="text-base font-black text-slate-900">{totalConfirmationsCount}</h4>
             </div>
           </div>
 
-          <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
-              <IndianRupee className="h-4.5 w-4.5" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] font-bold text-slate-400 uppercase truncate block">Total Invoiced</span>
-              <h4 className="text-sm font-black text-slate-900 truncate">
-                {formatCurrency(supplier.financialSummary?.totalPayableAmount || 0)}
-              </h4>
-            </div>
-          </div>
+          {canViewFinancials ? (
+            <>
+              <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
+                  <IndianRupee className="h-4.5 w-4.5" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase truncate block">Total Invoiced</span>
+                  <h4 className="text-sm font-black text-slate-900 truncate">
+                    {formatCurrency(supplier.financialSummary?.totalPayableAmount || 0)}
+                  </h4>
+                </div>
+              </div>
 
-          <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold shrink-0">
-              <CreditCard className="h-4.5 w-4.5" />
+              <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold shrink-0">
+                  <CreditCard className="h-4.5 w-4.5" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase truncate block">Outstanding</span>
+                  <h4 className="text-sm font-black text-rose-700 truncate">
+                    {formatCurrency(supplier.financialSummary?.totalOutstandingAmount || 0)}
+                  </h4>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="col-span-2 bg-slate-50/60 p-3.5 rounded-xl border border-dashed border-slate-200 flex items-center justify-center text-center">
+              <span className="text-[11px] font-semibold text-slate-400">Financial payables restricted to Agency Owner</span>
             </div>
-            <div className="min-w-0">
-              <span className="text-[10px] font-bold text-slate-400 uppercase truncate block">Outstanding</span>
-              <h4 className="text-sm font-black text-rose-700 truncate">
-                {formatCurrency(supplier.financialSummary?.totalOutstandingAmount || 0)}
-              </h4>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Tabbed Navigation Bar */}
         <div className="flex items-center gap-1.5 border-b border-slate-200/80 pb-px overflow-x-auto text-xs no-scrollbar">
           {[
             { id: "overview", label: "Commercial Profile" },
-            { id: "confirmations", label: `Confirmations (${supplier.hotelConfirmations?.length || 0})` },
-            { id: "payables", label: `Payables & Finance (${supplier.payables?.length || 0})` },
+            { id: "confirmations", label: `Confirmations (${totalConfirmationsCount})` },
+            ...(canViewFinancials ? [{ id: "payables", label: `Payables & Finance (${supplier.payables?.length || 0})` }] : []),
             { id: "activeRates", label: `Active Rates (${supplier.activeRateSheets.length})` },
             { id: "expiredRates", label: `Expired Rates (${supplier.expiredRateSheets.length})` },
             { id: "hotels", label: `Hotels (${supplier.hotels.length})` },
@@ -637,7 +667,9 @@ export default function SupplierDetailPage() {
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400">Wire Transfer Bank Account</span>
                   <p className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-slate-800 font-mono text-xs whitespace-pre-wrap mt-1">
-                    {supplier.bankDetails || "No bank details registered."}
+                    {canViewFinancials
+                      ? supplier.bankDetails || "No bank details registered."
+                      : "[Confidential - Owner/Finance Access Required]"}
                   </p>
                 </div>
 
@@ -656,79 +688,207 @@ export default function SupplierDetailPage() {
 
         {/* Tab: Operational Confirmations */}
         {activeTab === "confirmations" && (
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                <span>Operational Confirmations & Tours ({supplier.hotelConfirmations?.length || 0})</span>
-              </h3>
+          <div className="space-y-6">
+            {/* Hotel Confirmations */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <Hotel className="h-4 w-4 text-emerald-600" />
+                  <span>Hotel Stay Confirmations ({supplier.hotelConfirmations?.length || 0})</span>
+                </h3>
+              </div>
+
+              {!supplier.hotelConfirmations || supplier.hotelConfirmations.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-500">
+                  No hotel stay confirmations linked to this supplier.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader className="bg-slate-50 text-[11px] uppercase font-bold text-slate-500">
+                    <TableRow>
+                      <TableHead>Confirmation #</TableHead>
+                      <TableHead>Trip / Tour</TableHead>
+                      <TableHead>Booking #</TableHead>
+                      <TableHead>Stay Window</TableHead>
+                      <TableHead>Room Details</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {supplier.hotelConfirmations.map((c: any) => (
+                      <TableRow key={c.id} className="hover:bg-slate-50 text-xs">
+                        <TableCell className="font-mono font-bold text-slate-800">
+                          {c.confirmationNumber || "CONF-PENDING"}
+                        </TableCell>
+                        <TableCell className="font-semibold text-slate-900">
+                          {c.tripOperation?.trip?.title || c.tripOperation?.trip?.tripNumber || "Tour"}
+                        </TableCell>
+                        <TableCell className="font-mono text-slate-600">
+                          {c.tripOperation?.booking?.bookingNumber || "—"}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {c.checkIn ? `${formatDateDisplay(c.checkIn)} → ${formatDateDisplay(c.checkOut)}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-slate-700">
+                          {c.roomDetails || c.tripHotel?.roomType || "Standard"}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge
+                            status={c.status}
+                            label={
+                              c.status === "CONFIRMED"
+                                ? "Confirmed"
+                                : c.status === "REQUESTED"
+                                ? "Requested"
+                                : c.status === "CANCELLED"
+                                ? "Cancelled"
+                                : c.status === "PENDING"
+                                ? "Pending"
+                                : c.status
+                            }
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {c.tripOperation?.tripId && (
+                            <Link
+                              href={`/operations/${c.tripOperation.tripId}`}
+                              className="text-indigo-600 font-semibold hover:underline"
+                            >
+                              Open Operations
+                            </Link>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </div>
 
-            {!supplier.hotelConfirmations || supplier.hotelConfirmations.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
-                No operational confirmations linked to this supplier yet.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader className="bg-slate-50 text-[11px] uppercase font-bold text-slate-500">
-                  <TableRow>
-                    <TableHead>Confirmation #</TableHead>
-                    <TableHead>Trip / Tour</TableHead>
-                    <TableHead>Booking #</TableHead>
-                    <TableHead>Stay / Service Window</TableHead>
-                    <TableHead>Room / Details</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {supplier.hotelConfirmations.map((c: any) => (
-                    <TableRow key={c.id} className="hover:bg-slate-50 text-xs">
-                      <TableCell className="font-mono font-bold text-slate-800">
-                        {c.confirmationNumber || "CONF-PENDING"}
-                      </TableCell>
-                      <TableCell className="font-semibold text-slate-900">
-                        {c.tripOperation?.trip?.title || c.tripOperation?.trip?.tripNumber || "Tour"}
-                      </TableCell>
-                      <TableCell className="font-mono text-slate-600">
-                        {c.tripOperation?.booking?.bookingNumber || "—"}
-                      </TableCell>
-                      <TableCell className="text-slate-600">
-                        {c.checkIn ? `${formatDateDisplay(c.checkIn)} → ${formatDateDisplay(c.checkOut)}` : "—"}
-                      </TableCell>
-                      <TableCell className="text-slate-700">
-                        {c.roomDetails || c.tripHotel?.roomType || "Standard"}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge
-                          status={c.status}
-                          label={
-                            c.status === "CONFIRMED"
-                              ? "Confirmed"
-                              : c.status === "REQUESTED"
-                              ? "Requested"
-                              : c.status === "CANCELLED"
-                              ? "Cancelled"
-                              : c.status === "PENDING"
-                              ? "Pending"
-                              : c.status
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {c.tripOperation?.tripId && (
-                          <Link
-                            href={`/operations/${c.tripOperation.tripId}`}
-                            className="text-indigo-600 font-semibold hover:underline"
-                          >
-                            Open Operations
-                          </Link>
-                        )}
-                      </TableCell>
+            {/* Vehicle Dispatches */}
+            {supplier.vehicleDispatches && supplier.vehicleDispatches.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+                <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <Car className="h-4 w-4 text-blue-600" />
+                    <span>Vehicle Fleet Dispatches ({supplier.vehicleDispatches.length})</span>
+                  </h3>
+                </div>
+                <Table>
+                  <TableHeader className="bg-slate-50 text-[11px] uppercase font-bold text-slate-500">
+                    <TableRow>
+                      <TableHead>Vehicle / Fleet</TableHead>
+                      <TableHead>Trip / Tour</TableHead>
+                      <TableHead>Booking #</TableHead>
+                      <TableHead>Pickup Details</TableHead>
+                      <TableHead>Driver Info</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {supplier.vehicleDispatches.map((vd: any) => (
+                      <TableRow key={vd.id} className="hover:bg-slate-50 text-xs">
+                        <TableCell className="font-semibold text-slate-900">
+                          {vd.vehicle?.name || vd.vehicleNumber || "Fleet Vehicle"}
+                        </TableCell>
+                        <TableCell className="font-semibold text-slate-900">
+                          {vd.tripOperation?.trip?.title || vd.tripOperation?.trip?.tripNumber || "Tour"}
+                        </TableCell>
+                        <TableCell className="font-mono text-slate-600">
+                          {vd.tripOperation?.booking?.bookingNumber || "—"}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {vd.pickupDate ? formatDateDisplay(vd.pickupDate) : "—"}
+                          {vd.pickupLocation ? ` (${vd.pickupLocation})` : ""}
+                        </TableCell>
+                        <TableCell className="text-slate-700">
+                          {vd.driverName ? `${vd.driverName}${vd.driverPhone ? ` (${vd.driverPhone})` : ""}` : "Not assigned"}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge
+                            status={vd.status}
+                            label={vd.status}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {vd.tripOperation?.tripId && (
+                            <Link
+                              href={`/operations/${vd.tripOperation.tripId}`}
+                              className="text-indigo-600 font-semibold hover:underline"
+                            >
+                              Open Operations
+                            </Link>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Activity Confirmations */}
+            {supplier.activityConfirmations && supplier.activityConfirmations.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+                <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-purple-600" />
+                    <span>Activity & Tour Confirmations ({supplier.activityConfirmations.length})</span>
+                  </h3>
+                </div>
+                <Table>
+                  <TableHeader className="bg-slate-50 text-[11px] uppercase font-bold text-slate-500">
+                    <TableRow>
+                      <TableHead>Confirmation / Ticket #</TableHead>
+                      <TableHead>Activity Name</TableHead>
+                      <TableHead>Trip / Tour</TableHead>
+                      <TableHead>Booking #</TableHead>
+                      <TableHead>Confirmed Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {supplier.activityConfirmations.map((ac: any) => (
+                      <TableRow key={ac.id} className="hover:bg-slate-50 text-xs">
+                        <TableCell className="font-mono font-bold text-slate-800">
+                          {ac.confirmationNumber || ac.ticketNumber || "CONF-PENDING"}
+                        </TableCell>
+                        <TableCell className="font-semibold text-slate-900">
+                          {ac.activity?.name || "Activity"}
+                        </TableCell>
+                        <TableCell className="font-semibold text-slate-900">
+                          {ac.tripOperation?.trip?.title || ac.tripOperation?.trip?.tripNumber || "Tour"}
+                        </TableCell>
+                        <TableCell className="font-mono text-slate-600">
+                          {ac.tripOperation?.booking?.bookingNumber || "—"}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {ac.confirmedAt ? formatDateDisplay(ac.confirmedAt) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge
+                            status={ac.status}
+                            label={ac.status}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {ac.tripOperation?.tripId && (
+                            <Link
+                              href={`/operations/${ac.tripOperation.tripId}`}
+                              className="text-indigo-600 font-semibold hover:underline"
+                            >
+                              Open Operations
+                            </Link>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </div>
         )}
@@ -1197,15 +1357,17 @@ export default function SupplierDetailPage() {
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Bank Account Details</label>
-                  <Textarea
-                    value={editBankDetails}
-                    onChange={(e) => setEditBankDetails(e.target.value)}
-                    rows={2}
-                    className="bg-slate-50/50 border-slate-200 text-xs font-mono"
-                  />
-                </div>
+                {isAgencyOwner && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Bank Account Details (Owner Only)</label>
+                    <Textarea
+                      value={editBankDetails}
+                      onChange={(e) => setEditBankDetails(e.target.value)}
+                      rows={2}
+                      className="bg-slate-50/50 border-slate-200 text-xs font-mono"
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Remarks & Notes</label>

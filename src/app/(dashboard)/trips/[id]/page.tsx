@@ -1,10 +1,15 @@
 "use client";
 
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
+import { useAuth } from "@/context/auth-context";
+
 import { QuotationStatusBadge } from "@/app/(dashboard)/quotations/page";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DestinationMultiSelect } from "@/components/shared/destination-multi-select";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { ItineraryBuilder } from "@/components/trips/itinerary/itinerary-builder";
 import { Button } from "@/components/ui/button";
 import {
 Dialog,
@@ -66,6 +71,7 @@ ArrowLeft,
 Building2,
 Calculator,
 Calendar,
+CalendarCheck,
 Car,
 Check,
 CheckCircle2,
@@ -92,16 +98,33 @@ UserPlus,
 Users
 } from "lucide-react";
 import Link from "next/link";
-import { useParams,useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 import * as Yup from "yup";
 import { TripStatusBadge } from "../page";
 
 export default function TripDetailPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("TRIP_DETAIL", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Trip Dossier"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+  const canViewCosting = isAgencyOwner || (isAgencyStaff && hasStaffPermission("TRIP_COSTING", "view"));
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const id = params.id as string;
+  const tabParam = searchParams?.get("tab");
 
   // Real Database States
   const [trip, setTrip] = React.useState<TripWithRelations | null>(null);
@@ -133,7 +156,7 @@ export default function TripDetailPage() {
   const [actionLoading, setActionLoading] = React.useState(false);
 
   // Active Tab state
-  const [activeTab, setActiveTab] = React.useState<
+  type TabType =
     | "overview"
     | "travelers"
     | "itinerary"
@@ -141,13 +164,37 @@ export default function TripDetailPage() {
     | "vehicles"
     | "activities"
     | "costing"
-    | "quotation"
-  >("overview");
+    | "quotation";
+
+  const resolveTabFromParam = React.useCallback((param: string | null | undefined): TabType => {
+    if (!param) return "overview";
+    const normalized = param.toLowerCase() === "quotations" ? "quotation" : param.toLowerCase();
+    const validTabs: TabType[] = [
+      "overview",
+      "travelers",
+      "itinerary",
+      "hotels",
+      "vehicles",
+      "activities",
+      "costing",
+      "quotation",
+    ];
+    return validTabs.includes(normalized as TabType) ? (normalized as TabType) : "overview";
+  }, []);
+
+  const [activeTab, setActiveTab] = React.useState<TabType>(() => resolveTabFromParam(tabParam));
+
+  // Sync activeTab whenever the URL tab parameter changes
+  React.useEffect(() => {
+    if (tabParam) {
+      setActiveTab(resolveTabFromParam(tabParam));
+    }
+  }, [tabParam, resolveTabFromParam]);
 
   // Fetch real trip details and assignments from APIs
-  const fetchTripDetails = React.useCallback(async () => {
+  const fetchTripDetails = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       const [tripRes, destsRes, hotelsRes, vehiclesRes, activitiesRes] = await Promise.all([
@@ -185,7 +232,7 @@ export default function TripDetailPage() {
       }
       setError(err?.message || "Failed to load trip workspace.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [id]);
 
@@ -492,7 +539,7 @@ export default function TripDetailPage() {
         if (res.success && res.data) {
           toast.success("Trip updated successfully.");
           setIsEditOpen(false);
-          await fetchTripDetails();
+          await fetchTripDetails(true);
         }
       } catch (err: any) {
         toast.error(err?.message || "Failed to update trip.");
@@ -557,7 +604,7 @@ export default function TripDetailPage() {
 
       toast.success("Traveler added.");
       setIsAddTravelerOpen(false);
-      await fetchTripDetails();
+      await fetchTripDetails(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to add traveler.");
     } finally {
@@ -598,7 +645,7 @@ export default function TripDetailPage() {
 
       toast.success("Traveler updated.");
       setIsEditTravelerOpen(false);
-      await fetchTripDetails();
+      await fetchTripDetails(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to update traveler.");
     } finally {
@@ -616,7 +663,7 @@ export default function TripDetailPage() {
         try {
           await travelerClient.deleteTraveler(id, travelerId);
           toast.success("Traveler removed.");
-          await fetchTripDetails();
+          await fetchTripDetails(true);
         } catch (err: any) {
           toast.error(getErrorMessage(err, "Failed to remove traveler. Please try again."));
         }
@@ -656,7 +703,7 @@ export default function TripDetailPage() {
 
       toast.success("Itinerary item added.");
       setIsAddItemOpen(false);
-      await fetchTripDetails();
+      await fetchTripDetails(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to add itinerary item.");
     } finally {
@@ -694,7 +741,7 @@ export default function TripDetailPage() {
 
       toast.success("Itinerary item updated.");
       setIsEditItemOpen(false);
-      await fetchTripDetails();
+      await fetchTripDetails(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to update itinerary item.");
     } finally {
@@ -712,7 +759,7 @@ export default function TripDetailPage() {
         try {
           await itineraryClient.deleteItineraryItem(id, itemId);
           toast.success("Itinerary item deleted.");
-          await fetchTripDetails();
+          await fetchTripDetails(true);
         } catch (err: any) {
           toast.error(getErrorMessage(err, "Failed to delete itinerary item. Please try again."));
         }
@@ -908,7 +955,7 @@ export default function TripDetailPage() {
 
       toast.success("Hotel reservation attached to trip.");
       setIsAddHotelOpen(false);
-      await fetchTripDetails();
+      await fetchTripDetails(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to add hotel reservation.");
     } finally {
@@ -965,7 +1012,7 @@ export default function TripDetailPage() {
 
       toast.success("Hotel reservation updated.");
       setIsEditHotelOpen(false);
-      await fetchTripDetails();
+      await fetchTripDetails(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to update hotel reservation.");
     } finally {
@@ -983,7 +1030,7 @@ export default function TripDetailPage() {
         try {
           await tripHotelClient.deleteTripHotel(id, tripHotelId);
           toast.success("Hotel reservation removed.");
-          await fetchTripDetails();
+          await fetchTripDetails(true);
         } catch (err: any) {
           toast.error(getErrorMessage(err, "Failed to remove hotel reservation. Please try again."));
         }
@@ -1053,7 +1100,7 @@ export default function TripDetailPage() {
 
       toast.success("Vehicle assigned to trip.");
       setIsAddVehicleOpen(false);
-      await fetchTripDetails();
+      await fetchTripDetails(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to assign vehicle.");
     } finally {
@@ -1109,7 +1156,7 @@ export default function TripDetailPage() {
 
       toast.success("Vehicle assignment updated.");
       setIsEditVehicleOpen(false);
-      await fetchTripDetails();
+      await fetchTripDetails(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to update vehicle assignment.");
     } finally {
@@ -1127,7 +1174,7 @@ export default function TripDetailPage() {
         try {
           await tripVehicleClient.deleteTripVehicle(id, tripVehicleId);
           toast.success("Vehicle assignment removed.");
-          await fetchTripDetails();
+          await fetchTripDetails(true);
         } catch (err: any) {
           toast.error(getErrorMessage(err, "Failed to remove vehicle assignment. Please try again."));
         }
@@ -1178,7 +1225,7 @@ export default function TripDetailPage() {
 
       toast.success("Activity added to trip.");
       setIsAddActivityOpen(false);
-      await fetchTripDetails();
+      await fetchTripDetails(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to add activity.");
     } finally {
@@ -1210,7 +1257,7 @@ export default function TripDetailPage() {
 
       toast.success("Activity updated.");
       setIsEditActivityOpen(false);
-      await fetchTripDetails();
+      await fetchTripDetails(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to update activity.");
     } finally {
@@ -1228,7 +1275,7 @@ export default function TripDetailPage() {
         try {
           await tripActivityClient.deleteTripActivity(id, tripActivityId);
           toast.success("Activity removed.");
-          await fetchTripDetails();
+          await fetchTripDetails(true);
         } catch (err: any) {
           toast.error(getErrorMessage(err, "Failed to remove activity. Please try again."));
         }
@@ -1248,7 +1295,7 @@ export default function TripDetailPage() {
     });
   };
 
-  if (loading) {
+  if (loading && !trip) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-slate-50/50">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-3" />
@@ -1418,7 +1465,7 @@ export default function TripDetailPage() {
               { id: "activities", label: "Activities", icon: Ticket, count: tripActivities.length },
               { id: "costing", label: "Costing", icon: DollarSign },
               { id: "quotation", label: "Quotations", icon: CheckCircle2, count: tripQuotations.length },
-            ].map((tab) => {
+            ].filter((tab) => tab.id !== "costing" || canViewCosting).map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
@@ -1779,96 +1826,18 @@ export default function TripDetailPage() {
           </div>
         )}
 
-        {/* TAB 3: ITINERARY */}
-        {activeTab === "itinerary" && (
-          <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <div className="min-w-0">
-                <h3 className="font-bold text-slate-900 text-sm">Day-by-Day Itinerary Builder</h3>
-                <p className="text-xs text-slate-500">
-                  Dates: {formatDateDisplay(trip.startDate)} to {formatDateDisplay(trip.endDate)} ({duration} Days)
-                </p>
-              </div>
-
-              <Button
-                onClick={handleOpenAddItem}
-                disabled={isReadOnly}
-                className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 cursor-pointer shadow-xs disabled:opacity-50 shrink-0"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> Add Day
-              </Button>
-            </div>
-
-            {itineraryItems.length === 0 ? (
-              <EmptyState
-                icon={Calendar}
-                title="No itinerary items added yet"
-                description="Start adding daily schedules, sightseeing, transfers, and coordinates to this trip."
-                actionText="Add Day 1"
-                onAction={handleOpenAddItem}
-              />
-            ) : (
-              <div className="space-y-4">
-                {itineraryItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3 hover:shadow-xs transition-all"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2.5">
-                      <div className="space-y-0.5 min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md uppercase shrink-0 whitespace-nowrap">
-                            Day {item.dayNumber}
-                          </span>
-                          <h4 className="font-bold text-slate-900 text-sm leading-snug break-words">{item.title}</h4>
-                        </div>
-                        {item.date && (
-                          <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
-                            <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
-                            {formatDateDisplay(item.date)}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => handleOpenEditItem(item)}
-                          disabled={isReadOnly}
-                          className="p-1.5 rounded-md border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                        >
-                          <Edit2 className="h-3 w-3" /> Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteItem(item.id, item.dayNumber)}
-                          disabled={isReadOnly}
-                          className="p-1.5 rounded-md border border-slate-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                        >
-                          <Trash2 className="h-3 w-3" /> Delete
-                        </button>
-                      </div>
-                    </div>
-
-                    {item.description && (
-                      <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed break-words">
-                        {item.description}
-                      </p>
-                    )}
-
-                    {(item.location || item.startTime || item.endTime) && (
-                      <div className="flex flex-wrap gap-2 sm:gap-3 text-xs text-slate-500 pt-1">
-                        {item.location && (
-                          <span>Location: <strong className="text-slate-800">{item.location}</strong></span>
-                        )}
-                        {(item.startTime || item.endTime) && (
-                          <span>Timing: <strong className="text-slate-800">{item.startTime || ""} – {item.endTime || ""}</strong></span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        {/* TAB 3: ITINERARY (Canonical Day-by-Day Virtual Builder) */}
+        {activeTab === "itinerary" && trip && (
+          <ItineraryBuilder
+            trip={trip}
+            itineraryItems={itineraryItems}
+            destinations={tripDestinations.map((td) => ({
+              id: td.destinationId,
+              name: td.destination.name,
+            }))}
+            isReadOnly={isReadOnly}
+            onItemsUpdated={() => fetchTripDetails(true)}
+          />
         )}
 
         {/* TAB 4: HOTELS (Real PostgreSQL Trip-Hotel Integration) */}
@@ -2208,7 +2177,7 @@ export default function TripDetailPage() {
         )}
 
         {/* TAB 7: COSTING */}
-        {activeTab === "costing" && (
+        {activeTab === "costing" && canViewCosting && (
           <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto w-full">
             <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
@@ -2361,6 +2330,11 @@ export default function TripDetailPage() {
                             V{q.version}
                           </span>
                           <QuotationStatusBadge status={q.status} />
+                          {q.customerFeedback && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                              <MessageSquare className="h-3 w-3 text-amber-600" /> Changes Requested
+                            </span>
+                          )}
                         </div>
 
                         <div className="text-left sm:text-right">
@@ -2370,6 +2344,108 @@ export default function TripDetailPage() {
                           </span>
                         </div>
                       </div>
+
+                      {/* Customer Revision Feedback Alert Banner */}
+                      {(q.customerFeedback || (q.customerResponseHistory && q.customerResponseHistory.length > 0)) && (
+                        <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-3 text-xs shadow-2xs">
+                          <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                            <MessageSquare className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div className="space-y-1.5 min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-amber-900 uppercase tracking-wider text-[10px] bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                                  Customer Changes Requested
+                                </span>
+                                {(q.customerFeedbackAt || (q.customerResponseHistory && q.customerResponseHistory.length > 0)) && (
+                                  <span className="text-[10px] text-amber-700">
+                                    Latest: {formatDateDisplay(q.customerFeedbackAt || q.customerResponseHistory[q.customerResponseHistory.length - 1].createdAt)}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-amber-900 text-xs italic break-words line-clamp-2">
+                                &ldquo;{q.customerFeedback || q.customerResponseHistory?.[q.customerResponseHistory.length - 1]?.message}&rdquo;
+                              </p>
+
+                              {/* Historical Revision Requests */}
+                              {q.customerResponseHistory && q.customerResponseHistory.length > 1 && (
+                                <div className="mt-2 pt-2 border-t border-amber-200/60 space-y-1">
+                                  <div className="text-[9px] font-bold text-amber-800 uppercase tracking-wider">
+                                    History ({q.customerResponseHistory.length} requests)
+                                  </div>
+                                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                                    {q.customerResponseHistory.map((item: any, idx: number) => (
+                                      <div key={item.id || idx} className="text-[10px] bg-white/70 rounded p-1.5 border border-amber-200/50">
+                                        <div className="flex justify-between text-[9px] text-amber-700 font-medium">
+                                          <span>V{item.version} - {item.action === "QUOTATION_ACCEPTED" ? "Accepted" : "Change Request"}</span>
+                                          <span>{formatDateDisplay(item.createdAt)}</span>
+                                        </div>
+                                        <p className="text-amber-900 italic line-clamp-1 mt-0.5">&ldquo;{item.message}&rdquo;</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="shrink-0 self-end sm:self-center">
+                            <Link href={`/trips/${trip.id}/quotation?quotationId=${q.id}`}>
+                              <Button
+                                size="sm"
+                                className="bg-amber-600 hover:bg-amber-700 text-white h-7 px-3 text-xs font-semibold rounded-lg cursor-pointer shadow-2xs whitespace-nowrap"
+                              >
+                                Review Feedback & Revise
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Customer Acceptance Banner */}
+                      {q.status === "ACCEPTED" && (
+                        <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+                          <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-emerald-900 uppercase tracking-wider text-[10px] bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
+                                  Accepted by Customer
+                                </span>
+                                {q.acceptedAt && (
+                                  <span className="text-[10px] text-emerald-700">
+                                    Accepted on {formatDateDisplay(q.acceptedAt)}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-emerald-900 text-xs">
+                                Client accepted Proposal V{q.version} for ₹{finalPrice.toLocaleString("en-IN")}.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="shrink-0 self-end sm:self-center">
+                            {q.bookings && q.bookings.length > 0 ? (
+                              <Link href={`/bookings/${q.bookings[0].id}`}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-300 h-7 px-3 text-xs font-semibold rounded-lg cursor-pointer shadow-2xs whitespace-nowrap"
+                                >
+                                  <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-600" />
+                                  View Booking #{q.bookings[0].bookingNumber}
+                                </Button>
+                              </Link>
+                            ) : (
+                              <Link href={`/trips/${trip.id}/quotation?quotationId=${q.id}`}>
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-3 text-xs font-semibold rounded-lg cursor-pointer shadow-2xs whitespace-nowrap"
+                                >
+                                  <CalendarCheck className="h-3 w-3 mr-1" />
+                                  Convert to Booking
+                                </Button>
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
                         <div className="space-y-1">
@@ -2410,7 +2486,7 @@ export default function TripDetailPage() {
                             </Button>
                           )}
 
-                          <Link href={`/trips/${trip.id}/quotation/preview`}>
+                          <Link href={`/trips/${trip.id}/quotation/preview?quotationId=${q.id}`}>
                             <Button
                               variant="outline"
                               size="sm"
@@ -2421,7 +2497,7 @@ export default function TripDetailPage() {
                             </Button>
                           </Link>
 
-                          <Link href={`/trips/${trip.id}/quotation`}>
+                          <Link href={`/trips/${trip.id}/quotation?quotationId=${q.id}`}>
                             <Button
                               size="sm"
                               className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 px-3 text-xs font-semibold rounded-lg cursor-pointer shadow-2xs"

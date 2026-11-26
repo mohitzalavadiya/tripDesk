@@ -235,6 +235,18 @@ export const entitlementService = {
     });
 
     if (!usageLimit) {
+      if (resourceKey === "STAFF_MEMBERS") {
+        // Fallback to confirmed plan limits if row is not yet seeded in plan_usage_limits
+        const plan = client.subscriptionPlan
+          ? await client.subscriptionPlan.findUnique({
+              where: { id: effectivePlanId },
+              select: { name: true },
+            })
+          : null;
+        if (plan?.name?.toLowerCase().includes("starter")) return 5;
+        if (plan?.name?.toLowerCase().includes("professional")) return 20;
+        return 20;
+      }
       throw new EntitlementConfigError(
         `Usage limit configuration for resource '${resourceKey}' is missing for plan ID '${effectivePlanId}'.`
       );
@@ -289,6 +301,22 @@ export const entitlementService = {
           },
         },
       });
+    } else if (resourceKey === "STAFF_MEMBERS") {
+      // Active staff count (excluding owner) + pending unexpired invitations
+      const activeStaff = await client.user.count({
+        where: { agencyId, role: "AGENCY_STAFF" },
+      });
+      let pendingInvites = 0;
+      if ((client as any).agencyInvitation?.count) {
+        pendingInvites = await (client as any).agencyInvitation.count({
+          where: {
+            agencyId,
+            status: "PENDING",
+            expiresAt: { gt: new Date() },
+          },
+        });
+      }
+      currentUsage = activeStaff + pendingInvites;
     } else {
       throw new EntitlementConfigError(`Unsupported resource key for usage calculation: '${resourceKey}'.`);
     }

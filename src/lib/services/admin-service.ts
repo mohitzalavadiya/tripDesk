@@ -838,7 +838,7 @@ export const adminService = {
         });
       }
 
-      const canonicalResources = ["TRIPS", "QUOTATIONS", "BOOKINGS"];
+      const canonicalResources = ["TRIPS", "QUOTATIONS", "BOOKINGS", "STAFF_MEMBERS"];
       for (const resourceKey of canonicalResources) {
         let limitVal: number | null = 20;
         if (input.usageLimits && resourceKey in input.usageLimits) {
@@ -961,7 +961,7 @@ export const adminService = {
       }
 
       if (input.usageLimits) {
-        const canonicalResources = ["TRIPS", "QUOTATIONS", "BOOKINGS"];
+        const canonicalResources = ["TRIPS", "QUOTATIONS", "BOOKINGS", "STAFF_MEMBERS"];
         for (const resourceKey of canonicalResources) {
           if (resourceKey in input.usageLimits) {
             const rawLimit = input.usageLimits[resourceKey as keyof typeof input.usageLimits];

@@ -16,6 +16,7 @@ Loader2,
 User
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import * as Yup from "yup";
 
@@ -57,10 +58,36 @@ const signupValidationSchema = Yup.object().shape({
     .oneOf([Yup.ref("password")], "Passwords do not match."),
 });
 
-export default function SignupPage() {
+function SignupFormContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const invitationToken = searchParams.get("invitation") || searchParams.get("token");
+
+  React.useEffect(() => {
+    if (invitationToken) {
+      router.replace(`/accept-invitation?token=${encodeURIComponent(invitationToken)}`);
+    }
+  }, [invitationToken, router]);
+
   const [serverError, setServerError] = React.useState<string | null>(null);
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
+
+  if (invitationToken) {
+    return (
+      <div className="min-h-screen bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center space-y-4 shadow-2xl animate-in fade-in-0 duration-200">
+          <div className="h-12 w-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto shadow-sm">
+            <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-sm font-bold text-slate-900">Redirecting to Staff Invitation...</h2>
+            <p className="text-xs text-slate-500">Routing you to the staff member acceptance portal.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const formik = useFormik({
     initialValues: {
@@ -439,6 +466,23 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-tr from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center space-y-3 shadow-2xl">
+            <Loader2 className="h-6 w-6 animate-spin text-purple-600 mx-auto" />
+            <p className="text-xs text-slate-500">Loading registration...</p>
+          </div>
+        </div>
+      }
+    >
+      <SignupFormContent />
+    </React.Suspense>
   );
 }
 

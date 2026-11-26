@@ -1,10 +1,12 @@
 import {
-apiSuccess,
-handleApiError,
-requireAgencyOwnerContext,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  handleApiError,
+  requireReadAccess,
+  requireWriteAccess,
+  enforceStaffPermission,
+  validateJson,
 } from "@/lib/api";
+
 import { communicationService } from "@/lib/services/communication-service";
 import { updateCommunicationSettingsSchema } from "@/lib/validation/communication-schema";
 import { NextRequest } from "next/server";
@@ -17,7 +19,16 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireReadAccess();
+    if (context.dbUser.role === "AGENCY_STAFF") {
+      await enforceStaffPermission(
+        context.dbUser.role,
+        context.agencyId,
+        context.dbUser.id,
+        "SETTINGS",
+        "VIEW"
+      );
+    }
     const settings = await communicationService.getAgencySettings(context.agencyId);
 
     return apiSuccess(settings);
@@ -33,6 +44,15 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
+    if (context.dbUser.role === "AGENCY_STAFF") {
+      await enforceStaffPermission(
+        context.dbUser.role,
+        context.agencyId,
+        context.dbUser.id,
+        "SETTINGS",
+        "UPDATE"
+      );
+    }
     const body = await validateJson(updateCommunicationSettingsSchema, request);
 
     const updated = await communicationService.updateAgencySettings(

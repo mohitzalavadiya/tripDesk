@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import {
 BookingStatusBadge,
 PaymentStatusBadge,
@@ -66,6 +69,19 @@ const PAYMENT_FILTER_LABELS: Record<string, string> = {
 };
 
 export default function BookingsDashboardPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("BOOKINGS", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Bookings Workspace"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const { canCreate, overview, isReadOnly: subReadOnly, readOnlyReason } = useSubscription();
 
@@ -121,10 +137,21 @@ export default function BookingsDashboardPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  // Restore filters from URL if present
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlStatus = params.get("status");
+      const urlPayment = params.get("paymentStatus");
+      if (urlStatus) setStatusFilter(urlStatus);
+      if (urlPayment) setPaymentFilter(urlPayment);
+    }
+  }, []);
+
   // Fetch real bookings from database API
-  const fetchBookings = React.useCallback(async () => {
+  const fetchBookings = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       const res = await bookingClient.getBookings({
@@ -193,7 +220,7 @@ export default function BookingsDashboardPage() {
           await bookingClient.deleteBooking(id);
           toast.success(`Booking ${number} archived successfully.`);
           setConfirmAction(null);
-          await fetchBookings();
+          await fetchBookings(true);
         } catch (err: any) {
           toast.error(getErrorMessage(err, "We couldn't archive the booking. Please try again."));
         } finally {
@@ -214,8 +241,8 @@ export default function BookingsDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Read-Only Banner */}
         {isReadOnly && <ReadOnlyBanner moduleName="Bookings & Reservations" />}
 
@@ -338,14 +365,14 @@ export default function BookingsDashboardPage() {
           </div>
 
           {/* Loading State */}
-          {loading && (
+          {loading && bookings.length === 0 && (
             <div className="p-4">
               <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
-          {!loading && error && (
+          {!loading && error && bookings.length === 0 && (
             <div className="p-8">
               <ErrorState
                 title="Unable to load bookings"
@@ -356,7 +383,7 @@ export default function BookingsDashboardPage() {
           )}
 
           {/* Table Content */}
-          {!loading && !error && bookings.length === 0 ? (
+          {(!loading || bookings.length > 0) && !error && bookings.length === 0 ? (
             <div className="p-12 text-center">
               <EmptyState
                 icon={CalendarCheck}
@@ -370,9 +397,9 @@ export default function BookingsDashboardPage() {
                 onAction={isFilterActive ? handleClearFilters : () => router.push("/bookings/new")}
               />
             </div>
-          ) : !loading && !error && (
+          ) : (!loading || bookings.length > 0) && !error && (
             <div className="overflow-hidden">
-              <div className="hidden lg:block overflow-x-auto max-h-[620px] overflow-y-auto">
+              <div className="hidden lg:block overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">

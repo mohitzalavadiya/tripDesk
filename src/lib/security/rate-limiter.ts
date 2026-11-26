@@ -214,8 +214,9 @@ export async function checkRateLimit(options: RateLimitOptions): Promise<RateLim
       remaining,
       retryAfterSeconds,
     };
-  } catch (error: any) {
-    console.warn(`[RATE_LIMITER] Storage error on key: ${key}:`, error?.message || error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[RATE_LIMITER] Storage error on key: ${key}:`, message);
 
     if (failClosed) {
       return {
@@ -242,6 +243,11 @@ export const RATE_LIMIT_CONFIGS = {
     limit: 5,
     windowMs: 60 * 1000, // 1 minute
     failClosed: true, // Fails closed to protect review mutations against spam/abuse during Redis outages
+  },
+  "public-quotation-mutation": {
+    limit: 10,
+    windowMs: 60 * 1000, // 1 minute
+    failClosed: true, // Fails closed to protect public quotation accept/change-request mutations during Redis outages
   },
   "public-read": {
     limit: 60,

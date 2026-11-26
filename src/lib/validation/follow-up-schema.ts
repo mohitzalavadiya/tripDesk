@@ -1,5 +1,6 @@
-import { EnquiryPriority,FollowUpStatus,FollowUpType } from "@prisma/client";
+import { EnquiryPriority, FollowUpStatus, FollowUpType } from "@prisma/client";
 import { z } from "zod";
+import { isValidOutcomeFormat } from "@/lib/utils/crm-urgency";
 
 /**
  * Zod schema for global follow-up listing and filtering
@@ -14,6 +15,7 @@ export const globalFollowUpQuerySchema = z.object({
   search: z.string().trim().optional(),
   enquiryId: z.string().trim().optional(),
   customerId: z.string().trim().optional(),
+  assignedToUserId: z.string().trim().optional(),
   startDate: z.string().trim().optional(),
   endDate: z.string().trim().optional(),
   sortBy: z.enum(["scheduledAt", "createdAt", "priority", "status"]).default("scheduledAt").optional(),
@@ -21,6 +23,20 @@ export const globalFollowUpQuerySchema = z.object({
 });
 
 export type GlobalFollowUpQueryInput = z.infer<typeof globalFollowUpQuerySchema>;
+
+/**
+ * Zod schema for follow-up telemetry summary filtering
+ */
+export const followUpSummaryQuerySchema = z.object({
+  type: z.nativeEnum(FollowUpType).optional(),
+  priority: z.nativeEnum(EnquiryPriority).optional(),
+  search: z.string().trim().optional(),
+  assignedToUserId: z.string().trim().optional(),
+  startDate: z.string().trim().optional(),
+  endDate: z.string().trim().optional(),
+});
+
+export type FollowUpSummaryQueryInput = z.infer<typeof followUpSummaryQuerySchema>;
 
 /**
  * Zod schema for creating a new follow-up globally
@@ -31,7 +47,16 @@ export const createGlobalFollowUpSchema = z.object({
   priority: z.nativeEnum(EnquiryPriority).default(EnquiryPriority.MEDIUM).optional(),
   status: z.nativeEnum(FollowUpStatus).default(FollowUpStatus.PENDING).optional(),
   scheduledAt: z.coerce.date(),
-  outcome: z.string().trim().max(2000).optional().nullable(),
+  outcome: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine(isValidOutcomeFormat, {
+      message:
+        "Invalid structured outcome code. Supported outcomes are: CONNECTED_MEANINGFUL, QUOTATION_DISCUSSED, REQUIREMENTS_GATHERED, NO_ANSWER, BUSY, WRONG_NUMBER, MESSAGE_LEFT",
+    })
+    .optional()
+    .nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
 });
 
@@ -41,7 +66,16 @@ export type CreateGlobalFollowUpInput = z.infer<typeof createGlobalFollowUpSchem
  * Zod schema for completing a follow-up with outcome and optional next follow-up scheduling
  */
 export const completeFollowUpSchema = z.object({
-  outcome: z.string().trim().max(2000).optional().nullable(),
+  outcome: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine(isValidOutcomeFormat, {
+      message:
+        "Invalid structured outcome code. Supported outcomes are: CONNECTED_MEANINGFUL, QUOTATION_DISCUSSED, REQUIREMENTS_GATHERED, NO_ANSWER, BUSY, WRONG_NUMBER, MESSAGE_LEFT",
+    })
+    .optional()
+    .nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
   scheduleNext: z.boolean().default(false).optional(),
   nextFollowUp: z

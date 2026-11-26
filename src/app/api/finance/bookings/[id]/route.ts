@@ -1,8 +1,11 @@
 import {
-apiSuccess,
-handleApiError,
-requireReadAccess,
+  apiSuccess,
+  ForbiddenError,
+  handleApiError,
+  requireReadAccess,
+  staffPermissionService,
 } from "@/lib/api";
+import { redactStaffFinancials } from "@/lib/auth/permissions";
 import { financeService } from "@/lib/services/finance-service";
 import { NextRequest } from "next/server";
 
@@ -19,6 +22,27 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    if (context.isAgencyStaff) {
+      const [canViewBookings, canViewFinance] = await Promise.all([
+        staffPermissionService.hasStaffPermission(
+          context.dbUser.role,
+          context.agencyId,
+          context.dbUser.id,
+          "BOOKINGS",
+          "VIEW"
+        ),
+        staffPermissionService.hasStaffPermission(
+          context.dbUser.role,
+          context.agencyId,
+          context.dbUser.id,
+          "FINANCE",
+          "VIEW"
+        ),
+      ]);
+      if (!canViewBookings && !canViewFinance) {
+        throw new ForbiddenError("You do not have permission to view booking financial details.");
+      }
+    }
     const { id } = await params;
 
     const breakdown = await financeService.getBookingFinanceBreakdown(
@@ -26,7 +50,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       id
     );
 
-    return apiSuccess(breakdown);
+    return apiSuccess(redactStaffFinancials(breakdown, context.dbUser.role));
   } catch (error) {
     return handleApiError(error);
   }

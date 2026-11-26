@@ -1,12 +1,14 @@
 import {
 apiCreated,
 apiSuccess,
+ForbiddenError,
 handleApiError,
 requireReadAccess,
 requireWriteAccess,
 validateJson,
 } from "@/lib/api";
 import prisma from "@/lib/prisma";
+import { canAccessFinancialMargins } from "@/lib/auth/permissions";
 import { financeService } from "@/lib/services/finance-service";
 import {
 recordSupplierPaymentSchema,
@@ -22,6 +24,9 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    if (!canAccessFinancialMargins(context.dbUser.role)) {
+      throw new ForbiddenError("You do not have permission to view supplier disbursements.");
+    }
     const { searchParams } = request.nextUrl;
     const search = searchParams.get("search") || undefined;
     const supplierId = searchParams.get("supplierId") || undefined;
@@ -68,6 +73,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
+    if (!canAccessFinancialMargins(context.dbUser.role)) {
+      throw new ForbiddenError("You do not have permission to record supplier disbursements.");
+    }
     const body = await validateJson(recordSupplierPaymentSchema, request);
 
     const payment = await financeService.recordSupplierPayment(

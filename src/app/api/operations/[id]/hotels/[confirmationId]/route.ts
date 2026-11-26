@@ -1,9 +1,10 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
-validateJson,
-validateRouteParams,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
+  validateJson,
+  validateRouteParams,
 } from "@/lib/api";
 import { operationsService } from "@/lib/services/operations-service";
 import { updateHotelConfirmationSchema } from "@/lib/validation/operations-schema";
@@ -28,6 +29,7 @@ interface RouteProps {
 export async function PATCH(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "OPERATIONS", "UPDATE");
     const { id, confirmationId } = validateRouteParams(
       paramsSchema,
       await props.params

@@ -1,8 +1,9 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  ForbiddenError,
+  handleApiError,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import { financeService } from "@/lib/services/finance-service";
 import { refundCustomerPaymentSchema } from "@/lib/validation/finance-schema";
@@ -16,11 +17,14 @@ interface RouteParams {
 
 /**
  * POST /api/finance/customer-payments/[id]/refund
- * Process refund on a customer payment.
+ * Process refund on a customer payment. Strictly restricted to Agency Owners.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    if (!context.isAgencyOwner) {
+      throw new ForbiddenError("Processing customer refunds is restricted to Agency Owners.");
+    }
     const { id } = await params;
     const body = await validateJson(refundCustomerPaymentSchema, request);
 

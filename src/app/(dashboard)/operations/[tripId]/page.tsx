@@ -1,5 +1,7 @@
 "use client";
 
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+import { useAuth } from "@/context/auth-context";
 import { EditPayableDialog } from "@/components/finance/edit-payable-dialog";
 import { RecordSupplierPaymentDialog } from "@/components/finance/record-supplier-payment-dialog";
 import { ActivityDialogMode } from "@/components/operations/activity-confirmation-dialog";
@@ -85,6 +87,7 @@ const TRAVELER_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function TripOperationsDetailPage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
   const params = useParams();
   const router = useRouter();
   const tripId = params.tripId as string;
@@ -172,7 +175,7 @@ export default function TripOperationsDetailPage() {
   const [documentsLoading, setDocumentsLoading] = React.useState(false);
 
   // Fetch full operation details
-  const fetchOperationData = React.useCallback(async () => {
+  const fetchOperationData = React.useCallback(async (isSilent = false) => {
     if (!tripId) return;
 
     try {
@@ -210,7 +213,7 @@ export default function TripOperationsDetailPage() {
         setError(err.message || "Failed to load trip operation details.");
       }
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [tripId]);
 
@@ -227,7 +230,7 @@ export default function TripOperationsDetailPage() {
         status: OperationStatus.PREPARING,
       });
       toast.success("Operations initialized for this trip!");
-      await fetchOperationData();
+      await fetchOperationData(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to initialize operations.");
     } finally {
@@ -241,7 +244,7 @@ export default function TripOperationsDetailPage() {
     try {
       await operationsClient.updateOperation(operation.id, { status: newStatus });
       toast.success(`Operation status updated to ${newStatus}`);
-      fetchOperationData();
+      fetchOperationData(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to update operation status.");
     }
@@ -257,7 +260,7 @@ export default function TripOperationsDetailPage() {
       });
       toast.success("Hotel confirmation updated!");
       setEditingHotelId(null);
-      fetchOperationData();
+      fetchOperationData(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to save hotel confirmation");
     }
@@ -271,7 +274,7 @@ export default function TripOperationsDetailPage() {
         status: DispatchStatus.CONFIRMED,
       });
       toast.success(`Dispatch for ${dispatch.tripVehicle?.vehicleName || "Vehicle"} confirmed!`);
-      fetchOperationData();
+      fetchOperationData(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to confirm dispatch");
     }
@@ -284,7 +287,7 @@ export default function TripOperationsDetailPage() {
         status: DispatchStatus.ON_DUTY,
       });
       toast.success(`Chauffeur ${dispatch.driverName || "Driver"} is now On Duty!`);
-      fetchOperationData();
+      fetchOperationData(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to start duty");
     }
@@ -297,7 +300,7 @@ export default function TripOperationsDetailPage() {
         status: DispatchStatus.COMPLETED,
       });
       toast.success(`Transport duty for ${dispatch.tripVehicle?.vehicleName || "Vehicle"} completed!`);
-      fetchOperationData();
+      fetchOperationData(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to complete duty");
     }
@@ -319,7 +322,7 @@ export default function TripOperationsDetailPage() {
               : "[CANCELLED]: Cancelled by operations coordinator.",
           });
           toast.success("Dispatch cancelled successfully.");
-          fetchOperationData();
+          fetchOperationData(true);
         } catch (err: any) {
           toast.error(getErrorMessage(err, "Failed to cancel dispatch. Please try again."));
         }
@@ -335,7 +338,7 @@ export default function TripOperationsDetailPage() {
         status: IssueStatus.IN_PROGRESS,
       });
       toast.success(`Issue "${issue.title}" is now In Progress`);
-      fetchOperationData();
+      fetchOperationData(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to update issue status.");
     }
@@ -358,13 +361,13 @@ export default function TripOperationsDetailPage() {
         status: IssueStatus.OPEN,
       });
       toast.success(`Issue "${issue.title}" reopened`);
-      fetchOperationData();
+      fetchOperationData(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to reopen issue.");
     }
   };
 
-  if (loading) {
+  if (loading && !operation) {
     return (
       <div className="min-h-screen bg-slate-50 p-6 sm:p-8 max-w-[1550px] mx-auto">
         <PageSkeleton />
@@ -418,6 +421,18 @@ export default function TripOperationsDetailPage() {
             </Button>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("OPERATIONS", "view"))) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Operations Workspace"
+          badgeText="Access Restricted"
+          description="You do not have permission to view trip operations. Please contact your Agency Owner to request access."
+        />
       </div>
     );
   }
@@ -1471,7 +1486,7 @@ export default function TripOperationsDetailPage() {
                 {/* 1. Finalization Status & Immutability Lock */}
                 <FinalizationChecklistCard
                   summary={closureSummary}
-                  onSuccess={fetchOperationData}
+                  onSuccess={() => fetchOperationData(true)}
                 />
 
                 {/* 2. Service Delivery & Discrepancies Reconciliation */}
@@ -1480,13 +1495,13 @@ export default function TripOperationsDetailPage() {
                 {/* 3. Post-Tour Quality Review */}
                 <PostTourReviewCard
                   summary={closureSummary}
-                  onSuccess={fetchOperationData}
+                  onSuccess={() => fetchOperationData(true)}
                 />
 
                 {/* 4. Internal Financial & Cost Reconciliation */}
                 <FinancialReconciliationCard
                   summary={closureSummary}
-                  onSuccess={fetchOperationData}
+                  onSuccess={() => fetchOperationData(true)}
                 />
               </>
             ) : (
@@ -1506,7 +1521,7 @@ export default function TripOperationsDetailPage() {
           mode={hotelDialogMode}
           isOpen={!!hotelForDialog}
           onClose={() => setHotelForDialog(null)}
-          onSuccess={fetchOperationData}
+          onSuccess={() => fetchOperationData(true)}
         />
       )}
 
@@ -1518,7 +1533,7 @@ export default function TripOperationsDetailPage() {
           mode={activityDialogMode}
           isOpen={!!selectedActivityForDialog}
           onClose={() => setSelectedActivityForDialog(null)}
-          onSuccess={fetchOperationData}
+          onSuccess={() => fetchOperationData(true)}
         />
       )}
       */}
@@ -1529,7 +1544,7 @@ export default function TripOperationsDetailPage() {
           dispatch={selectedDispatchForDriver}
           isOpen={!!selectedDispatchForDriver}
           onClose={() => setSelectedDispatchForDriver(null)}
-          onSuccess={fetchOperationData}
+          onSuccess={() => fetchOperationData(true)}
         />
       )}
 
@@ -1539,7 +1554,7 @@ export default function TripOperationsDetailPage() {
           dispatch={selectedDispatchForDelay}
           isOpen={!!selectedDispatchForDelay}
           onClose={() => setSelectedDispatchForDelay(null)}
-          onSuccess={fetchOperationData}
+          onSuccess={() => fetchOperationData(true)}
         />
       )}
 
@@ -1550,7 +1565,7 @@ export default function TripOperationsDetailPage() {
           activityConfirmation={selectedActivityForReschedule}
           isOpen={!!selectedActivityForReschedule}
           onClose={() => setSelectedActivityForReschedule(null)}
-          onSuccess={fetchOperationData}
+          onSuccess={() => fetchOperationData(true)}
         />
       )}
       */}
@@ -1559,13 +1574,13 @@ export default function TripOperationsDetailPage() {
         operationId={operation.id}
         isOpen={isIssueModalOpen}
         onClose={() => setIsIssueModalOpen(false)}
-        onSuccess={fetchOperationData}
+        onSuccess={() => fetchOperationData(true)}
       />
 
       <ResolveIssueDialog
         isOpen={!!selectedIssueForResolve}
         onClose={() => setSelectedIssueForResolve(null)}
-        onSuccess={fetchOperationData}
+        onSuccess={() => fetchOperationData(true)}
         operationId={operation.id}
         issue={selectedIssueForResolve}
         targetStatus={issueDialogTargetStatus}
@@ -1575,14 +1590,14 @@ export default function TripOperationsDetailPage() {
         operation={operation}
         isOpen={isCompleteModalOpen}
         onClose={() => setIsCompleteModalOpen(false)}
-        onSuccess={fetchOperationData}
+        onSuccess={() => fetchOperationData(true)}
       />
 
       <CommunicationModal
         operation={operation}
         isOpen={isCommunicationModalOpen}
         onClose={() => setIsCommunicationModalOpen(false)}
-        onSuccess={fetchOperationData}
+        onSuccess={() => fetchOperationData(true)}
       />
 
       {operation && (
@@ -1631,7 +1646,7 @@ export default function TripOperationsDetailPage() {
           payable={selectedPayableForEdit}
           payableId={selectedPayableForEdit.id}
           onSuccess={() => {
-            fetchOperationData();
+            fetchOperationData(true);
           }}
         />
       )}
@@ -1649,7 +1664,7 @@ export default function TripOperationsDetailPage() {
           payable={selectedPayableForPayment}
           isPayableLocked={true}
           onSuccess={() => {
-            fetchOperationData();
+            fetchOperationData(true);
           }}
         />
       )}
@@ -1662,7 +1677,7 @@ export default function TripOperationsDetailPage() {
           tripOperationId={operation.id}
           bookingId={operation.bookingId}
           onSuccess={() => {
-            fetchOperationData();
+            fetchOperationData(true);
           }}
         />
       )}

@@ -2,7 +2,7 @@ import {
 apiSuccess,
 handleApiError,
 requireAgencyOwnerContext,
-requireWriteAccess,
+requireReadAccess,
 validateJson,
 } from "@/lib/api";
 import { taxProfileService } from "@/lib/services/tax-profile-service";
@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireReadAccess();
     const profile = await taxProfileService.getAgencyTaxProfile(context.agencyId);
 
     return apiSuccess(profile);
@@ -32,7 +32,7 @@ export async function GET() {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const context = await requireWriteAccess();
+    const context = await requireAgencyOwnerContext();
     const body = await validateJson(updateAgencyTaxProfileSchema, request);
 
     const updated = await taxProfileService.updateAgencyTaxProfile(

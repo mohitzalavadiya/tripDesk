@@ -1,4 +1,5 @@
-import { apiSuccess,handleApiError,requireReadAccess } from "@/lib/api";
+import { apiSuccess, enforceStaffPermission, handleApiError, requireReadAccess } from "@/lib/api";
+import { redactStaffFinancials } from "@/lib/auth/permissions";
 import { operationsAnalyticsService } from "@/lib/services/operations-analytics-service";
 import { analyticsFilterSchema } from "@/lib/validation/operations-schema";
 import { OperationStatus } from "@prisma/client";
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "OPERATIONS", "VIEW");
     const { searchParams } = new URL(request.url);
 
     const rawFilters = {
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest) {
       startDate: searchParams.get("startDate") || undefined,
       endDate: searchParams.get("endDate") || undefined,
       status: searchParams.get("status") ? (searchParams.get("status") as OperationStatus) : undefined,
-      serviceType: searchParams.get("serviceType") ? (searchParams.get("serviceType") as any) : undefined,
+      serviceType: searchParams.get("serviceType") || undefined,
       supplierId: searchParams.get("supplierId") || undefined,
       search: searchParams.get("search") || undefined,
     };
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
       filters
     );
 
-    return apiSuccess(dashboard);
+    return apiSuccess(redactStaffFinancials(dashboard, context.dbUser.role));
   } catch (error) {
     return handleApiError(error);
   }

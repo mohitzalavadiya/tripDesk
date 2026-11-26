@@ -2,6 +2,7 @@ import {
 apiSuccess,
 handleApiError,
 requireReadAccess,
+  enforceStaffPermission,
 } from "@/lib/api";
 import { travelDocumentService } from "@/lib/services/travel-document-service";
 import { NextRequest } from "next/server";
@@ -19,6 +20,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "DOCUMENTS", "VIEW");
     const { id } = await params;
 
     const document = await travelDocumentService.getDocumentDetails(context.agencyId, id);

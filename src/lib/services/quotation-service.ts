@@ -1,9 +1,11 @@
 import { DEFAULT_QUOTATION_TERMS } from "@/lib/constants/quotation-defaults";
 import { prisma } from "@/lib/prisma";
 import {
-CreatePaymentMilestoneInput,
-GeneratePaymentScheduleInput,
-UpdatePaymentMilestoneInput,
+  CreatePaymentMilestoneInput,
+  GeneratePaymentScheduleInput,
+  ReorderPaymentMilestonesInput,
+  SyncPaymentScheduleInput,
+  UpdatePaymentMilestoneInput,
 } from "@/lib/validation/payment-milestone-schema";
 import {
 CreateProposalItemInput,
@@ -23,6 +25,7 @@ RequestChangesInput,
 UpdateQuotationInput,
 } from "@/lib/validation/quotation-schema";
 import {
+EnquiryStatus,
 GstTreatment,
 Prisma,
 ProposalItemType,
@@ -34,7 +37,7 @@ QuotationStatus,
 TaxMode,
 } from "@prisma/client";
 import crypto from "crypto";
-import "server-only";
+import { agencyAuditService } from "./agency-audit-service";
 import { communicationService } from "./communication-service";
 import { entitlementService } from "./entitlement-service";
 import { internalNotificationService } from "./internal-notification-service";
@@ -137,6 +140,20 @@ export type QuotationWithRelations = Quotation & {
   items: QuotationItem[];
   proposalItems: QuotationProposalItem[];
   paymentMilestones: QuotationPaymentMilestone[];
+  bookings?: Array<{
+    id: string;
+    bookingNumber: string;
+    status: string;
+    createdAt: Date;
+  }>;
+  customerResponseHistory?: Array<{
+    id: string;
+    action: string;
+    version: number;
+    message: string;
+    customerName?: string;
+    createdAt: Date;
+  }>;
 };
 
 export const quotationService = {
@@ -412,6 +429,11 @@ export const quotationService = {
           paymentMilestones: {
             orderBy: { sortOrder: "asc" },
           },
+          bookings: {
+            where: { archivedAt: null },
+            select: { id: true, bookingNumber: true, status: true, createdAt: true },
+            orderBy: { createdAt: "desc" },
+          },
         },
       }),
     ]);
@@ -547,8 +569,17 @@ export const quotationService = {
         paymentMilestones: {
           orderBy: { sortOrder: "asc" },
         },
+        bookings: {
+          where: { archivedAt: null },
+          select: { id: true, bookingNumber: true, status: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
+
+    if (quote) {
+      (quote as any).customerResponseHistory = await this.getCustomerResponseHistory(agencyId, quote.id);
+    }
 
     return quote as QuotationWithRelations | null;
   },
@@ -674,10 +705,22 @@ export const quotationService = {
         paymentMilestones: {
           orderBy: { sortOrder: "asc" },
         },
+        bookings: {
+          where: { archivedAt: null },
+          select: { id: true, bookingNumber: true, status: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 
-    return quotations as QuotationWithRelations[];
+    const quotationsWithHistory = await Promise.all(
+      quotations.map(async (q) => {
+        (q as any).customerResponseHistory = await this.getCustomerResponseHistory(agencyId, q.id);
+        return q;
+      })
+    );
+
+    return quotationsWithHistory as QuotationWithRelations[];
   },
 
   /**
@@ -873,6 +916,23 @@ export const quotationService = {
       },
     });
 
+    // Link to originating Enquiry if an unambiguous active one exists for this trip
+    const linkedEnquiries = await tx.enquiry.findMany({
+      where: {
+        agencyId,
+        convertedTripId: data.tripId,
+        archivedAt: null,
+        status: { notIn: [EnquiryStatus.LOST, EnquiryStatus.CANCELLED] },
+      },
+      select: { id: true, convertedQuotationId: true },
+    });
+    if (linkedEnquiries.length === 1 && !linkedEnquiries[0].convertedQuotationId) {
+      await tx.enquiry.update({
+        where: { id: linkedEnquiries[0].id },
+        data: { convertedQuotationId: quote.id },
+      });
+    }
+
       return quote as QuotationWithRelations;
     });
   },
@@ -942,6 +1002,9 @@ export const quotationService = {
         ...(titleToUpdate !== undefined ? { title: titleToUpdate } : {}),
         ...(data.tier !== undefined ? { tier: data.tier } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(data.status === QuotationStatus.ACCEPTED && !existing.acceptedAt ? { acceptedAt: new Date() } : {}),
+        ...(data.status === QuotationStatus.REJECTED && !existing.rejectedAt ? { rejectedAt: new Date() } : {}),
+        ...(data.status === QuotationStatus.SENT && !existing.sharedAt ? { sharedAt: new Date() } : {}),
         ...(data.validUntil !== undefined ? { validUntil: data.validUntil ? new Date(data.validUntil) : null } : {}),
         ...(data.currency !== undefined ? { currency: data.currency } : {}),
         subtotal: new Prisma.Decimal(subtotal),
@@ -1588,6 +1651,23 @@ export const quotationService = {
           },
         },
       });
+
+      // Link to originating Enquiry if an unambiguous active one exists for this trip
+      const linkedEnquiries = await tx.enquiry.findMany({
+        where: {
+          agencyId,
+          convertedTripId: tripId,
+          archivedAt: null,
+          status: { notIn: [EnquiryStatus.LOST, EnquiryStatus.CANCELLED] },
+        },
+        select: { id: true, convertedQuotationId: true },
+      });
+      if (linkedEnquiries.length === 1 && !linkedEnquiries[0].convertedQuotationId) {
+        await tx.enquiry.update({
+          where: { id: linkedEnquiries[0].id },
+          data: { convertedQuotationId: q.id },
+        });
+      }
 
       return q;
     });
@@ -2386,6 +2466,167 @@ export const quotationService = {
   },
 
   /**
+   * Synchronize full payment schedule (terms + milestones) atomically
+   */
+  async syncPaymentSchedule(
+    agencyId: string,
+    quotationId: string,
+    data: SyncPaymentScheduleInput
+  ): Promise<{ paymentTerms: string | null; milestones: QuotationPaymentMilestone[] }> {
+    const quotation = await prisma.quotation.findFirst({
+      where: { id: quotationId, agencyId, archivedAt: null },
+    });
+
+    if (!quotation) {
+      throw new Error("Quotation not found.");
+    }
+
+    // Validate percentage rules
+    if (data.milestones && data.milestones.length > 0) {
+      let totalPercentage = 0;
+      for (const m of data.milestones) {
+        const pct = m.percentage != null ? Number(m.percentage) : 0;
+        if (pct < 0 || pct > 100) {
+          throw new Error(`Milestone percentage must be between 0% and 100%. Received: ${pct}%`);
+        }
+        totalPercentage += pct;
+      }
+      if (totalPercentage > 100) {
+        throw new Error(`Total milestone percentages cannot exceed 100%. Current total: ${totalPercentage}%`);
+      }
+    }
+
+    const finalAmount = Number(quotation.finalAmount || 0);
+
+    return prisma.$transaction(async (tx) => {
+      // 1. Update payment terms on quotation if provided
+      let currentPaymentTerms = quotation.paymentTerms;
+      if (data.paymentTerms !== undefined) {
+        const updatedQuote = await tx.quotation.update({
+          where: { id: quotationId },
+          data: { paymentTerms: data.paymentTerms },
+          select: { paymentTerms: true },
+        });
+        currentPaymentTerms = updatedQuote.paymentTerms;
+      }
+
+      // 2. Fetch existing milestones for this quotation
+      const existingMilestones = await tx.quotationPaymentMilestone.findMany({
+        where: { quotationId },
+      });
+      const existingIds = new Set(existingMilestones.map((m) => m.id));
+      const incomingIds = new Set(data.milestones.map((m) => m.id).filter(Boolean) as string[]);
+
+      // 3. Delete milestones that were removed
+      const idsToDelete = existingMilestones
+        .filter((m) => !incomingIds.has(m.id))
+        .map((m) => m.id);
+
+      if (idsToDelete.length > 0) {
+        await tx.quotationPaymentMilestone.deleteMany({
+          where: { id: { in: idsToDelete } },
+        });
+      }
+
+      // 4. Update existing or Create new milestones
+      for (let idx = 0; idx < data.milestones.length; idx++) {
+        const m = data.milestones[idx];
+        const pct = m.percentage != null ? Number(m.percentage) : null;
+        let amount = m.amount !== undefined && m.amount !== null ? Number(m.amount) : 0;
+        if (!amount && pct !== null && finalAmount > 0) {
+          amount = Math.round((finalAmount * pct) / 100);
+        }
+
+        const milestoneData = {
+          title: m.title,
+          description: m.description || null,
+          percentage: pct !== null ? new Prisma.Decimal(pct) : null,
+          amount: new Prisma.Decimal(amount),
+          dueDate: m.dueDate ? new Date(m.dueDate) : null,
+          sortOrder: m.sortOrder !== undefined ? m.sortOrder : idx,
+        };
+
+        if (m.id && existingIds.has(m.id)) {
+          await tx.quotationPaymentMilestone.update({
+            where: { id: m.id },
+            data: milestoneData,
+          });
+        } else {
+          await tx.quotationPaymentMilestone.create({
+            data: {
+              quotationId,
+              ...milestoneData,
+            },
+          });
+        }
+      }
+
+      // 5. Return updated milestones sorted by sortOrder asc
+      const updatedMilestones = await tx.quotationPaymentMilestone.findMany({
+        where: { quotationId },
+        orderBy: { sortOrder: "asc" },
+      });
+
+      return {
+        paymentTerms: currentPaymentTerms,
+        milestones: updatedMilestones,
+      };
+    });
+  },
+
+  /**
+   * Batch reorder payment milestones
+   */
+  async reorderPaymentMilestones(
+    agencyId: string,
+    quotationId: string,
+    milestoneIds: string[]
+  ): Promise<QuotationPaymentMilestone[]> {
+    const quotation = await prisma.quotation.findFirst({
+      where: { id: quotationId, agencyId, archivedAt: null },
+    });
+
+    if (!quotation) {
+      throw new Error("Quotation not found.");
+    }
+
+    if (new Set(milestoneIds).size !== milestoneIds.length) {
+      throw new Error("Duplicate milestone IDs are not allowed in reorder list.");
+    }
+
+    const existing = await prisma.quotationPaymentMilestone.findMany({
+      where: { quotationId },
+      select: { id: true },
+    });
+    const validIds = new Set(existing.map((m) => m.id));
+
+    if (milestoneIds.length !== existing.length) {
+      throw new Error("Reorder request must include all milestones belonging to this quotation.");
+    }
+
+    // Verify all IDs belong to this quotation
+    for (const id of milestoneIds) {
+      if (!validIds.has(id)) {
+        throw new Error("One or more milestone IDs do not belong to this quotation.");
+      }
+    }
+
+    await prisma.$transaction(
+      milestoneIds.map((id, index) =>
+        prisma.quotationPaymentMilestone.updateMany({
+          where: { id, quotationId },
+          data: { sortOrder: index },
+        })
+      )
+    );
+
+    return prisma.quotationPaymentMilestone.findMany({
+      where: { quotationId },
+      orderBy: { sortOrder: "asc" },
+    });
+  },
+
+  /**
    * Generate default payment schedule template
    */
   async generateDefaultPaymentSchedule(
@@ -2656,6 +2897,18 @@ export const quotationService = {
 
     const isExpired = quotation.validUntil ? new Date() > new Date(quotation.validUntil) : false;
 
+    // Check if this quotation has been superseded by a newer version
+    const newerVersion = await prisma.quotation.findFirst({
+      where: {
+        agencyId: quotation.agencyId,
+        quotationNumber: quotation.quotationNumber,
+        version: { gt: quotation.version },
+        archivedAt: null,
+      },
+      select: { id: true, version: true, shareToken: true },
+      orderBy: { version: "desc" },
+    });
+
     return {
       id: quotation.id,
       quotationNumber: quotation.quotationNumber,
@@ -2667,6 +2920,9 @@ export const quotationService = {
       currency: quotation.currency,
       validUntil: quotation.validUntil,
       isExpired,
+      isSuperseded: !!newerVersion,
+      latestVersion: newerVersion?.version || null,
+      latestShareToken: newerVersion?.shareToken || null,
       finalAmount: Number(quotation.finalAmount || 0),
       customerMessage: quotation.customerMessage,
       inclusionsIntro: quotation.inclusionsIntro,
@@ -2737,116 +2993,331 @@ export const quotationService = {
   },
 
   /**
-   * Customer Action: Accept Proposal
+   * Retrieves durable customer response and revision request history for a quotation
    */
-  async acceptPublicQuotation(shareToken: string, _input?: AcceptQuotationInput) {
-    const quotation = await prisma.quotation.findFirst({
-      where: { shareToken, archivedAt: null },
-      include: { bookings: true },
-    });
+  async getCustomerResponseHistory(agencyId: string, quotationId: string) {
+    try {
+      if (!(prisma as any).agencyAuditLog?.findMany) {
+        return [];
+      }
+      const logs = await prisma.agencyAuditLog.findMany({
+        where: {
+          agencyId,
+          entityType: "QUOTATION",
+          entityId: quotationId,
+          action: { in: ["QUOTATION_CHANGE_REQUESTED", "QUOTATION_ACCEPTED"] },
+        },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          action: true,
+          actorUserId: true,
+          entityId: true,
+          metadata: true,
+          newState: true,
+          createdAt: true,
+        },
+      });
 
-    if (!quotation) {
-      throw new Error("Quotation proposal not found or link has expired.");
+      return logs.map((log: any) => {
+        const meta = (log.metadata as any) || {};
+        const state = (log.newState as any) || {};
+        return {
+          id: log.id,
+          quotationId: log.entityId || quotationId,
+          action: log.action,
+          version: typeof meta.version === "number" ? meta.version : 1,
+          message: meta.message || state.customerFeedback || meta.customerComments || "",
+          customerName: meta.customerName || "Customer",
+          createdAt: log.createdAt,
+          actorUserId: log.actorUserId,
+        };
+      });
+    } catch {
+      return [];
     }
-
-    if (quotation.validUntil && new Date() > new Date(quotation.validUntil)) {
-      throw new Error("This quotation has expired. Please contact your travel advisor to refresh the proposal.");
-    }
-
-    if (quotation.status === QuotationStatus.REJECTED || quotation.status === QuotationStatus.EXPIRED) {
-      throw new Error(`This quotation has been ${quotation.status.toLowerCase()} and cannot be accepted.`);
-    }
-
-    if (quotation.status === QuotationStatus.ACCEPTED) {
-      return { success: true, message: "Quotation has already been accepted.", quotationId: quotation.id };
-    }
-
-    if (quotation.bookings.length > 0) {
-      throw new Error("This proposal has already been confirmed as a booking.");
-    }
-
-    const updated = await prisma.quotation.update({
-      where: { id: quotation.id },
-      data: {
-        status: QuotationStatus.ACCEPTED,
-        acceptedAt: new Date(),
-      },
-    });
-
-    internalNotificationService.notifyAgencyOwner(quotation.agencyId, {
-      type: "QUOTATION_ACCEPTED",
-      title: "Quotation Accepted",
-      message: `Quotation #${quotation.quotationNumber} (${quotation.title}) was accepted by the client.`,
-      linkUrl: `/trips/${quotation.tripId}/quotation`,
-      metadata: {
-        quotationId: quotation.id,
-        quotationNumber: quotation.quotationNumber,
-        finalAmount: Number(quotation.finalAmount),
-      },
-      idempotencyKey: `quote-accept-${quotation.id}`,
-    }).catch((err) => {
-      console.warn("[QuotationService] Failed to notify agency owner of quotation acceptance:", err);
-    });
-
-    return {
-      success: true,
-      message: "Thank you! You have accepted the quotation proposal. Our travel specialist will be in touch shortly.",
-      quotationId: updated.id,
-      status: updated.status,
-      finalAmount: Number(updated.finalAmount),
-    };
   },
 
   /**
-   * Customer Action: Request Changes / Feedback
+   * Customer Action: Accept Proposal (Concurrency-Safe & Idempotent)
+   */
+  async acceptPublicQuotation(shareToken: string, _input?: AcceptQuotationInput) {
+    return await prisma.$transaction(async (tx) => {
+      // 1. Resolve candidate quotation by token
+      const initialCandidate = await tx.quotation.findFirst({
+        where: { shareToken, archivedAt: null },
+        select: { id: true },
+      });
+
+      if (!initialCandidate) {
+        throw new Error("Quotation proposal not found or link has expired.");
+      }
+
+      // 2. Lock quotation row FOR UPDATE to serialize concurrent responses
+      await tx.$queryRaw`
+        SELECT "id" FROM "quotations" WHERE "id" = ${initialCandidate.id} FOR UPDATE
+      `;
+
+      // 3. Re-read fresh authoritative state under the exclusive row lock
+      const quotation = await tx.quotation.findUnique({
+        where: { id: initialCandidate.id },
+        include: {
+        bookings: {
+          select: { id: true },
+        },
+          customer: {
+            select: { id: true, name: true, email: true, phone: true },
+          },
+        },
+      });
+
+      if (!quotation || quotation.archivedAt) {
+        throw new Error("Quotation proposal not found or link has expired.");
+      }
+
+      // 4. Mandatory version enforcement: customer must acknowledge the exact displayed proposal version
+      if (!_input?.version) {
+        throw new Error("Quotation version is required to confirm proposal acceptance.");
+      }
+      if (_input.version !== quotation.version) {
+        throw new Error(
+          `Quotation version mismatch: displayed proposal (V${_input.version}) does not match server record (V${quotation.version}).`
+        );
+      }
+
+      // 5. Superseded check: verify if a newer version of this quotation exists
+      const newerVersion = await tx.quotation.findFirst({
+        where: {
+          agencyId: quotation.agencyId,
+          quotationNumber: quotation.quotationNumber,
+          version: { gt: quotation.version },
+          archivedAt: null,
+        },
+        select: { id: true, version: true, shareToken: true },
+        orderBy: { version: "desc" },
+      });
+
+      if (newerVersion) {
+        throw new Error(
+          `This quotation proposal (V${quotation.version}) has been superseded by an updated revision (V${newerVersion.version}). Please review the latest proposal before responding.`
+        );
+      }
+
+      if (quotation.validUntil && new Date() > new Date(quotation.validUntil)) {
+        throw new Error("This quotation has expired. Please contact your travel advisor to refresh the proposal.");
+      }
+
+      if (quotation.status === QuotationStatus.REJECTED || quotation.status === QuotationStatus.EXPIRED) {
+        throw new Error(`This quotation has been ${quotation.status.toLowerCase()} and cannot be accepted.`);
+      }
+
+      // 6. Safe idempotency: if already accepted for this exact version, return clean success without duplicate writes/notifications
+      if (quotation.status === QuotationStatus.ACCEPTED) {
+        return { success: true, message: "Quotation has already been accepted.", quotationId: quotation.id };
+      }
+
+      if (quotation.bookings.length > 0) {
+        throw new Error("This proposal has already been confirmed as a booking.");
+      }
+
+      const updated = await tx.quotation.update({
+        where: { id: quotation.id },
+        data: {
+          status: QuotationStatus.ACCEPTED,
+          acceptedAt: new Date(),
+        },
+      });
+
+      // 7. Immutable Agency Audit Log for customer acceptance (external actor)
+      await agencyAuditService.logEvent({
+        agencyId: quotation.agencyId,
+        actorUserId: "CUSTOMER",
+        action: "QUOTATION_ACCEPTED",
+        entityType: "QUOTATION",
+        entityId: quotation.id,
+        previousState: { status: quotation.status },
+        newState: { status: QuotationStatus.ACCEPTED, acceptedAt: updated.acceptedAt },
+        metadata: {
+          quotationNumber: quotation.quotationNumber,
+          version: quotation.version,
+          finalAmount: Number(quotation.finalAmount),
+          currency: quotation.currency,
+          customerName: _input?.customerName || quotation.customer?.name,
+          customerComments: _input?.comments,
+        },
+      }, tx).catch((err) => {
+        console.warn("[QuotationService] Failed to record customer acceptance audit log:", err);
+      });
+
+      internalNotificationService.notifyAgencyOwner(quotation.agencyId, {
+        type: "QUOTATION_ACCEPTED",
+        title: "Quotation Accepted",
+        message: `Quotation #${quotation.quotationNumber} (V${quotation.version} - ${quotation.title}) was accepted by the client.`,
+        linkUrl: `/trips/${quotation.tripId}/quotation`,
+        metadata: {
+          quotationId: quotation.id,
+          quotationNumber: quotation.quotationNumber,
+          version: quotation.version,
+          finalAmount: Number(quotation.finalAmount),
+        },
+        idempotencyKey: `quote-accept-${quotation.id}`,
+      }).catch((err) => {
+        console.warn("[QuotationService] Failed to notify agency owner of quotation acceptance:", err);
+      });
+
+      return {
+        success: true,
+        message: "Thank you! You have accepted the quotation proposal. Our travel specialist will be in touch shortly.",
+        quotationId: updated.id,
+        version: updated.version,
+        status: updated.status,
+        finalAmount: Number(updated.finalAmount),
+      };
+    });
+  },
+
+  /**
+   * Customer Action: Request Changes / Feedback (Concurrency-Safe & State-Enforced)
    */
   async requestChangesPublicQuotation(shareToken: string, input: RequestChangesInput) {
-    const quotation = await prisma.quotation.findFirst({
-      where: { shareToken, archivedAt: null },
-      include: { bookings: true },
+    return await prisma.$transaction(async (tx) => {
+      // 1. Resolve candidate quotation by token
+      const initialCandidate = await tx.quotation.findFirst({
+        where: { shareToken, archivedAt: null },
+        select: { id: true },
+      });
+
+      if (!initialCandidate) {
+        throw new Error("Quotation proposal not found or link has expired.");
+      }
+
+      // 2. Lock quotation row FOR UPDATE to serialize concurrent requests
+      await tx.$queryRaw`
+        SELECT "id" FROM "quotations" WHERE "id" = ${initialCandidate.id} FOR UPDATE
+      `;
+
+      // 3. Re-read fresh authoritative state under the exclusive row lock
+      const quotation = await tx.quotation.findUnique({
+        where: { id: initialCandidate.id },
+        include: {
+        bookings: {
+          select: { id: true },
+        },
+          customer: {
+            select: { id: true, name: true },
+          },
+        },
+      });
+
+      if (!quotation || quotation.archivedAt) {
+        throw new Error("Quotation proposal not found or link has expired.");
+      }
+
+      // 4. Mandatory version enforcement: customer must request changes against displayed version
+      if (!input?.version) {
+        throw new Error("Quotation version is required to submit change requests.");
+      }
+      if (input.version !== quotation.version) {
+        throw new Error(
+          `Quotation version mismatch: displayed proposal (V${input.version}) does not match server record (V${quotation.version}).`
+        );
+      }
+
+      // 5. Superseded check: verify if a newer version of this quotation exists
+      const newerVersion = await tx.quotation.findFirst({
+        where: {
+          agencyId: quotation.agencyId,
+          quotationNumber: quotation.quotationNumber,
+          version: { gt: quotation.version },
+          archivedAt: null,
+        },
+        select: { id: true, version: true, shareToken: true },
+        orderBy: { version: "desc" },
+      });
+
+      if (newerVersion) {
+        throw new Error(
+          `This quotation proposal (V${quotation.version}) has been superseded by an updated revision (V${newerVersion.version}). Please review the latest proposal before responding.`
+        );
+      }
+
+      // 6. Coherent State Invariant: An accepted quotation cannot receive late revision requests
+      if (quotation.status === QuotationStatus.ACCEPTED) {
+        throw new Error(
+          "This quotation proposal has already been accepted and cannot be modified. Please contact your travel advisor directly if you need further adjustments."
+        );
+      }
+
+      if (quotation.status === QuotationStatus.REJECTED || quotation.status === QuotationStatus.EXPIRED) {
+        throw new Error(`This quotation has been ${quotation.status.toLowerCase()} and cannot accept change requests.`);
+      }
+
+      if (quotation.validUntil && new Date() > new Date(quotation.validUntil)) {
+        throw new Error("This quotation has expired. Please contact your travel advisor to refresh the proposal.");
+      }
+
+      if (quotation.bookings.length > 0) {
+        throw new Error("This proposal has already been confirmed as a booking.");
+      }
+
+      const feedbackMsg = (input.message || (input as any).notes || "Revision requested").trim();
+      if (!feedbackMsg) {
+        throw new Error("Please provide feedback or requested changes.");
+      }
+      if (feedbackMsg.length > 5000) {
+        throw new Error("Revision feedback cannot exceed 5000 characters.");
+      }
+
+      const updated = await tx.quotation.update({
+        where: { id: quotation.id },
+        data: {
+          customerFeedback: feedbackMsg,
+          customerFeedbackAt: new Date(),
+        },
+      });
+
+      // 7. Immutable Agency Audit Log for customer revision request (external actor)
+      await agencyAuditService.logEvent({
+        agencyId: quotation.agencyId,
+        actorUserId: "CUSTOMER",
+        action: "QUOTATION_CHANGE_REQUESTED",
+        entityType: "QUOTATION",
+        entityId: quotation.id,
+        previousState: { customerFeedback: quotation.customerFeedback },
+        newState: { customerFeedback: feedbackMsg, customerFeedbackAt: updated.customerFeedbackAt },
+        metadata: {
+          quotationNumber: quotation.quotationNumber,
+          version: quotation.version,
+          message: feedbackMsg,
+          customerFeedback: feedbackMsg,
+          customerName: input.customerName || quotation.customer?.name,
+        },
+      }, tx).catch((err) => {
+        console.warn("[QuotationService] Failed to record customer revision request audit log:", err);
+      });
+
+      internalNotificationService.notifyAgencyOwner(quotation.agencyId, {
+        type: "QUOTATION_CHANGE_REQUESTED",
+        title: "Quotation Revision Requested",
+        message: `Client requested changes for Quotation #${quotation.quotationNumber} (V${quotation.version}): "${feedbackMsg.slice(0, 100)}"`,
+        linkUrl: `/trips/${quotation.tripId}/quotation`,
+        metadata: {
+          quotationId: quotation.id,
+          quotationNumber: quotation.quotationNumber,
+          version: quotation.version,
+          message: feedbackMsg,
+        },
+        idempotencyKey: `quote-changes-${quotation.id}-${Date.now()}`,
+      }).catch((err) => {
+        console.warn("[QuotationService] Failed to notify agency owner of quotation change request:", err);
+      });
+
+      return {
+        success: true,
+        message: "Your feedback and revision request have been submitted to your travel advisor.",
+        quotationId: updated.id,
+        version: updated.version,
+      };
     });
-
-    if (!quotation) {
-      throw new Error("Quotation proposal not found or link has expired.");
-    }
-
-    if (quotation.validUntil && new Date() > new Date(quotation.validUntil)) {
-      throw new Error("This quotation has expired. Please contact your travel advisor to refresh the proposal.");
-    }
-
-    if (quotation.bookings.length > 0) {
-      throw new Error("This proposal has already been confirmed as a booking.");
-    }
-
-    const feedbackMsg = input.message || (input as any).notes || "Revision requested";
-
-    const updated = await prisma.quotation.update({
-      where: { id: quotation.id },
-      data: {
-        customerFeedback: feedbackMsg,
-        customerFeedbackAt: new Date(),
-      },
-    });
-
-    internalNotificationService.notifyAgencyOwner(quotation.agencyId, {
-      type: "QUOTATION_CHANGE_REQUESTED",
-      title: "Quotation Revision Requested",
-      message: `Client requested changes for Quotation #${quotation.quotationNumber}: "${feedbackMsg.slice(0, 100)}"`,
-      linkUrl: `/trips/${quotation.tripId}/quotation`,
-      metadata: {
-        quotationId: quotation.id,
-        quotationNumber: quotation.quotationNumber,
-        message: feedbackMsg,
-      },
-      idempotencyKey: `quote-changes-${quotation.id}-${Date.now()}`,
-    }).catch((err) => {
-      console.warn("[QuotationService] Failed to notify agency owner of quotation change request:", err);
-    });
-
-    return {
-      success: true,
-      message: "Your feedback and revision request have been submitted to your travel advisor.",
-      quotationId: updated.id,
-    };
   },
 };

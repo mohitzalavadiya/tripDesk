@@ -9,6 +9,7 @@ Compass,
 CreditCard,
 FileSpreadsheet,
 FileText,
+Gift,
 Hotel,
 Inbox,
 IndianRupee,
@@ -31,6 +32,8 @@ export interface NavigationItem {
   badge?: string;
   badgeVariant?: "default" | "warning" | "success" | "info" | "travel";
   featureKey?: string;
+  ownerOnly?: boolean;
+  moduleKey?: string;
 }
 
 export interface NavigationSection {
@@ -43,47 +46,66 @@ export interface NavigationSection {
  */
 export const agencyNavigationConfig: NavigationSection[] = [
   {
-    title: "MAIN",
+    title: "CRM & PIPELINE",
     items: [
       {
         label: "Dashboard",
         href: "/dashboard",
         icon: LayoutDashboard,
       },
-    ],
-  },
-  {
-    title: "TRAVEL MANAGEMENT",
-    items: [
       {
         label: "Enquiries",
         href: "/enquiries",
         icon: Inbox,
+        moduleKey: "ENQUIRIES",
+      },
+      {
+        label: "Follow-ups",
+        href: "/follow-ups",
+        icon: Clock,
+        moduleKey: "FOLLOW_UPS",
       },
       {
         label: "Customers",
         href: "/customers",
         icon: Users,
+        moduleKey: "CUSTOMERS",
       },
+      {
+        label: "Customer Insights",
+        href: "/customer-insights",
+        icon: TrendingUp,
+        featureKey: "CUSTOMER_INSIGHTS",
+        moduleKey: "CUSTOMER_INSIGHTS",
+      },
+    ],
+  },
+  {
+    title: "TRIPS & BOOKINGS",
+    items: [
       {
         label: "Trips",
         href: "/trips",
         icon: Compass,
+        moduleKey: "TRIPS",
       },
       {
         label: "Quotations",
         href: "/quotations",
         icon: FileText,
+        moduleKey: "QUOTATIONS",
       },
       {
         label: "Bookings",
         href: "/bookings",
         icon: CalendarCheck,
+        moduleKey: "BOOKINGS",
       },
       {
         label: "Documents",
         href: "/documents",
         icon: FileText,
+        moduleKey: "DOCUMENTS",
       },
       {
         label: "Operations",
@@ -91,6 +113,7 @@ export const agencyNavigationConfig: NavigationSection[] = [
         icon: Activity,
         badge: "Live",
         badgeVariant: "warning",
+        moduleKey: "OPERATIONS",
       },
     ],
   },
@@ -101,69 +124,86 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Destinations",
         href: "/destinations",
         icon: MapPin,
+        moduleKey: "DESTINATIONS",
       },
       {
         label: "Hotels",
         href: "/hotels",
         icon: Hotel,
+        moduleKey: "HOTELS",
       },
       {
         label: "Vehicles",
         href: "/vehicles",
         icon: Car,
+        moduleKey: "VEHICLES",
       },
       {
         label: "Activities",
         href: "/activities",
         icon: Ticket,
+        moduleKey: "ACTIVITIES",
       },
       {
         label: "Rate Sheets",
         href: "/rate-sheets",
         icon: FileSpreadsheet,
+        moduleKey: "RATE_SHEETS",
+      },
+      {
+        label: "Suppliers",
+        href: "/suppliers",
+        icon: Building,
+        moduleKey: "SUPPLIERS",
       },
     ],
   },
   {
-    title: "FINANCE & RETENTION",
+    title: "FINANCE & REPORTING",
     items: [
       {
         label: "Finance",
         href: "/finance",
         icon: IndianRupee,
+        moduleKey: "FINANCE",
+      },
+      {
+        label: "Invoices",
+        href: "/invoices",
+        icon: FileText,
+        moduleKey: "INVOICES",
       },
       {
         label: "Payments",
         href: "/payments",
         icon: CreditCard,
-      },
-      {
-        label: "Follow-ups",
-        href: "/follow-ups",
-        icon: Clock,
+        moduleKey: "PAYMENTS",
       },
       {
         label: "Feedback & Reviews",
         href: "/feedback",
         icon: Star,
         featureKey: "FEEDBACK_REVIEWS",
-      },
-      {
-        label: "Customer Insights",
-        href: "/customer-insights",
-        icon: TrendingUp,
-        featureKey: "CUSTOMER_INSIGHTS",
+        moduleKey: "FEEDBACK",
       },
       {
         label: "Reports & Analytics",
         href: "/reports",
         icon: BarChart,
         featureKey: "REPORTS_ANALYTICS",
+        moduleKey: "REPORTS",
       },
       {
         label: "Communications",
         href: "/communications",
         icon: MessageSquare,
+        moduleKey: "COMMUNICATIONS",
+      },
+      {
+        label: "Referrals & Rewards",
+        href: "/referrals",
+        icon: Gift,
+        moduleKey: "REFERRALS",
       },
     ],
   },
@@ -174,16 +214,19 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Agency Settings",
         href: "/settings",
         icon: Settings,
+        moduleKey: "SETTINGS",
       },
       {
         label: "Subscription",
         href: "/subscription",
         icon: CreditCard,
+        moduleKey: "SUBSCRIPTION",
       },
       {
         label: "Support Chat",
         href: "/support",
         icon: MessageSquare,
+        moduleKey: "SUPPORT_CHAT",
       },
     ],
   },
@@ -220,6 +263,7 @@ export const adminNavigationConfig: NavigationSection[] = [
         label: "Payment Requests",
         href: "/admin/payments",
         icon: IndianRupee,
+        ownerOnly: true,
       },
       {
         label: "Plans & Pricing",

@@ -429,6 +429,7 @@ export const feedbackService = {
               where: { status: { not: "CANCELLED" } },
               orderBy: { createdAt: "desc" },
               take: 1,
+              select: { id: true },
             },
           },
         },

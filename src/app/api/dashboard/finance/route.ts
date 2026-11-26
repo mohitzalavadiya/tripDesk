@@ -1,4 +1,6 @@
+import { ForbiddenError } from "@/lib/api/errors";
 import { requireReadAccess } from "@/lib/api/context";
+import { canAccessFinancialMargins } from "@/lib/auth/permissions";
 import { dashboardService } from "@/lib/services/dashboard-service";
 import { DashboardFilterSchema } from "@/lib/validation/dashboard-schema";
 import { NextRequest,NextResponse } from "next/server";
@@ -6,6 +8,9 @@ import { NextRequest,NextResponse } from "next/server";
 export async function GET(req: NextRequest) {
   try {
     const context = await requireReadAccess();
+    if (!canAccessFinancialMargins(context.dbUser.role)) {
+      throw new ForbiddenError("You do not have permission to view financial dashboard metrics.");
+    }
     const agencyId = context.agencyId;
 
     const { searchParams } = new URL(req.url);
@@ -32,11 +37,12 @@ export async function GET(req: NextRequest) {
         payables,
       },
     });
-  } catch (error: any) {
-    if (error.statusCode) {
+  } catch (error: unknown) {
+    const err = error as { statusCode?: number; message?: string };
+    if (err.statusCode) {
       return NextResponse.json(
-        { success: false, error: error.message },
-        { status: error.statusCode }
+        { success: false, error: err.message },
+        { status: err.statusCode }
       );
     }
     console.error("GET /api/dashboard/finance error:", error);

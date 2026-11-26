@@ -1,4 +1,4 @@
-import { handleApiError,NotFoundError,requireReadAccess } from "@/lib/api";
+import { enforceStaffPermission, handleApiError, NotFoundError, requireReadAccess } from "@/lib/api";
 import { invoicePdfService } from "@/lib/services/invoice-pdf-service";
 import { invoiceService } from "@/lib/services/invoice-service";
 import { NextRequest,NextResponse } from "next/server";
@@ -15,6 +15,7 @@ export async function GET(
 ) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "INVOICES", "VIEW");
     const { id } = await params;
 
     const invoice = await invoiceService.getInvoice(context.agencyId, id);

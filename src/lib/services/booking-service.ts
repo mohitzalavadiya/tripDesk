@@ -18,6 +18,7 @@ ActivityConfirmation,
 Booking,
 BookingPaymentStatus,
 BookingStatus,
+EnquiryStatus,
 HotelConfirmation,
 InvoiceStatus,
 OperationalIssue,
@@ -26,10 +27,12 @@ Payment,
 Prisma,
 QuotationStatus,
 TripStatus,
+UserNotificationType,
 VehicleDispatch,
 } from "@prisma/client";
-import "server-only";
+import { agencyAuditService } from "./agency-audit-service";
 import { entitlementService } from "./entitlement-service";
+import { PAYMENT_SCALAR_SELECT } from "./payment-service";
 
 export type BookingWithRelations = Booking & {
   customer: {
@@ -118,7 +121,52 @@ export type BookingWithRelations = Booking & {
     events: OperationEvent[];
   } | null;
   operationalReadiness?: ReadinessSummary | null;
+  attributionDiagnostic?: {
+    isAmbiguous: boolean;
+    candidateEnquiries: string[];
+    message: string;
+  } | null;
 };
+
+/**
+ * Authoritative scalar fields that physically exist on the PostgreSQL 'bookings' table (33 columns).
+ * Excludes 'enquiryId' which is defined in prisma/schema.prisma but not yet migrated in physical database.
+ */
+export const BOOKING_SCALAR_SELECT = {
+  id: true,
+  agencyId: true,
+  tripId: true,
+  customerId: true,
+  quotationId: true,
+  packageOptionName: true,
+  bookingNumber: true,
+  status: true,
+  paymentStatus: true,
+  bookingDate: true,
+  travelStartDate: true,
+  travelEndDate: true,
+  currency: true,
+  totalAmount: true,
+  paidAmount: true,
+  balanceAmount: true,
+  taxableAmount: true,
+  taxAmount: true,
+  taxRate: true,
+  taxMode: true,
+  gstTreatment: true,
+  cgstAmount: true,
+  sgstAmount: true,
+  igstAmount: true,
+  notes: true,
+  internalNotes: true,
+  cancellationReason: true,
+  confirmedAt: true,
+  completedAt: true,
+  cancelledAt: true,
+  archivedAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 export const bookingService = {
   /**
@@ -195,7 +243,8 @@ export const bookingService = {
         skip,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
-        include: {
+        select: {
+          ...BOOKING_SCALAR_SELECT,
           customer: {
             select: { id: true, name: true, phone: true, email: true },
           },
@@ -223,13 +272,19 @@ export const bookingService = {
           payments: {
             where: { archivedAt: null },
             orderBy: { paymentDate: "desc" },
+            select: PAYMENT_SCALAR_SELECT,
           },
         },
       }),
     ]);
 
+    const sanitizedData = data.map((b) => ({
+      ...b,
+      enquiryId: (b as any).enquiryId ?? null,
+    })) as unknown as BookingWithRelations[];
+
     return {
-      data: data as BookingWithRelations[],
+      data: sanitizedData,
       meta: {
         total,
         page,
@@ -245,7 +300,8 @@ export const bookingService = {
   async getBooking(agencyId: string, bookingId: string): Promise<BookingWithRelations | null> {
     const booking = await prisma.booking.findFirst({
       where: { id: bookingId, agencyId, archivedAt: null },
-      include: {
+      select: {
+        ...BOOKING_SCALAR_SELECT,
         customer: {
           select: { id: true, name: true, phone: true, email: true },
         },
@@ -257,7 +313,18 @@ export const bookingService = {
             startDate: true,
             endDate: true,
             status: true,
-            travelers: { select: { id: true, name: true, type: true } },
+            travelers: {
+              select: {
+                id: true,
+                name: true,
+                type: true,
+                isPrimary: true,
+                phone: true,
+                email: true,
+                specialRequirements: true,
+                notes: true,
+              },
+            },
             tripHotels: {
               include: { hotel: { select: { id: true, name: true, city: true, category: true } } },
               orderBy: { checkIn: "asc" },
@@ -285,6 +352,7 @@ export const bookingService = {
         payments: {
           where: { archivedAt: null },
           orderBy: { paymentDate: "desc" },
+          select: PAYMENT_SCALAR_SELECT,
         },
         invoices: {
           where: { archivedAt: null },
@@ -353,17 +421,34 @@ export const bookingService = {
       }
     }
 
+    // Check if an ambiguous attribution event was recorded on this booking's trip operation
+    let attributionDiagnostic: { isAmbiguous: boolean; candidateEnquiries: string[]; message: string } | null = null;
+    const ambiguousEvent = booking.tripOperation?.events?.find(
+      (ev) => ev.eventType === "ENQUIRY_ATTRIBUTION_AMBIGUOUS"
+    );
+    if (ambiguousEvent) {
+      const meta = (ambiguousEvent.metadata as any) || {};
+      const candidateList: string[] = Array.isArray(meta.candidateEnquiries) ? meta.candidateEnquiries : [];
+      attributionDiagnostic = {
+        isAmbiguous: true,
+        candidateEnquiries: candidateList,
+        message: ambiguousEvent.description,
+      };
+    }
+
     return {
       ...booking,
+      enquiryId: (booking as any).enquiryId ?? null,
       operationalReadiness,
-    } as BookingWithRelations;
+      attributionDiagnostic,
+    } as unknown as BookingWithRelations;
   },
 
   /**
    * Create a new booking
    */
   async createBooking(agencyId: string, data: CreateBookingInput): Promise<BookingWithRelations> {
-    const { createdBooking, tripTitle } = await prisma.$transaction(async (tx) => {
+    const { createdBooking, tripTitle, isAmbiguousEnquiryMatch, candidateEnquiryNumbers } = await prisma.$transaction(async (tx) => {
       // 1. Lock authoritative agency subscription FOR UPDATE
       await entitlementService.lockAgencySubscription(agencyId, tx);
 
@@ -405,6 +490,13 @@ export const bookingService = {
         if (!quotation) {
           throw new Error("Quotation not found or does not belong to this agency.");
         }
+        const existingQuoteBooking = await tx.booking.findFirst({
+          where: { agencyId, quotationId: data.quotationId, archivedAt: null },
+          select: { id: true, bookingNumber: true },
+        });
+        if (existingQuoteBooking) {
+          throw new Error(`Quotation already has an active booking (${existingQuoteBooking.bookingNumber}).`);
+        }
         quoteTax = {
           taxableAmount: quotation.taxableAmount !== null ? new Prisma.Decimal(quotation.taxableAmount) : null,
           taxAmount: quotation.taxAmount !== null ? new Prisma.Decimal(quotation.taxAmount) : null,
@@ -430,6 +522,57 @@ export const bookingService = {
         paymentStatus = BookingPaymentStatus.PARTIALLY_PAID;
       }
 
+      // Resolve originating enquiry for this booking strictly through authoritative trip or quotation linkage.
+      // Customer-only matching, destination/date inference, or arbitrary client-supplied IDs are prohibited.
+      let originatingEnquiryId: string | null = null;
+      let isAmbiguousEnquiryMatch = false;
+      let candidateEnquiryNumbers: string[] = [];
+
+      if (data.enquiryId) {
+        const candidateEnquiries = await tx.enquiry.findMany({
+          where: {
+            id: data.enquiryId,
+            agencyId,
+            archivedAt: null,
+            status: { notIn: [EnquiryStatus.CONVERTED, EnquiryStatus.LOST, EnquiryStatus.CANCELLED] },
+            OR: [
+              { convertedTripId: data.tripId },
+              ...(data.quotationId ? [{ convertedQuotationId: data.quotationId }] : []),
+            ],
+          },
+          select: { id: true, enquiryNumber: true },
+        });
+        if (candidateEnquiries.length === 1) {
+          originatingEnquiryId = candidateEnquiries[0].id;
+        } else if (candidateEnquiries.length > 1) {
+          isAmbiguousEnquiryMatch = true;
+          candidateEnquiryNumbers = candidateEnquiries.map((e) => e.enquiryNumber);
+        }
+      }
+      if (!originatingEnquiryId && !isAmbiguousEnquiryMatch) {
+        const tripEnquiries = await tx.enquiry.findMany({
+          where: {
+            agencyId,
+            archivedAt: null,
+            status: { notIn: [EnquiryStatus.CONVERTED, EnquiryStatus.LOST, EnquiryStatus.CANCELLED] },
+            OR: [
+              { convertedTripId: data.tripId },
+              ...(data.quotationId ? [{ convertedQuotationId: data.quotationId }] : []),
+            ],
+          },
+          select: { id: true, enquiryNumber: true },
+        });
+        // Require unambiguous 1-to-1 linkage: if 0 or multiple matching enquiries exist, do not convert
+        if (tripEnquiries.length === 1) {
+          originatingEnquiryId = tripEnquiries[0].id;
+        } else if (tripEnquiries.length > 1) {
+          isAmbiguousEnquiryMatch = true;
+          candidateEnquiryNumbers = tripEnquiries.map((e) => e.enquiryNumber);
+        }
+      }
+
+      const bookingStatus = data.status || BookingStatus.CONFIRMED;
+
       const b = await tx.booking.create({
         data: {
           agencyId,
@@ -438,7 +581,7 @@ export const bookingService = {
           quotationId: data.quotationId || null,
           packageOptionName: quoteTax?.packageOptionName || null,
           bookingNumber,
-          status: data.status || BookingStatus.CONFIRMED,
+          status: bookingStatus,
           paymentStatus,
           bookingDate: data.bookingDate ? new Date(data.bookingDate) : new Date(),
           travelStartDate: data.travelStartDate ? new Date(data.travelStartDate) : trip.startDate,
@@ -458,6 +601,7 @@ export const bookingService = {
           notes: data.notes,
           internalNotes: data.internalNotes,
         },
+        select: BOOKING_SCALAR_SELECT,
       });
 
       // Update Trip status to BOOKED if not already in execution
@@ -465,6 +609,22 @@ export const bookingService = {
         await tx.trip.update({
           where: { id: data.tripId },
           data: { status: TripStatus.BOOKED },
+        });
+      }
+
+      // If booking is confirmed and has an unambiguous originating enquiry, mark enquiry CONVERTED (Won)
+      if (bookingStatus === BookingStatus.CONFIRMED && originatingEnquiryId) {
+        await tx.enquiry.updateMany({
+          where: {
+            id: originatingEnquiryId,
+            agencyId,
+            status: { notIn: [EnquiryStatus.CONVERTED, EnquiryStatus.LOST, EnquiryStatus.CANCELLED] },
+          },
+          data: {
+            status: EnquiryStatus.CONVERTED,
+            closedAt: new Date(),
+            convertedQuotationId: data.quotationId || undefined,
+          },
         });
       }
 
@@ -499,10 +659,16 @@ export const bookingService = {
             status: "COMPLETED",
             notes: "Initial advance logged on booking creation.",
           },
+          select: { id: true },
         });
       }
 
-      return { createdBooking: b, tripTitle: trip.title };
+      return {
+        createdBooking: b,
+        tripTitle: trip.title,
+        isAmbiguousEnquiryMatch,
+        candidateEnquiryNumbers,
+      };
     });
 
     // Auto-initialize operations and dispatch notifications outside transaction
@@ -516,6 +682,34 @@ export const bookingService = {
         eventType: "BOOKING_CREATED",
         description: `Booking ${createdBooking.bookingNumber} created for trip ${tripTitle}. Initial status: ${createdBooking.status}.`,
       });
+
+      if (isAmbiguousEnquiryMatch && candidateEnquiryNumbers.length > 0) {
+        await operationsService.logEvent(agencyId, operation.id, {
+          eventType: "ENQUIRY_ATTRIBUTION_AMBIGUOUS",
+          description: `Booking ${createdBooking.bookingNumber} confirmed, but multiple eligible originating enquiries exist (${candidateEnquiryNumbers.join(", ")}). Automatic conversion was withheld; manual CRM attribution is required.`,
+          metadata: {
+            bookingId: createdBooking.id,
+            bookingNumber: createdBooking.bookingNumber,
+            candidateEnquiries: candidateEnquiryNumbers,
+            requiresManualResolution: true,
+          },
+        });
+
+        internalNotificationService.notifyAgencyOwner(agencyId, {
+          type: UserNotificationType.BOOKING_CREATED,
+          title: "Ambiguous Enquiry Attribution",
+          message: `Booking #${createdBooking.bookingNumber} was confirmed, but multiple eligible enquiries were found (${candidateEnquiryNumbers.join(", ")}). Automatic conversion was withheld; please resolve manually in CRM.`,
+          linkUrl: `/enquiries?search=${encodeURIComponent(candidateEnquiryNumbers[0])}`,
+          metadata: {
+            bookingId: createdBooking.id,
+            bookingNumber: createdBooking.bookingNumber,
+            candidateEnquiries: candidateEnquiryNumbers,
+          },
+          idempotencyKey: `ambiguous-attribution-${createdBooking.id}`,
+        }).catch((err) => {
+          console.warn("[BookingService] Failed to notify agency owner of ambiguous attribution:", err);
+        });
+      }
 
       await customerNotificationService.notifyTripStatusChange(
         agencyId,
@@ -572,9 +766,21 @@ export const bookingService = {
       throw new Error("Quotation not found or does not belong to this agency.");
     }
 
+    // Eligibility: Must be explicitly ACCEPTED by customer with recorded timestamp
+    if (quotation.status !== QuotationStatus.ACCEPTED) {
+      throw new Error(
+        `Only accepted quotations can be converted to a booking. Current quotation status is ${quotation.status}.`
+      );
+    }
+
+    if (!quotation.acceptedAt) {
+      throw new Error("Quotation must have a recorded customer acceptance timestamp before conversion.");
+    }
+
     // Idempotent duplicate check: If booking already exists, return it cleanly
     const existingBooking = await prisma.booking.findFirst({
       where: { agencyId, quotationId, archivedAt: null },
+      select: { id: true },
     });
     if (existingBooking) {
       // Ensure operations are linked
@@ -589,7 +795,6 @@ export const bookingService = {
       return (await this.getBooking(agencyId, existingBooking.id))!;
     }
 
-    const bookingNumber = await this.generateNextBookingNumber(agencyId);
     const totalAmount = Number(quotation.finalAmount);
     const packageOptionName = quotation.tier || null;
 
@@ -603,23 +808,84 @@ export const bookingService = {
     const sgstAmount = quotation.sgstAmount ?? null;
     const igstAmount = quotation.igstAmount ?? null;
 
-    const booking = await prisma.$transaction(async (tx) => {
+    const txResult = await prisma.$transaction(async (tx) => {
       // 1. Lock authoritative agency subscription FOR UPDATE
       await entitlementService.lockAgencySubscription(agencyId, tx);
+
+      // Lock the quotation row FOR UPDATE to serialize concurrent booking conversions
+      await tx.$queryRaw`
+        SELECT "id" FROM "quotations"
+        WHERE "id" = ${quotationId} AND "agencyId" = ${agencyId} AND "archivedAt" IS NULL
+        FOR UPDATE
+      `;
+
+      // Check inside transaction if a booking was created concurrently
+      const concurrentBooking = await tx.booking.findFirst({
+        where: { agencyId, quotationId, archivedAt: null },
+        select: { id: true, bookingNumber: true },
+      });
+      if (concurrentBooking) {
+        return { ...concurrentBooking, isExisting: true } as any;
+      }
 
       // 2. Validate quota for "BOOKINGS" resource inside transaction
       await entitlementService.checkQuota(agencyId, "BOOKINGS", tx);
 
-      // 3. Create Booking with full Tax V1 snapshot
+      // Resolve originating enquiry if an unambiguous link exists for the trip or quotation
+      // 1. Prioritize explicit direct quotation linkage (convertedQuotationId)
+      const directQuoteEnquiries = await tx.enquiry.findMany({
+        where: {
+          agencyId,
+          archivedAt: null,
+          convertedQuotationId: quotation.id,
+          status: { notIn: [EnquiryStatus.CONVERTED, EnquiryStatus.LOST, EnquiryStatus.CANCELLED] },
+        },
+        select: { id: true, enquiryNumber: true },
+      });
+
+      let originatingEnquiry: { id: string; enquiryNumber: string } | null = null;
+      let isAmbiguousEnquiryMatch = false;
+      let candidateEnquiryNumbers: string[] = [];
+
+      if (directQuoteEnquiries.length === 1) {
+        originatingEnquiry = directQuoteEnquiries[0];
+      } else if (directQuoteEnquiries.length > 1) {
+        isAmbiguousEnquiryMatch = true;
+        candidateEnquiryNumbers = directQuoteEnquiries.map((e) => e.enquiryNumber);
+      } else {
+        // 2. Fall back to unambiguous 1-to-1 trip-level enquiries
+        const tripEnquiries = await tx.enquiry.findMany({
+          where: {
+            agencyId,
+            archivedAt: null,
+            convertedTripId: quotation.tripId,
+            status: { notIn: [EnquiryStatus.CONVERTED, EnquiryStatus.LOST, EnquiryStatus.CANCELLED] },
+          },
+          select: { id: true, enquiryNumber: true },
+        });
+
+        if (tripEnquiries.length === 1) {
+          originatingEnquiry = tripEnquiries[0];
+        } else if (tripEnquiries.length > 1) {
+          isAmbiguousEnquiryMatch = true;
+          candidateEnquiryNumbers = tripEnquiries.map((e) => e.enquiryNumber);
+        }
+      }
+
+      // 3. Generate sequential booking number inside transaction under agency subscription lock
+      const bookingNumber = await this.generateNextBookingNumber(agencyId, tx);
+
+      // 4. Create Booking with full Tax V1 snapshot and DRAFT status (Quotation acceptance is NOT booking confirmation)
       const b = await tx.booking.create({
         data: {
           agencyId,
           tripId: quotation.tripId,
           customerId: quotation.customerId,
           quotationId: quotation.id,
+          enquiryId: originatingEnquiry?.id || null,
           packageOptionName,
           bookingNumber,
-          status: BookingStatus.CONFIRMED,
+          status: BookingStatus.DRAFT,
           paymentStatus: BookingPaymentStatus.UNPAID,
           bookingDate: new Date(),
           travelStartDate: quotation.trip.startDate,
@@ -642,22 +908,12 @@ export const bookingService = {
               ? `Converted from Proposal ${quotation.quotationNumber} (${packageOptionName}).`
               : `Converted from Proposal ${quotation.quotationNumber}.`),
           internalNotes: data?.internalNotes,
-          confirmedAt: new Date(),
+          confirmedAt: null,
         },
+        select: BOOKING_SCALAR_SELECT,
       });
 
-      // 2. Mark Quotation as ACCEPTED if not already
-      if (quotation.status !== QuotationStatus.ACCEPTED) {
-        await tx.quotation.update({
-          where: { id: quotationId },
-          data: {
-            status: QuotationStatus.ACCEPTED,
-            acceptedAt: quotation.acceptedAt || new Date(),
-          },
-        });
-      }
-
-      // 3. Update Trip status to BOOKED
+      // 5. Update Trip status to BOOKED
       await tx.trip.update({
         where: { id: quotation.tripId },
         data: {
@@ -665,8 +921,32 @@ export const bookingService = {
         },
       });
 
-      return b;
+      // Note: CRM Pass A invariant — Originating enquiry is linked via enquiryId but remains in
+      // active negotiation until the booking is explicitly confirmed by agency staff/owner.
+
+      return {
+        booking: b,
+        isAmbiguousEnquiryMatch,
+        candidateEnquiryNumbers,
+      };
     });
+
+    const isExisting = (txResult as any).isExisting;
+    const booking = isExisting ? (txResult as any) : txResult.booking;
+    const isAmbiguousEnquiryMatch = !isExisting && txResult.isAmbiguousEnquiryMatch;
+    const candidateEnquiryNumbers = !isExisting ? (txResult.candidateEnquiryNumbers || []) : [];
+
+    if ((booking as any).isExisting) {
+      try {
+        await operationsService.initializeOperation(agencyId, {
+          tripId: quotation.tripId,
+          bookingId: booking.id,
+        });
+      } catch {
+        // Safe fallback
+      }
+      return (await this.getBooking(agencyId, booking.id))!;
+    }
 
     // 4. Initialize Operations & Timeline Events outside tx
     try {
@@ -677,23 +957,69 @@ export const bookingService = {
 
       await operationsService.logEvent(agencyId, operation.id, {
         eventType: "BOOKING_CREATED",
-        description: `Booking ${booking.bookingNumber} confirmed from proposal ${quotation.quotationNumber} (${packageOptionName || "Standard"}).`,
+        description: `Booking ${booking.bookingNumber} draft created from accepted proposal ${quotation.quotationNumber} (${packageOptionName || "Standard"}).`,
       });
 
-      await customerNotificationService.notifyTripStatusChange(
+      // Immutable Agency Audit Log for booking conversion
+      await agencyAuditService.logEvent({
         agencyId,
-        quotation.tripId,
-        "CONFIRMED"
-      );
-
-      communicationService.notifyBookingConfirmed(agencyId, booking.id).catch((err) => {
-        console.warn("[Communication Non-blocking Notice] Failed to notify booking confirmed:", err?.message || err);
+        actorUserId: (data as any)?.userId || "AGENCY_USER",
+        action: "QUOTATION_CONVERTED_TO_BOOKING",
+        entityType: "BOOKING",
+        entityId: booking.id,
+        newState: {
+          bookingNumber: booking.bookingNumber,
+          quotationId: quotation.id,
+          quotationNumber: quotation.quotationNumber,
+          version: quotation.version,
+          totalAmount: Number(booking.totalAmount),
+          status: booking.status,
+        },
+        metadata: {
+          quotationId: quotation.id,
+          quotationNumber: quotation.quotationNumber,
+          version: quotation.version,
+          bookingNumber: booking.bookingNumber,
+          tripId: quotation.tripId,
+          customerId: quotation.customerId,
+        },
+      }).catch((err) => {
+        console.warn("[BookingService] Failed to record quotation conversion audit log:", err);
       });
+
+      if (isAmbiguousEnquiryMatch && candidateEnquiryNumbers.length > 0) {
+        await operationsService.logEvent(agencyId, operation.id, {
+          eventType: "ENQUIRY_ATTRIBUTION_AMBIGUOUS",
+          description: `Booking ${booking.bookingNumber} created, but multiple eligible originating enquiries exist (${candidateEnquiryNumbers.join(", ")}). Automatic conversion was withheld; manual CRM attribution is required upon confirmation.`,
+          metadata: {
+            bookingId: booking.id,
+            bookingNumber: booking.bookingNumber,
+            candidateEnquiries: candidateEnquiryNumbers,
+            requiresManualResolution: true,
+          },
+        });
+
+        internalNotificationService.notifyAgencyOwner(agencyId, {
+          type: UserNotificationType.BOOKING_CREATED,
+          title: "Ambiguous Enquiry Attribution",
+          message: `Booking #${booking.bookingNumber} was created from Quotation #${quotation.quotationNumber}, but multiple eligible enquiries were found (${candidateEnquiryNumbers.join(", ")}). Please review in CRM before confirming.`,
+          linkUrl: `/enquiries?search=${encodeURIComponent(candidateEnquiryNumbers[0])}`,
+          metadata: {
+            bookingId: booking.id,
+            bookingNumber: booking.bookingNumber,
+            quotationId: quotation.id,
+            candidateEnquiries: candidateEnquiryNumbers,
+          },
+          idempotencyKey: `ambiguous-attribution-${booking.id}`,
+        }).catch((err) => {
+          console.warn("[BookingService] Failed to notify agency owner of ambiguous attribution:", err);
+        });
+      }
 
       internalNotificationService.notifyAgencyOwner(agencyId, {
         type: "BOOKING_CREATED",
         title: "Quotation Converted to Booking",
-        message: `Booking #${booking.bookingNumber} created from Quotation #${quotation.quotationNumber}.`,
+        message: `Booking #${booking.bookingNumber} draft created from Quotation #${quotation.quotationNumber}. Pending agency confirmation.`,
         linkUrl: `/bookings/${booking.id}`,
         metadata: {
           bookingId: booking.id,
@@ -728,9 +1054,16 @@ export const bookingService = {
 
     const booking = await db.booking.findUniqueOrThrow({
       where: { id: bookingId },
-      include: {
+      select: {
+        id: true,
+        totalAmount: true,
         payments: {
-          where: { archivedAt: null, status: "COMPLETED" },
+          where: { archivedAt: null, status: { in: ["COMPLETED", "REFUNDED"] } },
+          select: {
+            id: true,
+            amount: true,
+            refundedAmount: true,
+          },
         },
       },
     });
@@ -759,6 +1092,7 @@ export const bookingService = {
         balanceAmount: new Prisma.Decimal(balance),
         paymentStatus,
       },
+      select: BOOKING_SCALAR_SELECT,
     });
 
     // Synchronize active (non-cancelled) Invoice if present
@@ -771,7 +1105,7 @@ export const bookingService = {
     });
 
     if (activeInvoice) {
-      const invTotal = total;
+      const invTotal = Number(activeInvoice.totalAmount);
       const invBalance = Math.max(0, Math.round((invTotal - paid) * 100) / 100);
       let newInvStatus: InvoiceStatus = InvoiceStatus.ISSUED;
       if (invBalance <= 0 && invTotal > 0) {
@@ -783,8 +1117,6 @@ export const bookingService = {
       await db.invoice.update({
         where: { id: activeInvoice.id },
         data: {
-          totalAmount: new Prisma.Decimal(invTotal),
-          subtotal: new Prisma.Decimal(invTotal),
           paidAmount: new Prisma.Decimal(paid),
           balanceAmount: new Prisma.Decimal(invBalance),
           status: newInvStatus,
@@ -792,7 +1124,10 @@ export const bookingService = {
       });
     }
 
-    return updatedBooking;
+    return {
+      ...updatedBooking,
+      enquiryId: null,
+    } as Booking;
   },
 
   /**
@@ -805,7 +1140,8 @@ export const bookingService = {
   ): Promise<BookingWithRelations> {
     const booking = await prisma.booking.findFirst({
       where: { id: bookingId, agencyId, archivedAt: null },
-      include: {
+      select: {
+        ...BOOKING_SCALAR_SELECT,
         tripOperation: {
           include: {
             events: {
@@ -867,6 +1203,11 @@ export const bookingService = {
     if (data.totalAmount !== undefined) {
       const newTotal = Number(data.totalAmount);
       const paid = Number(booking.paidAmount);
+      if (newTotal < paid) {
+        throw new Error(
+          `Cannot reduce booking total (₹${newTotal}) below verified received payments (₹${paid}). Price reductions below paid amounts require an approved refund procedure.`
+        );
+      }
       const newBalance = Math.max(0, Math.round((newTotal - paid) * 100) / 100);
 
       updateData.totalAmount = new Prisma.Decimal(newTotal);
@@ -881,49 +1222,153 @@ export const bookingService = {
       }
     }
 
-    await prisma.booking.update({
-      where: { id: bookingId },
-      data: updateData,
-    });
 
-    // Synchronize active invoice if total amount changed or booking cancelled
-    const activeInvoice = await prisma.invoice.findFirst({
-      where: {
-        bookingId,
-        status: { not: InvoiceStatus.CANCELLED },
-        archivedAt: null,
-      },
-    });
+    // Execute booking update, enquiry conversion, and invoice sync in ONE atomic transaction
+    const txResult = await prisma.$transaction(async (tx) => {
+      let isAmbiguousEnquiryMatch = false;
+      let candidateEnquiryNumbers: string[] = [];
 
-    if (activeInvoice) {
-      if (data.status === BookingStatus.CANCELLED) {
-        await prisma.invoice.update({
-          where: { id: activeInvoice.id },
-          data: {
-            status: InvoiceStatus.CANCELLED,
-            cancelledAt: new Date(),
-            cancellationReason: data.cancellationReason || "Booking was cancelled.",
-          },
-        });
-      } else if (data.totalAmount !== undefined) {
-        const newTotal = Number(data.totalAmount);
-        const paid = Number(activeInvoice.paidAmount);
-        const newBalance = Math.max(0, Math.round((newTotal - paid) * 100) / 100);
-        let newStatus: InvoiceStatus = InvoiceStatus.ISSUED;
-        if (newBalance <= 0 && newTotal > 0) {
-          newStatus = InvoiceStatus.PAID;
-        } else if (paid > 0) {
-          newStatus = InvoiceStatus.PARTIALLY_PAID;
+      // 1. If transitioning to CONFIRMED, mark linked enquiry as CONVERTED inside transaction
+      if (data.status === BookingStatus.CONFIRMED && !booking.confirmedAt) {
+        let linkedEnquiryId = (booking as any).enquiryId;
+
+        if (linkedEnquiryId) {
+          // Verify that pre-recorded enquiryId authoritatively links to this booking's trip or quotation within the agency
+          const verified = await tx.enquiry.findFirst({
+            where: {
+              id: linkedEnquiryId,
+              agencyId,
+              archivedAt: null,
+              OR: [
+                { convertedTripId: booking.tripId },
+                ...(booking.quotationId ? [{ convertedQuotationId: booking.quotationId }] : []),
+              ],
+            },
+            select: { id: true, enquiryNumber: true },
+          });
+          if (!verified) {
+            linkedEnquiryId = null;
+          }
         }
+        if (!linkedEnquiryId) {
+          // 1. Prioritize explicit direct quotation linkage if booking has quotationId
+          if (booking.quotationId) {
+            const directQuoteEnquiries = await tx.enquiry.findMany({
+              where: {
+                agencyId,
+                archivedAt: null,
+                convertedQuotationId: booking.quotationId,
+                status: { notIn: [EnquiryStatus.CONVERTED, EnquiryStatus.LOST, EnquiryStatus.CANCELLED] },
+              },
+              select: { id: true, enquiryNumber: true },
+            });
+            if (directQuoteEnquiries.length === 1) {
+              linkedEnquiryId = directQuoteEnquiries[0].id;
+            } else if (directQuoteEnquiries.length > 1) {
+              isAmbiguousEnquiryMatch = true;
+              candidateEnquiryNumbers = directQuoteEnquiries.map((e) => e.enquiryNumber);
+            }
+          }
 
-        await prisma.invoice.update({
-          where: { id: activeInvoice.id },
-          data: {
-            totalAmount: new Prisma.Decimal(newTotal),
-            balanceAmount: new Prisma.Decimal(newBalance),
-            status: newStatus,
+          // 2. Fall back to unambiguous 1-to-1 trip-level enquiries
+          if (!linkedEnquiryId && !isAmbiguousEnquiryMatch) {
+            const tripEnquiries = await tx.enquiry.findMany({
+              where: {
+                agencyId,
+                archivedAt: null,
+                convertedTripId: booking.tripId,
+                status: { notIn: [EnquiryStatus.CONVERTED, EnquiryStatus.LOST, EnquiryStatus.CANCELLED] },
+              },
+              select: { id: true, enquiryNumber: true },
+            });
+            if (tripEnquiries.length === 1) {
+              linkedEnquiryId = tripEnquiries[0].id;
+            } else if (tripEnquiries.length > 1) {
+              isAmbiguousEnquiryMatch = true;
+              candidateEnquiryNumbers = tripEnquiries.map((e) => e.enquiryNumber);
+            }
+          }
+        }
+        if (linkedEnquiryId) {
+          await tx.enquiry.updateMany({
+            where: {
+              id: linkedEnquiryId,
+              agencyId,
+              status: { notIn: [EnquiryStatus.CONVERTED, EnquiryStatus.LOST, EnquiryStatus.CANCELLED] },
+            },
+            data: {
+              status: EnquiryStatus.CONVERTED,
+              closedAt: new Date(),
+            },
+          });
+        }
+      }
+
+      // 2. Update booking record
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: updateData,
+        select: { id: true },
+      });
+
+      // 3. Synchronize active invoice if total amount changed or booking cancelled
+      const activeInvoice = await tx.invoice.findFirst({
+        where: {
+          bookingId,
+          status: { not: InvoiceStatus.CANCELLED },
+          archivedAt: null,
+        },
+      });
+
+      if (activeInvoice) {
+        if (data.status === BookingStatus.CANCELLED) {
+          await tx.invoice.update({
+            where: { id: activeInvoice.id },
+            data: {
+              status: InvoiceStatus.CANCELLED,
+              cancelledAt: new Date(),
+              cancellationReason: data.cancellationReason || "Booking was cancelled.",
+            },
+          });
+        }
+        // Note on Invoice Immutability:
+        // An issued tax invoice is a historical accounting document. When booking totalAmount
+        // is amended, the issued invoice is NOT mutated in place, preserving accounting integrity.
+      }
+
+
+      return { isAmbiguousEnquiryMatch, candidateEnquiryNumbers };
+    });
+
+    if (txResult.isAmbiguousEnquiryMatch && txResult.candidateEnquiryNumbers.length > 0 && booking.tripOperation?.id) {
+      try {
+        await operationsService.logEvent(agencyId, booking.tripOperation.id, {
+          eventType: "ENQUIRY_ATTRIBUTION_AMBIGUOUS",
+          description: `Booking ${booking.bookingNumber} confirmed, but multiple eligible originating enquiries exist (${txResult.candidateEnquiryNumbers.join(", ")}). Automatic conversion was withheld; manual CRM attribution is required.`,
+          metadata: {
+            bookingId: booking.id,
+            bookingNumber: booking.bookingNumber,
+            candidateEnquiries: txResult.candidateEnquiryNumbers,
+            requiresManualResolution: true,
           },
         });
+
+        internalNotificationService.notifyAgencyOwner(agencyId, {
+          type: UserNotificationType.BOOKING_CREATED,
+          title: "Ambiguous Enquiry Attribution",
+          message: `Booking #${booking.bookingNumber} was confirmed, but multiple eligible enquiries were found (${txResult.candidateEnquiryNumbers.join(", ")}). Automatic conversion was withheld; please resolve manually in CRM.`,
+          linkUrl: `/enquiries?search=${encodeURIComponent(txResult.candidateEnquiryNumbers[0])}`,
+          metadata: {
+            bookingId: booking.id,
+            bookingNumber: booking.bookingNumber,
+            candidateEnquiries: txResult.candidateEnquiryNumbers,
+          },
+          idempotencyKey: `ambiguous-attribution-${booking.id}`,
+        }).catch((err) => {
+          console.warn("[BookingService] Failed to notify agency owner of ambiguous attribution:", err);
+        });
+      } catch {
+        // Non-blocking
       }
     }
 
@@ -945,7 +1390,42 @@ export const bookingService = {
       }
     }
 
+    // Record audit event for financial amendment
+    if (data.totalAmount !== undefined && Number(data.totalAmount) !== Number(booking.totalAmount)) {
+
+      try {
+        const newTotal = Number(data.totalAmount);
+        const prevTotal = Number(booking.totalAmount);
+        await agencyAuditService.logEvent({
+          agencyId,
+          actorUserId: (data as any)?.userId || "AGENCY_USER",
+          action: "BOOKING_AMENDED",
+          entityType: "BOOKING",
+          entityId: bookingId,
+          previousState: {
+            totalAmount: prevTotal,
+            balanceAmount: Number(booking.balanceAmount),
+            paymentStatus: booking.paymentStatus,
+          },
+          newState: {
+            totalAmount: newTotal,
+            balanceAmount: Math.max(0, newTotal - Number(booking.paidAmount)),
+          },
+          metadata: {
+            previousTotal: prevTotal,
+            newTotal,
+            difference: newTotal - prevTotal,
+            reason: data.notes || "Booking total amount modified",
+            bookingNumber: booking.bookingNumber,
+          },
+        });
+      } catch {
+        // Non-blocking audit log
+      }
+    }
+
     return (await this.getBooking(agencyId, bookingId))!;
+
   },
 
   /**
@@ -958,7 +1438,8 @@ export const bookingService = {
   ): Promise<BookingWithRelations> {
     const booking = await prisma.booking.findFirst({
       where: { id: bookingId, agencyId, archivedAt: null },
-      include: {
+      select: {
+        ...BOOKING_SCALAR_SELECT,
         tripOperation: {
           include: {
             events: { where: { eventType: "OPERATION_FINALIZED" } },
@@ -985,6 +1466,7 @@ export const bookingService = {
         cancelledAt: new Date(),
         cancellationReason: reason.trim() || "Cancelled by agency coordinator.",
       },
+      select: { id: true },
     });
 
     // Auto-cancel active invoice if present
@@ -1036,6 +1518,7 @@ export const bookingService = {
   ): Promise<BookingWithRelations> {
     const booking = await prisma.booking.findFirst({
       where: { id: bookingId, agencyId, archivedAt: null },
+      select: { id: true, tripId: true },
     });
 
     if (!booking) {
@@ -1056,15 +1539,22 @@ export const bookingService = {
   async archiveBooking(agencyId: string, bookingId: string): Promise<Booking> {
     const booking = await prisma.booking.findFirst({
       where: { id: bookingId, agencyId, archivedAt: null },
+      select: { id: true },
     });
 
     if (!booking) {
       throw new Error("Booking not found.");
     }
 
-    return prisma.booking.update({
+    const archived = await prisma.booking.update({
       where: { id: bookingId },
       data: { archivedAt: new Date() },
+      select: BOOKING_SCALAR_SELECT,
     });
+
+    return {
+      ...archived,
+      enquiryId: null,
+    } as Booking;
   },
 };

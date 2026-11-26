@@ -1,8 +1,9 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import { communicationService } from "@/lib/services/communication-service";
 import { resendCommunicationSchema } from "@/lib/validation/communication-schema";
@@ -21,6 +22,13 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "COMMUNICATIONS",
+      "CREATE"
+    );
     const { id } = await params;
     let customRecipient: string | undefined;
     try {

@@ -159,7 +159,7 @@ export default function InvoiceDetailPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [showPayModal, setShowPayModal] = React.useState(false);
 
-  const fetchInvoice = React.useCallback(async () => {
+  const fetchInvoice = React.useCallback(async (isSilent = false) => {
     setLoading(true);
     setError(null);
     try {
@@ -175,7 +175,7 @@ export default function InvoiceDetailPage() {
     } catch (err: any) {
       setError(err?.message || "Failed to load invoice details.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [invoiceId]);
 

@@ -3,7 +3,9 @@ apiSuccess,
 handleApiError,
 NotFoundError,
 requireReadAccess,
+requireAgencyOwnerContext,
 requireWriteAccess,
+  enforceStaffPermission,
 validateJson,
 } from "@/lib/api";
 import { invoiceService } from "@/lib/services/invoice-service";
@@ -22,6 +24,7 @@ export async function GET(
 ) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "INVOICES", "VIEW");
     const { id } = await params;
 
     const invoice = await invoiceService.getInvoice(context.agencyId, id);
@@ -45,6 +48,7 @@ export async function PATCH(
 ) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "INVOICES", "UPDATE");
     const { id } = await params;
     const body = await validateJson(updateDraftInvoiceSchema, request);
 
@@ -66,6 +70,7 @@ export async function DELETE(
 ) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "INVOICES", "DELETE");
     const { id } = await params;
 
     const result = await invoiceService.deleteDraftInvoice(context.agencyId, id);

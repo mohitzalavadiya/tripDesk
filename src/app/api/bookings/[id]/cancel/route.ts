@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiSuccess,
 handleApiError,
 requireWriteAccess,
@@ -25,6 +26,7 @@ const cancelBookingSchema = z.object({
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "BOOKINGS", "UPDATE");
     const { id } = await params;
     const body = await validateJson(cancelBookingSchema, request);
 

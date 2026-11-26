@@ -50,6 +50,7 @@ export async function updateSession(request: NextRequest) {
     pathname === "/api/health" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/signup") ||
+    pathname.startsWith("/accept-invitation") || // Staff invitation acceptance flow
     pathname.startsWith("/forgot-password") ||
     pathname.startsWith("/reset-password") ||
     pathname.startsWith("/verify-email") ||
@@ -64,6 +65,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/bookings/public") || // Public booking endpoints
     pathname.startsWith("/api/customer/") || // Customer authenticated API
     pathname === "/api/subscription/plans" || // Public subscription plans catalog
+    pathname === "/api/team/invitations/verify" || // Public invitation token verification
+    pathname === "/api/team/invitations/accept" || // Public invitation onboarding acceptance
     pathname.startsWith("/api/webhooks/"); // Webhook endpoints
 
 

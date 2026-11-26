@@ -1,10 +1,10 @@
 import {
-apiSuccess,
-handleApiError,
-requireReadAccess,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
 } from "@/lib/api";
 import { invoiceService } from "@/lib/services/invoice-service";
-import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +12,10 @@ export const dynamic = "force-dynamic";
  * GET /api/invoices/summary
  * Operational invoice summary metrics
  */
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "INVOICES", "VIEW");
     const summary = await invoiceService.getInvoiceSummary(context.agencyId);
 
     return apiSuccess(summary);

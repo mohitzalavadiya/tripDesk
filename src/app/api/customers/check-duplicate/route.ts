@@ -1,8 +1,9 @@
 import {
-apiSuccess,
-handleApiError,
-requireReadAccess,
-validateQueryParams,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  validateQueryParams,
 } from "@/lib/api";
 import { customerService } from "@/lib/services/customer-service";
 import { checkDuplicateCustomerSchema } from "@/lib/validation/customer-schema";
@@ -17,6 +18,13 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "CUSTOMERS",
+      "VIEW"
+    );
     const query = validateQueryParams(checkDuplicateCustomerSchema, request.nextUrl.searchParams);
 
     const result = await customerService.checkDuplicateCustomer(context.agencyId, query);

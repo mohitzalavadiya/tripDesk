@@ -89,8 +89,19 @@ export interface PublicTripPayload {
     totalAmount: string;
     paidAmount: string;
     balanceAmount: string;
+    paymentMilestones?: Array<{
+      title: string;
+      percentage: number;
+      plannedAmount: number;
+      allocatedAmount: number;
+      remainingAmount: number;
+      dueDate: string | null;
+      status: "PENDING" | "PARTIALLY_PAID" | "PAID";
+      isOverdue: boolean;
+    }>;
   } | null;
 }
+
 
 export const tripPublicService = {
   /**
@@ -135,7 +146,37 @@ export const tripPublicService = {
               where: { status: { not: "CANCELLED" } },
               orderBy: { createdAt: "desc" },
               take: 1,
+              select: {
+                id: true,
+                bookingNumber: true,
+                status: true,
+                paymentStatus: true,
+                packageOptionName: true,
+                currency: true,
+                totalAmount: true,
+                paidAmount: true,
+                balanceAmount: true,
+                quotation: {
+                  select: {
+                    paymentMilestones: {
+                      orderBy: { sortOrder: "asc" },
+                      select: {
+                        id: true,
+                        title: true,
+                        percentage: true,
+                        amount: true,
+                        dueDate: true,
+                      },
+                    },
+                  },
+                },
+                payments: {
+                  where: { archivedAt: null, status: "COMPLETED" },
+                  select: { amount: true, refundedAmount: true },
+                },
+              },
             },
+
           },
         },
       },
@@ -223,18 +264,62 @@ export const tripPublicService = {
         participantsCount: (ta.adults || 0) + (ta.children || 0) || 1,
       })),
       bookingSummary: latestBooking
-        ? {
-            id: latestBooking.id,
-            bookingNumber: latestBooking.bookingNumber,
-            status: latestBooking.status,
-            paymentStatus: latestBooking.paymentStatus,
-            packageOptionName: latestBooking.packageOptionName,
-            currency: latestBooking.currency,
-            totalAmount: latestBooking.totalAmount.toFixed(2),
-            paidAmount: latestBooking.paidAmount.toFixed(2),
-            balanceAmount: latestBooking.balanceAmount.toFixed(2),
-          }
+        ? (() => {
+            const totalAmt = Number(latestBooking.totalAmount);
+            let netReceived = 0;
+            for (const p of latestBooking.payments || []) {
+              netReceived += Number(p.amount) - Number(p.refundedAmount || 0);
+            }
+            netReceived = Math.max(0, netReceived);
+
+            const rawMilestones = (latestBooking.quotation?.paymentMilestones || []).map((m: any) => ({
+              id: m.id,
+              title: m.title,
+              percentage: m.percentage ? Number(m.percentage) : 0,
+              amount: m.amount ? Number(m.amount) : m.percentage ? Math.round((Number(m.percentage) / 100) * totalAmt * 100) / 100 : 0,
+              dueDate: m.dueDate ? new Date(m.dueDate).toISOString() : null,
+            }));
+
+            let remainingNet = netReceived;
+            const now = new Date();
+            const computedMilestones = rawMilestones.map((m: any) => {
+              const allocated = Math.min(m.amount, Math.max(0, remainingNet));
+              remainingNet = Math.max(0, remainingNet - allocated);
+              const remaining = Math.max(0, m.amount - allocated);
+              let status: "PENDING" | "PARTIALLY_PAID" | "PAID" = "PENDING";
+              if (allocated >= m.amount && m.amount > 0) {
+                status = "PAID";
+              } else if (allocated > 0) {
+                status = "PARTIALLY_PAID";
+              }
+              const isOverdue = Boolean(m.dueDate && new Date(m.dueDate) < now && remaining > 0);
+              return {
+                title: m.title,
+                percentage: m.percentage,
+                plannedAmount: m.amount,
+                allocatedAmount: allocated,
+                remainingAmount: remaining,
+                dueDate: m.dueDate,
+                status,
+                isOverdue,
+              };
+            });
+
+            return {
+              id: latestBooking.id,
+              bookingNumber: latestBooking.bookingNumber,
+              status: latestBooking.status,
+              paymentStatus: latestBooking.paymentStatus,
+              packageOptionName: latestBooking.packageOptionName,
+              currency: latestBooking.currency,
+              totalAmount: latestBooking.totalAmount.toFixed(2),
+              paidAmount: latestBooking.paidAmount.toFixed(2),
+              balanceAmount: latestBooking.balanceAmount.toFixed(2),
+              paymentMilestones: computedMilestones,
+            };
+          })()
         : null,
+
     };
   },
 
@@ -282,7 +367,9 @@ export const tripPublicService = {
         tripId: shareLink.tripId,
         agencyId: shareLink.agencyId,
         status: TravelDocumentStatus.ISSUED,
+        isLatest: true,
         documentType: { not: TravelDocumentType.SUPPLIER_VOUCHER },
+
       },
       orderBy: [{ issuedAt: "desc" }, { createdAt: "desc" }],
       select: {

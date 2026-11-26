@@ -13,6 +13,7 @@ export interface AuthenticatedContext {
   subscription: (Subscription & { plan: SubscriptionPlan }) | null;
   isPlatformOwner: boolean;
   isAgencyOwner: boolean;
+  isAgencyStaff: boolean;
   hasFullAccess: boolean;
   isReadOnly: boolean;
   trialDaysRemaining: number;
@@ -67,6 +68,7 @@ export async function getCurrentUser(): Promise<AuthenticatedContext | null> {
 
     const isPlatformOwner = dbUser.role === "PLATFORM_OWNER" && !dbUser.agencyId;
     const isAgencyOwner = dbUser.role === "AGENCY_OWNER" && !!dbUser.agencyId;
+    const isAgencyStaff = dbUser.role === "AGENCY_STAFF" && !!dbUser.agencyId;
 
     // Determine subscription access
     let hasFullAccess = isPlatformOwner;
@@ -87,7 +89,7 @@ export async function getCurrentUser(): Promise<AuthenticatedContext | null> {
         hasFullAccess = false;
         isReadOnly = true;
       }
-    } else if (isAgencyOwner) {
+    } else if (isAgencyOwner || isAgencyStaff) {
       // If agency has no subscription record, default to read-only
       hasFullAccess = false;
       isReadOnly = true;
@@ -103,6 +105,7 @@ export async function getCurrentUser(): Promise<AuthenticatedContext | null> {
       subscription,
       isPlatformOwner,
       isAgencyOwner,
+      isAgencyStaff,
       hasFullAccess,
       isReadOnly,
       trialDaysRemaining,
@@ -152,6 +155,24 @@ export async function requireAgencyOwner(): Promise<AuthenticatedContext> {
     redirect("/admin");
   }
   if (!auth.isAgencyOwner || !auth.agency) {
+    redirect("/login");
+  }
+  return auth;
+}
+
+/**
+ * Server-side guard: Ensures the user is an AGENCY_OWNER or AGENCY_STAFF with a valid agency.
+ * Redirects unauthenticated users to /login and PLATFORM_OWNER to /admin.
+ */
+export async function requireAgencyMember(): Promise<AuthenticatedContext> {
+  const auth = await getCurrentUser();
+  if (!auth) {
+    redirect("/login");
+  }
+  if (auth.isPlatformOwner) {
+    redirect("/admin");
+  }
+  if ((!auth.isAgencyOwner && !auth.isAgencyStaff) || !auth.agency) {
     redirect("/login");
   }
   return auth;

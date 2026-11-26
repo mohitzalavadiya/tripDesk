@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiCreated,
 apiSuccess,
 handleApiError,
@@ -24,6 +25,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATIONS", "VIEW");
     const { id } = await params;
     const typeParam = request.nextUrl.searchParams.get("type") as ProposalItemType | null;
 
@@ -46,6 +48,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATIONS", "UPDATE");
     const { id } = await params;
     const body = await validateJson(createProposalItemSchema, request);
 

@@ -1,9 +1,11 @@
 import {
-CheckDuplicateEnquiryQuery,
+  AssignLeadInput,
+  CheckDuplicateEnquiryQuery,
 ConvertEnquiryToTripInput,
 CreateEnquiryInput,
 CreateFollowUpInput,
 EnquiryQueryInput,
+QuickLogInteractionInput,
 MarkEnquiryLostInput,
 TransitionStageInput,
 UpdateEnquiryInput,
@@ -48,6 +50,14 @@ export type EnquiryWithRelations = Enquiry & {
     startDate: Date | string;
     endDate: Date | string;
     status: string;
+    bookings?: Array<{
+      id: string;
+      bookingNumber: string;
+      totalAmount: number;
+      paidAmount: number;
+      balanceAmount: number;
+      status: string;
+    }>;
   } | null;
   convertedQuotation?: {
     id: string;
@@ -57,6 +67,7 @@ export type EnquiryWithRelations = Enquiry & {
     status: string;
   } | null;
   followUps: EnquiryFollowUp[];
+  isRepeatCustomer?: boolean;
 };
 
 export interface CrmTimelineEvent {
@@ -71,14 +82,29 @@ export interface CrmTimelineEvent {
     | "QUOTATION_ACCEPTED"
     | "BOOKING_CREATED"
     | "ENQUIRY_CONVERTED"
-    | "ENQUIRY_LOST";
+    | "ENQUIRY_LOST"
+    | "LEAD_REASSIGNED"
+    | "FIELD_UPDATED"
+    | "FOLLOW_UP_CANCELLED"
+    | "INTERACTION_LOGGED";
   title: string;
   description: string;
   timestamp: Date | string;
   referenceId?: string;
   referenceUrl?: string;
   statusBadge?: string;
+  actorName?: string;
+  actorRole?: string;
+  changes?: Array<{ field: string; label: string; oldValue?: any; newValue?: any }>;
   metadata?: Record<string, any>;
+}
+
+export interface EnquiryAssignee {
+  id?: string;
+  name: string;
+  email?: string;
+  role?: string;
+  isUser: boolean;
 }
 
 export interface EnquiryDetails360 extends EnquiryWithRelations {
@@ -120,6 +146,10 @@ export const enquiryClient = {
     if (params?.priority) searchParams.set("priority", params.priority);
     if (params?.source) searchParams.set("source", params.source);
     if (params?.customerId) searchParams.set("customerId", params.customerId);
+    if (params?.urgency) searchParams.set("urgency", params.urgency);
+    if (params?.assignedTo) searchParams.set("assignedTo", params.assignedTo);
+    if ((params as any)?.scope) searchParams.set("scope", (params as any).scope);
+    if ((params as any)?.myEnquiries) searchParams.set("myEnquiries", "true");
     if (params?.sortBy) searchParams.set("sortBy", params.sortBy);
     if (params?.sortOrder) searchParams.set("sortOrder", params.sortOrder);
 
@@ -348,5 +378,50 @@ export const enquiryClient = {
     });
 
     return handleResponse<SingleResponse<CrmDashboardStats>>(res);
+  },
+
+  /**
+   * Quick-log an interaction against an enquiry
+   */
+  async logInteraction(
+    id: string,
+    data: QuickLogInteractionInput
+  ): Promise<SingleResponse<{ interaction: EnquiryFollowUp; nextFollowUp?: EnquiryFollowUp | null }>> {
+    const res = await fetch(`/api/enquiries/${encodeURIComponent(id)}/interactions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    return handleResponse<SingleResponse<{ interaction: EnquiryFollowUp; nextFollowUp?: EnquiryFollowUp | null }>>(res);
+  },
+
+  /**
+   * Reassign or hand off an enquiry with concurrency protection and audit trail
+   */
+  async assignEnquiry(
+    id: string,
+    data: AssignLeadInput
+  ): Promise<SingleResponse<EnquiryWithRelations>> {
+    const res = await fetch(`/api/enquiries/${encodeURIComponent(id)}/assign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    return handleResponse<SingleResponse<EnquiryWithRelations>>(res);
+  },
+
+  /**
+   * Get authorized team members and historical owners for the current agency
+   */
+  async getAssignees(): Promise<SingleResponse<EnquiryAssignee[]>> {
+    const res = await fetch("/api/enquiries/assignees", {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+
+    return handleResponse<SingleResponse<EnquiryAssignee[]>>(res);
   },
 };

@@ -18,10 +18,18 @@ TaxMode,
 import "server-only";
 import { invoiceSequenceService } from "./invoice-sequence-service";
 import { taxService } from "./tax-service";
+import { PAYMENT_SCALAR_SELECT, PaymentScalar } from "./payment-service";
 
 export type InvoiceWithDetails = Invoice & {
   items: InvoiceItem[];
-  payments: any[];
+  payments: Array<
+    Partial<PaymentScalar> & {
+      id: string;
+      amount: Prisma.Decimal;
+      status: PaymentStatus;
+      paymentDate: Date;
+    }
+  >;
   booking: {
     id: string;
     bookingNumber: string;
@@ -162,7 +170,11 @@ export const invoiceService = {
           },
         },
         payments: {
-          where: { archivedAt: null, status: PaymentStatus.COMPLETED },
+          where: {
+            archivedAt: null,
+            status: { in: [PaymentStatus.COMPLETED, PaymentStatus.REFUNDED] },
+          },
+          select: PAYMENT_SCALAR_SELECT,
         },
       },
     });
@@ -289,6 +301,12 @@ export const invoiceService = {
     try {
       const result = await prisma.$transaction(
         async (tx) => {
+          // Acquire booking-scoped advisory lock to prevent concurrent duplicate issuance/sequence waste
+          if (tx.$queryRaw) {
+            const lockKey = `invoice:${agencyId}:${bookingId}`;
+            await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+          }
+
           // Check for existing invoice for this booking (using composite unique selector)
           const existingActive = await tx.invoice.findUnique({
             where: {
@@ -299,7 +317,7 @@ export const invoiceService = {
             },
             include: {
               items: { orderBy: { sortOrder: "asc" } },
-              payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+              payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" }, select: PAYMENT_SCALAR_SELECT },
               booking: {
                 select: {
                   id: true,
@@ -379,7 +397,7 @@ export const invoiceService = {
             },
           });
 
-          const taxProfile = (booking.agency as any)?.taxProfile || null;
+          const taxProfile = booking.agency?.taxProfile || null;
           const customerSnapshot = booking.customer
             ? {
                 id: booking.customer.id,
@@ -436,7 +454,134 @@ export const invoiceService = {
               throw new Error("Cannot regenerate a cancelled invoice.");
             }
 
-            // If existing active invoice was missing invoiceNumber (e.g. legacy draft), allocate number
+            // Invoice Immutability Guard:
+            // An already issued, partially paid, or paid invoice is a historical accounting document.
+            // Repeated getOrCreate/confirmation retries must NEVER overwrite its line items,
+            // subtotal, discounts, taxes, totalAmount, or historical snapshots.
+            if (existingActive.status !== InvoiceStatus.DRAFT) {
+              const linkResult = await tx.payment.updateMany({
+                where: {
+                  bookingId: booking.id,
+                  invoiceId: null,
+                  archivedAt: null,
+                },
+                data: {
+                  invoiceId: existingActive.id,
+                },
+              });
+
+              if (linkResult.count > 0) {
+                const invPayments = await tx.payment.findMany({
+                  where: {
+                    invoiceId: existingActive.id,
+                    archivedAt: null,
+                    status: { in: [PaymentStatus.COMPLETED, PaymentStatus.REFUNDED] },
+                  },
+                  select: { amount: true, refundedAmount: true },
+                });
+                const refreshedPaid = Math.round(
+                  invPayments.reduce(
+                    (sum, p) => sum + Math.max(0, Number(p.amount) - Number(p.refundedAmount || 0)),
+                    0
+                  ) * 100
+                ) / 100;
+                const historicalTotal = Number(existingActive.totalAmount);
+                const refreshedBalance = Math.max(
+                  0,
+                  Math.round((historicalTotal - refreshedPaid) * 100) / 100
+                );
+                const refreshedStatus = calculateInvoiceStatus(historicalTotal, refreshedPaid, false);
+
+                return await tx.invoice.update({
+                  where: { id: existingActive.id },
+                  data: {
+                    paidAmount: new Prisma.Decimal(refreshedPaid),
+                    balanceAmount: new Prisma.Decimal(refreshedBalance),
+                    status: refreshedStatus,
+                  },
+                  include: {
+                    items: { orderBy: { sortOrder: "asc" } },
+                    payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" }, select: PAYMENT_SCALAR_SELECT },
+                    booking: {
+                      select: {
+                        id: true,
+                        bookingNumber: true,
+                        status: true,
+                        bookingDate: true,
+                        travelStartDate: true,
+                        travelEndDate: true,
+                        currency: true,
+                        totalAmount: true,
+                        paidAmount: true,
+                        balanceAmount: true,
+                        taxableAmount: true,
+                        taxAmount: true,
+                        taxRate: true,
+                        taxMode: true,
+                        gstTreatment: true,
+                        cgstAmount: true,
+                        sgstAmount: true,
+                        igstAmount: true,
+                        notes: true,
+                        customer: {
+                          select: {
+                            id: true,
+                            name: true,
+                            phone: true,
+                            email: true,
+                            address: true,
+                            city: true,
+                            state: true,
+                            country: true,
+                            postalCode: true,
+                          },
+                        },
+                        trip: {
+                          select: {
+                            id: true,
+                            title: true,
+                            tripNumber: true,
+                            startDate: true,
+                            endDate: true,
+                            travelers: {
+                              select: { id: true, name: true, type: true },
+                            },
+                          },
+                        },
+                        quotation: {
+                          select: {
+                            id: true,
+                            quotationNumber: true,
+                            title: true,
+                            items: {
+                              where: { isOptional: false },
+                              orderBy: { sortOrder: "asc" },
+                              select: {
+                                id: true,
+                                name: true,
+                                description: true,
+                                quantity: true,
+                                sellingPrice: true,
+                                unitPrice: true,
+                                totalPrice: true,
+                                sortOrder: true,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                    agency: {
+                      select: { id: true, name: true, email: true, phone: true, address: true, logo: true },
+                    },
+                  },
+                });
+              }
+
+              return existingActive;
+            }
+
+            // If existing active invoice is still DRAFT (legacy draft without number), allocate number and populate
             let invoiceNumber = existingActive.invoiceNumber;
             if (!invoiceNumber) {
               invoiceNumber = await invoiceSequenceService.getNextInvoiceNumber(agencyId, tx);
@@ -483,7 +628,7 @@ export const invoiceService = {
               },
               include: {
                 items: { orderBy: { sortOrder: "asc" } },
-                payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+                payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" }, select: PAYMENT_SCALAR_SELECT },
                 booking: {
                   select: {
                     id: true,
@@ -624,7 +769,7 @@ export const invoiceService = {
             },
             include: {
               items: { orderBy: { sortOrder: "asc" } },
-              payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+              payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" }, select: PAYMENT_SCALAR_SELECT },
               booking: {
                 select: {
                   id: true,
@@ -738,7 +883,7 @@ export const invoiceService = {
           },
           include: {
             items: { orderBy: { sortOrder: "asc" } },
-            payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+            payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" }, select: PAYMENT_SCALAR_SELECT },
             booking: {
               select: {
                 id: true,
@@ -1044,12 +1189,12 @@ export const invoiceService = {
         inv.status !== InvoiceStatus.CANCELLED &&
         inv.status !== InvoiceStatus.DRAFT;
 
-      const customerSnapshot = inv.customerSnapshot as any;
+      const customerSnapshot = inv.customerSnapshot as { name?: string } | null;
       const customerName =
         customerSnapshot?.name || inv.booking?.customer?.name || "Unknown Customer";
 
       return {
-        ...(inv as any),
+        ...inv,
         customerName,
         bookingNumber: inv.booking?.bookingNumber,
         isOverdue,
@@ -1201,7 +1346,7 @@ export const invoiceService = {
         },
         include: {
           items: { orderBy: { sortOrder: "asc" } },
-          payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+          payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" }, select: PAYMENT_SCALAR_SELECT },
           booking: {
             select: {
               id: true,
@@ -1238,9 +1383,24 @@ export const invoiceService = {
     input?: IssueInvoiceInput
   ): Promise<InvoiceWithDetails> {
     const result = await prisma.$transaction(async (tx) => {
+      if (tx.$queryRaw) {
+        await tx.$queryRaw`
+          SELECT "id" FROM "invoices" WHERE "id" = ${invoiceId} AND "agencyId" = ${agencyId} FOR UPDATE
+        `;
+      }
+
       const invoice = await tx.invoice.findFirst({
         where: { id: invoiceId, agencyId, archivedAt: null },
-        include: { items: true, payments: { where: { archivedAt: null, status: { not: PaymentStatus.VOIDED } } } },
+        include: {
+          items: true,
+          payments: {
+            where: {
+              archivedAt: null,
+              status: { in: [PaymentStatus.COMPLETED, PaymentStatus.REFUNDED] },
+            },
+            select: PAYMENT_SCALAR_SELECT,
+          },
+        },
       });
 
       if (!invoice) {
@@ -1272,8 +1432,13 @@ export const invoiceService = {
       // Generate next sequential number atomically
       const invoiceNumber = await invoiceSequenceService.getNextInvoiceNumber(agencyId, tx);
 
-      // Recalculate status based on active payments
-      const activePaymentsTotal = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      // Recalculate status based on settled net payments (COMPLETED + REFUNDED net of refunds; excludes PENDING/FAILED/VOIDED)
+      const activePaymentsTotal = Math.round(
+        invoice.payments.reduce((sum, p) => {
+          const net = Number(p.amount) - Number(p.refundedAmount || 0);
+          return sum + Math.max(0, net);
+        }, 0) * 100
+      ) / 100;
       const totalAmount = Number(invoice.totalAmount);
       const balanceAmount = Math.max(0, Math.round((totalAmount - activePaymentsTotal) * 100) / 100);
 
@@ -1295,7 +1460,7 @@ export const invoiceService = {
         },
         include: {
           items: { orderBy: { sortOrder: "asc" } },
-          payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+          payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" }, select: PAYMENT_SCALAR_SELECT },
           booking: {
             select: {
               id: true,
@@ -1393,7 +1558,7 @@ export const invoiceService = {
         },
         include: {
           items: { orderBy: { sortOrder: "asc" } },
-          payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" } },
+          payments: { where: { archivedAt: null }, orderBy: { paymentDate: "desc" }, select: PAYMENT_SCALAR_SELECT },
           booking: {
             select: {
               id: true,
@@ -1462,6 +1627,12 @@ export const invoiceService = {
 
     if (invoice.status === InvoiceStatus.CANCELLED) {
       throw new Error("Cannot regenerate a cancelled invoice.");
+    }
+
+    if (invoice.status !== InvoiceStatus.DRAFT) {
+      throw new Error(
+        `Issued or paid invoices (${invoice.status}) are immutable historical accounting documents and cannot be regenerated in place.`
+      );
     }
 
     if (!invoice.bookingId) {

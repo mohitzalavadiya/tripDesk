@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -46,6 +49,19 @@ import * as React from "react";
 import { toast } from "sonner";
 
 export default function VehiclesPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("VEHICLES", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Vehicles Fleet"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
 
@@ -88,9 +104,9 @@ export default function VehiclesPage() {
   }, [search]);
 
   // Fetch real vehicles from API
-  const fetchVehicles = React.useCallback(async () => {
+  const fetchVehicles = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       const res = await vehicleClient.getVehicles({
@@ -109,7 +125,7 @@ export default function VehiclesPage() {
       }
       setError(getErrorMessage(err, "Unable to load vehicle fleet. Please try again."));
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [debouncedSearch, page]);
 
@@ -157,7 +173,7 @@ export default function VehiclesPage() {
           await vehicleClient.archiveVehicle(id);
           toast.success(`Vehicle "${name}" archived successfully.`);
           setConfirmAction(null);
-          await fetchVehicles();
+          await fetchVehicles(true);
         } catch (err: any) {
           if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
             setLocalReadOnly(true);
@@ -175,8 +191,8 @@ export default function VehiclesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Read-Only Banner */}
         {isReadOnly && <ReadOnlyBanner moduleName="Vehicle Fleet" />}
 
@@ -259,14 +275,14 @@ export default function VehiclesPage() {
           </div>
 
           {/* Loading State */}
-          {loading && (
+          {loading && vehicles.length === 0 && (
             <div className="p-4">
               <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
-          {!loading && error && (
+          {!loading && error && vehicles.length === 0 && (
             <div className="p-8">
               <ErrorState
                 title="Unable to load vehicles"
@@ -277,7 +293,7 @@ export default function VehiclesPage() {
           )}
 
           {/* Table Content */}
-          {!loading && !error && vehicles.length === 0 ? (
+          {(!loading || vehicles.length > 0) && !error && vehicles.length === 0 ? (
             <div className="p-12 text-center">
               <EmptyState
                 icon={Car}
@@ -291,9 +307,9 @@ export default function VehiclesPage() {
                 onAction={isFilterActive ? handleClearFilters : handleAddVehicle}
               />
             </div>
-          ) : !loading && !error && (
+          ) : (!loading || vehicles.length > 0) && !error && (
             <div className="overflow-hidden">
-              <div className="hidden lg:block overflow-x-auto max-h-[620px] overflow-y-auto">
+              <div className="hidden lg:block overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">

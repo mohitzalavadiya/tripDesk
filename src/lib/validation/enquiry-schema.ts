@@ -6,6 +6,7 @@ FollowUpStatus,
 FollowUpType,
 } from "@prisma/client";
 import { z } from "zod";
+import { isValidOutcomeFormat } from "@/lib/utils/crm-urgency";
 
 /**
  * Zod schema for creating a new Enquiry
@@ -89,6 +90,25 @@ export const updateEnquirySchema = z
   })
   .refine(
     (data) => {
+      if (data.status === EnquiryStatus.LOST) {
+        return Boolean(data.lostReason && data.lostReason.trim().length > 0);
+      }
+      return true;
+    },
+    {
+      message: "A structured lost reason is required when marking an enquiry as LOST.",
+      path: ["lostReason"],
+    }
+  )
+  .refine(
+    (data) => data.status !== EnquiryStatus.CONVERTED,
+    {
+      message: "Direct transition to CONVERTED is restricted. Enquiries are automatically converted only when an authorized booking is confirmed.",
+      path: ["status"],
+    }
+  )
+  .refine(
+    (data) => {
       if (data.startDate && data.endDate) {
         return new Date(data.endDate) >= new Date(data.startDate);
       }
@@ -140,6 +160,12 @@ export const transitionStageSchema = z.object({
     message: "A structured lost reason is required when marking an enquiry as LOST.",
     path: ["lostReason"],
   }
+).refine(
+  (data) => data.status !== EnquiryStatus.CONVERTED,
+  {
+    message: "Direct transition to CONVERTED is restricted. Enquiries are automatically converted only when an authorized booking is confirmed.",
+    path: ["status"],
+  }
 );
 
 export type TransitionStageInput = z.infer<typeof transitionStageSchema>;
@@ -182,14 +208,24 @@ export type CheckDuplicateEnquiryQuery = z.infer<typeof checkDuplicateEnquirySch
 /**
  * Zod schema for querying enquiries with filters
  */
+const emptyOrAllToUndefined = (val: unknown) =>
+  val === "all" || val === "" || val === "undefined" || val === "null" ? undefined : val;
+
 export const enquiryQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20).optional(),
   search: z.string().trim().optional(),
-  status: z.nativeEnum(EnquiryStatus).optional(),
-  priority: z.nativeEnum(EnquiryPriority).optional(),
-  source: z.nativeEnum(EnquirySource).optional(),
-  customerId: z.string().trim().optional(),
+  status: z.preprocess(emptyOrAllToUndefined, z.nativeEnum(EnquiryStatus).optional()),
+  priority: z.preprocess(emptyOrAllToUndefined, z.nativeEnum(EnquiryPriority).optional()),
+  source: z.preprocess(emptyOrAllToUndefined, z.nativeEnum(EnquirySource).optional()),
+  customerId: z.preprocess(emptyOrAllToUndefined, z.string().trim().optional()),
+  urgency: z.preprocess(
+    emptyOrAllToUndefined,
+    z.enum(["all", "overdue", "due_today", "today", "upcoming", "no_next_action", "stale"]).optional()
+  ),
+  assignedTo: z.preprocess(emptyOrAllToUndefined, z.string().trim().optional()),
+  scope: z.preprocess(emptyOrAllToUndefined, z.enum(["all", "my"]).optional()),
+  myEnquiries: z.coerce.boolean().optional(),
   sortBy: z
     .enum(["createdAt", "startDate", "enquiryNumber", "priority", "nextFollowUpAt", "budget"])
     .default("createdAt")
@@ -198,6 +234,18 @@ export const enquiryQuerySchema = z.object({
 });
 
 export type EnquiryQueryInput = z.infer<typeof enquiryQuerySchema>;
+
+/**
+ * Zod schema for assigning or handing off an Enquiry to an agency team member / owner
+ */
+export const assignLeadSchema = z.object({
+  assignedTo: z.string().trim().max(100).optional().nullable(),
+  assignedToUserId: z.string().trim().optional().nullable(),
+  currentAssignedTo: z.string().trim().optional().nullable(),
+  reason: z.string().trim().max(500).optional().nullable(),
+});
+
+export type AssignLeadInput = z.infer<typeof assignLeadSchema>;
 
 /**
  * Zod schema for converting Enquiry to a Trip
@@ -217,7 +265,16 @@ export const createFollowUpSchema = z.object({
   priority: z.nativeEnum(EnquiryPriority).default(EnquiryPriority.MEDIUM).optional(),
   status: z.nativeEnum(FollowUpStatus).default(FollowUpStatus.PENDING).optional(),
   scheduledAt: z.coerce.date(),
-  outcome: z.string().trim().max(2000).optional().nullable(),
+  outcome: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine(isValidOutcomeFormat, {
+      message:
+        "Invalid structured outcome code. Supported outcomes are: CONNECTED_MEANINGFUL, QUOTATION_DISCUSSED, REQUIREMENTS_GATHERED, NO_ANSWER, BUSY, WRONG_NUMBER, MESSAGE_LEFT",
+    })
+    .optional()
+    .nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
 });
 
@@ -232,7 +289,16 @@ export const updateFollowUpSchema = z
     priority: z.nativeEnum(EnquiryPriority).optional(),
     status: z.nativeEnum(FollowUpStatus).optional(),
     scheduledAt: z.coerce.date().optional(),
-    outcome: z.string().trim().max(2000).optional().nullable(),
+    outcome: z
+      .string()
+      .trim()
+      .max(2000)
+      .refine(isValidOutcomeFormat, {
+        message:
+          "Invalid structured outcome code. Supported outcomes are: CONNECTED_MEANINGFUL, QUOTATION_DISCUSSED, REQUIREMENTS_GATHERED, NO_ANSWER, BUSY, WRONG_NUMBER, MESSAGE_LEFT",
+      })
+      .optional()
+      .nullable(),
     notes: z.string().trim().max(2000).optional().nullable(),
     completedAt: z.coerce.date().optional().nullable(),
   })
@@ -241,3 +307,49 @@ export const updateFollowUpSchema = z
   });
 
 export type UpdateFollowUpInput = z.infer<typeof updateFollowUpSchema>;
+
+/**
+ * Zod schema for quick-logging an interaction against an Enquiry
+ */
+export const quickLogInteractionSchema = z
+  .object({
+    type: z.nativeEnum(FollowUpType).default(FollowUpType.CALL),
+    interactionAt: z.coerce.date().optional().nullable(),
+    notes: z.string().trim().max(5000).optional().nullable(),
+    outcome: z
+      .string()
+      .trim()
+      .max(2000)
+      .refine(isValidOutcomeFormat, {
+        message:
+          "Invalid structured outcome code. Supported outcomes are: CONNECTED_MEANINGFUL, QUOTATION_DISCUSSED, REQUIREMENTS_GATHERED, NO_ANSWER, BUSY, WRONG_NUMBER, MESSAGE_LEFT",
+      })
+      .optional()
+      .nullable(),
+    completePendingFollowUpId: z.string().trim().optional().nullable(),
+    completeFollowUpId: z.string().trim().optional().nullable(),
+    customerId: z.string().trim().optional().nullable(),
+    scheduleNext: z.boolean().default(false).optional(),
+    nextScheduledAt: z.coerce.date().optional().nullable(),
+    nextFollowUpAt: z.coerce.date().optional().nullable(),
+    nextType: z.nativeEnum(FollowUpType).default(FollowUpType.CALL).optional(),
+    nextFollowUpType: z.nativeEnum(FollowUpType).default(FollowUpType.CALL).optional(),
+    nextPriority: z.nativeEnum(EnquiryPriority).default(EnquiryPriority.MEDIUM).optional(),
+    nextNotes: z.string().trim().max(2000).optional().nullable(),
+    nextFollowUpNotes: z.string().trim().max(2000).optional().nullable(),
+    idempotencyKey: z.string().trim().max(128).optional().nullable(),
+  })
+  .refine(
+    (data) => {
+      if (data.scheduleNext) {
+        return Boolean(data.nextScheduledAt || data.nextFollowUpAt);
+      }
+      return true;
+    },
+    {
+      message: "Scheduled date is required when scheduling a next follow-up",
+      path: ["nextScheduledAt"],
+    }
+  );
+
+export type QuickLogInteractionInput = z.infer<typeof quickLogInteractionSchema>;

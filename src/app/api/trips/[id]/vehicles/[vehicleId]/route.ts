@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiSuccess,
 handleApiError,
 NotFoundError,
@@ -27,6 +28,7 @@ interface RouteProps {
 export async function GET(_request: NextRequest, props: RouteProps) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TRIPS", "VIEW");
     const { id, vehicleId } = validateRouteParams(tripVehicleRouteParamsSchema, await props.params);
 
     const tripVehicle = await tripVehicleService.getTripVehicleById(context.agencyId, id, vehicleId);
@@ -49,6 +51,7 @@ export async function GET(_request: NextRequest, props: RouteProps) {
 export async function PATCH(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TRIPS", "UPDATE");
     const { id, vehicleId } = validateRouteParams(tripVehicleRouteParamsSchema, await props.params);
     const body = await validateJson(updateTripVehicleSchema, request);
 
@@ -73,6 +76,7 @@ export async function PATCH(request: NextRequest, props: RouteProps) {
 export async function DELETE(_request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TRIPS", "UPDATE");
     const { id, vehicleId } = validateRouteParams(tripVehicleRouteParamsSchema, await props.params);
 
     const deleted = await tripVehicleService.deleteTripVehicle(context.agencyId, id, vehicleId);

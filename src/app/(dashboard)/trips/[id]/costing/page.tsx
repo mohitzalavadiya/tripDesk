@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +31,9 @@ import { useParams,useRouter } from "next/navigation";
 import * as React from "react";
 
 export default function TripCostingDedicatedPage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+  const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("TRIP_COSTING", "view"));
+
   const params = useParams();
   const router = useRouter();
   const tripId = params.id as string;
@@ -37,10 +43,11 @@ export default function TripCostingDedicatedPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
 
-  // Fetch real trip costing
-  const fetchCosting = React.useCallback(async () => {
+  // Fetch real trip costing with network fetch suppression for unauthorized staff
+  const fetchCosting = React.useCallback(async (isSilent = false) => {
+    if (!isViewAllowed) return;
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
       const res = await quotationClient.getTripQuotation(tripId);
       if (res.success && res.data) {
@@ -52,15 +59,27 @@ export default function TripCostingDedicatedPage() {
       }
       setError(err?.message || "Failed to load trip costing.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
-  }, [tripId]);
+  }, [tripId, isViewAllowed]);
 
   React.useEffect(() => {
-    if (tripId) fetchCosting();
-  }, [tripId, fetchCosting]);
+    if (tripId && isViewAllowed) fetchCosting();
+  }, [tripId, isViewAllowed, fetchCosting]);
 
-  if (loading) {
+  if (!isViewAllowed) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Trip Costing Studio"
+          badgeText="Access Restricted"
+          description="Internal supplier contract rates, net costs, agency markup schedules, and commercial margin calculations are restricted. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
+  if (loading && !costing) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-slate-50/50">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-3" />

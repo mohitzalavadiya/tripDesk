@@ -1,5 +1,7 @@
 "use client";
 
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+import { useAuth } from "@/context/auth-context";
 import { OperationsAnalyticsKpiGrid } from "@/components/operations/analytics/operations-analytics-kpi-grid";
 import { OperationsFinancialAnalyticsCard } from "@/components/operations/analytics/operations-financial-analytics-card";
 import { OperationsIssuesAnalyticsCard } from "@/components/operations/analytics/operations-issues-analytics-card";
@@ -40,6 +42,20 @@ const PRESET_LABELS: { label: string; value: AnalyticsPreset }[] = [
 ];
 
 export default function OperationsAnalyticsPage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+
+  if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("OPERATIONS", "view"))) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Operations Analytics"
+          badgeText="Access Restricted"
+          description="You do not have permission to access this page. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -86,6 +102,10 @@ export default function OperationsAnalyticsPage() {
   };
 
   const handleExportCsv = () => {
+    if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("OPERATIONS", "export"))) {
+      toast.error("You do not have permission to export operations analytics.");
+      return;
+    }
     const url = operationsClient.getOperationsAnalyticsExportUrl({
       preset,
       startDate: preset === "CUSTOM" && startDate ? startDate : undefined,
@@ -209,7 +229,16 @@ export default function OperationsAnalyticsPage() {
 
         {/* Section 3: Financial Variance & Guest Satisfaction */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <OperationsFinancialAnalyticsCard financialData={data?.financial} loading={loading} />
+          {isAgencyOwner ? (
+            <OperationsFinancialAnalyticsCard financialData={data?.financial} loading={loading} />
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col justify-center items-center text-center space-y-2">
+              <h4 className="text-sm font-bold text-slate-800">Financial Variance Analysis</h4>
+              <p className="text-xs text-slate-500 max-w-sm">
+                Financial variance audits and supplier margins are reserved for Agency Owners.
+              </p>
+            </div>
+          )}
           <OperationsSatisfactionCard satisfactionData={data?.guestSatisfaction} loading={loading} />
         </div>
 

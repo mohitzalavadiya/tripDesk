@@ -3,9 +3,11 @@
 import { Badge } from "@/components/ui/badge";
 import { SalesFunnelAnalytics } from "@/lib/services/dashboard-service";
 import {
-Filter,
-TrendingUp
+  ArrowUpRight,
+  Filter,
+  TrendingUp,
 } from "lucide-react";
+import Link from "next/link";
 
 interface SalesFunnelCardProps {
   funnel?: SalesFunnelAnalytics | null;
@@ -43,14 +45,33 @@ export function SalesFunnelCard({ funnel, loading = false }: SalesFunnelCardProp
 
   const getStageColor = (idx: number) => {
     const colors = [
-      "from-indigo-500 to-indigo-600 text-indigo-700 bg-indigo-50 border-indigo-100",
-      "from-blue-500 to-blue-600 text-blue-700 bg-blue-50 border-blue-100",
-      "from-sky-500 to-sky-600 text-sky-700 bg-sky-50 border-sky-100",
-      "from-teal-500 to-teal-600 text-teal-700 bg-teal-50 border-teal-100",
-      "from-amber-500 to-amber-600 text-amber-700 bg-amber-50 border-amber-100",
-      "from-emerald-500 to-emerald-600 text-emerald-700 bg-emerald-50 border-emerald-100",
+      "from-slate-700 to-slate-900 text-slate-800 bg-slate-100 border-slate-200",
+      "from-teal-600 to-teal-700 text-teal-800 bg-teal-50 border-teal-100",
+      "from-indigo-600 to-indigo-700 text-indigo-800 bg-indigo-50 border-indigo-100",
+      "from-sky-500 to-sky-600 text-sky-800 bg-sky-50 border-sky-100",
+      "from-amber-500 to-amber-600 text-amber-800 bg-amber-50 border-amber-100",
+      "from-emerald-600 to-emerald-700 text-emerald-800 bg-emerald-50 border-emerald-100",
     ];
     return colors[idx] || colors[0];
+  };
+
+  const getStageHref = (key: string) => {
+    switch (key) {
+      case "ENQUIRIES":
+        return "/enquiries";
+      case "QUALIFIED":
+        return "/enquiries?status=QUALIFIED";
+      case "QUOTED":
+        return "/quotations";
+      case "VIEWED":
+        return "/quotations";
+      case "ACCEPTED":
+        return "/quotations?status=ACCEPTED";
+      case "BOOKED":
+        return "/bookings";
+      default:
+        return "/enquiries";
+    }
   };
 
   return (
@@ -58,11 +79,11 @@ export function SalesFunnelCard({ funnel, loading = false }: SalesFunnelCardProp
       <div className="flex flex-col gap-2.5 border-b border-slate-100 pb-3 sm:pb-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2 min-w-0">
-            <Filter className="h-4 w-4 text-indigo-600 shrink-0" />
-            <span className="whitespace-nowrap">Quotation Conversion</span>
+            <Filter className="h-4 w-4 text-teal-700 shrink-0" />
+            <span className="whitespace-nowrap">Quotation Conversion Funnel</span>
           </h3>
 
-          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-bold gap-1 shrink-0 whitespace-nowrap">
+          <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200 text-xs font-bold gap-1 shrink-0 whitespace-nowrap">
             <TrendingUp className="h-3 w-3" />
             {overallConversion}% Win Rate
           </Badge>
@@ -78,21 +99,28 @@ export function SalesFunnelCard({ funnel, loading = false }: SalesFunnelCardProp
         </div>
       </div>
 
-      {/* Stepped Funnel Visualization */}
+      {/* Stepped Funnel Visualization with Direct Stage Drill-Down */}
       <div className="space-y-2">
         {stages.map((stage, idx) => {
-          const isLast = idx === stages.length - 1;
           const isFirst = idx === 0;
           const barWidthPercent = Math.max(12, stage.cumulativeConversionPercent || (isFirst ? 100 : 5));
+          const href = getStageHref(stage.stage);
 
           return (
-            <div key={stage.stage} className="relative group">
-              <div className="flex items-center justify-between text-xs py-1.5 px-2.5 sm:px-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-100/60 transition-colors gap-2 min-w-0">
-                <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial sm:min-w-[130px]">
-                  <span className="font-bold text-slate-800 truncate" title={stage.label}>{stage.label}</span>
+            <Link
+              key={stage.stage}
+              href={href}
+              className="relative group block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+            >
+              <div className="flex items-center justify-between text-xs py-1.5 px-2.5 sm:px-3 rounded-xl border border-slate-100 bg-slate-50/50 group-hover:bg-slate-100/80 group-hover:border-slate-300 transition-all duration-200 gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial sm:min-w-[140px]">
+                  <span className="font-bold text-slate-800 group-hover:text-teal-800 transition-colors truncate" title={stage.label}>
+                    {stage.label}
+                  </span>
                   <span className="font-mono font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0 text-[11px] tabular-nums">
                     {stage.count}
                   </span>
+                  <ArrowUpRight className="h-3 w-3 text-slate-400 opacity-0 group-hover:opacity-100 group-hover:text-teal-700 transition-opacity shrink-0 hidden sm:inline" />
                 </div>
 
                 {/* Visual Bar Container */}
@@ -126,7 +154,7 @@ export function SalesFunnelCard({ funnel, loading = false }: SalesFunnelCardProp
                   ) : null}
                 </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>

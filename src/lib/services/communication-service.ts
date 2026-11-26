@@ -15,9 +15,11 @@ import {
 AgencyCommunicationSetting,
 CustomerNotification,
 CustomerNotificationType,
+EnquiryStatus,
 NotificationChannel,
 NotificationDeliveryStatus,
 Prisma,
+QuotationStatus,
 } from "@prisma/client";
 import "server-only";
 
@@ -663,6 +665,37 @@ export class CommunicationService {
         idempotencyKey: `quote-sent-wa-${quote.id}-${quote.version}`,
       });
     }
+
+    // Advance quotation status to SENT and set sharedAt if currently DRAFT
+    if (quote.status === QuotationStatus.DRAFT) {
+      await prisma.quotation.update({
+        where: { id: quotationId },
+        data: {
+          status: QuotationStatus.SENT,
+          sharedAt: quote.sharedAt || new Date(),
+        },
+      });
+    }
+
+    // Advance linked active enquiry to QUOTATION_SENT if in an earlier active stage
+    const candidateEnquiries = await prisma.enquiry.findMany({
+      where: {
+        agencyId,
+        convertedTripId: quote.tripId,
+        archivedAt: null,
+        status: { in: [EnquiryStatus.NEW, EnquiryStatus.CONTACTED, EnquiryStatus.QUALIFIED, EnquiryStatus.FOLLOW_UP] },
+      },
+      select: { id: true, convertedQuotationId: true },
+    });
+    if (candidateEnquiries.length === 1) {
+      await prisma.enquiry.update({
+        where: { id: candidateEnquiries[0].id },
+        data: {
+          status: EnquiryStatus.QUOTATION_SENT,
+          convertedQuotationId: quote.id,
+        },
+      });
+    }
   }
 
   /**
@@ -860,10 +893,15 @@ export class CommunicationService {
         status: { in: ["CONFIRMED", "ONGOING"] },
         balanceAmount: { gt: 0 },
       },
-      include: {
+      select: {
+        id: true,
+        bookingNumber: true,
+        balanceAmount: true,
+        customerId: true,
+        tripId: true,
         customer: true,
         quotation: {
-          include: {
+          select: {
             paymentMilestones: {
               where: {
                 dueDate: { lte: reminderThreshold },
@@ -954,7 +992,12 @@ export class CommunicationService {
       },
       include: {
         customer: true,
-        bookings: true,
+        bookings: {
+          select: {
+            id: true,
+            bookingNumber: true,
+          },
+        },
       },
     });
 
@@ -1034,7 +1077,11 @@ export class CommunicationService {
       },
       include: {
         customer: true,
-        bookings: true,
+        bookings: {
+          select: {
+            id: true,
+          },
+        },
         feedbacks: true,
       },
     });

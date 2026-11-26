@@ -1,21 +1,22 @@
-import { getRequestContext } from "@/lib/api/context";
+import { requireReadAccess } from "@/lib/api/context";
 import { subscriptionService } from "@/lib/services/subscription-service";
-import { NextRequest,NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   try {
-    await getRequestContext();
+    await requireReadAccess();
     const settings = await subscriptionService.getPublicBillingSettings();
 
     return NextResponse.json({
       success: true,
       data: settings,
     });
-  } catch (error: any) {
-    if (error.statusCode) {
+  } catch (error: unknown) {
+    const err = error as { statusCode?: number; message?: string };
+    if (err.statusCode) {
       return NextResponse.json(
-        { success: false, error: error.message },
-        { status: error.statusCode }
+        { success: false, error: err.message },
+        { status: err.statusCode }
       );
     }
     console.error("GET /api/subscription/billing-settings error:", error);

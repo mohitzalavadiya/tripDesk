@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiSuccess,
 handleApiError,
 requireWriteAccess,
@@ -24,6 +25,7 @@ interface RouteProps {
 export async function PATCH(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TRIPS", "UPDATE");
     const { id } = validateRouteParams(tripIdParamSchema, await props.params);
     const body = await validateJson(reorderTripDestinationsSchema, request);
 

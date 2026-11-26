@@ -1,11 +1,12 @@
 import { getRequestContext } from "@/lib/api/context";
+import { staffPermissionService } from "@/lib/services/staff-permission-service";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/auth/me
- * Returns trusted server-side user, role, agency, and subscription access info.
+ * Returns trusted server-side user, role, agency, subscription access, and staff permissions.
  * Never trusts client headers or query parameters for identity.
  */
 export async function GET() {
@@ -24,6 +25,10 @@ export async function GET() {
         { status: 401 }
       );
     }
+
+    const staffPermissions = (context.isAgencyStaff && context.dbUser.agencyId)
+      ? await staffPermissionService.getStaffPermissions(context.dbUser.agencyId, context.dbUser.id)
+      : null;
 
     return NextResponse.json({
       success: true,
@@ -48,6 +53,7 @@ export async function GET() {
         subscriptionAccess: context.subscriptionAccess,
         isPlatformOwner: context.isPlatformOwner,
         isAgencyOwner: context.isAgencyOwner,
+        staffPermissions,
       },
     });
   } catch (err: any) {

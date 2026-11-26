@@ -1,5 +1,7 @@
 "use client";
 
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+import { useAuth } from "@/context/auth-context";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DestinationSelect } from "@/components/shared/destination-select";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
@@ -40,6 +42,7 @@ const editActivitySchema = Yup.object().shape({
 });
 
 export default function ActivityProfilePage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
   const params = useParams();
   const router = useRouter();
   const activityId = params.id as string;

@@ -1,4 +1,4 @@
-import { requireAgencyOwnerContext } from "@/lib/api/context";
+import { requireMemberReadAccess, enforceStaffPermission } from "@/lib/api";
 import { customerInsightsService } from "@/lib/services/customer-insights-service";
 import { NextRequest,NextResponse } from "next/server";
 
@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   try {
-    const authContext = await requireAgencyOwnerContext();
+    const authContext = await requireMemberReadAccess();
+    await enforceStaffPermission(authContext.dbUser.role, authContext.agencyId, authContext.dbUser.id, "CUSTOMER_INSIGHTS", "VIEW");
 
     const data = await customerInsightsService.getCustomerInsights(authContext.agencyId);
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -12,6 +14,7 @@ SelectTrigger,
 SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/context/auth-context";
 import { useSubscription } from "@/context/subscription-context";
 import { experienceClient } from "@/lib/api-client/experience-client";
 import { useModalScrollLock } from "@/lib/scroll-lock";
@@ -39,6 +42,21 @@ import * as React from "react";
 import { toast } from "sonner";
 
 export default function FeedbackAndReviewsPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("FEEDBACK", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Feedback & Reviews"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+  const canManageSettings = isAgencyOwner || (isAgencyStaff && hasStaffPermission("FEEDBACK", "update"));
   const router = useRouter();
   const { isFeatureAllowed, loading: subLoading } = useSubscription();
   const isAllowed = isFeatureAllowed("FEEDBACK_REVIEWS");
@@ -95,8 +113,8 @@ export default function FeedbackAndReviewsPage() {
     }
   }, []);
 
-  const fetchFeedbacks = React.useCallback(async () => {
-    setLoading(true);
+  const fetchFeedbacks = React.useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const res = await experienceClient.listFeedbacks({
         tab: activeTab !== "REVIEWS" ? activeTab : "ALL",
@@ -115,16 +133,18 @@ export default function FeedbackAndReviewsPage() {
         toast.error(err.message || "Failed to load feedback");
       }
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [activeTab, searchQuery]);
 
   React.useEffect(() => {
     if (isAllowed) {
       fetchFeedbacks();
-      fetchSettings();
+      if (canManageSettings) {
+        fetchSettings();
+      }
     }
-  }, [isAllowed, fetchFeedbacks, fetchSettings]);
+  }, [isAllowed, fetchFeedbacks, fetchSettings, canManageSettings]);
 
   // Compute star distribution from live feedbacks
   const starCounts = React.useMemo(() => {
@@ -148,7 +168,7 @@ export default function FeedbackAndReviewsPage() {
 
       toast.success("Service recovery follow-up updated in database.");
       setSelectedRecoveryFb(null);
-      fetchFeedbacks();
+      fetchFeedbacks(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to update service recovery");
     } finally {
@@ -219,18 +239,18 @@ export default function FeedbackAndReviewsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-20">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Top Header */}
         <PageHeader
           title="Customer Feedback & Post-Trip Reviews"
           description="Collect post-trip guest ratings, manage service recovery for unhappy guests, and generate Google/TripAdvisor reviews."
           breadcrumbs={[{ label: "Experience & Retention" }, { label: "Feedback & Reviews" }]}
-          primaryAction={{
+          primaryAction={canManageSettings ? {
             label: "Review Link Settings",
             onClick: () => setIsSettingsOpen(true),
             icon: Settings,
-          }}
+          } : undefined}
         />
 
         {/* ─── 5 OPERATIONAL KPI CARDS ────────────────────────────────────── */}
@@ -475,7 +495,7 @@ export default function FeedbackAndReviewsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchFeedbacks}
+              onClick={() => fetchFeedbacks()}
               className="h-8.5 text-xs"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-purple-600" : ""}`} />
@@ -485,7 +505,7 @@ export default function FeedbackAndReviewsPage() {
 
         {/* ─── FEEDBACK LIST LEDGER / PUBLIC REVIEWS ───────────────────────── */}
         <div className="space-y-4">
-          {loading ? (
+          {loading && feedbacks.length === 0 ? (
             <div className="flex items-center justify-center p-16 bg-white rounded-3xl border border-slate-200/90 text-slate-400 text-xs gap-2">
               <RefreshCw className="h-4 w-4 animate-spin text-purple-600" />
               Loading database feedback records...
@@ -848,7 +868,7 @@ export default function FeedbackAndReviewsPage() {
       )}
 
       {/* ─── REVIEW SETTINGS MODAL ──────────────────────────────────────── */}
-      {isSettingsOpen && (
+      {isSettingsOpen && canManageSettings && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in-0">
           <div className="bg-white border border-slate-200/90 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-xs">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">

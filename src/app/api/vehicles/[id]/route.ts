@@ -3,7 +3,9 @@ apiSuccess,
 handleApiError,
 NotFoundError,
 requireReadAccess,
+requireAgencyOwnerContext,
 requireWriteAccess,
+  enforceStaffPermission,
 validateJson,
 } from "@/lib/api";
 import { vehicleService } from "@/lib/services/vehicle-service";
@@ -24,6 +26,7 @@ interface RouteParams {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "VEHICLES", "VIEW");
     const { id } = await params;
 
     const vehicle = await vehicleService.getVehicleById(context.agencyId, id);
@@ -46,6 +49,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "VEHICLES", "UPDATE");
     const { id } = await params;
     const body = await validateJson(updateVehicleSchema, request);
 
@@ -65,6 +69,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "VEHICLES", "DELETE");
     const { id } = await params;
 
     const archivedVehicle = await vehicleService.archiveVehicle(context.agencyId, id);

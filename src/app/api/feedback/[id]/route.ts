@@ -1,4 +1,6 @@
-import { requireAgencyOwnerContext } from "@/lib/api/context";
+import { requireReadAccess, requireWriteAccess,
+  enforceStaffPermission,
+} from "@/lib/api";
 import { feedbackService } from "@/lib/services/feedback-service";
 import { feedbackUpdateRecoverySchema } from "@/lib/validation/feedback-schema";
 import { NextRequest,NextResponse } from "next/server";
@@ -14,7 +16,8 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authContext = await requireAgencyOwnerContext();
+    const authContext = await requireReadAccess();
+    await enforceStaffPermission(authContext.dbUser.role, authContext.agencyId, authContext.dbUser.id, "FEEDBACK", "VIEW");
     const { id } = await context.params;
 
     const feedback = await feedbackService.getFeedback(authContext.agencyId, id);
@@ -48,7 +51,8 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authContext = await requireAgencyOwnerContext();
+    const authContext = await requireWriteAccess();
+    await enforceStaffPermission(authContext.dbUser.role, authContext.agencyId, authContext.dbUser.id, "FEEDBACK", "UPDATE");
     const { id } = await context.params;
 
     const body = await request.json();
