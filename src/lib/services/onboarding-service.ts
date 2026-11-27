@@ -95,35 +95,8 @@ export async function provisionOnboardedAgencyOwner(
     }
 
 
-    // Ensure the agency has a trial subscription and starter destinations if recovery is needed
+    // Ensure starter destinations are seeded idempotently if recovery is needed
     if (existingUser.agencyId) {
-      if (!existingUser.agency?.subscriptions || existingUser.agency.subscriptions.length === 0) {
-        let starterPlan = await prisma.subscriptionPlan.findFirst({
-          where: { name: { equals: "Starter", mode: "insensitive" } },
-        });
-        if (!starterPlan) {
-          starterPlan = await prisma.subscriptionPlan.findFirst({
-            where: { isActive: true },
-            orderBy: { price: "asc" },
-          });
-        }
-        if (starterPlan) {
-          const now = new Date();
-          const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-          await prisma.subscription.create({
-            data: {
-              agencyId: existingUser.agencyId,
-              planId: starterPlan.id,
-              status: "TRIAL",
-              billingCycle: "MONTHLY",
-              trialStart: now,
-              trialEnd: trialEnd,
-            },
-          });
-        }
-      }
-
-      // Ensure starter destinations are seeded idempotently
       await destinationService.seedStarterDestinations(existingUser.agencyId);
 
       return { success: true, alreadyOnboarded: true };
@@ -148,26 +121,8 @@ export async function provisionOnboardedAgencyOwner(
     return { success: false, error: "missing_onboarding_data" };
   }
 
-  // 4. Resolve Starter Subscription Plan from Catalog
-  let starterPlan = await prisma.subscriptionPlan.findFirst({
-    where: { name: { equals: "Starter", mode: "insensitive" } },
-  });
-
-  if (!starterPlan) {
-    starterPlan = await prisma.subscriptionPlan.findFirst({
-      where: { isActive: true },
-      orderBy: { price: "asc" },
-    });
-  }
-
-  if (!starterPlan) {
-    console.error("No active Starter SubscriptionPlan found in catalog.");
-    return { success: false, error: "plan_unavailable" };
-  }
-
-  // 5. Atomic Prisma Transaction: Agency + User + Starter Subscription (7-Day Trial)
+  // 4. Atomic Prisma Transaction: Agency + User (Free SaaS — no subscription required)
   const now = new Date();
-  const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -229,19 +184,7 @@ export async function provisionOnboardedAgencyOwner(
         });
       }
 
-      // C. Create Starter Trial Subscription
-      await tx.subscription.create({
-        data: {
-          agencyId: agency.id,
-          planId: starterPlan.id,
-          status: "TRIAL",
-          billingCycle: "MONTHLY",
-          trialStart: now,
-          trialEnd: trialEnd,
-        },
-      });
-
-      // D. Seed 32 Starter Destinations for Agency
+      // C. Seed 32 Starter Destinations for Agency
       await destinationService.seedStarterDestinations(agency.id, tx);
     });
   } catch (txError: any) {
@@ -298,7 +241,7 @@ export async function provisionOnboardedAgencyOwner(
     internalNotificationService.notifyPlatformOwners({
       type: UserNotificationType.AGENCY_SIGNUP,
       title: "New agency registered",
-      message: `${agencyName} has registered and started a 7-day trial.`,
+      message: `${agencyName} has registered on Your Travel Desk.`,
       linkUrl: `/admin/agencies`,
       idempotencyKeyPrefix: `agency-signup-${user.id}`,
       metadata: {

@@ -623,7 +623,7 @@ export const adminService = {
       type: "AGENCY_STATUS_CHANGED",
       title: "Account Status Update",
       message: `Your agency account has been suspended: ${reason}`,
-      linkUrl: "/subscription",
+      linkUrl: "/support",
       metadata: { status: "SUSPENDED", reason },
       idempotencyKey: `agency-suspend-${agencyId}-${Date.now()}`,
     }).catch((err) => {

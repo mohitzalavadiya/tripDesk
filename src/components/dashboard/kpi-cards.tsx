@@ -38,11 +38,11 @@ export function KpiCards({
 
   if (loading) {
     return (
-      <div className="grid gap-2.5 sm:gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid gap-2.5 sm:gap-3 grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div
             key={i}
-            className="h-24 rounded-2xl border border-slate-200/80 bg-white p-3.5 animate-pulse shadow-2xs space-y-2"
+            className="h-24 rounded-2xl border border-slate-200/80 bg-white p-3.5 animate-pulse shadow-2xs space-y-2 min-w-0"
           >
             <div className="flex justify-between items-center">
               <div className="h-3 w-16 bg-slate-200 rounded" />
@@ -65,13 +65,13 @@ export function KpiCards({
   const totalUrgent = actualOverdue + actualDueToday;
 
   return (
-    <div className="grid gap-2.5 sm:gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+    <div className="grid gap-2.5 sm:gap-3 grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
       {/* 1. Total Booking Value */}
       <Link
         href="/bookings"
         className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-indigo-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 overflow-hidden"
       >
-        <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" /> */}
         <div>
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
@@ -98,7 +98,7 @@ export function KpiCards({
         href="/enquiries"
         className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-teal-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 overflow-hidden"
       >
-        <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-teal-500 to-teal-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-teal-500 to-teal-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" /> */}
         <div>
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
@@ -125,7 +125,7 @@ export function KpiCards({
         href="/quotations"
         className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-emerald-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 overflow-hidden"
       >
-        <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" /> */}
         <div>
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
@@ -153,7 +153,7 @@ export function KpiCards({
           href="/trips"
           className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-purple-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 overflow-hidden"
         >
-          <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-purple-500 to-purple-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+          {/* <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-purple-500 to-purple-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" /> */}
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
@@ -179,7 +179,7 @@ export function KpiCards({
           href="/trips"
           className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-purple-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 overflow-hidden"
         >
-          <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-purple-500 to-purple-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+          {/* <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-purple-500 to-purple-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" /> */}
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
@@ -207,7 +207,7 @@ export function KpiCards({
         href="/payments"
         className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-rose-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 overflow-hidden"
       >
-        <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-rose-500 to-rose-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-rose-500 to-rose-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" /> */}
         <div>
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
@@ -238,7 +238,7 @@ export function KpiCards({
         href="/follow-ups"
         className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-amber-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 overflow-hidden"
       >
-        <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-amber-500 to-amber-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-amber-500 to-amber-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" /> */}
         <div>
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">

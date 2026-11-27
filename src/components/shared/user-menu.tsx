@@ -11,7 +11,7 @@ DropdownMenuSeparator,
 DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/auth-context";
-import { Building,CreditCard,LogOut,Settings } from "lucide-react";
+import { Building,LogOut,Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export function UserMenu() {
@@ -65,14 +65,6 @@ export function UserMenu() {
 
         {!isPlatformOwner ? (
           <>
-            <DropdownMenuItem
-              onClick={() => router.push("/subscription")}
-              className="hover:bg-slate-50 cursor-pointer text-xs font-medium"
-            >
-              <CreditCard className="mr-2 h-4 w-4 text-emerald-600" />
-              <span>Subscription & Plan</span>
-            </DropdownMenuItem>
-
             <DropdownMenuItem
               onClick={() => router.push("/settings")}
               className="hover:bg-slate-50 cursor-pointer text-xs font-medium"

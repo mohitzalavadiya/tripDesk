@@ -10,7 +10,7 @@ DialogHeader,
 DialogTitle,
 } from "@/components/ui/dialog";
 import { ReadOnlyReason } from "@/context/subscription-context";
-import { ArrowRight,CreditCard,Lock,Phone,ShieldAlert } from "lucide-react";
+import { Lock,Phone,ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export interface ReadOnlyModeDialogProps {
@@ -24,7 +24,7 @@ export interface ReadOnlyModeDialogProps {
 export function ReadOnlyModeDialog({
   open,
   onOpenChange,
-  reason = "EXPIRED",
+  reason = "SUSPENDED",
   actionName,
   actionLabel,
 }: ReadOnlyModeDialogProps) {
@@ -36,11 +36,6 @@ export function ReadOnlyModeDialog({
   const handleContactSupport = () => {
     onOpenChange(false);
     router.push("/support");
-  };
-
-  const handleRenew = () => {
-    onOpenChange(false);
-    router.push("/subscription");
   };
 
   return (
@@ -84,7 +79,7 @@ export function ReadOnlyModeDialog({
                 </span>
               ) : (
                 <span>
-                  Your subscription or free trial has expired. Existing records remain accessible in read-only mode, but <strong>{effectiveActionName}</strong> and data creation are restricted. Renew your plan to resume operations.
+                  This workspace is currently in read-only mode. Existing records remain accessible, while <strong>{effectiveActionName}</strong> and data creation are restricted.
                 </span>
               )}
             </DialogDescription>
@@ -103,11 +98,7 @@ export function ReadOnlyModeDialog({
           <ul className="space-y-1 text-[11px] text-slate-600 list-disc pl-4">
             <li>You can continue browsing existing trips, quotations, and bookings.</li>
             <li>All agency financial and customer records are safely preserved.</li>
-            {isSuspended ? (
-              <li>Reach out to our support team for account reactivation.</li>
-            ) : (
-              <li>Select a plan to immediately unlock full creation and editing capabilities.</li>
-            )}
+            <li>Reach out to our support team for workspace assistance or reactivation.</li>
           </ul>
         </div>
 
@@ -122,28 +113,15 @@ export function ReadOnlyModeDialog({
             Close
           </Button>
 
-          {isSuspended ? (
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleContactSupport}
-              className="w-full sm:w-auto justify-center h-9 px-4 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-xs gap-1.5 cursor-pointer"
-            >
-              <Phone className="h-3.5 w-3.5" />
-              <span>Contact Support</span>
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleRenew}
-              className="w-full sm:w-auto justify-center h-9 px-4 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs gap-1.5 cursor-pointer"
-            >
-              <CreditCard className="h-3.5 w-3.5" />
-              <span>Renew Subscription</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-          )}
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleContactSupport}
+            className="w-full sm:w-auto justify-center h-9 px-4 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-xs gap-1.5 cursor-pointer"
+          >
+            <Phone className="h-3.5 w-3.5" />
+            <span>Contact Support</span>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

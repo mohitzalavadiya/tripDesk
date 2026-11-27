@@ -52,7 +52,6 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
     ? [
         { label: "Admin", href: "/admin", icon: Home },
         { label: "Agencies", href: "/admin/agencies", icon: Building },
-        { label: "Subscriptions", href: "/admin/subscriptions", icon: CreditCard },
         { label: "More", onClick: () => setOpen(true), icon: Menu },
       ]
     : [

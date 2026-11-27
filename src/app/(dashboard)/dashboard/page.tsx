@@ -319,9 +319,9 @@ export default function DashboardPage() {
 
         {/* 2. ONE Unified Primary Executive KPI Row with Date Filter */}
         <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-indigo-600" />
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 px-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="h-2 w-2 rounded-full bg-indigo-600 shrink-0" />
               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                 Executive Performance &amp; Operational Priorities
               </h2>
@@ -347,14 +347,14 @@ export default function DashboardPage() {
             </h2>
           </div>
 
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+          <div className="grid gap-6 grid-cols-1 xl:grid-cols-3">
             {/* Visual SVG Revenue & Collections Analytics Chart */}
-            <div className="lg:col-span-2 min-w-0">
+            <div className="xl:col-span-2 min-w-0">
               <RevenueChart analytics={data?.revenueTrend} loading={loading} />
             </div>
 
             {/* Visual Quotation Conversion Funnel + Pipeline Velocity Health */}
-            <div className="lg:col-span-1 min-w-0 space-y-4">
+            <div className="xl:col-span-1 min-w-0 space-y-4">
               <SalesFunnelCard funnel={data?.funnel} loading={loading} />
               <PipelineHealthCard summary={data?.summary} funnel={data?.funnel} loading={loading} />
             </div>
@@ -370,9 +370,9 @@ export default function DashboardPage() {
             </h2>
           </div>
 
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+          <div className="grid gap-6 grid-cols-1 xl:grid-cols-3">
             {/* Today's Follow-ups & Urgency Queue */}
-            <div className="lg:col-span-2 min-w-0">
+            <div className="xl:col-span-2 min-w-0">
               <TodaysFollowUpsCard
                 followUps={crmData?.followUps}
                 loading={crmLoading}
@@ -384,22 +384,22 @@ export default function DashboardPage() {
             </div>
 
             {/* Upcoming Departures & Trip Status */}
-            <div className="lg:col-span-1 min-w-0">
+            <div className="xl:col-span-1 min-w-0">
               <UpcomingTripsList trips={opsData?.upcomingDepartures} loading={loading} />
             </div>
           </div>
         </div>
 
         {/* 6. BUSINESS INTELLIGENCE & COMMUNICATION CHANNELS */}
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-          <div className="lg:col-span-2 min-w-0">
+        <div className="grid gap-6 grid-cols-1 xl:grid-cols-3">
+          <div className="xl:col-span-2 min-w-0">
             <TopDestinationsCustomersCard
               destinations={data?.destinations}
               customers={data?.customers}
               loading={loading}
             />
           </div>
-          <div className="lg:col-span-1 min-w-0">
+          <div className="xl:col-span-1 min-w-0">
             <CommunicationHealthCard
               communication={data?.summary.communication}
               loading={loading}

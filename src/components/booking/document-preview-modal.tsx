@@ -274,7 +274,7 @@ export function DocumentPreviewModal({
                 </p>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-center text-xs pt-2 border-t border-slate-100">
+              <div className="grid grid-cols-1 min-[380px]:grid-cols-3 gap-2 text-center text-xs pt-2 border-t border-slate-100">
                 <div>
                   <span className="text-slate-400 text-[10px] font-bold uppercase block">Total Package</span>
                   <span className="font-bold text-slate-800">{formatCurrency(booking.totalAmount)}</span>

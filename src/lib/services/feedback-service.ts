@@ -94,7 +94,6 @@ export const feedbackService = {
    * 1. List feedbacks with tenant isolation, filtering, and summary statistics
    */
   async listFeedbacks(agencyId: string, filter?: FeedbackFilterInput) {
-    await entitlementService.checkFeatureAllowed(agencyId, "FEEDBACK_REVIEWS");
 
     const where: Prisma.CustomerFeedbackWhereInput = {
       agencyId,
@@ -248,7 +247,6 @@ export const feedbackService = {
    * 2. Get single feedback with strict tenant isolation
    */
   async getFeedback(agencyId: string, feedbackId: string): Promise<AgencyFeedbackItem | null> {
-    await entitlementService.checkFeatureAllowed(agencyId, "FEEDBACK_REVIEWS");
 
     const f: any = await prisma.customerFeedback.findFirst({
       where: { id: feedbackId, agencyId },
@@ -293,7 +291,6 @@ export const feedbackService = {
    * 3. Create feedback manually on behalf of customer
    */
   async createFeedback(agencyId: string, input: FeedbackCreateInput) {
-    await entitlementService.checkFeatureAllowed(agencyId, "FEEDBACK_REVIEWS");
 
     // Validate customer and trip ownership
     const customer = await prisma.customer.findFirst({
@@ -365,7 +362,6 @@ export const feedbackService = {
     feedbackId: string,
     input: FeedbackUpdateRecoveryInput
   ) {
-    await entitlementService.checkFeatureAllowed(agencyId, "FEEDBACK_REVIEWS");
 
     const feedback = await prisma.customerFeedback.findFirst({
       where: { id: feedbackId, agencyId },

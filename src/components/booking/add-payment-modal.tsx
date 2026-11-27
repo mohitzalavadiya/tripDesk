@@ -123,7 +123,7 @@ export function AddPaymentModal({
         </div>
 
         {/* Current Balances Header */}
-        <div className="grid grid-cols-3 gap-2.5 bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-3 gap-2.5 bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total Package</span>
             <span className="text-xs font-bold text-slate-900">{formatCurrency(booking.totalAmount)}</span>

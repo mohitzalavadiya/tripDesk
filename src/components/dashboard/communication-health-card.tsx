@@ -59,7 +59,7 @@ export function CommunicationHealthCard({
         </div>
 
         {/* 2. 4 Delivery Metric Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 py-3">
+        <div className="grid grid-cols-2 2xl:grid-cols-4 gap-2 sm:gap-3 py-3">
           <div className="p-2.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-100 min-w-0">
             <span className="text-[10px] uppercase font-bold text-slate-500 block truncate">Total Sent</span>
             <strong className="text-sm sm:text-base text-slate-900 font-mono font-bold block mt-0.5 tabular-nums whitespace-nowrap truncate">

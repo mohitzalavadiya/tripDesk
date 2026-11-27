@@ -86,9 +86,6 @@ export async function GET(request: NextRequest) {
     if (onboardingResult.error === "missing_onboarding_data") {
       return NextResponse.redirect(new URL("/login?error=missing_onboarding_data", request.url));
     }
-    if (onboardingResult.error === "plan_unavailable") {
-      return NextResponse.redirect(new URL("/login?error=plan_unavailable", request.url));
-    }
     return NextResponse.redirect(new URL("/login?error=onboarding_failed", request.url));
   }
 

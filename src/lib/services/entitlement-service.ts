@@ -164,57 +164,28 @@ export const entitlementService = {
   },
 
   /**
-   * 3. Checks whether a feature key is allowed for the agency.
-   * Throws FeatureNotAllowedError or EntitlementConfigError if missing or disabled (Fail Closed).
+   * 3. Retired subscription feature gate (Free SaaS): all features are available to every agency.
    */
   async checkFeatureAllowed(
     agencyId: string,
-    featureKey: string,
-    client: PrismaClientOrTx = prisma
+    _featureKey: string,
+    _client: PrismaClientOrTx = prisma
   ): Promise<boolean> {
-    const ctx = await this.resolveAgencySubscription(agencyId, client);
-
-    const feature = await client.planFeatureEntitlement.findUnique({
-      where: {
-        planId_featureKey: {
-          planId: ctx.effectivePlanId,
-          featureKey,
-        },
-      },
-    });
-
-    if (!feature) {
-      throw new FeatureNotAllowedError(
-        featureKey,
-        `Feature configuration '${featureKey}' is missing for plan '${ctx.effectivePlanName}'. Access denied.`
-      );
+    if (!agencyId) {
+      throw new NoActiveSubscriptionError("Agency ID is required for feature access.");
     }
-
-    if (!feature.enabled) {
-      throw new FeatureNotAllowedError(
-        featureKey,
-        `Feature '${featureKey}' is not included in the ${ctx.effectivePlanName} plan. Upgrade to access.`
-      );
-    }
-
     return true;
   },
 
   /**
-   * 4. Safe boolean query for feature permission.
-   * Returns false if unauthenticated, missing subscription, expired, or feature disabled/missing.
+   * 4. Safe boolean query for feature permission (Free SaaS: always true for valid agency).
    */
   async isFeatureAllowed(
     agencyId: string,
-    featureKey: string,
-    client: PrismaClientOrTx = prisma
+    _featureKey: string,
+    _client: PrismaClientOrTx = prisma
   ): Promise<boolean> {
-    try {
-      await this.checkFeatureAllowed(agencyId, featureKey, client);
-      return true;
-    } catch {
-      return false;
-    }
+    return Boolean(agencyId);
   },
 
   /**
@@ -258,105 +229,36 @@ export const entitlementService = {
   },
 
   /**
-   * 6. Resolves current resource usage and remaining count within authoritative billing period.
-   * Counts creations in half-open interval: createdAt >= periodStart AND createdAt < periodEnd.
-   * Includes soft-deleted/archived rows (creation-based quota).
+   * 6. Retired quota usage lookup (Free SaaS): returns unlimited usage without requiring subscription/usage rows.
    */
   async getResourceUsage(
     agencyId: string,
     resourceKey: string,
-    client: PrismaClientOrTx = prisma
+    _client: PrismaClientOrTx = prisma
   ): Promise<ResourceUsageInfo> {
-    const ctx = await this.resolveAgencySubscription(agencyId, client);
-    const limit = await this.getUsageLimit(ctx.effectivePlanId, resourceKey, client);
-
-    let currentUsage = 0;
-    const { periodStart, periodEnd } = ctx;
-
-    if (resourceKey === "TRIPS") {
-      currentUsage = await client.trip.count({
-        where: {
-          agencyId,
-          createdAt: {
-            gte: periodStart,
-            lt: periodEnd,
-          },
-        },
-      });
-    } else if (resourceKey === "QUOTATIONS") {
-      currentUsage = await client.quotation.count({
-        where: {
-          agencyId,
-          createdAt: {
-            gte: periodStart,
-            lt: periodEnd,
-          },
-        },
-      });
-    } else if (resourceKey === "BOOKINGS") {
-      currentUsage = await client.booking.count({
-        where: {
-          agencyId,
-          createdAt: {
-            gte: periodStart,
-            lt: periodEnd,
-          },
-        },
-      });
-    } else if (resourceKey === "STAFF_MEMBERS") {
-      // Active staff count (excluding owner and deactivated staff) + pending unexpired invitations
-      const activeStaff = await client.user.count({
-        where: { agencyId, role: "AGENCY_STAFF", isActive: true },
-      });
-      let pendingInvites = 0;
-      if ((client as any).agencyInvitation?.count) {
-        pendingInvites = await (client as any).agencyInvitation.count({
-          where: {
-            agencyId,
-            status: "PENDING",
-            expiresAt: { gt: new Date() },
-          },
-        });
-      }
-      currentUsage = activeStaff + pendingInvites;
-    } else {
-      throw new EntitlementConfigError(`Unsupported resource key for usage calculation: '${resourceKey}'.`);
+    if (!agencyId) {
+      throw new NoActiveSubscriptionError("Agency ID is required for resource usage.");
     }
-
-    const remaining = limit === null ? null : Math.max(0, limit - currentUsage);
-    const isExceeded = limit !== null && currentUsage >= limit;
-
+    const now = new Date();
     return {
       resourceKey,
-      limit,
-      currentUsage,
-      remaining,
-      periodStart,
-      periodEnd,
-      isExceeded,
+      limit: null,
+      currentUsage: 0,
+      remaining: null,
+      periodStart: new Date(0),
+      periodEnd: now,
+      isExceeded: false,
     };
   },
 
   /**
-   * 7. Enforces creation quota limit.
-   * Throws QuotaExceededError if current usage >= limit.
+   * 7. Retired creation quota enforcement (Free SaaS): never blocks creation.
    */
   async checkQuota(
     agencyId: string,
     resourceKey: string,
     client: PrismaClientOrTx = prisma
   ): Promise<ResourceUsageInfo> {
-    const usage = await this.getResourceUsage(agencyId, resourceKey, client);
-
-    if (usage.isExceeded) {
-      throw new QuotaExceededError(
-        resourceKey,
-        usage.limit!,
-        usage.currentUsage,
-        `Creation limit of ${usage.limit} reached for ${resourceKey} in current billing period.`
-      );
-    }
-
-    return usage;
+    return this.getResourceUsage(agencyId, resourceKey, client);
   },
 };

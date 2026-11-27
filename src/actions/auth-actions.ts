@@ -718,9 +718,6 @@ export async function verifyEmailOtpAction(
     if (onboardingResult.error === "missing_onboarding_data") {
       return { error: "Your registration details could not be found. Please contact support or sign up again." };
     }
-    if (onboardingResult.error === "plan_unavailable") {
-      return { error: "Starter subscription plan is currently unavailable in the catalog." };
-    }
     return { error: "Failed to initialize agency workspace. Please try again or contact support." };
   }
 

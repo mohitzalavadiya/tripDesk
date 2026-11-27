@@ -1,4 +1,5 @@
 import { requirePlatformOwnerContext } from "@/lib/api/context";
+import { subscriptionRetiredResponse } from "@/lib/api/errors";
 import { adminService } from "@/lib/services/admin-service";
 import { subscriptionPaymentRejectSchema } from "@/lib/validation/admin-schema";
 import { NextRequest,NextResponse } from "next/server";
@@ -15,6 +16,7 @@ export async function POST(
 ) {
   try {
     const authContext = await requirePlatformOwnerContext();
+    return subscriptionRetiredResponse();
     const { id } = await context.params;
 
     const body = await request.json();

@@ -1,10 +1,12 @@
 import { requirePlatformOwnerContext } from "@/lib/api/context";
+import { subscriptionRetiredResponse } from "@/lib/api/errors";
 import { adminService } from "@/lib/services/admin-service";
 import { NextRequest,NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
     const context = await requirePlatformOwnerContext();
+    return subscriptionRetiredResponse();
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
@@ -15,13 +17,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const arrayBuffer = await file.arrayBuffer();
+    const arrayBuffer = await file!.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     const updated = await adminService.uploadBillingQr(
       buffer,
-      file.name,
-      file.type,
+      file!.name,
+      file!.type,
       context.dbUser.id
     );
 
@@ -48,6 +50,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(_req: NextRequest) {
   try {
     const context = await requirePlatformOwnerContext();
+    return subscriptionRetiredResponse();
     const updated = await adminService.deleteBillingQr(context.dbUser.id);
 
     return NextResponse.json({

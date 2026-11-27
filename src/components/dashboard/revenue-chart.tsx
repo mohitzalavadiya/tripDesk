@@ -154,13 +154,13 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-2xs flex flex-col space-y-5 min-w-0 overflow-hidden">
       {/* 1. Header & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3 sm:pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3 sm:pb-4 min-w-0">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="h-7 w-7 rounded-lg bg-teal-50 border border-teal-100 text-teal-700 flex items-center justify-center shrink-0">
               <TrendingUp className="h-4 w-4" />
             </span>
-            <h3 className="text-base font-bold text-slate-900 tracking-tight truncate">
+            <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
               Financial &amp; Revenue Analytics
             </h3>
           </div>
@@ -169,13 +169,13 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end min-w-0">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end shrink-0">
           {/* Mode switch */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 text-[11px] sm:text-xs font-semibold flex-1 sm:flex-initial min-w-0">
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 text-[11px] sm:text-xs font-semibold flex-1 md:flex-initial min-w-0">
             <button
               type="button"
               onClick={() => setChartMode("FINANCIAL")}
-              className={`flex items-center justify-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex-1 sm:flex-initial ${
+              className={`flex items-center justify-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex-1 md:flex-initial shrink-0 ${
                 chartMode === "FINANCIAL"
                   ? "bg-white text-slate-900 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -187,7 +187,7 @@ export function RevenueChart({ analytics, loading = false }: RevenueChartProps) 
             <button
               type="button"
               onClick={() => setChartMode("VOLUME")}
-              className={`flex items-center justify-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex-1 sm:flex-initial ${
+              className={`flex items-center justify-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex-1 md:flex-initial shrink-0 ${
                 chartMode === "VOLUME"
                   ? "bg-white text-slate-900 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"

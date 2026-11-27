@@ -1,10 +1,12 @@
 import { requirePlatformOwnerContext } from "@/lib/api/context";
+import { subscriptionRetiredResponse } from "@/lib/api/errors";
 import { adminService } from "@/lib/services/admin-service";
 import { NextRequest,NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   try {
     await requirePlatformOwnerContext();
+    return subscriptionRetiredResponse();
     const { searchParams } = new URL(req.url);
 
     const status = searchParams.get("status") || undefined;

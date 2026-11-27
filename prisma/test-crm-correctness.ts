@@ -93,7 +93,12 @@ import {
   DEFAULT_STAFF_PERMISSIONS,
   evaluateStaffPermission,
 } from "../src/lib/auth/permissions";
-import { staffPermissionService } from "../src/lib/services/staff-permission-service";
+import {
+  enforceFinancialMarginsAccess,
+  enforceStaffPermission,
+  hasFinancialMarginsAccess,
+  staffPermissionService,
+} from "../src/lib/services/staff-permission-service";
 import { agencyAuditService } from "../src/lib/services/agency-audit-service";
 import { entitlementService } from "../src/lib/services/entitlement-service";
 import { paymentService } from "../src/lib/services/payment-service";
@@ -4394,23 +4399,20 @@ async function run() {
     const convertEnd = bookingServiceCode.indexOf("async recalculateBookingPaymentTotals(", convertStart);
     const convertCode = convertStart !== -1 && convertEnd !== -1 ? bookingServiceCode.substring(convertStart, convertEnd) : "";
 
-    const lockIdx = convertCode.indexOf("await entitlementService.lockAgencySubscription(agencyId, tx);");
     const quoteLockIdx = convertCode.indexOf("SELECT \"id\" FROM \"quotations\"");
     const dupCheckIdx = convertCode.indexOf("const concurrentBooking = await tx.booking.findFirst({");
     const genIdx = convertCode.indexOf("await this.generateNextBookingNumber(agencyId, tx);");
     const createIdx = convertCode.indexOf("await tx.booking.create({");
 
     assert(
-      lockIdx !== -1 &&
       quoteLockIdx !== -1 &&
       dupCheckIdx !== -1 &&
       genIdx !== -1 &&
       createIdx !== -1 &&
-      lockIdx < genIdx &&
       quoteLockIdx < genIdx &&
       dupCheckIdx < genIdx &&
       genIdx < createIdx,
-      "[Behavioral] Number generation is sequenced after subscription lock, quotation lock, and duplicate check, before booking create"
+      "[Behavioral] Number generation is sequenced after quotation lock and duplicate check, before booking create"
     );
   }
 
@@ -4435,12 +4437,12 @@ async function run() {
     const createEnd = bookingServiceCode.indexOf("async convertQuotationToBooking(", createStart);
     const createCode = createStart !== -1 && createEnd !== -1 ? bookingServiceCode.substring(createStart, createEnd) : "";
 
-    const lockIdx = createCode.indexOf("await entitlementService.lockAgencySubscription(agencyId, tx);");
     const genIdx = createCode.indexOf("await this.generateNextBookingNumber(agencyId, tx);");
+    const createBookingIdx = createCode.indexOf("await tx.booking.create({");
 
     assert(
-      lockIdx !== -1 && genIdx !== -1 && lockIdx < genIdx,
-      "[Behavioral] createBooking locks agency subscription before generating booking number using tx"
+      genIdx !== -1 && createBookingIdx !== -1 && genIdx < createBookingIdx,
+      "[Behavioral] createBooking generates booking number using tx before creating booking"
     );
   }
 
@@ -6243,23 +6245,140 @@ async function run() {
     );
   }
 
-  // 37.14: GET /api/trips/[id]/quotation suppresses costing to null and runs quotations through safe DTO for staff
+  // 37.14: GET /api/trips/[id]/quotation delegated financial-margin access, tenant scoping, costing suppression & safe DTO redaction
   {
     const tripQuotationRouteSrc = fs.readFileSync(
       path.join(process.cwd(), "src/app/api/trips/[id]/quotation/route.ts"),
       "utf8"
     );
 
-    assert(
-      tripQuotationRouteSrc.includes("const hasMarginAccess = canAccessFinancialMargins(context.dbUser.role);") &&
+    // Static check of route handler wiring (live Next.js HTTP handler with DB is not executed in DB-free harness)
+    const staticRouteWired =
+      tripQuotationRouteSrc.includes("const hasMarginAccess = await hasFinancialMarginsAccess(context.dbUser.role, context.agencyId, context.dbUser.id);") &&
       tripQuotationRouteSrc.includes("const includeCosting = hasMarginAccess && searchParams.get(\"includeCosting\") !== \"false\";") &&
       tripQuotationRouteSrc.includes("toStaffSafeQuotationListDTO(quotations.data)") &&
-      tripQuotationRouteSrc.includes("costing: null,"),
-      "[Phase E Costing API Suppression] GET /api/trips/[id]/quotation strictly suppresses costing to null and sanitizes quotations for staff"
+      tripQuotationRouteSrc.includes("costing: null,");
+
+    // Runtime behavioral checks with mocked Prisma (no live DB mutations)
+    let queriedWhere: any = null;
+    const makeMarginMockPrisma = (opts: {
+      foundUser?: { id: string; isActive: boolean; deactivatedAt: Date | null } | null;
+      permissions?: Record<string, Record<string, boolean>> | null;
+      hasTable?: boolean;
+    }) => ({
+      __mockHasStaffPermissionProfileTable: opts.hasTable ?? true,
+      user: {
+        findFirst: async ({ where }: any) => {
+          queriedWhere = where;
+          return opts.foundUser === undefined
+            ? { id: where.id, isActive: true, deactivatedAt: null }
+            : opts.foundUser;
+        },
+      },
+      staffPermissionProfile: {
+        findUnique: async () =>
+          opts.permissions === undefined ? null : opts.permissions === null ? null : { permissions: opts.permissions },
+      },
+    });
+
+    const ownerAllowed = await hasFinancialMarginsAccess("AGENCY_OWNER", "agency_alpha", "usr_owner_1");
+    const platformDenied = await hasFinancialMarginsAccess("PLATFORM_OWNER", "agency_alpha", "usr_po_1");
+    const unauthStaffDenied = await hasFinancialMarginsAccess(
+      "AGENCY_STAFF",
+      "agency_alpha",
+      "usr_staff_unauth",
+      makeMarginMockPrisma({ permissions: null }) // DEFAULT_STAFF_PERMISSIONS has FINANCE.view=false & QUOTATIONS.commercialMargins=false
+    );
+    const deactivatedStaffDenied = await hasFinancialMarginsAccess(
+      "AGENCY_STAFF",
+      "agency_alpha",
+      "usr_staff_deact",
+      makeMarginMockPrisma({
+        foundUser: { id: "usr_staff_deact", isActive: false, deactivatedAt: new Date() },
+        permissions: { FINANCE: { view: true, commercialMargins: true } },
+      })
+    );
+    const delegatedQuoteMarginAllowed = await hasFinancialMarginsAccess(
+      "AGENCY_STAFF",
+      "agency_alpha",
+      "usr_staff_del_q",
+      makeMarginMockPrisma({ permissions: { QUOTATIONS: { view: true, commercialMargins: true } } })
+    );
+    const delegatedFinanceViewAllowed = await hasFinancialMarginsAccess(
+      "AGENCY_STAFF",
+      "agency_alpha",
+      "usr_staff_del_f",
+      makeMarginMockPrisma({ permissions: { FINANCE: { view: true } } })
+    );
+
+    // Cross-tenant isolation: query scopes strictly by { id, agencyId, role: "AGENCY_STAFF" }; foreign tenant yields null -> fail-closed rejection
+    let crossTenantRejected = false;
+    try {
+      await hasFinancialMarginsAccess(
+        "AGENCY_STAFF",
+        "agency_beta",
+        "usr_staff_alpha",
+        makeMarginMockPrisma({ foundUser: null, permissions: { FINANCE: { view: true } } })
+      );
+    } catch {
+      crossTenantRejected = true;
+    }
+    const tenantScopedLookup =
+      queriedWhere?.agencyId === "agency_beta" &&
+      queriedWhere?.id === "usr_staff_alpha" &&
+      queriedWhere?.role === "AGENCY_STAFF";
+
+    // Unauthorized staff blocked by enforceFinancialMarginsAccess
+    let enforceRejected = false;
+    try {
+      await enforceFinancialMarginsAccess(
+        "AGENCY_STAFF",
+        "agency_alpha",
+        "usr_staff_unauth",
+        undefined,
+        makeMarginMockPrisma({ permissions: { QUOTATIONS: { view: true, commercialMargins: false } } })
+      );
+    } catch (err) {
+      enforceRejected = err instanceof ForbiddenError;
+    }
+
+    // Sensitive financial fields remain stripped for unauthorized users via toStaffSafeQuotationListDTO
+    const redactedList = toStaffSafeQuotationListDTO([
+      {
+        id: "q_red_1",
+        subtotal: 50000,
+        finalAmount: 60000,
+        markupPercentage: 20,
+        markupAmount: 10000,
+        internalNotes: "Secret net rate note",
+        items: [{ id: "i_1", name: "Resort", unitPrice: 30000, costPrice: 20000, supplierCost: 20000, netRate: 20000, markupPercent: 50 }],
+      },
+    ]);
+    const redactedOk =
+      (redactedList[0] as any).markupPercentage === undefined &&
+      (redactedList[0] as any).markupAmount === undefined &&
+      (redactedList[0] as any).internalNotes === undefined &&
+      (redactedList[0].items[0] as any).costPrice === undefined &&
+      (redactedList[0].items[0] as any).supplierCost === undefined &&
+      (redactedList[0].items[0] as any).netRate === undefined;
+
+    assert(
+      staticRouteWired &&
+      ownerAllowed === true &&
+      platformDenied === false &&
+      unauthStaffDenied === false &&
+      deactivatedStaffDenied === false &&
+      delegatedQuoteMarginAllowed === true &&
+      delegatedFinanceViewAllowed === true &&
+      crossTenantRejected === true &&
+      tenantScopedLookup === true &&
+      enforceRejected === true &&
+      redactedOk === true,
+      "[Phase E Costing API Suppression] GET /api/trips/[id]/quotation & hasFinancialMarginsAccess enforce owner/delegated staff margins, tenant isolation, fail-closed rejection & safe DTO redaction"
     );
   }
 
-  // 37.15: Server-side permission guards across finance summary, transactions, export, payables, and finance dashboard
+  // 37.15: Server-side FINANCE permission guards across finance summary, transactions, export, payables, and finance dashboard
   {
     const financeSummaryRouteSrc = fs.readFileSync(
       path.join(process.cwd(), "src/app/api/finance/summary/route.ts"),
@@ -6282,13 +6401,46 @@ async function run() {
       "utf8"
     );
 
+    const hasFinanceGuardCall = (src: string) =>
+      src.includes("enforceStaffPermission(") && src.includes('"FINANCE"') && src.includes('"VIEW"');
+
+    // Runtime verification of enforceStaffPermission for FINANCE VIEW
+    const makeFinanceMock = (opts: { found?: boolean; view?: boolean }) => ({
+      __mockHasStaffPermissionProfileTable: true,
+      user: {
+        findFirst: async () => (opts.found === false ? null : { id: "usr_fin_staff", isActive: true, deactivatedAt: null }),
+      },
+      staffPermissionProfile: {
+        findUnique: async () => ({ permissions: { FINANCE: { view: Boolean(opts.view) } } }),
+      },
+    });
+
+    await enforceStaffPermission("AGENCY_OWNER", "agency_alpha", "usr_owner", "FINANCE", "VIEW");
+    await enforceStaffPermission("AGENCY_STAFF", "agency_alpha", "usr_fin_staff", "FINANCE", "VIEW", makeFinanceMock({ view: true }));
+
+    let unauthFinanceBlocked = false;
+    try {
+      await enforceStaffPermission("AGENCY_STAFF", "agency_alpha", "usr_fin_staff", "FINANCE", "VIEW", makeFinanceMock({ view: false }));
+    } catch (err) {
+      unauthFinanceBlocked = err instanceof ForbiddenError;
+    }
+
+    let crossTenantFinanceBlocked = false;
+    try {
+      await enforceStaffPermission("AGENCY_STAFF", "agency_beta", "usr_fin_staff", "FINANCE", "VIEW", makeFinanceMock({ found: false, view: true }));
+    } catch (err) {
+      crossTenantFinanceBlocked = err instanceof ForbiddenError;
+    }
+
     assert(
-      financeSummaryRouteSrc.includes("canAccessFinancialMargins(context.dbUser.role)") &&
-      financeTransactionsRouteSrc.includes("canAccessFinancialMargins(context.dbUser.role)") &&
-      financeExportRouteSrc.includes("canAccessFinancialMargins(context.dbUser.role)") &&
-      financePayablesRouteSrc.includes("canAccessFinancialMargins(context.dbUser.role)") &&
-      dashboardFinanceRouteSrc.includes("canAccessFinancialMargins(context.dbUser.role)"),
-      "[Phase E Owner-Only Financial Guard] All finance endpoints strictly guard access with canAccessFinancialMargins"
+      hasFinanceGuardCall(financeSummaryRouteSrc) &&
+      hasFinanceGuardCall(financeTransactionsRouteSrc) &&
+      hasFinanceGuardCall(financeExportRouteSrc) &&
+      hasFinanceGuardCall(financePayablesRouteSrc) &&
+      hasFinanceGuardCall(dashboardFinanceRouteSrc) &&
+      unauthFinanceBlocked === true &&
+      crossTenantFinanceBlocked === true,
+      "[Phase E Owner/Delegated Financial Guard] Finance endpoints enforce FINANCE.VIEW permission, tenant isolation & owner access via enforceStaffPermission"
     );
   }
 
@@ -6479,59 +6631,75 @@ async function run() {
     );
   }
 
-  // 38.2: Role Ceiling Enforcement for Staff
+  // 38.2: Delegable Module Governance & Least-Privilege Boundaries for Staff
   {
-    const maliciousStaffGrants: any = {
+    // Default staff profile denies sensitive admin/finance modules
+    const defaultSettingsView = evaluateStaffPermission("AGENCY_STAFF", DEFAULT_STAFF_PERMISSIONS, "SETTINGS", "view");
+    const defaultFinanceView = evaluateStaffPermission("AGENCY_STAFF", DEFAULT_STAFF_PERMISSIONS, "FINANCE", "view");
+    const defaultTeamView = evaluateStaffPermission("AGENCY_STAFF", DEFAULT_STAFF_PERMISSIONS, "TEAM", "view");
+
+    // Undeclared actions outside PAGE_PERMISSIONS_REGISTRY delegableActions and non-agency roles remain blocked
+    const undeclaredActionBlocked = evaluateStaffPermission("AGENCY_STAFF", { FINANCE: { view: true, transferOwnership: true } as any }, "FINANCE", "transferOwnership");
+    const platformOwnerBlocked = evaluateStaffPermission("PLATFORM_OWNER", { FINANCE: { view: true } }, "FINANCE", "view");
+
+    // Explicit Owner delegation grants page-level view/delete cleanly when view=true
+    const delegatedGrants: any = {
       ...DEFAULT_STAFF_PERMISSIONS,
-      SETTINGS: { view: true, update: true },
-      FINANCE: { view: true, manage: true },
-      SUBSCRIPTION: { view: true, manage: true },
-      TEAM: { view: true, invite: true },
+      SETTINGS: { view: true, update: true, delete: true },
+      FINANCE: { view: true, delete: true },
+      SUBSCRIPTION: { view: true, delete: true },
+      TEAM: { view: true, delete: true },
     };
 
-    const canSettings = evaluateStaffPermission("AGENCY_STAFF", maliciousStaffGrants, "SETTINGS", "view");
-    const canFinance = evaluateStaffPermission("AGENCY_STAFF", maliciousStaffGrants, "FINANCE", "view");
-    const canSubscription = evaluateStaffPermission("AGENCY_STAFF", maliciousStaffGrants, "SUBSCRIPTION", "view");
-    const canTeam = evaluateStaffPermission("AGENCY_STAFF", maliciousStaffGrants, "TEAM", "view");
-    const canFinanceDelete = evaluateStaffPermission("AGENCY_STAFF", { FINANCE: { view: true, delete: true } }, "FINANCE", "delete");
-    const canSettingsDelete = evaluateStaffPermission("AGENCY_STAFF", { SETTINGS: { view: true, delete: true } }, "SETTINGS", "delete");
-    const canSubscriptionDelete = evaluateStaffPermission("AGENCY_STAFF", { SUBSCRIPTION: { view: true, delete: true } }, "SUBSCRIPTION", "delete");
-    const canTeamDelete = evaluateStaffPermission("AGENCY_STAFF", { TEAM: { view: true, delete: true } }, "TEAM", "delete");
+    const canSettings = evaluateStaffPermission("AGENCY_STAFF", delegatedGrants, "SETTINGS", "view");
+    const canFinance = evaluateStaffPermission("AGENCY_STAFF", delegatedGrants, "FINANCE", "view");
+    const canSubscription = evaluateStaffPermission("AGENCY_STAFF", delegatedGrants, "SUBSCRIPTION", "view");
+    const canTeam = evaluateStaffPermission("AGENCY_STAFF", delegatedGrants, "TEAM", "view");
+    const canFinanceDelete = evaluateStaffPermission("AGENCY_STAFF", delegatedGrants, "FINANCE", "delete");
+    const canSettingsDelete = evaluateStaffPermission("AGENCY_STAFF", delegatedGrants, "SETTINGS", "delete");
 
     assert(
+      defaultSettingsView === false &&
+      defaultFinanceView === false &&
+      defaultTeamView === false &&
+      undeclaredActionBlocked === false &&
+      platformOwnerBlocked === false &&
       canSettings === true &&
       canFinance === true &&
       canSubscription === true &&
       canTeam === true &&
-      canFinanceDelete === false &&
-      canSettingsDelete === false &&
-      canSubscriptionDelete === false &&
-      canTeamDelete === false,
-      "[Phase F Role Ceiling] Configurable page permissions allow delegated view while hard ceiling prevents unauthorized deletions"
+      canFinanceDelete === true &&
+      canSettingsDelete === true,
+      "[Phase F Role Ceiling] Default staff profile blocks sensitive modules while explicit delegation & undeclared-action bounds remain enforced"
     );
   }
 
-  // 38.3: Delegable Operational Deletion Guard & Owner-Only Boundaries
+  // 38.3: Delegable Deletion Guard, Default Denials & View-Prerequisite Enforcement
   {
-    // Default staff permissions: delete is false across delegable modules
+    // Default staff permissions: delete is false across all modules
     const staffDefaultEnqDelete = evaluateStaffPermission("AGENCY_STAFF", DEFAULT_STAFF_PERMISSIONS, "ENQUIRIES", "delete");
     const staffDefaultCustDelete = evaluateStaffPermission("AGENCY_STAFF", DEFAULT_STAFF_PERMISSIONS, "CUSTOMERS", "delete");
     const staffDefaultBkDelete = evaluateStaffPermission("AGENCY_STAFF", DEFAULT_STAFF_PERMISSIONS, "BOOKINGS", "delete");
+    const staffDefaultPayDelete = evaluateStaffPermission("AGENCY_STAFF", DEFAULT_STAFF_PERMISSIONS, "PAYMENTS", "delete");
+    const staffDefaultFinDelete = evaluateStaffPermission("AGENCY_STAFF", DEFAULT_STAFF_PERMISSIONS, "FINANCE", "delete");
 
-    // Delegated delete: allowed when explicitly granted
+    // Delegated delete: allowed when explicitly granted WITH view=true
     const staffGrantsWithDelete: any = {
       ...DEFAULT_STAFF_PERMISSIONS,
       ENQUIRIES: { ...DEFAULT_STAFF_PERMISSIONS.ENQUIRIES, delete: true },
       CUSTOMERS: { ...DEFAULT_STAFF_PERMISSIONS.CUSTOMERS, delete: true },
       BOOKINGS: { ...DEFAULT_STAFF_PERMISSIONS.BOOKINGS, delete: true },
+      PAYMENTS: { view: true, delete: true },
+      FINANCE: { view: true, delete: true },
     };
     const staffEnqDelete = evaluateStaffPermission("AGENCY_STAFF", staffGrantsWithDelete, "ENQUIRIES", "delete");
     const staffCustDelete = evaluateStaffPermission("AGENCY_STAFF", staffGrantsWithDelete, "CUSTOMERS", "delete");
     const staffBkDelete = evaluateStaffPermission("AGENCY_STAFF", staffGrantsWithDelete, "BOOKINGS", "delete");
+    const staffPayDelete = evaluateStaffPermission("AGENCY_STAFF", staffGrantsWithDelete, "PAYMENTS", "delete");
+    const staffFinDelete = evaluateStaffPermission("AGENCY_STAFF", staffGrantsWithDelete, "FINANCE", "delete");
 
-    // Non-delegable / immutable modules: strictly blocked even if granted
-    const staffPayDelete = evaluateStaffPermission("AGENCY_STAFF", { PAYMENTS: { view: true, delete: true } }, "PAYMENTS", "delete");
-    const staffFinDelete = evaluateStaffPermission("AGENCY_STAFF", { FINANCE: { view: true, delete: true } }, "FINANCE", "delete");
+    // View-prerequisite guard: delete=true without view=true stays blocked
+    const staffFinDeleteWithoutView = evaluateStaffPermission("AGENCY_STAFF", { FINANCE: { view: false, delete: true } }, "FINANCE", "delete");
 
     // Owner: permitted
     const ownerEnqDelete = evaluateStaffPermission("AGENCY_OWNER", null, "ENQUIRIES", "delete");
@@ -6540,13 +6708,16 @@ async function run() {
       staffDefaultEnqDelete === false &&
       staffDefaultCustDelete === false &&
       staffDefaultBkDelete === false &&
+      staffDefaultPayDelete === false &&
+      staffDefaultFinDelete === false &&
       staffEnqDelete === true &&
       staffCustDelete === true &&
       staffBkDelete === true &&
-      staffPayDelete === false &&
-      staffFinDelete === false &&
+      staffPayDelete === true &&
+      staffFinDelete === true &&
+      staffFinDeleteWithoutView === false &&
       ownerEnqDelete === true,
-      "[Phase F Deletion Guard] Delegable deletions permitted when granted, denied by default, and immutable modules permanently protected"
+      "[Phase F Deletion Guard] Delegable deletions denied by default, blocked without view, and allowed only when explicitly delegated by owner"
     );
   }
 
@@ -6638,40 +6809,22 @@ async function run() {
     );
   }
 
-  // 38.8: Committed Capacity Accounting
+  // 38.8: Free SaaS Staff Capacity Accounting (Unlimited Quotas)
   {
     const mockCapacityPrisma: any = {
       user: {
-        count: async ({ where }: any) => {
-          assert(where.role === "AGENCY_STAFF" && where.agencyId === "agency_alpha", "User count filters strictly for staff in agency");
-          return 3;
-        },
+        count: async () => 3,
       },
       agencyInvitation: {
-        count: async ({ where }: any) => {
-          assert(where.status === "PENDING" && where.agencyId === "agency_alpha" && where.expiresAt.gt instanceof Date, "Invitation count filters strictly pending unexpired");
-          return 1;
-        },
+        count: async () => 1,
       },
-      subscription: {
-        findFirst: async () => ({
-          id: "sub_1",
-          status: "ACTIVE",
-          subscriptionEnd: new Date(Date.now() + 100000),
-          plan: { id: "plan_pro", name: "Professional" },
-        }),
-      },
-      subscriptionPlan: {
-        findUnique: async () => ({ id: "plan_pro", name: "Professional" }),
-      },
-      planUsageLimit: { findUnique: async () => null },
     };
 
     const usage = await entitlementService.getResourceUsage("agency_alpha", "STAFF_MEMBERS", mockCapacityPrisma);
 
     assert(
-      usage.currentUsage === 4 && usage.limit === 20 && usage.isExceeded === false,
-      "[Phase F Capacity Accounting] Committed staff capacity equals active staff (3) + pending unexpired invites (1) = 4"
+      usage.limit === null && usage.remaining === null && usage.isExceeded === false,
+      "[Phase F Capacity Accounting] Free SaaS staff capacity returns unlimited (limit=null, isExceeded=false) without requiring subscription rows"
     );
   }
 
@@ -6699,7 +6852,7 @@ async function run() {
     );
   }
 
-  // 38.10: Acceptance Quota Re-check Inside Transaction
+  // 38.10: Acceptance Proceeds Without Plan Quota Blocks Under Free SaaS While Preserving Role & Tenant Binding
   {
     const inviteToken = generateInvitationToken();
     const mockAtLimit = createInvitationMockPrisma(
@@ -6722,42 +6875,22 @@ async function run() {
       ]
     );
 
-    mockAtLimit.subscription = {
-      findFirst: async () => ({
-        id: "sub_starter",
-        agencyId: "agency_alpha",
-        status: "ACTIVE",
-        subscriptionEnd: new Date(Date.now() + 100000),
-        planId: "plan_starter",
-        plan: { id: "plan_starter", name: "Starter" },
-      }),
-    };
-    mockAtLimit.subscriptionPlan = {
-      findUnique: async () => ({ id: "plan_starter", name: "Starter" }),
-    };
-
-    let capacityError: any = null;
-    try {
-      await invitationService.acceptInvitation(
-        inviteToken,
-        {
-          token: inviteToken,
-          name: "Late Entrant",
-          password: "Password123!",
-          mockUserId: "usr_late_entrant",
-        },
-        mockAtLimit
-      );
-    } catch (err: any) {
-      capacityError = err;
-    }
+    const accepted = await invitationService.acceptInvitation(
+      inviteToken,
+      {
+        token: inviteToken,
+        name: "Late Entrant",
+        password: "Password123!",
+        mockUserId: "usr_late_entrant",
+      },
+      mockAtLimit
+    );
 
     assert(
-      capacityError instanceof QuotaExceededError &&
-      capacityError.details.resourceKey === "STAFF_MEMBERS" &&
-      capacityError.details.limit === 5 &&
-      capacityError.details.currentUsage === 5,
-      "[Phase F Acceptance Quota Guard] Acceptance re-evaluates staff quota inside transaction and rejects when capacity is exhausted"
+      accepted.user.id === "usr_late_entrant" &&
+      accepted.user.role === "AGENCY_STAFF" &&
+      accepted.user.agencyId === "agency_alpha",
+      "[Phase F Acceptance Free SaaS Guard] Staff acceptance is no longer blocked by legacy 5-seat quota while enforcing AGENCY_STAFF role and tenant binding"
     );
   }
 
@@ -7211,7 +7344,7 @@ async function run() {
     );
   }
 
-  // 38.22: Resending Expired/Revoked Invitation Enforces Staff Quota Limit
+  // 38.22: Resending Expired Invitation Under Free SaaS Rotates Token & Renews Expiry Without Legacy Quota Block
   {
     const initialInvites = [
       {
@@ -7220,10 +7353,9 @@ async function run() {
         email: "revived@target.com",
         role: "AGENCY_STAFF",
         status: "EXPIRED",
-        expiresAt: new Date(Date.now() - 50000), // Expired!
+        expiresAt: new Date(Date.now() - 50000),
       },
     ];
-    // Fill agency staff to capacity (5 for Starter)
     const activeStaffUsers = Array.from({ length: 5 }, (_, i) => ({
       id: `usr_staff_${i}`,
       agencyId: "agency_alpha",
@@ -7232,35 +7364,21 @@ async function run() {
     }));
 
     const mockAtCapacity = createInvitationMockPrisma(activeStaffUsers, initialInvites);
-    mockAtCapacity.subscription = {
-      findFirst: async () => ({
-        id: "sub_starter_cap",
-        agencyId: "agency_alpha",
-        status: "ACTIVE",
-        subscriptionEnd: new Date(Date.now() + 100000),
-        plan: { id: "plan_starter", name: "Starter" },
-      }),
-    };
-    mockAtCapacity.subscriptionPlan = {
-      findUnique: async () => ({ id: "plan_starter", name: "Starter" }),
-    };
 
-    let resendQuotaError: any = null;
-    try {
-      await invitationService.resendInvitation(
-        { userId: "usr_owner_a", role: "AGENCY_OWNER", agencyId: "agency_alpha" },
-        "inv_expired_resend",
-        mockAtCapacity
-      );
-    } catch (err) {
-      resendQuotaError = err;
-    }
+    const resent = await invitationService.resendInvitation(
+      { userId: "usr_owner_a", role: "AGENCY_OWNER", agencyId: "agency_alpha" },
+      "inv_expired_resend",
+      mockAtCapacity
+    );
+
+    const updatedInvite = mockAtCapacity._getInvitations().find((i: any) => i.id === "inv_expired_resend");
 
     assert(
-      resendQuotaError instanceof QuotaExceededError &&
-      resendQuotaError.details.resourceKey === "STAFF_MEMBERS" &&
-      resendQuotaError.details.limit === 5,
-      "[Phase F Resend Quota Guard] Resending an expired invitation re-validates quota and blocks activation when capacity is full"
+      typeof resent.rawToken === "string" &&
+      resent.rawToken.length === 64 &&
+      updatedInvite?.status === "PENDING" &&
+      updatedInvite?.expiresAt.getTime() > Date.now(),
+      "[Phase F Resend Free SaaS Guard] Resending an expired invitation succeeds without legacy quota block, restores PENDING status & rotates token"
     );
   }
 
@@ -7662,10 +7780,9 @@ async function run() {
     );
   }
 
-  // 39.6: Quota Enforcement during Staff Acceptance
+  // 39.6: Free SaaS Unlimited Staff Acceptance Beyond Legacy Seat Count
   {
     const quotaToken = generateInvitationToken();
-    // Starter plan: max 5 staff members. Pre-populate with 5 active staff members.
     const fullStaffUsers = Array.from({ length: 5 }, (_, i) => ({
       id: `usr_starter_staff_${i}`,
       agencyId: "agency_alpha",
@@ -7685,41 +7802,22 @@ async function run() {
       },
     ]);
 
-    mockAtQuota.subscription = {
-      findFirst: async () => ({
-        id: "sub_starter_cap",
-        agencyId: "agency_alpha",
-        status: "ACTIVE",
-        subscriptionEnd: new Date(Date.now() + 100000),
-        planId: "plan_starter",
-        plan: { id: "plan_starter", name: "Starter" },
-      }),
-    };
-    mockAtQuota.subscriptionPlan = {
-      findUnique: async () => ({ id: "plan_starter", name: "Starter" }),
-    };
-
-    let quotaAcceptError: any = null;
-    try {
-      await invitationService.acceptInvitation(
-        quotaToken,
-        {
-          token: quotaToken,
-          name: "Staff Exceed",
-          password: "Password123!",
-          mockUserId: "usr_exceed",
-        },
-        mockAtQuota
-      );
-    } catch (err) {
-      quotaAcceptError = err;
-    }
+    const acceptedOverLegacyLimit = await invitationService.acceptInvitation(
+      quotaToken,
+      {
+        token: quotaToken,
+        name: "Staff Beyond Legacy Cap",
+        password: "Password123!",
+        mockUserId: "usr_exceed",
+      },
+      mockAtQuota
+    );
 
     assert(
-      quotaAcceptError instanceof QuotaExceededError &&
-      quotaAcceptError.details.resourceKey === "STAFF_MEMBERS" &&
-      quotaAcceptError.details.limit === 5,
-      "[Phase F Quota Enforcement] Acceptance is blocked with QuotaExceededError when agency staff capacity is reached"
+      acceptedOverLegacyLimit.user.id === "usr_exceed" &&
+      acceptedOverLegacyLimit.user.role === "AGENCY_STAFF" &&
+      acceptedOverLegacyLimit.user.agencyId === "agency_alpha",
+      "[Phase F Unlimited Staff Acceptance] Free SaaS allows accepting staff beyond legacy 5-seat cap while enforcing role and tenant scoping"
     );
   }
 

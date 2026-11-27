@@ -50,9 +50,9 @@ export function CrmActionSummary({
             <span>Sales Command Center &amp; Action Radar</span>
           </h2>
         </div>
-        <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+        {/* <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
           Live CRM Triage • Asia/Kolkata
-        </span>
+        </span> */}
       </div>
 
       {crmError && !crmLoading ? (
@@ -72,14 +72,14 @@ export function CrmActionSummary({
           )}
         </div>
       ) : (
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid gap-2.5 sm:gap-3 grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
           {/* CARD 1: Overdue Follow-ups */}
           {crmLoading ? (
             <CardSkeleton />
           ) : (
             <Link
               href="/follow-ups?scope=overdue"
-              className={`group relative flex flex-col justify-between p-3.5 rounded-2xl border transition-all duration-200 shadow-2xs hover:shadow-md ${
+              className={`group relative flex flex-col justify-between p-3.5 rounded-2xl border transition-all duration-200 shadow-2xs hover:shadow-md min-w-0 ${
                 overdueCount > 0
                   ? "bg-gradient-to-br from-rose-50/90 via-white to-white border-rose-200/90 hover:border-rose-300"
                   : "bg-white border-slate-200/80 hover:border-slate-300"

@@ -1,20 +1,13 @@
 "use client";
 
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { adminClient } from "@/lib/api-client/admin-client";
 import {
-CheckCircle2,
-Landmark,
-QrCode,
 RefreshCw,
-Save,
-Smartphone,
-Trash2,
-UploadCloud
+Save
 } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
@@ -22,59 +15,26 @@ import { toast } from "sonner";
 export default function AdminSettingsPage() {
   const [loading, setLoading] = React.useState(true);
   const [savingGeneral, setSavingGeneral] = React.useState(false);
-  const [savingBilling, setSavingBilling] = React.useState(false);
-  const [uploadingQr, setUploadingQr] = React.useState(false);
-  const [removingQr, setRemovingQr] = React.useState(false);
-  const [confirmDeleteQrOpen, setConfirmDeleteQrOpen] = React.useState(false);
 
   // General Settings
-  const [platformName, setPlatformName] = React.useState("Your Travel Desk SaaS Platform");
-  const [defaultTrialDays, setDefaultTrialDays] = React.useState("7");
+  const [platformName, setPlatformName] = React.useState("Your Travel Desk Platform");
   const [supportEmail, setSupportEmail] = React.useState("");
   const [supportPhone, setSupportPhone] = React.useState("");
   const [maintenanceMode, setMaintenanceMode] = React.useState("false");
   const [platformNotice, setPlatformNotice] = React.useState("");
 
-  // Billing & Payment Settings
-  const [upiId, setUpiId] = React.useState("");
-  const [upiDisplayName, setUpiDisplayName] = React.useState("");
-  const [accountHolder, setAccountHolder] = React.useState("");
-  const [bankName, setBankName] = React.useState("");
-  const [accountNumber, setAccountNumber] = React.useState("");
-  const [ifscCode, setIfscCode] = React.useState("");
-  const [branchName, setBranchName] = React.useState("");
-  const [qrCodeUrl, setQrCodeUrl] = React.useState<string | null>(null);
-
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
-
   const fetchAllSettings = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [generalRes, billingRes] = await Promise.all([
-        adminClient.getSettings(),
-        adminClient.getBillingSettings(),
-      ]);
+      const generalRes = await adminClient.getSettings();
 
       if (generalRes.success && generalRes.data) {
         const s = generalRes.data;
         if (s.platformName) setPlatformName(s.platformName);
-        if (s.defaultTrialDays) setDefaultTrialDays(s.defaultTrialDays);
         if (s.supportEmail !== undefined) setSupportEmail(s.supportEmail || "");
         if (s.supportPhone !== undefined) setSupportPhone(s.supportPhone || "");
         if (s.maintenanceMode) setMaintenanceMode(s.maintenanceMode);
         if (s.platformNotice) setPlatformNotice(s.platformNotice);
-      }
-
-      if (billingRes.success && billingRes.data) {
-        const b = billingRes.data;
-        setUpiId(b.upiId || "");
-        setUpiDisplayName(b.upiDisplayName || "");
-        setAccountHolder(b.accountHolder || "");
-        setBankName(b.bankName || "");
-        setAccountNumber(b.accountNumber || "");
-        setIfscCode(b.ifscCode || "");
-        setBranchName(b.branchName || "");
-        setQrCodeUrl(b.qrCodeUrl || null);
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to load platform settings");
@@ -93,7 +53,6 @@ export default function AdminSettingsPage() {
     try {
       await adminClient.updateSettings({
         platformName,
-        defaultTrialDays,
         supportEmail,
         supportPhone,
         maintenanceMode,
@@ -107,96 +66,14 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handleSaveBilling = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingBilling(true);
-    try {
-      const res = await adminClient.updateBillingSettings({
-        upiId: upiId.trim(),
-        upiDisplayName: upiDisplayName.trim() || null,
-        accountHolder: accountHolder.trim(),
-        bankName: bankName.trim(),
-        accountNumber: accountNumber.trim(),
-        ifscCode: ifscCode.trim().toUpperCase(),
-        branchName: branchName.trim() || null,
-      });
-      if (res.success) {
-        toast.success("Platform billing & payment instructions saved successfully");
-        if (res.data) {
-          setUpiId(res.data.upiId || "");
-          setUpiDisplayName(res.data.upiDisplayName || "");
-          setAccountHolder(res.data.accountHolder || "");
-          setBankName(res.data.bankName || "");
-          setAccountNumber(res.data.accountNumber || "");
-          setIfscCode(res.data.ifscCode || "");
-          setBranchName(res.data.branchName || "");
-        }
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update billing settings");
-    } finally {
-      setSavingBilling(false);
-    }
-  };
-
-  const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(file.type)) {
-      toast.error("Invalid file format. Please select a PNG, JPEG, or WEBP image.");
-      return;
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("File is too large. Maximum size is 2MB.");
-      return;
-    }
-
-    setUploadingQr(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await adminClient.uploadBillingQr(formData);
-      if (res.success && res.data) {
-        setQrCodeUrl(res.data.qrCodeUrl || null);
-        toast.success("QR Code uploaded successfully");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to upload QR Code");
-    } finally {
-      setUploadingQr(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
-  };
-
-  const handleRemoveQr = async () => {
-    setRemovingQr(true);
-    try {
-      const res = await adminClient.deleteBillingQr();
-      if (res.success && res.data) {
-        setQrCodeUrl(null);
-        setConfirmDeleteQrOpen(false);
-        toast.success("Billing QR Code removed successfully");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to remove QR Code");
-    } finally {
-      setRemovingQr(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
       <div className="max-w-[1550px] mx-auto px-2.5 sm:px-6 lg:px-8 pt-4 sm:pt-8 space-y-4 sm:space-y-6 min-w-0">
         {/* Top Header */}
         <PageHeader
           title="Your Travel Desk Platform Settings"
-          description="Configure global SaaS environment defaults, trial periods, subscription billing instructions, and support channels."
-          breadcrumbs={[{ label: "SaaS Platform", href: "/admin" }, { label: "Platform Settings" }]}
+          description="Configure global platform defaults, maintenance mode, and support channels."
+          breadcrumbs={[{ label: "Platform", href: "/admin" }, { label: "Platform Settings" }]}
           primaryAction={{
             label: "Refresh Settings",
             onClick: fetchAllSettings,
@@ -212,233 +89,6 @@ export default function AdminSettingsPage() {
         ) : (
           <div className="space-y-6 sm:space-y-8 max-w-4xl min-w-0">
             {/* ═══════════════════════════════════════════════════════════════════ */}
-            {/* 1. PLATFORM BILLING & PAYMENT SETTINGS (SUBSCRIPTION INSTRUCTIONS) */}
-            {/* ═══════════════════════════════════════════════════════════════════ */}
-            <form onSubmit={handleSaveBilling} className="space-y-4 sm:space-y-6">
-              <div className="bg-white border border-indigo-200/80 rounded-2xl p-3.5 sm:p-6 shadow-sm space-y-4 sm:space-y-6 min-w-0">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3.5 sm:pb-4 gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg shrink-0">
-                        <Landmark className="h-4 w-4" />
-                      </span>
-                      <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 truncate">
-                        Platform Billing & Payment Instructions
-                      </h3>
-                    </div>
-                    <p className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-relaxed">
-                      Official payment details displayed to Agency Owners when purchasing or renewing subscriptions.
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full w-fit shrink-0">
-                    Global SaaS Singleton
-                  </span>
-                </div>
-
-                {/* UPI Configuration */}
-                <div className="space-y-2.5 sm:space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
-                    <Smartphone className="h-4 w-4 text-indigo-600 shrink-0" />
-                    <span>Official UPI Configuration</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-slate-700">
-                        Your Travel Desk Official UPI ID <span className="text-rose-500">*</span>
-                      </label>
-                      <Input
-                        value={upiId}
-                        onChange={(e) => setUpiId(e.target.value)}
-                        placeholder="e.g. yourtraveldesk.billing@icici"
-                        className="h-9 text-xs font-mono"
-                        required
-                      />
-                      <p className="text-[10px] text-slate-400">
-                        Official VPA handle for subscription payments.
-                      </p>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-slate-700">UPI Business / Display Name</label>
-                      <Input
-                        value={upiDisplayName}
-                        onChange={(e) => setUpiDisplayName(e.target.value)}
-                        placeholder="e.g. Your Travel Desk Billing"
-                        className="h-9 text-xs"
-                      />
-                      <p className="text-[10px] text-slate-400">
-                        Merchant name registered on the UPI VPA.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bank Details Configuration */}
-                <div className="space-y-2.5 sm:space-y-3 pt-3.5 sm:pt-4 border-t border-slate-100">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
-                    <Landmark className="h-4 w-4 text-indigo-600 shrink-0" />
-                    <span>Direct Bank Transfer Details (NEFT / IMPS / RTGS)</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-slate-700">
-                        Account Holder / Beneficiary Name <span className="text-rose-500">*</span>
-                      </label>
-                      <Input
-                        value={accountHolder}
-                        onChange={(e) => setAccountHolder(e.target.value)}
-                        placeholder="e.g. Your Travel Desk SaaS Technologies Pvt Ltd"
-                        className="h-9 text-xs"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-slate-700">
-                        Bank Name <span className="text-rose-500">*</span>
-                      </label>
-                      <Input
-                        value={bankName}
-                        onChange={(e) => setBankName(e.target.value)}
-                        placeholder="e.g. ICICI Bank"
-                        className="h-9 text-xs"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-slate-700">
-                        Account Number <span className="text-rose-500">*</span>
-                      </label>
-                      <Input
-                        value={accountNumber}
-                        onChange={(e) => setAccountNumber(e.target.value)}
-                        placeholder="e.g. 002105009844"
-                        className="h-9 text-xs font-mono"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-slate-700">
-                        IFSC Code <span className="text-rose-500">*</span>
-                      </label>
-                      <Input
-                        value={ifscCode}
-                        onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
-                        placeholder="e.g. ICIC0000021"
-                        className="h-9 text-xs font-mono uppercase"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <label className="font-bold text-slate-700">Bank Branch</label>
-                      <Input
-                        value={branchName}
-                        onChange={(e) => setBranchName(e.target.value)}
-                        placeholder="e.g. MG Road Branch"
-                        className="h-9 text-xs"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* QR Code Management */}
-                <div className="space-y-3 sm:space-y-4 pt-3.5 sm:pt-4 border-t border-slate-100">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
-                    <QrCode className="h-4 w-4 text-indigo-600 shrink-0" />
-                    <span>Official Billing QR Code</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 items-start">
-                    {/* QR Preview */}
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex flex-col items-center justify-center text-center min-h-[140px] sm:min-h-[160px]">
-                      {qrCodeUrl ? (
-                        <div className="space-y-2 flex flex-col items-center">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={qrCodeUrl}
-                            alt="Billing QR Code"
-                            className="w-28 h-28 sm:w-32 sm:h-32 object-contain bg-white p-2 rounded-xl border border-slate-200 shadow-2xs"
-                          />
-                          <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3" /> Active Official QR
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5 sm:space-y-2 py-3 sm:py-4 text-slate-400">
-                          <QrCode className="h-8 sm:h-10 w-8 sm:w-10 mx-auto text-slate-300 stroke-[1.5]" />
-                          <p className="text-[11px] font-medium">No QR Code Uploaded</p>
-                          <p className="text-[10px] text-slate-400 leading-tight">
-                            Payment modal will show UPI & Bank details only.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* QR Actions */}
-                    <div className="md:col-span-2 space-y-2.5 sm:space-y-3 text-xs">
-                      <p className="text-slate-600 leading-relaxed text-[11px]">
-                        Upload your official bank or UPI merchant QR code image (PNG, JPG, or WEBP, max 2MB). When uploaded, Agency Owners can scan this QR code directly inside their subscription payment modal.
-                      </p>
-
-                      <div className="flex flex-col min-[360px]:flex-row flex-wrap items-stretch min-[360px]:items-center gap-2 sm:gap-3 pt-1 sm:pt-2">
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          onChange={handleQrUpload}
-                          accept="image/png,image/jpeg,image/jpg,image/webp"
-                          className="hidden"
-                          id="qr-upload-input"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={uploadingQr}
-                          onClick={() => fileInputRef.current?.click()}
-                          className="w-full min-[360px]:w-auto h-9 text-xs font-semibold rounded-xl cursor-pointer justify-center"
-                        >
-                          <UploadCloud className="h-4 w-4 mr-1.5 text-indigo-600 shrink-0" />
-                          {uploadingQr
-                            ? "Uploading..."
-                            : qrCodeUrl
-                            ? "Replace QR Code Image"
-                            : "Upload QR Code Image"}
-                        </Button>
-
-                        {qrCodeUrl && (
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            disabled={removingQr}
-                            onClick={() => setConfirmDeleteQrOpen(true)}
-                            className="w-full min-[360px]:w-auto h-9 text-xs font-semibold rounded-xl cursor-pointer justify-center"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                            {removingQr ? "Removing..." : "Remove QR"}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Save Billing Settings Button */}
-                <div className="flex flex-col sm:flex-row sm:justify-end pt-2 border-t border-slate-100">
-                  <Button
-                    type="submit"
-                    disabled={savingBilling}
-                    className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 sm:px-6 py-2 h-9 rounded-xl shadow-sm cursor-pointer justify-center"
-                  >
-                    <Save className="h-4 w-4 mr-1.5 shrink-0" />
-                    {savingBilling ? "Saving Instructions..." : "Save Billing & Payment Settings"}
-                  </Button>
-                </div>
-              </div>
-            </form>
-
-            {/* ═══════════════════════════════════════════════════════════════════ */}
             {/* 2. CORE SAAS & MAINTENANCE SETTINGS */}
             {/* ═══════════════════════════════════════════════════════════════════ */}
             <form onSubmit={handleSaveGeneral} className="space-y-4 sm:space-y-6">
@@ -449,23 +99,12 @@ export default function AdminSettingsPage() {
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 sm:col-span-2">
                     <label className="font-bold text-slate-700">Platform Brand Name</label>
                     <Input
                       value={platformName}
                       onChange={(e) => setPlatformName(e.target.value)}
                       className="h-9 text-xs"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700">Default Free Trial Duration (Days)</label>
-                    <Input
-                      type="number"
-                      value={defaultTrialDays}
-                      onChange={(e) => setDefaultTrialDays(e.target.value)}
-                      className="h-9 text-xs font-mono"
                       required
                     />
                   </div>
@@ -525,19 +164,6 @@ export default function AdminSettingsPage() {
             </form>
           </div>
         )}
-
-        {/* Delete QR Code Confirmation Dialog */}
-        <ConfirmDialog
-          open={confirmDeleteQrOpen}
-          onOpenChange={setConfirmDeleteQrOpen}
-          title="Remove Billing QR Code"
-          description="Are you sure you want to remove the current billing QR Code? Agency Owners will see direct UPI ID and bank transfer details until a new QR is uploaded."
-          confirmText="Remove QR"
-          cancelText="Cancel"
-          variant="destructive"
-          loading={removingQr}
-          onConfirm={handleRemoveQr}
-        />
       </div>
     </div>
   );

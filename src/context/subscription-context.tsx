@@ -1,7 +1,6 @@
 "use client";
 
-import { subscriptionClient } from "@/lib/api-client/subscription-client";
-import { evaluateEffectiveSubscriptionState } from "@/lib/auth/subscription-state";
+import { useAuth } from "@/context/auth-context";
 import * as React from "react";
 
 export interface EntitlementsState {
@@ -40,8 +39,23 @@ export interface QuotaDecision {
   loading: boolean;
 }
 
+export interface SubscriptionOverviewStub {
+  subscription?: {
+    plan?: { name?: string };
+  };
+  agency?: {
+    customLogoUrl?: string | null;
+    logo?: string | null;
+  };
+  logo?: {
+    customLogoUrl?: string | null;
+    logo?: string | null;
+  };
+  usage?: Record<string, { currentUsage?: number; limit?: number | null }>;
+}
+
 export interface SubscriptionContextType {
-  overview: any | null;
+  overview: SubscriptionOverviewStub | null;
   entitlements: EntitlementsState;
   usage: UsageState;
   loading: boolean;
@@ -55,11 +69,11 @@ export interface SubscriptionContextType {
   incrementUsage: (resourceKey: "TRIPS" | "QUOTATIONS" | "BOOKINGS") => void;
 }
 
-const defaultEntitlements: EntitlementsState = {
-  CUSTOM_AGENCY_LOGO: false,
-  FEEDBACK_REVIEWS: false,
-  CUSTOMER_INSIGHTS: false,
-  REPORTS_ANALYTICS: false,
+const fullEntitlements: EntitlementsState = {
+  CUSTOM_AGENCY_LOGO: true,
+  FEEDBACK_REVIEWS: true,
+  CUSTOMER_INSIGHTS: true,
+  REPORTS_ANALYTICS: true,
 };
 
 const defaultUsage: UsageState = {
@@ -71,275 +85,95 @@ const defaultUsage: UsageState = {
 const SubscriptionContext = React.createContext<SubscriptionContextType | undefined>(undefined);
 
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
-  const [overview, setOverview] = React.useState<any | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const { subscriptionAccess, isLoading: authLoading } = useAuth();
 
-  const fetchSubscription = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await subscriptionClient.getSubscription();
-      if (res.success && res.data) {
-        setOverview(res.data);
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to load subscription data");
-    } finally {
-      setLoading(false);
-    }
+  const refreshSubscription = React.useCallback(async () => {
+    // Subscription feature retired (Free SaaS)
   }, []);
 
-  React.useEffect(() => {
-    fetchSubscription();
-  }, [fetchSubscription]);
-
-  // Throttled window focus revalidation (5-minute cooldown) to capture multi-tab or dynamic admin changes
-  React.useEffect(() => {
-    let lastFetchTime = Date.now();
-    const handleFocus = () => {
-      if (Date.now() - lastFetchTime > 5 * 60 * 1000) {
-        lastFetchTime = Date.now();
-        fetchSubscription();
-      }
-    };
-
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [fetchSubscription]);
-
-  const entitlements: EntitlementsState = React.useMemo(() => {
-    if (!overview) {
-      return defaultEntitlements;
-    }
-
-    // Direct entitlement payload from /api/subscription overview
-    if (overview.entitlements) {
-      return {
-        CUSTOM_AGENCY_LOGO: !!overview.entitlements.CUSTOM_AGENCY_LOGO,
-        FEEDBACK_REVIEWS: !!overview.entitlements.FEEDBACK_REVIEWS,
-        CUSTOMER_INSIGHTS: !!overview.entitlements.CUSTOMER_INSIGHTS,
-        REPORTS_ANALYTICS: !!overview.entitlements.REPORTS_ANALYTICS,
-      };
-    }
-
-    // Fallback to legacy features structure if present
-    if (overview.features) {
-      return {
-        CUSTOM_AGENCY_LOGO: !!overview.features.CUSTOM_AGENCY_LOGO?.allowed,
-        FEEDBACK_REVIEWS: !!overview.features.FEEDBACK_REVIEWS?.allowed,
-        CUSTOMER_INSIGHTS: !!overview.features.CUSTOMER_INSIGHTS?.allowed,
-        REPORTS_ANALYTICS: !!overview.features.REPORTS_ANALYTICS?.allowed,
-      };
-    }
-
-    return defaultEntitlements;
-  }, [overview]);
-
-  const usage: UsageState = React.useMemo(() => {
-    if (!overview?.usage) return defaultUsage;
-    return {
-      TRIPS: overview.usage.TRIPS || null,
-      QUOTATIONS: overview.usage.QUOTATIONS || null,
-      BOOKINGS: overview.usage.BOOKINGS || null,
-    };
-  }, [overview]);
+  const entitlements: EntitlementsState = fullEntitlements;
+  const usage: UsageState = defaultUsage;
 
   const isFeatureAllowed = React.useCallback(
-    (featureKey: keyof EntitlementsState) => {
-      return !!entitlements[featureKey];
-    },
-    [entitlements]
+    (_featureKey: keyof EntitlementsState) => true,
+    []
   );
 
-  const { isReadOnly, readOnlyReason } = React.useMemo(() => {
-    if (loading || !overview) {
-      return { isReadOnly: false, readOnlyReason: null as ReadOnlyReason };
-    }
-
-    if (overview.agency?.status === "SUSPENDED") {
-      return { isReadOnly: true, readOnlyReason: "SUSPENDED" as ReadOnlyReason };
-    }
-
-    const sub = overview.subscription;
-    if (!sub) {
-      return { isReadOnly: true, readOnlyReason: "EXPIRED" as ReadOnlyReason };
-    }
-
-    if (sub.status === "PAST_DUE" || sub.status === "UNPAID") {
-      return { isReadOnly: true, readOnlyReason: "PAST_DUE" as ReadOnlyReason };
-    }
-
-    if (sub.status === "CANCELED" || sub.status === "CANCELLED") {
-      return { isReadOnly: true, readOnlyReason: "CANCELLED" as ReadOnlyReason };
-    }
-
-    const evalState = evaluateEffectiveSubscriptionState({
-      agencyStatus: overview.agency?.status,
-      subscription: {
-        status: sub.storedStatus || sub.status,
-        trialStart: sub.trialStart,
-        trialEnd: sub.trialEnd,
-        subscriptionStart: sub.subscriptionStart,
-        subscriptionEnd: sub.subscriptionEnd,
-      },
-    });
-
-    if (evalState.isReadOnly || sub.isSubscriptionExpired || sub.isExpired || sub.isTrialExpired) {
-      return {
-        isReadOnly: true,
-        readOnlyReason: (evalState.effectiveStatus === "CANCELLED" ? "CANCELLED" : "EXPIRED") as ReadOnlyReason,
-      };
-    }
-
-    return { isReadOnly: false, readOnlyReason: null as ReadOnlyReason };
-  }, [loading, overview]);
+  // Only SUSPENDED agency status triggers read-only mode (account security, not subscription)
+  const isReadOnly = Boolean(subscriptionAccess?.isReadOnly);
+  const readOnlyReason: ReadOnlyReason = isReadOnly ? "SUSPENDED" : null;
 
   const canCreate = React.useCallback(
-    (resourceKey: "TRIPS" | "QUOTATIONS" | "BOOKINGS"): QuotaDecision => {
-      if (loading) {
-        return {
-          allowed: true,
-          currentUsage: 0,
-          limit: null,
-          remaining: null,
-          isExceeded: false,
-          loading: true,
-        };
-      }
-
+    (_resourceKey: "TRIPS" | "QUOTATIONS" | "BOOKINGS"): QuotaDecision => {
       if (isReadOnly) {
         return {
           allowed: false,
           reason: "READ_ONLY_SUBSCRIPTION",
-          currentUsage: usage[resourceKey]?.currentUsage ?? 0,
-          limit: usage[resourceKey]?.limit ?? null,
-          remaining: usage[resourceKey]?.remaining ?? null,
-          isExceeded: false,
-          loading: false,
-        };
-      }
-
-      const item = usage[resourceKey];
-      if (!item) {
-        return {
-          allowed: false,
-          reason: isReadOnly ? "READ_ONLY_SUBSCRIPTION" : "QUOTA_EXCEEDED",
           currentUsage: 0,
-          limit: 0,
-          remaining: 0,
-          isExceeded: true,
-          loading: false,
-        };
-      }
-
-      if (item.limit === null) {
-        return {
-          allowed: true,
-          currentUsage: item.currentUsage,
           limit: null,
           remaining: null,
           isExceeded: false,
-          loading: false,
+          loading: authLoading,
         };
       }
-
-      const isLimitReached = item.isExceeded || item.currentUsage >= item.limit;
-      if (isLimitReached) {
-        return {
-          allowed: false,
-          reason: "QUOTA_EXCEEDED",
-          currentUsage: item.currentUsage,
-          limit: item.limit,
-          remaining: item.remaining ?? 0,
-          isExceeded: true,
-          loading: false,
-        };
-      }
-
       return {
         allowed: true,
-        currentUsage: item.currentUsage,
-        limit: item.limit,
-        remaining: item.remaining,
+        currentUsage: 0,
+        limit: null,
+        remaining: null,
         isExceeded: false,
-        loading: false,
+        loading: authLoading,
       };
     },
-    [isReadOnly, loading, usage]
+    [isReadOnly, authLoading]
   );
 
-  const incrementUsage = React.useCallback(
-    (resourceKey: "TRIPS" | "QUOTATIONS" | "BOOKINGS") => {
-      setOverview((prev: any) => {
-        if (!prev || !prev.usage || !prev.usage[resourceKey]) return prev;
+  const incrementUsage = React.useCallback((_resourceKey: "TRIPS" | "QUOTATIONS" | "BOOKINGS") => {
+    // No-op: quotas retired
+  }, []);
 
-        const currentItem = prev.usage[resourceKey];
-        const newUsage = (currentItem.currentUsage || 0) + 1;
-        const limit = currentItem.limit;
-        const remaining = limit !== null ? Math.max(0, limit - newUsage) : null;
-        const isExceeded = limit !== null && newUsage >= limit;
-
-        return {
-          ...prev,
-          usage: {
-            ...prev.usage,
-            [resourceKey]: {
-              ...currentItem,
-              currentUsage: newUsage,
-              remaining,
-              isExceeded,
-            },
-          },
-        };
-      });
-    },
-    []
+  const value = React.useMemo(
+    () => ({
+      overview: null,
+      entitlements,
+      usage,
+      loading: authLoading,
+      error: null,
+      isReadOnly,
+      readOnlyReason,
+      canWrite: !isReadOnly,
+      refreshSubscription,
+      isFeatureAllowed,
+      canCreate,
+      incrementUsage,
+    }),
+    [entitlements, usage, authLoading, isReadOnly, readOnlyReason, refreshSubscription, isFeatureAllowed, canCreate, incrementUsage]
   );
 
-  return (
-    <SubscriptionContext.Provider
-      value={{
-        overview,
-        entitlements,
-        usage,
-        loading,
-        error,
-        isReadOnly,
-        readOnlyReason,
-        canWrite: !isReadOnly,
-        refreshSubscription: fetchSubscription,
-        isFeatureAllowed,
-        canCreate,
-        incrementUsage,
-      }}
-    >
-      {children}
-    </SubscriptionContext.Provider>
-  );
+  return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;
 }
 
 export function useSubscription(): SubscriptionContextType {
   const context = React.useContext(SubscriptionContext);
   if (!context) {
-    // Graceful fallback for non-dashboard wrappers
+    // Graceful fallback for non-dashboard wrappers (Free SaaS: no subscription gate)
     return {
       overview: null,
-      entitlements: defaultEntitlements,
+      entitlements: fullEntitlements,
       usage: defaultUsage,
       loading: false,
       error: null,
-      isReadOnly: true,
-      readOnlyReason: "EXPIRED",
-      canWrite: false,
+      isReadOnly: false,
+      readOnlyReason: null,
+      canWrite: true,
       refreshSubscription: async () => {},
-      isFeatureAllowed: () => false,
+      isFeatureAllowed: () => true,
       canCreate: (_resourceKey: "TRIPS" | "QUOTATIONS" | "BOOKINGS"): QuotaDecision => ({
-        allowed: false,
-        reason: "READ_ONLY_SUBSCRIPTION",
+        allowed: true,
         currentUsage: 0,
-        limit: 0,
-        remaining: 0,
-        isExceeded: true,
+        limit: null,
+        remaining: null,
+        isExceeded: false,
         loading: false,
       }),
       incrementUsage: () => {},

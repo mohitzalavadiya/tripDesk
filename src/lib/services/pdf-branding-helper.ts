@@ -52,19 +52,6 @@ export const pdfBrandingHelper = {
       return null;
     }
 
-    // 1. Entitlement check (if agencyId provided and checkEntitlement requested)
-    if (agencyId && checkEntitlement) {
-      try {
-        const isAllowed = await entitlementService.isFeatureAllowed(agencyId, "CUSTOM_AGENCY_LOGO");
-        if (!isAllowed) {
-          return null;
-        }
-      } catch (err) {
-        console.warn("[pdfBrandingHelper] Entitlement check warning:", err);
-        return null;
-      }
-    }
-
     const trimmedUrl = logoUrl.trim();
 
     // 2. Data URL handling (e.g. data:image/png;base64,...)
