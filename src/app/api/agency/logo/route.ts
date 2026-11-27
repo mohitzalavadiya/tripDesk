@@ -23,9 +23,6 @@ export async function POST(request: NextRequest) {
     );
     const agencyId = authContext.agencyId;
 
-    // Enforce CUSTOM_AGENCY_LOGO entitlement server-side
-    await entitlementService.checkFeatureAllowed(agencyId, "CUSTOM_AGENCY_LOGO");
-
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 
@@ -82,9 +79,6 @@ export async function DELETE(_request: NextRequest) {
       "UPDATE"
     );
     const agencyId = authContext.agencyId;
-
-    // Enforce CUSTOM_AGENCY_LOGO entitlement server-side
-    await entitlementService.checkFeatureAllowed(agencyId, "CUSTOM_AGENCY_LOGO");
 
     const updatedAgency = await agencyLogoService.deleteLogo(agencyId);
 

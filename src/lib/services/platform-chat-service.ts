@@ -59,11 +59,6 @@ export class PlatformChatService {
           where: { role: UserRole.AGENCY_OWNER },
           take: 1,
         },
-        subscriptions: {
-          include: { plan: true },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
       },
     });
 
@@ -174,11 +169,6 @@ export class PlatformChatService {
         platformChatConversation: true,
         users: {
           where: { role: UserRole.AGENCY_OWNER },
-          take: 1,
-        },
-        subscriptions: {
-          include: { plan: true },
-          orderBy: { createdAt: "desc" },
           take: 1,
         },
       },
@@ -498,13 +488,7 @@ export class PlatformChatService {
     platformContacts?: { supportEmail?: string | null; supportPhone?: string | null }
   ): ConversationView {
     const owner = agency.users?.[0] || null;
-    const sub = agency.subscriptions?.[0] || null;
-
-    let trialDaysRemaining = 0;
-    if (sub && sub.status === "TRIAL" && sub.trialEnd) {
-      const end = new Date(sub.trialEnd).getTime();
-      trialDaysRemaining = Math.max(0, Math.ceil((end - Date.now()) / (1000 * 60 * 60 * 24)));
-    }
+    const trialDaysRemaining = 0;
 
     const lastMsgTime = conv.lastMessageAt ? new Date(conv.lastMessageAt).getTime() : 0;
     const agencyReadTime = conv.agencyLastReadAt ? new Date(conv.agencyLastReadAt).getTime() : 0;
@@ -526,8 +510,8 @@ export class PlatformChatService {
       ownerName: owner?.name || "Agency Owner",
       ownerEmail: owner?.email || agency.email,
       ownerPhone: owner?.phone || agency.phone,
-      subscriptionPlan: sub?.plan?.name || "Starter",
-      subscriptionStatus: sub?.status || "TRIAL",
+      subscriptionPlan: "",
+      subscriptionStatus: agency.status,
       trialDaysRemaining,
       lastMessageAt: conv.lastMessageAt ? new Date(conv.lastMessageAt).toISOString() : null,
       lastMessageSnippet: conv.lastMessageSnippet || null,

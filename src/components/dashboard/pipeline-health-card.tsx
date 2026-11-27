@@ -66,8 +66,8 @@ export function PipelineHealthCard({
     (crm?.overdueFollowUpsCount ?? 0) + (crm?.followUpsDueTodayCount ?? 0);
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-3">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+    <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs space-y-3 min-w-0 overflow-hidden">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <Activity className="h-3.5 w-3.5 text-teal-700 shrink-0" />
           <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider truncate">
@@ -76,14 +76,14 @@ export function PipelineHealthCard({
         </div>
         <Link
           href="/enquiries"
-          className="text-[11px] font-semibold text-teal-700 hover:text-teal-800 flex items-center gap-0.5 shrink-0 transition-colors"
+          className="text-[11px] font-semibold text-teal-700 hover:text-teal-800 flex items-center gap-0.5 shrink-0 transition-colors whitespace-nowrap"
         >
           <span>Pipeline</span>
           <ArrowUpRight className="h-3 w-3" />
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 min-[340px]:grid-cols-2 gap-2">
         {/* Metric 1: Average Deal Value */}
         <div className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-100 min-w-0">
           <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-slate-500 tracking-wider truncate">

@@ -23259,3 +23259,169 @@ In standard viewport heights (900px - 1000px display with top navbar, breadcrumb
 - **HTTP & Browser Verification:**
   - **Unauthenticated `GET http://localhost:3001/api/customers/cmufaeybg0000ectqe6n155i6`:** `VERIFIED` — returned `401 UNAUTHORIZED` (`{"success":false,"error":{"code":"UNAUTHORIZED","message":"Authentication required to access this endpoint."}}`).
   - **Authenticated browser `GET /api/customers/[id]`:** `NOT VERIFIED` — Chrome DevTools remote debugging is not active (`DevToolsActivePort` `False`).
+
+
+---
+
+## § 276.91 Complete Subscription Feature Retirement — Free SaaS Conversion (2026-11-27)
+
+> **FREE SAAS CONVERSION (CODE-ONLY, ZERO DATA LOSS):** Retired all subscription plans, trials, expiry restrictions, quotas, and billing UI across Agency Owner, Agency Staff, and Platform Owner interfaces while preserving historical subscription code, Prisma schema/migrations, database records, and all security/tenant/staff-permission boundaries. Zero Production access or deployment.
+
+- **Runtime Enforcement & Quotas Disconnected:**
+  - `src/lib/api/context.ts` (`getRequestContext`): Disconnected `evaluateEffectiveSubscriptionState` so missing, expired, or cancelled subscriptions never restrict access. Only `AgencyStatus.SUSPENDED` sets `isReadOnly: true` / `canWrite: false`.
+  - `src/lib/auth/index.ts` (`getCurrentUser`, `getSubscriptionAccess`): Grants full access to all non-suspended agencies regardless of subscription state.
+  - `src/lib/services/entitlement-service.ts`: `checkFeatureAllowed()` and `isFeatureAllowed()` allow all features (`CUSTOM_AGENCY_LOGO`, `FEEDBACK_REVIEWS`, `CUSTOMER_INSIGHTS`, `REPORTS_ANALYTICS`) for any valid `agencyId`; `getResourceUsage()` and `checkQuota()` return unlimited (`limit: null, isExceeded: false`) without requiring subscription or usage rows.
+  - Disconnected `entitlementService.lockAgencySubscription`, `checkQuota`, `checkFeatureAllowed`, and `getResourceUsage` call sites in `trip-service.ts`, `quotation-service.ts`, `booking-service.ts`, `invitation-service.ts`, `customer-insights-service.ts`, `feedback-service.ts`, `reporting-service.ts`, `pdf-branding-helper.ts`, and `src/app/api/agency/logo/route.ts`.
+  - `src/lib/services/onboarding-service.ts`: Removed Starter plan lookup and 7-day trial subscription creation so new agency registration works without subscription plans.
+  - `src/context/subscription-context.tsx`: `SubscriptionProvider` no longer polls `/api/subscription`; grants full feature entitlements and unlimited creation (`canCreate` blocked only when `agency.status === "SUSPENDED"`).
+- **Agency & Platform Owner UI Retired:**
+  - `src/lib/navigation.ts`, `src/components/layout/mobile-nav.tsx`, `src/components/shared/user-menu.tsx`: Removed `/subscription`, `/admin/subscriptions`, `/admin/payments`, `/admin/plans`, and `featureKey` locks.
+  - `src/components/layout/agency-lifecycle-banner.tsx`: Retired Read-Only subscription, Trial Expiring, and 7-Day Trial banners while preserving the `Account Suspended` security banner.
+  - `src/app/(dashboard)/settings/page.tsx` & `src/app/(dashboard)/support/page.tsx`: Unlocked custom agency logo branding and removed trial/plan upgrade prompts.
+  - `src/app/(dashboard)/subscription/page.tsx` (and `/app/subscription`), `src/app/admin/subscriptions/page.tsx`, `src/app/admin/payments/page.tsx`, `src/app/admin/plans/page.tsx`: Replaced with clean redirects to `/dashboard` / `/admin`.
+  - `src/app/admin/page.tsx`, `src/app/admin/agencies/page.tsx`, `src/app/admin/agencies/[agencyId]/page.tsx`, `src/app/admin/agencies/new/page.tsx`, `src/app/admin/settings/page.tsx`: Removed SaaS MRR/ARR cards, Active/Expiring Trial KPIs and modals, Subscription filters/columns/tabs, Section 3 Subscription & Terms, and Platform Billing UPI/QR settings while retaining agency governance, usage telemetry, audit logs, and suspend/reactivate security controls.
+- **Subscription & Payment APIs Retired (`410 FEATURE_RETIRED`):**
+  - Added `subscriptionRetiredResponse()` in `src/lib/api/errors.ts` and returned `410` (preserving auth checks and original implementations in place) across `/api/subscription`, `/api/subscription/plans`, `/api/subscription/billing-settings`, `/api/subscription/payment-request`, `/api/admin/subscriptions`, `/api/admin/plans`, `/api/admin/plans/[id]`, `/api/admin/subscription-payments/**`, `/api/admin/agencies/[id]/extend-trial`, and `/api/admin/billing-settings/**`.
+- **Verification Results:**
+  - `prisma/test-free-saas-retirement.ts`: **`9 passed, 0 failed (total 9)`**
+  - `prisma/test-itinerary-correctness.ts`: **`143/143`** passed (`100%`)
+  - `prisma/test-staff-application-wide-authorization.ts`, `prisma/test-staff-lifecycle.ts`, `prisma/test-staff-invitation-session.ts`, `prisma/test-phase1-security-financial-stabilization.ts`: all passed prior to final `SubscriptionOverviewStub` type tweak in `subscription-context.tsx` (zero behavioral changes).
+  - `npx eslint ...` (`0` errors), `npx tsc --noEmit` (`0` errors), `npx prisma validate`, `git diff --check`, and `npm run build` all exited `0` after final edits.
+  - Live Browser Verification: **`NOT VERIFIED`** (`DevToolsActivePort` `False`).
+
+---
+
+## § 276.92 Free SaaS Final Integration & Regression Closure (2026-11-27)
+
+> **GLOBAL AUDIT & CLOSURE COMPLETE (CODE-ONLY, ZERO DB WRITES, ZERO PRODUCTION ACCESS):** Independently audited all 108 matching source files under `src/` and all 251 API routes (`src/app/api/**/route.ts`), closed 10 remaining active/visible subscription UI and notification dependencies missed in §276.91, proved CRM Category 37 failure was pre-existing (`8c6378e`), verified all 14 retired subscription endpoints return `410 FEATURE_RETIRED` while preserving `401`/`403` auth guards and `AgencyStatus.SUSPENDED` security controls, and re-ran regression/build gates.
+
+- **Remaining Active/Visible Subscription Dependencies Closed:**
+  - `src/app/admin/chat/page.tsx` & `src/lib/services/platform-chat-service.ts`: Removed Platform Owner Live Chat `{subscriptionPlan}` / `{subscriptionStatus}` plan & trial badges and dropped runtime `subscriptions` joins in chat conversation loading (showing `Suspended` badge only when `agencyStatus === "SUSPENDED"`).
+  - `src/app/admin/page.tsx`: Removed leftover `{agency.planName}` label from Recent Agency Onboardings and removed the orphaned `Extend Free Trial Period` modal (`extendModalAgency`, `handleExtendTrial`).
+  - `src/app/admin/settings/page.tsx`: Removed `Default Free Trial Duration (Days)` input (`defaultTrialDays`) and dead `Remove Billing QR Code` confirmation dialog/handlers.
+  - `src/app/admin/agencies/new/page.tsx` & `src/app/admin/agencies/page.tsx`: Removed remaining `"setup initial subscription & 7-day trial terms"` subtitle copy, unused Section 3 plan/trial state, unused `sub` variable, and fixed empty/loading `colSpan={5}`.
+  - `src/components/team/staff-permissions-modal.tsx`: Filtered retired `moduleKey === "SUBSCRIPTION"` (`/subscription`) out of the live Staff Permissions Matrix UI while retaining `"SUBSCRIPTION"` in `src/lib/auth/permissions.ts` for historical test compatibility.
+  - `src/components/shared/read-only-banner.tsx`, `src/components/shared/read-only-mode-card.tsx`, `src/components/shared/read-only-mode-dialog.tsx`: Replaced `"Subscription Expired — Read-Only Mode"` / `"Renew Subscription"` (`/subscription`) fallback copy and `reason = "EXPIRED"` defaults with workspace-restriction / suspension messaging linking to `/support`.
+  - `src/lib/services/onboarding-service.ts` (`line 244`), `src/actions/auth-actions.ts`, `src/app/auth/callback/route.ts`, `src/lib/services/admin-service.ts` (`line 626`), `src/context/auth-context.tsx`, and `src/app/(dashboard)/settings/page.tsx`: Replaced `"started a 7-day trial"` platform notification, removed dead `plan_unavailable` branch, updated `suspendAgency` notification `linkUrl` from `/subscription` to `/support`, changed default fallback `plan` label from `"Starter"` to `"Free"`, and removed dead `"Locked on Starter"` / `"Professional feature"` strings.
+- **CRM Category 37 Investigation (`[Phase E Costing API Suppression]`):**
+  - `prisma/test-crm-correctness.ts:6250-6256` fails on assertion `tripQuotationRouteSrc.includes("const hasMarginAccess = canAccessFinancialMargins(context.dbUser.role);")`.
+  - `git show 8c6378e` proves commit `8c6378e` (`add role base`, prior to `remove-subscrption` Free SaaS edits) intentionally changed `src/app/api/trips/[id]/quotation/route.ts:39` to `await hasFinancialMarginsAccess(context.dbUser.role, context.agencyId, context.dbUser.id)` for delegated staff permissions while the static string check in `test-crm-correctness.ts` was never updated. Unrelated to subscription retirement; left unchanged.
+- **Verification Results:**
+  - `prisma/test-free-saas-retirement.ts`: **`10 passed, 0 failed (total 10)`** (covers missing, expired, cancelled, and suspended subscriptions; `SUSPENDED` agency & deactivated user blocks; Platform Owner access; all 14 retired API routes returning `410 FEATURE_RETIRED`; and `401`/`403` auth preservation).
+  - `prisma/test-staff-application-wide-authorization.ts`: **`137/137`** passed (`100%`).
+  - `prisma/test-staff-lifecycle.ts` & `prisma/test-staff-invitation-session.ts`: exited `0`.
+  - `prisma/test-phase1-security-financial-stabilization.ts`: **`58 passed, 0 failed`**.
+  - `prisma/test-itinerary-correctness.ts`: **`143/143`** passed (`100%`).
+  - `prisma/test-phase7-finance.ts`: **`82/82`** passed (`0` failed).
+  - `prisma/test-tax-service.ts`: **`27 passed, 0 failed`**.
+  - `prisma/test-crm-correctness.ts`: Categories 1–36 passed; Category 37 failed (`CRM_EXIT=1`) solely on pre-existing `[Phase E Costing API Suppression]`.
+  - Live-DB scripts (`test-booking-invoice-pdf-tax.ts`, `test-phase11-booking.ts`, `test-phase12-finance.ts`, `test-quotation-tax.ts`): **NOT RUN** to strictly maintain zero database writes.
+  - Focused ESLint (`11` core/shared files: `0` errors, `13` warnings; full touched-file lint encountered `136` pre-existing `no-explicit-any`/`set-state-in-effect` errors on untouched legacy sections), `npx tsc --noEmit`, `npx prisma validate`, `git diff --check`, and `npm run build` all exited `0` after final source edits.
+  - Live Browser Verification: **`NOT VERIFIED`** (`DevToolsActivePort` missing / Chrome remote debugging unavailable).
+
+---
+
+## § 276.93 CRM Regression Test Alignment After Free SaaS & Delegated Permission Evolution (2026-11-27)
+
+> **CRM REGRESSION SUITE CLOSED (`450/450` PASSED, TEST-ONLY ALIGNMENT):** Updated stale test expectations in `prisma/test-crm-correctness.ts` (Categories 37–39) to verify the live delegated financial-margin permission helper (`hasFinancialMarginsAccess`, `enforceStaffPermission`, `evaluateStaffPermission`) introduced in commit `8c6378e` and the Free SaaS unlimited staff capacity rules from §276.91, without modifying any application source files, database state, or environment config.
+
+- **Exact Test Alignments (`prisma/test-crm-correctness.ts`):**
+  - **Test 37.14 (`[Phase E Costing API Suppression]`):** Replaced stale string check for `canAccessFinancialMargins(context.dbUser.role)` with combined runtime + static verification covering `src/app/api/trips/[id]/quotation/route.ts` wiring (`await hasFinancialMarginsAccess(...)`, `costing: null` suppression, and `toStaffSafeQuotationListDTO`), runtime checks of `hasFinancialMarginsAccess` & `enforceFinancialMarginsAccess` (owner allowed, `PLATFORM_OWNER` denied, unpermitted/deactivated staff denied, delegated `FINANCE.view` / `QUOTATIONS.commercialMargins` staff allowed, cross-tenant `user.findFirst` scoping & fail-closed rejection), and runtime DTO redaction of `markupPercentage`, `markupAmount`, `internalNotes`, `costPrice`, `supplierCost`, and `netRate`.
+  - **Test 37.15 (`[Phase E Owner/Delegated Financial Guard]`):** Updated check across all 5 finance routes (`summary`, `transactions`, `export`, `supplier-payables`, `dashboard/finance`) from `canAccessFinancialMargins` to `enforceStaffPermission(..., "FINANCE", "VIEW")` plus runtime checks proving owner access, delegated staff `FINANCE.view` access, unauthorized denial (`ForbiddenError`), and cross-tenant isolation.
+  - **Tests 38.2 & 38.3 (`[Phase F Role Ceiling]` & `[Phase F Deletion Guard]`):** Aligned assertions to `8c6378e`'s delegable module permissions (default `DEFAULT_STAFF_PERMISSIONS` denies sensitive modules & deletions, undeclared actions outside `delegableActions` remain blocked, `view: false` blocks child actions including `delete`, `PLATFORM_OWNER` blocked, and owner-delegated grants permit targeted actions).
+  - **Tests 38.8, 38.10, 38.22 & 39.6 (`[Phase F/Invitation Quotas]`):** Updated assertions to reflect Free SaaS unlimited staff capacity (`entitlementService.getResourceUsage` returning `limit: null, isExceeded: false`, and `acceptInvitation` / `resendInvitation` succeeding beyond legacy 5-seat quota while enforcing `AGENCY_STAFF` role, token rotation, and agency tenant binding).
+- **Verification Scope & Results (No Application Source Changed — Production Build Re-run Omitted Since Application Code Was Unchanged):**
+  - `npx tsx prisma/test-crm-correctness.ts`: **`450/450 TESTS PASSED (100%)`** across all **39** categories.
+  - `npx tsx prisma/test-free-saas-retirement.ts`: **`10 passed, 0 failed (total 10)`**.
+  - `npx tsx prisma/test-staff-application-wide-authorization.ts`: **`137/137 TESTS PASSED (100%)`**.
+  - `npx tsx prisma/test-phase1-security-financial-stabilization.ts`: **`58 passed, 0 failed (total 58)`**.
+  - `npx tsc --noEmit`, `npx prisma validate`, and `git diff --check`: all exited `0`.
+  - **Unverified / Mock Boundary:** Runtime assertions in `prisma/test-crm-correctness.ts` run with mocked Prisma delegates; full Next.js HTTP route execution against live Postgres (`GET /api/trips/[id]/quotation` end-to-end) was not run in order to maintain zero database access/mutations.
+
+---
+
+## § 276.94–§ 276.95 Browser Acceptance Status & Manual Confirmation Record (2026-11-27)
+
+- Automated DevTools browser verification on `http://localhost:3001` was blocked due to missing `DevToolsActivePort` (`ENOENT`). Unauthenticated server checks passed (`GET /api/health` → `200`, `GET /api/subscription/plans` → `410 FEATURE_RETIRED`, auth-gated APIs → `401`, `/subscription` & `/admin/{subscriptions,plans,payments}` → `307 /login`).
+- The user subsequently **manually confirmed** in the browser that all three roles (**`PLATFORM_OWNER`**, **`AGENCY_OWNER`**, **`AGENCY_STAFF`**) operate cleanly after the Free SaaS conversion.
+
+---
+
+## § 276.96 Final Production Preflight After Free SaaS Conversion — `NO-GO` (2026-11-27 15:08 IST)
+
+> **FINAL PREFLIGHT VERDICT: `NO-GO`** *(Verification-only task — zero source, schema, migration, dependency, `.env*`, Staging, Production, or Git history mutations)*
+
+### 1. Baseline & Working Tree
+- **Branch / HEAD:** `remove-subscrption` @ `fb7103ecd59d37e41451dbed99e51e82b57a622f`
+- **Working Tree:** `59` modified tracked files (`M`) + `1` untracked test file (`?? prisma/test-free-saas-retirement.ts`) preserved intact before and after preflight (only `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` appended here).
+
+### 2. Free SaaS Verification & Three-Role Acceptance
+- **Code & Runtime Invariants (`PASS`):**
+  - `src/lib/api/context.ts` & `src/lib/auth/index.ts`: disconnected subscription expiry/cancellation checks; only `AgencyStatus.SUSPENDED` restricts access (`isSuspendedAgency`).
+  - `src/lib/services/entitlement-service.ts`: quota/feature checks return unlimited/allowed while retaining historical helpers (`resolveAgencySubscription`, `lockAgencySubscription`) and Prisma models (`Subscription`, `SubscriptionPlan`, `SubscriptionPayment`, `PlanFeatureEntitlement`, `PlanUsageLimit`).
+  - Retired subscription UI links/banners removed from navigation/banner/modals (`§276.91`–`§276.92`); retired `/api/subscription*` & `/api/admin/*` endpoints return `410 FEATURE_RETIRED` after auth checks.
+- **Three-Role Browser Acceptance:** **MANUALLY CONFIRMED** by the user for `PLATFORM_OWNER`, `AGENCY_OWNER`, and `AGENCY_STAFF`.
+
+### 3. Build, Static Checks & Regression Suites (Observed Results)
+- **Static & Build (`task-3480`, exit `0`):**
+  - `npx prisma validate` → `PASS`
+  - `npx tsc --noEmit` → `PASS` (`0` errors)
+  - `git diff --check` → `PASS`
+  - Focused ESLint (`14` core Free SaaS, security/rate-limit, and UI files) → `0` errors, `13` warnings
+  - `npm run build` (Next.js `16.4.6` Turbopack) → `PASS` (`Compiled successfully in 36.9s`, TypeScript `12.2s`, `42/42` static pages)
+- **DB-Free / Mocked Regression Suites (`task-3481` + Excel check, `1,011/1,011` assertions passed, `0` failed):**
+  - `prisma/test-free-saas-retirement.ts`: **`10/10`** passed
+  - `prisma/test-crm-correctness.ts`: **`450/450`** passed (Categories 1–39)
+  - `prisma/test-itinerary-correctness.ts`: **`143/143`** passed
+  - `prisma/test-staff-application-wide-authorization.ts`: **`137/137`** passed
+  - `prisma/test-staff-lifecycle.ts`: **`23/23`** passed
+  - `prisma/test-staff-invitation-session.ts`: **`27/27`** passed
+  - `prisma/test-staff-dashboard-authorization.ts`: **`54/54`** passed
+  - `prisma/test-phase1-security-financial-stabilization.ts`: **`58/58`** passed
+  - `prisma/test-phase7-finance.ts`: **`82/82`** passed
+  - `prisma/test-tax-service.ts`: **`27/27`** passed
+  - DB-free `read-excel-file`/`write-excel-file` (`hotelExcelService`, `rateExcelService` mocked Prisma): **`EXCEL_DBFREE_PASS`** (`hotelRows=2, rateRows=3`, invalid non-ZIP rejected)
+- **Blocked / Not Run DB-Backed Suites (No Isolated Test Postgres):**
+  - `prisma/test-crm-itinerary-e2e-integration.ts`, `prisma/test-staff-failures-phase1.ts`, `prisma/test-phase3-correctness-closure.ts`, `prisma/test-booking-invoice-pdf-tax.ts`, `prisma/test-phase11-booking.ts`, `prisma/test-phase12-finance.ts`, `prisma/test-qa-19-hotel-master-destination-excel.ts`, `prisma/test-qa-20-phase-158d-e2e-qa.ts`, `prisma/test-qa-21-rate-excel-validation-error.ts`, `scratch/test-dev03-excel.ts`, `scratch/test-dev03-qa-matrix.ts`.
+
+### 4. Database & Migration Readiness (`BLOCKED` / `NOT VERIFIED`)
+- **Isolated Local DB Availability:** `DOCKER=False`, `PSQL=False`, `PORT_5432=False` — no disposable PostgreSQL instance available on host. Shared `.env`/`.env.staging` and `.env.production` DBs were NOT touched.
+- **Static Migration Alignment:** All `61` Prisma models in `prisma/schema.prisma` have matching `CREATE TABLE` definitions across the `8` migration directories (`20261007120000_baseline_schema` through `20261126120000_add_staff_lifecycle_fields`).
+- **Live Production Migration Status:** **`NOT VERIFIED`** (not connected or queried per safety rules; must verify `prisma migrate status` against Production Postgres before release, ensuring `20261027150000_phase_f_staff_permissions` and `20261126120000_add_staff_lifecycle_fields` are cleanly applied with backup taken beforehand).
+
+### 5. Production Environment & Redis Rate Limiter Audit (`NOT VERIFIED` on Hosting Platform)
+- **Fail-Closed Rate Limiter Confirmed (`src/lib/security/rate-limiter.ts`):**
+  - `POST /api/quotations/public/[token]/accept` and `POST /api/quotations/public/[token]/request-changes` call `limitEndpoint("public-quotation-mutation", ..., request)` (`10 req/min`, `failClosed: true`).
+  - Under `NODE_ENV=production`, missing or unreachable `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` triggers `{ allowed: false, isServiceUnavailable: true }`, returning **`503 Service Unavailable`**.
+- **Required Runtime Environment Variables Found in `src/`:**
+  - *Required Core / Auth / DB:* `NODE_ENV` (`production`), `DATABASE_URL`, `DIRECT_URL` (Prisma CLI migrations), `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+  - *Required Fail-Closed Rate Limiting:* `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
+  - *Required Automation / Webhooks / Admin:* `CRON_SECRET`, `COMMUNICATION_WEBHOOK_SECRET`, `BOOTSTRAP_OWNER_EMAIL` (and/or `PLATFORM_OWNER_EMAIL`, `PLATFORM_OWNER_USER_ID`).
+  - *Optional / Graceful-Fallback Variables:* `RECOVERY_SIGNING_SECRET` (falls back to `SUPABASE_SERVICE_ROLE_KEY`), `TRUST_CLOUDFLARE_PROXY` (`"true"` only behind Cloudflare), `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_FROM`, `WHATSAPP_API_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID`/`WHATSAPP_BUSINESS_ACCOUNT_ID`, `DEBUG`, `VERCEL_URL`.
+- **Local `.env.production` vs Hosting Config:** Local `.env.production` has `NODE_ENV=production` and non-empty core DB, Supabase, Upstash Redis (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`), `CRON_SECRET`, and webhook keys (`SMTP_*` and `WHATSAPP_*` omitted). Local `.env` / `.env.staging` have `NODE_ENV=development`. Effective hosting platform variables (confirming `NODE_ENV=production` override-free and live Upstash Redis connectivity) are **`NOT VERIFIED`** from this workspace.
+
+### 6. Dependency Vulnerabilities & Excel Compatibility
+- **`npm audit` & `npm audit --omit=dev`:** Both report **`3` high (`0` critical, `0` moderate, `0` low)** — `GHSA-7589-6fvf-x4pw` (`effect <=3.22.0` ReDoS in `Schema.TemplateLiteral` via `prisma@7.10.1` → `@prisma/config@7.10.1` → `effect@3.20.0`).
+- **Excel Replacement (`PASS`):** `npm ls xlsx` is `(empty)`; zero `src/` files import `xlsx`, `effect`, or `@prisma/config`; `read-excel-file@9.3.20` and `write-excel-file@4.1.1` remain intact.
+- **Assessment:** `0` vulnerabilities remain with an identified Next.js production-runtime execution path (`@prisma/client@7.9.1` & `@prisma/adapter-pg@7.9.1` do not import `@prisma/config`/`effect`; `npm audit --omit=dev` includes `prisma` solely via peer dependency). Still, an upstream Prisma 7 `@prisma/config`/`effect >3.22.0` release is required to eliminate the advisory (`npm audit fix --force` would downgrade to `prisma@6.12.0`).
+
+### 7. Remaining Blockers Preventing `GO`
+1. Provision an isolated disposable PostgreSQL DB and run the blocked DB-backed integration/concurrency suites (`test:staff:failures`, `test:crm:correctness` live-DB scenarios, `test:e2e:integration`, `test-phase3-correctness-closure.ts`, booking/finance/Excel suites).
+2. Verify Production database backup and read-only `prisma migrate status` (confirming `20261027150000_phase_f_staff_permissions` & `20261126120000_add_staff_lifecycle_fields`) and execute authorized `prisma migrate deploy` if pending migrations exist.
+3. Verify on the hosting platform dashboard that `NODE_ENV=production` (not `development`) and valid live `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` credentials are active and reachable in Production before deploying.
+4. Ensure any Production deployment comes from a clean, reviewed commit on the release branch rather than uncommitted local edits.
+
+---
+
+## § 276.97 Production Database Migration Status Verification (2026-11-27 15:18 IST)
+
+> **READ-ONLY CHECK PASSED (`UP TO DATE`, EXIT `0`):** Verified Production database migration status without executing any database writes, repairs, schema changes, or business data queries.
+
+- **Verified Production Target:** `aws-0-ap-northeast-2.pooler.supabase.com:5432` / database `postgres` (`schema: public`, `TRIPDESK_ENV=production` from `.env.production` — distinct from `.env` Staging host `aws-0-ap-northeast-1.pooler.supabase.com`).
+- **Exact Command Executed:** `node --env-file=.env.production node_modules/prisma/build/index.js migrate status`
+- **Exit Code:** `0`
+- **Migration Counts:** `8` migrations found in `prisma/migrations`; `8` migrations applied in Production; `0` pending, `0` missing, `0` failed/unresolved (`Database schema is up to date!`).
+- **Named Migration Statuses:**
+  - `20261027150000_phase_f_staff_permissions`: **APPLIED**
+  - `20261126120000_add_staff_lifecycle_fields`: **APPLIED**
+- **Safety Confirmation:** Zero database writes, zero `_prisma_migrations` edits, zero business record queries, and zero application/schema/environment/dependency/Git modifications occurred.

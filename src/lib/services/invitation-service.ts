@@ -216,18 +216,7 @@ export class InvitationService {
         }
       }
 
-      // 5. Quota check inside the advisory lock
-      const staffQuota = await entitlementService.getResourceUsage(actor.agencyId, "STAFF_MEMBERS", tx);
-      if (staffQuota.isExceeded) {
-        throw new QuotaExceededError(
-          "STAFF_MEMBERS",
-          staffQuota.limit!,
-          staffQuota.currentUsage,
-          `Your plan allows a maximum of ${staffQuota.limit} staff members. Upgrade to Professional to invite more staff.`
-        );
-      }
-
-      // 6. Supersede any existing pending invitations for this email in this agency
+      // 5. Supersede any existing pending invitations for this email in this agency
       await tx.agencyInvitation.updateMany({
         where: {
           agencyId: actor.agencyId,
@@ -407,19 +396,6 @@ export class InvitationService {
 
       if (invitation.status === "ACCEPTED") {
         throw new ConflictError("Cannot resend an invitation that has already been accepted.");
-      }
-
-      // If the invitation was previously expired or revoked, setting it to PENDING consumes a slot:
-      if (invitation.status !== "PENDING" || new Date(invitation.expiresAt) <= new Date()) {
-        const staffQuota = await entitlementService.getResourceUsage(actor.agencyId, "STAFF_MEMBERS", tx);
-        if (staffQuota.isExceeded) {
-          throw new QuotaExceededError(
-            "STAFF_MEMBERS",
-            staffQuota.limit!,
-            staffQuota.currentUsage,
-            `Your plan allows a maximum of ${staffQuota.limit} staff members. Upgrade to Professional to invite more staff.`
-          );
-        }
       }
 
       const rawToken = generateInvitationToken();
@@ -628,23 +604,6 @@ export class InvitationService {
           throw new ConflictError(
             "Invitation was concurrently accepted or modified. Duplicate acceptance prevented."
           );
-        }
-
-        // 4b. Re-verify active staff quota limit inside transaction
-        if (tx.subscription) {
-          const activeStaff = await tx.user.count({
-            where: { agencyId: invitation.agencyId, role: "AGENCY_STAFF", isActive: true },
-          });
-          const planCtx = await entitlementService.resolveAgencySubscription(invitation.agencyId, tx);
-          const maxStaff = await entitlementService.getUsageLimit(planCtx.effectivePlanId, "STAFF_MEMBERS", tx);
-          if (maxStaff !== null && activeStaff >= maxStaff) {
-            throw new QuotaExceededError(
-              "STAFF_MEMBERS",
-              maxStaff,
-              activeStaff,
-              `Your agency has reached its maximum staff limit of ${maxStaff}. Unable to accept invitation.`
-            );
-          }
         }
 
         // 5. Resolve authenticated identity UUID:

@@ -17,19 +17,19 @@ export function ReadOnlyBanner({ moduleName = "Workspace" }: ReadOnlyBannerProps
         </div>
         <div>
           <p className="text-xs font-bold text-amber-900">
-            Subscription Expired — Read-Only Mode
+            Workspace Restricted — Read-Only Mode
           </p>
           <p className="text-[11px] text-amber-800 mt-0.5">
-            Your {moduleName} records are safely preserved and accessible in read-only mode. Renew your subscription to resume creating or modifying data.
+            Your {moduleName} records are safely preserved and accessible in read-only mode. Contact support for assistance with workspace restrictions.
           </p>
         </div>
       </div>
-      <Link href="/subscription" className="shrink-0">
+      <Link href="/support" className="shrink-0">
         <Button
           size="sm"
           className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-8 px-3 rounded-lg shadow-xs flex items-center gap-1 cursor-pointer"
         >
-          <span>Renew Subscription</span>
+          <span>Contact Support</span>
           <ArrowRight className="h-3 w-3" />
         </Button>
       </Link>

@@ -1,4 +1,5 @@
 import { requirePlatformOwnerContext } from "@/lib/api/context";
+import { subscriptionRetiredResponse } from "@/lib/api/errors";
 import { adminService } from "@/lib/services/admin-service";
 import { NextRequest,NextResponse } from "next/server";
 
@@ -14,6 +15,7 @@ export async function GET(
 ) {
   try {
     await requirePlatformOwnerContext();
+    return subscriptionRetiredResponse();
     const { id } = await context.params;
 
     const payment = await adminService.getSubscriptionPayment(id);

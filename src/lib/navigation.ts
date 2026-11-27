@@ -75,7 +75,6 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Customer Insights",
         href: "/customer-insights",
         icon: TrendingUp,
-        featureKey: "CUSTOMER_INSIGHTS",
         moduleKey: "CUSTOMER_INSIGHTS",
       },
     ],
@@ -183,14 +182,12 @@ export const agencyNavigationConfig: NavigationSection[] = [
         label: "Feedback & Reviews",
         href: "/feedback",
         icon: Star,
-        featureKey: "FEEDBACK_REVIEWS",
         moduleKey: "FEEDBACK",
       },
       {
         label: "Reports & Analytics",
         href: "/reports",
         icon: BarChart,
-        featureKey: "REPORTS_ANALYTICS",
         moduleKey: "REPORTS",
       },
       {
@@ -215,12 +212,6 @@ export const agencyNavigationConfig: NavigationSection[] = [
         href: "/settings",
         icon: Settings,
         moduleKey: "SETTINGS",
-      },
-      {
-        label: "Subscription",
-        href: "/subscription",
-        icon: CreditCard,
-        moduleKey: "SUBSCRIPTION",
       },
       {
         label: "Support Chat",
@@ -253,22 +244,6 @@ export const adminNavigationConfig: NavigationSection[] = [
         label: "Agencies",
         href: "/admin/agencies",
         icon: Building,
-      },
-      {
-        label: "Subscriptions",
-        href: "/admin/subscriptions",
-        icon: CreditCard,
-      },
-      {
-        label: "Payment Requests",
-        href: "/admin/payments",
-        icon: IndianRupee,
-        ownerOnly: true,
-      },
-      {
-        label: "Plans & Pricing",
-        href: "/admin/plans",
-        icon: Layers,
       },
       {
         label: "Usage & Analytics",

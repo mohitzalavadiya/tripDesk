@@ -205,7 +205,7 @@ export default function SettingsPage() {
       return;
     }
     if (!logoAllowed) {
-      toast.error("Custom agency logo is a Professional feature. Please upgrade your plan.");
+      toast.error("Logo upload is currently unavailable.");
       return;
     }
     if (!selectedLogoFile) {
@@ -244,7 +244,7 @@ export default function SettingsPage() {
       return;
     }
     if (!logoAllowed) {
-      toast.error("Custom agency logo is a Professional feature. Please upgrade your plan.");
+      toast.error("Logo upload is currently unavailable.");
       return;
     }
 
@@ -459,11 +459,6 @@ export default function SettingsPage() {
           >
             <ImageIcon className="h-4 w-4 shrink-0" />
             Agency Branding & Logo
-            {!logoAllowed && (
-              <span className="text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
-                <Lock className="h-2.5 w-2.5" /> PRO
-              </span>
-            )}
           </button>
           {(isAgencyOwner || hasStaffPermission("TEAM", "view")) && (
             <button
@@ -1115,34 +1110,6 @@ export default function SettingsPage() {
         ) : activeTab === "branding" ? (
           /* ─── AGENCY BRANDING & LOGO TAB ─── */
           <div className="space-y-6">
-            {!logoAllowed && (
-              <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-amber-100 text-amber-700 rounded-xl shrink-0 mt-0.5">
-                      <Lock className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-amber-950 flex items-center gap-2">
-                        <span>Custom Agency Logo Management — Professional Feature</span>
-                        <span className="text-[10px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">
-                          Starter Locked
-                        </span>
-                      </h4>
-                      <p className="text-xs text-amber-800 leading-relaxed mt-1">
-                        Uploading a custom agency logo for PDF proposals, vouchers, and customer portals is available with the <strong>Professional Plan</strong>. Upgrade to customize your agency brand identity.
-                      </p>
-                    </div>
-                  </div>
-                  <Link href="/subscription" className="shrink-0">
-                    <Button type="button" className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-9 px-4 rounded-xl cursor-pointer">
-                      Upgrade to Professional
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            )}
-
             <div className="bg-white p-4 sm:p-6 md:p-8 rounded-3xl border border-slate-200/90 shadow-2xs space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
                 <div className="flex items-center gap-2.5 sm:gap-3">
@@ -1162,7 +1129,7 @@ export default function SettingsPage() {
                   </span>
                 ) : (
                   <span className="self-start sm:self-auto text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-700 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full flex items-center gap-1 shrink-0">
-                    <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> Locked on Starter
+                    <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> Restricted
                   </span>
                 )}
               </div>
@@ -1268,7 +1235,7 @@ export default function SettingsPage() {
                 <div
                   onClick={() => {
                     if (!logoAllowed) {
-                      toast.error("Custom agency logo is a Professional feature. Please upgrade your plan.");
+                      toast.error("Logo upload is currently unavailable.");
                       return;
                     }
                     fileInputRef.current?.click();
@@ -1284,7 +1251,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-slate-800">
-                      {logoAllowed ? "Click to select a logo image" : "Custom Logo Locked on Starter"}
+                      {logoAllowed ? "Click to select a logo image" : "Logo Upload Unavailable"}
                     </p>
                     <p className="text-[11px] text-slate-500 mt-0.5">
                       Supports PNG, JPEG, or WEBP up to 2MB.

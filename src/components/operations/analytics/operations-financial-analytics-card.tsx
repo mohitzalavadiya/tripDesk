@@ -67,7 +67,7 @@ export function OperationsFinancialAnalyticsCard({
         </div>
 
         {/* Cost Summary Highlights */}
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-4">
+        <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-1.5 sm:gap-2 mb-4">
           <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-1.5 sm:p-2.5 text-center sm:text-left">
             <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 truncate">Total Planned</div>
             <div className="text-xs sm:text-base font-bold text-slate-900 mt-0.5 truncate">

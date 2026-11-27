@@ -56,7 +56,7 @@ export function OperationsIssuesAnalyticsCard({
         </div>
 
         {/* Resolution Velocity & Reopen Rate */}
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-4">
+        <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-1.5 sm:gap-2 mb-4">
           <div className="rounded-lg bg-slate-50 border border-slate-200/80 p-1.5 sm:p-2.5 text-center">
             <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 flex items-center justify-center gap-1 truncate">
               <Clock className="h-3 w-3 shrink-0" /> Avg Res.

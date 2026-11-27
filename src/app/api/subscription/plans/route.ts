@@ -1,8 +1,10 @@
+import { subscriptionRetiredResponse } from "@/lib/api/errors";
 import { subscriptionService } from "@/lib/services/subscription-service";
 import { NextRequest,NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   try {
+    return subscriptionRetiredResponse();
     const plans = await subscriptionService.listActivePlans();
 
     return NextResponse.json({

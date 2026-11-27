@@ -729,12 +729,6 @@ export const quotationService = {
    */
   async createQuotation(agencyId: string, data: CreateQuotationInput): Promise<QuotationWithRelations> {
     return prisma.$transaction(async (tx) => {
-      // 1. Lock authoritative agency subscription FOR UPDATE
-      await entitlementService.lockAgencySubscription(agencyId, tx);
-
-      // 2. Validate quota for "QUOTATIONS" resource inside transaction
-      await entitlementService.checkQuota(agencyId, "QUOTATIONS", tx);
-
       const quotationNumber = await this.generateNextQuotationNumber(agencyId, tx);
       const shareToken = crypto.randomBytes(16).toString("hex");
 
@@ -1491,12 +1485,6 @@ export const quotationService = {
     const quotationTitle = options?.title || `Proposal for ${costing.tripTitle} - ${selectedTier}`;
 
     const quotation = await prisma.$transaction(async (tx) => {
-      // 1. Lock authoritative agency subscription FOR UPDATE
-      await entitlementService.lockAgencySubscription(agencyId, tx);
-
-      // 2. Validate quota for "QUOTATIONS" resource inside transaction
-      await entitlementService.checkQuota(agencyId, "QUOTATIONS", tx);
-
       const q = await tx.quotation.create({
         data: {
           agencyId,
@@ -1704,12 +1692,6 @@ export const quotationService = {
     const newShareToken = crypto.randomBytes(16).toString("hex");
 
     const newQuotation = await prisma.$transaction(async (tx) => {
-      // 1. Lock authoritative agency subscription FOR UPDATE
-      await entitlementService.lockAgencySubscription(agencyId, tx);
-
-      // 2. Validate quota for "QUOTATIONS" resource inside transaction
-      await entitlementService.checkQuota(agencyId, "QUOTATIONS", tx);
-
       const q = await tx.quotation.create({
         data: {
           agencyId,

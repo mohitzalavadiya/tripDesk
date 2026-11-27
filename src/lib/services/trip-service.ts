@@ -335,13 +335,7 @@ export const tripService = {
    */
   async createTrip(agencyId: string, data: CreateTripInput, txClient?: Prisma.TransactionClient): Promise<Trip> {
     const execute = async (tx: Prisma.TransactionClient) => {
-      // 1. Lock authoritative agency subscription row FOR UPDATE
-      await entitlementService.lockAgencySubscription(agencyId, tx);
-
-      // 2. Validate quota for "TRIPS" resource inside transaction
-      await entitlementService.checkQuota(agencyId, "TRIPS", tx);
-
-      // 3. Verify customer exists under this agency and is not archived
+      // Verify customer exists under this agency and is not archived
       const customer = await tx.customer.findFirst({
         where: {
           id: data.customerId,

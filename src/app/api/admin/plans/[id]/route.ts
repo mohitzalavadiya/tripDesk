@@ -1,4 +1,5 @@
 import { requirePlatformOwnerContext } from "@/lib/api/context";
+import { subscriptionRetiredResponse } from "@/lib/api/errors";
 import { adminService } from "@/lib/services/admin-service";
 import { planUpdateSchema } from "@/lib/validation/admin-schema";
 import { NextRequest,NextResponse } from "next/server";
@@ -10,6 +11,7 @@ interface RouteParams {
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
   try {
     const context = await requirePlatformOwnerContext();
+    return subscriptionRetiredResponse();
     const { id } = await params;
     const body = await req.json();
 

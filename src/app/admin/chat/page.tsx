@@ -274,24 +274,13 @@ export default function AdminChatPage() {
                           )}
                         </p>
 
-                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">
-                            {conv.subscriptionPlan || "Trial"}
-                          </span>
-                          {conv.subscriptionStatus && (
-                            <span
-                              className={`text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${
-                                conv.subscriptionStatus === "ACTIVE"
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : conv.subscriptionStatus === "TRIALING"
-                                  ? "bg-blue-50 text-blue-700"
-                                  : "bg-amber-50 text-amber-700"
-                              }`}
-                            >
-                              {conv.subscriptionStatus}
+                        {conv.agencyStatus === "SUSPENDED" && (
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 shrink-0">
+                              SUSPENDED
                             </span>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Unread Indicator */}
@@ -331,10 +320,11 @@ export default function AdminChatPage() {
                       <h2 className="text-xs sm:text-sm font-bold text-slate-900 truncate" title={selectedConversation.agencyName}>
                         {selectedConversation.agencyName}
                       </h2>
-                      <span className="text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
-                        {selectedConversation.subscriptionPlan || "Trial"} •{" "}
-                        {selectedConversation.subscriptionStatus || "Active"}
-                      </span>
+                      {selectedConversation.agencyStatus === "SUSPENDED" && (
+                        <span className="text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+                          Suspended
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 text-[10px] sm:text-xs text-slate-500 mt-0.5 min-w-0">
                       {selectedConversation.ownerName && (
