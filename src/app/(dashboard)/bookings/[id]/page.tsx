@@ -5,6 +5,7 @@ BookingStatusBadge,
 PaymentStatusBadge,
 } from "@/components/booking/booking-status-badge";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { formatEmbeddedEnums, formatEnumLabel } from "@/lib/utils/enum-formatters";
 import { useAuth } from "@/context/auth-context";
 import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
@@ -1145,7 +1146,7 @@ export default function BookingDetailPage() {
                             </TableCell>
                             <TableCell className="py-2.5 px-3">
                               <div className="font-bold text-slate-800">{doc.title}</div>
-                              <div className="text-[10px] text-slate-500">{doc.documentType}</div>
+                              <div className="text-[10px] text-slate-500">{formatEnumLabel(doc.documentType)}</div>
                             </TableCell>
                             <TableCell className="py-2.5 px-3">
                               <Badge
@@ -1352,18 +1353,18 @@ export default function BookingDetailPage() {
                 </div>
 
                 {financeBreakdown && financeBreakdown.supplierCostActual !== undefined ? (
-                  <div className="p-3.5 bg-gradient-to-br from-slate-50 to-emerald-50/20 border border-slate-200/80 rounded-xl space-y-2.5">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60">
+                  <div className="p-3 sm:p-3.5 bg-gradient-to-br from-slate-50 to-emerald-50/20 border border-slate-200/80 rounded-xl space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-200/60">
                       <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
-                        <Coins className="h-3.5 w-3.5 text-emerald-600" />
-                        Supplier Cost & Commercial Contribution
+                        <Coins className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <span>Supplier Cost & Commercial Contribution</span>
                       </span>
                       <span className="text-[10px] text-slate-500 font-medium italic">
                         {financeBreakdown.isCostComplete ? "Audited Gross Margin (Pre-Overheads)" : "Provisional Gross Margin (Pre-Overheads)"}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-2 text-xs">
                       <div>
                         <div className="text-[10px] text-slate-400 font-medium">Recorded Supplier Obligations</div>
                         <div className="font-bold text-slate-800 tabular-nums">
@@ -1386,7 +1387,7 @@ export default function BookingDetailPage() {
                         <div className="text-[10px] text-slate-500 font-bold uppercase">
                           {financeBreakdown.isCostComplete ? "Definitive Gross Margin" : "Estimated Gross Margin"}
                         </div>
-                        <div className="font-black text-slate-900 text-sm tabular-nums flex items-center gap-1">
+                        <div className="font-black text-slate-900 text-sm tabular-nums flex flex-wrap items-center gap-1">
                           <span>{formatCurrency(financeBreakdown.grossMargin ?? financeBreakdown.grossProfit)}</span>
                           <span className="text-[11px] text-emerald-600 font-bold">
                             ({financeBreakdown.profitMarginPercent}%)
@@ -1396,12 +1397,12 @@ export default function BookingDetailPage() {
                     </div>
 
                     {financeBreakdown.costCompletenessReason && (
-                      <div className={`p-2 rounded-lg border text-[11px] flex items-center gap-1.5 ${
+                      <div className={`p-2 rounded-lg border text-[11px] flex items-start gap-1.5 ${
                         financeBreakdown.isCostComplete
                           ? "bg-emerald-50/60 border-emerald-200/80 text-emerald-800"
                           : "bg-amber-50/80 border-amber-200/80 text-amber-800"
                       }`}>
-                        <Info className="h-3.5 w-3.5 shrink-0" />
+                        <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                         <span><strong>Cost Base Status:</strong> {financeBreakdown.costCompletenessReason}</span>
                       </div>
                     )}
@@ -1651,7 +1652,7 @@ export default function BookingDetailPage() {
                               })}
                             </span>
                           </div>
-                          {e.description && <p className="text-slate-600 mt-0.5 break-words">{e.description}</p>}
+                          {e.description && <p className="text-slate-600 mt-0.5 break-words">{formatEmbeddedEnums(e.description)}</p>}
                         </div>
                       </div>
                     ))}

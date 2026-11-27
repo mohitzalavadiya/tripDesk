@@ -202,7 +202,7 @@ export function MobileNav({ open, setOpen }: MobileNavProps) {
                     })}
                   </div>
                 </div>
-              );})}`
+              );})}
             </div>
           </div>
         </div>

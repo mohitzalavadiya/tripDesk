@@ -212,7 +212,7 @@ export function QuickLogModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
-      <DialogContent className="sm:max-w-md w-full bg-white border-slate-200 shadow-xl rounded-xl p-5">
+      <DialogContent className="w-[calc(100vw-1.25rem)] sm:max-w-md max-h-[90vh] overflow-y-auto bg-white border-slate-200 shadow-xl rounded-xl p-4 sm:p-5">
         <DialogHeader className="space-y-1">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center font-bold text-sm">
@@ -268,7 +268,7 @@ export function QuickLogModal({
           {/* Interaction Type Selector */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-slate-700">Interaction Channel</Label>
-            <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 sm:gap-2">
               {INTERACTION_TYPES.map((item) => {
                 const Icon = item.icon;
                 const isSelected = selectedType === item.type;
@@ -277,14 +277,14 @@ export function QuickLogModal({
                     key={item.type}
                     type="button"
                     onClick={() => setSelectedType(item.type)}
-                    className={`flex flex-col items-center justify-center p-1.5 sm:p-2 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
+                    className={`flex flex-col items-center justify-center min-w-0 p-2 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
                       isSelected
                         ? "bg-teal-50 border-teal-500 text-teal-800 shadow-2xs ring-1 ring-teal-400"
                         : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <Icon className={`h-4 w-4 mb-1 ${isSelected ? "text-teal-600" : "text-slate-500"}`} />
-                    <span className="text-[10px] sm:text-[11px] truncate">{item.label}</span>
+                    <Icon className={`h-4 w-4 mb-1 shrink-0 ${isSelected ? "text-teal-600" : "text-slate-500"}`} />
+                    <span className="text-[10px] sm:text-[11px] leading-tight text-center">{item.label}</span>
                   </button>
                 );
               })}
@@ -301,7 +301,7 @@ export function QuickLogModal({
           </div>
 
           {/* Interaction Timestamp & Time Toggle */}
-          <div className="flex items-center justify-between text-[11px] bg-slate-50/70 p-2 rounded-lg border border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] bg-slate-50/70 p-2 rounded-lg border border-slate-100">
             <span className="text-slate-600 font-medium flex items-center gap-1">
               <Clock className="h-3 w-3 text-slate-400" />
               Timestamp: <strong className="text-slate-800">{useCustomTime ? "Custom" : "Just now"}</strong>
@@ -332,7 +332,7 @@ export function QuickLogModal({
 
           {/* Outcome / Summary */}
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-0.5">
               <Label htmlFor="interaction-outcome" className="text-xs font-semibold text-slate-700">
                 Outcome Summary
               </Label>
@@ -409,7 +409,7 @@ export function QuickLogModal({
 
             {scheduleNext && (
               <div className="bg-teal-50/40 border border-teal-100 rounded-lg p-3 space-y-2.5 animate-in fade-in-50 duration-150">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="next-date" className="text-[11px] font-semibold text-slate-700">
@@ -496,14 +496,14 @@ export function QuickLogModal({
             </div>
           )}
 
-          <DialogFooter className="pt-2 flex items-center justify-between sm:justify-between border-t border-slate-100">
+          <DialogFooter className="pt-3 flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-between gap-2 border-t border-slate-100">
             <Button
               type="button"
               variant="outline"
               size="sm"
               disabled={isSubmitting}
               onClick={onClose}
-              className="text-xs h-8"
+              className="w-full sm:w-auto justify-center text-xs h-8"
             >
               Cancel
             </Button>
@@ -512,7 +512,7 @@ export function QuickLogModal({
               type="submit"
               size="sm"
               disabled={isSubmitting || isReadOnly}
-              className="text-xs h-8 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-4 cursor-pointer gap-1.5"
+              className="w-full sm:w-auto justify-center text-xs h-8 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-4 cursor-pointer gap-1.5"
             >
               {isSubmitting ? (
                 <>

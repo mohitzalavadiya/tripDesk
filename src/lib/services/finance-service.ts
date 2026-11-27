@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { formatEnumLabel } from "@/lib/utils/enum-formatters";
 import {
 CreateExpenseInput,
 CreateSupplierPayableInput,
@@ -1369,7 +1370,7 @@ export const financeService = {
         if (!existing) {
           const payableNumber = await this.generateNextPayableNumber(agencyId);
           const vehicleName = matchedVehicleCost?.vehicleName || tv.vehicle?.name || tv.vehicleType || "Vehicle Provider";
-          const desc = `Vehicle: ${vehicleName} (${tv.pricingType || "Standard"})`;
+          const desc = `Vehicle: ${vehicleName} (${formatEnumLabel(tv.pricingType || "Standard")})`;
 
           const p = await db.supplierPayable.create({
             data: {

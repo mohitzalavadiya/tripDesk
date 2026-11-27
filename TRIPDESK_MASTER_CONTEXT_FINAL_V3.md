@@ -23231,3 +23231,31 @@ In standard viewport heights (900px - 1000px display with top navbar, breadcrumb
   - `DOTENV_CONFIG_PATH=.env.production npx prisma migrate status` against `aws-0-ap-northeast-2.pooler.supabase.com:5432`: `8 migrations found in prisma/migrations`, **`Database schema is up to date!`**
 - **Latest Verified Local Test & Build Status (from § 276.88, no code edits since):**
   - `test-subscription-expiry-enforcement.ts`: `34/34` passed (run twice); `test-staff-lifecycle.ts`: `23/23`; `test-staff-application-wide-authorization.ts`: `137/137`; `test-staff-invitation-session.ts`: `27/27`; `test-phase1-security-financial-stabilization.ts`: `58/58`; `npx prisma validate`, `npx tsc --noEmit`, `git diff --check`, focused `eslint`, and `npm run build`: all exited `0`.
+
+
+---
+
+## § 276.90 Global API Route Integrity Audit & Fix (2026-11-27)
+
+> **CORRECTNESS & INTEGRITY AUDIT:** Fixed only the confirmed accidental JSDoc omission in `src/app/api/customers/[id]/route.ts`. Zero schema/migration changes, zero database writes, zero subscription/payment/account mutations, zero `.env*` changes, zero Git staging/commits, and Production (`qypkowejgqrmilckemcr`) was not accessed or deployed.
+
+- **Preflight & Git State:**
+  - Branch: `implement-crm`; `HEAD`: `2434ab8` (`fix subscrption issue`). Pre-existing changes were preserved.
+- **Complete API Route Inventory & AST Audit (`src/app/api/**/route.ts`):**
+  - **Total route files audited:** **251**
+  - **Total active exported HTTP handlers:** **358** (`GET`: `163`, `POST`: `118`, `PATCH`: `45`, `DELETE`: `29`, `PUT`: `3`).
+  - **Git history cross-check (`9d1c948~1..HEAD` across 197 modified API route files):** `0` lost HTTP methods.
+  - **Static AST & comment scan results:** `0` parse errors, `0` duplicate HTTP exports, `0` routes with zero HTTP exports, and `0` other commented-out handlers or unclosed block comments.
+- **Defect Found & Fixed (1 total):**
+  - **`src/app/api/customers/[id]/route.ts`:** An unclosed JSDoc comment introduced in commit `9d1c948` (`add crm feature`) left `export async function GET` (lines `30–60`) commented out until the `PATCH` JSDoc terminator, causing authenticated `GET /api/customers/[id]` requests to fail with `405 Method Not Allowed`.
+  - **Fix:** Restored the closing `*/` on line `30` above `export async function GET`, preserving `requireMemberReadAccess()`, `CUSTOMERS.VIEW` staff permission enforcement, `customerService.getCustomerDetails(context.agencyId, id)`, and `404` tenant scoping.
+- **Static, Regression & Build Verification (all exited `0`):**
+  - `npx tsc --noEmit`, `npx prisma validate`, `git diff --check`, `npx eslint src/app/api/customers/[id]/route.ts`, and `npm run build` all passed.
+  - `prisma/test-subscription-expiry-enforcement.ts`: **`34 passed, 0 failed (total 34)`**
+  - `prisma/test-staff-lifecycle.ts`: **`23 passed, 0 failed (total 23)`**
+  - `prisma/test-staff-application-wide-authorization.ts`: **`137/137`** passed (`100%`)
+  - `prisma/test-staff-invitation-session.ts`: **`27/27`** passed (`100%`)
+  - `prisma/test-phase1-security-financial-stabilization.ts`: **`58 passed, 0 failed (total 58)`**
+- **HTTP & Browser Verification:**
+  - **Unauthenticated `GET http://localhost:3001/api/customers/cmufaeybg0000ectqe6n155i6`:** `VERIFIED` — returned `401 UNAUTHORIZED` (`{"success":false,"error":{"code":"UNAUTHORIZED","message":"Authentication required to access this endpoint."}}`).
+  - **Authenticated browser `GET /api/customers/[id]`:** `NOT VERIFIED` — Chrome DevTools remote debugging is not active (`DevToolsActivePort` `False`).

@@ -114,7 +114,7 @@ export function ItineraryDayCard({
         opacity: isDragging ? 0.35 : 1,
         touchAction: "pan-x pan-y",
       }}
-      className={`bg-white rounded-xl border p-4 sm:p-5 shadow-2xs space-y-4 transition-all ${
+      className={`bg-white rounded-xl border p-3 sm:p-5 shadow-2xs space-y-3.5 sm:space-y-4 transition-all ${
         isOverDay
           ? "border-indigo-500 ring-2 ring-indigo-500/30 bg-indigo-50/20"
           : isBeyondDuration
@@ -271,7 +271,7 @@ export function ItineraryDayCard({
       {items.length === 0 ? (
         <div
           ref={setDroppableItemsRef}
-          className={`py-6 px-4 rounded-lg border border-dashed transition-colors text-center space-y-2 ${
+          className={`py-5 px-3 sm:py-6 sm:px-4 rounded-lg border border-dashed transition-colors text-center space-y-2.5 ${
             isOverItemsArea
               ? "border-indigo-400 bg-indigo-50/60 ring-2 ring-indigo-400/30"
               : "border-slate-200 bg-slate-50/50"
@@ -282,7 +282,7 @@ export function ItineraryDayCard({
               ? "Drop activity here to add to Day " + dayNumber
               : "No schedule or sightseeing planned for Day " + dayNumber + " yet."}
           </p>
-          <div data-no-dnd="true" className="flex items-center justify-center gap-2 pt-1">
+          <div data-no-dnd="true" className="flex flex-wrap items-center justify-center gap-2 pt-1">
             <Button
               data-no-dnd="true"
               type="button"
@@ -290,9 +290,9 @@ export function ItineraryDayCard({
               size="sm"
               disabled={isReadOnly}
               onClick={() => onAddItemToDay(dayNumber)}
-              className="h-7 text-xs px-3 bg-white border-slate-200"
+              className="w-full sm:w-auto justify-center h-8 text-xs px-3 bg-white border-slate-200"
             >
-              <Plus className="h-3 w-3 mr-1" /> Add Day Schedule
+              <Plus className="h-3 w-3 mr-1 shrink-0" /> Add Day Schedule
             </Button>
             <Button
               data-no-dnd="true"
@@ -301,9 +301,9 @@ export function ItineraryDayCard({
               size="sm"
               disabled={isReadOnly}
               onClick={() => onApplyDayTemplate(dayNumber)}
-              className="h-7 text-xs px-3 bg-white border-slate-200"
+              className="w-full sm:w-auto justify-center h-8 text-xs px-3 bg-white border-slate-200"
             >
-              <FileDown className="h-3 w-3 mr-1" /> Pick Day Template
+              <FileDown className="h-3 w-3 mr-1 shrink-0" /> Pick Day Template
             </Button>
           </div>
         </div>

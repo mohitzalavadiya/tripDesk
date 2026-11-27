@@ -279,14 +279,14 @@ export function TeamManagementPanel() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => fetchTeamData(true)}
             disabled={loading || refreshing}
-            className="h-9 px-3 rounded-xl border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="flex-1 sm:flex-initial justify-center h-9 px-3 rounded-xl border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
             <RotateCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? "animate-spin text-indigo-600" : ""}`} />
             Refresh
@@ -302,9 +302,9 @@ export function TeamManagementPanel() {
                 setInviteModalOpen(true);
               }}
               disabled={isReadOnly}
-              className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm cursor-pointer"
+              className="flex-1 sm:flex-initial justify-center h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm cursor-pointer whitespace-nowrap"
             >
-              <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+              <UserPlus className="h-3.5 w-3.5 mr-1.5 shrink-0" />
               Invite Staff Member
             </Button>
           )}
@@ -362,7 +362,7 @@ export function TeamManagementPanel() {
 
       {/* Section 1: Active Team Members Table */}
       <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+        <div className="px-3.5 sm:px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
           <div className="flex items-center gap-2">
             <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
               Current Team Members ({activeMembersCount} active
@@ -511,7 +511,7 @@ export function TeamManagementPanel() {
 
       {/* Section 2: Pending & Past Invitations Table */}
       <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+        <div className="px-3.5 sm:px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
           <div className="flex items-center gap-2">
             <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
               Staff Invitations ({invitations.length})

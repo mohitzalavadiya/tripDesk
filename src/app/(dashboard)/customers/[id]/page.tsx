@@ -47,7 +47,7 @@ import { communicationClient,CommunicationLogItem } from "@/lib/api-client/commu
 import { openWhatsAppChat } from "@/lib/communication/whatsapp/click-to-chat";
 import { formatCurrency } from "@/lib/costing-engine";
 import { getErrorMessage } from "@/lib/utils";
-import { formatEnumLabel,GENDER_OPTIONS } from "@/lib/utils/enum-formatters";
+import { formatEmbeddedEnums, formatEnumLabel, GENDER_OPTIONS } from "@/lib/utils/enum-formatters";
 import { phoneYup } from "@/lib/validation-schemas";
 import { useFormik } from "formik";
 import {
@@ -492,7 +492,7 @@ export default function CustomerDetailPage() {
               <Users className="h-3 w-3 text-blue-500 shrink-0" />
               Customer 360 Profile
             </span>
-            <span className="text-slate-300">•</span>
+            <span className="text-slate-300 hidden sm:inline">•</span>
             <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
               {customer.customerNumber || "CUS-LEGACY"}
             </span>
@@ -543,10 +543,10 @@ export default function CustomerDetailPage() {
 
                   {customer.email && (
                     <>
-                      <span className="text-slate-300">•</span>
+                      <span className="text-slate-300 hidden sm:inline">•</span>
                       <a
                         href={`mailto:${customer.email}`}
-                        className="flex items-center gap-1 hover:text-indigo-600 transition-colors truncate max-w-[180px] sm:max-w-none"
+                        className="flex items-center gap-1 hover:text-indigo-600 transition-colors min-w-0 max-w-full sm:max-w-none"
                       >
                         <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                         <span className="truncate">{customer.email}</span>
@@ -556,8 +556,8 @@ export default function CustomerDetailPage() {
 
                   {(customer.city || customer.address) && (
                     <>
-                      <span className="text-slate-300">•</span>
-                      <span className="flex items-center gap-1 truncate max-w-[140px] sm:max-w-none">
+                      <span className="text-slate-300 hidden sm:inline">•</span>
+                      <span className="flex items-center gap-1 min-w-0 max-w-full sm:max-w-none">
                         <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                         <span className="truncate">{customer.city || customer.address}</span>
                       </span>
@@ -568,7 +568,7 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 w-full lg:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
               <Button
                 variant="outline"
                 size="sm"
@@ -771,10 +771,10 @@ export default function CustomerDetailPage() {
 
             {/* Derived CRM Activity Timeline */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-3.5 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-3">
                   <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-indigo-600" />
+                    <Clock className="h-4 w-4 text-indigo-600 shrink-0" />
                     <span>CRM Activity Timeline ({customer.timeline?.length || 0})</span>
                   </h3>
                   <div className="flex items-center gap-2">
@@ -782,7 +782,7 @@ export default function CustomerDetailPage() {
                       size="sm"
                       onClick={handleOpenQuickLog}
                       disabled={isReadOnly}
-                      className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold h-7.5 px-2.5 rounded-lg cursor-pointer disabled:opacity-50 gap-1"
+                      className="w-full sm:w-auto justify-center bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold h-8 px-3 rounded-lg cursor-pointer disabled:opacity-50 gap-1.5"
                     >
                       <Phone className="h-3 w-3 shrink-0" />
                       <span>Log Interaction</span>
@@ -816,13 +816,13 @@ export default function CustomerDetailPage() {
                       </div>
 
                       <div className="space-y-1 flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className="font-bold text-slate-900 truncate">{ev.title}</h4>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-0.5 sm:gap-2">
+                          <h4 className="font-bold text-slate-900 break-words sm:truncate">{ev.title}</h4>
                           <span className="text-[11px] text-slate-400 shrink-0">
                             {formatDateTimeDisplay(ev.timestamp)}
                           </span>
                         </div>
-                        <p className="text-slate-600 text-xs">{ev.description}</p>
+                        <p className="text-slate-600 text-xs break-words">{formatEmbeddedEnums(ev.description)}</p>
                       </div>
 
                       {ev.referenceUrl && (
@@ -845,24 +845,24 @@ export default function CustomerDetailPage() {
         {/* Tab 2: Enquiries */}
         {activeTab === "enquiries" && (
           <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-            <div className="p-3.5 sm:p-5 border-b border-slate-100 flex flex-col xs:flex-row xs:items-center justify-between gap-2.5">
+            <div className="p-3.5 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                 <Inbox className="h-4 w-4 text-blue-600 shrink-0" />
                 <span>Captured Inquiries ({customer.enquiries.length})</span>
               </h3>
-              <div className="flex items-center gap-2 w-full xs:w-auto">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <Button
                   size="sm"
                   onClick={handleOpenQuickLog}
                   disabled={isReadOnly}
-                  className="w-full xs:w-auto justify-center bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer disabled:opacity-50"
+                  className="flex-1 sm:flex-initial justify-center bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer disabled:opacity-50 whitespace-nowrap"
                 >
                   <Phone className="h-3.5 w-3.5 mr-1 shrink-0" /> Quick Log
                 </Button>
                 <Button
                   size="sm"
                   onClick={() => router.push(`/enquiries/new?customerId=${customer.id}`)}
-                  className="w-full xs:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer"
+                  className="flex-1 sm:flex-initial justify-center bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8 rounded-lg cursor-pointer whitespace-nowrap"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> New Enquiry
                 </Button>

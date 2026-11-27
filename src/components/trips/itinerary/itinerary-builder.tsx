@@ -719,7 +719,7 @@ export function ItineraryBuilder({
     >
       <div className="space-y-6 max-w-4xl mx-auto w-full select-none">
         {/* Header Card */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200 shadow-2xs">
           <div className="min-w-0 space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-bold text-slate-900 text-sm sm:text-base">
@@ -762,7 +762,7 @@ export function ItineraryBuilder({
           </div>
 
           {/* Global Toolbar Actions */}
-          <div data-no-dnd="true" className="flex items-center gap-2 flex-wrap shrink-0">
+          <div data-no-dnd="true" className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:flex-wrap w-full sm:w-auto shrink-0">
             <Button
               data-no-dnd="true"
               type="button"
@@ -770,7 +770,7 @@ export function ItineraryBuilder({
               size="sm"
               disabled={isReadOnly}
               onClick={handleOpenPackageTemplatePicker}
-              className="h-9 text-xs px-3 border-slate-200 hover:bg-slate-50 font-medium cursor-pointer shadow-2xs"
+              className="w-full sm:w-auto justify-center h-9 text-xs px-2.5 sm:px-3 border-slate-200 hover:bg-slate-50 font-medium cursor-pointer shadow-2xs"
             >
               <FileDown className="h-3.5 w-3.5 mr-1 text-indigo-600 shrink-0" /> Apply Package
             </Button>
@@ -783,7 +783,7 @@ export function ItineraryBuilder({
                 size="sm"
                 disabled={isReadOnly}
                 onClick={handleOpenSavePackageTemplate}
-                className="h-9 text-xs px-3 border-slate-200 hover:bg-slate-50 font-medium cursor-pointer shadow-2xs"
+                className="w-full sm:w-auto justify-center h-9 text-xs px-2.5 sm:px-3 border-slate-200 hover:bg-slate-50 font-medium cursor-pointer shadow-2xs"
               >
                 <BookmarkPlus className="h-3.5 w-3.5 mr-1 text-slate-600 shrink-0" /> Save Package
               </Button>
@@ -795,7 +795,7 @@ export function ItineraryBuilder({
               size="sm"
               disabled={isReadOnly}
               onClick={handleOpenAddDay}
-              className="h-9 text-xs px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold cursor-pointer shadow-xs"
+              className="col-span-2 sm:col-span-1 w-full sm:w-auto justify-center h-9 text-xs px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold cursor-pointer shadow-xs"
             >
               <Plus className="h-3.5 w-3.5 mr-1 shrink-0" /> Add Day
             </Button>

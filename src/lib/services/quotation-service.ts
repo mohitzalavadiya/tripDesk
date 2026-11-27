@@ -1,4 +1,5 @@
 import { DEFAULT_QUOTATION_TERMS } from "@/lib/constants/quotation-defaults";
+import { formatEnumLabel } from "@/lib/utils/enum-formatters";
 import { prisma } from "@/lib/prisma";
 import {
   CreatePaymentMilestoneInput,
@@ -1351,7 +1352,7 @@ export const quotationService = {
         sourceType: "TRIP_VEHICLE",
         sourceId: v.id,
         name: `${v.vehicleName} (${v.vehicleType})`,
-        description: `Dedicated transport • ${v.pricingType} pricing (${v.estimatedKm} km estimated)`,
+        description: `Dedicated transport • ${formatEnumLabel(v.pricingType)} pricing (${v.estimatedKm} km estimated)`,
         quantity: 1,
         unit: "vehicle",
         unitPrice: new Prisma.Decimal(itemCost),

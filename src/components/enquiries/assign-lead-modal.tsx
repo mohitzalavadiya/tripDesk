@@ -150,7 +150,7 @@ export function AssignLeadModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
-      <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-6 shadow-xl select-none">
+      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-xl select-none">
         <form onSubmit={handleSubmit}>
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-slate-900 font-bold text-base flex items-center gap-2">
@@ -175,25 +175,25 @@ export function AssignLeadModal({
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 Assignment Handoff
               </span>
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="h-7 w-7 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
                     {currentOwner ? currentOwner.slice(0, 2).toUpperCase() : <UserX className="h-3.5 w-3.5 text-slate-400" />}
                   </div>
                   <div className="flex flex-col min-w-0">
                     <span className="text-[10px] text-slate-400">Current Owner</span>
-                    <span className="font-bold text-slate-800 truncate text-xs">
+                    <span className="font-bold text-slate-800 break-words sm:truncate text-xs">
                       {currentOwner || "Unassigned"}
                     </span>
                   </div>
                 </div>
 
-                <ArrowRight className="h-4 w-4 text-slate-300 shrink-0" />
+                <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-300 shrink-0 rotate-90 sm:rotate-0 self-start ml-2 sm:ml-0 sm:self-center" />
 
-                <div className="flex items-center gap-2 min-w-0 text-right">
+                <div className="flex flex-row-reverse sm:flex-row items-center justify-end sm:justify-start gap-2 min-w-0 text-left sm:text-right">
                   <div className="flex flex-col min-w-0">
                     <span className="text-[10px] text-slate-400">Proposed Owner</span>
-                    <span className="font-bold text-indigo-700 truncate text-xs">
+                    <span className="font-bold text-indigo-700 break-words sm:truncate text-xs">
                       {selectedAssigneeKey === "__unassigned__"
                         ? "Unassigned"
                         : selectedAssigneeKey.startsWith("user:")
@@ -229,7 +229,15 @@ export function AssignLeadModal({
                   disabled={isReadOnly || isSubmitting}
                 >
                   <SelectTrigger className="h-9.5 text-xs bg-white border-slate-200 shadow-2xs">
-                    <SelectValue placeholder="Select team member..." />
+                    <SelectValue placeholder="Select team member...">
+                      {selectedAssigneeKey === "__unassigned__"
+                        ? "Unassigned (Keep in pool)"
+                        : selectedAssigneeKey.startsWith("user:")
+                        ? assignees.find((a) => a.id === selectedAssigneeKey.replace("user:", ""))?.name || "Team Member"
+                        : selectedAssigneeKey.startsWith("name:")
+                        ? selectedAssigneeKey.replace("name:", "")
+                        : undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-white border-slate-200 text-xs shadow-lg max-h-56">
                     <SelectItem value="__unassigned__" className="text-amber-700 font-semibold cursor-pointer">
@@ -281,14 +289,14 @@ export function AssignLeadModal({
             </div>
           </div>
 
-          <DialogFooter className="mt-6 flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+          <DialogFooter className="mt-5 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-3 border-t border-slate-100">
             <Button
               type="button"
               variant="outline"
               size="sm"
               disabled={isSubmitting}
               onClick={onClose}
-              className="bg-white border-slate-200 text-xs h-8 cursor-pointer"
+              className="w-full sm:w-auto justify-center bg-white border-slate-200 text-xs h-8 cursor-pointer"
             >
               Cancel
             </Button>
@@ -296,7 +304,7 @@ export function AssignLeadModal({
               type="submit"
               size="sm"
               disabled={isReadOnly || isSubmitting || loadingAssignees || !selectedAssigneeKey}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 cursor-pointer gap-1.5 shadow-2xs"
+              className="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 cursor-pointer gap-1.5 shadow-2xs"
             >
               {isSubmitting ? (
                 <>

@@ -272,6 +272,46 @@ function TripQuotationPreviewContent() {
   };
 
   // ─── 0. ACCESS RESTRICTION CHECK ───
+  // ─── 3. MEMOIZED METADATA & DERIVED COLLECTIONS (unconditional before early returns) ───
+  const durationText = React.useMemo(() => {
+    if (quotation?.trip?.startDate && quotation?.trip?.endDate) {
+      const start = new Date(quotation.trip.startDate);
+      const end = new Date(quotation.trip.endDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const nights = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
+      return `${nights} Nights / ${nights + 1} Days`;
+    }
+    return "Custom Itinerary";
+  }, [quotation?.trip?.startDate, quotation?.trip?.endDate]);
+
+  const hotelsList = React.useMemo(() => quotation?.trip?.tripHotels || [], [quotation?.trip?.tripHotels]);
+  const vehiclesList = React.useMemo(() => quotation?.trip?.tripVehicles || [], [quotation?.trip?.tripVehicles]);
+  const activitiesList = React.useMemo(() => quotation?.trip?.tripActivities || [], [quotation?.trip?.tripActivities]);
+  const itineraryItems = React.useMemo(() => quotation?.trip?.itineraryItems || [], [quotation?.trip?.itineraryItems]);
+  const sortedDestinations = React.useMemo(() => {
+    const destinations = quotation?.trip?.tripDestinations || [];
+    return [...destinations].sort((a, b) => a.sequence - b.sequence);
+  }, [quotation?.trip?.tripDestinations]);
+
+  const inclusions = React.useMemo(
+    () => quotation?.proposalItems?.filter((p) => p.type === "INCLUSION") || [],
+    [quotation?.proposalItems]
+  );
+  const exclusions = React.useMemo(
+    () => quotation?.proposalItems?.filter((p) => p.type === "EXCLUSION") || [],
+    [quotation?.proposalItems]
+  );
+  const importantNotes = React.useMemo(
+    () => quotation?.proposalItems?.filter((p) => p.type === "IMPORTANT_NOTE") || [],
+    [quotation?.proposalItems]
+  );
+  const milestones = React.useMemo(() => quotation?.paymentMilestones || [], [quotation?.paymentMilestones]);
+
+  const agencyContacts = React.useMemo(
+    () => [quotation?.agency?.phone, quotation?.agency?.email].filter(Boolean),
+    [quotation?.agency?.phone, quotation?.agency?.email]
+  );
+
   if (!isViewAllowed) {
     return (
       <div className="max-w-7xl mx-auto p-4 sm:p-6">
@@ -400,45 +440,6 @@ function TripQuotationPreviewContent() {
     );
   }
 
-  // ─── 3. MEMOIZED METADATA & DERIVED COLLECTIONS ───
-  const durationText = React.useMemo(() => {
-    if (quotation.trip?.startDate && quotation.trip?.endDate) {
-      const start = new Date(quotation.trip.startDate);
-      const end = new Date(quotation.trip.endDate);
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      const nights = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
-      return `${nights} Nights / ${nights + 1} Days`;
-    }
-    return "Custom Itinerary";
-  }, [quotation.trip?.startDate, quotation.trip?.endDate]);
-
-  const hotelsList = React.useMemo(() => quotation.trip?.tripHotels || [], [quotation.trip?.tripHotels]);
-  const vehiclesList = React.useMemo(() => quotation.trip?.tripVehicles || [], [quotation.trip?.tripVehicles]);
-  const activitiesList = React.useMemo(() => quotation.trip?.tripActivities || [], [quotation.trip?.tripActivities]);
-  const itineraryItems = React.useMemo(() => quotation.trip?.itineraryItems || [], [quotation.trip?.itineraryItems]);
-  const sortedDestinations = React.useMemo(() => {
-    const destinations = quotation.trip?.tripDestinations || [];
-    return [...destinations].sort((a, b) => a.sequence - b.sequence);
-  }, [quotation.trip?.tripDestinations]);
-
-  const inclusions = React.useMemo(
-    () => quotation.proposalItems?.filter((p) => p.type === "INCLUSION") || [],
-    [quotation.proposalItems]
-  );
-  const exclusions = React.useMemo(
-    () => quotation.proposalItems?.filter((p) => p.type === "EXCLUSION") || [],
-    [quotation.proposalItems]
-  );
-  const importantNotes = React.useMemo(
-    () => quotation.proposalItems?.filter((p) => p.type === "IMPORTANT_NOTE") || [],
-    [quotation.proposalItems]
-  );
-  const milestones = React.useMemo(() => quotation.paymentMilestones || [], [quotation.paymentMilestones]);
-
-  const agencyContacts = React.useMemo(
-    () => [quotation.agency?.phone, quotation.agency?.email].filter(Boolean),
-    [quotation.agency?.phone, quotation.agency?.email]
-  );
   const agencySubtext = agencyContacts.length > 0 ? agencyContacts.join(" | ") : "TRIP PROPOSAL";
 
   const tierName = quotation.tier || "Deluxe";
@@ -447,10 +448,10 @@ function TripQuotationPreviewContent() {
   return (
     <div className="min-h-screen bg-slate-100/70 pb-16 font-sans overflow-x-hidden w-full max-w-full">
       {/* ─── TOP ACTION & CRM NAVIGATION BAR ─── */}
-      <div className="bg-white border-b border-slate-200 shadow-2xs py-2.5 px-3 sm:px-6 lg:px-8 print:hidden sticky top-0 z-30">
-        <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div className="bg-white border-b border-slate-200 shadow-2xs py-2.5 px-3 sm:px-6 lg:px-8 print:hidden md:sticky md:top-0 z-20">
+        <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 md:gap-3">
           {/* Left Column: Navigation & Quotation Reference */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap min-w-0">
             <Link
               href={`/trips/${encodeURIComponent(tripId)}/quotation`}
               className="inline-flex items-center justify-center bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold h-8 sm:h-8.5 px-2.5 sm:px-3 rounded-xl transition-colors text-slate-700 shrink-0 shadow-2xs"
@@ -480,10 +481,10 @@ function TripQuotationPreviewContent() {
           </div>
 
           {/* Right Column: Multi-Tier Switcher & Supported Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-between md:justify-end">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-start md:justify-end">
             {/* Version/Tier Switcher if multiple quotations exist */}
             {allQuotations.length > 1 && (
-              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200/80 mr-1">
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200/80">
                 <Layers className="h-3.5 w-3.5 text-slate-500 ml-1.5 hidden xs:inline" />
                 <select
                   aria-label="Select quotation version or tier"

@@ -16,6 +16,7 @@ TableRow,
 } from "@/components/ui/table";
 import { quotationClient,TripCostingResult } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
+import { formatEnumLabel } from "@/lib/utils/enum-formatters";
 import {
 AlertCircle,
 ArrowLeft,
@@ -274,7 +275,7 @@ export default function TripCostingDedicatedPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="py-3 px-4 text-slate-700">
-                          {v.pricingType}
+                          {formatEnumLabel(v.pricingType)}
                         </TableCell>
                         <TableCell className="py-3 px-4 text-slate-700">
                           {v.pricingType === "PER_KM" ? `₹${v.ratePerKm}/km (${v.estimatedKm} km)` : "Flat Tariff"}

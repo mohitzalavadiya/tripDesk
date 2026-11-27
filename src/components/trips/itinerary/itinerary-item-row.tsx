@@ -191,13 +191,13 @@ export function ItineraryItemRow({
             onChange={(e) => updateField("title", e.target.value)}
             onBlur={flushSave}
             placeholder="Schedule item title..."
-            className="h-8 font-semibold text-xs sm:text-sm text-slate-800 bg-white border-slate-200 focus:bg-white"
+            className="h-8 min-w-0 flex-1 font-semibold text-xs sm:text-sm text-slate-800 bg-white border-slate-200 focus:bg-white rounded-lg px-2.5"
             aria-label={`Title for item ${itemIndex + 1}`}
           />
         </div>
 
         {/* Action Controls & Autosave Status */}
-        <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+        <div className="flex flex-wrap items-center justify-end gap-1.5 self-end sm:self-center shrink-0">
           {/* Status Badge */}
           {status === "saving" && (
             <span className="text-[10px] text-amber-600 font-medium flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50">

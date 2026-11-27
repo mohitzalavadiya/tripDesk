@@ -27,6 +27,7 @@ interface RouteProps {
  * GET /api/customers/[id]
  * Retrieves comprehensive 360-degree Customer profile.
  * Returns 404 if not found or if the customer belongs to another agency.
+ */
 export async function GET(request: NextRequest, props: RouteProps) {
   try {
     // const context = await requireReadAccess();

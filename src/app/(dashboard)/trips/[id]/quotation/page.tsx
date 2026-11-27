@@ -2,6 +2,7 @@
 
 import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
 import { useAuth } from "@/context/auth-context";
+import { formatEmbeddedEnums } from "@/lib/utils/enum-formatters";
 import { QuotationStatusBadge } from "@/app/(dashboard)/quotations/page";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
@@ -1599,7 +1600,7 @@ export default function TripQuotationEditorPage() {
                               <div>
                                 <span>{item.name}</span>
                                 {item.description && (
-                                  <p className="text-[11px] font-normal text-slate-500">{item.description}</p>
+                                  <p className="text-[11px] font-normal text-slate-500">{formatEmbeddedEnums(item.description)}</p>
                                 )}
                               </div>
                             </TableCell>
