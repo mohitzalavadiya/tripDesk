@@ -359,7 +359,14 @@ export class CustomerNotificationService {
       include: {
         tripHotel: {
           include: {
-            trip: { include: { customer: true, bookings: true } },
+            trip: {
+              include: {
+                customer: true,
+                bookings: {
+                  select: { id: true },
+                },
+              },
+            },
             hotel: true,
           },
         },
@@ -393,7 +400,14 @@ export class CustomerNotificationService {
       include: {
         tripVehicle: {
           include: {
-            trip: { include: { customer: true, bookings: true } },
+            trip: {
+              include: {
+                customer: true,
+                bookings: {
+                  select: { id: true },
+                },
+              },
+            },
             vehicle: true,
           },
         },
@@ -428,7 +442,14 @@ export class CustomerNotificationService {
       include: {
         tripActivity: {
           include: {
-            trip: { include: { customer: true, bookings: true } },
+            trip: {
+              include: {
+                customer: true,
+                bookings: {
+                  select: { id: true },
+                },
+              },
+            },
             activity: true,
           },
         },
@@ -525,7 +546,12 @@ export class CustomerNotificationService {
   ) {
     const trip = await prisma.trip.findFirst({
       where: { id: tripId, agencyId },
-      include: { customer: true, bookings: true },
+      include: {
+        customer: true,
+        bookings: {
+          select: { id: true },
+        },
+      },
     });
 
     if (!trip) return null;
@@ -565,7 +591,12 @@ export class CustomerNotificationService {
   ) {
     const trip = await prisma.trip.findFirst({
       where: { id: tripId, agencyId },
-      include: { customer: true, bookings: true },
+      include: {
+        customer: true,
+        bookings: {
+          select: { id: true },
+        },
+      },
     });
 
     if (!trip) return null;

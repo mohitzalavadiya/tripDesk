@@ -51,3 +51,49 @@ export async function deleteAuthUser(userId: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Bans a Supabase Auth user (100 years) to block new logins and refresh-token renewals.
+ * Throws if Supabase Auth is configured and the revocation call fails.
+ */
+export async function revokeAuthUserSessionsAndBan(userId: string): Promise<{ invoked: boolean }> {
+  await assertNotPlatformOwner({ userId }, { context: "revokeAuthUserSessionsAndBan" });
+
+  const adminClient = getAdminClient();
+  if (!adminClient) {
+    return { invoked: false };
+  }
+
+  const { error } = await adminClient.auth.admin.updateUserById(userId, {
+    ban_duration: "876000h",
+  });
+
+  if (error) {
+    throw new Error(`Supabase Auth session revocation failed: ${error.message}`);
+  }
+
+  return { invoked: true };
+}
+
+/**
+ * Removes the Supabase Auth login ban when an Agency Owner reactivates a staff member.
+ * Existing old sessions remain invalid via application-side sessionRevokedAt checks.
+ */
+export async function unbanAuthUser(userId: string): Promise<{ invoked: boolean }> {
+  await assertNotPlatformOwner({ userId }, { context: "unbanAuthUser" });
+
+  const adminClient = getAdminClient();
+  if (!adminClient) {
+    return { invoked: false };
+  }
+
+  const { error } = await adminClient.auth.admin.updateUserById(userId, {
+    ban_duration: "none",
+  });
+
+  if (error) {
+    throw new Error(`Supabase Auth reactivation failed: ${error.message}`);
+  }
+
+  return { invoked: true };
+}

@@ -1,4 +1,6 @@
 import prisma from "@/lib/prisma";
+import { isDbUserSessionValid } from "@/lib/auth/session-validation";
+import { evaluateEffectiveSubscriptionState } from "@/lib/auth/subscription-state";
 import { createClient } from "@/lib/supabase/server";
 import {
 Agency,
@@ -40,9 +42,16 @@ export interface RequestContext {
   subscriptionAccess: SubscriptionAccessInfo;
   isPlatformOwner: boolean;
   isAgencyOwner: boolean;
+  isAgencyStaff: boolean;
 }
 
 export interface AgencyOwnerRequestContext extends RequestContext {
+  dbUser: User & { agencyId: string };
+  agency: Agency;
+  agencyId: string;
+}
+
+export interface AgencyMemberRequestContext extends RequestContext {
   dbUser: User & { agencyId: string };
   agency: Agency;
   agencyId: string;
@@ -98,48 +107,38 @@ export async function getRequestContext(): Promise<RequestContext | null> {
       return null;
     }
 
+    const sessionValid = await isDbUserSessionValid(dbUser, supabase, user);
+    if (!sessionValid) {
+      return null;
+    }
+
     const agency = dbUser.agency || null;
     const subscription = agency?.subscriptions[0] || null;
 
     const isPlatformOwner = dbUser.role === UserRole.PLATFORM_OWNER && !dbUser.agencyId;
     const isAgencyOwner = dbUser.role === UserRole.AGENCY_OWNER && !!dbUser.agencyId;
-    const isSuspendedAgency = isAgencyOwner && agency?.status === AgencyStatus.SUSPENDED;
+    const isAgencyStaff = dbUser.role === UserRole.AGENCY_STAFF && !!dbUser.agencyId;
 
-    // Calculate subscription access
-    let status: SubscriptionStatus = SubscriptionStatus.TRIAL;
-    let canWrite = isPlatformOwner;
-    const canRead = true;
-    let trialDaysRemaining = 0;
+    // Calculate authoritative effective subscription access (never trusts stored ACTIVE if subscriptionEnd has passed)
+    const evalState = evaluateEffectiveSubscriptionState({
+      agencyStatus: agency?.status,
+      subscription,
+      isPlatformOwner,
+    });
 
-    if (subscription) {
-      status = subscription.status;
-      const now = Date.now();
-
-      if (subscription.status === SubscriptionStatus.TRIAL && subscription.trialEnd) {
-        const end = new Date(subscription.trialEnd).getTime();
-        trialDaysRemaining = Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)));
-        canWrite = !isSuspendedAgency && trialDaysRemaining > 0;
-      } else if (subscription.status === SubscriptionStatus.ACTIVE) {
-        canWrite = !isSuspendedAgency;
-      } else {
-        canWrite = false;
-      }
-    } else if (isAgencyOwner) {
-      status = SubscriptionStatus.EXPIRED;
-      canWrite = false;
-    }
-
-    if (isSuspendedAgency) {
-      canWrite = false;
+    if (evalState.diagnosticReason && evalState.diagnosticReason !== "PLATFORM_OWNER" && evalState.isExpired) {
+      console.info(
+        `[getRequestContext] Agency ${agency?.id ?? "unknown"} restricted (${evalState.diagnosticReason})`
+      );
     }
 
     const subscriptionAccess: SubscriptionAccessInfo = {
-      status,
-      hasFullAccess: canWrite,
-      isReadOnly: !canWrite,
-      canRead,
-      canWrite,
-      trialDaysRemaining,
+      status: evalState.effectiveStatus,
+      hasFullAccess: evalState.hasFullAccess,
+      isReadOnly: evalState.isReadOnly,
+      canRead: evalState.canRead,
+      canWrite: evalState.canWrite,
+      trialDaysRemaining: evalState.daysRemaining,
       trialStart: subscription?.trialStart,
       trialEnd: subscription?.trialEnd,
       subscriptionEnd: subscription?.subscriptionEnd,
@@ -157,6 +156,7 @@ export async function getRequestContext(): Promise<RequestContext | null> {
       subscriptionAccess,
       isPlatformOwner,
       isAgencyOwner,
+      isAgencyStaff,
     };
   } catch (err) {
     console.error("Error evaluating request context:", err);
@@ -214,10 +214,10 @@ export async function requirePlatformOwnerContext(): Promise<PlatformOwnerReques
 }
 
 /**
- * Guard: Enforces read permissions on an agency workspace.
+ * Guard: Enforces read permissions on an agency workspace for any agency member (Owner or Staff).
  */
-export async function requireReadAccess(): Promise<AgencyOwnerRequestContext> {
-  const context = await requireAgencyOwnerContext();
+export async function requireReadAccess(): Promise<AgencyMemberRequestContext> {
+  const context = await requireAgencyMemberContext();
   if (!context.subscriptionAccess.canRead) {
     throw new ForbiddenError("Access to this workspace data has been suspended.");
   }
@@ -225,11 +225,11 @@ export async function requireReadAccess(): Promise<AgencyOwnerRequestContext> {
 }
 
 /**
- * Guard: Enforces write/mutation permissions on an agency workspace.
+ * Guard: Enforces write/mutation permissions on an agency workspace for any agency member (Owner or Staff).
  * Throws 403 ReadOnlyAccessError if agency is suspended or subscription has expired/cancelled.
  */
-export async function requireWriteAccess(): Promise<AgencyOwnerRequestContext> {
-  const context = await requireAgencyOwnerContext();
+export async function requireWriteAccess(): Promise<AgencyMemberRequestContext> {
+  const context = await requireAgencyMemberContext();
   if (context.agency.status === AgencyStatus.SUSPENDED) {
     throw new ReadOnlyAccessError(
       "Your agency workspace is currently suspended. Creating or modifying business records is restricted. Please contact Your Travel Desk support to reactivate your workspace."
@@ -244,10 +244,76 @@ export async function requireWriteAccess(): Promise<AgencyOwnerRequestContext> {
 }
 
 /**
- * Guard: Enforces Agency Owner access to Platform Support Chat.
- * Allows authenticated Agency Owners to chat with Platform Support even if trial/subscription is EXPIRED or CANCELLED.
+ * Guard: Enforces access to Platform Support Chat for Agency Members (Owner or Staff).
+ * Allows authenticated Agency Members to chat with Platform Support even if trial/subscription is EXPIRED or CANCELLED.
  */
-export async function requireAgencyOwnerChatAccess(): Promise<AgencyOwnerRequestContext> {
-  return requireAgencyOwnerContext();
+export async function requireAgencyOwnerChatAccess(): Promise<AgencyMemberRequestContext> {
+  return requireAgencyMemberContext();
+}
+
+export const requireAgencyMemberChatAccess = requireAgencyOwnerChatAccess;
+
+/**
+ * Guard: Allows authenticated non-suspended Agency Members to submit subscription renewal payment requests
+ * even when the agency's trial or paid subscription is EXPIRED or CANCELLED.
+ * Strictly blocks SUSPENDED agencies and relies on route-level role/permission checks.
+ */
+export async function requireBillingRenewalAccess(): Promise<AgencyMemberRequestContext> {
+  const context = await requireAgencyMemberContext();
+  if (context.agency.status === AgencyStatus.SUSPENDED) {
+    throw new ReadOnlyAccessError(
+      "Your agency workspace is currently suspended. Subscription renewal requests are disabled. Please contact Your Travel Desk support."
+    );
+  }
+  return context;
+}
+
+/**
+ * Guard: Requires an authenticated Agency Member (Owner or Staff) with a valid agency assignment.
+ * Throws 401 if not logged in, or 403 if user is not an agency owner or staff member.
+ */
+export async function requireAgencyMemberContext(): Promise<AgencyMemberRequestContext> {
+  const context = await requireAuthenticatedUser();
+
+  if ((!context.isAgencyOwner && !context.isAgencyStaff) || !context.agency || !context.dbUser.agencyId) {
+    throw new ForbiddenError("This endpoint requires an active Agency workspace session.");
+  }
+
+  return {
+    ...context,
+    agency: context.agency,
+    agencyId: context.dbUser.agencyId,
+    dbUser: context.dbUser as User & { agencyId: string },
+  };
+}
+
+/**
+ * Guard: Enforces read permissions on an agency workspace for any agency member (Owner or Staff).
+ */
+export async function requireMemberReadAccess(): Promise<AgencyMemberRequestContext> {
+  const context = await requireAgencyMemberContext();
+  if (!context.subscriptionAccess.canRead) {
+    throw new ForbiddenError("Access to this workspace data has been suspended.");
+  }
+  return context;
+}
+
+/**
+ * Guard: Enforces write/mutation permissions on an agency workspace for any agency member (Owner or Staff).
+ * Throws 403 ReadOnlyAccessError if agency is suspended or subscription has expired/cancelled.
+ */
+export async function requireMemberWriteAccess(): Promise<AgencyMemberRequestContext> {
+  const context = await requireAgencyMemberContext();
+  if (context.agency.status === AgencyStatus.SUSPENDED) {
+    throw new ReadOnlyAccessError(
+      "Your agency workspace is currently suspended. Creating or modifying business records is restricted. Please contact Your Travel Desk support to reactivate your workspace."
+    );
+  }
+  if (!context.subscriptionAccess.canWrite) {
+    throw new ReadOnlyAccessError(
+      "Your subscription or free trial has expired. Existing data is accessible in read-only mode. Renew to resume creating or modifying business records."
+    );
+  }
+  return context;
 }
 

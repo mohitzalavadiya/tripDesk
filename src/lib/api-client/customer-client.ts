@@ -53,6 +53,7 @@ export interface CustomerActivityEvent {
   type:
     | "CUSTOMER_CREATED"
     | "ENQUIRY_CREATED"
+    | "FOLLOW_UP_COMPLETED"
     | "ENQUIRY_CONVERTED"
     | "TRIP_CREATED"
     | "QUOTATION_CREATED"
@@ -211,5 +212,22 @@ export const customerClient = {
     });
 
     return handleResponse<SingleResponse<{ message: string; customer: Customer }>>(res);
+  },
+
+  /**
+   * Resolves an existing customer by phone/email or creates a new one safely.
+   */
+  async resolveOrCreateCustomer(data: {
+    name: string;
+    phone: string;
+    email?: string;
+  }): Promise<SingleResponse<{ customer: Customer; isExisting: boolean; matchedBy?: "phone" | "email" }>> {
+    const res = await fetch("/api/customers/resolve-or-create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    return handleResponse<SingleResponse<{ customer: Customer; isExisting: boolean; matchedBy?: "phone" | "email" }>>(res);
   },
 };

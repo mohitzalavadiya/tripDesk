@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiSuccess,
 handleApiError,
 requireWriteAccess,
@@ -21,6 +22,7 @@ interface RouteParams {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATIONS", "UPDATE");
     const { id, itemId } = await params;
     const body = await validateJson(updateQuotationItemSchema, request);
 
@@ -39,6 +41,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATIONS", "UPDATE");
     const { id, itemId } = await params;
 
     await quotationService.deleteQuotationItem(context.agencyId, id, itemId);

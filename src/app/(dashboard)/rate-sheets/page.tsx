@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { ExcelImportModal } from "@/components/excel/excel-import-modal";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -51,6 +54,20 @@ import * as React from "react";
 import { toast } from "sonner";
 
 export default function RateSheetsPage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+
+  if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("RATE_SHEETS", "view"))) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Supplier Rate Sheets"
+          badgeText="Access Restricted"
+          description="You do not have permission to view supplier rate sheets. Contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
 
@@ -105,9 +122,9 @@ export default function RateSheetsPage() {
   }, [search]);
 
   // Fetch Rate Sheets from PostgreSQL API
-  const fetchRateSheets = React.useCallback(async () => {
+  const fetchRateSheets = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       const res = await rateSheetClient.getRateSheets({
@@ -131,7 +148,7 @@ export default function RateSheetsPage() {
       }
       setError(getErrorMessage(err, "Unable to load rate sheets. Please try again."));
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [debouncedSearch, typeFilter, statusFilter, includeArchived, page]);
 
@@ -183,7 +200,7 @@ export default function RateSheetsPage() {
           await rateSheetClient.archiveRateSheet(id);
           toast.success(`Rate sheet ${ref} archived.`);
           setConfirmAction(null);
-          await fetchRateSheets();
+          await fetchRateSheets(true);
         } catch (err: any) {
           if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
             setLocalReadOnly(true);
@@ -222,8 +239,8 @@ export default function RateSheetsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Read-Only Banner */}
         {isReadOnly && <ReadOnlyBanner moduleName="Rate Sheets" />}        {/* Top Hero Command Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 shadow-xs relative overflow-hidden">
@@ -376,14 +393,14 @@ export default function RateSheetsPage() {
           </div>
 
           {/* Loading State */}
-          {loading && (
+          {loading && rateSheets.length === 0 && (
             <div className="p-4">
               <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
-          {!loading && error && (
+          {!loading && error && rateSheets.length === 0 && (
             <div className="p-8">
               <ErrorState
                 title="Unable to load rate sheets"
@@ -394,7 +411,7 @@ export default function RateSheetsPage() {
           )}
 
           {/* Table View */}
-          {!loading && !error && rateSheets.length === 0 ? (
+          {(!loading || rateSheets.length > 0) && !error && rateSheets.length === 0 ? (
             <div className="p-12 text-center">
               <EmptyState
                 icon={FileSpreadsheet}
@@ -408,10 +425,10 @@ export default function RateSheetsPage() {
                 onAction={isFilterActive ? handleClearFilters : handleAddRateSheet}
               />
             </div>
-          ) : !loading && !error && (
+          ) : (!loading || rateSheets.length > 0) && !error && (
             <div>
               {/* Desktop Table */}
-              <div className="hidden lg:block overflow-x-auto max-h-[620px] overflow-y-auto">
+              <div className="hidden lg:block overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">

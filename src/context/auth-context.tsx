@@ -1,10 +1,15 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import {
+  evaluateStaffPermission,
+  DEFAULT_STAFF_PERMISSIONS,
+  StaffPermissionsProfileMap,
+} from "@/lib/auth/permissions";
 import * as React from "react";
 import { toast } from "sonner";
 
-export type PlatformRole = "PLATFORM_OWNER" | "AGENCY_OWNER" | "TRIPDESK_OWNER";
+export type PlatformRole = "PLATFORM_OWNER" | "AGENCY_OWNER" | "AGENCY_STAFF" | "TRIPDESK_OWNER";
 
 export interface UserProfile {
   id: string;
@@ -54,6 +59,9 @@ interface AuthContextType {
   isLoading: boolean;
   isPlatformOwner: boolean;
   isAgencyOwner: boolean;
+  isAgencyStaff: boolean;
+  staffPermissions: StaffPermissionsProfileMap | null;
+  hasStaffPermission: (moduleKey: string, actionKey?: string) => boolean;
   updateAgencyStatus: (
     agencyId: string,
     status: "Active" | "Trial" | "Suspended"
@@ -96,6 +104,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [agencies, setAgencies] = React.useState<AgencyAccount[]>([]);
   const [subscriptionAccess, setSubscriptionAccess] =
     React.useState<SubscriptionAccessInfo | null>(null);
+  const [staffPermissions, setStaffPermissions] =
+    React.useState<StaffPermissionsProfileMap | null>(null);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
 
   const fetchSession = React.useCallback(async () => {
@@ -142,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           setSubscriptionAccess(json.data.subscriptionAccess || null);
+          setStaffPermissions(json.data.staffPermissions || null);
         }
       }
     } catch (err) {
@@ -162,6 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setCurrentUser(defaultUser);
         setCurrentAgency(defaultAgency);
         setSubscriptionAccess(null);
+        setStaffPermissions(null);
         setIsLoading(false);
       } else if (event === "SIGNED_IN") {
         fetchSession();
@@ -228,6 +240,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isPlatformOwner =
     currentUser.role === "PLATFORM_OWNER" || currentUser.role === "TRIPDESK_OWNER";
   const isAgencyOwner = currentUser.role === "AGENCY_OWNER" && !isPlatformOwner;
+  const isAgencyStaff = currentUser.role === "AGENCY_STAFF";
+
+  const hasStaffPermission = React.useCallback(
+    (moduleKey: string, actionKey: string = "view"): boolean => {
+      if (currentUser.role === "AGENCY_OWNER") return true;
+      if (currentUser.role !== "AGENCY_STAFF") return false;
+      return evaluateStaffPermission(
+        currentUser.role,
+        staffPermissions || DEFAULT_STAFF_PERMISSIONS,
+        moduleKey,
+        actionKey
+      );
+    },
+    [currentUser.role, staffPermissions]
+  );
 
   return (
     <AuthContext.Provider
@@ -239,6 +266,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isPlatformOwner,
         isAgencyOwner,
+        isAgencyStaff,
+        staffPermissions,
+        hasStaffPermission,
         updateAgencyStatus,
         registerAgency,
         logout,

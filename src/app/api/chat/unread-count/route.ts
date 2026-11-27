@@ -1,4 +1,4 @@
-import { requireAuthenticatedUser } from "@/lib/api/context";
+import { enforceStaffPermission, requireAuthenticatedUser } from "@/lib/api";
 import { handleApiError } from "@/lib/api/errors";
 import { platformChatService } from "@/lib/services/platform-chat-service";
 import { UserRole } from "@prisma/client";
@@ -13,6 +13,15 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const context = await requireAuthenticatedUser();
+    if (context.isAgencyStaff && context.dbUser?.agencyId) {
+      await enforceStaffPermission(
+        context.dbUser.role,
+        context.dbUser.agencyId,
+        context.dbUser.id,
+        "SUPPORT_CHAT",
+        "VIEW"
+      );
+    }
 
     const count = await platformChatService.getUnreadCount({
       role: context.dbUser.role as UserRole,

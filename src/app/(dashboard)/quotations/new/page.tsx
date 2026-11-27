@@ -19,6 +19,8 @@ import { percentageYup } from "@/lib/validation-schemas";
 import { useFormik } from "formik";
 import { AlertTriangle,Compass,Loader2,Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
 import * as React from "react";
 import { toast } from "sonner";
 import * as Yup from "yup";
@@ -33,6 +35,19 @@ const createQuotationValidationSchema = Yup.object().shape({
 });
 
 export default function NewQuotationPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("QUOTATIONS", "create")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Quotation Creation"
+          badgeText="Access Restricted"
+          description="You do not have permission to draft quotations. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const {
     canCreate,

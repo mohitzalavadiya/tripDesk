@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
@@ -42,6 +45,19 @@ const REFERRAL_STATUS_FILTER_LABELS: Record<string, string> = {
 };
 
 export default function ReferralsAndRewardsPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("REFERRALS", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Referrals & Rewards"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
 
   const [referrals, setReferrals] = React.useState<AgencyReferralItem[]>([]);
@@ -76,8 +92,8 @@ export default function ReferralsAndRewardsPage() {
 
   useModalScrollLock(Boolean(isCreateOpen || isSettingsOpen));
 
-  const fetchReferrals = React.useCallback(async () => {
-    setLoading(true);
+  const fetchReferrals = React.useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const res = await experienceClient.listReferrals({
         status: statusFilter !== "ALL" ? (statusFilter as any) : undefined,
@@ -94,7 +110,7 @@ export default function ReferralsAndRewardsPage() {
     } catch (err: any) {
       toast.error(err.message || "Failed to load referrals");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [statusFilter, searchQuery]);
 
@@ -143,7 +159,7 @@ export default function ReferralsAndRewardsPage() {
       setFriendPhone("");
       setFriendEmail("");
       setNotes("");
-      fetchReferrals();
+      fetchReferrals(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to create referral");
     } finally {
@@ -157,7 +173,7 @@ export default function ReferralsAndRewardsPage() {
         status: newStatus,
       });
       toast.success(`Referral status updated to ${newStatus}`);
-      fetchReferrals();
+      fetchReferrals(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to update status");
     }
@@ -277,7 +293,7 @@ export default function ReferralsAndRewardsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchReferrals}
+              onClick={() => fetchReferrals()}
               className="h-9 text-xs"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-purple-600" : ""}`} />
@@ -287,7 +303,7 @@ export default function ReferralsAndRewardsPage() {
 
         {/* ─── REFERRALS TABLE / LIST ─────────────────────────────────────── */}
         <div className="space-y-3">
-          {loading ? (
+          {loading && referrals.length === 0 ? (
             <div className="flex items-center justify-center p-16 bg-white rounded-2xl border border-slate-200/90 text-slate-400 text-xs gap-2">
               <RefreshCw className="h-4 w-4 animate-spin text-purple-600" />
               Loading database referral records...

@@ -1,0 +1,234 @@
+<USER_REQUEST>
+# Your Travel Desk — Complete Staff Permissions Reconciliation, Repair & Verification
+
+## Objective
+
+The current staff-permissions implementation is incomplete. Previous work addressed selected pages, but unnecessary owner-only restrictions are still visible in several areas:
+
+- Settings & Admin
+- Engagement & Analytics
+- Finance & Invoicing
+- CRM & Sales
+
+Do not treat the previous implementation report, passing automated tests, or updated V3 documentation as proof that the feature is complete.
+
+**Inspect the actual current code, compare the Agency Owner and Agency Staff experiences across the entire application, fix every in-scope inconsistency, and verify the result in one focused pass.**
+
+Do not restart completed work, recreate the permissions system, or implement an unrelated feature.
+
+## 1. Preserve project continuity
+
+- Work in the currently open Your Travel Desk repository and existing branch.
+- Read `TRIPDESK_MASTER_CONTEXT_FINAL_V3.md` and the latest permissions-related V3 entries, including Section 276.47 and any later updates.
+- Inspect the current code before changing anything. The current codebase takes precedence over outdated documentation or earlier reports.
+- Preserve the existing permission schema, migration history, working implementation, audit logging, UI conventions, and user changes.
+- Do not create V4 or another replacement continuity document.
+- Do not commit, push, merge, change branches, or deploy.
+- Do not run `prisma db push`, reset a database, or apply migrations blindly. Determine whether any schema changes are genuinely required before proposing them.
+
+## 2. Establish the complete application page inventory
+
+Identify every actual application page and its route from the current repository. Do not rely only on the sidebar configuration or an existing permission registry.
+
+Include:
+- All pages nested under Settings & Admin.
+- All pages nested under Engagement & Analytics.
+- All pages nested under Finance & Invoicing.
+- All pages nested under CRM & Sales.
+- Every remaining application page, including detail pages, nested pages, operational tools, and pages accessible through direct URLs.
+- Relevant dialogs, detail views, tabs, and page-specific actions that can modify data.
+
+Create an internal route-to-permission inventory and reconcile it with the existing permission registry.
+
+For each route, identify:
+1. Route and page title.
+2. Navigation group and sidebar entry.
+3. Permission key and permission definition.
+4. Owner access behavior.
+5. Staff View, Add/Create, Edit/Update, Delete, and Export capabilities, where applicable.
+6. Page-level guards.
+7. API routes, server actions, services, and data queries used by the page.
+8. Any remaining hard-coded owner-only checks.
+9. Whether the restriction is a configurable page permission or a separate, justified security restriction.
+
+Do not leave unregistered pages or silently omit nested routes.
+
+## 3. Required permission behavior
+
+Implement and reconcile the following behavior across the entire app.
+
+### Agency Owner
+
+- The Agency Owner can open and use all ordinary pages belonging to their agency.
+- The Agency Owner can manage page permissions for agency staff through the existing permissions-management interface.
+- Every ordinary application page must have configurable permissions, rather than an unchangeable `ownerOnly` flag that prevents delegation.
+- Do not let staff grant permissions to themselves or modify another user's permissions.
+- Preserve the existing permission-management audit trail and reliable save/reload behavior.
+
+### Agency Staff
+
+Every application page must remain visible in the staff sidebar and corresponding mobile navigation, regardless of its assigned permissions.
+
+Do not hide a page merely because the staff member lacks access.
+
+- If View is granted, staff can view the permitted page and its authorized data.
+- If View is denied, direct navigation must show the established restricted-access state. Protected data must not be fetched or exposed.
+- If Add/Create is granted, staff can create the relevant records.
+- If Edit/Update is granted, staff can modify the relevant records.
+- If Delete is granted, staff can perform only the permitted deletion operations.
+- If Export is supported and granted, staff can export the permitted data.
+- If an action is not granted, disable or omit the corresponding action control using existing UI patterns and enforce the denial on the server.
+- Add, Edit, and Delete should automatically require or enable View. If the current UI has this dependency, preserve it consistently.
+- Permission changes must take effect without requiring a new account or an unrelated configuration change.
+
+Do not implement permissions only in the UI. Direct URLs, APIs, server actions, and service-layer operations must enforce the same rules.
+
+## 4. Repair the permissions modal
+
+Inspect the existing large, responsive permissions modal and its actual state-management behavior.
+
+The modal must:
+- List every application page, organized by the existing navigation groups.
+- Use **Page Access**, not the ambiguous label Toggle.
+- Provide individual View, Add/Create, Edit/Update, and Delete controls where applicable.
+- Provide Export only for pages that genuinely support exporting.
+- Keep all pages visible in the permission-management list.
+- Clearly distinguish disabled page access from individual disabled actions.
+- Save and reload the exact persisted permissions.
+- Avoid silently restoring owner-only defaults when reopening the modal.
+- Preserve unsaved-change handling, loading states, error messages, and retry behavior.
+- Support a large responsive layout without clipping controls or making lower pages inaccessible.
+
+Define and verify the exact Page Access behavior. Turning it off must revoke that page's delegated actions. Turning it on must enable only the documented defaults; it must not silently grant unrelated sensitive capabilities. Individual actions must remain configurable.
+
+Do not merely rename a label and claim the modal is fixed.
+
+## 5. Remove unnecessary owner-only restrictions throughout the application
+
+Search the entire repository for:
+- `ownerOnly` and equivalent permission flags.
+- `requireAgencyOwnerContext()` and similar owner-only guards.
+- Role checks that reject staff before checking their configured permission.
+- Navigation configuration that marks ordinary pages as owner-only.
+- Page-level guards that disagree with the permission modal.
+- API, server-action, service, export, and detail-route restrictions.
+- Permission defaults or fallback logic that restores owner-only behavior.
+- Disabled buttons or hidden actions that contradict saved permissions.
+
+For each occurrence, determine whether it blocks an ordinary page or action that should be delegable.
+
+Remove or replace **unnecessary owner-only restrictions on ordinary agency pages** with the correct page permission check. Do not stop after fixing only Rate Sheets, Suppliers, Invoices, Reports, or Customer Insights.
+
+Explicitly reconcile all remaining restrictions across the four named navigation groups and the rest of the app.
+
+A restriction is not considered fixed simply because the sidebar entry is visible.
+
+## 6. Security boundaries that must remain intact
+
+Removing unnecessary owner-only restrictions must not compromise security.
+
+Preserve:
+- Agency tenant isolation. Always derive `agencyId` from authenticated server context, never from client-controlled input.
+- Platform-owner-only platform administration and credential-protection controls.
+- Subscription and SaaS-level operations that are outside ordinary agency delegation.
+- Existing safeguards for payment verification, voiding, and other privileged financial operations unless the existing product specification explicitly authorizes delegation.
+- Sensitive supplier costs, net rates, margins, payables, bank details, and internal financial data that staff are not authorized to see.
+- Existing customer-data access controls, authentication checks, subscription/write-access rules, and audit logging.
+
+However, do not use these safeguards as a reason to lock an entire ordinary page if the intended behavior is to allow safe delegated access.
+
+Where a page combines operational and sensitive financial information, separate the permissions and redact unauthorized fields. Allow the staff member to perform permitted operational actions without exposing protected data.
+
+Review the nested permission distinctions, including customer versus supplier payments. Do not merge distinct security domains into one broad permission.
+
+For each remaining immutable owner-only restriction, document the exact protected operation, why delegation is unsafe or contrary to the product rules, and where it is enforced. No unexplained owner-only restrictions should remain on ordinary pages.
+
+## 7. Compare both sides end to end
+
+Create and execute a comparison matrix for **every inventoried page**, not just the four named groups.
+
+Test these cases:
+
+1. Agency Owner opens the page and performs the normal permitted workflow.
+2. Staff with no page permissions sees the navigation entry but receives a restricted-access state without protected data.
+3. Staff with View only can view authorized data but cannot create, edit, delete, or export.
+4. Staff with View + Add/Create can create records but cannot edit or delete unless separately granted.
+5. Staff with View + Edit/Update can update permitted records but cannot create or delete unless separately granted.
+6. Staff with View + Delete can delete only eligible records and cannot bypass business rules.
+7. Staff with the relevant combination of permissions can complete the permitted workflow.
+8. Staff attempts the same unauthorized operations through a direct URL, API request, server action, and export endpoint.
+9. An Agency Owner changes permissions; saved values persist after reload and affect staff authorization correctly.
+10. Tenant isolation remains intact when client-supplied agency identifiers are manipulated.
+
+For every page, compare the permission shown in the modal, the saved permission record, the sidebar behavior, the page guard, the rendered action controls, and the actual server enforcement.
+
+Do not claim full coverage based solely on a handful of representative pages.
+
+## 8. Fix the implementation, not just the tests
+
+Use the existing permission architecture wherever possible. Avoid a second permission system, duplicated registries, broad refactors, or unnecessary database changes.
+
+Fix root causes in shared helpers or configuration where appropriate, then repair any page-specific exceptions.
+
+Add or update regression tests for every defect found, including the navigation groups listed above. Do not weaken existing tests or change expected security behavior merely to make a test pass.
+
+Inspect the existing tests and verify that their assertions reflect the actual product requirements. A passing test suite is necessary but not sufficient.
+
+## 9. Verification requirements
+
+Run the relevant existing test suites and report actual results, including:
+- Staff permission failure tests.
+- App-wide staff permission tests.
+- CRM correctness tests.
+- Itinerary correctness tests.
+- Any new page-permission regression tests.
+- `npx prisma validate`
+- `npx tsc --noEmit`
+- `git diff --check`
+- `npm run build`
+
+Check for material performance regressions, especially shared navigation, permission loading, database queries, and page authorization. Avoid introducing repeated permission queries or fetching protected page data before authorization.
+
+If browser tooling is available, verify the Agency Owner and Agency Staff flows in the running application. Use representative role accounts and inspect the actual rendered UI and network/server responses. Do not claim browser verification if it was not performed.
+
+If browser testing is unavailable, clearly distinguish automated verification from manual/browser verification and provide the exact remaining gap.
+
+## 10. Update V3 and report the outcome
+
+Update the existing V3 document with the final, verified state. Do not record planned work as completed.
+
+At the end, report:
+1. Total application pages/routes inventoried.
+2. Pages with configurable permissions before and after the repair.
+3. Every unnecessary owner-only restriction removed.
+4. Every remaining owner-only restriction and its precise justification.
+5. Results for Settings & Admin, Engagement & Analytics, Finance & Invoicing, and CRM & Sales.
+6. Permission-modal behavior and persistence verification.
+7. Owner-versus-staff comparison results.
+8. Security and tenant-isolation verification.
+9. Tests, TypeScript, Prisma validation, diff checks, and build results.
+10. Browser verification performed or not performed.
+11. Files changed and V3 section updated.
+12. Any unresolved issue, stated plainly.
+
+## Completion criteria
+
+Do not report the task as complete unless every application route has been inventoried, the modal and permission registry agree, ordinary page access is delegable, the staff sidebar remains complete, server-side action enforcement matches the saved permissions, and the owner/staff comparison has been completed.
+
+If a genuine product or security constraint prevents delegation for a specific operation, identify that exact operation and explain why. Do not leave an entire page owner-only merely because one section of it contains sensitive information.
+
+Perform the inspection, implementation, focused regression testing, and V3 update in this single pass. Do not stop after producing another audit report or after fixing only the previously mentioned pages.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-29T15:09:58+05:30.
+
+The user's current state is as follows:
+Active Document: c:\Users\hp\OneDrive\Desktop\Mohit\ssssyber\src\lib\auth\permissions.ts (LANGUAGE_UNSPECIFIED)
+Cursor is on line: 80
+Other open documents:
+- c:\Users\hp\OneDrive\Desktop\Mohit\ssssyber\UPCOMING_FEATURE.md (LANGUAGE_UNSPECIFIED)
+- c:\Users\hp\OneDrive\Desktop\Mohit\ssssyber\.env (LANGUAGE_UNSPECIFIED)
+- c:\Users\hp\OneDrive\Desktop\Mohit\ssssyber\scratch\check-enum.ts (LANGUAGE_UNSPECIFIED)
+- c:\Users\hp\OneDrive\Desktop\Mohit\ssssyber\scratch\fix-use-client.js (LANGUAGE_UNSPECIFIED)
+- c:\Users\hp\OneDrive\Desktop\Mohit\ssssyber\src\app\(dashboard)\bookings\new\page.tsx (LANGUAGE_UNSPECIFIED)
+</ADDITIONAL_METADATA>

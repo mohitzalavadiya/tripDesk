@@ -1,8 +1,9 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import { financeService } from "@/lib/services/finance-service";
 import { refundCustomerPaymentSchema } from "@/lib/validation/finance-schema";
@@ -16,11 +17,19 @@ interface RouteParams {
 
 /**
  * POST /api/finance/customer-payments/[id]/refund
- * Process refund on a customer payment.
+ * Process refund on a customer payment. Strictly restricted to Agency Owners.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "PAYMENTS",
+      "void",
+      "You do not have permission to process customer refunds."
+    );
     const { id } = await params;
     const body = await validateJson(refundCustomerPaymentSchema, request);
 

@@ -1,0 +1,532 @@
+[
+  {
+    "file": "src/app/(dashboard)/activities/new/page.tsx",
+    "route": "/activities/new",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/activities/page.tsx",
+    "route": "/activities",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/activities/[id]/page.tsx",
+    "route": "/activities/[id]",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/bookings/new/page.tsx",
+    "route": "/bookings/new",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/bookings/page.tsx",
+    "route": "/bookings",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/bookings/[id]/page.tsx",
+    "route": "/bookings/[id]",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/communications/page.tsx",
+    "route": "/communications",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/customer-insights/page.tsx",
+    "route": "/customer-insights",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/customers/new/page.tsx",
+    "route": "/customers/new",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/customers/page.tsx",
+    "route": "/customers",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/customers/[id]/page.tsx",
+    "route": "/customers/[id]",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/dashboard/page.tsx",
+    "route": "/dashboard",
+    "hasRestrictedCardImport": false,
+    "hasAuthImport": true,
+    "checksPerm": false,
+    "checksOwner": true,
+    "checksStaff": false,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/destinations/page.tsx",
+    "route": "/destinations",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/documents/page.tsx",
+    "route": "/documents",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/enquiries/new/page.tsx",
+    "route": "/enquiries/new",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/enquiries/page.tsx",
+    "route": "/enquiries",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/enquiries/[id]/page.tsx",
+    "route": "/enquiries/[id]",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/feedback/page.tsx",
+    "route": "/feedback",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/finance/page.tsx",
+    "route": "/finance",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/follow-ups/page.tsx",
+    "route": "/follow-ups",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/hotels/new/page.tsx",
+    "route": "/hotels/new",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/hotels/page.tsx",
+    "route": "/hotels",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/hotels/[id]/page.tsx",
+    "route": "/hotels/[id]",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/invoices/page.tsx",
+    "route": "/invoices",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/invoices/[id]/page.tsx",
+    "route": "/invoices/[id]",
+    "hasRestrictedCardImport": false,
+    "hasAuthImport": false,
+    "checksPerm": false,
+    "checksOwner": false,
+    "checksStaff": false,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+    "route": "/operations/analytics",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/operations/issues/page.tsx",
+    "route": "/operations/issues",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/operations/page.tsx",
+    "route": "/operations",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/operations/[tripId]/page.tsx",
+    "route": "/operations/[tripId]",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/payments/page.tsx",
+    "route": "/payments",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/quotations/new/page.tsx",
+    "route": "/quotations/new",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/quotations/page.tsx",
+    "route": "/quotations",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/quotations/[id]/page.tsx",
+    "route": "/quotations/[id]",
+    "hasRestrictedCardImport": false,
+    "hasAuthImport": false,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/rate-sheets/new/page.tsx",
+    "route": "/rate-sheets/new",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/rate-sheets/page.tsx",
+    "route": "/rate-sheets",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/rate-sheets/[id]/page.tsx",
+    "route": "/rate-sheets/[id]",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/referrals/page.tsx",
+    "route": "/referrals",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/reports/page.tsx",
+    "route": "/reports",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/settings/page.tsx",
+    "route": "/settings",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/subscription/page.tsx",
+    "route": "/subscription",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/suppliers/new/page.tsx",
+    "route": "/suppliers/new",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/suppliers/page.tsx",
+    "route": "/suppliers",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/suppliers/[id]/page.tsx",
+    "route": "/suppliers/[id]",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/support/page.tsx",
+    "route": "/support",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/trips/new/page.tsx",
+    "route": "/trips/new",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/trips/page.tsx",
+    "route": "/trips",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/trips/[id]/costing/page.tsx",
+    "route": "/trips/[id]/costing",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/trips/[id]/page.tsx",
+    "route": "/trips/[id]",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+    "route": "/trips/[id]/quotation",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx",
+    "route": "/trips/[id]/quotation/preview",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/vehicles/new/page.tsx",
+    "route": "/vehicles/new",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/vehicles/page.tsx",
+    "route": "/vehicles",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": false,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  },
+  {
+    "file": "src/app/(dashboard)/vehicles/[id]/page.tsx",
+    "route": "/vehicles/[id]",
+    "hasRestrictedCardImport": true,
+    "hasAuthImport": true,
+    "checksPerm": true,
+    "checksOwner": true,
+    "checksStaff": true,
+    "hasPureOwnerGate": false
+  }
+]

@@ -5,20 +5,24 @@ DashboardPreset,
 calculateDashboardDateRange,
 } from "@/lib/validation/dashboard-schema";
 import {
-BookingPaymentStatus,
-BookingStatus,
-EnquiryStatus,
-FollowUpStatus,
-IssueStatus,
-NotificationChannel,
-NotificationDeliveryStatus,
-PaymentStatus,
-QuotationStatus,
-SupplierPayableStatus,
-TravelDocumentStatus,
-TravelDocumentType,
-TripStatus,
+  BookingPaymentStatus,
+  BookingStatus,
+  EnquiryPriority,
+  EnquiryStatus,
+  FollowUpStatus,
+  FollowUpType,
+  IssueStatus,
+  NotificationChannel,
+  NotificationDeliveryStatus,
+  PaymentStatus,
+  QuotationStatus,
+  SupplierPayableStatus,
+  TravelDocumentStatus,
+  TravelDocumentType,
+  TripStatus,
 } from "@prisma/client";
+import { getTodayBoundaries } from "@/lib/utils/timezone";
+import { getStaleCutoffDate } from "@/lib/utils/crm-urgency";
 import "server-only";
 
 // ═════════════════════════════════════════════════════════════════════
@@ -31,7 +35,10 @@ export interface DashboardSalesKPIs {
   quotationsSent: number;
   quotationAcceptanceRate: number;
   confirmedBookings: number;
+  wonEnquiries?: number;
+  totalEnquiries?: number;
   bookingConversionRate: number;
+  enquiryConversionRate: number;
   pipelineValue: number;
 }
 
@@ -235,6 +242,7 @@ export interface CRMUpcomingFollowUpItem {
   scheduledAt: string;
   notes?: string | null;
   isOverdue: boolean;
+  stage?: string;
   enquiry?: {
     destination: string;
     customer: {
@@ -249,6 +257,8 @@ export interface CRMAndFollowUpAnalytics {
   overdueCount: number;
   upcomingCount: number;
   uncontactedLeadsCount: number;
+  staleLeadsCount?: number;
+  urgentEnquiriesCount?: number;
   dueTodayFollowUps: CRMUpcomingFollowUpItem[];
   overdueFollowUps: CRMUpcomingFollowUpItem[];
 }
@@ -330,8 +340,7 @@ export const dashboardService = {
     );
 
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const { start: todayStart, end: todayEnd } = getTodayBoundaries();
 
     // ─── PARALLEL SERVER-SIDE AGGREGATIONS ───
     const [
@@ -342,6 +351,7 @@ export const dashboardService = {
       enquiriesBudgetInRange,
       quotationsSent,
       quotationsAccepted,
+      wonEnquiriesInRange,
       confirmedBookingsInRange,
 
       // Financials (Bookings in range)
@@ -413,7 +423,13 @@ export const dashboardService = {
         where: {
           agencyId,
           archivedAt: null,
-          sharedAt: { gte: start, lte: end },
+          OR: [
+            { sharedAt: { gte: start, lte: end } },
+            {
+              status: { in: [QuotationStatus.SENT, QuotationStatus.VIEWED, QuotationStatus.ACCEPTED] },
+              updatedAt: { gte: start, lte: end },
+            },
+          ],
         },
       }),
       // 6. Quotations Accepted in range
@@ -423,6 +439,15 @@ export const dashboardService = {
           archivedAt: null,
           acceptedAt: { gte: start, lte: end },
           status: QuotationStatus.ACCEPTED,
+        },
+      }),
+      // 6b. Won Enquiries in range (cohort conversion)
+      prisma.enquiry.count({
+        where: {
+          agencyId,
+          archivedAt: null,
+          createdAt: { gte: start, lte: end },
+          status: EnquiryStatus.CONVERTED,
         },
       }),
       // 7. Confirmed Bookings in range
@@ -657,10 +682,13 @@ export const dashboardService = {
       sales: {
         newEnquiries,
         activeLeads,
+        wonEnquiries: wonEnquiriesInRange,
+        totalEnquiries: enquiriesInRange,
         quotationsSent,
         quotationAcceptanceRate: safeDivision(quotationsAccepted, quotationsSent),
         confirmedBookings: confirmedBookingsInRange,
         bookingConversionRate: safeDivision(confirmedBookingsInRange, enquiriesInRange),
+        enquiryConversionRate: safeDivision(wonEnquiriesInRange, enquiriesInRange),
         pipelineValue: Number(enquiriesBudgetInRange._sum.budget || 0),
       },
       financial: {
@@ -1312,11 +1340,20 @@ export const dashboardService = {
    * 7. Generates CRM Follow-ups Analytics (Due Today & Overdue actionable lists).
    */
   async getCRMAndFollowUpAnalytics(agencyId: string): Promise<CRMAndFollowUpAnalytics> {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const todayBoundaries = getTodayBoundaries();
+    const { start: todayStart, end: todayEnd } = todayBoundaries;
+    const staleCutoff = getStaleCutoffDate(todayBoundaries);
 
-    const [dueToday, overdue, upcomingCount, uncontactedCount] = await Promise.all([
+    const [
+      dueToday,
+      overdue,
+      dueTodayCount,
+      overdueCount,
+      upcomingCount,
+      uncontactedCount,
+      staleLeadsCount,
+      urgentEnquiriesCount,
+    ] = await Promise.all([
       prisma.enquiryFollowUp.findMany({
         where: {
           agencyId,
@@ -1332,6 +1369,7 @@ export const dashboardService = {
               enquiryNumber: true,
               title: true,
               destination: true,
+              status: true,
               customer: { select: { name: true, phone: true } },
             },
           },
@@ -1352,9 +1390,26 @@ export const dashboardService = {
               enquiryNumber: true,
               title: true,
               destination: true,
+              status: true,
               customer: { select: { name: true, phone: true } },
             },
           },
+        },
+      }),
+      prisma.enquiryFollowUp.count({
+        where: {
+          agencyId,
+          archivedAt: null,
+          status: FollowUpStatus.PENDING,
+          scheduledAt: { gte: todayStart, lte: todayEnd },
+        },
+      }),
+      prisma.enquiryFollowUp.count({
+        where: {
+          agencyId,
+          archivedAt: null,
+          status: FollowUpStatus.PENDING,
+          scheduledAt: { lt: todayStart },
         },
       }),
       prisma.enquiryFollowUp.count({
@@ -1373,6 +1428,30 @@ export const dashboardService = {
           followUps: { none: { status: FollowUpStatus.PENDING } },
         },
       }),
+      prisma.enquiry.count({
+        where: {
+          agencyId,
+          archivedAt: null,
+          status: { notIn: [EnquiryStatus.CONVERTED, EnquiryStatus.LOST, EnquiryStatus.CANCELLED] },
+          createdAt: { lt: staleCutoff },
+          followUps: {
+            none: {
+              status: FollowUpStatus.COMPLETED,
+              archivedAt: null,
+              completedAt: { gte: staleCutoff },
+              type: { in: [FollowUpType.CALL, FollowUpType.WHATSAPP, FollowUpType.EMAIL, FollowUpType.MEETING] },
+            },
+          },
+        },
+      }),
+      prisma.enquiry.count({
+        where: {
+          agencyId,
+          archivedAt: null,
+          status: { notIn: [EnquiryStatus.CONVERTED, EnquiryStatus.LOST, EnquiryStatus.CANCELLED] },
+          priority: { in: [EnquiryPriority.URGENT, EnquiryPriority.HIGH] },
+        },
+      }),
     ]);
 
     const mapFollowUp = (f: any, isOverdue: boolean): CRMUpcomingFollowUpItem => ({
@@ -1388,13 +1467,16 @@ export const dashboardService = {
       scheduledAt: f.scheduledAt.toISOString(),
       notes: f.notes,
       isOverdue,
+      stage: f.enquiry?.status || undefined,
     });
 
     return {
-      dueTodayCount: dueToday.length,
-      overdueCount: overdue.length,
+      dueTodayCount,
+      overdueCount,
       upcomingCount,
       uncontactedLeadsCount: uncontactedCount,
+      staleLeadsCount,
+      urgentEnquiriesCount,
       dueTodayFollowUps: dueToday.map((f) => mapFollowUp(f, false)),
       overdueFollowUps: overdue.map((f) => mapFollowUp(f, true)),
     };
@@ -1526,6 +1608,7 @@ export const dashboardService = {
       ["Active Leads", summary.sales.activeLeads.toString()],
       ["Confirmed Bookings", summary.sales.confirmedBookings.toString()],
       ["Quotation Acceptance Rate", `${summary.sales.quotationAcceptanceRate}%`],
+      ["Enquiry Conversion Rate", `${summary.sales.enquiryConversionRate}%`],
       ["Booking Conversion Rate", `${summary.sales.bookingConversionRate}%`],
       ["Upcoming Trips", summary.operations.upcomingTripsCount.toString()],
       ["Operationally Ready Trips", summary.operations.operationallyReadyTripsCount.toString()],

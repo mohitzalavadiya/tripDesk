@@ -6,7 +6,7 @@ import { InventoryProvider } from "@/context/inventory-context";
 import { OperationsProvider } from "@/context/operations-context";
 import { QuotationProvider } from "@/context/quotation-context";
 import { SubscriptionProvider } from "@/context/subscription-context";
-import { requireAgencyOwner } from "@/lib/auth";
+import { requireAgencyMember } from "@/lib/auth";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ interface DashboardLayoutProps {
 }
 
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
-  await requireAgencyOwner();
+  await requireAgencyMember();
 
   return (
     <SubscriptionProvider>

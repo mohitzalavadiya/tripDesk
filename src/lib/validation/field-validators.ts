@@ -64,6 +64,51 @@ export function isValidPhoneNumber(value: unknown): boolean {
 }
 
 /**
+ * Deterministically normalizes phone numbers for CRM customer records.
+ *
+ * Requirements:
+ * - Normalizes harmless formatting differences consistently (strips spaces, dashes, dots, brackets).
+ * - Preserves valid international numbers and their explicit '+' country codes (does NOT force +91 on international numbers).
+ * - For 10-digit Indian mobile numbers (starting with 6, 7, 8, 9), domestic trunk '0' prefixes (11 digits),
+ *   or '91' prefixes without plus (12 digits), normalizes consistently to '+91XXXXXXXXXX'.
+ * - For other numbers without '+', strips formatting symbols to return clean digits without guessing country codes.
+ * - Leaves invalid/empty values as-is (validation is handled by isValidPhoneNumber).
+ */
+export function normalizePhoneNumber(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const str = String(value).trim();
+  if (!str) return "";
+
+  const hasPlus = str.startsWith("+");
+  const digits = str.replace(/\D/g, "");
+
+  if (!digits) return str;
+
+  // 1. Explicit international '+' prefix provided: preserve '+' and digits
+  if (hasPlus) {
+    return `+${digits}`;
+  }
+
+  // 2. Standard 10-digit Indian mobile number (starts with 6, 7, 8, 9)
+  if (digits.length === 10 && /^[6-9]\d{9}$/.test(digits)) {
+    return `+91${digits}`;
+  }
+
+  // 3. Indian domestic trunk prefix: 0 followed by 10-digit mobile starting with 6-9
+  if (digits.length === 11 && digits.startsWith("0") && /^[6-9]\d{9}$/.test(digits.slice(1))) {
+    return `+91${digits.slice(1)}`;
+  }
+
+  // 4. 12 digits starting with 91 followed by 10-digit mobile starting with 6-9
+  if (digits.length === 12 && digits.startsWith("91") && /^[6-9]\d{9}$/.test(digits.slice(2))) {
+    return `+91${digits.slice(2)}`;
+  }
+
+  // 5. Other numbers without '+': return clean digits without assuming country
+  return digits;
+}
+
+/**
  * Blocks exponent keys ('e', 'E', '+') on numeric inputs to prevent accidental scientific notation entry.
  * For non-negative fields, also blocks '-'.
  * For whole-number (integer) fields, also blocks '.'.

@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { useSubscription } from "@/context/subscription-context";
@@ -25,6 +28,20 @@ import * as React from "react";
 import { toast } from "sonner";
 
 export default function CustomerInsightsPage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+
+  if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("CUSTOMER_INSIGHTS", "view"))) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Customer Insights & Lifetime Analytics"
+          badgeText="Access Restricted"
+          description="Customer lifetime valuation, churn analysis, and financial retention metrics are restricted to authorized personnel."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const { isFeatureAllowed, loading: subLoading } = useSubscription();
   const isAllowed = isFeatureAllowed("CUSTOMER_INSIGHTS");
@@ -32,8 +49,8 @@ export default function CustomerInsightsPage() {
   const [data, setData] = React.useState<CustomerInsightsData | null>(null);
   const [loading, setLoading] = React.useState(true);
 
-  const fetchInsights = React.useCallback(async () => {
-    setLoading(true);
+  const fetchInsights = React.useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const res = await experienceClient.getCustomerInsights();
 
@@ -45,7 +62,7 @@ export default function CustomerInsightsPage() {
         toast.error(err.message || "Failed to load customer insights");
       }
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, []);
 
@@ -201,7 +218,7 @@ export default function CustomerInsightsPage() {
               </div>
             </div>
 
-            {loading ? (
+            {loading && !data ? (
               <div className="p-8 text-center text-xs text-slate-400">Loading destinations...</div>
             ) : topDestinations.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-400">No destinations recorded yet.</div>
@@ -240,7 +257,7 @@ export default function CustomerInsightsPage() {
               </div>
             </div>
 
-            {loading ? (
+            {loading && !data ? (
               <div className="p-8 text-center text-xs text-slate-400">Loading VIP accounts...</div>
             ) : topCustomers.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-400">No customer spend data recorded yet.</div>

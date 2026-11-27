@@ -1,5 +1,7 @@
 "use client";
 
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+import { useAuth } from "@/context/auth-context";
 import { DestinationSelect } from "@/components/shared/destination-select";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
@@ -27,6 +29,20 @@ const createActivitySchema = Yup.object().shape({
 });
 
 export default function NewActivityPage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+
+  if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("ACTIVITIES", "create"))) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Create Activity"
+          badgeText="Access Restricted"
+          description="You do not have permission to access this page. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
   const [localReadOnly, setLocalReadOnly] = React.useState(false);

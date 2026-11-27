@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { formatEnumLabel } from "@/lib/utils/enum-formatters";
 import {
 CreateExpenseInput,
 CreateSupplierPayableInput,
@@ -14,6 +15,7 @@ UpdateSupplierPayableInput,
 import {
 BookingPaymentStatus,
 BookingStatus,
+InvoiceStatus,
 OperationalExpense,
 Payment,
 PaymentMethod,
@@ -25,6 +27,7 @@ SupplierPayment,
 SupplierPaymentStatus,
 } from "@prisma/client";
 import "server-only";
+import { PAYMENT_SCALAR_SELECT } from "./payment-service";
 import { tripCostingService } from "./trip-costing-service";
 
 // ═════════════════════════════════════════════════════════════════════
@@ -33,6 +36,7 @@ import { tripCostingService } from "./trip-costing-service";
 
 export interface FinanceKPIOverview {
   totalSales: number;
+  confirmedBookingValue?: number;
   amountReceived: number;
   customerOutstanding: number;
   customerRefunded: number;
@@ -173,7 +177,9 @@ export interface BookingFinanceBreakdown {
   tripNumber: string;
   tripTitle: string;
   customerName: string;
+  quotedAmount?: number;
   totalBookingAmount: number;
+  invoicedAmount?: number;
   customerPaid: number;
   customerRefunded: number;
   customerOutstanding: number;
@@ -188,14 +194,26 @@ export interface BookingFinanceBreakdown {
   supplierPaid: number;
   supplierOutstanding: number;
   operationalExpenses: number;
+  grossMargin?: number;
   grossProfit: number;
   profitMarginPercent: number;
   netCashPosition: number;
+  isCostComplete?: boolean;
+  costCompletenessReason?: string;
   isFinalized: boolean;
-  customerPayments: Payment[];
+  customerPayments: Array<Omit<Payment, "verifiedById" | "verifiedAt">>;
   supplierPayables: (SupplierPayable & { supplier?: { name: string; type: string | null } | null })[];
   supplierPayments: (SupplierPayment & { supplier?: { name: string } | null })[];
   expenses: OperationalExpense[];
+  invoices?: {
+    id: string;
+    invoiceNumber: string | null;
+    totalAmount: Prisma.Decimal;
+    paidAmount: Prisma.Decimal;
+    balanceAmount: Prisma.Decimal;
+    status: string;
+    dueDate: Date | null;
+  }[];
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -352,7 +370,8 @@ export const financeService = {
       where: { id: bookingId },
       include: {
         payments: {
-          where: { archivedAt: null, status: PaymentStatus.COMPLETED },
+          where: { archivedAt: null, status: { in: [PaymentStatus.COMPLETED, PaymentStatus.REFUNDED] } },
+          select: { id: true, amount: true, refundedAmount: true },
         },
       },
     });
@@ -367,9 +386,9 @@ export const financeService = {
       totalRefunded += Number(p.refundedAmount || 0);
     }
 
-    const netPaid = Math.max(0, totalPaid - totalRefunded);
+    const netPaid = Math.max(0, Math.round((totalPaid - totalRefunded) * 100) / 100);
     const totalAmount = Number(booking.totalAmount);
-    const balanceAmount = Math.max(0, totalAmount - netPaid);
+    const balanceAmount = Math.max(0, Math.round((totalAmount - netPaid) * 100) / 100);
 
     let paymentStatus: BookingPaymentStatus = BookingPaymentStatus.UNPAID;
     if (netPaid >= totalAmount && totalAmount > 0) {
@@ -386,6 +405,56 @@ export const financeService = {
         paymentStatus,
       },
     });
+
+    // Keep linked non-cancelled invoice paid/balance/status synchronized without altering historical totals
+    const activeInvoice = await db.invoice.findFirst({
+      where: {
+        bookingId,
+        status: { not: InvoiceStatus.CANCELLED },
+        archivedAt: null,
+      },
+      select: { id: true, totalAmount: true, status: true },
+    });
+
+    if (activeInvoice) {
+      const invPayments = await db.payment.findMany({
+        where: {
+          invoiceId: activeInvoice.id,
+          archivedAt: null,
+          status: { in: [PaymentStatus.COMPLETED, PaymentStatus.REFUNDED] },
+        },
+        select: { amount: true, refundedAmount: true },
+      });
+      const invPaid =
+        invPayments.length > 0
+          ? Math.max(
+              0,
+              Math.round(
+                invPayments.reduce(
+                  (sum, pay) => sum + Math.max(0, Number(pay.amount) - Number(pay.refundedAmount || 0)),
+                  0
+                ) * 100
+              ) / 100
+            )
+          : netPaid;
+      const invTotal = Number(activeInvoice.totalAmount);
+      const invBalance = Math.max(0, Math.round((invTotal - invPaid) * 100) / 100);
+      let newInvStatus: InvoiceStatus = InvoiceStatus.ISSUED;
+      if (invBalance <= 0 && invTotal > 0) {
+        newInvStatus = InvoiceStatus.PAID;
+      } else if (invPaid > 0) {
+        newInvStatus = InvoiceStatus.PARTIALLY_PAID;
+      }
+
+      await db.invoice.update({
+        where: { id: activeInvoice.id },
+        data: {
+          paidAmount: new Prisma.Decimal(invPaid),
+          balanceAmount: new Prisma.Decimal(invBalance),
+          ...(activeInvoice.status !== InvoiceStatus.DRAFT ? { status: newInvStatus } : {}),
+        },
+      });
+    }
   },
 
   // ═════════════════════════════════════════════════════════════════════
@@ -398,8 +467,21 @@ export const financeService = {
   async recordCustomerPayment(
     agencyId: string,
     input: RecordCustomerPaymentInput,
-    userId?: string
+    userId?: string,
+    actor?: { role: string; userId: string }
   ): Promise<Payment> {
+    if (actor?.role === "AGENCY_STAFF") {
+      const { enforceStaffPermission } = await import("./staff-permission-service");
+      await enforceStaffPermission(
+        actor.role,
+        agencyId,
+        actor.userId,
+        "PAYMENTS",
+        "recordReceipt",
+        "You do not have permission to record customer payments."
+      );
+    }
+
     // 1. Verify booking exists and belongs to agency
     const booking = await prisma.booking.findFirst({
       where: { id: input.bookingId, agencyId, archivedAt: null },
@@ -415,23 +497,53 @@ export const financeService = {
       await this.verifyOperationNotFinalized(agencyId, booking.tripOperation.id);
     }
 
-    // 3. Idempotency Check: if referenceNumber or idempotencyKey provided, prevent double recording
-    if (input.referenceNumber || input.idempotencyKey) {
-      const existingPayment = await prisma.payment.findFirst({
+    // 3. Idempotency & duplicate-reference Check (excludes VOIDED payments so voided references are reusable)
+    if (input.idempotencyKey) {
+      const existingByKey = await prisma.payment.findFirst({
         where: {
           agencyId,
           bookingId: input.bookingId,
           archivedAt: null,
-          ...(input.referenceNumber ? { referenceNumber: input.referenceNumber } : {}),
-          ...(input.idempotencyKey
-            ? { notes: { contains: `[idempotency:${input.idempotencyKey}]` } }
-            : {}),
+          status: { not: PaymentStatus.VOIDED },
+          notes: { contains: `[idempotency:${input.idempotencyKey}]` },
         },
+        select: PAYMENT_SCALAR_SELECT,
       });
-      if (existingPayment) {
-        return existingPayment;
+      if (existingByKey) {
+        return existingByKey as unknown as Payment;
       }
     }
+
+    if (input.referenceNumber && input.referenceNumber.trim()) {
+      const ref = input.referenceNumber.trim();
+      const existingByRef = await prisma.payment.findFirst({
+        where: {
+          agencyId,
+          referenceNumber: ref,
+          archivedAt: null,
+          status: { not: PaymentStatus.VOIDED },
+        },
+        select: PAYMENT_SCALAR_SELECT,
+      });
+      if (existingByRef) {
+        if (existingByRef.bookingId === input.bookingId) {
+          return existingByRef as unknown as Payment;
+        }
+        throw new Error(
+          `A payment with reference number "${ref}" has already been recorded (${existingByRef.paymentNumber}).`
+        );
+      }
+    }
+
+    const activeInvoice = await prisma.invoice.findFirst({
+      where: {
+        agencyId,
+        bookingId: input.bookingId,
+        status: { not: InvoiceStatus.CANCELLED },
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
 
     // 4. Generate sequential payment number
     const year = new Date().getFullYear();
@@ -466,7 +578,11 @@ export const financeService = {
       });
 
       const activePayments = await tx.payment.findMany({
-        where: { bookingId: booking.id, archivedAt: null, status: PaymentStatus.COMPLETED },
+        where: {
+          bookingId: booking.id,
+          archivedAt: null,
+          status: { in: [PaymentStatus.COMPLETED, PaymentStatus.REFUNDED] },
+        },
         select: { amount: true, refundedAmount: true },
       });
 
@@ -476,7 +592,7 @@ export const financeService = {
         totalPaid += Number(p.amount);
         totalRefunded += Number(p.refundedAmount || 0);
       }
-      const netPaid = Math.max(0, totalPaid - totalRefunded);
+      const netPaid = Math.max(0, Math.round((totalPaid - totalRefunded) * 100) / 100);
       const totalAmount = freshBooking ? Number(freshBooking.totalAmount) : Number(booking.totalAmount);
       const currentOutstanding = Math.max(0, Math.round((totalAmount - netPaid) * 100) / 100);
       const requestedAmount = Math.round(input.amount * 100) / 100;
@@ -497,6 +613,7 @@ export const financeService = {
         data: {
           agencyId,
           bookingId: input.bookingId,
+          invoiceId: activeInvoice?.id || null,
           tripId: booking.tripId,
           customerId: booking.customerId,
           paymentNumber,
@@ -511,6 +628,7 @@ export const financeService = {
           receivedBy: input.receivedBy,
           notes: notesWithIdempotency,
         },
+        select: PAYMENT_SCALAR_SELECT,
       });
 
       // Recalculate booking totals
@@ -541,7 +659,7 @@ export const financeService = {
       return p;
     });
 
-    return payment;
+    return payment as unknown as Payment;
   },
 
   /**
@@ -553,45 +671,57 @@ export const financeService = {
     input: RefundCustomerPaymentInput,
     userId?: string
   ): Promise<Payment> {
-    const payment = await prisma.payment.findFirst({
-      where: { id: paymentId, agencyId, archivedAt: null },
-      include: { booking: { include: { tripOperation: true } } },
-    });
-
-    if (!payment) {
-      throw new Error("Payment record not found.");
-    }
-
-    if (payment.status !== PaymentStatus.COMPLETED) {
-      throw new Error("Only completed payments can be refunded.");
-    }
-
-    const currentRefunded = Number(payment.refundedAmount || 0);
-    const eligibleAmount = Number(payment.amount) - currentRefunded;
-
-    if (input.amount > eligibleAmount + 0.001) {
-      throw new Error(
-        `Refund amount (₹${input.amount}) exceeds eligible balance (₹${eligibleAmount.toFixed(2)}).`
-      );
-    }
-
-    // Check operation finalization lock
-    if (payment.booking?.tripOperation) {
-      await this.verifyOperationNotFinalized(agencyId, payment.booking.tripOperation.id);
-    }
-
-    // Check for idempotency on refund
-    if (input.idempotencyKey && payment.notes?.includes(`[refund-idempotency:${input.idempotencyKey}]`)) {
-      return payment;
-    }
-
-    const newRefundedAmount = currentRefunded + input.amount;
-    const isFullyRefunded = Math.abs(newRefundedAmount - Number(payment.amount)) < 0.01;
-
-    const refundNoteTag = input.idempotencyKey ? ` [refund-idempotency:${input.idempotencyKey}]` : "";
-    const refundNoteText = `Refund: ₹${input.amount} (${input.reason})${refundNoteTag}`;
-
     const updated = await prisma.$transaction(async (tx) => {
+      if (tx.$queryRaw) {
+        await tx.$queryRaw`
+          SELECT "id" FROM "payments" WHERE "id" = ${paymentId} AND "agencyId" = ${agencyId} FOR UPDATE
+        `;
+      }
+
+      const payment = await tx.payment.findFirst({
+        where: { id: paymentId, agencyId, archivedAt: null },
+        include: { booking: { include: { tripOperation: true } } },
+      });
+
+      if (!payment) {
+        throw new Error("Payment record not found.");
+      }
+
+      if (payment.status !== PaymentStatus.COMPLETED) {
+        throw new Error("Only completed payments can be refunded.");
+      }
+
+      // Check for idempotency on refund under row lock
+      if (input.idempotencyKey && payment.notes?.includes(`[refund-idempotency:${input.idempotencyKey}]`)) {
+        return payment;
+      }
+
+      const currentRefunded = Number(payment.refundedAmount || 0);
+      const eligibleAmount = Number(payment.amount) - currentRefunded;
+
+      if (input.amount > eligibleAmount + 0.001) {
+        throw new Error(
+          `Refund amount (₹${input.amount}) exceeds eligible balance (₹${eligibleAmount.toFixed(2)}).`
+        );
+      }
+
+      // Check operation finalization lock
+      if (payment.booking?.tripOperation) {
+        await this.verifyOperationNotFinalized(agencyId, payment.booking.tripOperation.id, tx);
+      }
+
+      if (tx.$queryRaw) {
+        await tx.$queryRaw`
+          SELECT "id" FROM "bookings" WHERE "id" = ${payment.bookingId} AND "agencyId" = ${agencyId} FOR UPDATE
+        `;
+      }
+
+      const newRefundedAmount = Math.round((currentRefunded + input.amount) * 100) / 100;
+      const isFullyRefunded = Math.abs(newRefundedAmount - Number(payment.amount)) < 0.01;
+
+      const refundNoteTag = input.idempotencyKey ? ` [refund-idempotency:${input.idempotencyKey}]` : "";
+      const refundNoteText = `Refund: ₹${input.amount} (${input.reason})${refundNoteTag}`;
+
       const p = await tx.payment.update({
         where: { id: paymentId },
         data: {
@@ -602,10 +732,50 @@ export const financeService = {
             ? `${payment.notes} | ${refundNoteText}`
             : refundNoteText,
         },
+        select: PAYMENT_SCALAR_SELECT,
       });
 
-      // Recalculate booking balance
+      // Recalculate booking balance (and linked invoice if present)
       await this.recalculateBookingBalances(payment.bookingId, tx);
+
+      // Synchronize linked invoice if present and not already synced with all payments
+      if (payment.invoiceId) {
+        const invPayments = await tx.payment.findMany({
+          where: {
+            invoiceId: payment.invoiceId,
+            archivedAt: null,
+            status: { in: [PaymentStatus.COMPLETED, PaymentStatus.REFUNDED] },
+          },
+          select: { amount: true, refundedAmount: true },
+        });
+        const invPaid = Math.max(
+          0,
+          Math.round(
+            invPayments.reduce((sum, pay) => {
+              const net = Number(pay.amount) - Number(pay.refundedAmount || 0);
+              return sum + Math.max(0, net);
+            }, 0) * 100
+          ) / 100
+        );
+        const invoice = await tx.invoice.findUnique({
+          where: { id: payment.invoiceId },
+          select: { totalAmount: true, status: true },
+        });
+        if (invoice) {
+          const invTotal = Number(invoice.totalAmount);
+          const invBalance = Math.max(0, Math.round((invTotal - invPaid) * 100) / 100);
+          const newInvStatus =
+            invBalance <= 0 && invTotal > 0 ? "PAID" : invPaid > 0 ? "PARTIALLY_PAID" : "ISSUED";
+          await tx.invoice.update({
+            where: { id: payment.invoiceId },
+            data: {
+              paidAmount: new Prisma.Decimal(invPaid),
+              balanceAmount: new Prisma.Decimal(invBalance),
+              ...(invoice.status !== "CANCELLED" ? { status: newInvStatus as InvoiceStatus } : {}),
+            },
+          });
+        }
+      }
 
       // Audit event
       if (payment.booking?.tripOperation) {
@@ -632,7 +802,7 @@ export const financeService = {
       return p;
     });
 
-    return updated;
+    return updated as unknown as Payment;
   },
 
   // ═════════════════════════════════════════════════════════════════════
@@ -645,8 +815,9 @@ export const financeService = {
   async createSupplierPayable(
     agencyId: string,
     input: CreateSupplierPayableInput,
-    _userId?: string
+    userId?: string
   ): Promise<SupplierPayable> {
+    void userId;
     let supplierName: string | null = null;
     if (input.supplierId) {
       const supplier = await prisma.supplier.findFirst({
@@ -865,6 +1036,11 @@ export const financeService = {
     });
     if (!payable) throw new Error("Payable not found.");
 
+    const targetOpOrBookingId = payable.tripOperationId || payable.bookingId;
+    if (targetOpOrBookingId) {
+      await this.verifyOperationNotFinalized(agencyId, targetOpOrBookingId);
+    }
+
     if (payable.payments.length > 0) {
       throw new Error("Cannot delete a payable that has payments recorded. Please cancel or adjust the amount instead.");
     }
@@ -920,7 +1096,7 @@ export const financeService = {
       }
     }
 
-    let payable: any = null;
+    let payable: (SupplierPayable & { supplier?: { name: string } | null }) | null = null;
     if (input.payableId) {
       payable = await prisma.supplierPayable.findFirst({
         where: { id: input.payableId, agencyId, archivedAt: null },
@@ -959,7 +1135,7 @@ export const financeService = {
       : input.notes;
 
     return prisma.$transaction(async (tx) => {
-      let activePayable = payable;
+      let activePayable: SupplierPayable | null = payable;
 
       if (input.payableId) {
         // 1. Acquire row lock on SupplierPayable record to serialize concurrent disbursements
@@ -977,8 +1153,8 @@ export const financeService = {
         }
         activePayable = freshPayable;
 
-        const actualAmt = Number(activePayable.actualAmount);
-        const paidAmt = Number(activePayable.paidAmount);
+        const actualAmt = Number(freshPayable.actualAmount);
+        const paidAmt = Number(freshPayable.paidAmount);
         const currentOutstanding = Math.max(0, Math.round((actualAmt - paidAmt) * 100) / 100);
         const requestedAmount = Math.round(input.amount * 100) / 100;
 
@@ -1037,11 +1213,11 @@ export const financeService = {
         });
 
         // If tied to an operation, log audit event
-        if (payable.tripOperationId) {
+        if (activePayable.tripOperationId) {
           await tx.operationEvent.create({
             data: {
               agencyId,
-              tripOperationId: payable.tripOperationId,
+              tripOperationId: activePayable.tripOperationId,
               eventType: "SUPPLIER_PAYMENT_RECORDED",
               description: `Disbursed payment ${paymentNumber} of ₹${input.amount.toLocaleString(
                 "en-IN"
@@ -1049,7 +1225,7 @@ export const financeService = {
               metadata: {
                 paymentId: payment.id,
                 paymentNumber,
-                payableId: payable.id,
+                payableId: activePayable.id,
                 payeeName: resolvedPayee,
                 amount: input.amount,
               },
@@ -1194,7 +1370,7 @@ export const financeService = {
         if (!existing) {
           const payableNumber = await this.generateNextPayableNumber(agencyId);
           const vehicleName = matchedVehicleCost?.vehicleName || tv.vehicle?.name || tv.vehicleType || "Vehicle Provider";
-          const desc = `Vehicle: ${vehicleName} (${tv.pricingType || "Standard"})`;
+          const desc = `Vehicle: ${vehicleName} (${formatEnumLabel(tv.pricingType || "Standard")})`;
 
           const p = await db.supplierPayable.create({
             data: {
@@ -1312,8 +1488,9 @@ export const financeService = {
     agencyId: string,
     expenseId: string,
     input: UpdateExpenseInput,
-    _userId?: string
+    userId?: string
   ): Promise<OperationalExpense> {
+    void userId;
     const expense = await prisma.operationalExpense.findFirst({
       where: { id: expenseId, agencyId, archivedAt: null },
     });
@@ -1341,7 +1518,8 @@ export const financeService = {
   /**
    * Delete / Archive Operational Expense
    */
-  async deleteExpense(agencyId: string, expenseId: string, _userId?: string): Promise<OperationalExpense> {
+  async deleteExpense(agencyId: string, expenseId: string, userId?: string): Promise<OperationalExpense> {
+    void userId;
     const expense = await prisma.operationalExpense.findFirst({
       where: { id: expenseId, agencyId, archivedAt: null },
     });
@@ -1585,7 +1763,7 @@ export const financeService = {
       include: {
         customer: true,
         trip: true,
-        payments: { where: { archivedAt: null } },
+        payments: { where: { archivedAt: null }, select: PAYMENT_SCALAR_SELECT },
         supplierPayables: { where: { archivedAt: null } },
         supplierPayments: { where: { archivedAt: null } },
         expenses: { where: { archivedAt: null } },
@@ -1600,6 +1778,7 @@ export const financeService = {
           archivedAt: null,
           paymentDate: { gte: start, lte: end },
         },
+        select: PAYMENT_SCALAR_SELECT,
       }),
       prisma.supplierPayable.findMany({
         where: {
@@ -1627,6 +1806,7 @@ export const financeService = {
 
     // 3. Compute Executive KPIs
     let totalSales = 0;
+    let confirmedBookingValue = 0;
     let fullyPaidCount = 0;
     let partiallyPaidCount = 0;
     let unpaidCount = 0;
@@ -1639,6 +1819,9 @@ export const financeService = {
       const bBalance = Number(b.balanceAmount);
 
       totalSales += bTotal;
+      if (b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.COMPLETED || b.status === BookingStatus.ONGOING) {
+        confirmedBookingValue += bTotal;
+      }
 
       if (b.paymentStatus === BookingPaymentStatus.PAID) fullyPaidCount++;
       else if (b.paymentStatus === BookingPaymentStatus.PARTIALLY_PAID) partiallyPaidCount++;
@@ -1674,7 +1857,7 @@ export const financeService = {
       }
     }
     const netReceived = Math.max(0, amountReceived - customerRefunded);
-    const customerOutstanding = Math.max(0, totalSales - netReceived);
+    const customerOutstanding = customerReceivablesItems.reduce((sum, item) => sum + item.outstandingAmount, 0);
 
     // Supplier payables & disbursements
     let supplierPayable = 0;
@@ -1770,6 +1953,7 @@ export const financeService = {
       },
       kpis: {
         totalSales,
+        confirmedBookingValue,
         amountReceived: netReceived,
         customerOutstanding,
         customerRefunded,
@@ -1825,6 +2009,26 @@ export const financeService = {
       include: {
         customer: true,
         trip: true,
+        quotation: {
+          select: {
+            id: true,
+            quotationNumber: true,
+            finalAmount: true,
+            subtotal: true,
+          },
+        },
+        invoices: {
+          where: { archivedAt: null, status: { not: InvoiceStatus.CANCELLED } },
+          select: {
+            id: true,
+            invoiceNumber: true,
+            totalAmount: true,
+            paidAmount: true,
+            balanceAmount: true,
+            status: true,
+            dueDate: true,
+          },
+        },
         tripOperation: {
           include: {
             events: {
@@ -1837,6 +2041,7 @@ export const financeService = {
         payments: {
           where: { archivedAt: null },
           orderBy: { paymentDate: "desc" },
+          select: PAYMENT_SCALAR_SELECT,
         },
         supplierPayables: {
           where: { archivedAt: null },
@@ -1863,6 +2068,11 @@ export const financeService = {
       booking.tripOperation?.events[0]?.eventType === "OPERATION_FINALIZED";
 
     const totalBookingAmount = Number(booking.totalAmount);
+    const quotedAmount = booking.quotation
+      ? Number(booking.quotation.finalAmount ?? booking.quotation.subtotal)
+      : totalBookingAmount;
+    const invoicedAmount = booking.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
+
     let customerPaid = 0;
     let customerRefunded = 0;
 
@@ -1902,10 +2112,33 @@ export const financeService = {
       operationalExpenses += Number(exp.amount);
     }
 
-    const grossProfit = totalBookingAmount - supplierCostActual - operationalExpenses;
+    const grossMargin = totalBookingAmount - supplierCostActual - operationalExpenses;
+    const grossProfit = grossMargin;
     const profitMarginPercent =
       totalBookingAmount > 0 ? Math.round((grossProfit / totalBookingAmount) * 100 * 10) / 10 : 0;
     const netCashPosition = netReceived - supplierPaid - operationalExpenses;
+
+    const hasRecordedPayables = booking.supplierPayables.length > 0;
+    const hasUnconfirmedPayables = booking.supplierPayables.some(
+      (sp) => sp.status === SupplierPayableStatus.PENDING
+    );
+
+    let isCostComplete = false;
+    let costCompletenessReason = "Supplier costs unrecorded or incomplete.";
+
+    if (!hasRecordedPayables) {
+      isCostComplete = false;
+      costCompletenessReason = "No supplier payables recorded. Gross margin is unverified.";
+    } else if (hasUnconfirmedPayables) {
+      isCostComplete = false;
+      costCompletenessReason = "Contains unconfirmed or disputed supplier obligations. Gross margin is estimated.";
+    } else if (!isFinalized) {
+      isCostComplete = false;
+      costCompletenessReason = "Trip operation not finalized. Pre-closure margin is estimated based on recorded obligations.";
+    } else {
+      isCostComplete = true;
+      costCompletenessReason = "Operation finalized and audited. Recorded supplier obligations are definitive.";
+    }
 
     return {
       bookingId: booking.id,
@@ -1914,7 +2147,9 @@ export const financeService = {
       tripNumber: booking.trip?.tripNumber || "N/A",
       tripTitle: booking.trip?.title || "Tour Itinerary",
       customerName: booking.customer?.name || "Customer",
+      quotedAmount,
       totalBookingAmount,
+      invoicedAmount,
       customerPaid: netReceived,
       customerRefunded,
       customerOutstanding,
@@ -1929,14 +2164,18 @@ export const financeService = {
       supplierPaid,
       supplierOutstanding,
       operationalExpenses,
+      grossMargin,
       grossProfit,
       profitMarginPercent,
       netCashPosition,
+      isCostComplete,
+      costCompletenessReason,
       isFinalized,
       customerPayments: booking.payments,
       supplierPayables: booking.supplierPayables,
       supplierPayments: booking.supplierPayments,
       expenses: booking.expenses,
+      invoices: booking.invoices,
     };
   },
 
@@ -1958,6 +2197,7 @@ export const financeService = {
         payments: {
           where: { archivedAt: null },
           orderBy: { paymentDate: "asc" },
+          select: PAYMENT_SCALAR_SELECT,
         },
       },
     });
@@ -1977,7 +2217,7 @@ export const financeService = {
     netReceivedAmount = Math.max(0, netReceivedAmount);
     const outstandingBalance = Math.max(0, totalBookingAmount - netReceivedAmount);
 
-    let rawMilestones = (booking.quotation?.paymentMilestones || []).map((m) => ({
+    const rawMilestones = (booking.quotation?.paymentMilestones || []).map((m) => ({
       id: m.id,
       title: m.title,
       description: m.description,
@@ -1987,40 +2227,9 @@ export const financeService = {
       sortOrder: m.sortOrder,
     }));
 
-    // If no quotation milestones exist, generate standard default schedule
-    if (rawMilestones.length === 0 && totalBookingAmount > 0) {
-      const advanceAmt = Math.round(totalBookingAmount * 0.3 * 100) / 100;
-      const finalAmt = Math.round((totalBookingAmount - advanceAmt) * 100) / 100;
+    // If no quotation milestones exist, do NOT invent or persist an artificial 30/70 schedule.
+    // The UI gracefully handles empty milestones by displaying standard booking terms.
 
-      const departureDate = booking.travelStartDate ? new Date(booking.travelStartDate) : null;
-      let finalDueDate: Date | null = null;
-      if (departureDate) {
-        const d = new Date(departureDate);
-        d.setDate(d.getDate() - 7);
-        finalDueDate = d;
-      }
-
-      rawMilestones = [
-        {
-          id: `default-milestone-1-${booking.id}`,
-          title: "Advance Booking Deposit",
-          description: "Initial booking confirmation deposit",
-          percentage: 30,
-          amount: advanceAmt,
-          dueDate: booking.bookingDate || new Date(),
-          sortOrder: 1,
-        },
-        {
-          id: `default-milestone-2-${booking.id}`,
-          title: "Final Tour Balance",
-          description: "Remaining balance prior to tour commencement",
-          percentage: 70,
-          amount: finalAmt,
-          dueDate: finalDueDate,
-          sortOrder: 2,
-        },
-      ];
-    }
 
     // Process deterministic waterfall allocation across milestones
     let remainingNetPaid = netReceivedAmount;
@@ -2103,7 +2312,7 @@ export const financeService = {
   async generateFinanceCsv(agencyId: string, filters: FinanceFilterInput = { preset: "LAST_30_DAYS" }): Promise<string> {
     const dashboard = await this.getFinanceDashboard(agencyId, filters);
 
-    const escape = (val: any) => {
+    const escape = (val: unknown) => {
       if (val === null || val === undefined) return '""';
       const str = String(val).replace(/"/g, '""');
       return `"${str}"`;

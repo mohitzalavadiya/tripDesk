@@ -1,9 +1,10 @@
 import {
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-ValidationError,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  requireWriteAccess,
+  ValidationError,
 } from "@/lib/api";
 import { hotelExcelService,ImportMode } from "@/lib/excel/hotel-excel-service";
 import { NextRequest } from "next/server";
@@ -25,6 +26,13 @@ export async function POST(request: NextRequest) {
 
     // Read access is sufficient for preview; write access is mandatory for execution
     const context = action === "execute" ? await requireWriteAccess() : await requireReadAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "HOTELS",
+      action === "execute" ? "CREATE" : "VIEW"
+    );
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;

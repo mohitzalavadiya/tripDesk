@@ -1,8 +1,9 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import { invoiceService } from "@/lib/services/invoice-service";
 import { cancelInvoiceSchema } from "@/lib/validation/invoice-schema";
@@ -20,6 +21,7 @@ export async function POST(
 ) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "INVOICES", "UPDATE");
     const { id } = await params;
     const body = await validateJson(cancelInvoiceSchema, request);
 

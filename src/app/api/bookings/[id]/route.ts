@@ -1,11 +1,14 @@
 import {
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  ForbiddenError,
+  handleApiError,
+  enforceStaffPermission,
+  requireMemberReadAccess,
+  requireMemberWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import { bookingService } from "@/lib/services/booking-service";
+import { staffPermissionService } from "@/lib/services/staff-permission-service";
 import { updateBookingSchema } from "@/lib/validation/booking-schema";
 import { NextRequest } from "next/server";
 
@@ -18,10 +21,25 @@ interface RouteParams {
 /**
  * GET /api/bookings/[id]
  * Get single booking with customer, trip, quotation, and payments.
+ * Evaluates requireReadAccess() via requireMemberReadAccess().
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireReadAccess();
+    const context = await requireMemberReadAccess();
+
+    if (context.isAgencyStaff) {
+      const canView = await staffPermissionService.hasStaffPermission(
+        context.dbUser.role,
+        context.agencyId,
+        context.dbUser.id,
+        "BOOKINGS",
+        "VIEW"
+      );
+      if (!canView) {
+        throw new ForbiddenError("You do not have permission to view bookings.");
+      }
+    }
+
     const { id } = await params;
 
     const booking = await bookingService.getBooking(context.agencyId, id);
@@ -45,7 +63,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireWriteAccess();
+    const context = await requireMemberWriteAccess();
+
+    if (context.isAgencyStaff) {
+      const canUpdate = await staffPermissionService.hasStaffPermission(
+        context.dbUser.role,
+        context.agencyId,
+        context.dbUser.id,
+        "BOOKINGS",
+        "UPDATE"
+      );
+      if (!canUpdate) {
+        throw new ForbiddenError("You do not have permission to update bookings.");
+      }
+    }
+
     const { id } = await params;
     const body = await validateJson(updateBookingSchema, request);
 
@@ -59,11 +91,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
 /**
  * DELETE /api/bookings/[id]
- * Soft delete / archive booking.
+ * Soft delete / archive booking and recalculate totals.
+ * Agency Owner only. Destructive deletion is restricted to Agency Owners.
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireWriteAccess();
+    const context = await requireMemberWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "BOOKING_DETAIL", "DELETE");
     const { id } = await params;
 
     await bookingService.archiveBooking(context.agencyId, id);

@@ -1,10 +1,11 @@
 import {
-apiCreated,
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-validateJson,
+  apiCreated,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import prisma from "@/lib/prisma";
 import { financeService } from "@/lib/services/finance-service";
@@ -19,10 +20,19 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/finance/supplier-payables
  * List supplier payables for the agency.
+ * Strictly restricted to roles with FINANCIAL_MARGINS VIEW permission.
  */
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "FINANCE",
+      "VIEW",
+      "You do not have permission to view supplier payables."
+    );
     const { searchParams } = request.nextUrl;
     const search = searchParams.get("search") || undefined;
     const supplierId = searchParams.get("supplierId") || undefined;
@@ -75,6 +85,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "FINANCE",
+      "CREATE",
+      "You do not have permission to manage supplier payables."
+    );
     const body = await validateJson(createSupplierPayableSchema, request);
 
     const payable = await financeService.createSupplierPayable(

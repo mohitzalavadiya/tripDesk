@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiSuccess,
 handleApiError,
 NotFoundError,
@@ -27,6 +28,7 @@ interface RouteProps {
 export async function GET(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TRIPS", "VIEW");
     const { id, travelerId } = validateRouteParams(
       travelerRouteParamsSchema,
       await props.params
@@ -51,6 +53,7 @@ export async function GET(request: NextRequest, props: RouteProps) {
 export async function PATCH(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TRIPS", "UPDATE");
     const { id, travelerId } = validateRouteParams(
       travelerRouteParamsSchema,
       await props.params
@@ -77,6 +80,7 @@ export async function PATCH(request: NextRequest, props: RouteProps) {
 export async function DELETE(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TRIPS", "UPDATE");
     const { id, travelerId } = validateRouteParams(
       travelerRouteParamsSchema,
       await props.params

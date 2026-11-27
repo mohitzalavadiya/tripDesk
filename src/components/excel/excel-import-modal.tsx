@@ -18,7 +18,7 @@ X
 } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+import writeXlsxFile from "write-excel-file/browser";
 
 export type ImportType = "hotels" | "rate-sheets";
 export type ImportMode = "SKIP" | "UPDATE" | "REJECT";
@@ -144,7 +144,6 @@ export function ExcelImportModal({
   const handleDownloadErrorReport = () => {
     if (!executeResult?.errors || executeResult.errors.length === 0) return;
 
-    const wb = XLSX.utils.book_new();
     const rows = [
       ["Row Number", "Item Identifier", "Error Description"],
       ...executeResult.errors.map((e: any) => [
@@ -153,9 +152,10 @@ export function ExcelImportModal({
         e.error,
       ]),
     ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, ws, "Import Errors");
-    XLSX.writeFile(wb, `${importType}_import_errors.xlsx`);
+    void writeXlsxFile(
+      rows.map((row) => row.map((v: any) => ({ value: v ?? undefined }))),
+      { sheet: "Import Errors" }
+    ).toFile(`${importType}_import_errors.xlsx`);
   };
 
   const summary = previewResult?.summary;

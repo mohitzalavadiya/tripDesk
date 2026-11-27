@@ -1,8 +1,9 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
-validateRouteParams,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
+  validateRouteParams,
 } from "@/lib/api";
 import { supplierService } from "@/lib/services/supplier-service";
 import { supplierIdParamSchema } from "@/lib/validation/supplier-schema";
@@ -21,6 +22,13 @@ interface RouteProps {
 export async function POST(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "SUPPLIERS",
+      "UPDATE"
+    );
     const { id } = validateRouteParams(supplierIdParamSchema, await props.params);
 
     const reactivatedSupplier = await supplierService.reactivateSupplier(context.agencyId, id);

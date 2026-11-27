@@ -4,6 +4,7 @@ handleApiError,
 NotFoundError,
 requireReadAccess,
 requireWriteAccess,
+  enforceStaffPermission,
 validateJson,
 } from "@/lib/api";
 import { activityService } from "@/lib/services/activity-service";
@@ -24,6 +25,7 @@ interface RouteParams {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "ACTIVITIES", "VIEW");
     const { id } = await params;
 
     const activity = await activityService.getActivityById(context.agencyId, id);
@@ -46,6 +48,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "ACTIVITIES", "UPDATE");
     const { id } = await params;
     const body = await validateJson(updateActivitySchema, request);
 
@@ -65,6 +68,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "ACTIVITIES", "DELETE");
     const { id } = await params;
 
     const archivedActivity = await activityService.archiveActivity(context.agencyId, id);

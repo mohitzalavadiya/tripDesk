@@ -157,9 +157,9 @@ export function FinanceTransactionTable({
       </CardHeader>
 
       <CardContent className="p-3.5 sm:p-6 pt-0">
-        <div className="border border-border rounded-lg overflow-x-auto">
+        <div className="border border-border rounded-lg overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
               <TableRow className="bg-muted/40">
                 <TableHead className="text-xs font-semibold">Txn #</TableHead>
                 <TableHead className="text-xs font-semibold">Type</TableHead>

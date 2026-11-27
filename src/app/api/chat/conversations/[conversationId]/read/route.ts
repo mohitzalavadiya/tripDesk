@@ -1,4 +1,4 @@
-import { requireAuthenticatedUser } from "@/lib/api/context";
+import { enforceStaffPermission, requireAuthenticatedUser } from "@/lib/api";
 import { ForbiddenError,handleApiError,NotFoundError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { platformChatService } from "@/lib/services/platform-chat-service";
@@ -17,6 +17,15 @@ export async function POST(
 ) {
   try {
     const context = await requireAuthenticatedUser();
+    if (context.isAgencyStaff && context.dbUser?.agencyId) {
+      await enforceStaffPermission(
+        context.dbUser.role,
+        context.dbUser.agencyId,
+        context.dbUser.id,
+        "SUPPORT_CHAT",
+        "VIEW"
+      );
+    }
     const { conversationId } = await params;
     const userAgencyId = context.agency?.id || context.dbUser?.agencyId;
 

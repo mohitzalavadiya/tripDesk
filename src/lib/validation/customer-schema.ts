@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isValidPhoneNumber } from "./field-validators";
+import { isValidPhoneNumber, normalizePhoneNumber } from "./field-validators";
 
 /**
  * Zod validation schema for creating a new Customer.
@@ -16,7 +16,8 @@ export const createCustomerSchema = z.object({
     .trim()
     .min(3, "Phone number is required.")
     .max(30, "Phone number must be at most 30 characters.")
-    .refine((val) => isValidPhoneNumber(val), "Please provide a valid phone number (digits, optional country code prefix, 7-15 digits)."),
+    .refine((val) => isValidPhoneNumber(val), "Please provide a valid phone number (digits, optional country code prefix, 7-15 digits).")
+    .transform((val) => normalizePhoneNumber(val)),
   alternatePhone: z
     .string()
     .trim()
@@ -24,7 +25,8 @@ export const createCustomerSchema = z.object({
     .optional()
     .nullable()
     .or(z.literal(""))
-    .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid alternate phone number."),
+    .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid alternate phone number.")
+    .transform((val) => (val ? normalizePhoneNumber(val) : (val === undefined ? undefined : null))),
   email: z
     .string()
     .trim()
@@ -126,6 +128,7 @@ export const updateCustomerSchema = z
       .min(3, "Phone number must have at least 3 characters.")
       .max(30, "Phone number must be at most 30 characters.")
       .refine((val) => isValidPhoneNumber(val), "Please provide a valid phone number.")
+      .transform((val) => normalizePhoneNumber(val))
       .optional(),
     alternatePhone: z
       .string()
@@ -134,7 +137,8 @@ export const updateCustomerSchema = z
       .optional()
       .nullable()
       .or(z.literal(""))
-      .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid alternate phone number."),
+      .refine((val) => !val || isValidPhoneNumber(val), "Please provide a valid alternate phone number.")
+      .transform((val) => (val ? normalizePhoneNumber(val) : (val === undefined ? undefined : null))),
     email: z
       .string()
       .trim()

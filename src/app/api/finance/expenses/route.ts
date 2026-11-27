@@ -1,15 +1,16 @@
 import {
-apiCreated,
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-validateJson,
+  apiCreated,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import prisma from "@/lib/prisma";
 import { financeService } from "@/lib/services/finance-service";
 import {
-createExpenseSchema,
+  createExpenseSchema,
 } from "@/lib/validation/finance-schema";
 import { NextRequest } from "next/server";
 
@@ -22,6 +23,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FINANCE", "VIEW");
     const { searchParams } = request.nextUrl;
     const tripOperationId = searchParams.get("tripOperationId") || undefined;
     const tripId = searchParams.get("tripId") || undefined;
@@ -55,6 +57,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FINANCE", "CREATE");
     const body = await validateJson(createExpenseSchema, request);
 
     const expense = await financeService.createExpense(

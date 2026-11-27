@@ -1,5 +1,7 @@
 "use client";
 
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
 import {
@@ -22,6 +24,19 @@ WifiOff
 import * as React from "react";
 
 export default function SupportPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("SUPPORT_CHAT", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Support Chat"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const { currentUser, subscriptionAccess, isPlatformOwner } = useAuth();
   const [conversation, setConversation] = React.useState<ConversationView | null>(null);
   const [isLoadingConv, setIsLoadingConv] = React.useState(true);

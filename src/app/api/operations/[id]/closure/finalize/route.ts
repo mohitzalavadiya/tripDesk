@@ -1,9 +1,10 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
-validateJson,
-validateRouteParams,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
+  validateJson,
+  validateRouteParams,
 } from "@/lib/api";
 import { operationsService } from "@/lib/services/operations-service";
 import { finalizeOperationSchema } from "@/lib/validation/operations-schema";
@@ -27,6 +28,14 @@ interface RouteProps {
 export async function POST(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "OPERATIONS",
+      "UPDATE",
+      "You do not have permission to finalize tour operation closure."
+    );
     const { id } = validateRouteParams(idParamSchema, await props.params);
     const body = await validateJson(finalizeOperationSchema, request);
 

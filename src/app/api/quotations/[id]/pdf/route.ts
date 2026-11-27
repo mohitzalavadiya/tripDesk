@@ -1,4 +1,4 @@
-import { handleApiError,requireReadAccess } from "@/lib/api";
+import { enforceStaffPermission, handleApiError, requireReadAccess } from "@/lib/api";
 import { quotationPdfService } from "@/lib/services/quotation-pdf-service";
 import { quotationService } from "@/lib/services/quotation-service";
 import { NextRequest,NextResponse } from "next/server";
@@ -16,6 +16,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATIONS", "VIEW");
     const { id } = await params;
 
     const quotation = await quotationService.getQuotation(context.agencyId, id);
@@ -75,10 +76,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         startDate: quotation.trip.startDate,
         endDate: quotation.trip.endDate,
         travelers: quotation.trip.travelers,
-        destinations: (quotation.trip as any).tripDestinations?.map((td: any) => ({
+        destinations: quotation.trip.tripDestinations?.map((td) => ({
           id: td.id,
           sequence: td.sequence,
-          name: td.destination?.name || td.name || "Destination",
+          name: td.destination?.name || "Destination",
         })),
         itineraryItems: quotation.trip.itineraryItems,
         hotels: quotation.trip.tripHotels?.map((th) => ({
@@ -114,7 +115,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       tier: quotation.tier,
       proposalItems: quotation.proposalItems.map((p) => ({
         id: p.id,
-        type: p.type as any,
+        type: p.type as "INCLUSION" | "EXCLUSION" | "IMPORTANT_NOTE",
         title: p.title,
         description: p.description,
       })),

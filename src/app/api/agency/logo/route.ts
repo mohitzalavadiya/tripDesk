@@ -1,4 +1,5 @@
 import { requireWriteAccess } from "@/lib/api/context";
+import { enforceStaffPermission } from "@/lib/services/staff-permission-service";
 import { agencyLogoService } from "@/lib/services/agency-logo-service";
 import { entitlementService } from "@/lib/services/entitlement-service";
 import { NextRequest,NextResponse } from "next/server";
@@ -13,6 +14,13 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const authContext = await requireWriteAccess();
+    await enforceStaffPermission(
+      authContext.dbUser.role,
+      authContext.agencyId,
+      authContext.dbUser.id,
+      "SETTINGS",
+      "UPDATE"
+    );
     const agencyId = authContext.agencyId;
 
     // Enforce CUSTOM_AGENCY_LOGO entitlement server-side
@@ -66,6 +74,13 @@ export async function POST(request: NextRequest) {
 export async function DELETE(_request: NextRequest) {
   try {
     const authContext = await requireWriteAccess();
+    await enforceStaffPermission(
+      authContext.dbUser.role,
+      authContext.agencyId,
+      authContext.dbUser.id,
+      "SETTINGS",
+      "UPDATE"
+    );
     const agencyId = authContext.agencyId;
 
     // Enforce CUSTOM_AGENCY_LOGO entitlement server-side

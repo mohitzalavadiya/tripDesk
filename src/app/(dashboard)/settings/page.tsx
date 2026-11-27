@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyModeDialog } from "@/components/shared/read-only-mode-dialog";
@@ -39,15 +42,44 @@ Sliders,
 Sparkles,
 Trash2,
 Upload,
+Users,
 Zap
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
+import { TeamManagementPanel } from "@/components/team/team-management-panel";
 
 export default function SettingsPage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+
+  const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("SETTINGS", "view"));
+
+  if (!isViewAllowed) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Agency Settings"
+          badgeText="Access Restricted"
+          description="Agency profile settings, team management, tax profiles, and communication gateways are restricted. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const { isFeatureAllowed, overview, isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
-  const [activeTab, setActiveTab] = React.useState<"communication" | "tax" | "branding">("communication");
+  const [activeTab, setActiveTab] = React.useState<"communication" | "tax" | "branding" | "team">("communication");
+
+  // Sync tab with URL search parameter if present
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam === "team" || tabParam === "tax" || tabParam === "branding" || tabParam === "communication") {
+        setActiveTab(tabParam as any);
+      }
+    }
+  }, []);
   const [settings, setSettings] = React.useState<CommunicationSettings | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -108,9 +140,9 @@ export default function SettingsPage() {
   const [recentLogs, setRecentLogs] = React.useState<CommunicationLogItem[]>([]);
   const [loadingLogs, setLoadingLogs] = React.useState(false);
 
-  const fetchSettings = React.useCallback(async () => {
+  const fetchSettings = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const data = await communicationClient.getSettings();
       setSettings(data);
       setEmailEnabled(data.emailEnabled);
@@ -129,7 +161,7 @@ export default function SettingsPage() {
         description: err?.message || "Please refresh to try again.",
       });
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, []);
 
@@ -238,19 +270,19 @@ export default function SettingsPage() {
     }
   };
 
-  const fetchLogs = React.useCallback(async () => {
+  const fetchLogs = React.useCallback(async (isSilent = false) => {
     try {
-      setLoadingLogs(true);
+      if (!isSilent) setLoadingLogs(true);
       const res = await communicationClient.listLogs({ limit: 10 });
       setRecentLogs(res.data);
     } catch {
       // safe fallback
     } finally {
-      setLoadingLogs(false);
+      if (!isSilent) setLoadingLogs(false);
     }
   }, []);
 
-  const fetchTaxData = React.useCallback(async () => {
+  const fetchTaxData = React.useCallback(async (isSilent = false) => {
     try {
       setLoadingTax(true);
       const [profileData, ratesData] = await Promise.all([
@@ -355,7 +387,7 @@ export default function SettingsPage() {
       toast.success("Automation sweep completed", {
         description: `Dispatched ${res.summary.totalDispatched} notifications (${res.summary.paymentRemindersSent} payments, ${res.summary.travelRemindersSent} departures, ${res.summary.feedbackRequestsSent} feedbacks).`,
       });
-      fetchLogs();
+      fetchLogs(true);
     } catch (err: any) {
       toast.error("Automation sweep failed", {
         description: err?.message || "Failed to trigger reminder scan.",
@@ -370,7 +402,7 @@ export default function SettingsPage() {
       toast.info("Retrying communication dispatch...");
       await communicationClient.resend(id);
       toast.success("Communication resent successfully");
-      fetchLogs();
+      fetchLogs(true);
     } catch (err: any) {
       toast.error("Failed to resend communication", {
         description: err?.message || "Error resending.",
@@ -433,10 +465,23 @@ export default function SettingsPage() {
               </span>
             )}
           </button>
+          {(isAgencyOwner || hasStaffPermission("TEAM", "view")) && (
+            <button
+              onClick={() => setActiveTab("team")}
+              className={`px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs flex items-center gap-2 border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+                activeTab === "team"
+                  ? "border-indigo-600 text-indigo-600 bg-indigo-50/30 rounded-t-lg"
+                  : "border-transparent text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              <Users className="h-4 w-4 shrink-0" />
+              Team & Staff Roles
+            </button>
+          )}
         </div>
 
         {activeTab === "communication" ? (
-          loading ? (
+          loading && !settings ? (
             <div className="bg-white p-12 rounded-2xl border border-slate-200 flex flex-col items-center justify-center space-y-3">
               <RotateCw className="h-8 w-8 text-indigo-600 animate-spin" />
               <p className="text-xs font-semibold text-slate-500">Loading communication configuration...</p>
@@ -699,7 +744,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-900 uppercase">Recent Dispatches</h4>
                     <button
-                      onClick={fetchLogs}
+                      onClick={() => fetchLogs()}
                       className="text-indigo-600 hover:text-indigo-800 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
                     >
                       <RotateCw className={`h-3 w-3 ${loadingLogs ? "animate-spin" : ""}`} />
@@ -1067,7 +1112,7 @@ export default function SettingsPage() {
               </div>
             </form>
           )
-        ) : (
+        ) : activeTab === "branding" ? (
           /* ─── AGENCY BRANDING & LOGO TAB ─── */
           <div className="space-y-6">
             {!logoAllowed && (
@@ -1268,6 +1313,17 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        ) : (
+          /* ─── AGENCY TEAM & STAFF MANAGEMENT TAB ─── */
+          (isAgencyOwner || hasStaffPermission("TEAM", "view")) ? (
+            <TeamManagementPanel />
+          ) : (
+            <OwnerRestrictedCard
+              featureName="Team Management"
+              badgeText="Access Restricted"
+              description="Inviting team members, modifying staff roles, and configuring staff permissions are restricted to authorized users. Please contact your Agency Owner to request access."
+            />
+          )
         )}
       </div>
       </div>

@@ -1,8 +1,9 @@
 import {
-apiSuccess,
-handleApiError,
-requireReadAccess,
-validateQueryParams,
+  apiSuccess,
+  handleApiError,
+  requireReadAccess,
+  enforceStaffPermission,
+  validateQueryParams,
 } from "@/lib/api";
 import { financeService } from "@/lib/services/finance-service";
 import { transactionQuerySchema } from "@/lib/validation/finance-schema";
@@ -17,6 +18,13 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "FINANCE",
+      "VIEW"
+    );
     const query = validateQueryParams(transactionQuerySchema, request.nextUrl.searchParams);
 
     const result = await financeService.getTransactions(context.agencyId, query);

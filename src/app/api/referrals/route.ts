@@ -1,4 +1,4 @@
-import { requireAgencyOwnerContext } from "@/lib/api/context";
+import { enforceStaffPermission, requireReadAccess, requireWriteAccess } from "@/lib/api";
 import { referralService } from "@/lib/services/referral-service";
 import {
 referralCreateSchema,
@@ -14,7 +14,14 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   try {
-    const authContext = await requireAgencyOwnerContext();
+    const authContext = await requireReadAccess();
+    await enforceStaffPermission(
+      authContext.dbUser.role,
+      authContext.agencyId,
+      authContext.dbUser.id,
+      "REFERRALS",
+      "VIEW"
+    );
     const { searchParams } = new URL(request.url);
 
     const filter = referralFilterSchema.parse({
@@ -33,11 +40,12 @@ export async function GET(request: NextRequest) {
       pagination: result.pagination,
       stats: result.stats,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("GET /api/referrals error:", error);
-    const status = error.statusCode || (error.name === "ZodError" ? 400 : 500);
+    const err = error as { statusCode?: number; name?: string; message?: string };
+    const status = err.statusCode || (err.name === "ZodError" ? 400 : 500);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to fetch referrals" },
+      { success: false, error: err.message || "Failed to fetch referrals" },
       { status }
     );
   }
@@ -49,7 +57,14 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const authContext = await requireAgencyOwnerContext();
+    const authContext = await requireWriteAccess();
+    await enforceStaffPermission(
+      authContext.dbUser.role,
+      authContext.agencyId,
+      authContext.dbUser.id,
+      "REFERRALS",
+      "CREATE"
+    );
     const body = await request.json();
     const validatedInput = referralCreateSchema.parse(body);
 
@@ -62,11 +77,12 @@ export async function POST(request: NextRequest) {
       success: true,
       data: referral,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("POST /api/referrals error:", error);
-    const status = error.statusCode || (error.name === "ZodError" ? 400 : 500);
+    const err = error as { statusCode?: number; name?: string; message?: string };
+    const status = err.statusCode || (err.name === "ZodError" ? 400 : 500);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to create referral" },
+      { success: false, error: err.message || "Failed to create referral" },
       { status }
     );
   }

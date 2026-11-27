@@ -2,6 +2,7 @@ import {
 apiSuccess,
 handleApiError,
 requireReadAccess,
+enforceStaffPermission,
 requireWriteAccess,
 validateJson,
 } from "@/lib/api";
@@ -23,6 +24,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FINANCE", "VIEW", "You do not have permission to view supplier payables.");
     const { id } = await params;
 
     const payable = await prisma.supplierPayable.findFirst({
@@ -59,6 +61,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FINANCE", "UPDATE", "You do not have permission to manage supplier payables.");
     const { id } = await params;
     const body = await validateJson(updateSupplierPayableSchema, request);
 
@@ -82,6 +85,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FINANCE", "DELETE", "You do not have permission to delete supplier payables.");
     const { id } = await params;
     let reason: string | undefined;
     try {

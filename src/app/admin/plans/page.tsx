@@ -53,10 +53,12 @@ export default function AdminPlansPage() {
     TRIPS: { isUnlimited: boolean; value: string };
     QUOTATIONS: { isUnlimited: boolean; value: string };
     BOOKINGS: { isUnlimited: boolean; value: string };
+    STAFF_MEMBERS: { isUnlimited: boolean; value: string };
   }>({
     TRIPS: { isUnlimited: false, value: "20" },
     QUOTATIONS: { isUnlimited: false, value: "20" },
     BOOKINGS: { isUnlimited: false, value: "20" },
+    STAFF_MEMBERS: { isUnlimited: false, value: "5" },
   });
 
   const fetchPlans = React.useCallback(async () => {
@@ -112,6 +114,10 @@ export default function AdminPlansPage() {
         isUnlimited: plan.usageLimits?.BOOKINGS === null,
         value: plan.usageLimits?.BOOKINGS !== null && plan.usageLimits?.BOOKINGS !== undefined ? String(plan.usageLimits.BOOKINGS) : "20",
       },
+      STAFF_MEMBERS: {
+        isUnlimited: plan.usageLimits?.STAFF_MEMBERS === null,
+        value: plan.usageLimits?.STAFF_MEMBERS !== null && plan.usageLimits?.STAFF_MEMBERS !== undefined ? String(plan.usageLimits.STAFF_MEMBERS) : "5",
+      },
     });
   };
 
@@ -141,6 +147,7 @@ export default function AdminPlansPage() {
       TRIPS: { isUnlimited: false, value: "20" },
       QUOTATIONS: { isUnlimited: false, value: "20" },
       BOOKINGS: { isUnlimited: false, value: "20" },
+      STAFF_MEMBERS: { isUnlimited: false, value: "5" },
     });
   };
 
@@ -179,6 +186,10 @@ export default function AdminPlansPage() {
       toast.error("Bookings quota limit must be a valid non-negative whole number.");
       return;
     }
+    if (!usageLimits.STAFF_MEMBERS.isUnlimited && !isValidInteger(usageLimits.STAFF_MEMBERS.value, { min: 0 })) {
+      toast.error("Staff members quota limit must be a valid non-negative whole number.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -198,6 +209,7 @@ export default function AdminPlansPage() {
         TRIPS: usageLimits.TRIPS.isUnlimited ? null : parseInt(usageLimits.TRIPS.value, 10),
         QUOTATIONS: usageLimits.QUOTATIONS.isUnlimited ? null : parseInt(usageLimits.QUOTATIONS.value, 10),
         BOOKINGS: usageLimits.BOOKINGS.isUnlimited ? null : parseInt(usageLimits.BOOKINGS.value, 10),
+        STAFF_MEMBERS: usageLimits.STAFF_MEMBERS.isUnlimited ? null : parseInt(usageLimits.STAFF_MEMBERS.value, 10),
       };
 
       const finalPrice = Number(planPrice);
@@ -624,6 +636,41 @@ export default function AdminPlansPage() {
                           setUsageLimits((prev) => ({
                             ...prev,
                             BOOKINGS: { ...prev.BOOKINGS, isUnlimited: e.target.checked },
+                          }))
+                        }
+                        className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
+                      />
+                      <span>Unlimited</span>
+                    </label>
+                  </div>
+
+                  {/* STAFF_MEMBERS */}
+                  <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200 space-y-2">
+                    <label className="text-[11px] font-bold text-slate-700 block">Staff Members Limit</label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="0"
+                        disabled={usageLimits.STAFF_MEMBERS.isUnlimited}
+                        value={usageLimits.STAFF_MEMBERS.isUnlimited ? "" : usageLimits.STAFF_MEMBERS.value}
+                        onChange={(e) =>
+                          setUsageLimits((prev) => ({
+                            ...prev,
+                            STAFF_MEMBERS: { ...prev.STAFF_MEMBERS, value: e.target.value },
+                          }))
+                        }
+                        placeholder={usageLimits.STAFF_MEMBERS.isUnlimited ? "∞ Unlimited" : "5"}
+                        className="text-xs h-8"
+                      />
+                    </div>
+                    <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600 cursor-pointer pt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={usageLimits.STAFF_MEMBERS.isUnlimited}
+                        onChange={(e) =>
+                          setUsageLimits((prev) => ({
+                            ...prev,
+                            STAFF_MEMBERS: { ...prev.STAFF_MEMBERS, isUnlimited: e.target.checked },
                           }))
                         }
                         className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"

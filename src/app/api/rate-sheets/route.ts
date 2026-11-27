@@ -5,9 +5,11 @@ ConflictError,
 handleApiError,
 requireReadAccess,
 requireWriteAccess,
+  enforceStaffPermission,
 validateJson,
 validateQueryParams,
 } from "@/lib/api";
+import { redactStaffFinancials } from "@/lib/auth/permissions";
 import { rateSheetService } from "@/lib/services/rate-sheet-service";
 import {
 createRateSheetSchema,
@@ -24,11 +26,13 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "RATE_SHEETS", "VIEW");
     const queryParams = validateQueryParams(rateSheetQuerySchema, request.nextUrl.searchParams);
 
     const result = await rateSheetService.listRateSheets(context.agencyId, queryParams);
 
-    return apiSuccess(result.items, 200, {
+    const items = context.isAgencyStaff ? redactStaffFinancials(result.items, context.dbUser.role) : result.items;
+    return apiSuccess(items, 200, {
       total: result.total,
       page: result.page,
       limit: result.limit,
@@ -46,6 +50,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "RATE_SHEETS", "CREATE");
     const body = await validateJson(createRateSheetSchema, request);
 
     // Overlap validation check

@@ -1,7 +1,12 @@
 import prisma from "@/lib/prisma";
 import { isValidPhoneNumber } from "@/lib/validation/field-validators";
+import readXlsxFile from "read-excel-file/node";
 import "server-only";
-import * as XLSX from "xlsx";
+import writeXlsxFile, { type Cell, type Sheet } from "write-excel-file/node";
+
+function toSheetData(rows: (string | number | boolean | Date | null | undefined)[][]): Cell[][] {
+  return rows.map((row) => row.map((v) => ({ value: v ?? undefined })));
+}
 
 export type ImportMode = "SKIP" | "UPDATE" | "REJECT";
 
@@ -71,9 +76,7 @@ export const hotelExcelService = {
   /**
    * Generates the official sample workbook `Hotels.xlsx` with Instructions and example rows.
    */
-  generateSampleWorkbook(): Buffer {
-    const wb = XLSX.utils.book_new();
-
+  async generateSampleWorkbook(): Promise<Buffer> {
     // Sheet 1: Instructions
     const instructionsData = [
       ["YOUR TRAVEL DESK — HOTEL MASTER IMPORT INSTRUCTIONS"],
@@ -100,15 +103,6 @@ export const hotelExcelService = {
       ["6. Supplier and GST/tax are not included in this Hotel Master import format."],
       ["7. Supported file format: .xlsx (Max 5 MB, Max 1,000 rows)."],
     ];
-
-    const wsInstructions = XLSX.utils.aoa_to_sheet(instructionsData);
-    wsInstructions["!cols"] = [
-      { wch: 18 },
-      { wch: 12 },
-      { wch: 60 },
-      { wch: 35 },
-    ];
-    XLSX.utils.book_append_sheet(wb, wsInstructions, "Instructions");
 
     // Sheet 2: Hotels (The actual import sheet)
     const hotelsData = [
@@ -179,23 +173,32 @@ export const hotelExcelService = {
       ],
     ];
 
-    const wsHotels = XLSX.utils.aoa_to_sheet(hotelsData);
-    wsHotels["!cols"] = [
-      { wch: 26 },
-      { wch: 18 },
-      { wch: 16 },
-      { wch: 28 },
-      { wch: 16 },
-      { wch: 14 },
-      { wch: 12 },
-      { wch: 18 },
-      { wch: 28 },
-      { wch: 28 },
-      { wch: 40 },
+    const sheets: Sheet<never>[] = [
+      {
+        sheet: "Instructions",
+        data: toSheetData(instructionsData),
+        columns: [{ width: 18 }, { width: 12 }, { width: 60 }, { width: 35 }],
+      },
+      {
+        sheet: "Hotels",
+        data: toSheetData(hotelsData),
+        columns: [
+          { width: 26 },
+          { width: 18 },
+          { width: 16 },
+          { width: 28 },
+          { width: 16 },
+          { width: 14 },
+          { width: 12 },
+          { width: 18 },
+          { width: 28 },
+          { width: 28 },
+          { width: 40 },
+        ],
+      },
     ];
-    XLSX.utils.book_append_sheet(wb, wsHotels, "Hotels");
 
-    return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    return await writeXlsxFile(sheets).toBuffer();
   },
 
   /**
@@ -211,21 +214,29 @@ export const hotelExcelService = {
       throw new Error("Agency ID is required.");
     }
 
-    const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
-
-    // Look for sheet named "Hotels" (case-insensitive) or fallback to first sheet
-    let sheetName = wb.SheetNames.find((s) => s.trim().toLowerCase() === "hotels");
-    if (!sheetName) {
-      // If no "Hotels" sheet, try the first non-"Instructions" sheet, or sheet 0
-      sheetName = wb.SheetNames.find((s) => s.trim().toLowerCase() !== "instructions") || wb.SheetNames[0];
+    if (
+      buffer.length < 4 ||
+      buffer[0] !== 0x50 ||
+      buffer[1] !== 0x4b ||
+      buffer[2] !== 0x03 ||
+      buffer[3] !== 0x04
+    ) {
+      throw new Error("Invalid .xlsx file signature.");
     }
 
-    if (!sheetName) {
+    const parsedSheets = await readXlsxFile(buffer);
+
+    // Look for sheet named "Hotels" (case-insensitive) or fallback to first non-"Instructions" sheet
+    const targetSheet =
+      parsedSheets.find((s) => s.sheet.trim().toLowerCase() === "hotels") ||
+      parsedSheets.find((s) => s.sheet.trim().toLowerCase() !== "instructions") ||
+      parsedSheets[0];
+
+    if (!targetSheet) {
       throw new Error("Workbook contains no readable sheets.");
     }
 
-    const ws = wb.Sheets[sheetName];
-    const rawRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    const rawRows: any[][] = targetSheet.data.map((row) => row.map((cell) => cell ?? ""));
 
     if (!rawRows || rawRows.length === 0) {
       throw new Error("The selected sheet is completely empty.");

@@ -1,26 +1,30 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { DashboardExecutiveSummary } from "@/lib/services/dashboard-service";
 import {
-AlertTriangle,
-ArrowUpRight,
-CheckCircle2,
-Clock,
-Compass,
-CreditCard,
-IndianRupee,
-ShieldCheck,
-TrendingUp
+  ArrowUpRight,
+  Clock,
+  CreditCard,
+  IndianRupee,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 
 interface KpiCardsProps {
   summary?: DashboardExecutiveSummary | null;
+  overdueCount?: number;
+  dueTodayCount?: number;
   loading?: boolean;
 }
 
-export function KpiCards({ summary, loading = false }: KpiCardsProps) {
+export function KpiCards({
+  summary,
+  overdueCount,
+  dueTodayCount,
+  loading = false,
+}: KpiCardsProps) {
   const formatRupees = (val?: number) => {
     if (val === undefined || val === null || isNaN(val)) return "₹0";
     if (val >= 10000000) {
@@ -34,18 +38,18 @@ export function KpiCards({ summary, loading = false }: KpiCardsProps) {
 
   if (loading) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid gap-2.5 sm:gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
           <div
             key={i}
-            className="h-36 rounded-2xl border border-slate-100 bg-white p-5 animate-pulse shadow-2xs"
+            className="h-24 rounded-2xl border border-slate-200/80 bg-white p-3.5 animate-pulse shadow-2xs space-y-2"
           >
             <div className="flex justify-between items-center">
-              <div className="h-3 w-24 bg-slate-200 rounded" />
-              <div className="h-8 w-8 bg-slate-100 rounded-xl" />
+              <div className="h-3 w-16 bg-slate-200 rounded" />
+              <div className="h-6 w-6 bg-slate-100 rounded-lg" />
             </div>
-            <div className="h-8 w-28 bg-slate-200 rounded-lg mt-4" />
-            <div className="h-3 w-36 bg-slate-100 rounded mt-2" />
+            <div className="h-6 w-20 bg-slate-200 rounded-md" />
+            <div className="h-2.5 w-24 bg-slate-100 rounded" />
           </div>
         ))}
       </div>
@@ -54,164 +58,217 @@ export function KpiCards({ summary, loading = false }: KpiCardsProps) {
 
   const fin = summary?.financial;
   const sales = summary?.sales;
-  const ops = summary?.operations;
   const crm = summary?.crm;
 
+  const actualOverdue = overdueCount ?? crm?.overdueFollowUpsCount ?? 0;
+  const actualDueToday = dueTodayCount ?? crm?.followUpsDueTodayCount ?? 0;
+  const totalUrgent = actualOverdue + actualDueToday;
+
   return (
-    <div className="space-y-3 sm:space-y-4">
-      {/* 4 Primary Executive KPIs */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {/* 1. Total Booking Value & Revenue */}
-        <Link
-          href="/bookings"
-          className="group relative flex flex-col justify-between p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300 transition-all duration-200"
-        >
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Total Bookings
-              </span>
-              <div className="h-8 w-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
-                <IndianRupee className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-2 tabular-nums whitespace-nowrap truncate">
-              {formatRupees(fin?.totalBookingValue)}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-slate-500 pt-2.5 sm:pt-3 border-t border-slate-100 mt-2.5 sm:mt-3">
-            <span className="whitespace-nowrap">Collected: <strong className="text-emerald-700 font-bold tabular-nums">{formatRupees(fin?.amountCollected)}</strong></span>
-            <span className="text-indigo-600 font-semibold flex items-center group-hover:translate-x-0.5 transition-transform whitespace-nowrap">
-              Bookings <ArrowUpRight className="h-3 w-3 ml-0.5" />
+    <div className="grid gap-2.5 sm:gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+      {/* 1. Total Booking Value */}
+      <Link
+        href="/bookings"
+        className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-indigo-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 overflow-hidden"
+      >
+        <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
+              Total Bookings
             </span>
+            <div className="h-6 w-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <IndianRupee className="h-3.5 w-3.5" />
+            </div>
           </div>
-        </Link>
+          <div className="text-base sm:text-lg font-black text-slate-900 tracking-tight mt-1.5 tabular-nums whitespace-nowrap truncate font-mono">
+            {formatRupees(fin?.totalBookingValue)}
+          </div>
+        </div>
+        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100 mt-1.5">
+          <span className="truncate">
+            Col: <strong className="text-emerald-700 font-bold tabular-nums font-mono">{formatRupees(fin?.amountCollected)}</strong>
+          </span>
+          <ArrowUpRight className="h-3 w-3 text-indigo-500 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
+        </div>
+      </Link>
 
-        {/* 2. Outstanding Receivables & Balance */}
-        <Link
-          href="/payments"
-          className="group relative flex flex-col justify-between p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-rose-300 transition-all duration-200"
-        >
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Receivables
-              </span>
-              <div className="h-8 w-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
-                <CreditCard className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="text-xl sm:text-2xl font-black text-rose-700 tracking-tight mt-2 tabular-nums whitespace-nowrap truncate">
-              {formatRupees(fin?.outstandingReceivables)}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-slate-500 pt-2.5 sm:pt-3 border-t border-slate-100 mt-2.5 sm:mt-3">
-            <span className="whitespace-nowrap">Payables: <strong className="text-slate-700 font-bold tabular-nums">{formatRupees(fin?.supplierOutstanding)}</strong></span>
-            <span className="text-rose-600 font-semibold flex items-center group-hover:translate-x-0.5 transition-transform whitespace-nowrap">
-              Ledger <ArrowUpRight className="h-3 w-3 ml-0.5" />
+      {/* 2. Active Pipeline Value */}
+      <Link
+        href="/enquiries"
+        className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-teal-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 overflow-hidden"
+      >
+        <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-teal-500 to-teal-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
+              Active Pipeline
             </span>
+            <div className="h-6 w-6 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
+              <TrendingUp className="h-3.5 w-3.5" />
+            </div>
           </div>
-        </Link>
+          <div className="text-base sm:text-lg font-black text-teal-900 tracking-tight mt-1.5 tabular-nums whitespace-nowrap truncate font-mono">
+            {formatRupees(sales?.pipelineValue)}
+          </div>
+        </div>
+        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100 mt-1.5">
+          <span className="truncate font-semibold text-slate-600">
+            {sales?.activeLeads ?? 0} active leads
+          </span>
+          <ArrowUpRight className="h-3 w-3 text-teal-600 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
+        </div>
+      </Link>
 
-        {/* 3. Estimated Profit & Margin */}
-        <div className="flex flex-col justify-between p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-emerald-300 transition-all duration-200">
+      {/* 3. Quotation Conversion Rate */}
+      <Link
+        href="/quotations"
+        className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-emerald-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 overflow-hidden"
+      >
+        <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
+              Enquiry Conversion
+            </span>
+            <div className="h-6 w-6 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+              <ShieldCheck className="h-3.5 w-3.5" />
+            </div>
+          </div>
+          <div className="text-base sm:text-lg font-black text-emerald-700 tracking-tight mt-1.5 tabular-nums whitespace-nowrap truncate font-mono">
+            {sales?.enquiryConversionRate ?? 0}%
+          </div>
+        </div>
+        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100 mt-1.5">
+          <span className="truncate">
+            {(sales?.wonEnquiries ?? sales?.confirmedBookings ?? 0)} won • {(sales?.totalEnquiries ?? sales?.newEnquiries ?? 0)} leads
+          </span>
+          <ArrowUpRight className="h-3 w-3 text-emerald-600 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
+        </div>
+      </Link>
+
+      {/* 4. Gross Profit & Margin (or Active Operations when margins are redacted for staff) */}
+      {fin?.grossProfit !== undefined ? (
+        <Link
+          href="/trips"
+          className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-purple-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 overflow-hidden"
+        >
+          <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-purple-500 to-purple-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
                 Gross Profit
               </span>
-              <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <TrendingUp className="h-4 w-4" />
+              <div className="h-6 w-6 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center shrink-0">
+                <Sparkles className="h-3.5 w-3.5" />
               </div>
             </div>
-            <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2 mt-2">
-              <span className="text-xl sm:text-2xl font-black text-emerald-700 tracking-tight tabular-nums whitespace-nowrap">
-                {formatRupees(fin?.grossProfit)}
-              </span>
-              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold whitespace-nowrap">
-                {fin?.grossMarginPercent ?? 0}% Margin
-              </Badge>
+            <div className="text-base sm:text-lg font-black text-purple-800 tracking-tight mt-1.5 tabular-nums whitespace-nowrap truncate font-mono">
+              {formatRupees(fin?.grossProfit)}
             </div>
           </div>
-          <div className="text-xs text-slate-500 pt-2.5 sm:pt-3 border-t border-slate-100 mt-2.5 sm:mt-3">
-            <span className="whitespace-nowrap">Cost: <strong className="text-slate-700 font-bold tabular-nums">{formatRupees(fin?.supplierPayable)}</strong></span>
-          </div>
-        </div>
-
-        {/* 4. Sales Conversion & Funnel Won */}
-        <Link
-          href="/enquiries"
-          className="group relative flex flex-col justify-between p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-purple-300 transition-all duration-200"
-        >
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Booking Conversion
-              </span>
-              <div className="h-8 w-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
-                <ShieldCheck className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2 mt-2">
-              <span className="text-xl sm:text-2xl font-black text-purple-900 tracking-tight tabular-nums whitespace-nowrap">
-                {sales?.bookingConversionRate ?? 0}%
-              </span>
-              <span className="text-xs font-bold text-slate-500 whitespace-nowrap">
-                ({sales?.confirmedBookings ?? 0} Won)
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-slate-500 pt-2.5 sm:pt-3 border-t border-slate-100 mt-2.5 sm:mt-3">
-            <span className="whitespace-nowrap">Enquiries: <strong className="text-slate-700 font-bold">{sales?.newEnquiries ?? 0} new</strong></span>
-            <span className="text-purple-600 font-semibold flex items-center group-hover:translate-x-0.5 transition-transform whitespace-nowrap">
-              CRM <ArrowUpRight className="h-3 w-3 ml-0.5" />
+          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100 mt-1.5">
+            <span className="text-purple-700 font-bold tabular-nums font-mono">
+              {fin?.grossMarginPercent ?? 0}% margin
             </span>
+            <ArrowUpRight className="h-3 w-3 text-purple-600 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
           </div>
         </Link>
-      </div>
-
-      {/* Secondary Operations & CRM Fast Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-        <div className="p-3 bg-white sm:bg-slate-50/80 rounded-xl border border-slate-200/80 sm:border-slate-100 flex items-center justify-between gap-1.5 min-w-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 truncate">
-            <Compass className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-            <span className="text-xs font-bold text-slate-700 truncate">Upcoming Trips</span>
+      ) : (
+        <Link
+          href="/trips"
+          className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-purple-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 overflow-hidden"
+        >
+          <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-purple-500 to-purple-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
+                Active Trips
+              </span>
+              <div className="h-6 w-6 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center shrink-0">
+                <Sparkles className="h-3.5 w-3.5" />
+              </div>
+            </div>
+            <div className="text-base sm:text-lg font-black text-purple-800 tracking-tight mt-1.5 tabular-nums whitespace-nowrap truncate font-mono">
+              {summary?.operations?.ongoingTripsCount ?? 0} Ongoing
+            </div>
           </div>
-          <Badge variant="outline" className="bg-white text-indigo-700 font-bold text-xs shrink-0 tabular-nums">
-            {ops?.upcomingTripsCount ?? 0}
-          </Badge>
-        </div>
-
-        <div className="p-3 bg-white sm:bg-slate-50/80 rounded-xl border border-slate-200/80 sm:border-slate-100 flex items-center justify-between gap-1.5 min-w-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 truncate">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-            <span className="text-xs font-bold text-slate-700 truncate">Ready Trips</span>
+          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100 mt-1.5">
+            <span className="text-purple-700 font-bold tabular-nums font-mono">
+              {summary?.operations?.upcomingTripsCount ?? 0} upcoming
+            </span>
+            <ArrowUpRight className="h-3 w-3 text-purple-600 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
           </div>
-          <Badge variant="outline" className="bg-white text-emerald-700 font-bold text-xs shrink-0 tabular-nums">
-            {ops?.operationallyReadyTripsCount ?? 0}
-          </Badge>
-        </div>
+        </Link>
+      )}
 
-        <div className="p-3 bg-white sm:bg-slate-50/80 rounded-xl border border-slate-200/80 sm:border-slate-100 flex items-center justify-between gap-1.5 min-w-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 truncate">
-            <Clock className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-            <span className="text-xs font-bold text-slate-700 truncate">Due Follow-ups</span>
+      {/* 5. Outstanding Receivables */}
+      <Link
+        href="/payments"
+        className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-rose-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 overflow-hidden"
+      >
+        <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-rose-500 to-rose-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
+              Receivables
+            </span>
+            <div className="h-6 w-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+              <CreditCard className="h-3.5 w-3.5" />
+            </div>
           </div>
-          <Badge variant="outline" className="bg-white text-amber-700 font-bold text-xs shrink-0 tabular-nums">
-            {crm?.followUpsDueTodayCount ?? 0}
-          </Badge>
+          <div className="text-base sm:text-lg font-black text-rose-700 tracking-tight mt-1.5 tabular-nums whitespace-nowrap truncate font-mono">
+            {formatRupees(fin?.outstandingReceivables)}
+          </div>
         </div>
+        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100 mt-1.5">
+          <span className="truncate">
+            {fin?.supplierOutstanding !== undefined ? (
+              <>Pay: <strong className="text-slate-700 font-bold tabular-nums font-mono">{formatRupees(fin.supplierOutstanding)}</strong></>
+            ) : (
+              <strong className="text-slate-600 font-semibold">Active Ledger</strong>
+            )}
+          </span>
+          <ArrowUpRight className="h-3 w-3 text-rose-600 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
+        </div>
+      </Link>
 
-        <div className="p-3 bg-white sm:bg-slate-50/80 rounded-xl border border-slate-200/80 sm:border-slate-100 flex items-center justify-between gap-1.5 min-w-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 truncate">
-            <AlertTriangle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
-            <span className="text-xs font-bold text-slate-700 truncate">Overdue Leads</span>
+      {/* 6. Action Radar / Urgent Callbacks */}
+      <Link
+        href="/follow-ups"
+        className="group relative flex flex-col justify-between p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-amber-400 hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 overflow-hidden"
+      >
+        <div className="absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-amber-500 to-amber-600 rounded-t opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
+              Follow-Up Radar
+            </span>
+            <div
+              className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 ${
+                actualOverdue > 0
+                  ? "bg-rose-50 text-rose-600"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              <Clock className="h-3.5 w-3.5" />
+            </div>
           </div>
-          <Badge variant="outline" className="bg-white text-rose-700 font-bold text-xs shrink-0 tabular-nums">
-            {crm?.overdueFollowUpsCount ?? 0}
-          </Badge>
+          <div
+            className={`text-base sm:text-lg font-black tracking-tight mt-1.5 tabular-nums whitespace-nowrap truncate font-mono ${
+              actualOverdue > 0 ? "text-rose-700" : "text-amber-800"
+            }`}
+          >
+            {actualOverdue > 0 ? `${actualOverdue} Overdue` : `${actualDueToday} Today`}
+          </div>
         </div>
-      </div>
+        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100 mt-1.5">
+          <span className="truncate">
+            {actualDueToday} today • {crm?.leadsWithoutNextActionCount ?? 0} new
+          </span>
+          <ArrowUpRight className="h-3 w-3 text-amber-600 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
+        </div>
+      </Link>
     </div>
   );
 }

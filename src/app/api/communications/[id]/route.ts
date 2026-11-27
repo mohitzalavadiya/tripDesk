@@ -1,10 +1,12 @@
 import {
-apiSuccess,
-handleApiError,
-NotFoundError,
-requireAgencyOwnerContext,
+  apiSuccess,
+  ForbiddenError,
+  handleApiError,
+  NotFoundError,
+  requireReadAccess,
 } from "@/lib/api";
 import { communicationService } from "@/lib/services/communication-service";
+import { staffPermissionService } from "@/lib/services/staff-permission-service";
 import { NextRequest } from "next/server";
 
 interface RouteParams {
@@ -19,7 +21,21 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireReadAccess();
+
+    if (context.isAgencyStaff) {
+      const canView = await staffPermissionService.hasStaffPermission(
+        context.dbUser.role,
+        context.agencyId,
+        context.dbUser.id,
+        "COMMUNICATIONS",
+        "VIEW"
+      );
+      if (!canView) {
+        throw new ForbiddenError("You do not have permission to view communication details.");
+      }
+    }
+
     const { id } = await params;
 
     const result = await communicationService.getCommunicationDetails(

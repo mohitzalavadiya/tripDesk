@@ -45,10 +45,10 @@ export function ReadOnlyModeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md p-6 bg-white border border-slate-200 rounded-2xl shadow-xl gap-5">
-        <div className="flex items-start gap-4">
+      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-md p-4 sm:p-6 bg-white border border-slate-200 rounded-2xl shadow-xl gap-4 sm:gap-5 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-start gap-3 sm:gap-4">
           <div
-            className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs border ${
+            className={`h-10 w-10 sm:h-11 sm:w-11 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs border ${
               isSuspended
                 ? "bg-rose-50 text-rose-600 border-rose-100"
                 : "bg-blue-50 text-blue-600 border-blue-100"
@@ -111,13 +111,13 @@ export function ReadOnlyModeDialog({
           </ul>
         </div>
 
-        <DialogFooter className="flex-row justify-end gap-2.5 pt-2 border-t border-slate-100 bg-transparent -mx-6 -mb-6 p-4 px-6 rounded-b-2xl">
+        <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-2.5 pt-3 border-t border-slate-100 bg-transparent -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 p-4 sm:px-6 rounded-b-2xl">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => onOpenChange(false)}
-            className="h-9 px-4 text-xs font-semibold rounded-xl bg-white hover:bg-slate-50 border-slate-200 text-slate-700 cursor-pointer"
+            className="w-full sm:w-auto justify-center h-9 px-4 text-xs font-semibold rounded-xl bg-white hover:bg-slate-50 border-slate-200 text-slate-700 cursor-pointer"
           >
             Close
           </Button>
@@ -127,7 +127,7 @@ export function ReadOnlyModeDialog({
               type="button"
               size="sm"
               onClick={handleContactSupport}
-              className="h-9 px-4 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-xs gap-1.5 cursor-pointer"
+              className="w-full sm:w-auto justify-center h-9 px-4 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-xs gap-1.5 cursor-pointer"
             >
               <Phone className="h-3.5 w-3.5" />
               <span>Contact Support</span>
@@ -137,7 +137,7 @@ export function ReadOnlyModeDialog({
               type="button"
               size="sm"
               onClick={handleRenew}
-              className="h-9 px-4 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs gap-1.5 cursor-pointer"
+              className="w-full sm:w-auto justify-center h-9 px-4 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs gap-1.5 cursor-pointer"
             >
               <CreditCard className="h-3.5 w-3.5" />
               <span>Renew Subscription</span>

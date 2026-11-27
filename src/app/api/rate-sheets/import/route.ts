@@ -1,9 +1,10 @@
 import {
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-ValidationError,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  requireWriteAccess,
+  ValidationError,
 } from "@/lib/api";
 import { ImportMode } from "@/lib/excel/hotel-excel-service";
 import { rateExcelService } from "@/lib/excel/rate-excel-service";
@@ -25,6 +26,13 @@ export async function POST(request: NextRequest) {
     }
 
     const context = action === "execute" ? await requireWriteAccess() : await requireReadAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "RATE_SHEETS",
+      action === "execute" ? "CREATE" : "VIEW"
+    );
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;

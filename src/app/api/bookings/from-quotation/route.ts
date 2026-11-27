@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiCreated,
 handleApiError,
 requireWriteAccess,
@@ -23,6 +24,7 @@ const convertQuotationSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "BOOKINGS", "CREATE");
     const body = await validateJson(convertQuotationSchema, request);
 
     const booking = await bookingService.convertQuotationToBooking(

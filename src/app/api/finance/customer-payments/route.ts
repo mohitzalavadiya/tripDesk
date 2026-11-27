@@ -1,16 +1,18 @@
 import {
-apiCreated,
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-validateJson,
-validateQueryParams,
+  apiCreated,
+  apiSuccess,
+  enforceStaffPermission,
+  ForbiddenError,
+  handleApiError,
+  requireReadAccess,
+  requireWriteAccess,
+  validateJson,
+  validateQueryParams,
 } from "@/lib/api";
 import { financeService } from "@/lib/services/finance-service";
 import { paymentService } from "@/lib/services/payment-service";
 import {
-recordCustomerPaymentSchema,
+  recordCustomerPaymentSchema,
 } from "@/lib/validation/finance-schema";
 import { paymentQuerySchema } from "@/lib/validation/payment-schema";
 import { NextRequest } from "next/server";
@@ -24,6 +26,13 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "PAYMENTS",
+      "VIEW"
+    );
     const query = validateQueryParams(paymentQuerySchema, request.nextUrl.searchParams);
 
     const result = await paymentService.getPayments(context.agencyId, query);
@@ -36,17 +45,27 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/finance/customer-payments
- * Record customer payment.
+ * Record settled customer payment. Strictly restricted to Agency Owners.
+ * Staff must submit pending receipts via POST /api/payments for Owner verification.
  */
 export async function POST(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "PAYMENTS",
+      "recordReceipt",
+      "You do not have permission to record customer payments."
+    );
     const body = await validateJson(recordCustomerPaymentSchema, request);
 
     const payment = await financeService.recordCustomerPayment(
       context.agencyId,
       body,
-      context.dbUser.id
+      context.dbUser.id,
+      { role: context.dbUser.role, userId: context.dbUser.id }
     );
 
     return apiCreated(payment);

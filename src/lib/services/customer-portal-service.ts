@@ -235,7 +235,18 @@ export class CustomerPortalService {
         archivedAt: null,
       },
       orderBy: { createdAt: "desc" },
-      include: {
+      select: {
+        id: true,
+        bookingNumber: true,
+        packageOptionName: true,
+        status: true,
+        paymentStatus: true,
+        travelStartDate: true,
+        travelEndDate: true,
+        totalAmount: true,
+        paidAmount: true,
+        balanceAmount: true,
+        currency: true,
         agency: {
           select: { name: true, phone: true, email: true, logo: true },
         },
@@ -374,6 +385,17 @@ export class CustomerPortalService {
           where: { status: { not: "CANCELLED" } },
           orderBy: { createdAt: "desc" },
           take: 1,
+          select: {
+            id: true,
+            bookingNumber: true,
+            status: true,
+            paymentStatus: true,
+            packageOptionName: true,
+            currency: true,
+            totalAmount: true,
+            paidAmount: true,
+            balanceAmount: true,
+          },
         },
       },
     });
@@ -524,6 +546,10 @@ export class CustomerPortalService {
         bookings: {
           where: { status: { not: "CANCELLED" } },
           take: 1,
+          select: {
+            id: true,
+            bookingNumber: true,
+          },
         },
       },
     });
@@ -645,7 +671,9 @@ export class CustomerPortalService {
       },
       include: {
         tripOperation: true,
-        bookings: true,
+        bookings: {
+          select: { id: true },
+        },
       },
     });
 
@@ -753,10 +781,28 @@ export class CustomerPortalService {
         agencyId,
         archivedAt: null,
       },
-      include: {
+      select: {
+        id: true,
+        bookingNumber: true,
+        currency: true,
+        totalAmount: true,
+        paidAmount: true,
+        balanceAmount: true,
+        paymentStatus: true,
         payments: {
           where: { archivedAt: null },
           orderBy: { paymentDate: "desc" },
+          select: {
+            id: true,
+            paymentNumber: true,
+            amount: true,
+            refundedAmount: true,
+            refundedAt: true,
+            paymentMethod: true,
+            paymentDate: true,
+            receiptNumber: true,
+            status: true,
+          },
         },
       },
     });
@@ -920,6 +966,7 @@ export class CustomerPortalService {
           where: { status: { not: "CANCELLED" } },
           orderBy: { createdAt: "desc" },
           take: 1,
+          select: { id: true },
         },
       },
     });
@@ -1047,7 +1094,11 @@ export class CustomerPortalService {
         OR: [{ id: trimmed }, { bookingNumber: trimmed }],
         archivedAt: null,
       },
-      include: {
+      select: {
+        id: true,
+        agencyId: true,
+        customerId: true,
+        bookingNumber: true,
         customer: true,
       },
     });

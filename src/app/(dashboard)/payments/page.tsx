@@ -1,5 +1,9 @@
 "use client";
 
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
+import { useAuth } from "@/context/auth-context";
+
 import { PaymentStatusBadge } from "@/components/booking/booking-status-badge";
 import { RecordSupplierPaymentDialog } from "@/components/finance/record-supplier-payment-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -92,9 +96,23 @@ export interface UnifiedPaymentItem {
   tripId?: string | null;
   rawCustomerPayment?: PaymentWithRelations;
   rawSupplierPayment?: any;
+  refundedAmount?: number;
 }
 
 export default function PaymentsPage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+
+  if (isAgencyStaff && !hasStaffPermission("PAYMENTS", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Payments & Receipts"
+          badgeText="Access Restricted"
+          description="You do not have permission to view Payments and Receipts. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
   const router = useRouter();
 
   // Data states
@@ -136,22 +154,24 @@ export default function PaymentsPage() {
   }, [search]);
 
   // Fetch unified payments (both customer collections and supplier disbursements)
-  const fetchAllPayments = React.useCallback(async () => {
+  const fetchAllPayments = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
-      const [custRes, suppRes] = await Promise.all([
-        paymentClient.getPayments({
-          search: debouncedSearch || undefined,
-          limit: 100,
-          sortBy: "paymentDate",
-          sortOrder: "desc",
-        }),
-        financeClient.getSupplierPayments({
-          search: debouncedSearch || undefined,
-        }),
-      ]);
+      const custPromise = paymentClient.getPayments({
+        search: debouncedSearch || undefined,
+        limit: 100,
+        sortBy: "paymentDate",
+        sortOrder: "desc",
+      });
+      const suppPromise = isAgencyOwner
+        ? financeClient.getSupplierPayments({
+            search: debouncedSearch || undefined,
+          })
+        : Promise.resolve({ success: true, data: [] });
+
+      const [custRes, suppRes] = await Promise.all([custPromise, suppPromise]);
 
       if (custRes.success && custRes.data) {
         setCustomerPayments(custRes.data);
@@ -167,7 +187,7 @@ export default function PaymentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, isAgencyOwner]);
 
   React.useEffect(() => {
     fetchAllPayments();
@@ -196,6 +216,7 @@ export default function PaymentsPage() {
         bookingId: p.bookingId,
         tripId: p.tripId,
         rawCustomerPayment: p,
+        refundedAmount: Number(p.refundedAmount || 0),
       });
     }
 
@@ -258,11 +279,18 @@ export default function PaymentsPage() {
 
     for (const item of unifiedItems) {
       if (item.type === "CUSTOMER") {
-        totalReceived += item.amount;
         customerCount++;
+        // Phase 7B: Strictly count only COMPLETED or REFUNDED payments, net of verified refunds
+        if (item.status === "COMPLETED" || item.status === "REFUNDED") {
+          const net = Math.max(0, item.amount - (item.refundedAmount || 0));
+          totalReceived += net;
+        }
       } else {
-        totalDisbursed += item.amount;
         supplierCount++;
+        // Disbursements: strictly count only completed/paid disbursements
+        if (item.status === "COMPLETED" || item.status === "PAID") {
+          totalDisbursed += item.amount;
+        }
       }
     }
 
@@ -354,7 +382,7 @@ export default function PaymentsPage() {
       if (res.success && res.data) {
         toast.success(`Payment ${res.data.paymentNumber} recorded successfully!`);
         setIsAddCustomerOpen(false);
-        await fetchAllPayments();
+        await fetchAllPayments(true);
       }
     } catch (err: any) {
       toast.error(err?.message || "Failed to record payment.");
@@ -390,7 +418,7 @@ export default function PaymentsPage() {
           await paymentClient.deletePayment(id);
           toast.success(`Payment ${num} archived successfully.`);
           setConfirmAction(null);
-          await fetchAllPayments();
+          await fetchAllPayments(true);
         } catch (err: any) {
           toast.error(getErrorMessage(err, "We couldn't archive the payment. Please try again."));
         } finally {
@@ -410,8 +438,8 @@ export default function PaymentsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Read-Only Banner */}
         {isReadOnly && <ReadOnlyBanner moduleName="Payments & Accounts Ledger" />}
 
@@ -643,14 +671,14 @@ export default function PaymentsPage() {
           </div>
 
           {/* Loading State */}
-          {loading && (
+          {loading && filteredItems.length === 0 && (
             <div className="p-4">
               <TableSkeleton rows={8} />
             </div>
           )}
 
           {/* Error State */}
-          {!loading && error && (
+          {!loading && error && filteredItems.length === 0 && (
             <div className="p-8">
               <ErrorState
                 title="Unable to load payments ledger"
@@ -661,7 +689,7 @@ export default function PaymentsPage() {
           )}
 
           {/* Empty State */}
-          {!loading && !error && filteredItems.length === 0 && (
+          {(!loading || filteredItems.length > 0) && !error && filteredItems.length === 0 && (
             <div className="p-12 text-center">
               <EmptyState
                 icon={CreditCard}
@@ -678,9 +706,9 @@ export default function PaymentsPage() {
           )}
 
           {/* Unified Payments Table */}
-          {!loading && !error && filteredItems.length > 0 && (
+          {(!loading || filteredItems.length > 0) && !error && filteredItems.length > 0 && (
             <div className="overflow-hidden">
-              <div className="hidden lg:block overflow-x-auto max-h-[640px] overflow-y-auto">
+              <div className="hidden lg:block overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">
@@ -925,7 +953,7 @@ export default function PaymentsPage() {
           open={isDisbursementOpen}
           onOpenChange={setIsDisbursementOpen}
           onSuccess={() => {
-            fetchAllPayments();
+            fetchAllPayments(true);
           }}
         />
 

@@ -4,6 +4,8 @@ import { CreateIssueModal } from "@/components/operations/create-issue-modal";
 import { OperationalIssueCard } from "@/components/operations/operational-issue-card";
 import { ResolveIssueDialog } from "@/components/operations/resolve-issue-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
 import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { PageHeader } from "@/components/shared/page-header";
@@ -54,6 +56,19 @@ type AgencyIssueItem = OperationalIssue & {
 };
 
 export function GlobalIssuesDashboardPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("OPERATIONS_ISSUES", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Operations Issues"
+          badgeText="Access Restricted"
+          description="You do not have permission to view operations issues. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
 
   // Data states
@@ -105,9 +120,9 @@ export function GlobalIssuesDashboardPage() {
   }, []);
 
   // Fetch agency issues with query filters
-  const fetchIssues = React.useCallback(async () => {
+  const fetchIssues = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       const res = await operationsClient.listAgencyIssues({
@@ -128,7 +143,7 @@ export function GlobalIssuesDashboardPage() {
         setError(err.message || "Failed to load operational issues.");
       }
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [statusFilter, priorityFilter, searchQuery]);
 
@@ -138,7 +153,7 @@ export function GlobalIssuesDashboardPage() {
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
-      fetchIssues();
+      fetchIssues(true);
     }, 250);
     return () => clearTimeout(timer);
   }, [fetchIssues]);
@@ -150,7 +165,7 @@ export function GlobalIssuesDashboardPage() {
         status: IssueStatus.IN_PROGRESS,
       });
       toast.success(`Issue "${issue.title}" is now In Progress`);
-      fetchIssues();
+      fetchIssues(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to update issue status.");
     }
@@ -172,15 +187,15 @@ export function GlobalIssuesDashboardPage() {
         status: IssueStatus.OPEN,
       });
       toast.success(`Issue "${issue.title}" reopened`);
-      fetchIssues();
+      fetchIssues(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to reopen issue.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Read-only Banner */}
         {isReadOnly && <ReadOnlyBanner moduleName="Operations" />}
 
@@ -399,14 +414,14 @@ export function GlobalIssuesDashboardPage() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         operationList={operationList}
-        onSuccess={fetchIssues}
+        onSuccess={() => fetchIssues(true)}
       />
 
       {/* ─── RESOLVE ISSUE DIALOG ─────────────────────────────────────────── */}
       <ResolveIssueDialog
         isOpen={!!resolvingIssue}
         onClose={() => setResolvingIssue(null)}
-        onSuccess={fetchIssues}
+        onSuccess={() => fetchIssues(true)}
         operationId={resolvingOpId}
         issue={resolvingIssue}
         targetStatus={dialogTargetStatus}

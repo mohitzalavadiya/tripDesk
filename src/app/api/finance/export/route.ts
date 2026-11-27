@@ -1,7 +1,8 @@
 import {
-handleApiError,
-requireReadAccess,
-validateQueryParams,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  validateQueryParams,
 } from "@/lib/api";
 import { financeService } from "@/lib/services/finance-service";
 import { financeFilterSchema } from "@/lib/validation/finance-schema";
@@ -11,11 +12,19 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/finance/export
- * Downloads sanitized financial CSV report.
+ * Downloads financial CSV report.
  */
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "FINANCE",
+      "VIEW",
+      "You do not have permission to export financial data."
+    );
     const query = validateQueryParams(financeFilterSchema, request.nextUrl.searchParams);
 
     const csvData = await financeService.generateFinanceCsv(context.agencyId, query);

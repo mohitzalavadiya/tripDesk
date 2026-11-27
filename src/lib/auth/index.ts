@@ -1,4 +1,6 @@
 import prisma from "@/lib/prisma";
+import { isDbUserSessionValid } from "@/lib/auth/session-validation";
+import { evaluateEffectiveSubscriptionState } from "@/lib/auth/subscription-state";
 import { createClient } from "@/lib/supabase/server";
 import { Agency,Subscription,SubscriptionPlan,SubscriptionStatus,User } from "@prisma/client";
 import { redirect } from "next/navigation";
@@ -13,6 +15,7 @@ export interface AuthenticatedContext {
   subscription: (Subscription & { plan: SubscriptionPlan }) | null;
   isPlatformOwner: boolean;
   isAgencyOwner: boolean;
+  isAgencyStaff: boolean;
   hasFullAccess: boolean;
   isReadOnly: boolean;
   trialDaysRemaining: number;
@@ -62,36 +65,27 @@ export async function getCurrentUser(): Promise<AuthenticatedContext | null> {
       return null;
     }
 
+    const sessionValid = await isDbUserSessionValid(dbUser, supabase, user);
+    if (!sessionValid) {
+      return null;
+    }
+
     const agency = dbUser.agency || null;
     const subscription = agency?.subscriptions[0] || null;
 
     const isPlatformOwner = dbUser.role === "PLATFORM_OWNER" && !dbUser.agencyId;
     const isAgencyOwner = dbUser.role === "AGENCY_OWNER" && !!dbUser.agencyId;
+    const isAgencyStaff = dbUser.role === "AGENCY_STAFF" && !!dbUser.agencyId;
 
-    // Determine subscription access
-    let hasFullAccess = isPlatformOwner;
-    let isReadOnly = false;
-    let trialDaysRemaining = 0;
-
-    if (subscription) {
-      const now = new Date().getTime();
-      if (subscription.status === "TRIAL" && subscription.trialEnd) {
-        const end = new Date(subscription.trialEnd).getTime();
-        trialDaysRemaining = Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)));
-        hasFullAccess = trialDaysRemaining > 0;
-        isReadOnly = trialDaysRemaining <= 0;
-      } else if (subscription.status === "ACTIVE") {
-        hasFullAccess = true;
-        isReadOnly = false;
-      } else {
-        hasFullAccess = false;
-        isReadOnly = true;
-      }
-    } else if (isAgencyOwner) {
-      // If agency has no subscription record, default to read-only
-      hasFullAccess = false;
-      isReadOnly = true;
-    }
+    // Determine authoritative effective subscription access
+    const evalState = evaluateEffectiveSubscriptionState({
+      agencyStatus: agency?.status,
+      subscription,
+      isPlatformOwner,
+    });
+    const hasFullAccess = evalState.hasFullAccess;
+    const isReadOnly = evalState.isReadOnly;
+    const trialDaysRemaining = evalState.daysRemaining;
 
     return {
       supabaseUser: {
@@ -103,6 +97,7 @@ export async function getCurrentUser(): Promise<AuthenticatedContext | null> {
       subscription,
       isPlatformOwner,
       isAgencyOwner,
+      isAgencyStaff,
       hasFullAccess,
       isReadOnly,
       trialDaysRemaining,
@@ -158,6 +153,24 @@ export async function requireAgencyOwner(): Promise<AuthenticatedContext> {
 }
 
 /**
+ * Server-side guard: Ensures the user is an AGENCY_OWNER or AGENCY_STAFF with a valid agency.
+ * Redirects unauthenticated users to /login and PLATFORM_OWNER to /admin.
+ */
+export async function requireAgencyMember(): Promise<AuthenticatedContext> {
+  const auth = await getCurrentUser();
+  if (!auth) {
+    redirect("/login");
+  }
+  if (auth.isPlatformOwner) {
+    redirect("/admin");
+  }
+  if ((!auth.isAgencyOwner && !auth.isAgencyStaff) || !auth.agency) {
+    redirect("/login");
+  }
+  return auth;
+}
+
+/**
  * Helper to compute subscription access rules for an agency.
  */
 export async function getSubscriptionAccess(agencyId: string) {
@@ -180,27 +193,16 @@ export async function getSubscriptionAccess(agencyId: string) {
     return { status: "EXPIRED" as SubscriptionStatus, hasFullAccess: false, isReadOnly: true };
   }
 
-  const sub = agency.subscriptions[0];
-  if (!sub) {
-    return { status: "EXPIRED" as SubscriptionStatus, hasFullAccess: false, isReadOnly: true };
-  }
+  const sub = agency.subscriptions[0] || null;
+  const evalState = evaluateEffectiveSubscriptionState({
+    agencyStatus: agency.status,
+    subscription: sub,
+  });
 
-  const now = new Date().getTime();
-  if (sub.status === "TRIAL" && sub.trialEnd) {
-    const end = new Date(sub.trialEnd).getTime();
-    const daysLeft = Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)));
-    return {
-      status: sub.status,
-      hasFullAccess: daysLeft > 0,
-      isReadOnly: daysLeft <= 0,
-      daysLeft,
-    };
-  }
-
-  const hasFullAccess = sub.status === "ACTIVE";
   return {
-    status: sub.status,
-    hasFullAccess,
-    isReadOnly: !hasFullAccess,
+    status: evalState.effectiveStatus,
+    hasFullAccess: evalState.hasFullAccess,
+    isReadOnly: evalState.isReadOnly,
+    daysLeft: evalState.daysRemaining,
   };
 }

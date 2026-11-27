@@ -1,7 +1,8 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
 } from "@/lib/api";
 import { bookingService } from "@/lib/services/booking-service";
 import { NextRequest } from "next/server";
@@ -19,6 +20,13 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "OPERATIONS",
+      "UPDATE"
+    );
     const { id } = await params;
 
     const result = await bookingService.initializeOperationsForBooking(

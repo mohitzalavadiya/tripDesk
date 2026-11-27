@@ -70,3 +70,71 @@ export const generatePaymentScheduleSchema = z.object({
 });
 
 export type GeneratePaymentScheduleInput = z.infer<typeof generatePaymentScheduleSchema>;
+
+/**
+ * Zod schema for individual milestone item in atomic sync
+ */
+export const syncPaymentMilestoneItemSchema = z.object({
+  id: z.string().optional(),
+  title: z
+    .string()
+    .trim()
+    .min(1, "Milestone title is required")
+    .max(200, "Title cannot exceed 200 characters"),
+  description: z
+    .string()
+    .trim()
+    .max(2000, "Description cannot exceed 2000 characters")
+    .optional()
+    .nullable(),
+  percentage: z
+    .number()
+    .gt(0, "Percentage must be greater than 0")
+    .max(100, "Percentage cannot exceed 100"),
+  amount: z.number().min(0, "Amount must be non-negative").optional().nullable(),
+  dueDate: z.coerce.date().optional().nullable(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+export type SyncPaymentMilestoneItemInput = z.infer<typeof syncPaymentMilestoneItemSchema>;
+
+/**
+ * Zod schema for synchronizing full payment schedule (terms + milestones) atomically
+ */
+export const syncPaymentScheduleSchema = z
+  .object({
+    paymentTerms: z.string().trim().max(3000, "Payment terms cannot exceed 3000 characters").optional().nullable(),
+    milestones: z.array(syncPaymentMilestoneItemSchema).default([]),
+  })
+  .refine(
+    (data) => {
+      if (!data.milestones || data.milestones.length === 0) return true;
+      const totalPct = data.milestones.reduce((acc, m) => acc + (Number(m.percentage) || 0), 0);
+      return Math.abs(totalPct - 100) < 0.01;
+    },
+    {
+      message: "Total milestone percentage must equal exactly 100% when milestones are configured",
+      path: ["milestones"],
+    }
+  );
+
+export type SyncPaymentScheduleInput = z.infer<typeof syncPaymentScheduleSchema>;
+
+/**
+ * Zod schema for batch reordering payment milestones
+ */
+export const reorderPaymentMilestonesSchema = z
+  .object({
+    milestoneIds: z
+      .array(z.string().min(1, "Milestone ID cannot be empty"))
+      .min(1, "At least one milestone ID is required"),
+  })
+  .refine(
+    (data) => new Set(data.milestoneIds).size === data.milestoneIds.length,
+    {
+      message: "Duplicate milestone IDs are not allowed in reorder list",
+      path: ["milestoneIds"],
+    }
+  );
+
+export type ReorderPaymentMilestonesInput = z.infer<typeof reorderPaymentMilestonesSchema>;

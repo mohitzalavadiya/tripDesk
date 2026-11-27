@@ -13,7 +13,8 @@ import { quotationService } from "../src/lib/services/quotation-service";
 import { bookingService } from "../src/lib/services/booking-service";
 import { invoiceService } from "../src/lib/services/invoice-service";
 import { ValidationError, NotFoundError } from "../src/lib/api";
-import * as XLSX from "xlsx";
+import readXlsxFile from "read-excel-file/node";
+import writeXlsxFile from "write-excel-file/node";
 
 const BOOTSTRAP_AGENCY_EMAIL = "tripmadeeasy.in@gmail.com";
 
@@ -337,11 +338,11 @@ async function runQA20() {
     // ---------------------------------------------------------
     console.log("\n--- SECTION 3: HOTEL EXCEL IMPORT & STRICT MATCHING ---");
 
-    function makeExcel(rows: any[][]) {
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      XLSX.utils.book_append_sheet(wb, ws, "Hotels");
-      return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    async function makeExcel(rows: any[][]) {
+      return await writeXlsxFile(
+        rows.map((row) => row.map((v) => ({ value: v ?? null }))),
+        { sheet: "Hotels" }
+      ).toBuffer();
     }
 
     const excelHeaders = [
@@ -350,7 +351,7 @@ async function runQA20() {
     ];
 
     // 12. Valid Hotel Excel row imports
-    const validBuf = makeExcel([
+    const validBuf = await makeExcel([
       excelHeaders,
       [`Alila Diwa QA20 ${timestamp}`, "Goa", "5 Star", "Ada Estate", "Majorda", "Goa", "India", "", "", "", ""]
     ]);
@@ -367,7 +368,7 @@ async function runQA20() {
     assert(exec12.imported === 1 && imported12?.destinationId === destGoa.id, "Test 12.1: Excel row imports into DB with destination relation");
 
     // 13. Missing Hotel Name in Excel fails
-    const missNameBuf = makeExcel([
+    const missNameBuf = await makeExcel([
       excelHeaders,
       ["", "Goa", "4 Star", "Street", "City", "State", "India", "", "", "", ""]
     ]);
@@ -375,7 +376,7 @@ async function runQA20() {
     assert(prev13.summary.errorRows === 1 && prev13.rows[0].errors.some(e => e.includes("Hotel Name is required")), "Test 13: Excel row with missing name fails validation");
 
     // 14. Missing Destination in Excel fails
-    const missDestBuf = makeExcel([
+    const missDestBuf = await makeExcel([
       excelHeaders,
       [`No Dest Hotel QA20 ${timestamp}`, "", "4 Star", "Street", "City", "State", "India", "", "", "", ""]
     ]);
@@ -383,7 +384,7 @@ async function runQA20() {
     assert(prev14.summary.errorRows === 1 && prev14.rows[0].errors.some(e => e.includes("Destination is required")), "Test 14: Excel row with missing destination fails validation");
 
     // 15. Whitespace matching ('   Goa   ' -> 'Goa')
-    const wsBuf = makeExcel([
+    const wsBuf = await makeExcel([
       excelHeaders,
       [`Whitespace Hotel QA20 ${timestamp}`, "   Goa   ", "4 Star", "Street", "City", "State", "India", "", "", "", ""]
     ]);
@@ -391,7 +392,7 @@ async function runQA20() {
     assert(prev15.summary.validRows === 1 && prev15.rows[0].destinationId === destGoa.id, "Test 15: Destination matching ignores leading/trailing whitespace");
 
     // 16. Case-insensitive matching ('gOa' -> 'Goa')
-    const caseBuf = makeExcel([
+    const caseBuf = await makeExcel([
       excelHeaders,
       [`Case Hotel QA20 ${timestamp}`, "gOa", "4 Star", "Street", "City", "State", "India", "", "", "", ""]
     ]);
@@ -399,7 +400,7 @@ async function runQA20() {
     assert(prev16.summary.validRows === 1 && prev16.rows[0].destinationId === destGoa.id, "Test 16: Destination matching is case-insensitive ('gOa' -> 'Goa')");
 
     // 17. Panaji does NOT map to Goa
-    const panajiBuf = makeExcel([
+    const panajiBuf = await makeExcel([
       excelHeaders,
       [`Panaji Hotel QA20 ${timestamp}`, "Panaji", "3 Star", "Street", "Panaji", "Goa", "India", "", "", "", ""]
     ]);
@@ -407,7 +408,7 @@ async function runQA20() {
     assert(prev17.summary.errorRows === 1 && prev17.rows[0].errors.some(e => e.includes("Unknown destination: 'Panaji'")), "Test 17: 'Panaji' does NOT automatically infer or map to 'Goa'");
 
     // 18. Unknown Destination fails validation
-    const unkBuf = makeExcel([
+    const unkBuf = await makeExcel([
       excelHeaders,
       [`Unknown Dest Hotel QA20 ${timestamp}`, "AtlantisUnderwater", "5 Star", "Street", "City", "State", "India", "", "", "", ""]
     ]);
@@ -416,9 +417,10 @@ async function runQA20() {
 
     // 19. RateSheet Excel template does NOT have Destination column
     const rateSampleBuf = await rateExcelService.generateSampleWorkbook(agencyA.id);
-    const parsedRateWb = XLSX.read(rateSampleBuf, { type: "buffer" });
-    const ratesSheet = parsedRateWb.Sheets["Rates"] || parsedRateWb.Sheets[parsedRateWb.SheetNames[1]];
-    const rateHeaders = XLSX.utils.sheet_to_json<string[]>(ratesSheet, { header: 1 })[0];
+    const parsedRateSheets = await readXlsxFile(rateSampleBuf);
+    const ratesSheet =
+      parsedRateSheets.find((s) => s.sheet === "Rates") || parsedRateSheets[1];
+    const rateHeaders = (ratesSheet?.data[0] || []).map((h) => String(h ?? ""));
     assert(
       !rateHeaders.some(h => /^destination$/i.test(h)) && rateHeaders.some(h => /^hotel\s*code$/i.test(h)),
       "Test 19: Hotel RateSheet Excel template intentionally DOES NOT contain Destination column (links via Hotel Code)"

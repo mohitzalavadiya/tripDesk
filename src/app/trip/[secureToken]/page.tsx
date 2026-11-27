@@ -13,6 +13,7 @@ import {
   ChevronUp,
   Clock,
   Compass,
+  CreditCard,
   Download,
   Edit3,
   ExternalLink,
@@ -384,8 +385,109 @@ export default function CustomerTripPortalPage() {
           </div>
         </div>
 
+        {/* ─── PAYMENT & MILESTONE SCHEDULE SECTION (PHASE 5) ──────────── */}
+        {trip.bookingSummary && (
+          <div id="payment" className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black">
+                  <CreditCard className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-extrabold text-slate-900">
+                    Payment Summary & Status
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Verified payments received and payment milestone schedule.
+                  </p>
+                </div>
+              </div>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                trip.bookingSummary.paymentStatus === "PAID"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : trip.bookingSummary.paymentStatus === "PARTIALLY_PAID"
+                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                  : "bg-slate-100 text-slate-700 border border-slate-200"
+              }`}>
+                {trip.bookingSummary.paymentStatus.replace("_", " ")}
+              </span>
+            </div>
+
+            {/* Total / Paid / Balance Metric Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Total Package</span>
+                <span className="text-lg font-black text-slate-900 font-mono mt-1 block">
+                  {trip.bookingSummary.currency} {Number(trip.bookingSummary.totalAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="bg-emerald-50/60 rounded-2xl p-4 border border-emerald-100">
+                <span className="text-[10px] uppercase font-bold text-emerald-600 block tracking-wider">Amount Paid</span>
+                <span className="text-lg font-black text-emerald-800 font-mono mt-1 block">
+                  {trip.bookingSummary.currency} {Number(trip.bookingSummary.paidAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Remaining Balance</span>
+                <span className="text-lg font-black text-slate-900 font-mono mt-1 block">
+                  {trip.bookingSummary.currency} {Number(trip.bookingSummary.balanceAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            {/* Milestones List if present */}
+            {trip.bookingSummary.paymentMilestones && trip.bookingSummary.paymentMilestones.length > 0 ? (
+              <div className="space-y-2 pt-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-600 block">
+                  Payment Milestones ({trip.bookingSummary.paymentMilestones.length})
+                </span>
+                <div className="border border-slate-100 rounded-2xl overflow-hidden divide-y divide-slate-100 text-xs">
+                  {trip.bookingSummary.paymentMilestones.map((m, idx) => (
+                    <div key={idx} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-50/50">
+                      <div className="space-y-0.5">
+                        <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                          <span>{m.title}</span>
+                          {m.percentage > 0 && (
+                            <span className="text-[9px] px-1 py-0 rounded bg-slate-100 font-mono text-slate-600">
+                              {m.percentage}%
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-slate-400">
+                          Due: {m.dueDate ? new Date(m.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Upon Confirmation"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between sm:justify-end gap-3">
+                        <span className="font-bold font-mono text-slate-800 text-xs">
+                          {trip.bookingSummary?.currency} {m.plannedAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          m.status === "PAID"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : m.status === "PARTIALLY_PAID"
+                            ? "bg-amber-100 text-amber-800"
+                            : m.isOverdue
+                            ? "bg-rose-100 text-rose-800 border border-rose-200"
+                            : "bg-slate-100 text-slate-600"
+                        }`}>
+                          {m.isOverdue && m.status !== "PAID" ? "OVERDUE" : m.status.replace("_", " ")}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-xl">
+                No milestone schedule defined for this booking. Full balance is due per standard booking terms.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* ─── TRAVEL DOCUMENTS & VOUCHERS SECTION ─────────────────────── */}
         <div id="documents" className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-xl space-y-5">
+
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">

@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -110,6 +113,19 @@ export function QuotationStatusBadge({ status }: { status: QuotationStatus | str
 }
 
 export default function QuotationsPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("QUOTATIONS", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Quotations & Proposals"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const { canCreate, overview, isReadOnly: subReadOnly, readOnlyReason } = useSubscription();
 
@@ -168,10 +184,19 @@ export default function QuotationsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  // Restore status filter from URL if present
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlStatus = params.get("status");
+      if (urlStatus) setStatusFilter(urlStatus);
+    }
+  }, []);
+
   // Fetch real quotations from database API
-  const fetchQuotations = React.useCallback(async () => {
+  const fetchQuotations = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       const res = await quotationClient.getQuotations({
@@ -238,7 +263,7 @@ export default function QuotationsPage() {
           await quotationClient.deleteQuotation(id);
           toast.success(`Quotation ${number} archived successfully.`);
           setConfirmAction(null);
-          await fetchQuotations();
+          await fetchQuotations(true);
         } catch (err: any) {
           toast.error(getErrorMessage(err, "We couldn't archive the quotation. Please try again."));
         } finally {
@@ -262,8 +287,8 @@ export default function QuotationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Read-Only Banner */}
         {isReadOnly && <ReadOnlyBanner moduleName="Quotations & Proposals" />}
 
@@ -360,14 +385,14 @@ export default function QuotationsPage() {
           </div>
 
           {/* Loading State */}
-          {loading && (
+          {loading && quotations.length === 0 && (
             <div className="p-4">
               <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
-          {!loading && error && (
+          {!loading && error && quotations.length === 0 && (
             <div className="p-8">
               <ErrorState
                 title="Unable to load quotations"
@@ -378,7 +403,7 @@ export default function QuotationsPage() {
           )}
 
           {/* Table Content */}
-          {!loading && !error && quotations.length === 0 ? (
+          {(!loading || quotations.length > 0) && !error && quotations.length === 0 ? (
             <div className="p-12 text-center">
               <EmptyState
                 icon={FileText}
@@ -392,9 +417,9 @@ export default function QuotationsPage() {
                 onAction={isFilterActive ? handleClearFilters : () => router.push("/trips")}
               />
             </div>
-          ) : !loading && !error && (
+          ) : (!loading || quotations.length > 0) && !error && (
             <div className="overflow-hidden">
-              <div className="hidden lg:block overflow-x-auto max-h-[620px] overflow-y-auto">
+              <div className="hidden lg:block overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">

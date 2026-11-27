@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiCreated,
 apiSuccess,
 handleApiError,
@@ -6,6 +7,7 @@ requireReadAccess,
 requireWriteAccess,
 validateJson,
 } from "@/lib/api";
+import { toStaffSafeQuotationDTO } from "@/lib/auth/permissions";
 import { quotationService } from "@/lib/services/quotation-service";
 import { createQuotationItemSchema } from "@/lib/validation/quotation-item-schema";
 import { NextRequest } from "next/server";
@@ -23,6 +25,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATIONS", "VIEW");
     const { id } = await params;
 
     const quotation = await quotationService.getQuotation(context.agencyId, id);
@@ -34,7 +37,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    return apiSuccess(quotation.items);
+    const safeItems = context.isAgencyStaff
+      ? toStaffSafeQuotationDTO(quotation).items
+      : quotation.items;
+
+    return apiSuccess(safeItems);
   } catch (error) {
     return handleApiError(error);
   }
@@ -47,6 +54,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATIONS", "UPDATE");
     const { id } = await params;
     const body = await validateJson(createQuotationItemSchema, request);
 

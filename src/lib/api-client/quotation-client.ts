@@ -1,7 +1,9 @@
 import {
-CreatePaymentMilestoneInput,
-GeneratePaymentScheduleInput,
-UpdatePaymentMilestoneInput,
+  CreatePaymentMilestoneInput,
+  GeneratePaymentScheduleInput,
+  ReorderPaymentMilestonesInput,
+  SyncPaymentScheduleInput,
+  UpdatePaymentMilestoneInput,
 } from "@/lib/validation/payment-milestone-schema";
 import {
 CreateProposalItemInput,
@@ -142,6 +144,20 @@ export type QuotationWithRelations = Quotation & {
   items: QuotationItem[];
   proposalItems: QuotationProposalItem[];
   paymentMilestones: QuotationPaymentMilestone[];
+  bookings?: Array<{
+    id: string;
+    bookingNumber: string;
+    status: string;
+    createdAt: Date | string;
+  }>;
+  customerResponseHistory?: Array<{
+    id: string;
+    action: string;
+    version: number;
+    message: string;
+    customerName?: string;
+    createdAt: Date | string;
+  }>;
 };
 
 export interface HotelCostItem {
@@ -235,6 +251,9 @@ export interface PublicQuotationPayload {
   tier: string;
   validUntil?: string | null;
   isExpired: boolean;
+  isSuperseded?: boolean;
+  latestVersion?: number | null;
+  latestShareToken?: string | null;
   finalAmount: number;
   customerMessage?: string | null;
   inclusionsIntro?: string | null;
@@ -663,6 +682,38 @@ export const quotationClient = {
     return handleResponse<SingleResponse<QuotationPaymentMilestone[]>>(res);
   },
 
+  /**
+   * Synchronize full payment schedule (terms + milestones) atomically
+   */
+  async syncPaymentSchedule(
+    quotationId: string,
+    data: SyncPaymentScheduleInput
+  ): Promise<SingleResponse<QuotationWithRelations>> {
+    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/payment-milestones`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    return handleResponse<SingleResponse<QuotationWithRelations>>(res);
+  },
+
+  /**
+   * Reorder payment milestones
+   */
+  async reorderPaymentMilestones(
+    quotationId: string,
+    milestoneIds: string[]
+  ): Promise<SingleResponse<QuotationPaymentMilestone[]>> {
+    const res = await fetch(`/api/quotations/${encodeURIComponent(quotationId)}/payment-milestones/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ milestoneIds }),
+    });
+
+    return handleResponse<SingleResponse<QuotationPaymentMilestone[]>>(res);
+  },
+
 
 
   // ──────────────────────── TRIP INTEGRATION ─────────────────────────
@@ -670,8 +721,12 @@ export const quotationClient = {
   /**
    * Get trip's live costing and quotations
    */
-  async getTripQuotation(tripId: string): Promise<SingleResponse<TripQuotationData>> {
-    const res = await fetch(`/api/trips/${encodeURIComponent(tripId)}/quotation`, {
+  async getTripQuotation(
+    tripId: string,
+    options?: { includeCosting?: boolean }
+  ): Promise<SingleResponse<TripQuotationData>> {
+    const query = options?.includeCosting === false ? "?includeCosting=false" : "";
+    const res = await fetch(`/api/trips/${encodeURIComponent(tripId)}/quotation${query}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",

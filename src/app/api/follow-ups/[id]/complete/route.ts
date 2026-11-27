@@ -1,8 +1,9 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import { followUpService } from "@/lib/services/follow-up-service";
 import { completeFollowUpSchema } from "@/lib/validation/follow-up-schema";
@@ -21,6 +22,13 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "FOLLOW_UPS",
+      "UPDATE"
+    );
     const { id } = await params;
     const body = await validateJson(completeFollowUpSchema, request);
 

@@ -1,4 +1,4 @@
-import { handleApiError,requireReadAccess } from "@/lib/api";
+import { enforceStaffPermission, handleApiError, requireReadAccess } from "@/lib/api";
 import { operationsAnalyticsService } from "@/lib/services/operations-analytics-service";
 import { analyticsFilterSchema } from "@/lib/validation/operations-schema";
 import { NextRequest,NextResponse } from "next/server";
@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "OPERATIONS", "EXPORT");
     const { searchParams } = new URL(request.url);
 
     const rawFilters = {
