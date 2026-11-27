@@ -1,4 +1,6 @@
-import { requireAgencyOwnerContext } from "@/lib/api/context";
+import { requireMemberReadAccess } from "@/lib/api/context";
+import { enforceStaffPermission } from "@/lib/api";
+import { redactStaffFinancials } from "@/lib/auth/permissions";
 import { reportingService } from "@/lib/services/reporting-service";
 import { reportFilterSchema } from "@/lib/validation/reporting-schema";
 import { NextRequest,NextResponse } from "next/server";
@@ -11,7 +13,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   try {
-    const context = await requireAgencyOwnerContext();
+    const context = await requireMemberReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "REPORTS", "VIEW");
     const agencyId = context.agencyId;
 
     const { searchParams } = new URL(request.url);
@@ -24,7 +27,8 @@ export async function GET(request: NextRequest) {
       limit: searchParams.get("limit") || undefined,
     });
 
-    const report = await reportingService.getAgencyBIReport(agencyId, parsedFilter);
+    const rawReport = await reportingService.getAgencyBIReport(agencyId, parsedFilter);
+    const report = context.isAgencyStaff ? redactStaffFinancials(rawReport, context.dbUser.role) : rawReport;
 
     return NextResponse.json({
       success: true,

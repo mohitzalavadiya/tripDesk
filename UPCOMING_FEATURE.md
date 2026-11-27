@@ -88,9 +88,6 @@ forgot password
 RLS disabled in public error in staging
 in numnber field we can not add alphabetic value
 Test hotel payable case in opration page
-
-**TODO**
-
 Create a msg for user
 
 
@@ -100,6 +97,17 @@ preview page UI issue
 scroll
 
 404 error
+
+**TODO**
+
+Permission modal change. only owner changes
+can we send invitaion email ?
+dashboard data take to much time to load
+
+avoid unnecessary review loops
+
+go ahead and do fast. don't waste time and avoid unnecessary review loops.. and make sure everthing is build without any error and bugs. please do all things carefully
+
 
 
 email and whatsapp send

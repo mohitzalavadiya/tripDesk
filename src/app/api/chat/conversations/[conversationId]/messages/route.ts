@@ -1,4 +1,4 @@
-import { requireAuthenticatedUser } from "@/lib/api/context";
+import { enforceStaffPermission, requireAuthenticatedUser } from "@/lib/api";
 import { ForbiddenError,handleApiError,NotFoundError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { platformChatService } from "@/lib/services/platform-chat-service";
@@ -7,13 +7,25 @@ import { NextRequest,NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+type AuthenticatedContext = Awaited<ReturnType<typeof requireAuthenticatedUser>>;
+
 /**
  * Helper to verify conversation access for the authenticated user.
  */
 async function resolveAndAuthorizeConversation(
   conversationId: string,
-  context: any
+  context: AuthenticatedContext,
+  action: "VIEW" | "CREATE"
 ) {
+  if (context.isAgencyStaff && context.dbUser?.agencyId) {
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.dbUser.agencyId,
+      context.dbUser.id,
+      "SUPPORT_CHAT",
+      action
+    );
+  }
   const userAgencyId = context.agency?.id || context.dbUser?.agencyId;
 
   // If conversationId starts with "new_", resolve by agencyId
@@ -56,7 +68,7 @@ export async function GET(
     const context = await requireAuthenticatedUser();
     const { conversationId } = await params;
 
-    const conv = await resolveAndAuthorizeConversation(conversationId, context);
+    const conv = await resolveAndAuthorizeConversation(conversationId, context, "VIEW");
 
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "50", 10);
@@ -90,7 +102,7 @@ export async function POST(
     const context = await requireAuthenticatedUser();
     const { conversationId } = await params;
 
-    const conv = await resolveAndAuthorizeConversation(conversationId, context);
+    const conv = await resolveAndAuthorizeConversation(conversationId, context, "CREATE");
 
     const body = await request.json();
     const messageText = body?.messageText || "";

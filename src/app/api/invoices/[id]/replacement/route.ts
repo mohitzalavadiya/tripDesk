@@ -1,7 +1,8 @@
 import {
-apiCreated,
-handleApiError,
-requireWriteAccess,
+  apiCreated,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
 } from "@/lib/api";
 import { invoiceService } from "@/lib/services/invoice-service";
 import { NextRequest } from "next/server";
@@ -18,6 +19,7 @@ export async function POST(
 ) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "INVOICES", "CREATE");
     const { id } = await params;
 
     const replacement = await invoiceService.createReplacementInvoice(context.agencyId, id);

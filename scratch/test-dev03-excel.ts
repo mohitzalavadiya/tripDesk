@@ -1,5 +1,6 @@
 import "dotenv/config";
-import * as XLSX from "xlsx";
+import readXlsxFile from "read-excel-file/node";
+import writeXlsxFile from "write-excel-file/node";
 import { prisma } from "../src/lib/prisma";
 import { hotelService } from "../src/lib/services/hotel-service";
 import { hotelExcelService } from "../src/lib/excel/hotel-excel-service";
@@ -115,11 +116,11 @@ async function runDev03Tests() {
     console.log("\n--- Testing Hotel Excel Importer ---");
 
     // Generate test Hotel Excel workbook
-    function createHotelWorkbook(rows: any[][]): Buffer {
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      XLSX.utils.book_append_sheet(wb, ws, "Hotels");
-      return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    async function createHotelWorkbook(rows: any[][]): Promise<Buffer> {
+      return await writeXlsxFile(
+        rows.map((row) => row.map((v) => ({ value: v ?? undefined }))),
+        { sheet: "Hotels" }
+      ).toBuffer();
     }
 
     const hotelImportRows = [
@@ -130,7 +131,7 @@ async function runDev03Tests() {
       ["Pine Valley Retreat", "3 Star", "Cliff Top", "Kodaikanal", "Tamil Nadu", "India", "", "", "", ""], // Same-file duplicate of row 2
     ];
 
-    const hotelWbBuffer = createHotelWorkbook(hotelImportRows);
+    const hotelWbBuffer = await createHotelWorkbook(hotelImportRows);
 
     // 7. Preview performs ZERO writes
     const preCount = await prisma.hotel.count({ where: { agencyId: agencyA.id } });
@@ -167,7 +168,7 @@ async function runDev03Tests() {
       ["Hotel Name", "Category", "Address", "City", "State", "Country", "Phone", "Email", "Website", "Notes"],
       ["Grand View Luxury Resort", "5 Star Deluxe", "Newly Renovated Suite Rd", "Munnar", "Kerala", "India", "", "", "", "New luxury wing"],
     ];
-    const updateWbBuffer = createHotelWorkbook(hotelUpdateRows);
+    const updateWbBuffer = await createHotelWorkbook(hotelUpdateRows);
     const executeUpdate = await hotelExcelService.executeImport(updateWbBuffer, agencyA.id, "UPDATE");
     const reloadedHotel1 = await prisma.hotel.findUnique({ where: { id: hotel1.id } });
     assert(
@@ -181,11 +182,11 @@ async function runDev03Tests() {
     // -------------------------------------------------------------
     console.log("\n--- Testing Hotel Rate Excel Importer ---");
 
-    function createRateWorkbook(rows: any[][]): Buffer {
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      XLSX.utils.book_append_sheet(wb, ws, "Rates");
-      return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    async function createRateWorkbook(rows: any[][]): Promise<Buffer> {
+      return await writeXlsxFile(
+        rows.map((row) => row.map((v) => ({ value: v ?? undefined }))),
+        { sheet: "Rates" }
+      ).toBuffer();
     }
 
     const rateImportRows = [
@@ -200,7 +201,7 @@ async function runDev03Tests() {
       [hotel1.hotelCode, "Deluxe Room", "CP", "Summer", "15-05-2026", "15-07-2026", 4900, "", "", ""], // In-file overlap with row 2 (01-Apr to 30-Jun)
     ];
 
-    const rateWbBuffer = createRateWorkbook(rateImportRows);
+    const rateWbBuffer = await createRateWorkbook(rateImportRows);
 
     // 12. Rate Preview performs ZERO writes
     const preRateCount = await prisma.rateSheet.count({ where: { agencyId: agencyA.id } });
@@ -241,7 +242,7 @@ async function runDev03Tests() {
       [hotel1.hotelCode, "Deluxe Room", "MAP", "Summer", "01-04-2026", "30-06-2026", 5500, 1800, 1000, "Different meal plan"],
       [hotel1.hotelCode, "Deluxe Room", "CP", "Monsoon", "01-07-2026", "30-09-2026", 3800, 1200, 600, "Adjacent period"],
     ];
-    const validRateWb = createRateWorkbook(validRateRows);
+    const validRateWb = await createRateWorkbook(validRateRows);
     const executeRate1 = await rateExcelService.executeImport(validRateWb, agencyA.id, "SKIP");
     assert(
       executeRate1.imported === 3 && executeRate1.failed === 0,
@@ -262,7 +263,7 @@ async function runDev03Tests() {
       ["Hotel Code", "Room Type", "Meal Plan", "Season", "Valid From", "Valid To", "Cost Price", "Extra Adult", "Extra Child", "Notes"],
       [hotel1.hotelCode, "Deluxe Room", "CP", "Summer Special", "01-04-2026", "30-06-2026", 4800, 1600, 900, "Updated summer rate"],
     ];
-    const updateRateWb = createRateWorkbook(updateRateRows);
+    const updateRateWb = await createRateWorkbook(updateRateRows);
     const executeRateUpdate = await rateExcelService.executeImport(updateRateWb, agencyA.id, "UPDATE");
     assert(
       executeRateUpdate.updated === 1,
@@ -274,7 +275,7 @@ async function runDev03Tests() {
       ["Hotel Code", "Room Type", "Meal Plan", "Season", "Valid From", "Valid To", "Cost Price", "Extra Adult", "Extra Child", "Notes"],
       [hotel1.hotelCode, "Deluxe Room", "CP", "Conflict Period", "15-05-2026", "15-07-2026", 5000, 1500, 800, "Overlaps with 01-Apr to 30-Jun"],
     ];
-    const conflictRateWb = createRateWorkbook(conflictRateRows);
+    const conflictRateWb = await createRateWorkbook(conflictRateRows);
     const conflictPreview = await rateExcelService.parseAndPreview(conflictRateWb, agencyA.id, "SKIP");
     assert(
       conflictPreview.rows[0].status === "REJECT" && conflictPreview.rows[0].errors.some((e) => e.includes("Overlaps with existing active rate period")),
@@ -286,7 +287,7 @@ async function runDev03Tests() {
       ["Hotel Code", "Room Type", "Meal Plan", "Season", "Valid From", "Valid To", "Cost Price", "Extra Adult", "Extra Child", "Notes"],
       [hotel1.hotelCode, "Deluxe Room", "CP", "Summer", "01-04-2026", "30-06-2026", 4500, "", "", ""],
     ];
-    const agencyBCrossWb = createRateWorkbook(agencyBCrossRateRows);
+    const agencyBCrossWb = await createRateWorkbook(agencyBCrossRateRows);
     const agencyBPreview = await rateExcelService.parseAndPreview(agencyBCrossWb, agencyB.id, "SKIP");
     assert(
       agencyBPreview.rows[0].status === "ERROR" && agencyBPreview.rows[0].errors.some((e) => e.includes("Unknown Hotel Code")),
@@ -298,24 +299,26 @@ async function runDev03Tests() {
     // -------------------------------------------------------------
     console.log("\n--- Testing Sample Workbook Downloads ---");
 
-    const hotelSampleBuffer = hotelExcelService.generateSampleWorkbook();
-    const hotelSampleWb = XLSX.read(hotelSampleBuffer, { type: "buffer" });
+    const hotelSampleBuffer = await hotelExcelService.generateSampleWorkbook();
+    const hotelSampleSheets = await readXlsxFile(hotelSampleBuffer);
+    const hotelSampleNames = hotelSampleSheets.map((s) => s.sheet);
     assert(
-      hotelSampleWb.SheetNames.includes("Instructions") && hotelSampleWb.SheetNames.includes("Hotels"),
+      hotelSampleNames.includes("Instructions") && hotelSampleNames.includes("Hotels"),
       "21. Hotel sample workbook contains 'Instructions' and 'Hotels' sheets"
     );
 
     const rateSampleBuffer = await rateExcelService.generateSampleWorkbook(agencyA.id);
-    const rateSampleWb = XLSX.read(rateSampleBuffer, { type: "buffer" });
+    const rateSampleSheets = await readXlsxFile(rateSampleBuffer);
+    const rateSampleNames = rateSampleSheets.map((s) => s.sheet);
     assert(
-      rateSampleWb.SheetNames.includes("Instructions") &&
-      rateSampleWb.SheetNames.includes("Rates") &&
-      rateSampleWb.SheetNames.includes("Hotels Reference"),
+      rateSampleNames.includes("Instructions") &&
+      rateSampleNames.includes("Rates") &&
+      rateSampleNames.includes("Hotels Reference"),
       "22. Hotel Rate sample workbook contains 'Instructions', 'Rates', and 'Hotels Reference' sheets"
     );
 
-    const refSheet = rateSampleWb.Sheets["Hotels Reference"];
-    const refData: any[][] = XLSX.utils.sheet_to_json(refSheet, { header: 1 });
+    const refSheet = rateSampleSheets.find((s) => s.sheet === "Hotels Reference");
+    const refData: any[][] = refSheet?.data ?? [];
     const containsHotel1Code = refData.some((row) => row.includes(hotel1.hotelCode));
     assert(
       containsHotel1Code,

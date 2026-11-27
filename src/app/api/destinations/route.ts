@@ -4,6 +4,7 @@ apiSuccess,
 handleApiError,
 requireReadAccess,
 requireWriteAccess,
+  enforceStaffPermission,
 validateJson,
 validateQueryParams,
 } from "@/lib/api";
@@ -23,6 +24,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "DESTINATIONS", "VIEW");
     const queryParams = validateQueryParams(destinationListQuerySchema, request.nextUrl.searchParams);
 
     const result = await destinationService.listDestinations(context.agencyId, queryParams);
@@ -45,6 +47,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "DESTINATIONS", "CREATE");
     const body = await validateJson(createDestinationSchema, request);
 
     const newDestination = await destinationService.createDestination(context.agencyId, body);

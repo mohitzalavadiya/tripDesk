@@ -1,0 +1,4449 @@
+{
+  "totalFiles": 669,
+  "totalMatches": 356,
+  "filesWithMatches": 84,
+  "byFile": {
+    "src/actions/auth-actions.ts": [
+      {
+        "file": "src/actions/auth-actions.ts",
+        "line": 194,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "// Agency User (AGENCY_OWNER, etc.)"
+      }
+    ],
+    "src/app/(dashboard)/activities/new/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/activities/new/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/activities/new/page.tsx",
+        "line": 32,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/activities/new/page.tsx",
+        "line": 34,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"ACTIVITIES\", \"create\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/activities/new/page.tsx",
+        "line": 37,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/activities/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/activities/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/activities/page.tsx",
+        "line": 56,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/activities/[id]/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/activities/[id]/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/activities/[id]/page.tsx",
+        "line": 45,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      }
+    ],
+    "src/app/(dashboard)/bookings/new/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/bookings/new/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/bookings/new/page.tsx",
+        "line": 47,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/bookings/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/bookings/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/bookings/page.tsx",
+        "line": 76,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/bookings/[id]/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/bookings/[id]/page.tsx",
+        "line": 9,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/bookings/[id]/page.tsx",
+        "line": 158,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/communications/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/communications/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/communications/page.tsx",
+        "line": 140,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/customer-insights/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/customer-insights/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/customer-insights/page.tsx",
+        "line": 31,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/customer-insights/page.tsx",
+        "line": 33,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"CUSTOMER_INSIGHTS\", \"view\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/customer-insights/page.tsx",
+        "line": 36,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/customers/new/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/customers/new/page.tsx",
+        "line": 5,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/customers/new/page.tsx",
+        "line": 63,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/customers/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/customers/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/customers/page.tsx",
+        "line": 87,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/customers/[id]/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/customers/[id]/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/customers/[id]/page.tsx",
+        "line": 131,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/dashboard/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/dashboard/page.tsx",
+        "line": 45,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/dashboard/page.tsx",
+        "line": 105,
+        "pattern": "/isAgencyOwner/",
+        "code": "isAgencyOwner ? dashboardClient.getFinance(filter) : Promise.resolve(null),"
+      },
+      {
+        "file": "src/app/(dashboard)/dashboard/page.tsx",
+        "line": 135,
+        "pattern": "/isAgencyOwner/",
+        "code": "[preset, startDate, endDate, isAgencyOwner]"
+      },
+      {
+        "file": "src/app/(dashboard)/dashboard/page.tsx",
+        "line": 268,
+        "pattern": "/isAgencyOwner/",
+        "code": "{isAgencyOwner && ("
+      }
+    ],
+    "src/app/(dashboard)/destinations/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/destinations/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/destinations/page.tsx",
+        "line": 66,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/documents/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/documents/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/documents/page.tsx",
+        "line": 92,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/enquiries/new/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/enquiries/new/page.tsx",
+        "line": 35,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/enquiries/new/page.tsx",
+        "line": 120,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/enquiries/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/enquiries/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/enquiries/page.tsx",
+        "line": 97,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/enquiries/[id]/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/enquiries/[id]/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/enquiries/[id]/page.tsx",
+        "line": 89,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/feedback/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/feedback/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/feedback/page.tsx",
+        "line": 49,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      },
+      {
+        "file": "src/app/(dashboard)/feedback/page.tsx",
+        "line": 58,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/feedback/page.tsx",
+        "line": 59,
+        "pattern": "/isAgencyOwner/",
+        "code": "const canManageSettings = isAgencyOwner || (isAgencyStaff && hasStaffPermission(\"FEEDBACK\", \"update\"));"
+      },
+      {
+        "file": "src/app/(dashboard)/feedback/page.tsx",
+        "line": 143,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (isAgencyOwner) {"
+      },
+      {
+        "file": "src/app/(dashboard)/feedback/page.tsx",
+        "line": 147,
+        "pattern": "/isAgencyOwner/",
+        "code": "}, [isAllowed, fetchFeedbacks, fetchSettings, isAgencyOwner]);"
+      }
+    ],
+    "src/app/(dashboard)/finance/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/finance/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/finance/page.tsx",
+        "line": 43,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/finance/page.tsx",
+        "line": 45,
+        "pattern": "/isAgencyOwner/",
+        "code": "const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission(\"FINANCE\", \"view\"));"
+      },
+      {
+        "file": "src/app/(dashboard)/finance/page.tsx",
+        "line": 50,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      },
+      {
+        "file": "src/app/(dashboard)/finance/page.tsx",
+        "line": 264,
+        "pattern": "/isAgencyOwner/",
+        "code": "{isAgencyOwner ? ("
+      },
+      {
+        "file": "src/app/(dashboard)/finance/page.tsx",
+        "line": 279,
+        "pattern": "/isAgencyOwner/",
+        "code": "supplierPayables={isAgencyOwner ? data.supplierPayables : { totalOutstanding: 0, overdueCount: 0, overdueAmount: 0, items: [] }}"
+      },
+      {
+        "file": "src/app/(dashboard)/finance/page.tsx",
+        "line": 281,
+        "pattern": "/isAgencyOwner/",
+        "code": "onRecordSupplierPayment={isAgencyOwner ? handleRecordSupplierPayment : () => {}}"
+      },
+      {
+        "file": "src/app/(dashboard)/finance/page.tsx",
+        "line": 282,
+        "pattern": "/isAgencyOwner/",
+        "code": "onRecordPayable={isAgencyOwner ? handleRecordPayable : () => {}}"
+      },
+      {
+        "file": "src/app/(dashboard)/finance/page.tsx",
+        "line": 283,
+        "pattern": "/isAgencyOwner/",
+        "code": "onEditPayable={isAgencyOwner ? handleEditPayable : () => {}}"
+      }
+    ],
+    "src/app/(dashboard)/follow-ups/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/follow-ups/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/follow-ups/page.tsx",
+        "line": 105,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/hotels/new/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/hotels/new/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/hotels/new/page.tsx",
+        "line": 43,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/hotels/new/page.tsx",
+        "line": 45,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"HOTELS\", \"create\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/hotels/new/page.tsx",
+        "line": 48,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/hotels/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/hotels/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/hotels/page.tsx",
+        "line": 69,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/hotels/[id]/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/hotels/[id]/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/hotels/[id]/page.tsx",
+        "line": 56,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      }
+    ],
+    "src/app/(dashboard)/invoices/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/invoices/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/invoices/page.tsx",
+        "line": 13,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/invoices/page.tsx",
+        "line": 15,
+        "pattern": "/isAgencyOwner/",
+        "code": "const isAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission(\"INVOICES\", \"view\"));"
+      },
+      {
+        "file": "src/app/(dashboard)/invoices/page.tsx",
+        "line": 26,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/operations/analytics/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+        "line": 45,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+        "line": 47,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"OPERATIONS\", \"view\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+        "line": 50,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      },
+      {
+        "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+        "line": 105,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"OPERATIONS\", \"export\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+        "line": 232,
+        "pattern": "/isAgencyOwner/",
+        "code": "{isAgencyOwner ? ("
+      }
+    ],
+    "src/app/(dashboard)/operations/issues/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/operations/issues/page.tsx",
+        "line": 8,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/operations/issues/page.tsx",
+        "line": 63,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/operations/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/operations/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/operations/page.tsx",
+        "line": 50,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/operations/[tripId]/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/operations/[tripId]/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/operations/[tripId]/page.tsx",
+        "line": 90,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/operations/[tripId]/page.tsx",
+        "line": 428,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"OPERATIONS\", \"view\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/operations/[tripId]/page.tsx",
+        "line": 431,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/payments/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/payments/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/payments/page.tsx",
+        "line": 102,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/payments/page.tsx",
+        "line": 107,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      },
+      {
+        "file": "src/app/(dashboard)/payments/page.tsx",
+        "line": 167,
+        "pattern": "/isAgencyOwner/",
+        "code": "const suppPromise = isAgencyOwner"
+      },
+      {
+        "file": "src/app/(dashboard)/payments/page.tsx",
+        "line": 189,
+        "pattern": "/isAgencyOwner/",
+        "code": "}, [debouncedSearch, isAgencyOwner]);"
+      }
+    ],
+    "src/app/(dashboard)/quotations/new/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/quotations/new/page.tsx",
+        "line": 23,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/quotations/new/page.tsx",
+        "line": 42,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/quotations/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/quotations/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/quotations/page.tsx",
+        "line": 120,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/rate-sheets/new/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/rate-sheets/new/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/rate-sheets/new/page.tsx",
+        "line": 39,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/rate-sheets/new/page.tsx",
+        "line": 41,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"RATE_SHEETS\", \"create\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/rate-sheets/new/page.tsx",
+        "line": 44,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/rate-sheets/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/rate-sheets/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/rate-sheets/page.tsx",
+        "line": 57,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/rate-sheets/page.tsx",
+        "line": 59,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"RATE_SHEETS\", \"view\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/rate-sheets/page.tsx",
+        "line": 62,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/rate-sheets/[id]/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/rate-sheets/[id]/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/rate-sheets/[id]/page.tsx",
+        "line": 51,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/rate-sheets/[id]/page.tsx",
+        "line": 53,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"RATE_SHEETS\", \"view\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/rate-sheets/[id]/page.tsx",
+        "line": 56,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/referrals/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/referrals/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/referrals/page.tsx",
+        "line": 52,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/reports/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/reports/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/reports/page.tsx",
+        "line": 51,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/reports/page.tsx",
+        "line": 53,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"REPORTS\", \"view\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/reports/page.tsx",
+        "line": 56,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/settings/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/settings/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/settings/page.tsx",
+        "line": 54,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/settings/page.tsx",
+        "line": 56,
+        "pattern": "/isAgencyOwner/",
+        "code": "const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission(\"SETTINGS\", \"view\"));"
+      },
+      {
+        "file": "src/app/(dashboard)/settings/page.tsx",
+        "line": 61,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      },
+      {
+        "file": "src/app/(dashboard)/settings/page.tsx",
+        "line": 468,
+        "pattern": "/isAgencyOwner/",
+        "code": "{(isAgencyOwner || hasStaffPermission(\"TEAM\", \"view\")) && ("
+      },
+      {
+        "file": "src/app/(dashboard)/settings/page.tsx",
+        "line": 1318,
+        "pattern": "/isAgencyOwner/",
+        "code": "(isAgencyOwner || hasStaffPermission(\"TEAM\", \"view\")) ? ("
+      },
+      {
+        "file": "src/app/(dashboard)/settings/page.tsx",
+        "line": 1321,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/subscription/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/subscription/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/subscription/page.tsx",
+        "line": 155,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/subscription/page.tsx",
+        "line": 156,
+        "pattern": "/isAgencyOwner/",
+        "code": "const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission(\"SUBSCRIPTION\", \"view\"));"
+      },
+      {
+        "file": "src/app/(dashboard)/subscription/page.tsx",
+        "line": 211,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/suppliers/new/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/suppliers/new/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/suppliers/new/page.tsx",
+        "line": 35,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/suppliers/new/page.tsx",
+        "line": 37,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"SUPPLIERS\", \"create\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/suppliers/new/page.tsx",
+        "line": 40,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/suppliers/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/suppliers/page.tsx",
+        "line": 9,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/suppliers/page.tsx",
+        "line": 78,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/suppliers/page.tsx",
+        "line": 80,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"SUPPLIERS\", \"view\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/suppliers/page.tsx",
+        "line": 83,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/suppliers/[id]/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/suppliers/[id]/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/suppliers/[id]/page.tsx",
+        "line": 93,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/suppliers/[id]/page.tsx",
+        "line": 95,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"SUPPLIERS\", \"view\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/suppliers/[id]/page.tsx",
+        "line": 98,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/support/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/support/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/support/page.tsx",
+        "line": 31,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      },
+      {
+        "file": "src/app/(dashboard)/support/page.tsx",
+        "line": 83,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "currentUserRole: currentUser?.role || \"AGENCY_OWNER\","
+      },
+      {
+        "file": "src/app/(dashboard)/support/page.tsx",
+        "line": 243,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "const isMe = msg.senderRole === \"AGENCY_OWNER\";"
+      }
+    ],
+    "src/app/(dashboard)/trips/new/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/trips/new/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/new/page.tsx",
+        "line": 70,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/trips/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/trips/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/page.tsx",
+        "line": 200,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/trips/[id]/costing/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/trips/[id]/costing/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/costing/page.tsx",
+        "line": 34,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/costing/page.tsx",
+        "line": 35,
+        "pattern": "/isAgencyOwner/",
+        "code": "const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission(\"TRIP_COSTING\", \"view\"));"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/costing/page.tsx",
+        "line": 73,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/trips/[id]/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/trips/[id]/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/page.tsx",
+        "line": 111,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/page.tsx",
+        "line": 120,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/page.tsx",
+        "line": 1440,
+        "pattern": "/isAgencyOwner/",
+        "code": "].filter((tab) => tab.id !== \"costing\" || isAgencyOwner).map((tab) => {"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/page.tsx",
+        "line": 2152,
+        "pattern": "/isAgencyOwner/",
+        "code": "{activeTab === \"costing\" && isAgencyOwner && ("
+      }
+    ],
+    "src/app/(dashboard)/trips/[id]/quotation/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+        "line": 88,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+        "line": 180,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || (!hasStaffPermission(\"QUOTATIONS\", \"view\") && !hasStaffPermission(\"QUOTATION_DETAIL\", \"view\")))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+        "line": 207,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || (!hasStaffPermission(\"QUOTATIONS\", \"view\") && !hasStaffPermission(\"QUOTATION_DETAIL\", \"view\")))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+        "line": 756,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"QUOTATIONS\", \"view\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+        "line": 759,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx",
+        "line": 67,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx",
+        "line": 68,
+        "pattern": "/isAgencyOwner/",
+        "code": "const isViewAllowed = isAgencyOwner || (isAgencyStaff && (hasStaffPermission(\"QUOTATIONS\", \"view\") || hasStaffPermission(\"QUOTATION_DETAIL\", \"view\")));"
+      },
+      {
+        "file": "src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx",
+        "line": 278,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/vehicles/new/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/vehicles/new/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/vehicles/new/page.tsx",
+        "line": 43,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/app/(dashboard)/vehicles/new/page.tsx",
+        "line": 45,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"VEHICLES\", \"create\"))) {"
+      },
+      {
+        "file": "src/app/(dashboard)/vehicles/new/page.tsx",
+        "line": 48,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/vehicles/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/vehicles/page.tsx",
+        "line": 4,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/vehicles/page.tsx",
+        "line": 56,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "<OwnerRestrictedCard"
+      }
+    ],
+    "src/app/(dashboard)/vehicles/[id]/page.tsx": [
+      {
+        "file": "src/app/(dashboard)/vehicles/[id]/page.tsx",
+        "line": 3,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+      },
+      {
+        "file": "src/app/(dashboard)/vehicles/[id]/page.tsx",
+        "line": 53,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      }
+    ],
+    "src/app/api/auth/me/route.ts": [
+      {
+        "file": "src/app/api/auth/me/route.ts",
+        "line": 55,
+        "pattern": "/isAgencyOwner/",
+        "code": "isAgencyOwner: context.isAgencyOwner,"
+      }
+    ],
+    "src/app/api/bookings/[id]/route.ts": [
+      {
+        "file": "src/app/api/bookings/[id]/route.ts",
+        "line": 96,
+        "pattern": "/Owner Only/i",
+        "code": "* Agency Owner only. Destructive deletion is restricted to Agency Owners."
+      }
+    ],
+    "src/app/api/customers/[id]/route.ts": [
+      {
+        "file": "src/app/api/customers/[id]/route.ts",
+        "line": 98,
+        "pattern": "/Owner Only/i",
+        "code": "* Agency Owner only. Destructive deletion is restricted to Agency Owners."
+      }
+    ],
+    "src/app/api/enquiries/[id]/route.ts": [
+      {
+        "file": "src/app/api/enquiries/[id]/route.ts",
+        "line": 94,
+        "pattern": "/Owner Only/i",
+        "code": "* Soft delete / archive enquiry. Agency Owner only."
+      }
+    ],
+    "src/app/api/payments/[id]/route.ts": [
+      {
+        "file": "src/app/api/payments/[id]/route.ts",
+        "line": 61,
+        "pattern": "/Owner Only/i",
+        "code": "* Agency Owner only. Staff cannot modify existing payment records."
+      },
+      {
+        "file": "src/app/api/payments/[id]/route.ts",
+        "line": 80,
+        "pattern": "/Owner Only/i",
+        "code": "* Agency Owner only. Destructive deletion is restricted to Agency Owners."
+      }
+    ],
+    "src/app/api/payments/[id]/verify/route.ts": [
+      {
+        "file": "src/app/api/payments/[id]/verify/route.ts",
+        "line": 18,
+        "pattern": "/Owner Only/i",
+        "code": "* Agency Owner only. Updates status to COMPLETED, recalculates booking balance, and sends customer receipt."
+      }
+    ],
+    "src/app/api/payments/[id]/void/route.ts": [
+      {
+        "file": "src/app/api/payments/[id]/void/route.ts",
+        "line": 24,
+        "pattern": "/Owner Only/i",
+        "code": "* Agency Owner only. Internal notification only, zero customer-facing notification."
+      }
+    ],
+    "src/app/api/quotations/[id]/route.ts": [
+      {
+        "file": "src/app/api/quotations/[id]/route.ts",
+        "line": 73,
+        "pattern": "/Owner Only/i",
+        "code": "* Agency Owner only. Destructive deletion is strictly restricted to Agency Owners."
+      }
+    ],
+    "src/app/api/team/invitations/route.ts": [
+      {
+        "file": "src/app/api/team/invitations/route.ts",
+        "line": 18,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (context.dbUser.role !== \"AGENCY_OWNER\") {"
+      }
+    ],
+    "src/app/api/team/invitations/[id]/resend/route.ts": [
+      {
+        "file": "src/app/api/team/invitations/[id]/resend/route.ts",
+        "line": 20,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (authContext.dbUser.role !== \"AGENCY_OWNER\") {"
+      }
+    ],
+    "src/app/api/team/invitations/[id]/revoke/route.ts": [
+      {
+        "file": "src/app/api/team/invitations/[id]/revoke/route.ts",
+        "line": 20,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (authContext.dbUser.role !== \"AGENCY_OWNER\") {"
+      }
+    ],
+    "src/app/api/team/members/[id]/permissions/route.ts": [
+      {
+        "file": "src/app/api/team/members/[id]/permissions/route.ts",
+        "line": 27,
+        "pattern": "/Owner Only/i",
+        "code": "* Agency Owner only."
+      },
+      {
+        "file": "src/app/api/team/members/[id]/permissions/route.ts",
+        "line": 48,
+        "pattern": "/Owner Only/i",
+        "code": "* Agency Owner only."
+      },
+      {
+        "file": "src/app/api/team/members/[id]/permissions/route.ts",
+        "line": 76,
+        "pattern": "/Owner Only/i",
+        "code": "* Agency Owner only."
+      }
+    ],
+    "src/app/api/trips/[id]/route.ts": [
+      {
+        "file": "src/app/api/trips/[id]/route.ts",
+        "line": 96,
+        "pattern": "/Owner Only/i",
+        "code": "* Agency Owner only. Destructive deletion is restricted to Agency Owners."
+      }
+    ],
+    "src/components/dashboard/revenue-chart.tsx": [
+      {
+        "file": "src/components/dashboard/revenue-chart.tsx",
+        "line": 24,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner } = useAuth();"
+      },
+      {
+        "file": "src/components/dashboard/revenue-chart.tsx",
+        "line": 202,
+        "pattern": "/isAgencyOwner/",
+        "code": "{isAgencyOwner && ("
+      }
+    ],
+    "src/components/layout/mobile-nav.tsx": [
+      {
+        "file": "src/components/layout/mobile-nav.tsx",
+        "line": 35,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isPlatformOwner, isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/components/layout/mobile-nav.tsx",
+        "line": 121,
+        "pattern": "/ownerOnly/",
+        "code": "if (item.ownerOnly && !isAgencyOwner && !isPlatformOwner) return false;"
+      },
+      {
+        "file": "src/components/layout/mobile-nav.tsx",
+        "line": 142,
+        "pattern": "/ownerOnly/",
+        "code": "const isOwnerRestricted = !isPlatform && !isAgencyOwner && Boolean(item.ownerOnly);"
+      }
+    ],
+    "src/components/layout/sidebar.tsx": [
+      {
+        "file": "src/components/layout/sidebar.tsx",
+        "line": 25,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isPlatformOwner, isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/components/layout/sidebar.tsx",
+        "line": 84,
+        "pattern": "/ownerOnly/",
+        "code": "if (item.ownerOnly && !isAgencyOwner && !isPlatformOwner) return false;"
+      },
+      {
+        "file": "src/components/layout/sidebar.tsx",
+        "line": 105,
+        "pattern": "/ownerOnly/",
+        "code": "const isOwnerRestricted = !isPlatform && !isAgencyOwner && Boolean(item.ownerOnly);"
+      }
+    ],
+    "src/components/shared/owner-restricted-card.tsx": [
+      {
+        "file": "src/components/shared/owner-restricted-card.tsx",
+        "line": 8,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "interface OwnerRestrictedCardProps {"
+      },
+      {
+        "file": "src/components/shared/owner-restricted-card.tsx",
+        "line": 14,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "export function OwnerRestrictedCard({"
+      },
+      {
+        "file": "src/components/shared/owner-restricted-card.tsx",
+        "line": 18,
+        "pattern": "/OwnerRestrictedCard/",
+        "code": "}: OwnerRestrictedCardProps) {"
+      }
+    ],
+    "src/components/team/staff-permissions-modal.tsx": [
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 17,
+        "pattern": "/IMMUTABLE_OWNER_ONLY_MODULES/",
+        "code": "IMMUTABLE_OWNER_ONLY_MODULES,"
+      },
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 146,
+        "pattern": "/isOwnerOnly/",
+        "code": "if (!page.isOwnerOnly) {"
+      },
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 162,
+        "pattern": "/isOwnerOnly/",
+        "code": "if (!page.isOwnerOnly) {"
+      },
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 185,
+        "pattern": "/isOwnerOnly/",
+        "code": "if (!page.isOwnerOnly) {"
+      },
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 206,
+        "pattern": "/isOwnerOnly/",
+        "code": "if (page.isOwnerOnly) return;"
+      },
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 436,
+        "pattern": "/isOwnerOnly/",
+        "code": "page.isOwnerOnly"
+      },
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 452,
+        "pattern": "/isOwnerOnly/",
+        "code": "{page.isOwnerOnly && ("
+      },
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 468,
+        "pattern": "/isOwnerOnly/",
+        "code": "{page.isOwnerOnly ? ("
+      },
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 489,
+        "pattern": "/isOwnerOnly/",
+        "code": "{page.isOwnerOnly ? ("
+      },
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 536,
+        "pattern": "/isOwnerOnly/",
+        "code": "{page.isOwnerOnly ? ("
+      },
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 583,
+        "pattern": "/isOwnerOnly/",
+        "code": "{page.isOwnerOnly || !isDeleteDelegable ? ("
+      },
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 589,
+        "pattern": "/Owner Only/i",
+        "code": "Owner Only"
+      },
+      {
+        "file": "src/components/team/staff-permissions-modal.tsx",
+        "line": 619,
+        "pattern": "/isOwnerOnly/",
+        "code": "{page.isOwnerOnly ? ("
+      }
+    ],
+    "src/components/team/team-management-panel.tsx": [
+      {
+        "file": "src/components/team/team-management-panel.tsx",
+        "line": 64,
+        "pattern": "/isAgencyOwner/",
+        "code": "const { isAgencyOwner, hasStaffPermission } = useAuth();"
+      },
+      {
+        "file": "src/components/team/team-management-panel.tsx",
+        "line": 65,
+        "pattern": "/isAgencyOwner/",
+        "code": "const canInvite = isAgencyOwner || hasStaffPermission(\"TEAM\", \"create\");"
+      },
+      {
+        "file": "src/components/team/team-management-panel.tsx",
+        "line": 66,
+        "pattern": "/isAgencyOwner/",
+        "code": "const canUpdate = isAgencyOwner || hasStaffPermission(\"TEAM\", \"update\");"
+      },
+      {
+        "file": "src/components/team/team-management-panel.tsx",
+        "line": 67,
+        "pattern": "/isAgencyOwner/",
+        "code": "const canDelete = isAgencyOwner || hasStaffPermission(\"TEAM\", \"delete\");"
+      },
+      {
+        "file": "src/components/team/team-management-panel.tsx",
+        "line": 270,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "{members.filter((m) => m.role === \"AGENCY_OWNER\").length} Owner(s) •{\" \"}"
+      },
+      {
+        "file": "src/components/team/team-management-panel.tsx",
+        "line": 343,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "const isOwner = member.role === \"AGENCY_OWNER\";"
+      },
+      {
+        "file": "src/components/team/team-management-panel.tsx",
+        "line": 386,
+        "pattern": "/isAgencyOwner/",
+        "code": "{!isOwner && isAgencyOwner && ("
+      }
+    ],
+    "src/context/auth-context.tsx": [
+      {
+        "file": "src/context/auth-context.tsx",
+        "line": 12,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "export type PlatformRole = \"PLATFORM_OWNER\" | \"AGENCY_OWNER\" | \"AGENCY_STAFF\" | \"TRIPDESK_OWNER\";"
+      },
+      {
+        "file": "src/context/auth-context.tsx",
+        "line": 61,
+        "pattern": "/isAgencyOwner/",
+        "code": "isAgencyOwner: boolean;"
+      },
+      {
+        "file": "src/context/auth-context.tsx",
+        "line": 78,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "role: \"AGENCY_OWNER\","
+      },
+      {
+        "file": "src/context/auth-context.tsx",
+        "line": 242,
+        "pattern": "/isAgencyOwner/",
+        "code": "const isAgencyOwner = currentUser.role === \"AGENCY_OWNER\" && !isPlatformOwner;"
+      },
+      {
+        "file": "src/context/auth-context.tsx",
+        "line": 247,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (currentUser.role === \"AGENCY_OWNER\") return true;"
+      },
+      {
+        "file": "src/context/auth-context.tsx",
+        "line": 268,
+        "pattern": "/isAgencyOwner/",
+        "code": "isAgencyOwner,"
+      }
+    ],
+    "src/hooks/use-platform-chat.ts": [
+      {
+        "file": "src/hooks/use-platform-chat.ts",
+        "line": 21,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "currentUserRole?: \"PLATFORM_OWNER\" | \"AGENCY_OWNER\" | string;"
+      }
+    ],
+    "src/lib/api/context.ts": [
+      {
+        "file": "src/lib/api/context.ts",
+        "line": 42,
+        "pattern": "/isAgencyOwner/",
+        "code": "isAgencyOwner: boolean;"
+      },
+      {
+        "file": "src/lib/api/context.ts",
+        "line": 112,
+        "pattern": "/isAgencyOwner/",
+        "code": "const isAgencyOwner = dbUser.role === UserRole.AGENCY_OWNER && !!dbUser.agencyId;"
+      },
+      {
+        "file": "src/lib/api/context.ts",
+        "line": 114,
+        "pattern": "/isAgencyOwner/",
+        "code": "const isSuspendedAgency = (isAgencyOwner || isAgencyStaff) && agency?.status === AgencyStatus.SUSPENDED;"
+      },
+      {
+        "file": "src/lib/api/context.ts",
+        "line": 135,
+        "pattern": "/isAgencyOwner/",
+        "code": "} else if (isAgencyOwner || isAgencyStaff) {"
+      },
+      {
+        "file": "src/lib/api/context.ts",
+        "line": 167,
+        "pattern": "/isAgencyOwner/",
+        "code": "isAgencyOwner,"
+      },
+      {
+        "file": "src/lib/api/context.ts",
+        "line": 195,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!context.isAgencyOwner || !context.agency || !context.dbUser.agencyId) {"
+      },
+      {
+        "file": "src/lib/api/context.ts",
+        "line": 272,
+        "pattern": "/isAgencyOwner/",
+        "code": "if ((!context.isAgencyOwner && !context.isAgencyStaff) || !context.agency || !context.dbUser.agencyId) {"
+      }
+    ],
+    "src/lib/auth/index.ts": [
+      {
+        "file": "src/lib/auth/index.ts",
+        "line": 15,
+        "pattern": "/isAgencyOwner/",
+        "code": "isAgencyOwner: boolean;"
+      },
+      {
+        "file": "src/lib/auth/index.ts",
+        "line": 70,
+        "pattern": "/isAgencyOwner/",
+        "code": "const isAgencyOwner = dbUser.role === \"AGENCY_OWNER\" && !!dbUser.agencyId;"
+      },
+      {
+        "file": "src/lib/auth/index.ts",
+        "line": 92,
+        "pattern": "/isAgencyOwner/",
+        "code": "} else if (isAgencyOwner || isAgencyStaff) {"
+      },
+      {
+        "file": "src/lib/auth/index.ts",
+        "line": 107,
+        "pattern": "/isAgencyOwner/",
+        "code": "isAgencyOwner,"
+      },
+      {
+        "file": "src/lib/auth/index.ts",
+        "line": 146,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "* Server-side guard: Ensures the user is an AGENCY_OWNER with a valid agency."
+      },
+      {
+        "file": "src/lib/auth/index.ts",
+        "line": 157,
+        "pattern": "/isAgencyOwner/",
+        "code": "if (!auth.isAgencyOwner || !auth.agency) {"
+      },
+      {
+        "file": "src/lib/auth/index.ts",
+        "line": 164,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "* Server-side guard: Ensures the user is an AGENCY_OWNER or AGENCY_STAFF with a valid agency."
+      },
+      {
+        "file": "src/lib/auth/index.ts",
+        "line": 175,
+        "pattern": "/isAgencyOwner/",
+        "code": "if ((!auth.isAgencyOwner && !auth.isAgencyStaff) || !auth.agency) {"
+      }
+    ],
+    "src/lib/auth/permissions.ts": [
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 5,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "* Differentiates PLATFORM_OWNER (SaaS admin), AGENCY_OWNER (tenant administrator),"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 9,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "export type AppRole = \"PLATFORM_OWNER\" | \"AGENCY_OWNER\" | \"AGENCY_STAFF\";"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 63,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "AGENCY_OWNER: {"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 184,
+        "pattern": "/IMMUTABLE_OWNER_ONLY_MODULES/",
+        "code": "export const IMMUTABLE_OWNER_ONLY_MODULES = new Set<string>([]);"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 198,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: boolean;"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 200,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: string[];"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 216,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 218,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [\"export\"],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 227,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 229,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 238,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 240,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 249,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 251,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [\"export\"],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 260,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 262,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 271,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 273,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 282,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 284,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 295,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 297,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 306,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 308,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 317,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 319,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 328,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 330,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [\"commercialMargins\"],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 339,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 341,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [\"commercialMargins\"],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 350,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 352,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 361,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 363,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 372,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 374,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 383,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 385,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 394,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 396,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 406,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 408,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [\"commercialMargins\"],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 419,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 421,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 430,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 432,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 441,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 443,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 452,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 454,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 463,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 465,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 471,
+        "pattern": "/Owner Only/i",
+        "code": "description: \"Supplier contacts, directory profiles, and service listings (unredacted ledger is Owner Only)\","
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 474,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 476,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 484,
+        "pattern": "/Owner Only/i",
+        "code": "description: \"View customer receipts and record pending receipts (verification is Owner Only)\","
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 487,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 489,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [\"verify\", \"void\", \"delete\"],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 498,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 500,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 509,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 511,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [\"commercialMargins\", \"supplierDisbursements\", \"delete\"],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 522,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 524,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 533,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 535,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 544,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 546,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 555,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 557,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 565,
+        "pattern": "/Owner Only/i",
+        "code": "description: \"Company profile, communication templates, and GST settings (team management is Owner Only)\","
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 568,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 570,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [\"teamManagement\", \"legalTaxProfile\"],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 576,
+        "pattern": "/Owner Only/i",
+        "code": "description: \"Plan tiers, usage entitlements, and billing renewals (plan purchase & upgrades are Owner Only)\","
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 579,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 581,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [\"purchaseUpgrade\", \"manage\"],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 587,
+        "pattern": "/Owner Only/i",
+        "code": "description: \"Agency staff directory and onboarding invitations (modifying staff permissions & removing staff are Owner Only)\","
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 590,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 592,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [\"managePermissions\", \"transferOwnership\"],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 601,
+        "pattern": "/isOwnerOnly/",
+        "code": "isOwnerOnly: false,"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 603,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnlyActions: [],"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 614,
+        "pattern": "/isOwnerOnly/",
+        "code": "if (!page.isOwnerOnly) {"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 642,
+        "pattern": "/IMMUTABLE_OWNER_ONLY_MODULES/",
+        "code": "if (IMMUTABLE_OWNER_ONLY_MODULES.has(cleanKey)) {"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 803,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (normalizedRole === \"AGENCY_OWNER\") {"
+      },
+      {
+        "file": "src/lib/auth/permissions.ts",
+        "line": 816,
+        "pattern": "/IMMUTABLE_OWNER_ONLY_MODULES/",
+        "code": "if (IMMUTABLE_OWNER_ONLY_MODULES.has(normalizedModule)) {"
+      }
+    ],
+    "src/lib/navigation.ts": [
+      {
+        "file": "src/lib/navigation.ts",
+        "line": 35,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnly?: boolean;"
+      },
+      {
+        "file": "src/lib/navigation.ts",
+        "line": 222,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnly: true,"
+      },
+      {
+        "file": "src/lib/navigation.ts",
+        "line": 267,
+        "pattern": "/ownerOnly/",
+        "code": "ownerOnly: true,"
+      }
+    ],
+    "src/lib/services/admin-service.ts": [
+      {
+        "file": "src/lib/services/admin-service.ts",
+        "line": 253,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "prisma.user.count({ where: { role: UserRole.AGENCY_OWNER } }),"
+      },
+      {
+        "file": "src/lib/services/admin-service.ts",
+        "line": 265,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "users: { where: { role: UserRole.AGENCY_OWNER }, take: 1 },"
+      },
+      {
+        "file": "src/lib/services/admin-service.ts",
+        "line": 401,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "where: { role: UserRole.AGENCY_OWNER },"
+      },
+      {
+        "file": "src/lib/services/admin-service.ts",
+        "line": 494,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "where: { role: UserRole.AGENCY_OWNER },"
+      },
+      {
+        "file": "src/lib/services/admin-service.ts",
+        "line": 1568,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "role: UserRole.AGENCY_OWNER,"
+      }
+    ],
+    "src/lib/services/internal-notification-service.ts": [
+      {
+        "file": "src/lib/services/internal-notification-service.ts",
+        "line": 141,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "* Notify the AGENCY_OWNER(s) of a specific agency"
+      },
+      {
+        "file": "src/lib/services/internal-notification-service.ts",
+        "line": 158,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "where: { agencyId, role: UserRole.AGENCY_OWNER },"
+      },
+      {
+        "file": "src/lib/services/internal-notification-service.ts",
+        "line": 168,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "role: UserRole.AGENCY_OWNER,"
+      },
+      {
+        "file": "src/lib/services/internal-notification-service.ts",
+        "line": 185,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "* Broadcast an internal notification to all active AGENCY_OWNER users (e.g. Platform Announcements)"
+      },
+      {
+        "file": "src/lib/services/internal-notification-service.ts",
+        "line": 200,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "role: UserRole.AGENCY_OWNER,"
+      },
+      {
+        "file": "src/lib/services/internal-notification-service.ts",
+        "line": 213,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "role: UserRole.AGENCY_OWNER,"
+      }
+    ],
+    "src/lib/services/invitation-service.ts": [
+      {
+        "file": "src/lib/services/invitation-service.ts",
+        "line": 137,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "* 1. Actor must be an AGENCY_OWNER."
+      },
+      {
+        "file": "src/lib/services/invitation-service.ts",
+        "line": 149,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (actor.role !== \"AGENCY_OWNER\") {"
+      },
+      {
+        "file": "src/lib/services/invitation-service.ts",
+        "line": 284,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (actor.role !== \"AGENCY_OWNER\") {"
+      },
+      {
+        "file": "src/lib/services/invitation-service.ts",
+        "line": 342,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (actor.role !== \"AGENCY_OWNER\") {"
+      }
+    ],
+    "src/lib/services/onboarding-service.ts": [
+      {
+        "file": "src/lib/services/onboarding-service.ts",
+        "line": 71,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (existingUser.role !== \"AGENCY_OWNER\") {"
+      },
+      {
+        "file": "src/lib/services/onboarding-service.ts",
+        "line": 72,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "console.error(`User ${existingUser.email} has role ${existingUser.role}; cannot onboard or re-link as AGENCY_OWNER.`);"
+      },
+      {
+        "file": "src/lib/services/onboarding-service.ts",
+        "line": 204,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (existingInTx.role !== \"AGENCY_OWNER\") {"
+      },
+      {
+        "file": "src/lib/services/onboarding-service.ts",
+        "line": 214,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "role: \"AGENCY_OWNER\","
+      },
+      {
+        "file": "src/lib/services/onboarding-service.ts",
+        "line": 226,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "role: \"AGENCY_OWNER\","
+      }
+    ],
+    "src/lib/services/platform-chat-service.ts": [
+      {
+        "file": "src/lib/services/platform-chat-service.ts",
+        "line": 59,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "where: { role: UserRole.AGENCY_OWNER },"
+      },
+      {
+        "file": "src/lib/services/platform-chat-service.ts",
+        "line": 176,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "where: { role: UserRole.AGENCY_OWNER },"
+      },
+      {
+        "file": "src/lib/services/platform-chat-service.ts",
+        "line": 384,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "...(senderRole === UserRole.AGENCY_OWNER"
+      },
+      {
+        "file": "src/lib/services/platform-chat-service.ts",
+        "line": 399,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (senderRole === UserRole.AGENCY_OWNER) {"
+      },
+      {
+        "file": "src/lib/services/platform-chat-service.ts",
+        "line": 435,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "...(role === UserRole.AGENCY_OWNER"
+      },
+      {
+        "file": "src/lib/services/platform-chat-service.ts",
+        "line": 458,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "lastMessageSenderRole: UserRole.AGENCY_OWNER,"
+      },
+      {
+        "file": "src/lib/services/platform-chat-service.ts",
+        "line": 473,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (params.role === UserRole.AGENCY_OWNER && params.agencyId) {"
+      },
+      {
+        "file": "src/lib/services/platform-chat-service.ts",
+        "line": 517,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "conv.lastMessageSenderRole === UserRole.AGENCY_OWNER && lastMsgTime > platformReadTime;"
+      }
+    ],
+    "src/lib/services/staff-permission-service.ts": [
+      {
+        "file": "src/lib/services/staff-permission-service.ts",
+        "line": 239,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "if (role === \"AGENCY_OWNER\") return true;"
+      }
+    ],
+    "src/lib/validation/invitation-schema.ts": [
+      {
+        "file": "src/lib/validation/invitation-schema.ts",
+        "line": 6,
+        "pattern": "/AGENCY_OWNER/",
+        "code": "* Agency owners cannot invite PLATFORM_OWNER or AGENCY_OWNER."
+      }
+    ]
+  },
+  "results": [
+    {
+      "file": "src/actions/auth-actions.ts",
+      "line": 194,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "// Agency User (AGENCY_OWNER, etc.)"
+    },
+    {
+      "file": "src/app/(dashboard)/activities/new/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/activities/new/page.tsx",
+      "line": 32,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/activities/new/page.tsx",
+      "line": 34,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"ACTIVITIES\", \"create\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/activities/new/page.tsx",
+      "line": 37,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/activities/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/activities/page.tsx",
+      "line": 56,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/activities/[id]/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/activities/[id]/page.tsx",
+      "line": 45,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/bookings/new/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/bookings/new/page.tsx",
+      "line": 47,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/bookings/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/bookings/page.tsx",
+      "line": 76,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/bookings/[id]/page.tsx",
+      "line": 9,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/bookings/[id]/page.tsx",
+      "line": 158,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/communications/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/communications/page.tsx",
+      "line": 140,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/customer-insights/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/customer-insights/page.tsx",
+      "line": 31,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/customer-insights/page.tsx",
+      "line": 33,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"CUSTOMER_INSIGHTS\", \"view\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/customer-insights/page.tsx",
+      "line": 36,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/customers/new/page.tsx",
+      "line": 5,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/customers/new/page.tsx",
+      "line": 63,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/customers/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/customers/page.tsx",
+      "line": 87,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/customers/[id]/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/customers/[id]/page.tsx",
+      "line": 131,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/dashboard/page.tsx",
+      "line": 45,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/dashboard/page.tsx",
+      "line": 105,
+      "pattern": "/isAgencyOwner/",
+      "code": "isAgencyOwner ? dashboardClient.getFinance(filter) : Promise.resolve(null),"
+    },
+    {
+      "file": "src/app/(dashboard)/dashboard/page.tsx",
+      "line": 135,
+      "pattern": "/isAgencyOwner/",
+      "code": "[preset, startDate, endDate, isAgencyOwner]"
+    },
+    {
+      "file": "src/app/(dashboard)/dashboard/page.tsx",
+      "line": 268,
+      "pattern": "/isAgencyOwner/",
+      "code": "{isAgencyOwner && ("
+    },
+    {
+      "file": "src/app/(dashboard)/destinations/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/destinations/page.tsx",
+      "line": 66,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/documents/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/documents/page.tsx",
+      "line": 92,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/enquiries/new/page.tsx",
+      "line": 35,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/enquiries/new/page.tsx",
+      "line": 120,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/enquiries/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/enquiries/page.tsx",
+      "line": 97,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/enquiries/[id]/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/enquiries/[id]/page.tsx",
+      "line": 89,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/feedback/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/feedback/page.tsx",
+      "line": 49,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/feedback/page.tsx",
+      "line": 58,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/feedback/page.tsx",
+      "line": 59,
+      "pattern": "/isAgencyOwner/",
+      "code": "const canManageSettings = isAgencyOwner || (isAgencyStaff && hasStaffPermission(\"FEEDBACK\", \"update\"));"
+    },
+    {
+      "file": "src/app/(dashboard)/feedback/page.tsx",
+      "line": 143,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (isAgencyOwner) {"
+    },
+    {
+      "file": "src/app/(dashboard)/feedback/page.tsx",
+      "line": 147,
+      "pattern": "/isAgencyOwner/",
+      "code": "}, [isAllowed, fetchFeedbacks, fetchSettings, isAgencyOwner]);"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/page.tsx",
+      "line": 43,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/page.tsx",
+      "line": 45,
+      "pattern": "/isAgencyOwner/",
+      "code": "const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission(\"FINANCE\", \"view\"));"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/page.tsx",
+      "line": 50,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/page.tsx",
+      "line": 264,
+      "pattern": "/isAgencyOwner/",
+      "code": "{isAgencyOwner ? ("
+    },
+    {
+      "file": "src/app/(dashboard)/finance/page.tsx",
+      "line": 279,
+      "pattern": "/isAgencyOwner/",
+      "code": "supplierPayables={isAgencyOwner ? data.supplierPayables : { totalOutstanding: 0, overdueCount: 0, overdueAmount: 0, items: [] }}"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/page.tsx",
+      "line": 281,
+      "pattern": "/isAgencyOwner/",
+      "code": "onRecordSupplierPayment={isAgencyOwner ? handleRecordSupplierPayment : () => {}}"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/page.tsx",
+      "line": 282,
+      "pattern": "/isAgencyOwner/",
+      "code": "onRecordPayable={isAgencyOwner ? handleRecordPayable : () => {}}"
+    },
+    {
+      "file": "src/app/(dashboard)/finance/page.tsx",
+      "line": 283,
+      "pattern": "/isAgencyOwner/",
+      "code": "onEditPayable={isAgencyOwner ? handleEditPayable : () => {}}"
+    },
+    {
+      "file": "src/app/(dashboard)/follow-ups/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/follow-ups/page.tsx",
+      "line": 105,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/hotels/new/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/hotels/new/page.tsx",
+      "line": 43,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/hotels/new/page.tsx",
+      "line": 45,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"HOTELS\", \"create\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/hotels/new/page.tsx",
+      "line": 48,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/hotels/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/hotels/page.tsx",
+      "line": 69,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/hotels/[id]/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/hotels/[id]/page.tsx",
+      "line": 56,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/invoices/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/invoices/page.tsx",
+      "line": 13,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/invoices/page.tsx",
+      "line": 15,
+      "pattern": "/isAgencyOwner/",
+      "code": "const isAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission(\"INVOICES\", \"view\"));"
+    },
+    {
+      "file": "src/app/(dashboard)/invoices/page.tsx",
+      "line": 26,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+      "line": 45,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+      "line": 47,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"OPERATIONS\", \"view\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+      "line": 50,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+      "line": 105,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"OPERATIONS\", \"export\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/analytics/page.tsx",
+      "line": 232,
+      "pattern": "/isAgencyOwner/",
+      "code": "{isAgencyOwner ? ("
+    },
+    {
+      "file": "src/app/(dashboard)/operations/issues/page.tsx",
+      "line": 8,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/issues/page.tsx",
+      "line": 63,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/page.tsx",
+      "line": 50,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/[tripId]/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/[tripId]/page.tsx",
+      "line": 90,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/[tripId]/page.tsx",
+      "line": 428,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"OPERATIONS\", \"view\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/operations/[tripId]/page.tsx",
+      "line": 431,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/payments/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/payments/page.tsx",
+      "line": 102,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/payments/page.tsx",
+      "line": 107,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/payments/page.tsx",
+      "line": 167,
+      "pattern": "/isAgencyOwner/",
+      "code": "const suppPromise = isAgencyOwner"
+    },
+    {
+      "file": "src/app/(dashboard)/payments/page.tsx",
+      "line": 189,
+      "pattern": "/isAgencyOwner/",
+      "code": "}, [debouncedSearch, isAgencyOwner]);"
+    },
+    {
+      "file": "src/app/(dashboard)/quotations/new/page.tsx",
+      "line": 23,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/quotations/new/page.tsx",
+      "line": 42,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/quotations/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/quotations/page.tsx",
+      "line": 120,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/rate-sheets/new/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/rate-sheets/new/page.tsx",
+      "line": 39,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/rate-sheets/new/page.tsx",
+      "line": 41,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"RATE_SHEETS\", \"create\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/rate-sheets/new/page.tsx",
+      "line": 44,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/rate-sheets/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/rate-sheets/page.tsx",
+      "line": 57,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/rate-sheets/page.tsx",
+      "line": 59,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"RATE_SHEETS\", \"view\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/rate-sheets/page.tsx",
+      "line": 62,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/rate-sheets/[id]/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/rate-sheets/[id]/page.tsx",
+      "line": 51,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/rate-sheets/[id]/page.tsx",
+      "line": 53,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"RATE_SHEETS\", \"view\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/rate-sheets/[id]/page.tsx",
+      "line": 56,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/referrals/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/referrals/page.tsx",
+      "line": 52,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/reports/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/reports/page.tsx",
+      "line": 51,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/reports/page.tsx",
+      "line": 53,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"REPORTS\", \"view\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/reports/page.tsx",
+      "line": 56,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/page.tsx",
+      "line": 54,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/page.tsx",
+      "line": 56,
+      "pattern": "/isAgencyOwner/",
+      "code": "const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission(\"SETTINGS\", \"view\"));"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/page.tsx",
+      "line": 61,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/settings/page.tsx",
+      "line": 468,
+      "pattern": "/isAgencyOwner/",
+      "code": "{(isAgencyOwner || hasStaffPermission(\"TEAM\", \"view\")) && ("
+    },
+    {
+      "file": "src/app/(dashboard)/settings/page.tsx",
+      "line": 1318,
+      "pattern": "/isAgencyOwner/",
+      "code": "(isAgencyOwner || hasStaffPermission(\"TEAM\", \"view\")) ? ("
+    },
+    {
+      "file": "src/app/(dashboard)/settings/page.tsx",
+      "line": 1321,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/subscription/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/subscription/page.tsx",
+      "line": 155,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/subscription/page.tsx",
+      "line": 156,
+      "pattern": "/isAgencyOwner/",
+      "code": "const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission(\"SUBSCRIPTION\", \"view\"));"
+    },
+    {
+      "file": "src/app/(dashboard)/subscription/page.tsx",
+      "line": 211,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/suppliers/new/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/suppliers/new/page.tsx",
+      "line": 35,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/suppliers/new/page.tsx",
+      "line": 37,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"SUPPLIERS\", \"create\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/suppliers/new/page.tsx",
+      "line": 40,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/suppliers/page.tsx",
+      "line": 9,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/suppliers/page.tsx",
+      "line": 78,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/suppliers/page.tsx",
+      "line": 80,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"SUPPLIERS\", \"view\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/suppliers/page.tsx",
+      "line": 83,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/suppliers/[id]/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/suppliers/[id]/page.tsx",
+      "line": 93,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/suppliers/[id]/page.tsx",
+      "line": 95,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"SUPPLIERS\", \"view\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/suppliers/[id]/page.tsx",
+      "line": 98,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/support/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/support/page.tsx",
+      "line": 31,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/support/page.tsx",
+      "line": 83,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "currentUserRole: currentUser?.role || \"AGENCY_OWNER\","
+    },
+    {
+      "file": "src/app/(dashboard)/support/page.tsx",
+      "line": 243,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "const isMe = msg.senderRole === \"AGENCY_OWNER\";"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/new/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/new/page.tsx",
+      "line": 70,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/page.tsx",
+      "line": 200,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/costing/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/costing/page.tsx",
+      "line": 34,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/costing/page.tsx",
+      "line": 35,
+      "pattern": "/isAgencyOwner/",
+      "code": "const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission(\"TRIP_COSTING\", \"view\"));"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/costing/page.tsx",
+      "line": 73,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/page.tsx",
+      "line": 111,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/page.tsx",
+      "line": 120,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/page.tsx",
+      "line": 1440,
+      "pattern": "/isAgencyOwner/",
+      "code": "].filter((tab) => tab.id !== \"costing\" || isAgencyOwner).map((tab) => {"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/page.tsx",
+      "line": 2152,
+      "pattern": "/isAgencyOwner/",
+      "code": "{activeTab === \"costing\" && isAgencyOwner && ("
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+      "line": 88,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+      "line": 180,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || (!hasStaffPermission(\"QUOTATIONS\", \"view\") && !hasStaffPermission(\"QUOTATION_DETAIL\", \"view\")))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+      "line": 207,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || (!hasStaffPermission(\"QUOTATIONS\", \"view\") && !hasStaffPermission(\"QUOTATION_DETAIL\", \"view\")))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+      "line": 756,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"QUOTATIONS\", \"view\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/quotation/page.tsx",
+      "line": 759,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx",
+      "line": 67,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx",
+      "line": 68,
+      "pattern": "/isAgencyOwner/",
+      "code": "const isViewAllowed = isAgencyOwner || (isAgencyStaff && (hasStaffPermission(\"QUOTATIONS\", \"view\") || hasStaffPermission(\"QUOTATION_DETAIL\", \"view\")));"
+    },
+    {
+      "file": "src/app/(dashboard)/trips/[id]/quotation/preview/page.tsx",
+      "line": 278,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/vehicles/new/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/vehicles/new/page.tsx",
+      "line": 43,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/(dashboard)/vehicles/new/page.tsx",
+      "line": 45,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission(\"VEHICLES\", \"create\"))) {"
+    },
+    {
+      "file": "src/app/(dashboard)/vehicles/new/page.tsx",
+      "line": 48,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/vehicles/page.tsx",
+      "line": 4,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/vehicles/page.tsx",
+      "line": 56,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "<OwnerRestrictedCard"
+    },
+    {
+      "file": "src/app/(dashboard)/vehicles/[id]/page.tsx",
+      "line": 3,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "import { OwnerRestrictedCard } from \"@/components/shared/owner-restricted-card\";"
+    },
+    {
+      "file": "src/app/(dashboard)/vehicles/[id]/page.tsx",
+      "line": 53,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/app/api/auth/me/route.ts",
+      "line": 55,
+      "pattern": "/isAgencyOwner/",
+      "code": "isAgencyOwner: context.isAgencyOwner,"
+    },
+    {
+      "file": "src/app/api/bookings/[id]/route.ts",
+      "line": 96,
+      "pattern": "/Owner Only/i",
+      "code": "* Agency Owner only. Destructive deletion is restricted to Agency Owners."
+    },
+    {
+      "file": "src/app/api/customers/[id]/route.ts",
+      "line": 98,
+      "pattern": "/Owner Only/i",
+      "code": "* Agency Owner only. Destructive deletion is restricted to Agency Owners."
+    },
+    {
+      "file": "src/app/api/enquiries/[id]/route.ts",
+      "line": 94,
+      "pattern": "/Owner Only/i",
+      "code": "* Soft delete / archive enquiry. Agency Owner only."
+    },
+    {
+      "file": "src/app/api/payments/[id]/route.ts",
+      "line": 61,
+      "pattern": "/Owner Only/i",
+      "code": "* Agency Owner only. Staff cannot modify existing payment records."
+    },
+    {
+      "file": "src/app/api/payments/[id]/route.ts",
+      "line": 80,
+      "pattern": "/Owner Only/i",
+      "code": "* Agency Owner only. Destructive deletion is restricted to Agency Owners."
+    },
+    {
+      "file": "src/app/api/payments/[id]/verify/route.ts",
+      "line": 18,
+      "pattern": "/Owner Only/i",
+      "code": "* Agency Owner only. Updates status to COMPLETED, recalculates booking balance, and sends customer receipt."
+    },
+    {
+      "file": "src/app/api/payments/[id]/void/route.ts",
+      "line": 24,
+      "pattern": "/Owner Only/i",
+      "code": "* Agency Owner only. Internal notification only, zero customer-facing notification."
+    },
+    {
+      "file": "src/app/api/quotations/[id]/route.ts",
+      "line": 73,
+      "pattern": "/Owner Only/i",
+      "code": "* Agency Owner only. Destructive deletion is strictly restricted to Agency Owners."
+    },
+    {
+      "file": "src/app/api/team/invitations/route.ts",
+      "line": 18,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (context.dbUser.role !== \"AGENCY_OWNER\") {"
+    },
+    {
+      "file": "src/app/api/team/invitations/[id]/resend/route.ts",
+      "line": 20,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (authContext.dbUser.role !== \"AGENCY_OWNER\") {"
+    },
+    {
+      "file": "src/app/api/team/invitations/[id]/revoke/route.ts",
+      "line": 20,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (authContext.dbUser.role !== \"AGENCY_OWNER\") {"
+    },
+    {
+      "file": "src/app/api/team/members/[id]/permissions/route.ts",
+      "line": 27,
+      "pattern": "/Owner Only/i",
+      "code": "* Agency Owner only."
+    },
+    {
+      "file": "src/app/api/team/members/[id]/permissions/route.ts",
+      "line": 48,
+      "pattern": "/Owner Only/i",
+      "code": "* Agency Owner only."
+    },
+    {
+      "file": "src/app/api/team/members/[id]/permissions/route.ts",
+      "line": 76,
+      "pattern": "/Owner Only/i",
+      "code": "* Agency Owner only."
+    },
+    {
+      "file": "src/app/api/trips/[id]/route.ts",
+      "line": 96,
+      "pattern": "/Owner Only/i",
+      "code": "* Agency Owner only. Destructive deletion is restricted to Agency Owners."
+    },
+    {
+      "file": "src/components/dashboard/revenue-chart.tsx",
+      "line": 24,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner } = useAuth();"
+    },
+    {
+      "file": "src/components/dashboard/revenue-chart.tsx",
+      "line": 202,
+      "pattern": "/isAgencyOwner/",
+      "code": "{isAgencyOwner && ("
+    },
+    {
+      "file": "src/components/layout/mobile-nav.tsx",
+      "line": 35,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isPlatformOwner, isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/components/layout/mobile-nav.tsx",
+      "line": 121,
+      "pattern": "/ownerOnly/",
+      "code": "if (item.ownerOnly && !isAgencyOwner && !isPlatformOwner) return false;"
+    },
+    {
+      "file": "src/components/layout/mobile-nav.tsx",
+      "line": 142,
+      "pattern": "/ownerOnly/",
+      "code": "const isOwnerRestricted = !isPlatform && !isAgencyOwner && Boolean(item.ownerOnly);"
+    },
+    {
+      "file": "src/components/layout/sidebar.tsx",
+      "line": 25,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isPlatformOwner, isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/components/layout/sidebar.tsx",
+      "line": 84,
+      "pattern": "/ownerOnly/",
+      "code": "if (item.ownerOnly && !isAgencyOwner && !isPlatformOwner) return false;"
+    },
+    {
+      "file": "src/components/layout/sidebar.tsx",
+      "line": 105,
+      "pattern": "/ownerOnly/",
+      "code": "const isOwnerRestricted = !isPlatform && !isAgencyOwner && Boolean(item.ownerOnly);"
+    },
+    {
+      "file": "src/components/shared/owner-restricted-card.tsx",
+      "line": 8,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "interface OwnerRestrictedCardProps {"
+    },
+    {
+      "file": "src/components/shared/owner-restricted-card.tsx",
+      "line": 14,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "export function OwnerRestrictedCard({"
+    },
+    {
+      "file": "src/components/shared/owner-restricted-card.tsx",
+      "line": 18,
+      "pattern": "/OwnerRestrictedCard/",
+      "code": "}: OwnerRestrictedCardProps) {"
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 17,
+      "pattern": "/IMMUTABLE_OWNER_ONLY_MODULES/",
+      "code": "IMMUTABLE_OWNER_ONLY_MODULES,"
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 146,
+      "pattern": "/isOwnerOnly/",
+      "code": "if (!page.isOwnerOnly) {"
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 162,
+      "pattern": "/isOwnerOnly/",
+      "code": "if (!page.isOwnerOnly) {"
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 185,
+      "pattern": "/isOwnerOnly/",
+      "code": "if (!page.isOwnerOnly) {"
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 206,
+      "pattern": "/isOwnerOnly/",
+      "code": "if (page.isOwnerOnly) return;"
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 436,
+      "pattern": "/isOwnerOnly/",
+      "code": "page.isOwnerOnly"
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 452,
+      "pattern": "/isOwnerOnly/",
+      "code": "{page.isOwnerOnly && ("
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 468,
+      "pattern": "/isOwnerOnly/",
+      "code": "{page.isOwnerOnly ? ("
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 489,
+      "pattern": "/isOwnerOnly/",
+      "code": "{page.isOwnerOnly ? ("
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 536,
+      "pattern": "/isOwnerOnly/",
+      "code": "{page.isOwnerOnly ? ("
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 583,
+      "pattern": "/isOwnerOnly/",
+      "code": "{page.isOwnerOnly || !isDeleteDelegable ? ("
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 589,
+      "pattern": "/Owner Only/i",
+      "code": "Owner Only"
+    },
+    {
+      "file": "src/components/team/staff-permissions-modal.tsx",
+      "line": 619,
+      "pattern": "/isOwnerOnly/",
+      "code": "{page.isOwnerOnly ? ("
+    },
+    {
+      "file": "src/components/team/team-management-panel.tsx",
+      "line": 64,
+      "pattern": "/isAgencyOwner/",
+      "code": "const { isAgencyOwner, hasStaffPermission } = useAuth();"
+    },
+    {
+      "file": "src/components/team/team-management-panel.tsx",
+      "line": 65,
+      "pattern": "/isAgencyOwner/",
+      "code": "const canInvite = isAgencyOwner || hasStaffPermission(\"TEAM\", \"create\");"
+    },
+    {
+      "file": "src/components/team/team-management-panel.tsx",
+      "line": 66,
+      "pattern": "/isAgencyOwner/",
+      "code": "const canUpdate = isAgencyOwner || hasStaffPermission(\"TEAM\", \"update\");"
+    },
+    {
+      "file": "src/components/team/team-management-panel.tsx",
+      "line": 67,
+      "pattern": "/isAgencyOwner/",
+      "code": "const canDelete = isAgencyOwner || hasStaffPermission(\"TEAM\", \"delete\");"
+    },
+    {
+      "file": "src/components/team/team-management-panel.tsx",
+      "line": 270,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "{members.filter((m) => m.role === \"AGENCY_OWNER\").length} Owner(s) •{\" \"}"
+    },
+    {
+      "file": "src/components/team/team-management-panel.tsx",
+      "line": 343,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "const isOwner = member.role === \"AGENCY_OWNER\";"
+    },
+    {
+      "file": "src/components/team/team-management-panel.tsx",
+      "line": 386,
+      "pattern": "/isAgencyOwner/",
+      "code": "{!isOwner && isAgencyOwner && ("
+    },
+    {
+      "file": "src/context/auth-context.tsx",
+      "line": 12,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "export type PlatformRole = \"PLATFORM_OWNER\" | \"AGENCY_OWNER\" | \"AGENCY_STAFF\" | \"TRIPDESK_OWNER\";"
+    },
+    {
+      "file": "src/context/auth-context.tsx",
+      "line": 61,
+      "pattern": "/isAgencyOwner/",
+      "code": "isAgencyOwner: boolean;"
+    },
+    {
+      "file": "src/context/auth-context.tsx",
+      "line": 78,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "role: \"AGENCY_OWNER\","
+    },
+    {
+      "file": "src/context/auth-context.tsx",
+      "line": 242,
+      "pattern": "/isAgencyOwner/",
+      "code": "const isAgencyOwner = currentUser.role === \"AGENCY_OWNER\" && !isPlatformOwner;"
+    },
+    {
+      "file": "src/context/auth-context.tsx",
+      "line": 247,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (currentUser.role === \"AGENCY_OWNER\") return true;"
+    },
+    {
+      "file": "src/context/auth-context.tsx",
+      "line": 268,
+      "pattern": "/isAgencyOwner/",
+      "code": "isAgencyOwner,"
+    },
+    {
+      "file": "src/hooks/use-platform-chat.ts",
+      "line": 21,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "currentUserRole?: \"PLATFORM_OWNER\" | \"AGENCY_OWNER\" | string;"
+    },
+    {
+      "file": "src/lib/api/context.ts",
+      "line": 42,
+      "pattern": "/isAgencyOwner/",
+      "code": "isAgencyOwner: boolean;"
+    },
+    {
+      "file": "src/lib/api/context.ts",
+      "line": 112,
+      "pattern": "/isAgencyOwner/",
+      "code": "const isAgencyOwner = dbUser.role === UserRole.AGENCY_OWNER && !!dbUser.agencyId;"
+    },
+    {
+      "file": "src/lib/api/context.ts",
+      "line": 114,
+      "pattern": "/isAgencyOwner/",
+      "code": "const isSuspendedAgency = (isAgencyOwner || isAgencyStaff) && agency?.status === AgencyStatus.SUSPENDED;"
+    },
+    {
+      "file": "src/lib/api/context.ts",
+      "line": 135,
+      "pattern": "/isAgencyOwner/",
+      "code": "} else if (isAgencyOwner || isAgencyStaff) {"
+    },
+    {
+      "file": "src/lib/api/context.ts",
+      "line": 167,
+      "pattern": "/isAgencyOwner/",
+      "code": "isAgencyOwner,"
+    },
+    {
+      "file": "src/lib/api/context.ts",
+      "line": 195,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!context.isAgencyOwner || !context.agency || !context.dbUser.agencyId) {"
+    },
+    {
+      "file": "src/lib/api/context.ts",
+      "line": 272,
+      "pattern": "/isAgencyOwner/",
+      "code": "if ((!context.isAgencyOwner && !context.isAgencyStaff) || !context.agency || !context.dbUser.agencyId) {"
+    },
+    {
+      "file": "src/lib/auth/index.ts",
+      "line": 15,
+      "pattern": "/isAgencyOwner/",
+      "code": "isAgencyOwner: boolean;"
+    },
+    {
+      "file": "src/lib/auth/index.ts",
+      "line": 70,
+      "pattern": "/isAgencyOwner/",
+      "code": "const isAgencyOwner = dbUser.role === \"AGENCY_OWNER\" && !!dbUser.agencyId;"
+    },
+    {
+      "file": "src/lib/auth/index.ts",
+      "line": 92,
+      "pattern": "/isAgencyOwner/",
+      "code": "} else if (isAgencyOwner || isAgencyStaff) {"
+    },
+    {
+      "file": "src/lib/auth/index.ts",
+      "line": 107,
+      "pattern": "/isAgencyOwner/",
+      "code": "isAgencyOwner,"
+    },
+    {
+      "file": "src/lib/auth/index.ts",
+      "line": 146,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "* Server-side guard: Ensures the user is an AGENCY_OWNER with a valid agency."
+    },
+    {
+      "file": "src/lib/auth/index.ts",
+      "line": 157,
+      "pattern": "/isAgencyOwner/",
+      "code": "if (!auth.isAgencyOwner || !auth.agency) {"
+    },
+    {
+      "file": "src/lib/auth/index.ts",
+      "line": 164,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "* Server-side guard: Ensures the user is an AGENCY_OWNER or AGENCY_STAFF with a valid agency."
+    },
+    {
+      "file": "src/lib/auth/index.ts",
+      "line": 175,
+      "pattern": "/isAgencyOwner/",
+      "code": "if ((!auth.isAgencyOwner && !auth.isAgencyStaff) || !auth.agency) {"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 5,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "* Differentiates PLATFORM_OWNER (SaaS admin), AGENCY_OWNER (tenant administrator),"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 9,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "export type AppRole = \"PLATFORM_OWNER\" | \"AGENCY_OWNER\" | \"AGENCY_STAFF\";"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 63,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "AGENCY_OWNER: {"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 184,
+      "pattern": "/IMMUTABLE_OWNER_ONLY_MODULES/",
+      "code": "export const IMMUTABLE_OWNER_ONLY_MODULES = new Set<string>([]);"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 198,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: boolean;"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 200,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: string[];"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 216,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 218,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [\"export\"],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 227,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 229,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 238,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 240,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 249,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 251,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [\"export\"],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 260,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 262,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 271,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 273,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 282,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 284,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 295,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 297,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 306,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 308,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 317,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 319,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 328,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 330,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [\"commercialMargins\"],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 339,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 341,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [\"commercialMargins\"],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 350,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 352,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 361,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 363,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 372,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 374,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 383,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 385,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 394,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 396,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 406,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 408,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [\"commercialMargins\"],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 419,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 421,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 430,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 432,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 441,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 443,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 452,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 454,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 463,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 465,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 471,
+      "pattern": "/Owner Only/i",
+      "code": "description: \"Supplier contacts, directory profiles, and service listings (unredacted ledger is Owner Only)\","
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 474,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 476,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 484,
+      "pattern": "/Owner Only/i",
+      "code": "description: \"View customer receipts and record pending receipts (verification is Owner Only)\","
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 487,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 489,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [\"verify\", \"void\", \"delete\"],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 498,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 500,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 509,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 511,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [\"commercialMargins\", \"supplierDisbursements\", \"delete\"],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 522,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 524,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 533,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 535,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 544,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 546,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 555,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 557,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 565,
+      "pattern": "/Owner Only/i",
+      "code": "description: \"Company profile, communication templates, and GST settings (team management is Owner Only)\","
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 568,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 570,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [\"teamManagement\", \"legalTaxProfile\"],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 576,
+      "pattern": "/Owner Only/i",
+      "code": "description: \"Plan tiers, usage entitlements, and billing renewals (plan purchase & upgrades are Owner Only)\","
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 579,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 581,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [\"purchaseUpgrade\", \"manage\"],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 587,
+      "pattern": "/Owner Only/i",
+      "code": "description: \"Agency staff directory and onboarding invitations (modifying staff permissions & removing staff are Owner Only)\","
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 590,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 592,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [\"managePermissions\", \"transferOwnership\"],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 601,
+      "pattern": "/isOwnerOnly/",
+      "code": "isOwnerOnly: false,"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 603,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnlyActions: [],"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 614,
+      "pattern": "/isOwnerOnly/",
+      "code": "if (!page.isOwnerOnly) {"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 642,
+      "pattern": "/IMMUTABLE_OWNER_ONLY_MODULES/",
+      "code": "if (IMMUTABLE_OWNER_ONLY_MODULES.has(cleanKey)) {"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 803,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (normalizedRole === \"AGENCY_OWNER\") {"
+    },
+    {
+      "file": "src/lib/auth/permissions.ts",
+      "line": 816,
+      "pattern": "/IMMUTABLE_OWNER_ONLY_MODULES/",
+      "code": "if (IMMUTABLE_OWNER_ONLY_MODULES.has(normalizedModule)) {"
+    },
+    {
+      "file": "src/lib/navigation.ts",
+      "line": 35,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnly?: boolean;"
+    },
+    {
+      "file": "src/lib/navigation.ts",
+      "line": 222,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnly: true,"
+    },
+    {
+      "file": "src/lib/navigation.ts",
+      "line": 267,
+      "pattern": "/ownerOnly/",
+      "code": "ownerOnly: true,"
+    },
+    {
+      "file": "src/lib/services/admin-service.ts",
+      "line": 253,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "prisma.user.count({ where: { role: UserRole.AGENCY_OWNER } }),"
+    },
+    {
+      "file": "src/lib/services/admin-service.ts",
+      "line": 265,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "users: { where: { role: UserRole.AGENCY_OWNER }, take: 1 },"
+    },
+    {
+      "file": "src/lib/services/admin-service.ts",
+      "line": 401,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "where: { role: UserRole.AGENCY_OWNER },"
+    },
+    {
+      "file": "src/lib/services/admin-service.ts",
+      "line": 494,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "where: { role: UserRole.AGENCY_OWNER },"
+    },
+    {
+      "file": "src/lib/services/admin-service.ts",
+      "line": 1568,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "role: UserRole.AGENCY_OWNER,"
+    },
+    {
+      "file": "src/lib/services/internal-notification-service.ts",
+      "line": 141,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "* Notify the AGENCY_OWNER(s) of a specific agency"
+    },
+    {
+      "file": "src/lib/services/internal-notification-service.ts",
+      "line": 158,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "where: { agencyId, role: UserRole.AGENCY_OWNER },"
+    },
+    {
+      "file": "src/lib/services/internal-notification-service.ts",
+      "line": 168,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "role: UserRole.AGENCY_OWNER,"
+    },
+    {
+      "file": "src/lib/services/internal-notification-service.ts",
+      "line": 185,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "* Broadcast an internal notification to all active AGENCY_OWNER users (e.g. Platform Announcements)"
+    },
+    {
+      "file": "src/lib/services/internal-notification-service.ts",
+      "line": 200,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "role: UserRole.AGENCY_OWNER,"
+    },
+    {
+      "file": "src/lib/services/internal-notification-service.ts",
+      "line": 213,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "role: UserRole.AGENCY_OWNER,"
+    },
+    {
+      "file": "src/lib/services/invitation-service.ts",
+      "line": 137,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "* 1. Actor must be an AGENCY_OWNER."
+    },
+    {
+      "file": "src/lib/services/invitation-service.ts",
+      "line": 149,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (actor.role !== \"AGENCY_OWNER\") {"
+    },
+    {
+      "file": "src/lib/services/invitation-service.ts",
+      "line": 284,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (actor.role !== \"AGENCY_OWNER\") {"
+    },
+    {
+      "file": "src/lib/services/invitation-service.ts",
+      "line": 342,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (actor.role !== \"AGENCY_OWNER\") {"
+    },
+    {
+      "file": "src/lib/services/onboarding-service.ts",
+      "line": 71,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (existingUser.role !== \"AGENCY_OWNER\") {"
+    },
+    {
+      "file": "src/lib/services/onboarding-service.ts",
+      "line": 72,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "console.error(`User ${existingUser.email} has role ${existingUser.role}; cannot onboard or re-link as AGENCY_OWNER.`);"
+    },
+    {
+      "file": "src/lib/services/onboarding-service.ts",
+      "line": 204,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (existingInTx.role !== \"AGENCY_OWNER\") {"
+    },
+    {
+      "file": "src/lib/services/onboarding-service.ts",
+      "line": 214,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "role: \"AGENCY_OWNER\","
+    },
+    {
+      "file": "src/lib/services/onboarding-service.ts",
+      "line": 226,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "role: \"AGENCY_OWNER\","
+    },
+    {
+      "file": "src/lib/services/platform-chat-service.ts",
+      "line": 59,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "where: { role: UserRole.AGENCY_OWNER },"
+    },
+    {
+      "file": "src/lib/services/platform-chat-service.ts",
+      "line": 176,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "where: { role: UserRole.AGENCY_OWNER },"
+    },
+    {
+      "file": "src/lib/services/platform-chat-service.ts",
+      "line": 384,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "...(senderRole === UserRole.AGENCY_OWNER"
+    },
+    {
+      "file": "src/lib/services/platform-chat-service.ts",
+      "line": 399,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (senderRole === UserRole.AGENCY_OWNER) {"
+    },
+    {
+      "file": "src/lib/services/platform-chat-service.ts",
+      "line": 435,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "...(role === UserRole.AGENCY_OWNER"
+    },
+    {
+      "file": "src/lib/services/platform-chat-service.ts",
+      "line": 458,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "lastMessageSenderRole: UserRole.AGENCY_OWNER,"
+    },
+    {
+      "file": "src/lib/services/platform-chat-service.ts",
+      "line": 473,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (params.role === UserRole.AGENCY_OWNER && params.agencyId) {"
+    },
+    {
+      "file": "src/lib/services/platform-chat-service.ts",
+      "line": 517,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "conv.lastMessageSenderRole === UserRole.AGENCY_OWNER && lastMsgTime > platformReadTime;"
+    },
+    {
+      "file": "src/lib/services/staff-permission-service.ts",
+      "line": 239,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "if (role === \"AGENCY_OWNER\") return true;"
+    },
+    {
+      "file": "src/lib/validation/invitation-schema.ts",
+      "line": 6,
+      "pattern": "/AGENCY_OWNER/",
+      "code": "* Agency owners cannot invite PLATFORM_OWNER or AGENCY_OWNER."
+    }
+  ]
+}

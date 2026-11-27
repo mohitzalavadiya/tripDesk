@@ -1,6 +1,8 @@
 "use client";
 
 import { PageHeader } from "@/components/shared/page-header";
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +56,19 @@ const createCustomerValidationSchema = Yup.object().shape({
 });
 
 export default function NewCustomerPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("CUSTOMERS", "create")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Customer Creation"
+          badgeText="Access Restricted"
+          description="You do not have permission to add new customers. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const [isReadOnly, setIsReadOnly] = React.useState(false);
 

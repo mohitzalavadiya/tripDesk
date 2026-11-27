@@ -1,11 +1,14 @@
 import {
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  enforceStaffPermission,
+  ForbiddenError,
+  handleApiError,
+  requireMemberReadAccess,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import { paymentService } from "@/lib/services/payment-service";
+import { staffPermissionService } from "@/lib/services/staff-permission-service";
 import { updatePaymentSchema } from "@/lib/validation/payment-schema";
 import { NextRequest } from "next/server";
 
@@ -21,7 +24,21 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const context = await requireReadAccess();
+    const context = await requireMemberReadAccess();
+
+    if (context.isAgencyStaff) {
+      const canView = await staffPermissionService.hasStaffPermission(
+        context.dbUser.role,
+        context.agencyId,
+        context.dbUser.id,
+        "PAYMENTS",
+        "VIEW"
+      );
+      if (!canView) {
+        throw new ForbiddenError("You do not have permission to view payments.");
+      }
+    }
+
     const { id } = await params;
 
     const payment = await paymentService.getPayment(context.agencyId, id);
@@ -42,10 +59,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 /**
  * PATCH /api/payments/[id]
  * Update payment status, notes, or refund amount.
+ * Agency Owner only. Staff cannot modify existing payment records.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "PAYMENTS", "UPDATE");
     const { id } = await params;
     const body = await validateJson(updatePaymentSchema, request);
 
@@ -64,6 +83,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "PAYMENTS", "DELETE");
     const { id } = await params;
 
     await paymentService.archivePayment(context.agencyId, id);

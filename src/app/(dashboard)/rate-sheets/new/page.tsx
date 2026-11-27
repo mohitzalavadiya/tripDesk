@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { PageHeader } from "@/components/shared/page-header";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { ReadOnlyModeCard } from "@/components/shared/read-only-mode-card";
@@ -33,6 +36,19 @@ import { toast } from "sonner";
 
 function NewRateSheetForm() {
   const router = useRouter();
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+
+  if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("RATE_SHEETS", "create"))) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Create Rate Sheet"
+          badgeText="Access Restricted"
+          description="You do not have permission to create rate sheets. Contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
   const searchParams = useSearchParams();
   const preselectedSupplier = searchParams.get("supplierId") || "";
   const preselectedHotel = searchParams.get("hotelId") || "";

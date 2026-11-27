@@ -1,5 +1,5 @@
 import "dotenv/config";
-import * as XLSX from "xlsx";
+import writeXlsxFile from "write-excel-file/node";
 import prisma from "@/lib/prisma";
 import { rateExcelService } from "@/lib/excel/rate-excel-service";
 import { ValidationError, ApiError, handleApiError } from "@/lib/api";
@@ -38,13 +38,13 @@ async function main() {
   console.log("\n--- TEST GROUP 1: Invalid Header 'Hotel Code (Test Mapping)' ---");
 
   // Create in-memory workbook with invalid column header
-  const invalidHeaderWb = XLSX.utils.book_new();
-  const invalidHeaderWs = XLSX.utils.aoa_to_sheet([
-    ["Hotel Code (Test Mapping)", "Room Type", "Meal Plan", "Valid From", "Valid To", "Cost Price"],
-    ["TEST-001", "Deluxe", "CP", "01-04-2026", "30-06-2026", 4500],
-  ]);
-  XLSX.utils.book_append_sheet(invalidHeaderWb, invalidHeaderWs, "Rates");
-  const invalidBuffer = XLSX.write(invalidHeaderWb, { type: "buffer", bookType: "xlsx" });
+  const invalidBuffer = await writeXlsxFile(
+    [
+      ["Hotel Code (Test Mapping)", "Room Type", "Meal Plan", "Valid From", "Valid To", "Cost Price"],
+      ["TEST-001", "Deluxe", "CP", "01-04-2026", "30-06-2026", 4500],
+    ].map((row) => row.map((v) => ({ value: v }))),
+    { sheet: "Rates" }
+  ).toBuffer();
 
   let caughtError: any = null;
   try {
@@ -79,10 +79,7 @@ async function main() {
   console.log("\n--- TEST GROUP 2: Missing Workbook / Empty Sheet / Limits ---");
 
   // Empty sheet
-  const emptyWb = XLSX.utils.book_new();
-  const emptyWs = XLSX.utils.aoa_to_sheet([]);
-  XLSX.utils.book_append_sheet(emptyWb, emptyWs, "Rates");
-  const emptyBuffer = XLSX.write(emptyWb, { type: "buffer", bookType: "xlsx" });
+  const emptyBuffer = await writeXlsxFile([], { sheet: "Rates" }).toBuffer();
 
   let emptyError: any = null;
   try {
@@ -94,12 +91,12 @@ async function main() {
   assert(emptyError?.message.includes("empty"), "Empty sheet message indicates sheet is empty");
 
   // Missing data rows
-  const headerOnlyWb = XLSX.utils.book_new();
-  const headerOnlyWs = XLSX.utils.aoa_to_sheet([
-    ["Hotel Code", "Room Type", "Meal Plan", "Valid From", "Valid To", "Cost Price"],
-  ]);
-  XLSX.utils.book_append_sheet(headerOnlyWb, headerOnlyWs, "Rates");
-  const headerOnlyBuffer = XLSX.write(headerOnlyWb, { type: "buffer", bookType: "xlsx" });
+  const headerOnlyBuffer = await writeXlsxFile(
+    [["Hotel Code", "Room Type", "Meal Plan", "Valid From", "Valid To", "Cost Price"]].map((row) =>
+      row.map((v) => ({ value: v }))
+    ),
+    { sheet: "Rates" }
+  ).toBuffer();
 
   let noRowsError: any = null;
   try {
@@ -117,13 +114,13 @@ async function main() {
   });
 
   if (hotel && hotel.hotelCode) {
-    const validWb = XLSX.utils.book_new();
-    const validWs = XLSX.utils.aoa_to_sheet([
-      ["Hotel Code", "Room Type", "Meal Plan", "Season", "Valid From", "Valid To", "Cost Price", "Extra Adult", "Extra Child", "Notes"],
-      [hotel.hotelCode, "Deluxe Room", "CP", "Summer Season", "01-05-2026", "30-06-2026", 4500, 1500, 800, "Breakfast included"],
-    ]);
-    XLSX.utils.book_append_sheet(validWb, validWs, "Rates");
-    const validBuffer = XLSX.write(validWb, { type: "buffer", bookType: "xlsx" });
+    const validBuffer = await writeXlsxFile(
+      [
+        ["Hotel Code", "Room Type", "Meal Plan", "Season", "Valid From", "Valid To", "Cost Price", "Extra Adult", "Extra Child", "Notes"],
+        [hotel.hotelCode, "Deluxe Room", "CP", "Summer Season", "01-05-2026", "30-06-2026", 4500, 1500, 800, "Breakfast included"],
+      ].map((row) => row.map((v) => ({ value: v }))),
+      { sheet: "Rates" }
+    ).toBuffer();
 
     let validResult: any = null;
     let validThrown: any = null;

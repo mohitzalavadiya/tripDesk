@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { EmptyState } from "@/components/shared/empty-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
@@ -190,6 +193,19 @@ export function TripStatusBadge({ status }: { status: TripStatus | string }) {
 }
 
 export default function TripsPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("TRIPS", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Trips Planning"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const { canCreate, overview, isReadOnly: subReadOnly, readOnlyReason } = useSubscription();
 
@@ -245,9 +261,9 @@ export default function TripsPage() {
   }, [search]);
 
   // Fetch real trips from PostgreSQL database via tripClient
-  const fetchTrips = React.useCallback(async () => {
+  const fetchTrips = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       const res = await tripClient.getTrips({
@@ -267,7 +283,7 @@ export default function TripsPage() {
       }
       setError(err?.message || "Failed to load trips from database.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [debouncedSearch, statusFilter, page]);
 
@@ -295,7 +311,7 @@ export default function TripsPage() {
       setArchivingId(id);
       await tripClient.archiveTrip(id);
       toast.success(`Trip "${title}" archived successfully.`);
-      await fetchTrips();
+      await fetchTrips(true);
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
@@ -336,8 +352,8 @@ export default function TripsPage() {
   }, [trips, pagination.total]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Read-Only Subscription Warning Banner */}
         {isReadOnly && <ReadOnlyBanner moduleName="Trip Workspaces" />}
 
@@ -458,14 +474,14 @@ export default function TripsPage() {
           </div>
 
           {/* Loading State */}
-          {loading && (
+          {loading && trips.length === 0 && (
             <div className="p-4">
               <TableSkeleton rows={8} />
             </div>
           )}
 
           {/* Error State */}
-          {!loading && error && (
+          {!loading && error && trips.length === 0 && (
             <div className="p-12 text-center space-y-3">
               <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
                 <AlertCircle className="h-5 w-5" />
@@ -483,7 +499,7 @@ export default function TripsPage() {
           )}
 
           {/* Content Table */}
-          {!loading && !error && trips.length === 0 ? (
+          {(!loading || trips.length > 0) && !error && trips.length === 0 ? (
             <div className="p-12 text-center">
               <EmptyState
                 icon={Compass}
@@ -497,9 +513,9 @@ export default function TripsPage() {
                 onAction={isFilterActive ? handleClearFilters : handleNewTrip}
               />
             </div>
-          ) : !loading && !error && (
+          ) : (!loading || trips.length > 0) && !error && (
             <div className="overflow-hidden">
-              <div className="hidden lg:block overflow-x-auto max-h-[620px] overflow-y-auto">
+              <div className="hidden lg:block overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">

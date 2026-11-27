@@ -1,16 +1,17 @@
 import {
-apiCreated,
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-validateJson,
-validateQueryParams,
+  apiCreated,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  requireWriteAccess,
+  validateJson,
+  validateQueryParams,
 } from "@/lib/api";
 import { followUpService } from "@/lib/services/follow-up-service";
 import {
-createGlobalFollowUpSchema,
-globalFollowUpQuerySchema,
+  createGlobalFollowUpSchema,
+  globalFollowUpQuerySchema,
 } from "@/lib/validation/follow-up-schema";
 import { NextRequest } from "next/server";
 
@@ -23,6 +24,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FOLLOW_UPS", "VIEW");
     const queryParams = validateQueryParams(globalFollowUpQuerySchema, request.nextUrl.searchParams);
 
     const result = await followUpService.getGlobalFollowUps(context.agencyId, queryParams);
@@ -40,6 +42,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FOLLOW_UPS", "CREATE");
     const body = await validateJson(createGlobalFollowUpSchema, request);
 
     const newFollowUp = await followUpService.createFollowUp(context.agencyId, body);

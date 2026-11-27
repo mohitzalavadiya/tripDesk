@@ -1,40 +1,47 @@
-import { requireReadAccess } from "@/lib/api/context";
+import { ForbiddenError, requireReadAccess, staffPermissionService } from "@/lib/api";
 import { dashboardService } from "@/lib/services/dashboard-service";
-import { DashboardFilterSchema } from "@/lib/validation/dashboard-schema";
-import { NextRequest,NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const context = await requireReadAccess();
+    if (context.isAgencyStaff) {
+      const [canViewDashboard, canViewEnquiries] = await Promise.all([
+        staffPermissionService.hasStaffPermission(
+          context.dbUser.role,
+          context.agencyId,
+          context.dbUser.id,
+          "DASHBOARD",
+          "VIEW"
+        ),
+        staffPermissionService.hasStaffPermission(
+          context.dbUser.role,
+          context.agencyId,
+          context.dbUser.id,
+          "ENQUIRIES",
+          "VIEW"
+        ),
+      ]);
+      if (!canViewDashboard && !canViewEnquiries) {
+        throw new ForbiddenError("You do not have permission to view CRM dashboard metrics.");
+      }
+    }
     const agencyId = context.agencyId;
 
-    const { searchParams } = new URL(req.url);
-    const parsedFilter = DashboardFilterSchema.parse({
-      preset: searchParams.get("preset") || undefined,
-      startDate: searchParams.get("startDate") || undefined,
-      endDate: searchParams.get("endDate") || undefined,
-    });
-
-    const [crmAnalytics, summary, topCustomers] = await Promise.all([
-      dashboardService.getCRMAndFollowUpAnalytics(agencyId),
-      dashboardService.getDashboardSummary(agencyId, parsedFilter),
-      dashboardService.getTopDestinationsAndCustomers(agencyId, parsedFilter),
-    ]);
+    const followUps = await dashboardService.getCRMAndFollowUpAnalytics(agencyId);
 
     return NextResponse.json({
       success: true,
       data: {
-        crmKPIs: summary.crm,
-        communicationKPIs: summary.communication,
-        followUps: crmAnalytics,
-        topCustomers: topCustomers.customers,
+        followUps,
       },
     });
-  } catch (error: any) {
-    if (error.statusCode) {
+  } catch (error: unknown) {
+    const err = error as { statusCode?: number; message?: string };
+    if (err.statusCode) {
       return NextResponse.json(
-        { success: false, error: error.message },
-        { status: error.statusCode }
+        { success: false, error: err.message },
+        { status: err.statusCode }
       );
     }
     console.error("GET /api/dashboard/crm error:", error);

@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { staffPermissionService } from "@/lib/services/staff-permission-service";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,20 @@ export default async function QuotationRedirectPage({ params }: QuotationRedirec
 
   if (!user) {
     redirect(`/login?redirectTo=/quotations/${encodeURIComponent(id)}`);
+  }
+
+  // Check staff view permission
+  if (!user.isPlatformOwner && user.isAgencyStaff && user.agency?.id) {
+    const canView = await staffPermissionService.hasStaffPermission(
+      user.dbUser.role,
+      user.agency.id,
+      user.dbUser.id,
+      "QUOTATIONS",
+      "VIEW"
+    );
+    if (!canView) {
+      redirect("/quotations");
+    }
   }
 
   // Find quotation with strict tenant isolation

@@ -1,16 +1,18 @@
 import {
-apiCreated,
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-validateJson,
-validateQueryParams,
+  apiCreated,
+  apiSuccess,
+  ForbiddenError,
+  handleApiError,
+  requireMemberReadAccess,
+  requireMemberWriteAccess,
+  validateJson,
+  validateQueryParams,
 } from "@/lib/api";
 import { customerService } from "@/lib/services/customer-service";
+import { staffPermissionService } from "@/lib/services/staff-permission-service";
 import {
-createCustomerSchema,
-customerQuerySchema,
+  createCustomerSchema,
+  customerQuerySchema,
 } from "@/lib/validation/customer-schema";
 import { NextRequest } from "next/server";
 
@@ -19,13 +21,26 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/customers
  * Retrieves paginated customers strictly scoped to the authenticated agency.
- * Enforces workspace read access.
+ * Enforces workspace read access and staff CUSTOMERS.view permission.
  */
 export async function GET(request: NextRequest) {
   try {
-    const context = await requireReadAccess();
-    const queryParams = validateQueryParams(customerQuerySchema, request.nextUrl.searchParams);
+    const context = await requireMemberReadAccess();
 
+    if (context.isAgencyStaff) {
+      const canView = await staffPermissionService.hasStaffPermission(
+        context.dbUser.role,
+        context.agencyId,
+        context.dbUser.id,
+        "CUSTOMERS",
+        "VIEW"
+      );
+      if (!canView) {
+        throw new ForbiddenError("You do not have permission to view customer records.");
+      }
+    }
+
+    const queryParams = validateQueryParams(customerQuerySchema, request.nextUrl.searchParams);
     const result = await customerService.listCustomers(context.agencyId, queryParams);
 
     return apiSuccess(result.items, 200, {
@@ -42,13 +57,26 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/customers
  * Creates a new customer record under the authenticated agency.
- * Enforces workspace write access (requires valid TRIAL or ACTIVE subscription).
+ * Enforces workspace write access and staff CUSTOMERS.create permission.
  */
 export async function POST(request: NextRequest) {
   try {
-    const context = await requireWriteAccess();
-    const body = await validateJson(createCustomerSchema, request);
+    const context = await requireMemberWriteAccess();
 
+    if (context.isAgencyStaff) {
+      const canCreate = await staffPermissionService.hasStaffPermission(
+        context.dbUser.role,
+        context.agencyId,
+        context.dbUser.id,
+        "CUSTOMERS",
+        "CREATE"
+      );
+      if (!canCreate) {
+        throw new ForbiddenError("You do not have permission to create customer records.");
+      }
+    }
+
+    const body = await validateJson(createCustomerSchema, request);
     const newCustomer = await customerService.createCustomer(context.agencyId, body);
 
     return apiCreated(newCustomer);

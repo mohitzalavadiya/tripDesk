@@ -295,6 +295,24 @@ export class QuotationPdfService {
             align: "center",
           });
 
+        if (data.tier) {
+          const tierPillW = 105;
+          const tierPillH = 16;
+          const tierPillX = margin + contentWidth - tierPillW - 16;
+          const tierPillY = pillY + pillH + 4;
+          doc
+            .roundedRect(tierPillX, tierPillY, tierPillW, tierPillH, 8)
+            .fillAndStroke("#312E81", "#4338CA");
+          doc
+            .fillColor("#E0E7FF")
+            .fontSize(7)
+            .font("Helvetica-Bold")
+            .text(`TIER: ${data.tier.toUpperCase()}`, tierPillX, tierPillY + 4, {
+              width: tierPillW,
+              align: "center",
+            });
+        }
+
         let curHeroY = heroHeaderTopY + 14;
 
         // Top-Left Branding: Logo & Agency Name
@@ -880,6 +898,108 @@ export class QuotationPdfService {
         }
 
         // ═════════════════════════════════════════════════════════════════════
+        // 8B. PAYMENT TERMS & SCHEDULE
+        // ═════════════════════════════════════════════════════════════════════
+        const paymentMilestonesList = data.paymentMilestones || [];
+        if (data.paymentTerms || paymentMilestonesList.length > 0) {
+          drawSectionHeader("Payment Terms & Schedule", "Agreed milestone payment schedule and booking payment terms");
+
+          if (paymentMilestonesList.length > 0) {
+            paymentMilestonesList.forEach((m, idx) => {
+              const descH = m.description
+                ? doc.fontSize(7.5).font("Helvetica").heightOfString(m.description, { width: contentWidth - 140, lineGap: 1.5 }) + 4
+                : 0;
+              const cardH = Math.max(42, 32 + descH);
+
+              ensureSpace(cardH + 10);
+              const cardY = doc.y;
+
+              doc
+                .roundedRect(margin, cardY, contentWidth, cardH, 6)
+                .fillAndStroke(bgCard, borderLight);
+
+              // Percentage Badge (Left)
+              const pctBadgeW = 46;
+              const pctText = m.percentage != null ? `${m.percentage}%` : `M${idx + 1}`;
+              doc
+                .roundedRect(margin + 12, cardY + 8, pctBadgeW, 16, 3)
+                .fillAndStroke(brandLight, "#C7D2FE");
+
+              doc
+                .fillColor(brandIndigo)
+                .fontSize(7.5)
+                .font("Helvetica-Bold")
+                .text(pctText, margin + 12, cardY + 12.5, {
+                  width: pctBadgeW,
+                  align: "center",
+                });
+
+              // Milestone Title
+              doc
+                .fillColor(textDark)
+                .fontSize(9)
+                .font("Helvetica-Bold")
+                .text(m.title, margin + 66, cardY + 11.5, {
+                  width: contentWidth - 220,
+                  ellipsis: true,
+                });
+
+              // Due Date / Timing (Right)
+              let dateStr = "";
+              if (m.dueDate) {
+                dateStr = `Due: ${new Date(m.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+              }
+              if (dateStr) {
+                doc
+                  .fillColor(brandIndigo)
+                  .fontSize(7.5)
+                  .font("Helvetica-Bold")
+                  .text(dateStr, margin + contentWidth - 160, cardY + 12, {
+                    width: 148,
+                    align: "right",
+                  });
+              }
+
+              // Description if present
+              if (m.description) {
+                doc
+                  .fillColor(textMuted)
+                  .fontSize(7.5)
+                  .font("Helvetica")
+                  .text(m.description, margin + 66, cardY + 26, {
+                    width: contentWidth - 140,
+                    lineGap: 1.5,
+                  });
+              }
+
+              doc.y = cardY + cardH + 8;
+              doc.x = margin;
+            });
+            doc.y += 4;
+          }
+
+          if (data.paymentTerms) {
+            ensureSpace(32);
+            doc
+              .fillColor(textDark)
+              .fontSize(8.5)
+              .font("Helvetica-Bold")
+              .text("Payment Terms & Conditions:", margin, doc.y, { width: contentWidth });
+
+            doc
+              .fillColor(textMuted)
+              .fontSize(7.5)
+              .font("Helvetica")
+              .text(data.paymentTerms, margin, doc.y + 2, {
+                width: contentWidth,
+                lineGap: 2,
+              });
+            doc.y += 8;
+            doc.x = margin;
+          }
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
         // 9. IMPORTANT NOTES, POLICIES & TERMS
         // ═════════════════════════════════════════════
         const importantNotesList = data.proposalItems?.filter((p) => p.type === "IMPORTANT_NOTE") || [];
@@ -1017,12 +1137,18 @@ export class QuotationPdfService {
             align: "right",
           });
 
+        const basisTravelerCount = data.trip?.travelers?.length;
+        let travelerBasisText = "Total all-inclusive package price";
+        if (basisTravelerCount && basisTravelerCount > 0) {
+          travelerBasisText = `Total all-inclusive package price for ${basisTravelerCount} ${basisTravelerCount === 1 ? "traveler" : "travelers"}`;
+        }
+
         doc
           .fillColor("#C7D2FE")
           .fontSize(7.5)
           .font("Helvetica")
-          .text(`All-inclusive holiday package price (${data.currency || "INR"})`, margin + 160, totalCardY + 36, {
-            width: contentWidth - 176,
+          .text(`${travelerBasisText} (${data.currency || "INR"})`, margin + 80, totalCardY + 36, {
+            width: contentWidth - 96,
             align: "right",
           });
 

@@ -4,6 +4,7 @@ apiSuccess,
 handleApiError,
 requireReadAccess,
 requireWriteAccess,
+  enforceStaffPermission,
 validateJson,
 validateQueryParams,
 } from "@/lib/api";
@@ -23,6 +24,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "INVOICES", "VIEW");
     const queryParams = validateQueryParams(invoiceQuerySchema, request.nextUrl.searchParams);
 
     const result = await invoiceService.listInvoices(context.agencyId, queryParams);
@@ -40,6 +42,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "INVOICES", "CREATE");
     const body = await validateJson(createInvoiceSchema, request);
 
     const invoice = await invoiceService.getOrCreateInvoiceForBooking(context.agencyId, body.bookingId);

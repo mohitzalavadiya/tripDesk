@@ -1,5 +1,8 @@
 "use client";
 
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+import { useAuth } from "@/context/auth-context";
+import { formatEmbeddedEnums } from "@/lib/utils/enum-formatters";
 import { QuotationStatusBadge } from "@/app/(dashboard)/quotations/page";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { QuotaExceededDialog } from "@/components/shared/quota-exceeded-dialog";
@@ -34,11 +37,12 @@ TableRow,
 import { Textarea } from "@/components/ui/textarea";
 import { useSubscription } from "@/context/subscription-context";
 import {
-quotationClient,
-QuotationWithRelations,
-taxClient,
-TaxRateItem,
-TripCostingResult,
+  bookingClient,
+  quotationClient,
+  QuotationWithRelations,
+  taxClient,
+  TaxRateItem,
+  TripCostingResult,
 } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/costing-engine";
 import { getErrorMessage } from "@/lib/utils";
@@ -54,38 +58,60 @@ QuotationStatus,
 TaxMode,
 } from "@prisma/client";
 import {
+AlertCircle,
+AlertTriangle,
+ArrowDown,
 ArrowLeft,
+ArrowUp,
+Calendar,
 CalendarCheck,
 Check,
 CheckCircle2,
+Clock,
 Copy,
+CreditCard,
 DollarSign,
 Download,
 Edit2,
 Eye,
 FileCheck,
 History,
+Info,
 Layers,
 Loader2,
 MessageSquare,
 Package,
 Plus,
+ShieldCheck,
 Sparkles,
 Ticket,
 Trash2,
 X
 } from "lucide-react";
 import Link from "next/link";
-import { useParams,useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
 type ActiveTabType = "pricing" | "inclusions" | "milestones" | "policies";
 
+export interface LocalMilestoneItem {
+  id?: string;
+  title: string;
+  description: string;
+  percentage: number;
+  amount?: number | null;
+  dueDate: string;
+  sortOrder: number;
+}
+
 export default function TripQuotationEditorPage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const tripId = params.id as string;
+  const queryQuotationId = searchParams?.get("quotationId") || null;
 
   const { isReadOnly: isCentralReadOnly, readOnlyReason, canCreate, refreshSubscription } = useSubscription();
 
@@ -146,15 +172,25 @@ export default function TripQuotationEditorPage() {
   const [proposalItemDesc, setProposalItemDesc] = React.useState("");
   const [proposalItemSaving, setProposalItemSaving] = React.useState(false);
 
-  // Payment Milestone Modal states
+  // Payment Schedule & Milestone Editor states (Phase 2C)
+  const [milestonesForm, setMilestonesForm] = React.useState<LocalMilestoneItem[]>([]);
+  const [schedulePaymentTerms, setSchedulePaymentTerms] = React.useState("");
+  const [scheduleSaveStatus, setScheduleSaveStatus] = React.useState<"idle" | "saving" | "saved" | "unsaved" | "error">("idle");
+  const [scheduleSaveError, setScheduleSaveError] = React.useState<string | null>(null);
+  const [editingMilestoneIdx, setEditingMilestoneIdx] = React.useState<number | null>(null);
+  const scheduleTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const scheduleInFlightRef = React.useRef(false);
+  const schedulePendingRef = React.useRef<{ terms: string; milestones: LocalMilestoneItem[] } | null>(null);
+  const scheduleSeqRef = React.useRef(0);
+  const latestScheduleRef = React.useRef({ terms: "", milestones: [] as LocalMilestoneItem[] });
+  const lastSyncedScheduleQuoteIdRef = React.useRef<string | null>(null);
+
+  // Milestone Add/Edit Modal states
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = React.useState(false);
-  const [editingMilestone, setEditingMilestone] = React.useState<QuotationPaymentMilestone | null>(null);
   const [milestoneTitle, setMilestoneTitle] = React.useState("");
   const [milestoneDesc, setMilestoneDesc] = React.useState("");
   const [milestonePct, setMilestonePct] = React.useState("");
-  const [milestoneAmt, setMilestoneAmt] = React.useState("");
   const [milestoneDueDate, setMilestoneDueDate] = React.useState("");
-  const [milestoneSaving, setMilestoneSaving] = React.useState(false);
 
   // Policies Form states
   const [policyForm, setPolicyForm] = React.useState({
@@ -171,18 +207,34 @@ export default function TripQuotationEditorPage() {
   const [markupInput, setMarkupInput] = React.useState("0");
   const [discountInput, setDiscountInput] = React.useState("0");
   const [savingPolicies, setSavingPolicies] = React.useState(false);
+  const [policySaveStatus, setPolicySaveStatus] = React.useState<"idle" | "saving" | "saved" | "unsaved" | "error">("idle");
+  const [policySaveError, setPolicySaveError] = React.useState<string | null>(null);
+  const policyTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const policyInFlightRef = React.useRef(false);
+  const policyPendingRef = React.useRef<typeof policyForm | null>(null);
+  const policySeqRef = React.useRef(0);
+  const latestPolicyRef = React.useRef(policyForm);
+  latestPolicyRef.current = policyForm;
 
   // Load trip quotations & live costing
-  const fetchTripQuotationData = React.useCallback(async () => {
+  const fetchTripQuotationData = React.useCallback(async (isSilent = false) => {
+    if (!isAgencyOwner && (!isAgencyStaff || (!hasStaffPermission("QUOTATIONS", "view") && !hasStaffPermission("QUOTATION_DETAIL", "view")))) {
+      setLoading(false);
+      return;
+    }
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
       const res = await quotationClient.getTripQuotation(tripId);
       if (res.success && res.data) {
         setCosting(res.data.costing);
         setQuotations(res.data.quotations);
-        if (res.data.quotations.length > 0 && !activeQuoteId) {
-          setActiveQuoteId(res.data.quotations[0].id);
+        if (res.data.quotations.length > 0) {
+          if (queryQuotationId && res.data.quotations.some((q) => q.id === queryQuotationId)) {
+            setActiveQuoteId(queryQuotationId);
+          } else if (!activeQuoteId || !res.data.quotations.some((q) => q.id === activeQuoteId)) {
+            setActiveQuoteId(res.data.quotations[0].id);
+          }
         }
       }
     } catch (err: any) {
@@ -191,12 +243,16 @@ export default function TripQuotationEditorPage() {
       }
       setError(err?.message || "Failed to load trip quotations.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
-  }, [tripId, activeQuoteId]);
+  }, [tripId, activeQuoteId, queryQuotationId]);
 
   // Load active tax rates catalog from DB
   const loadTaxRates = React.useCallback(async () => {
+    if (!isAgencyOwner && (!isAgencyStaff || (!hasStaffPermission("QUOTATIONS", "view") && !hasStaffPermission("QUOTATION_DETAIL", "view")))) {
+      setTaxRatesLoading(false);
+      return;
+    }
     try {
       setTaxRatesLoading(true);
       setTaxRatesError(null);
@@ -216,11 +272,39 @@ export default function TripQuotationEditorPage() {
     }
   }, [tripId, fetchTripQuotationData, loadTaxRates]);
 
+  // Synchronize active quotation when URL query parameter targets a specific quotation
+  React.useEffect(() => {
+    if (queryQuotationId && quotations.length > 0 && quotations.some((q) => q.id === queryQuotationId)) {
+      setActiveQuoteId(queryQuotationId);
+    }
+  }, [queryQuotationId, quotations]);
+
   const activeQuote = quotations.find((q) => q.id === activeQuoteId) || quotations[0] || null;
 
-  // Sync policy form on active quote change
+  const latestVersionNumber = React.useMemo(() => {
+    if (!activeQuote || quotations.length === 0) return activeQuote?.version || 1;
+    const sameNumberQuotes = quotations.filter((q) => q.quotationNumber === activeQuote.quotationNumber);
+    return Math.max(...sameNumberQuotes.map((q) => q.version), activeQuote.version);
+  }, [activeQuote, quotations]);
+
+  const isHistoricalVersion = Boolean(activeQuote && activeQuote.version < latestVersionNumber);
+  const latestQuoteForNumber = React.useMemo(() => {
+    if (!activeQuote) return null;
+    return (
+      quotations.find(
+        (q) => q.quotationNumber === activeQuote.quotationNumber && q.version === latestVersionNumber
+      ) || null
+    );
+  }, [activeQuote, quotations, latestVersionNumber]);
+
+  const lastSyncedQuoteIdRef = React.useRef<string | null>(null);
+
+  // Sync policy form on active quote change (preserve local in-flight edits on same quote)
   React.useEffect(() => {
-    if (activeQuote) {
+    if (!activeQuote) return;
+    const isDifferentQuote = lastSyncedQuoteIdRef.current !== activeQuote.id;
+    if (isDifferentQuote || (policySaveStatus !== "unsaved" && policySaveStatus !== "saving")) {
+      lastSyncedQuoteIdRef.current = activeQuote.id;
       setPolicyForm({
         proposalSubtitle: activeQuote.proposalSubtitle || "",
         customerMessage: activeQuote.customerMessage || "",
@@ -235,7 +319,32 @@ export default function TripQuotationEditorPage() {
       setMarkupInput(String(Number(activeQuote.markupPercentage || 0)));
       setDiscountInput(String(Number(activeQuote.discountPercentage || 0)));
     }
-  }, [activeQuote]);
+  }, [activeQuote, policySaveStatus]);
+
+  // Sync payment schedule on active quote change (preserve local in-flight edits on same quote)
+  React.useEffect(() => {
+    if (!activeQuote) return;
+    const isDifferentQuote = lastSyncedScheduleQuoteIdRef.current !== activeQuote.id;
+    if (isDifferentQuote || (scheduleSaveStatus !== "unsaved" && scheduleSaveStatus !== "saving")) {
+      lastSyncedScheduleQuoteIdRef.current = activeQuote.id;
+      const initialTerms = activeQuote.paymentTerms || "";
+      const initialMilestones: LocalMilestoneItem[] = (activeQuote.paymentMilestones || []).map((m, idx) => ({
+        id: m.id,
+        title: m.title,
+        description: m.description || "",
+        percentage: Number(m.percentage || 0),
+        amount: m.amount ? Number(m.amount) : null,
+        dueDate: m.dueDate ? new Date(m.dueDate).toISOString().split("T")[0] : "",
+        sortOrder: m.sortOrder ?? idx,
+      })).sort((a, b) => a.sortOrder - b.sortOrder);
+
+      setSchedulePaymentTerms(initialTerms);
+      setMilestonesForm(initialMilestones);
+      latestScheduleRef.current = { terms: initialTerms, milestones: initialMilestones };
+      setScheduleSaveStatus("idle");
+      setScheduleSaveError(null);
+    }
+  }, [activeQuote, scheduleSaveStatus]);
 
   // Generate Quotation Snapshot
   const handleGenerate = async () => {
@@ -269,7 +378,7 @@ export default function TripQuotationEditorPage() {
       if (res.success && res.data) {
         toast.success(`Proposal snapshot ${res.data.quotationNumber} (V${res.data.version}) created!`);
         refreshSubscription();
-        await fetchTripQuotationData();
+        await fetchTripQuotationData(true);
         setActiveQuoteId(res.data.id);
       }
     } catch (err: any) {
@@ -303,7 +412,7 @@ export default function TripQuotationEditorPage() {
       if (res.success && res.data) {
         toast.success(`Forked new version V${res.data.version} successfully!`);
         refreshSubscription();
-        await fetchTripQuotationData();
+        await fetchTripQuotationData(true);
         setActiveQuoteId(res.data.id);
       }
     } catch (err: any) {
@@ -329,9 +438,37 @@ export default function TripQuotationEditorPage() {
       setShowQuotaDialog(true);
       return;
     }
-    if (activeQuote) {
-      router.push(`/bookings/new?quotationId=${activeQuote.id}&tripId=${tripId}`);
+    if (!activeQuote) return;
+
+    if (activeQuote.status !== QuotationStatus.ACCEPTED) {
+      toast.error("Only accepted quotations can be converted to a booking.");
+      return;
     }
+
+    const existingBookingId = activeQuote.bookings?.[0]?.id;
+    if (existingBookingId) {
+      router.push(`/bookings/${existingBookingId}`);
+      return;
+    }
+
+    setConfirmAction({
+      title: "Convert Accepted Quotation to Booking?",
+      description: `Create a new booking from Quotation #${activeQuote.quotationNumber} (V${activeQuote.version} - ${activeQuote.tier || "Standard"}) for ${formatCurrency(Number(activeQuote.finalAmount), activeQuote.currency)}. A draft booking will be created in your bookings management for final confirmation and invoice issuance.`,
+      confirmText: "Convert to Booking",
+      variant: "default",
+      action: async () => {
+        try {
+          const res = await bookingClient.convertQuotationToBooking(activeQuote.id);
+          if (res.success && res.data) {
+            toast.success(`Booking ${res.data.bookingNumber} created successfully!`);
+            refreshSubscription();
+            router.push(`/bookings/${res.data.id}`);
+          }
+        } catch (err: any) {
+          toast.error(err?.message || "Failed to convert quotation to booking.");
+        }
+      },
+    });
   };
 
   // Status Change
@@ -437,7 +574,7 @@ export default function TripQuotationEditorPage() {
       if (res.success) {
         toast.success("Line item added.");
         setIsAddItemOpen(false);
-        await fetchTripQuotationData();
+        await fetchTripQuotationData(true);
       }
     } catch (err: any) {
       toast.error(err?.message || "Failed to add line item.");
@@ -498,7 +635,7 @@ export default function TripQuotationEditorPage() {
       if (res.success) {
         toast.success("Line item updated.");
         setIsEditItemOpen(false);
-        await fetchTripQuotationData();
+        await fetchTripQuotationData(true);
       }
     } catch (err: any) {
       toast.error(err?.message || "Failed to update item.");
@@ -519,7 +656,7 @@ export default function TripQuotationEditorPage() {
           const res = await quotationClient.deleteQuotationItem(activeQuote.id, itemId);
           if (res.success) {
             toast.success("Item removed.");
-            await fetchTripQuotationData();
+            await fetchTripQuotationData(true);
           }
         } catch (err: any) {
           toast.error(getErrorMessage(err, "Failed to delete item. Please try again."));
@@ -581,7 +718,7 @@ export default function TripQuotationEditorPage() {
         toast.success("Proposal item added.");
       }
       setIsProposalItemModalOpen(false);
-      await fetchTripQuotationData();
+      await fetchTripQuotationData(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to save proposal item.");
     } finally {
@@ -594,129 +731,388 @@ export default function TripQuotationEditorPage() {
     try {
       await quotationClient.deleteProposalItem(activeQuote.id, itemId);
       toast.success("Item removed.");
-      await fetchTripQuotationData();
+      await fetchTripQuotationData(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to delete proposal item.");
     }
   };
 
-  // Payment Milestone Handlers
+  // Payment Schedule & Milestone Handlers (Phase 2C)
+  const executeScheduleSave = React.useCallback(async (payloadToSave: { terms: string; milestones: LocalMilestoneItem[] }) => {
+    if (!activeQuote || isReadOnly) return;
+
+    if (scheduleInFlightRef.current) {
+      schedulePendingRef.current = payloadToSave;
+      return;
+    }
+
+    const totalPct = payloadToSave.milestones.reduce((acc, m) => acc + (Number(m.percentage) || 0), 0);
+    // If milestones are configured, require total percentage to equal 100% before persisting
+    if (payloadToSave.milestones.length > 0 && Math.abs(totalPct - 100) >= 0.01) {
+      setScheduleSaveStatus("unsaved");
+      return;
+    }
+
+    scheduleInFlightRef.current = true;
+    setScheduleSaveStatus("saving");
+    setScheduleSaveError(null);
+    const currentSeq = ++scheduleSeqRef.current;
+
+    try {
+      const res = await quotationClient.syncPaymentSchedule(activeQuote.id, {
+        paymentTerms: payloadToSave.terms ? payloadToSave.terms.trim() : null,
+        milestones: payloadToSave.milestones.map((m, idx) => ({
+          id: m.id,
+          title: m.title.trim(),
+          description: m.description ? m.description.trim() : null,
+          percentage: Number(m.percentage),
+          amount: m.amount ?? null,
+          dueDate: m.dueDate ? new Date(m.dueDate) : null,
+          sortOrder: idx,
+        })),
+      });
+
+      if (currentSeq === scheduleSeqRef.current) {
+        if (res.success && res.data) {
+          setQuotations((prev) => prev.map((q) => (q.id === activeQuote.id ? res.data! : q)));
+          setScheduleSaveStatus("saved");
+          setTimeout(() => {
+            setScheduleSaveStatus((curr) => (curr === "saved" ? "idle" : curr));
+          }, 2500);
+        }
+      }
+    } catch (err: any) {
+      if (currentSeq === scheduleSeqRef.current) {
+        setScheduleSaveStatus("error");
+        setScheduleSaveError(err?.message || "Failed to persist payment schedule.");
+      }
+    } finally {
+      scheduleInFlightRef.current = false;
+      if (schedulePendingRef.current) {
+        const nextPayload = schedulePendingRef.current;
+        schedulePendingRef.current = null;
+        executeScheduleSave(nextPayload);
+      }
+    }
+  }, [activeQuote, isReadOnly]);
+
+  const triggerDebouncedScheduleSave = React.useCallback((terms: string, milestones: LocalMilestoneItem[]) => {
+    latestScheduleRef.current = { terms, milestones };
+    setScheduleSaveStatus("unsaved");
+
+    if (scheduleTimerRef.current) {
+      clearTimeout(scheduleTimerRef.current);
+    }
+
+    const totalPct = milestones.reduce((acc, m) => acc + (Number(m.percentage) || 0), 0);
+    if (milestones.length === 0 || Math.abs(totalPct - 100) < 0.01) {
+      scheduleTimerRef.current = setTimeout(() => {
+        executeScheduleSave({ terms, milestones });
+      }, 800);
+    }
+  }, [executeScheduleSave]);
+
+  React.useEffect(() => {
+    return () => {
+      if (scheduleTimerRef.current) {
+        clearTimeout(scheduleTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handlePaymentTermsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    if (val.length > 3000) return;
+    setSchedulePaymentTerms(val);
+    triggerDebouncedScheduleSave(val, milestonesForm);
+  };
+
+  const handleManualScheduleSave = async () => {
+    if (!activeQuote || isReadOnly) return;
+    const currentSchedule = latestScheduleRef.current;
+    const totalPct = currentSchedule.milestones.reduce((acc, m) => acc + (Number(m.percentage) || 0), 0);
+    if (currentSchedule.milestones.length > 0 && Math.abs(totalPct - 100) >= 0.01) {
+      toast.error(`Total milestone percentage must equal 100% (currently ${totalPct}%). Please adjust milestone percentages.`);
+      return;
+    }
+    await executeScheduleSave(currentSchedule);
+    toast.success("Payment schedule saved.");
+  };
+
+  const handleMoveMilestoneUp = (index: number) => {
+    if (index <= 0 || isReadOnly) return;
+    const next = [...milestonesForm];
+    const temp = next[index];
+    next[index] = next[index - 1];
+    next[index - 1] = temp;
+    const reordered = next.map((m, idx) => ({ ...m, sortOrder: idx }));
+    setMilestonesForm(reordered);
+    triggerDebouncedScheduleSave(schedulePaymentTerms, reordered);
+  };
+
+  const handleMoveMilestoneDown = (index: number) => {
+    if (index >= milestonesForm.length - 1 || isReadOnly) return;
+    const next = [...milestonesForm];
+    const temp = next[index];
+    next[index] = next[index + 1];
+    next[index + 1] = temp;
+    const reordered = next.map((m, idx) => ({ ...m, sortOrder: idx }));
+    setMilestonesForm(reordered);
+    triggerDebouncedScheduleSave(schedulePaymentTerms, reordered);
+  };
+
+  const handleApplyScheduleTemplate = (templateKey: "STANDARD_3_TIER" | "ADVANCE_BALANCE" | "FULL_ADVANCE") => {
+    if (!activeQuote || isReadOnly) return;
+    let newMilestones: LocalMilestoneItem[] = [];
+    if (templateKey === "STANDARD_3_TIER") {
+      newMilestones = [
+        {
+          title: "Booking Deposit",
+          description: "Required upon booking confirmation to secure travel reservations",
+          percentage: 30,
+          amount: null,
+          dueDate: "",
+          sortOrder: 0,
+        },
+        {
+          title: "Pre-Travel Clearance",
+          description: "Required 30 days prior to travel for voucher issuance",
+          percentage: 50,
+          amount: null,
+          dueDate: "",
+          sortOrder: 1,
+        },
+        {
+          title: "Final Balance",
+          description: "Due 7 days prior to departure date",
+          percentage: 20,
+          amount: null,
+          dueDate: "",
+          sortOrder: 2,
+        },
+      ];
+    } else if (templateKey === "ADVANCE_BALANCE") {
+      newMilestones = [
+        {
+          title: "Booking Advance",
+          description: "Initial confirmation deposit upon proposal approval",
+          percentage: 50,
+          amount: null,
+          dueDate: "",
+          sortOrder: 0,
+        },
+        {
+          title: "Final Balance",
+          description: "Due 15 days prior to departure",
+          percentage: 50,
+          amount: null,
+          dueDate: "",
+          sortOrder: 1,
+        },
+      ];
+    } else if (templateKey === "FULL_ADVANCE") {
+      newMilestones = [
+        {
+          title: "Full Payment Advance",
+          description: "100% advance required upon package booking",
+          percentage: 100,
+          amount: null,
+          dueDate: "",
+          sortOrder: 0,
+        },
+      ];
+    }
+
+    setMilestonesForm(newMilestones);
+    triggerDebouncedScheduleSave(schedulePaymentTerms, newMilestones);
+    toast.success("Schedule preset applied!");
+  };
+
+  const handleClearMilestones = () => {
+    if (!activeQuote || isReadOnly) return;
+    setConfirmAction({
+      title: "Clear all payment milestones?",
+      description: "This will remove all milestones from the payment schedule for this quotation version. The customer proposal will show payment terms only.",
+      confirmText: "Clear Milestones",
+      variant: "destructive",
+      action: async () => {
+        setMilestonesForm([]);
+        triggerDebouncedScheduleSave(schedulePaymentTerms, []);
+        toast.success("Payment milestones cleared.");
+      },
+    });
+  };
+
+  const handleDeleteMilestoneItem = (index: number) => {
+    if (!activeQuote || isReadOnly) return;
+    const target = milestonesForm[index];
+    if (!target) return;
+    setConfirmAction({
+      title: "Delete payment milestone?",
+      description: `Remove "${target.title}" (${target.percentage}%) from this quotation?`,
+      confirmText: "Delete Milestone",
+      variant: "destructive",
+      action: async () => {
+        const next = milestonesForm.filter((_, idx) => idx !== index).map((m, idx) => ({ ...m, sortOrder: idx }));
+        setMilestonesForm(next);
+        triggerDebouncedScheduleSave(schedulePaymentTerms, next);
+        toast.success("Milestone removed.");
+      },
+    });
+  };
+
   const handleOpenAddMilestone = () => {
-    setEditingMilestone(null);
+    setEditingMilestoneIdx(null);
     setMilestoneTitle("");
     setMilestoneDesc("");
-    setMilestonePct("");
-    setMilestoneAmt("");
+    const currentTotal = milestonesForm.reduce((acc, m) => acc + (Number(m.percentage) || 0), 0);
+    const remaining = Math.max(0, 100 - currentTotal);
+    setMilestonePct(remaining > 0 ? String(remaining) : "");
     setMilestoneDueDate("");
     setIsMilestoneModalOpen(true);
   };
 
-  const handleOpenEditMilestone = (m: QuotationPaymentMilestone) => {
-    setEditingMilestone(m);
+  const handleOpenEditMilestoneIdx = (index: number) => {
+    const m = milestonesForm[index];
+    if (!m) return;
+    setEditingMilestoneIdx(index);
     setMilestoneTitle(m.title);
     setMilestoneDesc(m.description || "");
     setMilestonePct(m.percentage ? String(m.percentage) : "");
-    setMilestoneAmt(m.amount ? String(m.amount) : "");
-    setMilestoneDueDate(m.dueDate ? new Date(m.dueDate).toISOString().split("T")[0] : "");
+    setMilestoneDueDate(m.dueDate || "");
     setIsMilestoneModalOpen(true);
   };
 
-  const handleSaveMilestone = async (e: React.FormEvent) => {
+  const handleSaveMilestoneModal = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeQuote || !milestoneTitle || isReadOnly) return;
+    if (!milestoneTitle.trim()) {
+      toast.error("Please enter a milestone title.");
+      return;
+    }
+    const pct = Number(milestonePct);
+    if (isNaN(pct) || pct <= 0 || pct > 100) {
+      toast.error("Percentage must be a positive number up to 100%.");
+      return;
+    }
 
-    if (milestonePct && !isValidDecimal(milestonePct, { min: 0, max: 100 })) {
-      toast.error("Percentage must be a valid number between 0 and 100");
+    let next: LocalMilestoneItem[];
+    if (editingMilestoneIdx !== null && editingMilestoneIdx >= 0 && editingMilestoneIdx < milestonesForm.length) {
+      next = milestonesForm.map((m, idx) => {
+        if (idx === editingMilestoneIdx) {
+          return {
+            ...m,
+            title: milestoneTitle.trim(),
+            description: milestoneDesc.trim(),
+            percentage: pct,
+            dueDate: milestoneDueDate,
+          };
+        }
+        return m;
+      });
+      toast.success("Milestone updated.");
+    } else {
+      const newItem: LocalMilestoneItem = {
+        title: milestoneTitle.trim(),
+        description: milestoneDesc.trim(),
+        percentage: pct,
+        amount: null,
+        dueDate: milestoneDueDate,
+        sortOrder: milestonesForm.length,
+      };
+      next = [...milestonesForm, newItem];
+      toast.success("Milestone added.");
+    }
+
+    setMilestonesForm(next);
+    setIsMilestoneModalOpen(false);
+    triggerDebouncedScheduleSave(schedulePaymentTerms, next);
+  };
+
+  // Reliable Auto-Save for Policy & Terms Form (Workstream E)
+  const executePolicySave = React.useCallback(async (payloadToSave: typeof policyForm) => {
+    if (!activeQuote || isReadOnly) return;
+
+    if (policyInFlightRef.current) {
+      policyPendingRef.current = payloadToSave;
       return;
     }
-    if (milestoneAmt && !isValidDecimal(milestoneAmt, { min: 0 })) {
-      toast.error("Fixed amount must be a valid positive amount");
-      return;
-    }
+
+    policyInFlightRef.current = true;
+    setPolicySaveStatus("saving");
+    setPolicySaveError(null);
+    const currentSeq = ++policySeqRef.current;
 
     try {
-      setMilestoneSaving(true);
-      const pct = milestonePct ? Number(milestonePct) : null;
-      const amt = milestoneAmt ? Number(milestoneAmt) : null;
+      const res = await quotationClient.updateQuotation(activeQuote.id, {
+        proposalSubtitle: payloadToSave.proposalSubtitle || null,
+        customerMessage: payloadToSave.customerMessage || null,
+        inclusionsIntro: payloadToSave.inclusionsIntro || null,
+        exclusionsIntro: payloadToSave.exclusionsIntro || null,
+        paymentTerms: payloadToSave.paymentTerms || null,
+        cancellationPolicy: payloadToSave.cancellationPolicy || null,
+        importantNotes: payloadToSave.importantNotes || null,
+        terms: payloadToSave.terms || null,
+        privacyPolicy: payloadToSave.privacyPolicy || null,
+      });
 
-      if (editingMilestone) {
-        await quotationClient.updatePaymentMilestone(activeQuote.id, editingMilestone.id, {
-          title: milestoneTitle,
-          description: milestoneDesc || null,
-          percentage: pct,
-          amount: amt,
-          dueDate: milestoneDueDate ? new Date(milestoneDueDate) : null,
-        });
-        toast.success("Milestone updated.");
-      } else {
-        await quotationClient.createPaymentMilestone(activeQuote.id, {
-          title: milestoneTitle,
-          description: milestoneDesc || null,
-          percentage: pct,
-          amount: amt,
-          dueDate: milestoneDueDate ? new Date(milestoneDueDate) : null,
-        });
-        toast.success("Milestone created.");
+      if (currentSeq === policySeqRef.current) {
+        if (res.success && res.data) {
+          setQuotations((prev) => prev.map((q) => (q.id === activeQuote.id ? res.data! : q)));
+          setPolicySaveStatus("saved");
+          setTimeout(() => {
+            setPolicySaveStatus((curr) => (curr === "saved" ? "idle" : curr));
+          }, 2500);
+        }
       }
-      setIsMilestoneModalOpen(false);
-      await fetchTripQuotationData();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to save milestone.");
+      if (currentSeq === policySeqRef.current) {
+        setPolicySaveStatus("error");
+        setPolicySaveError(err?.message || "Failed to autosave proposal terms.");
+      }
     } finally {
-      setMilestoneSaving(false);
+      policyInFlightRef.current = false;
+      if (policyPendingRef.current) {
+        const nextPayload = policyPendingRef.current;
+        policyPendingRef.current = null;
+        executePolicySave(nextPayload);
+      }
     }
-  };
+  }, [activeQuote, isReadOnly]);
 
-  const handleDeleteMilestone = async (milestoneId: string) => {
-    if (!activeQuote || isReadOnly) return;
-    try {
-      await quotationClient.deletePaymentMilestone(activeQuote.id, milestoneId);
-      toast.success("Milestone removed.");
-      await fetchTripQuotationData();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to delete milestone.");
-    }
-  };
+  const updatePolicyField = React.useCallback((field: keyof typeof policyForm, value: string) => {
+    setPolicyForm((prev) => {
+      const next = { ...prev, [field]: value };
+      latestPolicyRef.current = next;
+      setPolicySaveStatus("unsaved");
 
-  const handleGenerateDefaultMilestones = async () => {
-    if (!activeQuote || isReadOnly) return;
-    try {
-      await quotationClient.generateDefaultPaymentSchedule(activeQuote.id, { template: "STANDARD_3_TIER" });
-      toast.success("3-Tier payment schedule generated (30% / 50% / 20%)!");
-      await fetchTripQuotationData();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to generate schedule.");
-    }
-  };
+      if (policyTimerRef.current) {
+        clearTimeout(policyTimerRef.current);
+      }
+      policyTimerRef.current = setTimeout(() => {
+        executePolicySave(next);
+      }, 800);
 
+      return next;
+    });
+  }, [executePolicySave]);
+
+  React.useEffect(() => {
+    return () => {
+      if (policyTimerRef.current) {
+        clearTimeout(policyTimerRef.current);
+        policyTimerRef.current = null;
+      }
+    };
+  }, []);
   // Save Policy / Terms Form
   const handleSavePolicies = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeQuote || isReadOnly) return;
-
-    try {
-      setSavingPolicies(true);
-      const res = await quotationClient.updateQuotation(activeQuote.id, {
-        proposalSubtitle: policyForm.proposalSubtitle || null,
-        customerMessage: policyForm.customerMessage || null,
-        inclusionsIntro: policyForm.inclusionsIntro || null,
-        exclusionsIntro: policyForm.exclusionsIntro || null,
-        paymentTerms: policyForm.paymentTerms || null,
-        cancellationPolicy: policyForm.cancellationPolicy || null,
-        importantNotes: policyForm.importantNotes || null,
-        terms: policyForm.terms || null,
-        privacyPolicy: policyForm.privacyPolicy || null,
-      });
-
-      if (res.success && res.data) {
-        toast.success("Proposal terms and policies saved.");
-        setQuotations((prev) => prev.map((q) => (q.id === activeQuote.id ? res.data! : q)));
-      }
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to save policies.");
-    } finally {
-      setSavingPolicies(false);
+    if (policyTimerRef.current) {
+      clearTimeout(policyTimerRef.current);
+      policyTimerRef.current = null;
     }
+    await executePolicySave(policyForm);
+    toast.success("Proposal terms and policies saved.");
   };
 
   // Copy Public Link
@@ -726,7 +1122,7 @@ export default function TripQuotationEditorPage() {
     toast.success("Public proposal link copied to clipboard!");
   };
 
-  if (loading) {
+  if (loading && !costing && quotations.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="text-center space-y-3">
@@ -742,6 +1138,18 @@ export default function TripQuotationEditorPage() {
   const importantNotes = activeQuote?.proposalItems?.filter((p) => p.type === ProposalItemType.IMPORTANT_NOTE) || [];
   const milestones = activeQuote?.paymentMilestones || [];
 
+  if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("QUOTATIONS", "view"))) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Trip Quotation"
+          badgeText="Access Restricted"
+          description="You do not have permission to view quotations. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
       {isReadOnly && <ReadOnlyBanner moduleName="Quotations" />}
@@ -751,7 +1159,7 @@ export default function TripQuotationEditorPage() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-start gap-2.5 sm:gap-3">
             <Link
-              href={`/trips/${tripId}`}
+              href={`/trips/${tripId}?tab=quotation`}
               className="inline-flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200 text-xs font-semibold h-9 w-9 rounded-xl shadow-2xs transition-colors shrink-0 mt-0.5"
             >
               <ArrowLeft className="h-4 w-4 text-slate-600" />
@@ -844,14 +1252,38 @@ export default function TripQuotationEditorPage() {
                   Preview
                 </Button>
 
-                <Button
-                  size="sm"
-                  onClick={handleConvertToBooking}
-                  className="w-full sm:w-auto bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer justify-center whitespace-nowrap"
-                >
-                  <CalendarCheck className="h-3.5 w-3.5 mr-1 text-emerald-600 shrink-0" />
-                  Convert to Booking
-                </Button>
+                {activeQuote.bookings && activeQuote.bookings.length > 0 ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/bookings/${activeQuote.bookings![0].id}`)}
+                    className="w-full sm:w-auto bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer justify-center whitespace-nowrap"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-emerald-600 shrink-0" />
+                    View Booking ({activeQuote.bookings[0].bookingNumber})
+                  </Button>
+                ) : activeQuote.status === QuotationStatus.ACCEPTED ? (
+                  <Button
+                    size="sm"
+                    onClick={handleConvertToBooking}
+                    disabled={isReadOnly}
+                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white h-9 font-semibold text-xs rounded-xl shadow-2xs cursor-pointer justify-center whitespace-nowrap"
+                  >
+                    <CalendarCheck className="h-3.5 w-3.5 mr-1 shrink-0" />
+                    Convert to Booking
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    title="Quotation must be accepted by the customer before converting to a booking."
+                    className="w-full sm:w-auto bg-slate-50 text-slate-400 border-slate-200 h-9 font-medium text-xs rounded-xl opacity-60 cursor-not-allowed justify-center whitespace-nowrap"
+                  >
+                    <CalendarCheck className="h-3.5 w-3.5 mr-1 shrink-0" />
+                    Convert to Booking
+                  </Button>
+                )}
               </>
             )}
 
@@ -947,19 +1379,116 @@ export default function TripQuotationEditorPage() {
           </div>
         )}
 
+        {/* Customer Acceptance Banner */}
+        {activeQuote?.status === QuotationStatus.ACCEPTED && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-2xs">
+            <div className="flex items-start gap-3.5 min-w-0">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-bold text-emerald-900 text-sm">Proposal Accepted by Customer</h4>
+                  <Badge className="bg-emerald-600 text-white text-[10px] font-bold">
+                    V{activeQuote.version} Accepted
+                  </Badge>
+                  {isHistoricalVersion && (
+                    <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 text-[10px]">
+                      Historical Version (Latest is V{latestVersionNumber})
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  Customer accepted Quotation #{activeQuote.quotationNumber} (V{activeQuote.version}) for {formatCurrency(Number(activeQuote.finalAmount), activeQuote.currency)}.
+                  {activeQuote.acceptedAt && (
+                    <span className="block text-[11px] text-emerald-700 font-medium mt-0.5">
+                      Accepted on {new Date(activeQuote.acceptedAt).toLocaleString()}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="shrink-0 flex items-center gap-2 self-end sm:self-center">
+              {activeQuote.bookings && activeQuote.bookings.length > 0 ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => router.push(`/bookings/${activeQuote.bookings![0].id}`)}
+                  className="bg-white border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-semibold h-8.5 px-3 rounded-xl shadow-2xs cursor-pointer"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                  View Booking #{activeQuote.bookings[0].bookingNumber}
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={handleConvertToBooking}
+                  disabled={actionLoading || isReadOnly}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8.5 px-4 rounded-xl shadow-xs cursor-pointer"
+                >
+                  <CalendarCheck className="h-3.5 w-3.5 mr-1.5" />
+                  Convert to Booking
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Historical Version Notice Banner */}
+        {isHistoricalVersion && latestQuoteForNumber && (
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+            <div className="flex items-center gap-2.5 text-slate-600">
+              <Info className="h-4 w-4 text-slate-500 shrink-0" />
+              <span>
+                You are viewing a historical snapshot (<strong>V{activeQuote.version}</strong>). The latest active version is <strong>V{latestVersionNumber}</strong>.
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setActiveQuoteId(latestQuoteForNumber.id)}
+              className="h-7 px-3 text-xs font-semibold bg-white hover:bg-slate-100 border-slate-300 text-slate-800 rounded-lg cursor-pointer shrink-0 self-end sm:self-center"
+            >
+              Open Latest (V{latestVersionNumber})
+            </Button>
+          </div>
+        )}
+
         {/* Customer Feedback Banner if changes requested */}
-        {activeQuote?.customerFeedback && (
+        {(activeQuote?.customerFeedback || (activeQuote?.customerResponseHistory && activeQuote.customerResponseHistory.length > 0)) && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-2xs">
             <MessageSquare className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <h4 className="font-bold text-amber-900 text-sm">Customer Feedback / Revision Request Received</h4>
-              <p className="text-xs text-amber-800 leading-relaxed italic">
-                &ldquo;{activeQuote.customerFeedback}&rdquo;
+            <div className="space-y-1.5 flex-1 min-w-0">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="font-bold text-amber-900 text-sm">Customer Feedback / Revision Request Received</h4>
+                {(activeQuote.customerFeedbackAt || (activeQuote.customerResponseHistory && activeQuote.customerResponseHistory.length > 0)) && (
+                  <span className="text-[10px] text-amber-600 font-medium">
+                    Latest: {new Date(activeQuote.customerFeedbackAt || activeQuote.customerResponseHistory![activeQuote.customerResponseHistory!.length - 1].createdAt).toLocaleString()}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed italic bg-white/60 p-2.5 rounded-xl border border-amber-200/60">
+                &ldquo;{activeQuote.customerFeedback || activeQuote.customerResponseHistory?.[activeQuote.customerResponseHistory.length - 1]?.message}&rdquo;
               </p>
-              {activeQuote.customerFeedbackAt && (
-                <p className="text-[10px] text-amber-600">
-                  Received on {new Date(activeQuote.customerFeedbackAt).toLocaleString()}
-                </p>
+
+              {/* Revision History List if multiple responses exist */}
+              {activeQuote.customerResponseHistory && activeQuote.customerResponseHistory.length > 1 && (
+                <div className="mt-3 pt-2.5 border-t border-amber-200/70 space-y-2">
+                  <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <History className="h-3 w-3" />
+                    Historical Revision Requests ({activeQuote.customerResponseHistory.length} total)
+                  </div>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                    {activeQuote.customerResponseHistory.map((item, idx) => (
+                      <div key={item.id || idx} className="text-[11px] bg-amber-100/50 rounded-lg p-2 border border-amber-200/50">
+                        <div className="flex items-center justify-between text-[10px] text-amber-700 font-medium mb-0.5">
+                          <span>{item.action === "QUOTATION_ACCEPTED" ? "Accepted" : "Change Request"} (V{item.version})</span>
+                          <span>{new Date(item.createdAt).toLocaleString()}</span>
+                        </div>
+                        <p className="text-amber-900 italic">&ldquo;{item.message}&rdquo;</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -990,8 +1519,7 @@ export default function TripQuotationEditorPage() {
               <CheckCircle2 className="h-4 w-4" />
               Inclusions & Exclusions ({inclusions.length + exclusions.length})
             </button>
-            {/* Payment Schedule Tab (Temporarily hidden from UI per Phase Cleanup) */}
-            {/* <button
+            <button
               onClick={() => setActiveTab("milestones")}
               className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
                 activeTab === "milestones"
@@ -1000,8 +1528,8 @@ export default function TripQuotationEditorPage() {
               }`}
             >
               <CreditCard className="h-4 w-4" />
-              Payment Schedule ({milestones.length})
-            </button> */}
+              Payment Schedule ({milestonesForm.length})
+            </button>
             <button
               onClick={() => setActiveTab("policies")}
               className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
@@ -1072,7 +1600,7 @@ export default function TripQuotationEditorPage() {
                               <div>
                                 <span>{item.name}</span>
                                 {item.description && (
-                                  <p className="text-[11px] font-normal text-slate-500">{item.description}</p>
+                                  <p className="text-[11px] font-normal text-slate-500">{formatEmbeddedEnums(item.description)}</p>
                                 )}
                               </div>
                             </TableCell>
@@ -1660,105 +2188,382 @@ export default function TripQuotationEditorPage() {
           );
         })()}
 
-        {/* ─── TAB 4: PAYMENT MILESTONES (Temporarily hidden from UI per Phase Cleanup) ─── */}
-        {/* {activeQuote && activeTab === "milestones" && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 flex-wrap gap-3">
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">Payment Milestone Schedule</h3>
-                <p className="text-xs text-slate-500">
-                  Configure deposit, pre-travel clearances, and balance schedules presented to the customer.
-                </p>
-              </div>
+        {/* ─── TAB 4: PAYMENT SCHEDULE & MILESTONES (Phase 2C) ─── */}
+        {activeQuote && activeTab === "milestones" && (() => {
+          const totalAllocated = milestonesForm.reduce((acc, m) => acc + (Number(m.percentage) || 0), 0);
+          const roundedAllocated = Math.round(totalAllocated * 10) / 10;
+          const isComplete = Math.abs(totalAllocated - 100) < 0.01;
+          const isOver = totalAllocated > 100;
+          const isUnder = totalAllocated < 100 && milestonesForm.length > 0;
 
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleGenerateDefaultMilestones}
-                  className="h-8.5 text-xs font-semibold bg-slate-50 hover:bg-slate-100 border-slate-200"
-                >
-                  <Sparkles className="h-3.5 w-3.5 mr-1 text-indigo-600" />
-                  Auto-Schedule (30% / 50% / 20%)
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleOpenAddMilestone}
-                  className="h-8.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Milestone
-                </Button>
-              </div>
-            </div>
+          return (
+            <div className="space-y-6">
+              {/* Main Card */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-slate-900 text-base">Payment Terms & Milestone Schedule</h3>
+                      {scheduleSaveStatus === "saving" && (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          Saving...
+                        </Badge>
+                      )}
+                      {scheduleSaveStatus === "saved" && (
+                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                          <Check className="h-3 w-3 mr-1 text-emerald-600" />
+                          Saved
+                        </Badge>
+                      )}
+                      {scheduleSaveStatus === "unsaved" && (
+                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
+                          <Clock className="h-3 w-3 mr-1 text-amber-600" />
+                          Unsaved changes
+                        </Badge>
+                      )}
+                      {scheduleSaveStatus === "error" && (
+                        <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 text-xs">
+                          <AlertCircle className="h-3 w-3 mr-1 text-rose-600" />
+                          Save failed
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Configure booking advance, pre-travel clearances, and balance schedules presented to the customer on Quotation V{activeQuote.version}.
+                    </p>
+                  </div>
 
-            {milestones.length === 0 ? (
-              <div className="text-center py-12 space-y-3">
-                <CreditCard className="h-10 w-10 text-slate-300 mx-auto" />
-                <p className="text-xs text-slate-500">No payment schedule configured for this proposal.</p>
-                <Button size="sm" onClick={handleGenerateDefaultMilestones} className="text-xs">
-                  Generate Standard Schedule
-                </Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {milestones.map((m, index) => (
-                  <div
-                    key={m.id}
-                    className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 relative group hover:border-indigo-200 transition-all space-y-3"
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      onClick={handleManualScheduleSave}
+                      disabled={scheduleSaveStatus === "saving" || isReadOnly || isOver || isUnder}
+                      className="h-8.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
+                    >
+                      {scheduleSaveStatus === "saving" ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Saving...
+                        </>
+                      ) : scheduleSaveStatus === "error" ? (
+                        <>Retry Save</>
+                      ) : (
+                        <>Save Schedule</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Templates & Add Milestone Bar */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-4 bg-slate-50/70 rounded-2xl border border-slate-100">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-slate-500 mr-1 flex items-center gap-1">
+                      <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
+                      Templates:
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleApplyScheduleTemplate("STANDARD_3_TIER")}
+                      disabled={isReadOnly}
+                      className="h-7 text-xs font-semibold bg-white hover:bg-slate-50 border-slate-200 text-slate-700 cursor-pointer"
+                    >
+                      Standard (30% / 50% / 20%)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleApplyScheduleTemplate("ADVANCE_BALANCE")}
+                      disabled={isReadOnly}
+                      className="h-7 text-xs font-semibold bg-white hover:bg-slate-50 border-slate-200 text-slate-700 cursor-pointer"
+                    >
+                      Advance & Balance (50% / 50%)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleApplyScheduleTemplate("FULL_ADVANCE")}
+                      disabled={isReadOnly}
+                      className="h-7 text-xs font-semibold bg-white hover:bg-slate-50 border-slate-200 text-slate-700 cursor-pointer"
+                    >
+                      Full Advance (100%)
+                    </Button>
+                    {milestonesForm.length > 0 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleClearMilestones}
+                        disabled={isReadOnly}
+                        className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 cursor-pointer ml-1"
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Clear Schedule
+                      </Button>
+                    )}
+                  </div>
+
+                  <Button
+                    size="sm"
+                    onClick={handleOpenAddMilestone}
+                    disabled={isReadOnly}
+                    className="h-8 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shrink-0 cursor-pointer"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                        Step {index + 1}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleOpenEditMilestone(m)}
-                          className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
-                        >
-                          <Edit2 className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteMilestone(m.id)}
-                          className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Milestone
+                  </Button>
+                </div>
 
+                {/* Percentage Allocation Health Card */}
+                <div className={`p-4 rounded-2xl border transition-all ${
+                  milestonesForm.length === 0
+                    ? "bg-slate-50 border-slate-200 text-slate-600"
+                    : isComplete
+                    ? "bg-emerald-50/60 border-emerald-200/90 text-emerald-950"
+                    : isOver
+                    ? "bg-rose-50/70 border-rose-200 text-rose-950"
+                    : "bg-amber-50/70 border-amber-200 text-amber-950"
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      {milestonesForm.length === 0 ? (
+                        <CreditCard className="h-4 w-4 text-slate-400 shrink-0" />
+                      ) : isComplete ? (
+                        <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                      ) : isOver ? (
+                        <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                      )}
+                      <span className="text-xs font-bold">
+                        {milestonesForm.length === 0
+                          ? "No payment milestones configured (Terms-only schedule)"
+                          : isComplete
+                          ? `Schedule Complete: 100% allocated across ${milestonesForm.length} milestone(s)`
+                          : isOver
+                          ? `Over-allocated: ${roundedAllocated}% allocated (${Math.round((roundedAllocated - 100) * 10) / 10}% over 100%)`
+                          : `Under-allocated: ${roundedAllocated}% of 100% allocated (${Math.round((100 - roundedAllocated) * 10) / 10}% remaining)`}
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono font-bold">
+                      {roundedAllocated}% of 100%
+                    </span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full bg-slate-200/80 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 rounded-full ${
+                        isComplete ? "bg-emerald-500" : isOver ? "bg-rose-500" : "bg-amber-500"
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(0, totalAllocated))}%` }}
+                    />
+                  </div>
+
+                  {/* Validation notice */}
+                  {(isOver || isUnder) && (
+                    <p className="text-[11px] mt-2 font-medium">
+                      {isOver
+                        ? "The total milestone percentage cannot exceed 100%. Please adjust milestone percentages."
+                        : "To persist a complete payment schedule, total percentage must sum to exactly 100%."}
+                    </p>
+                  )}
+                </div>
+
+                {/* Milestones Cards Grid */}
+                {milestonesForm.length === 0 ? (
+                  <div className="text-center py-12 px-4 space-y-3 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                    <CreditCard className="h-10 w-10 text-slate-300 mx-auto" />
                     <div>
-                      <h4 className="font-bold text-slate-900 text-sm">{m.title}</h4>
-                      {m.description && <p className="text-[11px] text-slate-500 mt-0.5">{m.description}</p>}
+                      <h4 className="text-sm font-bold text-slate-700">No Payment Milestones Configured</h4>
+                      <p className="text-xs text-slate-500 mt-0.5 max-w-sm mx-auto">
+                        Customer proposals will show general payment terms only. Add milestones to present a structured payment timeline.
+                      </p>
                     </div>
-
-                    <div className="pt-2 border-t border-slate-200 flex items-baseline justify-between">
-                      <div>
-                        {m.percentage && <span className="text-xs font-black text-slate-700">{Number(m.percentage)}%</span>}
-                        {m.dueDate && (
-                          <p className="text-[10px] text-slate-400">
-                            Due: {new Date(m.dueDate).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                      <span className="font-black text-indigo-600 text-base">
-                        {formatCurrency(Number(m.amount || 0))}
-                      </span>
+                    <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                      <Button
+                        size="sm"
+                        onClick={() => handleApplyScheduleTemplate("STANDARD_3_TIER")}
+                        disabled={isReadOnly}
+                        className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
+                      >
+                        <Sparkles className="h-3.5 w-3.5 mr-1" />
+                        Apply Standard Schedule
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleOpenAddMilestone}
+                        disabled={isReadOnly}
+                        className="text-xs font-semibold border-slate-200 cursor-pointer"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Add First Milestone
+                      </Button>
                     </div>
                   </div>
-                ))}
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {milestonesForm.map((m, index) => (
+                      <div
+                        key={m.id || `local-milestone-${index}`}
+                        className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/90 relative group hover:border-indigo-300 hover:shadow-xs transition-all space-y-3 flex flex-col justify-between"
+                      >
+                        <div>
+                          {/* Step Badge & Controls */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                              Step {index + 1}
+                            </span>
+                            <div className="flex items-center gap-0.5">
+                              {/* Move Up */}
+                              <button
+                                type="button"
+                                onClick={() => handleMoveMilestoneUp(index)}
+                                disabled={index === 0 || isReadOnly}
+                                title="Move Up"
+                                className="p-1 text-slate-400 hover:text-slate-800 disabled:opacity-20 cursor-pointer transition-colors"
+                              >
+                                <ArrowUp className="h-3.5 w-3.5" />
+                              </button>
+                              {/* Move Down */}
+                              <button
+                                type="button"
+                                onClick={() => handleMoveMilestoneDown(index)}
+                                disabled={index === milestonesForm.length - 1 || isReadOnly}
+                                title="Move Down"
+                                className="p-1 text-slate-400 hover:text-slate-800 disabled:opacity-20 cursor-pointer transition-colors"
+                              >
+                                <ArrowDown className="h-3.5 w-3.5" />
+                              </button>
+                              {/* Edit */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditMilestoneIdx(index)}
+                                disabled={isReadOnly}
+                                title="Edit Milestone"
+                                className="p-1 text-slate-400 hover:text-indigo-600 cursor-pointer transition-colors"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
+                              {/* Delete */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMilestoneItem(index)}
+                                disabled={isReadOnly}
+                                title="Delete Milestone"
+                                className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer transition-colors"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mt-2.5">
+                            <h4 className="font-bold text-slate-900 text-sm leading-snug">{m.title}</h4>
+                            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed line-clamp-3">
+                              {m.description || "No description provided."}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Card Footer: Percentage and Due Date (Preserving Single Final Package Price Invariant) */}
+                        <div className="pt-2.5 border-t border-slate-200/80 flex items-center justify-between text-xs">
+                          <Badge variant="outline" className="font-black text-xs text-indigo-700 bg-indigo-50/60 border-indigo-200">
+                            {m.percentage}%
+                          </Badge>
+                          {m.dueDate ? (
+                            <span className="text-[11px] text-slate-500 flex items-center gap-1 font-medium">
+                              <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
+                              Due: {new Date(m.dueDate).toLocaleDateString()}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">Timing upon booking</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Booking Payment Terms Section */}
+                <div className="bg-slate-50/60 rounded-2xl border border-slate-200/80 p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+                        Payment Terms & Settlement Instructions
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Visible on customer web proposals and PDF exports. Includes bank details, deposit policies, and clearance conditions.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                      {schedulePaymentTerms.length} / 3000 chars
+                    </span>
+                  </div>
+
+                  <Textarea
+                    value={schedulePaymentTerms}
+                    onChange={handlePaymentTermsChange}
+                    placeholder="Enter wire transfer bank instructions, credit card policies, cancellation terms, and advance clearance instructions..."
+                    rows={4}
+                    maxLength={3000}
+                    disabled={isReadOnly}
+                    className="text-xs bg-white border-slate-200 resize-y rounded-xl leading-relaxed"
+                  />
+                </div>
               </div>
-            )}
-          </div>
-        )} */}
+            </div>
+          );
+        })()}
 
         {/* ─── TAB 5: TERMS & POLICIES ─── */}
         {activeQuote && activeTab === "policies" && (
           <form onSubmit={handleSavePolicies} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
-            <div>
-              <h3 className="font-bold text-slate-900 text-base">Proposal Branding & Policy Terms</h3>
-              <p className="text-xs text-slate-500">
-                Customize welcome messaging, cancellation policies, and terms displayed to the client.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Proposal Branding & Policy Terms</h3>
+                <p className="text-xs text-slate-500">
+                  Customize welcome messaging, cancellation policies, and terms displayed to the client.
+                </p>
+              </div>
+
+              {/* Visible Save Status Badge (Workstream E) */}
+              <div className="flex items-center gap-2 shrink-0">
+                {policySaveStatus === "saving" && (
+                  <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 border border-amber-200">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving changes...
+                  </span>
+                )}
+                {policySaveStatus === "saved" && (
+                  <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200">
+                    <Check className="h-3.5 w-3.5" /> All changes saved
+                  </span>
+                )}
+                {policySaveStatus === "unsaved" && (
+                  <button
+                    type="button"
+                    onClick={() => executePolicySave(policyForm)}
+                    className="text-[11px] text-slate-600 hover:text-slate-900 font-medium px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-200 cursor-pointer"
+                    title="Click to save now"
+                  >
+                    Unsaved changes (Save)
+                  </button>
+                )}
+                {policySaveStatus === "error" && (
+                  <button
+                    type="button"
+                    onClick={() => executePolicySave(policyForm)}
+                    className="text-[11px] text-rose-600 font-medium flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 border border-rose-200 cursor-pointer"
+                    title={policySaveError || "Save failed, click to retry"}
+                  >
+                    <AlertCircle className="h-3.5 w-3.5" /> Save failed (Retry)
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
@@ -1766,7 +2571,7 @@ export default function TripQuotationEditorPage() {
                 <label className="font-bold text-slate-700">Proposal Subtitle</label>
                 <Input
                   value={policyForm.proposalSubtitle}
-                  onChange={(e) => setPolicyForm({ ...policyForm, proposalSubtitle: e.target.value })}
+                  onChange={(e) => updatePolicyField("proposalSubtitle", e.target.value)}
                   placeholder="e.g. 5 Nights Kerala Honeymoon Retreat"
                   className="text-xs bg-slate-50"
                 />
@@ -1776,9 +2581,40 @@ export default function TripQuotationEditorPage() {
                 <label className="font-bold text-slate-700">Customer Welcome Note</label>
                 <Textarea
                   value={policyForm.customerMessage}
-                  onChange={(e) => setPolicyForm({ ...policyForm, customerMessage: e.target.value })}
+                  onChange={(e) => updatePolicyField("customerMessage", e.target.value)}
                   placeholder="Warm message greeting the traveler..."
                   rows={2}
+                  className="text-xs bg-slate-50 resize-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Inclusions Introduction</label>
+                <Input
+                  value={policyForm.inclusionsIntro}
+                  onChange={(e) => updatePolicyField("inclusionsIntro", e.target.value)}
+                  placeholder="e.g. Your customized holiday package includes:"
+                  className="text-xs bg-slate-50"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Exclusions Introduction</label>
+                <Input
+                  value={policyForm.exclusionsIntro}
+                  onChange={(e) => updatePolicyField("exclusionsIntro", e.target.value)}
+                  placeholder="e.g. Please note the following are excluded from this quote:"
+                  className="text-xs bg-slate-50"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Payment Terms</label>
+                <Textarea
+                  value={policyForm.paymentTerms}
+                  onChange={(e) => updatePolicyField("paymentTerms", e.target.value)}
+                  placeholder="Deposit requirements, milestone schedules, and bank transfer instructions..."
+                  rows={3}
                   className="text-xs bg-slate-50 resize-none"
                 />
               </div>
@@ -1787,7 +2623,7 @@ export default function TripQuotationEditorPage() {
                 <label className="font-bold text-slate-700">Cancellation Policy</label>
                 <Textarea
                   value={policyForm.cancellationPolicy}
-                  onChange={(e) => setPolicyForm({ ...policyForm, cancellationPolicy: e.target.value })}
+                  onChange={(e) => updatePolicyField("cancellationPolicy", e.target.value)}
                   placeholder="Detailed cancellation timeline and refund percentages..."
                   rows={3}
                   className="text-xs bg-slate-50 resize-none"
@@ -1798,8 +2634,19 @@ export default function TripQuotationEditorPage() {
                 <label className="font-bold text-slate-700">Important Traveler Notes</label>
                 <Textarea
                   value={policyForm.importantNotes}
-                  onChange={(e) => setPolicyForm({ ...policyForm, importantNotes: e.target.value })}
+                  onChange={(e) => updatePolicyField("importantNotes", e.target.value)}
                   placeholder="Government ID rules, check-in timings, altitude advisories..."
+                  rows={3}
+                  className="text-xs bg-slate-50 resize-none"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700">Terms & Conditions</label>
+                <Textarea
+                  value={policyForm.terms}
+                  onChange={(e) => updatePolicyField("terms", e.target.value)}
+                  placeholder="Standard agency terms, booking validity, liability limits..."
                   rows={3}
                   className="text-xs bg-slate-50 resize-none"
                 />
@@ -1809,7 +2656,7 @@ export default function TripQuotationEditorPage() {
                 <label className="font-bold text-slate-700">Privacy Policy</label>
                 <Textarea
                   value={policyForm.privacyPolicy}
-                  onChange={(e) => setPolicyForm({ ...policyForm, privacyPolicy: e.target.value })}
+                  onChange={(e) => updatePolicyField("privacyPolicy", e.target.value)}
                   placeholder="Agency privacy policy and data handling terms..."
                   rows={3}
                   className="text-xs bg-slate-50 resize-none"
@@ -2013,78 +2860,84 @@ export default function TripQuotationEditorPage() {
           </DialogContent>
         </Dialog>
 
-        {/* ─── ADD / EDIT MILESTONE MODAL ─── */}
+        {/* ─── ADD / EDIT MILESTONE MODAL (Phase 2C) ─── */}
         <Dialog open={isMilestoneModalOpen} onOpenChange={setIsMilestoneModalOpen}>
           <DialogContent className="bg-white border border-slate-200 rounded-2xl max-w-md p-6 shadow-xl">
-            <form onSubmit={handleSaveMilestone}>
+            <form onSubmit={handleSaveMilestoneModal}>
               <DialogHeader>
                 <DialogTitle className="text-slate-900 font-bold text-base">
-                  {editingMilestone ? "Edit Payment Milestone" : "Add Payment Milestone"}
+                  {editingMilestoneIdx !== null ? "Edit Payment Milestone" : "Add Payment Milestone"}
                 </DialogTitle>
                 <DialogDescription className="text-slate-500 text-xs mt-1">
-                  Configure milestone name, percentage or exact amount, and due date.
+                  Configure milestone title, payment percentage, due date, and customer instructions.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-3.5 mt-4 text-xs">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Milestone Title *</label>
-                  <Input
-                    value={milestoneTitle}
-                    onChange={(e) => setMilestoneTitle(e.target.value)}
-                    placeholder="e.g. 30% Booking Advance"
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    required
-                  />
-                </div>
+              {(() => {
+                const currentAllocatedExcludingSelf = milestonesForm.reduce(
+                  (acc, m, idx) => acc + (idx === editingMilestoneIdx ? 0 : (Number(m.percentage) || 0)),
+                  0
+                );
+                const remainingAvailable = Math.max(0, Math.round((100 - currentAllocatedExcludingSelf) * 10) / 10);
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Percentage (%)</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={milestonePct}
-                      onChange={(e) => setMilestonePct(e.target.value)}
-                      placeholder="e.g. 30"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
+                return (
+                  <div className="space-y-3.5 mt-4 text-xs">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Milestone Title *</label>
+                      <Input
+                        value={milestoneTitle}
+                        onChange={(e) => setMilestoneTitle(e.target.value)}
+                        placeholder="e.g. Booking Deposit, 2nd Installment, Final Balance"
+                        className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                        required
+                        autoFocus
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Percentage (%) *</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          step="any"
+                          value={milestonePct}
+                          onChange={(e) => setMilestonePct(e.target.value)}
+                          placeholder="e.g. 30"
+                          className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                          required
+                        />
+                        <p className="text-[10px] text-slate-400">
+                          Available: <span className="font-semibold text-slate-700">{remainingAvailable}%</span>
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Due Date (Optional)</label>
+                        <Input
+                          type="date"
+                          value={milestoneDueDate}
+                          onChange={(e) => setMilestoneDueDate(e.target.value)}
+                          className="h-9 bg-slate-50/50 border-slate-200 text-xs"
+                        />
+                        <p className="text-[10px] text-slate-400">Payment deadline</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Description (Optional)</label>
+                      <Textarea
+                        value={milestoneDesc}
+                        onChange={(e) => setMilestoneDesc(e.target.value)}
+                        placeholder="e.g. Required upon confirmation to lock hotel vouchers and flight bookings."
+                        rows={3}
+                        className="text-xs bg-slate-50/50 border-slate-200 resize-none leading-relaxed"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Fixed Amount (₹)</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={milestoneAmt}
-                      onChange={(e) => setMilestoneAmt(e.target.value)}
-                      placeholder="e.g. 15000"
-                      className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Due Date</label>
-                  <Input
-                    type="date"
-                    value={milestoneDueDate}
-                    onChange={(e) => setMilestoneDueDate(e.target.value)}
-                    className="h-9 bg-slate-50/50 border-slate-200 text-xs"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Description</label>
-                  <Textarea
-                    value={milestoneDesc}
-                    onChange={(e) => setMilestoneDesc(e.target.value)}
-                    placeholder="e.g. Required upon confirmation to lock hotel bookings."
-                    rows={2}
-                    className="text-xs bg-slate-50/50 border-slate-200 resize-none"
-                  />
-                </div>
-              </div>
+                );
+              })()}
 
               <DialogFooter className="mt-6 flex gap-2">
                 <Button
@@ -2097,10 +2950,10 @@ export default function TripQuotationEditorPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={milestoneSaving || isReadOnly}
+                  disabled={isReadOnly}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9 px-4 font-semibold"
                 >
-                  {milestoneSaving ? "Saving..." : "Save Milestone"}
+                  {editingMilestoneIdx !== null ? "Update Milestone" : "Add to Schedule"}
                 </Button>
               </DialogFooter>
             </form>

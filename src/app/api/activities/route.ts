@@ -4,6 +4,7 @@ apiSuccess,
 handleApiError,
 requireReadAccess,
 requireWriteAccess,
+  enforceStaffPermission,
 validateJson,
 validateQueryParams,
 } from "@/lib/api";
@@ -24,6 +25,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "ACTIVITIES", "VIEW");
     const queryParams = validateQueryParams(activityListQuerySchema, request.nextUrl.searchParams);
 
     const result = await activityService.listActivities(context.agencyId, queryParams);
@@ -47,6 +49,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "ACTIVITIES", "CREATE");
     const body = await validateJson(createActivitySchema, request);
 
     const newActivity = await activityService.createActivity(context.agencyId, body);

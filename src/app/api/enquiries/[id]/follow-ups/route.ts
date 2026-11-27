@@ -4,6 +4,7 @@ apiSuccess,
 handleApiError,
 requireReadAccess,
 requireWriteAccess,
+  enforceStaffPermission,
 validateJson,
 } from "@/lib/api";
 import { enquiryService } from "@/lib/services/enquiry-service";
@@ -23,6 +24,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FOLLOW_UPS", "VIEW");
     const { id: enquiryId } = await params;
 
     const followUps = await enquiryService.getFollowUps(context.agencyId, enquiryId);
@@ -40,10 +42,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FOLLOW_UPS", "CREATE");
     const { id: enquiryId } = await params;
     const body = await validateJson(createFollowUpSchema, request);
 
-    const newFollowUp = await enquiryService.createFollowUp(context.agencyId, enquiryId, body);
+    const newFollowUp = await enquiryService.createFollowUp(context.agencyId, enquiryId, body, {
+      userId: context.dbUser.id,
+      userName: context.dbUser.name || context.dbUser.email || (context.isAgencyOwner ? "Agency Owner" : "Staff Member"),
+      role: context.dbUser.role,
+    });
 
     return apiCreated(newFollowUp);
   } catch (error) {

@@ -25,11 +25,14 @@ AlertTriangle,
 Loader2,
 MapPin,
 Plus,
+Search,
 Settings2,
 User,
 Users
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
 import * as React from "react";
 import { toast } from "sonner";
 import * as Yup from "yup";
@@ -110,6 +113,19 @@ const createEnquiryValidationSchema = Yup.object().shape({
 });
 
 export default function NewEnquiryPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("ENQUIRIES", "create")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Enquiry Creation"
+          badgeText="Access Restricted"
+          description="You do not have permission to create enquiries. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
 
   // Data states
@@ -120,6 +136,8 @@ export default function NewEnquiryPage() {
   // Duplicate Enquiry Detection State
   const [duplicateEnquiries, setDuplicateEnquiries] = React.useState<any[]>([]);
   const [checkingDuplicates, setCheckingDuplicates] = React.useState(false);
+  const [customerSearch, setCustomerSearch] = React.useState("");
+  const [searchingCustomers, setSearchingCustomers] = React.useState(false);
 
   const formik = useFormik({
     initialValues: {
@@ -161,18 +179,25 @@ export default function NewEnquiryPage() {
         setSubmitting(true);
         let customerId = values.selectedCustomerId;
 
-        // 1. If new customer mode, create customer first via real API
+        // 1. If new customer mode, safely resolve or create customer via real API
         if (values.customerMode === "new") {
-          const custRes = await customerClient.createCustomer({
+          const custRes = await customerClient.resolveOrCreateCustomer({
             name: values.newCustomerName.trim(),
             phone: values.newCustomerPhone.trim(),
             email: values.newCustomerEmail.trim() || undefined,
           });
 
           if (custRes.success && custRes.data) {
-            customerId = custRes.data.id;
+            customerId = custRes.data.customer.id;
+            if (custRes.data.isExisting) {
+              toast.info(
+                `Reusing existing customer record for "${custRes.data.customer.name}" (${custRes.data.customer.phone}).`
+              );
+            } else {
+              toast.success("New customer profile created.");
+            }
           } else {
-            throw new Error("Failed to create new customer.");
+            throw new Error("Failed to create or resolve customer profile.");
           }
         }
 
@@ -248,6 +273,26 @@ export default function NewEnquiryPage() {
     }
     loadCustomers();
   }, []);
+
+  // Debounced search for customers beyond first 100
+  React.useEffect(() => {
+    if (!customerSearch.trim()) return;
+    const timer = setTimeout(async () => {
+      try {
+        setSearchingCustomers(true);
+        const res = await customerClient.getCustomers({ search: customerSearch.trim(), limit: 50 });
+        if (res.success && res.data) {
+          setCustomers(res.data);
+        }
+      } catch {
+        // Silent catch for live search
+      } finally {
+        setSearchingCustomers(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
 
   // Debounced Duplicate Lead Detection
   React.useEffect(() => {
@@ -364,14 +409,32 @@ export default function NewEnquiryPage() {
 
               {formik.values.customerMode === "existing" ? (
                 <div className="space-y-1.5 text-xs">
-                  <label className="font-bold text-slate-700">Select Customer *</label>
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-700">Select Customer *</label>
+                    {searchingCustomers && (
+                      <span className="text-[11px] text-indigo-600 flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Searching...
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <Input
+                      placeholder="Search customers by name, phone, or email..."
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className="pl-8 text-xs h-8 bg-white border-slate-200 rounded-lg focus-visible:ring-indigo-500"
+                    />
+                  </div>
+
                   {loadingCustomers ? (
                     <div className="h-9.5 flex items-center gap-2 text-slate-400 text-xs px-3 bg-slate-50 border border-slate-200 rounded-xl">
                       <Loader2 className="h-4 w-4 animate-spin text-indigo-600" /> Loading customer directory...
                     </div>
                   ) : customers.length === 0 ? (
                     <div className="p-3 bg-amber-50 text-amber-800 text-xs rounded-xl border border-amber-200">
-                      No customers found. Switch to Quick Add Customer to create one.
+                      No matching customers found. Switch to Quick Add Customer to create one.
                     </div>
                   ) : (
                     <>

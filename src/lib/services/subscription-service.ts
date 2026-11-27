@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { evaluateEffectiveSubscriptionState } from "@/lib/auth/subscription-state";
 import { entitlementService } from "@/lib/services/entitlement-service";
 import { internalNotificationService } from "@/lib/services/internal-notification-service";
 import { AgencyPaymentRequestInput } from "@/lib/validation/subscription-schema";
@@ -45,6 +46,7 @@ export interface AgencySubscriptionOverview {
   };
   subscription: {
     id: string;
+    storedStatus?: SubscriptionStatus;
     status: SubscriptionStatus;
     billingCycle: string;
     planId: string;
@@ -59,6 +61,8 @@ export interface AgencySubscriptionOverview {
     subscriptionEnd: string | null;
     daysRemaining: number;
     isTrialExpired: boolean;
+    isSubscriptionExpired: boolean;
+    isExpired: boolean;
     isActive: boolean;
   };
   usage?: {
@@ -186,17 +190,12 @@ export const subscriptionService = {
     }
 
     const now = new Date();
-    let daysRemaining = 0;
-    let isTrialExpired = false;
-
-    if (sub.status === SubscriptionStatus.TRIAL && sub.trialEnd) {
-      const end = new Date(sub.trialEnd).getTime();
-      daysRemaining = Math.max(0, Math.ceil((end - now.getTime()) / (1000 * 60 * 60 * 24)));
-      isTrialExpired = daysRemaining <= 0;
-    } else if (sub.status === SubscriptionStatus.ACTIVE && sub.subscriptionEnd) {
-      const end = new Date(sub.subscriptionEnd).getTime();
-      daysRemaining = Math.max(0, Math.ceil((end - now.getTime()) / (1000 * 60 * 60 * 24)));
-    }
+    const evalState = evaluateEffectiveSubscriptionState(
+      { agencyStatus: agency.status, subscription: sub },
+      now
+    );
+    const daysRemaining = evalState.daysRemaining;
+    const isTrialExpired = evalState.isTrialExpired;
 
     // Find latest pending payment
     const allPayments = agency.subscriptionPayments || [];
@@ -333,7 +332,8 @@ export const subscriptionService = {
       },
       subscription: {
         id: sub.id,
-        status: sub.status,
+        storedStatus: sub.status,
+        status: evalState.effectiveStatus,
         billingCycle: sub.billingCycle || "MONTHLY",
         planId: sub.planId,
         planName: sub.plan.name,
@@ -347,7 +347,9 @@ export const subscriptionService = {
         subscriptionEnd: sub.subscriptionEnd ? sub.subscriptionEnd.toISOString() : null,
         daysRemaining,
         isTrialExpired,
-        isActive: sub.status === SubscriptionStatus.ACTIVE,
+        isSubscriptionExpired: evalState.isSubscriptionExpired,
+        isExpired: evalState.isExpired,
+        isActive: evalState.effectiveStatus === SubscriptionStatus.ACTIVE,
       },
       usage: {
         TRIPS: tripsUsage,

@@ -1,0 +1,754 @@
+const fs = require('fs');
+
+const routeInventory = [
+  // ─── 1. CRM & Sales (9 Routes) ───────────────────────────────────────────
+  {
+    route: "/dashboard",
+    permissionKey: "DASHBOARD",
+    actions: { view: true, create: false, update: false, delete: false, export: true },
+    ownerAccess: "Full access to operational metrics, conversion funnel, financial receivables & payables card, and CSV export",
+    staffAccess: {
+      granted: "Can view operational KPIs, upcoming tasks, follow-ups, and sales funnels. Financial metrics and payables are redacted.",
+      denied: "Not applicable (Dashboard is home workspace, but export is restricted by role ceiling to Owner)."
+    },
+    pageGuard: "Dynamic useAuth() with conditional financial card rendering",
+    serverAuthorization: "GET /api/dashboard/crm: requireReadAccess(); GET /api/dashboard/finance: canAccessFinancialMargins(); GET /api/dashboard/export: enforceStaffPermission('DASHBOARD', 'EXPORT')",
+    associatedApis: ["/api/dashboard/summary", "/api/dashboard/crm", "/api/dashboard/sales", "/api/dashboard/finance", "/api/dashboard/export"],
+    remainingOwnerOnlyRestrictions: "Exporting dashboard CSV (restricted by role ceiling) and viewing receivables/payables card",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 3; test-permissions-acceptance-gate.ts Test 5"
+  },
+  {
+    route: "/customers",
+    permissionKey: "CUSTOMERS",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Full access: view, search, filter, create, edit, delete",
+    staffAccess: {
+      granted: "Can view directory, search/filter, and create/update/delete if delegable actions are granted by Owner",
+      denied: "Displays OwnerRestrictedCard('Access Restricted') without fetching client data"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('CUSTOMERS', 'view')",
+    serverAuthorization: "GET /api/customers: staffPermissionService.hasStaffPermission('CUSTOMERS', 'VIEW'); POST /api/customers: 'CUSTOMERS', 'CREATE'",
+    associatedApis: ["/api/customers", "/api/customers/check-duplicate", "/api/customers/resolve-or-create"],
+    remainingOwnerOnlyRestrictions: "None. All actions delegable by Owner.",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 4; test-permissions-acceptance-gate.ts Test 1, 4"
+  },
+  {
+    route: "/customers/new",
+    permissionKey: "CUSTOMERS",
+    actions: { view: false, create: true, update: false, delete: false, export: false },
+    ownerAccess: "Full access to create customer form",
+    staffAccess: {
+      granted: "Can fill form and submit new customer record",
+      denied: "Displays OwnerRestrictedCard('Access Restricted'); form submission blocked at API"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('CUSTOMERS', 'create')",
+    serverAuthorization: "POST /api/customers: enforceStaffPermission('CUSTOMERS', 'CREATE')",
+    associatedApis: ["/api/customers"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-failures-phase1.ts Category 6; test-permissions-acceptance-gate.ts Test 2"
+  },
+  {
+    route: "/customers/[id]",
+    permissionKey: "CUSTOMER_DETAIL",
+    actions: { view: true, create: false, update: true, delete: true, export: false },
+    ownerAccess: "Full dossier access: traveler details, bookings, documents, notes, interactions",
+    staffAccess: {
+      granted: "Can view traveler 360 dossier and update preferences/notes if granted; decoupled from list view",
+      denied: "Displays OwnerRestrictedCard('Access Restricted'); fetch suppressed"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('CUSTOMER_DETAIL', 'view')",
+    serverAuthorization: "GET /api/customers/[id]: enforceStaffPermission('CUSTOMER_DETAIL', 'VIEW'); PATCH: 'CUSTOMER_DETAIL', 'UPDATE'; DELETE: 'CUSTOMER_DETAIL', 'DELETE'",
+    associatedApis: ["/api/customers/[id]"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-failures-phase1.ts Category 8; test-crm-correctness.ts Category 24"
+  },
+  {
+    route: "/customer-insights",
+    permissionKey: "CUSTOMER_INSIGHTS",
+    actions: { view: true, create: false, update: false, delete: false, export: false },
+    ownerAccess: "Full access to customer segmentation, lifetime value analytics, and repeat client metrics",
+    staffAccess: {
+      granted: "Can view high-level client insights (with commercial gross margin metrics redacted)",
+      denied: "Displays OwnerRestrictedCard('Access Restricted'); fetch suppressed"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('CUSTOMER_INSIGHTS', 'view')",
+    serverAuthorization: "GET /api/customer-insights: enforceStaffPermission('CUSTOMER_INSIGHTS', 'VIEW')",
+    associatedApis: ["/api/customer-insights"],
+    remainingOwnerOnlyRestrictions: "None on page access; margin aggregates redacted",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 8"
+  },
+  {
+    route: "/enquiries",
+    permissionKey: "ENQUIRIES",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Full access to sales pipeline, Kanban board, lead intake, status changes, conversion",
+    staffAccess: {
+      granted: "Can view lead pipeline, drag cards, change stages, and log interactions",
+      denied: "Displays OwnerRestrictedCard('Access Restricted'); pipeline data not loaded"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('ENQUIRIES', 'view')",
+    serverAuthorization: "GET /api/enquiries: staffPermissionService.hasStaffPermission('ENQUIRIES', 'VIEW')",
+    associatedApis: ["/api/enquiries", "/api/enquiries/check-duplicate", "/api/enquiries/assignees"],
+    remainingOwnerOnlyRestrictions: "None. All actions delegable by Owner.",
+    testEvidence: "test-crm-correctness.ts Category 7, 10, 17; test-permissions-acceptance-gate.ts Test 2"
+  },
+  {
+    route: "/enquiries/new",
+    permissionKey: "ENQUIRIES",
+    actions: { view: false, create: true, update: false, delete: false, export: false },
+    ownerAccess: "Full lead capture form access",
+    staffAccess: {
+      granted: "Can capture new traveler enquiries with dates, budget, travelers",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('ENQUIRIES', 'create')",
+    serverAuthorization: "POST /api/enquiries: enforceStaffPermission('ENQUIRIES', 'CREATE')",
+    associatedApis: ["/api/enquiries"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-crm-correctness.ts Category 1"
+  },
+  {
+    route: "/enquiries/[id]",
+    permissionKey: "ENQUIRY_DETAIL",
+    actions: { view: true, create: false, update: true, delete: true, export: false },
+    ownerAccess: "Full lead workspace: timeline, notes, follow-up scheduling, trip conversion",
+    staffAccess: {
+      granted: "Can view lead timeline, add follow-ups, convert to trip; decoupled from pipeline list view",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('ENQUIRY_DETAIL', 'view')",
+    serverAuthorization: "GET /api/enquiries/[id]: staffPermissionService.hasStaffPermission('ENQUIRY_DETAIL', 'VIEW'); PATCH: UPDATE; DELETE: DELETE",
+    associatedApis: ["/api/enquiries/[id]", "/api/enquiries/[id]/stage", "/api/enquiries/[id]/lost", "/api/enquiries/[id]/convert", "/api/enquiries/[id]/timeline"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-failures-phase1.ts Category 8; test-crm-correctness.ts Category 11, 23"
+  },
+  {
+    route: "/follow-ups",
+    permissionKey: "FOLLOW_UPS",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Full access to overdue, today, upcoming, and completed task lists across all consultants",
+    staffAccess: {
+      granted: "Can view tasks, complete actions, reschedule follow-ups, and mark outcomes",
+      denied: "Displays OwnerRestrictedCard('Access Restricted'); tasks not fetched"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('FOLLOW_UPS', 'view')",
+    serverAuthorization: "GET /api/follow-ups: enforceStaffPermission('FOLLOW_UPS', 'VIEW'); POST /api/follow-ups: CREATE; POST /complete: UPDATE",
+    associatedApis: ["/api/follow-ups", "/api/follow-ups/[id]/complete", "/api/follow-ups/[id]/reschedule", "/api/follow-ups/[id]/cancel"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-crm-correctness.ts Category 10, 14, 28"
+  },
+
+  // ─── 2. Trips & Quotations (9 Routes) ────────────────────────────────────
+  {
+    route: "/trips",
+    permissionKey: "TRIPS",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Full trip management: list, filter, create, clone, archive",
+    staffAccess: {
+      granted: "Can view trip directory and manage trips if granted",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('TRIPS', 'view')",
+    serverAuthorization: "GET /api/trips: staffPermissionService.hasStaffPermission('TRIPS', 'VIEW')",
+    associatedApis: ["/api/trips"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-failures-phase1.ts Category 8"
+  },
+  {
+    route: "/trips/new",
+    permissionKey: "TRIPS",
+    actions: { view: false, create: true, update: false, delete: false, export: false },
+    ownerAccess: "Trip creation wizard",
+    staffAccess: {
+      granted: "Can create new trip itineraries",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('TRIPS', 'create')",
+    serverAuthorization: "POST /api/trips: enforceStaffPermission('TRIPS', 'CREATE')",
+    associatedApis: ["/api/trips"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-itinerary-correctness.ts Category 1"
+  },
+  {
+    route: "/trips/[id]",
+    permissionKey: "TRIP_DETAIL",
+    actions: { view: true, create: false, update: true, delete: true, export: false },
+    ownerAccess: "Full trip itinerary builder: day templates, accommodations, vehicles, activities",
+    staffAccess: {
+      granted: "Can view itinerary builder and modify days/items; decoupled from trip list",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('TRIP_DETAIL', 'view')",
+    serverAuthorization: "GET /api/trips/[id]: staffPermissionService.hasStaffPermission('TRIP_DETAIL', 'VIEW'); PATCH: UPDATE; DELETE: DELETE",
+    associatedApis: ["/api/trips/[id]", "/api/trips/[id]/itinerary", "/api/trips/[id]/itinerary/reorder-item", "/api/trips/[id]/itinerary/duplicate-day"],
+    remainingOwnerOnlyRestrictions: "Commercial costing tab link hidden from staff",
+    testEvidence: "test-itinerary-correctness.ts Category 1-14"
+  },
+  {
+    route: "/trips/[id]/costing",
+    permissionKey: "FINANCIAL_MARGINS",
+    actions: { view: true, create: false, update: false, delete: false, export: false },
+    ownerAccess: "Full access to internal net rates, supplier cost sheets, markup multipliers, and gross margins",
+    staffAccess: {
+      granted: "NEVER granted. Hard-coded Owner Only security boundary.",
+      denied: "Displays OwnerRestrictedCard('Commercial Trip Costing - Owner Only'); cost sheet fetch rejected with HTTP 403"
+    },
+    pageGuard: "Client if (!isAgencyOwner) return <OwnerRestrictedCard />",
+    serverAuthorization: "GET /api/trips/[id]/quotation?includeCosting=true: canAccessFinancialMargins() rejects staff with ForbiddenError",
+    associatedApis: ["/api/trips/[id]/quotation"],
+    remainingOwnerOnlyRestrictions: "100% Owner-Only. Justified by commercial supplier secrecy and net rate protection.",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 3; test-staff-failures-phase1.ts Category 3"
+  },
+  {
+    route: "/trips/[id]/quotation",
+    permissionKey: "QUOTATIONS",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Quotation editor: tiers, versioning, proposal inclusions, payment milestones, customer pricing",
+    staffAccess: {
+      granted: "Can view and edit customer quotation; internal markup and supplier costs are redacted by server DTO",
+      denied: "Displays OwnerRestrictedCard('Access Restricted'); fetch suppressed"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('QUOTATIONS', 'view')",
+    serverAuthorization: "GET /api/trips/[id]/quotation: enforceStaffPermission('QUOTATIONS', 'VIEW') + toStaffSafeQuotationListDTO()",
+    associatedApis: ["/api/trips/[id]/quotation", "/api/quotations/[id]/version", "/api/quotations/[id]/items", "/api/quotations/[id]/proposal-items"],
+    remainingOwnerOnlyRestrictions: "Internal supplier cost breakdown and markup % stripped from staff response",
+    testEvidence: "test-staff-failures-phase1.ts Category 6; test-staff-application-wide-authorization.ts Category 7"
+  },
+  {
+    route: "/trips/[id]/quotation/preview",
+    permissionKey: "QUOTATIONS",
+    actions: { view: true, create: false, update: false, delete: false, export: false },
+    ownerAccess: "Customer-facing proposal preview with PDF export and WhatsApp share link",
+    staffAccess: {
+      granted: "Can preview client proposal document without confidential costing",
+      denied: "Displays OwnerRestrictedCard('Access Restricted'); fetch suppressed"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('QUOTATIONS', 'view')",
+    serverAuthorization: "GET /api/trips/[id]/quotation?includeCosting=false: enforceStaffPermission('QUOTATIONS', 'VIEW')",
+    associatedApis: ["/api/trips/[id]/quotation", "/api/quotations/[id]/pdf"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-failures-phase1.ts Category 6"
+  },
+  {
+    route: "/quotations",
+    permissionKey: "QUOTATIONS",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Quotation directory across all agency trips",
+    staffAccess: {
+      granted: "Can view quotation directory and version history",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('QUOTATIONS', 'view')",
+    serverAuthorization: "GET /api/quotations: enforceStaffPermission('QUOTATIONS', 'VIEW')",
+    associatedApis: ["/api/quotations"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-failures-phase1.ts Category 6"
+  },
+  {
+    route: "/quotations/new",
+    permissionKey: "QUOTATIONS",
+    actions: { view: false, create: true, update: false, delete: false, export: false },
+    ownerAccess: "Quotation generation dialog",
+    staffAccess: {
+      granted: "Can generate quotation for confirmed trips",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('QUOTATIONS', 'create')",
+    serverAuthorization: "POST /api/trips/[id]/quotation: enforceStaffPermission('QUOTATIONS', 'CREATE')",
+    associatedApis: ["/api/trips/[id]/quotation"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-failures-phase1.ts Category 6"
+  },
+  {
+    route: "/quotations/[id]",
+    permissionKey: "QUOTATION_DETAIL",
+    actions: { view: true, create: false, update: false, delete: false, export: false },
+    ownerAccess: "Redirects safely to parent trip quotation builder /trips/[id]/quotation",
+    staffAccess: {
+      granted: "Redirects to trip quotation workspace",
+      denied: "Redirects to /quotations (where OwnerRestrictedCard is rendered); prevents unauthorized trip discovery"
+    },
+    pageGuard: "Server redirect checking staffPermissionService.hasStaffPermission('QUOTATIONS', 'VIEW')",
+    serverAuthorization: "Prisma lookup scoped strictly to user.agencyId",
+    associatedApis: ["/api/quotations/[id]"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-failures-phase1.ts Category 7; test-permissions-acceptance-gate.ts Test 3"
+  },
+
+  // ─── 3. Bookings & Operations (7 Routes) ──────────────────────────────────
+  {
+    route: "/bookings",
+    permissionKey: "BOOKINGS",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Full booking roster: status filters, confirmed amounts, payments, cancellation",
+    staffAccess: {
+      granted: "Can view bookings and initialize operations; net costs redacted",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('BOOKINGS', 'view')",
+    serverAuthorization: "GET /api/bookings: staffPermissionService.hasStaffPermission('BOOKINGS', 'VIEW')",
+    associatedApis: ["/api/bookings", "/api/bookings/from-quotation"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-crm-correctness.ts Category 5, 26, 27"
+  },
+  {
+    route: "/bookings/new",
+    permissionKey: "BOOKINGS",
+    actions: { view: false, create: true, update: false, delete: false, export: false },
+    ownerAccess: "Convert quotation to booking wizard",
+    staffAccess: {
+      granted: "Can convert approved quotation into confirmed booking",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('BOOKINGS', 'create')",
+    serverAuthorization: "POST /api/bookings: enforceStaffPermission('BOOKINGS', 'CREATE')",
+    associatedApis: ["/api/bookings/from-quotation"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-crm-correctness.ts Category 5"
+  },
+  {
+    route: "/bookings/[id]",
+    permissionKey: "BOOKING_DETAIL",
+    actions: { view: true, create: false, update: true, delete: true, export: false },
+    ownerAccess: "Full booking record: customer payments, invoices, vouchers, operations status",
+    staffAccess: {
+      granted: "Can view booking detail and update status; payment voiding/refunds disabled",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('BOOKING_DETAIL', 'view')",
+    serverAuthorization: "GET /api/bookings/[id]: staffPermissionService.hasStaffPermission('BOOKING_DETAIL', 'VIEW')",
+    associatedApis: ["/api/bookings/[id]", "/api/bookings/[id]/cancel", "/api/bookings/[id]/initialize-operations"],
+    remainingOwnerOnlyRestrictions: "None on booking view; payment deletion remains Owner-Only",
+    testEvidence: "test-staff-failures-phase1.ts Category 8"
+  },
+  {
+    route: "/operations",
+    permissionKey: "OPERATIONS",
+    actions: { view: true, create: false, update: true, delete: true, export: true },
+    ownerAccess: "Operations board: trip dispatch, driver details, voucher status, issue count",
+    staffAccess: {
+      granted: "Can view operational board and update dispatch/vouchers",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('OPERATIONS', 'view')",
+    serverAuthorization: "GET /api/operations: enforceStaffPermission('OPERATIONS', 'VIEW')",
+    associatedApis: ["/api/operations"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-permissions-acceptance-gate.ts Test 1"
+  },
+  {
+    route: "/operations/issues",
+    permissionKey: "OPERATIONS_ISSUES",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Incident response dashboard: flight delays, hotel rebookings, medical alerts",
+    staffAccess: {
+      granted: "Can log and resolve operational issues; decoupled from main operations list",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('OPERATIONS_ISSUES', 'view')",
+    serverAuthorization: "GET /api/operations/issues: enforceStaffPermission('OPERATIONS_ISSUES', 'VIEW')",
+    associatedApis: ["/api/operations/issues", "/api/operations/[id]/issues"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-failures-phase1.ts Category 8"
+  },
+  {
+    route: "/operations/[tripId]",
+    permissionKey: "OPERATIONS",
+    actions: { view: true, create: true, update: true, delete: false, export: false },
+    ownerAccess: "Comprehensive trip operations workspace: rooming manifests, vehicle dispatch, vouchers, closures",
+    staffAccess: {
+      granted: "Can view workspace, confirm hotels, assign drivers, and resolve incident alerts",
+      denied: "Displays OwnerRestrictedCard('Access Restricted'); fetchOperationData suppressed"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('OPERATIONS', 'view')",
+    serverAuthorization: "GET /api/operations: enforceStaffPermission('OPERATIONS', 'VIEW')",
+    associatedApis: ["/api/operations/[id]/readiness", "/api/operations/[id]/hotels", "/api/operations/[id]/vehicles", "/api/operations/[id]/closure"],
+    remainingOwnerOnlyRestrictions: "Supplier payment recording modals remain restricted to Owner",
+    testEvidence: "test-permissions-acceptance-gate.ts Test 1"
+  },
+  {
+    route: "/operations/analytics",
+    permissionKey: "OPERATIONS",
+    actions: { view: true, create: false, update: false, delete: false, export: true },
+    ownerAccess: "Operations analytics: service delivery, supplier reliability, guest sentiment, financial variance",
+    staffAccess: {
+      granted: "Can view operational delivery KPIs; financial variance breakdown is strictly hidden and API returns 403",
+      denied: "Displays OwnerRestrictedCard('Access Restricted'); fetch suppressed"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('OPERATIONS', 'view')",
+    serverAuthorization: "GET /api/operations/analytics: enforceStaffPermission('OPERATIONS', 'VIEW'); /financial: canAccessFinancialMargins()",
+    associatedApis: ["/api/operations/analytics", "/api/operations/analytics/financial", "/api/operations/analytics/export"],
+    remainingOwnerOnlyRestrictions: "Financial variance breakdown is strictly Owner-Only",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 3"
+  },
+
+  // ─── 4. Catalog & Inventory (13 Routes) ──────────────────────────────────
+  {
+    route: "/destinations",
+    permissionKey: "DESTINATIONS",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Destination master directory",
+    staffAccess: { granted: "Full directory view, create, edit, delete", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('DESTINATIONS', 'view')",
+    serverAuthorization: "GET /api/destinations: enforceStaffPermission('DESTINATIONS', 'VIEW')",
+    associatedApis: ["/api/destinations", "/api/destinations/[id]"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-itinerary-correctness.ts Category 7"
+  },
+  {
+    route: "/hotels",
+    permissionKey: "HOTELS",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Hotel master directory",
+    staffAccess: { granted: "Full hotel directory view and management", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('HOTELS', 'view')",
+    serverAuthorization: "GET /api/hotels: enforceStaffPermission('HOTELS', 'VIEW')",
+    associatedApis: ["/api/hotels", "/api/hotels/import", "/api/hotels/sample"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-permissions-acceptance-gate.ts Test 4"
+  },
+  {
+    route: "/hotels/new",
+    permissionKey: "HOTELS",
+    actions: { view: false, create: true, update: false, delete: false, export: false },
+    ownerAccess: "Create hotel form",
+    staffAccess: { granted: "Can create hotels", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('HOTELS', 'create')",
+    serverAuthorization: "POST /api/hotels: enforceStaffPermission('HOTELS', 'CREATE')",
+    associatedApis: ["/api/hotels"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-permissions-acceptance-gate.ts Test 2"
+  },
+  {
+    route: "/hotels/[id]",
+    permissionKey: "HOTELS",
+    actions: { view: true, create: false, update: true, delete: true, export: false },
+    ownerAccess: "Hotel detail view and edit",
+    staffAccess: { granted: "Can view and update hotel", denied: "OwnerRestrictedCard; fetch suppressed" },
+    pageGuard: "Client useAuth().hasStaffPermission('HOTELS', 'view')",
+    serverAuthorization: "GET /api/hotels/[id]: enforceStaffPermission('HOTELS', 'VIEW'); PATCH: UPDATE; DELETE: DELETE",
+    associatedApis: ["/api/hotels/[id]"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-permissions-acceptance-gate.ts Test 4"
+  },
+  {
+    route: "/vehicles",
+    permissionKey: "VEHICLES",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Vehicle fleet catalog",
+    staffAccess: { granted: "Full fleet directory view and management", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('VEHICLES', 'view')",
+    serverAuthorization: "GET /api/vehicles: enforceStaffPermission('VEHICLES', 'VIEW')",
+    associatedApis: ["/api/vehicles"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-permissions-acceptance-gate.ts Test 4"
+  },
+  {
+    route: "/vehicles/new",
+    permissionKey: "VEHICLES",
+    actions: { view: false, create: true, update: false, delete: false, export: false },
+    ownerAccess: "Create vehicle form",
+    staffAccess: { granted: "Can add vehicles", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('VEHICLES', 'create')",
+    serverAuthorization: "POST /api/vehicles: enforceStaffPermission('VEHICLES', 'CREATE')",
+    associatedApis: ["/api/vehicles"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-permissions-acceptance-gate.ts Test 2"
+  },
+  {
+    route: "/vehicles/[id]",
+    permissionKey: "VEHICLES",
+    actions: { view: true, create: false, update: true, delete: true, export: false },
+    ownerAccess: "Vehicle detail view and edit",
+    staffAccess: { granted: "Can view and update vehicle", denied: "OwnerRestrictedCard; fetch suppressed" },
+    pageGuard: "Client useAuth().hasStaffPermission('VEHICLES', 'view')",
+    serverAuthorization: "GET /api/vehicles/[id]: enforceStaffPermission('VEHICLES', 'VIEW'); PATCH: UPDATE; DELETE: DELETE",
+    associatedApis: ["/api/vehicles/[id]"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-permissions-acceptance-gate.ts Test 4"
+  },
+  {
+    route: "/activities",
+    permissionKey: "ACTIVITIES",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Activities & sightseeing catalog",
+    staffAccess: { granted: "Full activities view and management", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('ACTIVITIES', 'view')",
+    serverAuthorization: "GET /api/activities: enforceStaffPermission('ACTIVITIES', 'VIEW')",
+    associatedApis: ["/api/activities"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 4"
+  },
+  {
+    route: "/activities/new",
+    permissionKey: "ACTIVITIES",
+    actions: { view: false, create: true, update: false, delete: false, export: false },
+    ownerAccess: "Create activity form",
+    staffAccess: { granted: "Can add activities", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('ACTIVITIES', 'create')",
+    serverAuthorization: "POST /api/activities: enforceStaffPermission('ACTIVITIES', 'CREATE')",
+    associatedApis: ["/api/activities"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-permissions-acceptance-gate.ts Test 2"
+  },
+  {
+    route: "/activities/[id]",
+    permissionKey: "ACTIVITIES",
+    actions: { view: true, create: false, update: true, delete: true, export: false },
+    ownerAccess: "Activity detail view and edit",
+    staffAccess: { granted: "Can view and update activity", denied: "OwnerRestrictedCard; fetch suppressed" },
+    pageGuard: "Client useAuth().hasStaffPermission('ACTIVITIES', 'view')",
+    serverAuthorization: "GET /api/activities/[id]: enforceStaffPermission('ACTIVITIES', 'VIEW'); PATCH: UPDATE; DELETE: DELETE",
+    associatedApis: ["/api/activities/[id]"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 4"
+  },
+  {
+    route: "/rate-sheets",
+    permissionKey: "RATE_SHEETS",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Supplier rate sheets directory",
+    staffAccess: { granted: "Can view and import rate sheets", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('RATE_SHEETS', 'view')",
+    serverAuthorization: "GET /api/rate-sheets: enforceStaffPermission('RATE_SHEETS', 'VIEW')",
+    associatedApis: ["/api/rate-sheets", "/api/rate-sheets/import", "/api/rate-sheets/sample"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 4"
+  },
+  {
+    route: "/rate-sheets/new",
+    permissionKey: "RATE_SHEETS",
+    actions: { view: false, create: true, update: false, delete: false, export: false },
+    ownerAccess: "Create rate sheet form",
+    staffAccess: { granted: "Can create rate sheets", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('RATE_SHEETS', 'create')",
+    serverAuthorization: "POST /api/rate-sheets: enforceStaffPermission('RATE_SHEETS', 'CREATE')",
+    associatedApis: ["/api/rate-sheets"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 4"
+  },
+  {
+    route: "/rate-sheets/[id]",
+    permissionKey: "RATE_SHEETS",
+    actions: { view: true, create: false, update: true, delete: true, export: false },
+    ownerAccess: "Rate sheet details and lookup",
+    staffAccess: { granted: "Can view and edit rate sheet", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('RATE_SHEETS', 'view')",
+    serverAuthorization: "GET /api/rate-sheets/[id]: enforceStaffPermission('RATE_SHEETS', 'VIEW'); PATCH: UPDATE; DELETE: DELETE",
+    associatedApis: ["/api/rate-sheets/[id]"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 4"
+  },
+
+  // ─── 5. Finance & Invoicing (4 Routes) ───────────────────────────────────
+  {
+    route: "/finance",
+    permissionKey: "FINANCE",
+    actions: { view: true, create: true, update: true, delete: false, export: false },
+    ownerAccess: "Full finance management: profit margins, customer payments, supplier disbursements, payables, export",
+    staffAccess: {
+      granted: "Can view customer receipts and log tour expenses; commercial margins (ProfitabilityCard), payables, and disbursements hidden",
+      denied: "Displays OwnerRestrictedCard('Access Restricted'); financial data not fetched"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('FINANCE', 'view')",
+    serverAuthorization: "GET /api/finance/summary: enforceStaffPermission('FINANCE', 'VIEW') + redactStaffFinancials(); /expenses: 'FINANCE', 'VIEW'",
+    associatedApis: ["/api/finance/summary", "/api/finance/transactions", "/api/finance/expenses", "/api/finance/customer-payments"],
+    remainingOwnerOnlyRestrictions: "Commercial profit margins, supplier payables, supplier disbursements, and CSV exports remain strictly Owner-Only",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 3; test-permissions-acceptance-gate.ts Test 1, 7"
+  },
+  {
+    route: "/invoices",
+    permissionKey: "INVOICES",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Full invoice directory: issue, void, replace, download PDF, track receivables",
+    staffAccess: {
+      granted: "Can view invoices and issue customer invoices; deletion delegable by Owner",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('INVOICES', 'view')",
+    serverAuthorization: "GET /api/invoices: enforceStaffPermission('INVOICES', 'VIEW'); POST /api/invoices: CREATE; POST /issue: UPDATE",
+    associatedApis: ["/api/invoices", "/api/invoices/summary", "/api/invoices/[id]/issue", "/api/invoices/[id]/pdf"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 4; test-permissions-acceptance-gate.ts Test 3"
+  },
+  {
+    route: "/invoices/[id]",
+    permissionKey: "INVOICES",
+    actions: { view: true, create: false, update: true, delete: true, export: false },
+    ownerAccess: "Invoice detail and lifecycle actions",
+    staffAccess: { granted: "Can view and issue invoice", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('INVOICES', 'view')",
+    serverAuthorization: "GET /api/invoices/[id]: enforceStaffPermission('INVOICES', 'VIEW'); DELETE: 'INVOICES', 'DELETE'",
+    associatedApis: ["/api/invoices/[id]"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-failures-phase1.ts Category 2"
+  },
+  {
+    route: "/payments",
+    permissionKey: "PAYMENTS",
+    actions: { view: true, create: true, update: false, delete: false, export: false },
+    ownerAccess: "Full payment management: record, verify, void, delete, download receipts",
+    staffAccess: {
+      granted: "Can view payment ledger and record customer payment receipts",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('PAYMENTS', 'view')",
+    serverAuthorization: "GET /api/payments: staffPermissionService.hasStaffPermission('PAYMENTS', 'VIEW'); POST /api/payments: CREATE",
+    associatedApis: ["/api/payments", "/api/payments/[id]/verify", "/api/payments/[id]/void"],
+    remainingOwnerOnlyRestrictions: "Payment verification, voiding, and deletion remain strictly Owner-Only",
+    testEvidence: "test-staff-failures-phase1.ts Category 1; test-staff-application-wide-authorization.ts Category 4"
+  },
+
+  // ─── 6. Engagement & Settings (11 Routes) ─────────────────────────────────
+  {
+    route: "/documents",
+    permissionKey: "DOCUMENTS",
+    actions: { view: true, create: true, update: true, delete: false, export: false },
+    ownerAccess: "Travel documents directory: vouchers, travel kits, tickets",
+    staffAccess: { granted: "Can view, generate, issue, and download travel documents", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('DOCUMENTS', 'view')",
+    serverAuthorization: "GET /api/documents: enforceStaffPermission('DOCUMENTS', 'VIEW'); POST /issue: CREATE; POST /revoke: UPDATE",
+    associatedApis: ["/api/documents", "/api/documents/[id]/download", "/api/documents/[id]/issue", "/api/documents/[id]/revoke"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 8"
+  },
+  {
+    route: "/suppliers",
+    permissionKey: "SUPPLIERS",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Supplier directory and contracts",
+    staffAccess: { granted: "Can view and manage supplier contacts", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('SUPPLIERS', 'view')",
+    serverAuthorization: "GET /api/suppliers: enforceStaffPermission('SUPPLIERS', 'VIEW')",
+    associatedApis: ["/api/suppliers", "/api/suppliers/check-duplicate"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 4"
+  },
+  {
+    route: "/suppliers/new",
+    permissionKey: "SUPPLIERS",
+    actions: { view: false, create: true, update: false, delete: false, export: false },
+    ownerAccess: "Create supplier form",
+    staffAccess: { granted: "Can add suppliers", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('SUPPLIERS', 'create')",
+    serverAuthorization: "POST /api/suppliers: enforceStaffPermission('SUPPLIERS', 'CREATE')",
+    associatedApis: ["/api/suppliers"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 4"
+  },
+  {
+    route: "/suppliers/[id]",
+    permissionKey: "SUPPLIERS",
+    actions: { view: true, create: false, update: true, delete: true, export: false },
+    ownerAccess: "Supplier detail and services",
+    staffAccess: { granted: "Can view and update supplier", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('SUPPLIERS', 'view')",
+    serverAuthorization: "GET /api/suppliers/[id]: enforceStaffPermission('SUPPLIERS', 'VIEW'); PATCH: UPDATE; DELETE: DELETE",
+    associatedApis: ["/api/suppliers/[id]"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 4"
+  },
+  {
+    route: "/feedback",
+    permissionKey: "FEEDBACK",
+    actions: { view: true, create: true, update: true, delete: true, export: false },
+    ownerAccess: "Customer feedback, NPS scores, sentiment analysis, review link configuration",
+    staffAccess: {
+      granted: "Can view customer reviews, log manual feedback, and configure review links",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('FEEDBACK', 'view')",
+    serverAuthorization: "GET /api/feedback: enforceStaffPermission('FEEDBACK', 'VIEW'); POST: CREATE; PATCH: UPDATE",
+    associatedApis: ["/api/feedback", "/api/feedback/[id]"],
+    remainingOwnerOnlyRestrictions: "None. All actions delegable by Owner.",
+    testEvidence: "test-final-permissions-reconciliation.ts Check 4"
+  },
+  {
+    route: "/reports",
+    permissionKey: "REPORTS",
+    actions: { view: true, create: false, update: false, delete: false, export: true },
+    ownerAccess: "Business intelligence and operational reports",
+    staffAccess: {
+      granted: "Can view reports and download CSV/PDF exports if granted by Owner; margins redacted",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('REPORTS', 'view')",
+    serverAuthorization: "GET /api/reports: enforceStaffPermission('REPORTS', 'VIEW'); /export: 'REPORTS', 'EXPORT'; /pdf: 'REPORTS', 'EXPORT'",
+    associatedApis: ["/api/reports", "/api/reports/export", "/api/reports/pdf"],
+    remainingOwnerOnlyRestrictions: "None on page access; margin reports require Owner",
+    testEvidence: "test-permissions-acceptance-gate.ts Test 5"
+  },
+  {
+    route: "/communications",
+    permissionKey: "COMMUNICATIONS",
+    actions: { view: true, create: true, update: true, delete: false, export: false },
+    ownerAccess: "Communication logs, automated delivery queues, WhatsApp & Email notification channels",
+    staffAccess: {
+      granted: "Can view audit logs and send manual client messages",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('COMMUNICATIONS', 'view')",
+    serverAuthorization: "GET /api/communications: staffPermissionService.hasStaffPermission('COMMUNICATIONS', 'VIEW')",
+    associatedApis: ["/api/communications", "/api/communications/[id]", "/api/communication/logs"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-final-permissions-reconciliation.ts Check 4"
+  },
+  {
+    route: "/referrals",
+    permissionKey: "REFERRALS",
+    actions: { view: true, create: true, update: true, delete: false, export: false },
+    ownerAccess: "Client referral programs and reward tracking",
+    staffAccess: { granted: "Can view referrals and record new referral attributions", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('REFERRALS', 'view')",
+    serverAuthorization: "GET /api/referrals: requireReadAccess(); POST: requireWriteAccess()",
+    associatedApis: ["/api/referrals", "/api/referrals/[id]"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 2"
+  },
+  {
+    route: "/settings",
+    permissionKey: "SETTINGS",
+    actions: { view: true, create: false, update: true, delete: false, export: false },
+    ownerAccess: "Full agency settings: General, GST Tax profile, Communication templates, Team & Staff Roles",
+    staffAccess: {
+      granted: "Can view agency details, GST profile, and configure notification templates. Team & Staff Roles tab is hidden; ?tab=team renders OwnerRestrictedCard.",
+      denied: "Displays OwnerRestrictedCard('Access Restricted')"
+    },
+    pageGuard: "Client useAuth().hasStaffPermission('SETTINGS', 'view')",
+    serverAuthorization: "GET /api/communication/settings: enforceStaffPermission('SETTINGS', 'VIEW'); PATCH: UPDATE; PUT /api/agency/tax-profile: requireAgencyOwnerContext()",
+    associatedApis: ["/api/communication/settings", "/api/agency/tax-profile", "/api/agency/logo", "/api/team", "/api/team/members/[id]/permissions"],
+    remainingOwnerOnlyRestrictions: "Team management, staff permissions, and agency legal tax profile modification remain strictly Owner-Only",
+    testEvidence: "test-final-permissions-reconciliation.ts Check 2; test-staff-application-wide-authorization.ts Category 2"
+  },
+  {
+    route: "/subscription",
+    permissionKey: "SUBSCRIPTION",
+    actions: { view: true, create: false, update: false, delete: false, export: false },
+    ownerAccess: "SaaS plan upgrades, billing payments, invoices, plan changes",
+    staffAccess: {
+      granted: "Can view active tier quotas and feature entitlements; pricing and payment history are redacted",
+      denied: "Can view active tier quotas with prices redacted"
+    },
+    pageGuard: "Universal read-only quota dashboard for authenticated agency members",
+    serverAuthorization: "GET /api/subscription: requireReadAccess() with automatic staff payload redaction (planPrice=0, paymentHistory=[])",
+    associatedApis: ["/api/subscription", "/api/subscription/plans", "/api/subscription/billing-settings"],
+    remainingOwnerOnlyRestrictions: "100% Owner-Only for purchasing subscriptions, upgrading plans, or viewing billing invoices",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 1"
+  },
+  {
+    route: "/support",
+    permissionKey: "SUPPORT_CHAT",
+    actions: { view: true, create: true, update: false, delete: false, export: false },
+    ownerAccess: "Full support desk access",
+    staffAccess: { granted: "Can submit operational tickets and chat with platform support", denied: "OwnerRestrictedCard" },
+    pageGuard: "Client useAuth().hasStaffPermission('SUPPORT_CHAT', 'view')",
+    serverAuthorization: "GET /api/chat/conversation: requireReadAccess()",
+    associatedApis: ["/api/chat/conversation", "/api/chat/conversations/[conversationId]/messages"],
+    remainingOwnerOnlyRestrictions: "None",
+    testEvidence: "test-staff-application-wide-authorization.ts Category 8"
+  }
+];
+
+fs.writeFileSync('scratch/route-inventory.json', JSON.stringify(routeInventory, null, 2));
+console.log('Successfully generated machine-readable inventory for', routeInventory.length, 'routes');
+

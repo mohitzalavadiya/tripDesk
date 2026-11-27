@@ -2,6 +2,7 @@ import {
 apiSuccess,
 handleApiError,
 requireWriteAccess,
+  enforceStaffPermission,
 validateJson,
 } from "@/lib/api";
 import { enquiryService } from "@/lib/services/enquiry-service";
@@ -21,10 +22,15 @@ interface RouteParams {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FOLLOW_UPS", "UPDATE");
     const { followUpId } = await params;
     const body = await validateJson(updateFollowUpSchema, request);
 
-    const updated = await enquiryService.updateFollowUp(context.agencyId, followUpId, body);
+    const updated = await enquiryService.updateFollowUp(context.agencyId, followUpId, body, {
+      userId: context.dbUser.id,
+      userName: context.dbUser.name || context.dbUser.email || (context.isAgencyOwner ? "Agency Owner" : "Staff Member"),
+      role: context.dbUser.role,
+    });
 
     return apiSuccess(updated);
   } catch (error) {
@@ -39,9 +45,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "FOLLOW_UPS", "DELETE");
     const { followUpId } = await params;
 
-    await enquiryService.deleteFollowUp(context.agencyId, followUpId);
+    await enquiryService.deleteFollowUp(context.agencyId, followUpId, {
+      userId: context.dbUser.id,
+      userName: context.dbUser.name || context.dbUser.email || (context.isAgencyOwner ? "Agency Owner" : "Staff Member"),
+      role: context.dbUser.role,
+    });
 
     return apiSuccess({ success: true, message: "Follow-up archived successfully." });
   } catch (error) {

@@ -1,5 +1,7 @@
 "use client";
 
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+import { useAuth } from "@/context/auth-context";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DestinationSelect } from "@/components/shared/destination-select";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
@@ -51,6 +53,7 @@ const editHotelSchema = Yup.object().shape({
 });
 
 export default function HotelProfilePage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
   const params = useParams();
   const router = useRouter();
   const hotelId = params.id as string;

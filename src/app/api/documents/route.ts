@@ -2,6 +2,7 @@ import {
 apiSuccess,
 handleApiError,
 requireReadAccess,
+  enforceStaffPermission,
 validateQueryParams,
 } from "@/lib/api";
 import { travelDocumentService } from "@/lib/services/travel-document-service";
@@ -17,6 +18,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "DOCUMENTS", "VIEW");
     const queryParams = validateQueryParams(listDocumentsSchema, request.nextUrl.searchParams);
 
     const result = await travelDocumentService.listDocuments(context.agencyId, queryParams);

@@ -1,6 +1,7 @@
 "use client";
 
 import { subscriptionClient } from "@/lib/api-client/subscription-client";
+import { evaluateEffectiveSubscriptionState } from "@/lib/auth/subscription-state";
 import * as React from "react";
 
 export interface EntitlementsState {
@@ -164,16 +165,30 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       return { isReadOnly: true, readOnlyReason: "EXPIRED" as ReadOnlyReason };
     }
 
-    if (sub.status === "EXPIRED" || (sub.isTrialExpired && sub.status !== "ACTIVE")) {
-      return { isReadOnly: true, readOnlyReason: "EXPIRED" as ReadOnlyReason };
+    if (sub.status === "PAST_DUE" || sub.status === "UNPAID") {
+      return { isReadOnly: true, readOnlyReason: "PAST_DUE" as ReadOnlyReason };
     }
 
-    if (sub.status === "CANCELLED" || sub.status === "CANCELED") {
+    if (sub.status === "CANCELED" || sub.status === "CANCELLED") {
       return { isReadOnly: true, readOnlyReason: "CANCELLED" as ReadOnlyReason };
     }
 
-    if (sub.status === "PAST_DUE" || sub.status === "UNPAID") {
-      return { isReadOnly: true, readOnlyReason: "PAST_DUE" as ReadOnlyReason };
+    const evalState = evaluateEffectiveSubscriptionState({
+      agencyStatus: overview.agency?.status,
+      subscription: {
+        status: sub.storedStatus || sub.status,
+        trialStart: sub.trialStart,
+        trialEnd: sub.trialEnd,
+        subscriptionStart: sub.subscriptionStart,
+        subscriptionEnd: sub.subscriptionEnd,
+      },
+    });
+
+    if (evalState.isReadOnly || sub.isSubscriptionExpired || sub.isExpired || sub.isTrialExpired) {
+      return {
+        isReadOnly: true,
+        readOnlyReason: (evalState.effectiveStatus === "CANCELLED" ? "CANCELLED" : "EXPIRED") as ReadOnlyReason,
+      };
     }
 
     return { isReadOnly: false, readOnlyReason: null as ReadOnlyReason };
@@ -204,26 +219,15 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         };
       }
 
-      const sub = overview?.subscription;
-
       const item = usage[resourceKey];
       if (!item) {
-        if (sub?.plan?.code === "PROFESSIONAL" || sub?.status === "TRIALING" || sub?.status === "TRIAL") {
-          return {
-            allowed: true,
-            currentUsage: 0,
-            limit: null,
-            remaining: null,
-            isExceeded: false,
-            loading: false,
-          };
-        }
         return {
-          allowed: true,
+          allowed: false,
+          reason: isReadOnly ? "READ_ONLY_SUBSCRIPTION" : "QUOTA_EXCEEDED",
           currentUsage: 0,
-          limit: null,
-          remaining: null,
-          isExceeded: false,
+          limit: 0,
+          remaining: 0,
+          isExceeded: true,
           loading: false,
         };
       }
@@ -261,7 +265,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         loading: false,
       };
     },
-    [isReadOnly, loading, overview, usage]
+    [isReadOnly, loading, usage]
   );
 
   const incrementUsage = React.useCallback(
@@ -324,17 +328,18 @@ export function useSubscription(): SubscriptionContextType {
       usage: defaultUsage,
       loading: false,
       error: null,
-      isReadOnly: false,
-      readOnlyReason: null,
-      canWrite: true,
+      isReadOnly: true,
+      readOnlyReason: "EXPIRED",
+      canWrite: false,
       refreshSubscription: async () => {},
       isFeatureAllowed: () => false,
       canCreate: (_resourceKey: "TRIPS" | "QUOTATIONS" | "BOOKINGS"): QuotaDecision => ({
-        allowed: true,
+        allowed: false,
+        reason: "READ_ONLY_SUBSCRIPTION",
         currentUsage: 0,
-        limit: null,
-        remaining: null,
-        isExceeded: false,
+        limit: 0,
+        remaining: 0,
+        isExceeded: true,
         loading: false,
       }),
       incrementUsage: () => {},

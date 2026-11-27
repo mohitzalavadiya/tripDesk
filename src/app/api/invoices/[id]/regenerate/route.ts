@@ -1,7 +1,8 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
 } from "@/lib/api";
 import { invoiceService } from "@/lib/services/invoice-service";
 import { NextRequest } from "next/server";
@@ -10,8 +11,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/invoices/[id]/regenerate
- * Regenerate an existing invoice from the latest booking/quotation financial state
- * while preserving the same invoice number and invoice record ID (Phase 203).
+ * Regenerate a draft invoice from the latest booking/quotation financial state.
  */
 export async function POST(
   _request: NextRequest,
@@ -19,6 +19,7 @@ export async function POST(
 ) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "INVOICES", "UPDATE");
     const { id } = await params;
 
     const regenerated = await invoiceService.regenerateInvoice(context.agencyId, id);

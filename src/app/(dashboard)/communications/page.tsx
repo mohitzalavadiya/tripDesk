@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -130,6 +133,19 @@ function formatRelativeTime(dateString: string): string {
 }
 
 export default function CommunicationsPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("COMMUNICATIONS", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Client Communications"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -492,8 +508,8 @@ export default function CommunicationsPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
-      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+    <div className="flex flex-col min-h-[calc(100vh-64px)] bg-slate-50/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* ─── HEADER ──────────────────────────────────────────────────────── */}
         <PageHeader
           title="Communication Center"
@@ -976,7 +992,7 @@ export default function CommunicationsPage() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto max-h-[620px] overflow-y-auto">
+                <div className="overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                       <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-[10px]">

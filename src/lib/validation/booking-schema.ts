@@ -8,6 +8,7 @@ export const createBookingSchema = z.object({
   tripId: z.string().min(1, "Trip ID is required"),
   customerId: z.string().min(1, "Customer ID is required"),
   quotationId: z.string().trim().optional().nullable(),
+  enquiryId: z.string().trim().optional().nullable(),
   status: z.nativeEnum(BookingStatus).default(BookingStatus.CONFIRMED).optional(),
   bookingDate: z.coerce.date().default(() => new Date()).optional(),
   travelStartDate: z.coerce.date().optional().nullable(),
@@ -35,6 +36,7 @@ export const updateBookingSchema = z
     notes: z.string().trim().max(5000).optional().nullable(),
     internalNotes: z.string().trim().max(5000).optional().nullable(),
     cancellationReason: z.string().trim().max(2000).optional().nullable(),
+    enquiryId: z.string().trim().optional().nullable(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided for update",

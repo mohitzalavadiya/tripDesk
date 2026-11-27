@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { ExcelImportModal } from "@/components/excel/excel-import-modal";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -59,6 +62,19 @@ import * as React from "react";
 import { toast } from "sonner";
 
 export default function HotelsPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("HOTELS", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Hotels Directory"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const { isReadOnly: subReadOnly, readOnlyReason } = useSubscription();
 
@@ -125,9 +141,9 @@ export default function HotelsPage() {
   }, [search]);
 
   // Fetch hotels from API
-  const fetchHotels = React.useCallback(async () => {
+  const fetchHotels = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       const res = await hotelClient.getHotels({
@@ -147,7 +163,7 @@ export default function HotelsPage() {
       }
       setError(err?.message || "Failed to load hotels from database.");
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [debouncedSearch, selectedDestinationId, page]);
 
@@ -181,7 +197,7 @@ export default function HotelsPage() {
       await hotelClient.archiveHotel(id);
       toast.success(`Hotel "${name}" archived successfully.`);
       setArchiveTarget(null);
-      await fetchHotels();
+      await fetchHotels(true);
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setIsReadOnly(true);
@@ -195,8 +211,8 @@ export default function HotelsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Read-Only Banner */}
         {isReadOnly && <ReadOnlyBanner moduleName="Hotel Inventory" />}
 
@@ -370,14 +386,14 @@ export default function HotelsPage() {
           </div>
 
           {/* Loading State */}
-          {loading && (
+          {loading && hotels.length === 0 && (
             <div className="p-4">
               <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
-          {!loading && error && (
+          {!loading && error && hotels.length === 0 && (
             <div className="p-8">
               <ErrorState
                 title="Unable to load hotels"
@@ -388,7 +404,7 @@ export default function HotelsPage() {
           )}
 
           {/* Table Content */}
-          {!loading && !error && hotels.length === 0 ? (
+          {(!loading || hotels.length > 0) && !error && hotels.length === 0 ? (
             <div className="p-12 text-center">
               <EmptyState
                 icon={HotelIcon}
@@ -402,9 +418,9 @@ export default function HotelsPage() {
                 onAction={isFilterActive ? handleClearFilters : () => router.push("/hotels/new")}
               />
             </div>
-          ) : !loading && !error && (
+          ) : (!loading || hotels.length > 0) && !error && (
             <div className="overflow-hidden">
-              <div className="hidden lg:block overflow-x-auto max-h-[620px] overflow-y-auto">
+              <div className="hidden lg:block overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">

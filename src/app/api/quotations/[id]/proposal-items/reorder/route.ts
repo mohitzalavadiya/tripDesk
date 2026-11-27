@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiSuccess,
 handleApiError,
 requireWriteAccess,
@@ -21,6 +22,7 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATIONS", "UPDATE");
     const { id: quotationId } = await params;
     const body = await validateJson(reorderProposalItemsSchema, request);
 

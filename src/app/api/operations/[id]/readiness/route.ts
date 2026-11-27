@@ -1,8 +1,9 @@
 import {
-apiSuccess,
-handleApiError,
-requireReadAccess,
-validateRouteParams,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  validateRouteParams,
 } from "@/lib/api";
 import { operationsService } from "@/lib/services/operations-service";
 import { NextRequest } from "next/server";
@@ -25,6 +26,7 @@ interface RouteProps {
 export async function GET(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "OPERATIONS", "VIEW");
     const { id } = validateRouteParams(idParamSchema, await props.params);
 
     const readiness = await operationsService.calculateReadiness(

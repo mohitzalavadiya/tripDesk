@@ -114,7 +114,19 @@ export const bookingPublicService = {
     const booking = await prisma.booking.findFirst({
       where: { tripId: shareLink.tripId, status: { not: "CANCELLED" } },
       orderBy: { createdAt: "desc" },
-      include: {
+      select: {
+        id: true,
+        bookingNumber: true,
+        packageOptionName: true,
+        status: true,
+        paymentStatus: true,
+        bookingDate: true,
+        travelStartDate: true,
+        travelEndDate: true,
+        currency: true,
+        totalAmount: true,
+        paidAmount: true,
+        balanceAmount: true,
         agency: { select: { name: true, phone: true, email: true, address: true, logo: true } },
         customer: { select: { name: true, phone: true, email: true } },
         trip: {
@@ -140,6 +152,15 @@ export const bookingPublicService = {
         payments: {
           where: { status: "COMPLETED" },
           orderBy: { paymentDate: "desc" },
+          select: {
+            id: true,
+            paymentNumber: true,
+            amount: true,
+            currency: true,
+            paymentMethod: true,
+            paymentDate: true,
+            receiptNumber: true,
+          },
         },
       },
     });

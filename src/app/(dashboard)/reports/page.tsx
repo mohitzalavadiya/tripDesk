@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { LockedFeatureCard } from "@/components/shared/locked-feature-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -45,6 +48,20 @@ const EXPORT_CSV_LABELS: Record<string, string> = {
 };
 
 export default function ReportsPage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+
+  if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("REPORTS", "view"))) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Reports & BI Analytics"
+          badgeText="Access Restricted"
+          description="You do not have permission to view reports and business analytics. Contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const { isFeatureAllowed, loading: subLoading } = useSubscription();
   const isAllowed = isFeatureAllowed("REPORTS_ANALYTICS");
 

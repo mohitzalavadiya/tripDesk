@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -82,6 +85,19 @@ const DOCUMENT_STATUS_LABELS: Record<string, string> = {
 };
 
 export default function DocumentCenterPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("DOCUMENTS", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Travel Documents"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const [loading, setLoading] = React.useState(true);
   const [documents, setDocuments] = React.useState<DocumentItem[]>([]);
   const [total, setTotal] = React.useState(0);
@@ -111,8 +127,8 @@ export default function DocumentCenterPage() {
   const [resendChannel, setResendChannel] = React.useState<NotificationChannel>(NotificationChannel.WHATSAPP);
   const [customRecipient, setCustomRecipient] = React.useState("");
 
-  const fetchDocuments = React.useCallback(async () => {
-    setLoading(true);
+  const fetchDocuments = React.useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const params: ListDocumentsParams = {
         page,
@@ -129,7 +145,7 @@ export default function DocumentCenterPage() {
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Failed to fetch documents."));
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [page, search, typeFilter, statusFilter]);
 
@@ -164,7 +180,7 @@ export default function DocumentCenterPage() {
         toast.success(`Document ${issueDoc.documentNumber} issued successfully!`);
       }
       setIssueDoc(null);
-      await fetchDocuments();
+      await fetchDocuments(true);
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Failed to issue document."));
     } finally {
@@ -184,7 +200,7 @@ export default function DocumentCenterPage() {
       toast.success(`Document ${revokeDoc.documentNumber} has been revoked.`);
       setRevokeDoc(null);
       setRevokeReason("");
-      await fetchDocuments();
+      await fetchDocuments(true);
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Failed to revoke document."));
     } finally {
@@ -220,7 +236,7 @@ export default function DocumentCenterPage() {
       }
       setResendDoc(null);
       setCustomRecipient("");
-      await fetchDocuments();
+      await fetchDocuments(true);
     } catch (err: any) {
       toast.error(getErrorMessage(err, "Failed to resend document."));
     } finally {
@@ -290,8 +306,8 @@ export default function DocumentCenterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         <PageHeader
           title="Travel Documents & Vouchers"
           description="Official travel vouchers, booking confirmations, payment receipts, and customer itineraries."
@@ -389,7 +405,7 @@ export default function DocumentCenterPage() {
               </div>
             </div>
           </div>
-          {loading ? (
+          {loading && documents.length === 0 ? (
             <div className="p-4">
               <TableSkeleton rows={8} />
             </div>
@@ -402,7 +418,7 @@ export default function DocumentCenterPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto max-h-[620px] overflow-y-auto">
+            <div className="overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm text-[11px] uppercase font-bold text-slate-600 shadow-2xs">
                   <TableRow>

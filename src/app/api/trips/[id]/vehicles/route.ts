@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiCreated,
 apiSuccess,
 handleApiError,
@@ -25,6 +26,7 @@ interface RouteProps {
 export async function GET(_request: NextRequest, props: RouteProps) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TRIPS", "VIEW");
     const { id } = validateRouteParams(tripIdParamSchema, await props.params);
 
     const vehicles = await tripVehicleService.listTripVehicles(context.agencyId, id);
@@ -43,6 +45,7 @@ export async function GET(_request: NextRequest, props: RouteProps) {
 export async function POST(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "TRIPS", "UPDATE");
     const { id } = validateRouteParams(tripIdParamSchema, await props.params);
     const body = await validateJson(createTripVehicleSchema, request);
 

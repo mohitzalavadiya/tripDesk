@@ -25,6 +25,8 @@ export interface SupplierDetails360 extends Supplier {
   activeRateSheets: any[];
   expiredRateSheets: any[];
   hotelConfirmations: any[];
+  vehicleDispatches: any[];
+  activityConfirmations: any[];
   payables: any[];
   payments: any[];
   financialSummary: {
@@ -273,8 +275,77 @@ export const supplierService = {
       }
     }
 
-    // Compute operational summary
-    const totalConfirmationsCount = supplier.hotelConfirmations.length;
+    // Query operational vehicle dispatches and activity confirmations linked to supplier's fleet/services
+    const [vehicleDispatches, activityConfirmations] = await Promise.all([
+      prisma.vehicleDispatch.findMany({
+        where: {
+          agencyId,
+          vehicle: { supplierId: id },
+        },
+        include: {
+          vehicle: true,
+          tripOperation: {
+            include: {
+              trip: {
+                select: {
+                  id: true,
+                  tripNumber: true,
+                  title: true,
+                  status: true,
+                  startDate: true,
+                  endDate: true,
+                },
+              },
+              booking: {
+                select: {
+                  id: true,
+                  bookingNumber: true,
+                  status: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+      prisma.activityConfirmation.findMany({
+        where: {
+          agencyId,
+          activity: { supplierId: id },
+        },
+        include: {
+          activity: true,
+          tripOperation: {
+            include: {
+              trip: {
+                select: {
+                  id: true,
+                  tripNumber: true,
+                  title: true,
+                  status: true,
+                  startDate: true,
+                  endDate: true,
+                },
+              },
+              booking: {
+                select: {
+                  id: true,
+                  bookingNumber: true,
+                  status: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+    ]);
+
+    // Compute operational summary across all confirmations
+    const totalConfirmationsCount =
+      supplier.hotelConfirmations.length + vehicleDispatches.length + activityConfirmations.length;
     let activeConfirmationsCount = 0;
     let completedConfirmationsCount = 0;
 
@@ -285,11 +356,27 @@ export const supplierService = {
         completedConfirmationsCount++;
       }
     }
+    for (const vd of vehicleDispatches) {
+      if (vd.status === "CONFIRMED" || vd.status === "PENDING") {
+        activeConfirmationsCount++;
+      } else if (vd.status === "COMPLETED") {
+        completedConfirmationsCount++;
+      }
+    }
+    for (const ac of activityConfirmations) {
+      if (ac.status === "CONFIRMED" || ac.status === "PENDING") {
+        activeConfirmationsCount++;
+      } else if (ac.status === "AMENDED") {
+        completedConfirmationsCount++;
+      }
+    }
 
     return {
       ...supplier,
       activeRateSheets,
       expiredRateSheets,
+      vehicleDispatches,
+      activityConfirmations,
       financialSummary: {
         totalPayableAmount: Number(totalPayableAmount.toFixed(2)),
         totalPaidAmount: Number(totalPaidAmount.toFixed(2)),

@@ -1,4 +1,6 @@
-import { requireAgencyOwnerContext } from "@/lib/api/context";
+import { requireReadAccess, requireWriteAccess,
+  enforceStaffPermission,
+} from "@/lib/api";
 import { feedbackService } from "@/lib/services/feedback-service";
 import {
 feedbackCreateSchema,
@@ -14,7 +16,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   try {
-    const authContext = await requireAgencyOwnerContext();
+    const authContext = await requireReadAccess();
+    await enforceStaffPermission(authContext.dbUser.role, authContext.agencyId, authContext.dbUser.id, "FEEDBACK", "VIEW");
     const { searchParams } = new URL(request.url);
 
     const filter = feedbackFilterSchema.parse({
@@ -50,7 +53,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const authContext = await requireAgencyOwnerContext();
+    const authContext = await requireWriteAccess();
+    await enforceStaffPermission(authContext.dbUser.role, authContext.agencyId, authContext.dbUser.id, "FEEDBACK", "CREATE");
     const body = await request.json();
     const validatedInput = feedbackCreateSchema.parse(body);
 

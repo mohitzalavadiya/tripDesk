@@ -2,6 +2,7 @@ import {
 apiSuccess,
 handleApiError,
 requireReadAccess,
+  enforceStaffPermission,
 } from "@/lib/api";
 import { operationsService } from "@/lib/services/operations-service";
 import { NextRequest } from "next/server";
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "OPERATIONS_ISSUES", "VIEW");
     const { searchParams } = new URL(request.url);
 
     const status = searchParams.get("status") || undefined;

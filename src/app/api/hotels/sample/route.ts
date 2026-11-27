@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   try {
     await requireReadAccess();
 
-    const buffer = hotelExcelService.generateSampleWorkbook();
+    const buffer = await hotelExcelService.generateSampleWorkbook();
 
     return new NextResponse(buffer as any, {
       status: 200,

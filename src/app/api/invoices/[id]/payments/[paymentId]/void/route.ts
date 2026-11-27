@@ -1,8 +1,9 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import { paymentService } from "@/lib/services/payment-service";
 import { voidPaymentSchema } from "@/lib/validation/invoice-schema";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/invoices/[id]/payments/[paymentId]/void
- * Void an active payment with mandatory reason
+ * Void an active payment with mandatory reason. Strictly Agency Owner only.
  */
 export async function POST(
   request: NextRequest,
@@ -20,14 +21,23 @@ export async function POST(
 ) {
   try {
     const context = await requireWriteAccess();
-    const { paymentId } = await params;
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "PAYMENTS",
+      "void",
+      "You do not have permission to void invoice payments."
+    );
+    const { id, paymentId } = await params;
     const body = await validateJson(voidPaymentSchema, request);
 
     const voided = await paymentService.voidPayment(
       context.agencyId,
       paymentId,
       context.dbUser.id,
-      body.reason
+      body.reason,
+      id
     );
 
     return apiSuccess(voided);

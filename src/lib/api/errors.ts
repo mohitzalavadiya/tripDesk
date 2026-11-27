@@ -83,7 +83,12 @@ export class QuotaExceededError extends ApiError {
 
 export class NotFoundError extends ApiError {
   constructor(resource = "Requested resource", details?: any) {
-    super(404, "NOT_FOUND", `${resource} not found.`, details);
+    const msg = resource.endsWith(" not found.") || resource.endsWith(" not found")
+      ? (resource.endsWith(".") ? resource : `${resource}.`)
+      : resource.includes(" not found")
+      ? (resource.endsWith(".") ? resource : `${resource}.`)
+      : `${resource} not found.`;
+    super(404, "NOT_FOUND", msg, details);
   }
 }
 

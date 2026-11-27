@@ -13,6 +13,14 @@ datasource db {
 enum UserRole {
   PLATFORM_OWNER
   AGENCY_OWNER
+  AGENCY_STAFF
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
 }
 
 enum AgencyStatus {
@@ -48,7 +56,10 @@ enum DestinationStatus {
   INACTIVE
 }
 
-
+enum ItineraryTemplateType {
+  DAY
+  PACKAGE
+}
 
 enum TripStatus {
   DRAFT
@@ -397,6 +408,7 @@ model Agency {
   enquiryFollowUps EnquiryFollowUp[]
   trips            Trip[]
   destinations     Destination[]
+  itineraryTemplates ItineraryTemplate[]
   hotels           Hotel[]
   vehicles         Vehicle[]
   activities       Activity[]
@@ -428,6 +440,9 @@ model Agency {
   userNotifications     UserNotification[]
   platformChatConversation PlatformChatConversation?
   platformChatMessages     PlatformChatMessage[]
+  invitations              AgencyInvitation[]
+  staffPermissionProfiles  StaffPermissionProfile[]
+  agencyAuditLogs          AgencyAuditLog[]
 
   @@map("agencies")
 }
@@ -438,20 +453,27 @@ model Agency {
 // ═════════════════════════════════════════════════════════════════════
 
 model User {
-  id            String    @id
-  agencyId      String?
-  name          String
-  email         String    @unique
-  phone         String?
-  passwordHash  String?
-  role          UserRole  @default(AGENCY_OWNER)
-  emailVerified DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               String    @id
+  agencyId         String?
+  name             String
+  email            String    @unique
+  phone            String?
+  passwordHash     String?
+  role             UserRole  @default(AGENCY_OWNER)
+  isActive         Boolean   @default(true)
+  deactivatedAt    DateTime?
+  sessionRevokedAt DateTime?
+  deactivatedById  String?
+  emailVerified    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   agency               Agency?               @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  createdInvitations   AgencyInvitation[]    @relation("AgencyInvitationsCreated")
+  assignedEnquiries    Enquiry[]             @relation("EnquiryAssignedToUser")
   userNotifications    UserNotification[]
   platformChatMessages PlatformChatMessage[]
+  staffPermissionProfile StaffPermissionProfile?
 
   @@index([agencyId])
   @@map("users")
@@ -724,6 +746,7 @@ model Destination {
   hotels           Hotel[]
   activities       Activity[]
   tripDestinations TripDestination[]
+  itineraryTemplates ItineraryTemplate[]
 
   @@unique([agencyId, name])
   @@index([agencyId])
@@ -847,6 +870,33 @@ model ItineraryItem {
   @@index([tripId])
   @@index([tripId, dayNumber])
   @@map("itinerary_items")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 10B. ITINERARY TEMPLATES (REUSABLE DAY & PACKAGE TEMPLATES)
+// ═════════════════════════════════════════════════════════════════════
+
+model ItineraryTemplate {
+  id            String                @id @default(cuid())
+  agencyId      String
+  destinationId String?
+  type          ItineraryTemplateType
+  name          String
+  description   String?
+  dayCount      Int                   @default(1)
+  content       Json
+  isArchived    Boolean               @default(false)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  agency      Agency       @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  destination Destination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId])
+  @@index([agencyId, type])
+  @@index([agencyId, destinationId])
+  @@index([agencyId, isArchived])
+  @@map("itinerary_templates")
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -1141,6 +1191,7 @@ model Booking {
   tripId             String
   customerId         String
   quotationId        String?
+  enquiryId          String?
   packageOptionName  String?
   bookingNumber      String
   status             BookingStatus        @default(CONFIRMED)
@@ -1173,6 +1224,7 @@ model Booking {
   agency    Agency     @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   trip      Trip       @relation(fields: [tripId], references: [id], onDelete: Restrict)
   quotation Quotation? @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  enquiry   Enquiry?   @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
   customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Restrict)
   payments         Payment[]
   invoices         Invoice[]
@@ -1190,6 +1242,7 @@ model Booking {
   @@index([tripId])
   @@index([customerId])
   @@index([quotationId])
+  @@index([enquiryId])
   @@index([agencyId, status])
   @@index([agencyId, paymentStatus])
   @@index([agencyId, createdAt])
@@ -1218,6 +1271,8 @@ model Payment {
   receiptNumber   String?
   notes           String?
   receivedBy      String?
+  verifiedById    String?
+  verifiedAt      DateTime?
   refundedAmount  Decimal       @default(0) @db.Decimal(12, 2)
   refundedAt      DateTime?
   voidReason      String?
@@ -1403,6 +1458,7 @@ model Enquiry {
   notes               String?
   internalNotes       String?
   assignedTo          String?
+  assignedToUserId    String?
   nextFollowUpAt      DateTime?
   convertedTripId     String?
   convertedQuotationId String?
@@ -1417,8 +1473,10 @@ model Enquiry {
   customer           Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
   convertedTrip      Trip?             @relation(fields: [convertedTripId], references: [id], onDelete: SetNull)
   convertedQuotation Quotation?        @relation(fields: [convertedQuotationId], references: [id], onDelete: SetNull)
+  assignedToUser     User?             @relation("EnquiryAssignedToUser", fields: [assignedToUserId], references: [id], onDelete: SetNull)
   followUps          EnquiryFollowUp[]
   customerNotifications CustomerNotification[]
+  bookings           Booking[]
 
   @@unique([agencyId, enquiryNumber])
   @@index([agencyId])
@@ -1430,6 +1488,7 @@ model Enquiry {
   @@index([agencyId, source])
   @@index([agencyId, nextFollowUpAt])
   @@index([agencyId, createdAt])
+  @@index([agencyId, assignedToUserId])
   @@map("enquiries")
 }
 
@@ -2322,6 +2381,80 @@ model PlatformChatMessage {
   @@index([agencyId, createdAt])
   @@index([senderUserId])
   @@map("platform_chat_messages")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 34. AGENCY INVITATION
+// ═════════════════════════════════════════════════════════════════════
+
+model AgencyInvitation {
+  id          String           @id @default(cuid())
+  agencyId    String
+  email       String
+  role        UserRole         @default(AGENCY_STAFF)
+  tokenHash   String           @unique
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  invitedById String
+  initialPermissions Json?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  agency    Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  invitedBy User   @relation("AgencyInvitationsCreated", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([agencyId, status])
+  @@index([email])
+  @@index([invitedById])
+  @@map("agency_invitations")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 35. STAFF PERMISSION PROFILE
+// ═════════════════════════════════════════════════════════════════════
+
+model StaffPermissionProfile {
+  id          String   @id @default(cuid())
+  agencyId    String
+  userId      String   @unique
+  permissions Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agency      Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId, userId])
+  @@map("staff_permission_profiles")
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 38. AGENCY AUDIT LOG
+// ═════════════════════════════════════════════════════════════════════
+
+model AgencyAuditLog {
+  id           String   @id @default(cuid())
+  agencyId     String
+  actorUserId  String
+  targetUserId String?
+  action       String
+  entityType   String
+  entityId     String?
+  previousState Json?
+  newState      Json?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  agency       Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId, createdAt])
+  @@index([agencyId, targetUserId])
+  @@index([agencyId, action])
+  @@map("agency_audit_logs")
 }
 
 

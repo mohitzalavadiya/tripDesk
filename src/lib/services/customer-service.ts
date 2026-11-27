@@ -1,13 +1,16 @@
 import { NotFoundError } from "@/lib/api";
 import prisma from "@/lib/prisma";
 import {
-CheckDuplicateCustomerInput,
-CreateCustomerInput,
-CustomerQueryParams,
-UpdateCustomerInput,
+  CheckDuplicateCustomerInput,
+  CreateCustomerInput,
+  CustomerQueryParams,
+  UpdateCustomerInput,
 } from "@/lib/validation/customer-schema";
-import { Customer,Prisma } from "@prisma/client";
+import { normalizePhoneNumber } from "@/lib/validation/field-validators";
+import { Customer, Prisma } from "@prisma/client";
 import "server-only";
+import { PAYMENT_SCALAR_SELECT } from "./payment-service";
+import { stripIdempotencyMarker } from "@/lib/utils/crm-urgency";
 
 export interface CustomerWithCounts extends Customer {
   _count?: {
@@ -32,6 +35,7 @@ export interface CustomerActivityEvent {
   type:
     | "CUSTOMER_CREATED"
     | "ENQUIRY_CREATED"
+    | "FOLLOW_UP_COMPLETED"
     | "ENQUIRY_CONVERTED"
     | "TRIP_CREATED"
     | "QUOTATION_CREATED"
@@ -65,6 +69,46 @@ export interface CustomerDetails360 extends Customer {
     totalSpent: number;
   };
   timeline: CustomerActivityEvent[];
+}
+
+export interface RepeatCustomerEvaluationParams {
+  trips?: Array<{ id: string; status: string; archivedAt?: Date | string | null }>;
+  bookings?: Array<{ id: string; status: string; archivedAt?: Date | string | null }>;
+  enquiries?: Array<{ id: string; status: string; archivedAt?: Date | string | null }>;
+}
+
+/**
+ * Server-authoritative Repeat Customer Evaluation Rule (V3 Section 265):
+ * A customer qualifies as a repeat customer if and only if they meet either of the following criteria:
+ * 1. At least ONE genuinely COMPLETED trip (trip.status === "COMPLETED" and not archived).
+ * 2. OR at least TWO distinct eligible confirmed bookings (booking.status in ["CONFIRMED", "COMPLETED", "ONGOING"] and not archived).
+ *
+ * Strict Disqualifications:
+ * - A single confirmed booking alone does NOT qualify.
+ * - A converted enquiry alone does NOT qualify.
+ * - Converted enquiries linked to bookings do NOT count as additional bookings.
+ * - Cancelled or Draft bookings (status "CANCELLED", "DRAFT") do NOT count toward confirmed booking totals.
+ * - Non-completed trips (status "DRAFT", "PLANNING", "QUOTED", "BOOKED", "ONGOING", "CANCELLED") do NOT satisfy the completed-trip criterion.
+ * - Duplicate records referring to the same booking ID are deduplicated.
+ */
+export function evaluateRepeatCustomerStatus(params: RepeatCustomerEvaluationParams): boolean {
+  // 1. Check for at least 1 genuinely completed trip
+  const hasCompletedTrip = (params.trips || []).some(
+    (t) => !t.archivedAt && t.status === "COMPLETED"
+  );
+  if (hasCompletedTrip) {
+    return true;
+  }
+
+  // 2. Count distinct eligible confirmed bookings
+  const eligibleBookingIds = new Set<string>();
+  for (const b of params.bookings || []) {
+    if (!b.archivedAt && (b.status === "CONFIRMED" || b.status === "COMPLETED" || b.status === "ONGOING")) {
+      eligibleBookingIds.add(b.id);
+    }
+  }
+
+  return eligibleBookingIds.size >= 2;
 }
 
 export const customerService = {
@@ -114,10 +158,17 @@ export const customerService = {
 
     if (params.phone?.trim()) {
       const rawPhone = params.phone.trim();
+      const normalizedPhone = normalizePhoneNumber(rawPhone);
       const cleanPhone = rawPhone.replace(/\D/g, "");
 
       orConditions.push({ phone: { contains: rawPhone, mode: "insensitive" } });
+      if (normalizedPhone && normalizedPhone !== rawPhone) {
+        orConditions.push({ phone: { contains: normalizedPhone, mode: "insensitive" } });
+      }
       orConditions.push({ alternatePhone: { contains: rawPhone, mode: "insensitive" } });
+      if (normalizedPhone && normalizedPhone !== rawPhone) {
+        orConditions.push({ alternatePhone: { contains: normalizedPhone, mode: "insensitive" } });
+      }
 
       if (cleanPhone.length >= 6) {
         const last10 = cleanPhone.slice(-10);
@@ -254,7 +305,11 @@ export const customerService = {
           take: 50,
           include: {
             convertedTrip: { select: { id: true, tripNumber: true, title: true } },
-            followUps: { where: { archivedAt: null } },
+            assignedToUser: { select: { id: true, name: true, email: true } },
+            followUps: {
+              where: { archivedAt: null },
+              orderBy: { scheduledAt: "asc" },
+            },
           },
         },
         trips: {
@@ -278,12 +333,46 @@ export const customerService = {
           where: { archivedAt: null },
           orderBy: { createdAt: "desc" },
           take: 50,
-          include: {
+          select: {
+            id: true,
+            agencyId: true,
+            tripId: true,
+            customerId: true,
+            quotationId: true,
+            bookingNumber: true,
+            status: true,
+            paymentStatus: true,
+            totalAmount: true,
+            paidAmount: true,
+            balanceAmount: true,
+            currency: true,
+            bookingDate: true,
+            travelStartDate: true,
+            travelEndDate: true,
+            taxableAmount: true,
+            taxAmount: true,
+            taxRate: true,
+            taxMode: true,
+            gstTreatment: true,
+            cgstAmount: true,
+            sgstAmount: true,
+            igstAmount: true,
+            notes: true,
+            internalNotes: true,
+            cancellationReason: true,
+            confirmedAt: true,
+            completedAt: true,
+            cancelledAt: true,
+            archivedAt: true,
+            createdAt: true,
+            updatedAt: true,
+            packageOptionName: true,
             trip: { select: { id: true, tripNumber: true, title: true } },
             quotation: { select: { id: true, quotationNumber: true } },
             payments: {
               where: { archivedAt: null },
               orderBy: { paymentDate: "desc" },
+              select: PAYMENT_SCALAR_SELECT,
             },
           },
         },
@@ -291,7 +380,8 @@ export const customerService = {
           where: { archivedAt: null },
           orderBy: { paymentDate: "desc" },
           take: 50,
-          include: {
+          select: {
+            ...PAYMENT_SCALAR_SELECT,
             booking: { select: { id: true, bookingNumber: true } },
             trip: { select: { id: true, tripNumber: true, title: true } },
           },
@@ -314,11 +404,12 @@ export const customerService = {
       totalOutstandingBalance += Number(b.balanceAmount || 0);
     }
 
-    // Derive server-authoritative repeat customer status
-    const isRepeatCustomer =
-      customer.trips.some((t) => t.status === "COMPLETED" || t.status === "ONGOING" || t.status === "BOOKED") ||
-      customer.bookings.some((b) => b.status === "CONFIRMED" || b.status === "COMPLETED" || b.status === "ONGOING") ||
-      customer.enquiries.some((e) => e.status === "CONVERTED");
+    // Derive server-authoritative repeat customer status (V3 Section 265)
+    const isRepeatCustomer = evaluateRepeatCustomerStatus({
+      trips: customer.trips,
+      bookings: customer.bookings,
+      enquiries: customer.enquiries,
+    });
 
     // Derive unified CRM activity timeline
     const timeline: CustomerActivityEvent[] = [];
@@ -347,11 +438,19 @@ export const customerService = {
       if (enq.followUps) {
         for (const fu of enq.followUps) {
           if (fu.status === "COMPLETED" && fu.completedAt) {
+            const cleanNotes = stripIdempotencyMarker(fu.notes);
+            const descParts: string[] = [];
+            if (fu.outcome) descParts.push(`Outcome: ${fu.outcome}`);
+            if (cleanNotes) descParts.push(cleanNotes);
+            if (descParts.length === 0) {
+              descParts.push(`Follow-up completed for ${enq.destination} lead.`);
+            }
+
             timeline.push({
               id: `fu-comp-${fu.id}`,
-              type: "ENQUIRY_CREATED",
+              type: "FOLLOW_UP_COMPLETED",
               title: `${fu.type} Follow-up Completed`,
-              description: fu.outcome ? `Outcome: ${fu.outcome}` : `Follow-up completed for ${enq.destination} lead.`,
+              description: descParts.join(" • "),
               timestamp: fu.completedAt,
               referenceId: enq.id,
               referenceUrl: `/enquiries/${enq.id}`,
@@ -461,16 +560,19 @@ export const customerService = {
   /**
    * Creates a new customer record under the authenticated agency with auto-generated sequential number.
    */
-  async createCustomer(agencyId: string, data: CreateCustomerInput): Promise<Customer> {
-    const customerNumber = await this.generateNextCustomerNumber(agencyId);
+  async createCustomer(agencyId: string, data: CreateCustomerInput, tx?: Prisma.TransactionClient): Promise<Customer> {
+    const db = tx || prisma;
+    const customerNumber = await this.generateNextCustomerNumber(agencyId, tx);
+    const normalizedPhone = normalizePhoneNumber(data.phone);
+    const normalizedAltPhone = data.alternatePhone ? normalizePhoneNumber(data.alternatePhone) : null;
 
-    return prisma.customer.create({
+    return db.customer.create({
       data: {
         agencyId,
         customerNumber,
         name: data.name,
-        phone: data.phone,
-        alternatePhone: data.alternatePhone || null,
+        phone: normalizedPhone,
+        alternatePhone: normalizedAltPhone,
         email: data.email || null,
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
         gender: data.gender || null,
@@ -514,8 +616,8 @@ export const customerService = {
       where: { id: customerId },
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(data.phone !== undefined ? { phone: data.phone } : {}),
-        ...(data.alternatePhone !== undefined ? { alternatePhone: data.alternatePhone || null } : {}),
+        ...(data.phone !== undefined ? { phone: normalizePhoneNumber(data.phone) } : {}),
+        ...(data.alternatePhone !== undefined ? { alternatePhone: data.alternatePhone ? normalizePhoneNumber(data.alternatePhone) : null } : {}),
         ...(data.email !== undefined ? { email: data.email || null } : {}),
         ...(data.dateOfBirth !== undefined ? { dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null } : {}),
         ...(data.gender !== undefined ? { gender: data.gender || null } : {}),
@@ -556,6 +658,119 @@ export const customerService = {
       data: {
         archivedAt: new Date(),
       },
+    });
+  },
+
+  /**
+   * Resolves an existing customer by phone/email or creates a new one safely
+   * adhering to Section 4.4 duplicate policy:
+   * - Searches existing active customer within the authenticated agency.
+   * - If one unambiguous match, reuse existing customer (isExisting: true).
+   * - If phone and email match two DIFFERENT existing customers, throws explicit conflict error.
+   * - If no match, creates new customer record atomically (isExisting: false).
+   */
+  async resolveOrCreateCustomerForEnquiry(
+    agencyId: string,
+    data: { name: string; phone: string; email?: string | null }
+  ): Promise<{ customer: Customer; isExisting: boolean; matchedBy?: "phone" | "email" }> {
+    const rawPhone = data.phone.trim();
+    const normalizedPhone = normalizePhoneNumber(rawPhone);
+    const cleanPhone = rawPhone.replace(/\D/g, "");
+    const email = data.email?.trim().toLowerCase() || null;
+
+    // Derive deterministic advisory lock keys to serialize concurrent intake for the same customer
+    const lockKeys: string[] = [];
+    if (cleanPhone.length >= 6) {
+      lockKeys.push(`agency:${agencyId}:phone:${cleanPhone.slice(-10)}`);
+    }
+    if (email) {
+      lockKeys.push(`agency:${agencyId}:email:${email}`);
+    }
+    // Lexicographical sort guarantees deadlock-free acquisition order across concurrent requests
+    lockKeys.sort();
+
+    return await prisma.$transaction(async (tx) => {
+      // 1. Acquire PostgreSQL transaction-level advisory locks for the normalized identifiers
+      for (const key of lockKeys) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+      }
+
+      // 2. Perform agency-scoped lookup inside the locked transaction
+      let phoneMatches: Customer[] = [];
+      if (cleanPhone.length >= 6) {
+        const last10 = cleanPhone.slice(-10);
+        const phoneOrConditions: Prisma.CustomerWhereInput[] = [
+          { phone: { contains: rawPhone, mode: "insensitive" } },
+          { phone: { contains: last10 } },
+          { alternatePhone: { contains: last10 } },
+        ];
+        if (normalizedPhone && normalizedPhone !== rawPhone) {
+          phoneOrConditions.push({ phone: { contains: normalizedPhone, mode: "insensitive" } });
+          phoneOrConditions.push({ alternatePhone: { contains: normalizedPhone, mode: "insensitive" } });
+        }
+
+        phoneMatches = await tx.customer.findMany({
+          where: {
+            agencyId,
+            archivedAt: null,
+            OR: phoneOrConditions,
+          },
+          take: 2,
+        });
+      }
+
+      let emailMatches: Customer[] = [];
+      if (email) {
+        emailMatches = await tx.customer.findMany({
+          where: {
+            agencyId,
+            archivedAt: null,
+            email: { equals: email, mode: "insensitive" },
+          },
+          take: 2,
+        });
+      }
+
+      // 3. Check for conflict: phone matches customer A, email matches customer B
+      if (phoneMatches.length > 0 && emailMatches.length > 0) {
+        if (phoneMatches[0].id !== emailMatches[0].id) {
+          throw new Error(
+            `Phone (${data.phone}) matches existing customer "${phoneMatches[0].name}", while email (${data.email}) matches a different customer "${emailMatches[0].name}". Please select the intended customer from the existing directory to avoid conflicting records.`
+          );
+        }
+      }
+
+      // 4. Unambiguous phone match
+      if (phoneMatches.length === 1) {
+        return { customer: phoneMatches[0], isExisting: true, matchedBy: "phone" };
+      }
+
+      // 5. Unambiguous email match
+      if (emailMatches.length === 1) {
+        return { customer: emailMatches[0], isExisting: true, matchedBy: "email" };
+      }
+
+      // 6. If multiple matches for phone or email within agency, select the first match
+      if (phoneMatches.length > 1) {
+        return { customer: phoneMatches[0], isExisting: true, matchedBy: "phone" };
+      }
+      if (emailMatches.length > 1) {
+        return { customer: emailMatches[0], isExisting: true, matchedBy: "email" };
+      }
+
+      // 7. No existing match: create new customer inside the SAME transaction tx
+      const newCustomer = await this.createCustomer(
+        agencyId,
+        {
+          name: data.name.trim(),
+          phone: normalizedPhone,
+          alternatePhone: null,
+          email: email || undefined,
+        },
+        tx
+      );
+
+      return { customer: newCustomer, isExisting: false };
     });
   },
 };

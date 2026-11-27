@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { DestinationDialog } from "@/components/destinations/destination-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -56,6 +59,19 @@ import * as React from "react";
 import { toast } from "sonner";
 
 export default function DestinationsPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("DESTINATIONS", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Destinations Catalog"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const { isReadOnly: isCentralReadOnly, readOnlyReason, refreshSubscription } = useSubscription();
 
   // Data states
@@ -103,9 +119,9 @@ export default function DestinationsPage() {
   }, [search]);
 
   // Fetch destinations from API
-  const fetchDestinations = React.useCallback(async () => {
+  const fetchDestinations = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       const res = await destinationClient.getDestinations({
@@ -125,7 +141,7 @@ export default function DestinationsPage() {
       }
       setError(getErrorMessage(err, "Unable to load destination catalog. Please try again."));
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [debouncedSearch, statusFilter, page]);
 
@@ -193,7 +209,7 @@ export default function DestinationsPage() {
           nextStatus === DestinationStatus.ACTIVE ? "Active" : "Inactive"
         }.`
       );
-      await fetchDestinations();
+      await fetchDestinations(true);
     } catch (err: any) {
       if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
         setLocalReadOnly(true);
@@ -227,7 +243,7 @@ export default function DestinationsPage() {
           await destinationClient.deleteDestination(dest.id);
           toast.success(`Destination "${dest.name}" deleted successfully.`);
           setConfirmAction(null);
-          await fetchDestinations();
+          await fetchDestinations(true);
         } catch (err: any) {
           if (err?.code === "READ_ONLY_ACCESS" || err?.statusCode === 403) {
             setLocalReadOnly(true);
@@ -249,8 +265,8 @@ export default function DestinationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Read-Only Banner */}
         {isReadOnly && <ReadOnlyBanner moduleName="Destination Master" />}
 
@@ -366,14 +382,14 @@ export default function DestinationsPage() {
           </div>
 
           {/* Loading State */}
-          {loading && (
+          {loading && destinations.length === 0 && (
             <div className="p-4">
               <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
-          {!loading && error && (
+          {!loading && error && destinations.length === 0 && (
             <div className="p-8">
               <ErrorState
                 title="Unable to load destinations"
@@ -384,7 +400,7 @@ export default function DestinationsPage() {
           )}
 
           {/* Table Content */}
-          {!loading && !error && destinations.length === 0 ? (
+          {(!loading || destinations.length > 0) && !error && destinations.length === 0 ? (
             <div className="p-12 text-center">
               <EmptyState
                 icon={MapPin}
@@ -398,9 +414,9 @@ export default function DestinationsPage() {
                 onAction={isFilterActive ? handleClearFilters : handleCreate}
               />
             </div>
-          ) : !loading && !error && (
+          ) : (!loading || destinations.length > 0) && !error && (
             <div className="overflow-hidden">
-              <div className="hidden lg:block overflow-x-auto max-h-[620px] overflow-y-auto">
+              <div className="hidden lg:block overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">

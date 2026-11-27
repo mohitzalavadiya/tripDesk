@@ -1,11 +1,12 @@
 import {
-apiCreated,
-apiSuccess,
-handleApiError,
-requireReadAccess,
-requireWriteAccess,
-validateJson,
-validateRouteParams,
+  apiCreated,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireReadAccess,
+  requireWriteAccess,
+  validateJson,
+  validateRouteParams,
 } from "@/lib/api";
 import { operationsService } from "@/lib/services/operations-service";
 import { createOperationalIssueSchema } from "@/lib/validation/operations-schema";
@@ -29,6 +30,7 @@ interface RouteProps {
 export async function GET(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "OPERATIONS_ISSUES", "VIEW");
     const { id } = validateRouteParams(idParamSchema, await props.params);
 
     const issues = await operationsService.listIssuesByOperation(
@@ -49,6 +51,7 @@ export async function GET(request: NextRequest, props: RouteProps) {
 export async function POST(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "OPERATIONS_ISSUES", "CREATE");
     const { id } = validateRouteParams(idParamSchema, await props.params);
     const body = await validateJson(createOperationalIssueSchema, request);
 

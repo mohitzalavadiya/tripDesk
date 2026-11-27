@@ -1,7 +1,13 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
+import { AssignLeadModal } from "@/components/enquiries/assign-lead-modal";
 import { PriorityBadge,StatusBadge } from "@/components/enquiries/status-badge";
+import { QuickLogModal } from "@/components/enquiries/quick-log-modal";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
+import { classifyEnquiryUrgency, stripIdempotencyMarker } from "@/lib/utils/crm-urgency";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,15 +61,20 @@ CheckCircle2,
 Clock,
 Compass,
 ExternalLink,
+FileText,
 Info,
 Loader2,
 Mail,
+MessageSquare,
 MoreVertical,
 Phone,
 Plus,
 Trash2,
 TrendingUp,
-User
+  User,
+  UserCheck,
+  UserX,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams,useRouter } from "next/navigation";
@@ -71,6 +82,19 @@ import * as React from "react";
 import { toast } from "sonner";
 
 export default function EnquiryDetailPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("ENQUIRY_DETAIL", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Enquiry Details"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
@@ -83,6 +107,13 @@ export default function EnquiryDetailPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"overview" | "timeline" | "followups">("overview");
+
+  // Quick-Log Modal State
+  const [isQuickLogOpen, setIsQuickLogOpen] = React.useState(false);
+  const [quickLogFollowUpId, setQuickLogFollowUpId] = React.useState<string | null>(null);
+
+  // Assign / Handoff Modal State
+  const [isAssignOpen, setIsAssignOpen] = React.useState(false);
 
   // Follow-up Schedule Modal State
   const [isFollowUpOpen, setIsFollowUpOpen] = React.useState(false);
@@ -127,9 +158,10 @@ export default function EnquiryDetailPage() {
   const [savingNotes, setSavingNotes] = React.useState(false);
 
   // Fetch real enquiry details and CRM timeline
-  const fetchEnquiry = React.useCallback(async () => {
+  const fetchEnquiry = React.useCallback(async (isSilent = false) => {
+    const silent = isSilent || Boolean(enquiry);
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
 
       const [enquiryRes, timelineRes] = await Promise.all([
@@ -141,8 +173,8 @@ export default function EnquiryDetailPage() {
         setEnquiry(enquiryRes.data);
         setTripTitle(enquiryRes.data.title || `${enquiryRes.data.destination} Trip`);
         setInternalNotes(enquiryRes.data.internalNotes || "");
-        if ((enquiryRes.data as any).isRepeatCustomer !== undefined) {
-          setIsRepeatCustomer((enquiryRes.data as any).isRepeatCustomer);
+        if (enquiryRes.data.isRepeatCustomer !== undefined) {
+          setIsRepeatCustomer(Boolean(enquiryRes.data.isRepeatCustomer));
         }
       }
 
@@ -155,7 +187,7 @@ export default function EnquiryDetailPage() {
       }
       setError(err?.message || "Failed to load enquiry record.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [id]);
 
@@ -163,10 +195,20 @@ export default function EnquiryDetailPage() {
     if (id) fetchEnquiry();
   }, [id, fetchEnquiry]);
 
+  // Handle Quick Log Completion & Timeline Refresh
+  const handleQuickLogSuccess = async () => {
+    await fetchEnquiry();
+  };
+
   // Update Status / Stage
   const handleStageChange = async (status: EnquiryStatus) => {
     if (isReadOnly) {
       toast.error("Subscription expired. Read-only mode is active.");
+      return;
+    }
+
+    if (status === EnquiryStatus.CONVERTED) {
+      toast.error("Leads cannot be manually converted. An enquiry is automatically converted when a linked booking is confirmed.");
       return;
     }
 
@@ -488,7 +530,18 @@ export default function EnquiryDetailPage() {
                 {enquiry.title || `${enquiry.destination} Trip`}
               </h1>
               <span className="text-xs font-semibold text-slate-500">
-                {enquiry.enquiryNumber} • {enquiry.customer?.name}
+                {enquiry.enquiryNumber} •{" "}
+                {enquiry.customer?.id ? (
+                  <Link
+                    href={`/customers/${enquiry.customer.id}`}
+                    className="text-indigo-600 hover:text-indigo-800 hover:underline font-semibold"
+                    title="View Customer 360 Workspace"
+                  >
+                    {enquiry.customer.name}
+                  </Link>
+                ) : (
+                  enquiry.customer?.name
+                )}
               </span>
             </div>
 
@@ -507,11 +560,291 @@ export default function EnquiryDetailPage() {
                 <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 Captured on {formatDateDisplay(enquiry.createdAt)}
               </span>
+              <span className="hidden sm:inline text-slate-300">•</span>
+              <button
+                type="button"
+                onClick={() => setIsAssignOpen(true)}
+                disabled={isReadOnly}
+                className="inline-flex items-center gap-1.5 transition-all cursor-pointer font-medium disabled:cursor-default"
+                title="Click to assign or reassign lead"
+              >
+                {enquiry.assignedTo ? (
+                  <span className="inline-flex items-center gap-1 text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-lg text-xs font-semibold">
+                    <UserCheck className="h-3 w-3 text-indigo-600" />
+                    Owner: <strong>{enquiry.assignedTo}</strong>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-lg text-xs font-bold">
+                    <UserX className="h-3 w-3 text-amber-600" />
+                    Unassigned (Assign Lead)
+                  </span>
+                )}
+              </button>
             </div>
+
+            {/* Sales Progression Trail (Lead → Trip → Proposal → Booking) */}
+            <div className="flex items-center gap-1.5 flex-wrap text-xs pt-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 hidden sm:inline">
+                Workflow:
+              </span>
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-semibold border border-slate-200/80">
+                <CheckCircle2 className="h-3 w-3 text-slate-500" />
+                <span>Lead Captured</span>
+              </div>
+              <span className="text-slate-300">→</span>
+              {enquiry.convertedTrip ? (
+                <Link
+                  href={`/trips/${enquiry.convertedTrip.id}`}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold border border-indigo-200 transition-colors"
+                  title="Open Trip Itinerary Workspace"
+                >
+                  <Compass className="h-3 w-3 text-indigo-600" />
+                  <span>Trip: {enquiry.convertedTrip.tripNumber || "View"}</span>
+                  <span className="text-[9px] uppercase px-1 py-0.2 rounded bg-indigo-100 text-indigo-800">
+                    {enquiry.convertedTrip.status}
+                  </span>
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsConvertOpen(true)}
+                  disabled={isReadOnly || ["LOST", "CANCELLED", "CONVERTED"].includes(enquiry.status)}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold border border-amber-200/80 transition-colors cursor-pointer disabled:cursor-default disabled:opacity-60"
+                  title="Convert lead to trip workspace"
+                >
+                  <Plus className="h-3 w-3 text-amber-600" />
+                  <span>Trip: Not Created</span>
+                </button>
+              )}
+              <span className="text-slate-300">→</span>
+              {enquiry.convertedQuotation ? (
+                <Link
+                  href={`/quotations/${enquiry.convertedQuotation.id}`}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold border border-emerald-200 transition-colors"
+                  title="Open Quotation Proposal"
+                >
+                  <FileText className="h-3 w-3 text-emerald-600" />
+                  <span>Quote: {enquiry.convertedQuotation.quotationNumber}</span>
+                  <span className="text-[9px] uppercase px-1 py-0.2 rounded bg-emerald-100 text-emerald-800">
+                    {enquiry.convertedQuotation.status}
+                  </span>
+                </Link>
+              ) : enquiry.convertedTripId ? (
+                <Link
+                  href={`/trips/${enquiry.convertedTripId}/quotation`}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-50 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 font-medium border border-slate-200 transition-colors"
+                  title="Build quotation proposal in trip workspace"
+                >
+                  <Plus className="h-3 w-3 text-slate-400" />
+                  <span>Quote: Pending</span>
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-50 text-slate-400 font-medium border border-slate-200">
+                  <span>Quote: Pending</span>
+                </span>
+              )}
+              <span className="text-slate-300">→</span>
+              {(() => {
+                const confirmedBooking = enquiry.convertedTrip?.bookings?.[0];
+                if (confirmedBooking) {
+                  return (
+                    <Link
+                      href={`/bookings/${confirmedBooking.id}`}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-900 font-bold border border-emerald-300 hover:bg-emerald-200 transition-colors"
+                      title="Open Confirmed Booking Workspace"
+                    >
+                      <CheckCircle2 className="h-3 w-3 text-emerald-700" />
+                      <span>Booking: #{confirmedBooking.bookingNumber}</span>
+                      <span className="text-[9px] uppercase px-1 py-0.2 rounded bg-emerald-200 text-emerald-900">
+                        {confirmedBooking.status}
+                      </span>
+                    </Link>
+                  );
+                }
+                if (enquiry.status === "CONVERTED") {
+                  return (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                      <span>Won / Converted</span>
+                    </span>
+                  );
+                }
+                return (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-50 text-slate-400 font-medium border border-slate-200">
+                    <span>Booking: Awaiting</span>
+                  </span>
+                );
+              })()}
+            </div>
+
+            {/* Next Action / Follow-up Urgency Banner */}
+            {(() => {
+              const urgencyResult = classifyEnquiryUrgency(enquiry);
+              const primaryAction = urgencyResult.primaryNextAction;
+              const isTerminal = ["CONVERTED", "LOST", "CANCELLED"].includes(enquiry.status);
+
+              if (primaryAction) {
+                const isOverdue = urgencyResult.urgency === "OVERDUE";
+                const isToday = urgencyResult.urgency === "DUE_TODAY";
+                return (
+                  <div className={`mt-2 flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl border text-xs ${
+                    isOverdue
+                      ? "bg-rose-50/70 border-rose-200/80 text-rose-900"
+                      : isToday
+                      ? "bg-amber-50/70 border-amber-200/80 text-amber-900"
+                      : "bg-indigo-50/60 border-indigo-100 text-indigo-900"
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      {primaryAction.type === "CALL" ? (
+                        <Phone className={`h-4 w-4 ${isOverdue ? "text-rose-600" : isToday ? "text-amber-600" : "text-indigo-600"}`} />
+                      ) : primaryAction.type === "WHATSAPP" ? (
+                        <MessageSquare className={`h-4 w-4 ${isOverdue ? "text-rose-600" : isToday ? "text-amber-600" : "text-indigo-600"}`} />
+                      ) : primaryAction.type === "EMAIL" ? (
+                        <Mail className={`h-4 w-4 ${isOverdue ? "text-rose-600" : isToday ? "text-amber-600" : "text-indigo-600"}`} />
+                      ) : (
+                        <Clock className={`h-4 w-4 ${isOverdue ? "text-rose-600" : isToday ? "text-amber-600" : "text-indigo-600"}`} />
+                      )}
+                      <div>
+                        <span className="font-bold">Next Action: </span>
+                        <span className="font-semibold">
+                          {primaryAction.type} •{" "}
+                          {new Date(primaryAction.scheduledAt).toLocaleDateString("en-IN", {
+                            timeZone: "Asia/Kolkata",
+                            month: "short",
+                            day: "numeric",
+                          })}{" "}
+                          at{" "}
+                          {new Date(primaryAction.scheduledAt).toLocaleTimeString("en-IN", {
+                            timeZone: "Asia/Kolkata",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        {isOverdue && (
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-200/70 text-rose-800">
+                            Overdue by {urgencyResult.daysDiff}d
+                          </span>
+                        )}
+                        {isToday && (
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-200/70 text-amber-800">
+                            Due Today
+                          </span>
+                        )}
+                        {primaryAction.notes && (
+                          <span className="ml-1 text-[11px] text-slate-500 italic max-w-xs truncate hidden md:inline">
+                            ({stripIdempotencyMarker(primaryAction.notes)})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={isReadOnly}
+                      onClick={() => {
+                        setQuickLogFollowUpId(primaryAction.id);
+                        setIsQuickLogOpen(true);
+                      }}
+                      className={`h-7 px-2.5 text-xs font-semibold rounded-lg cursor-pointer transition-colors shadow-2xs ${
+                        isOverdue
+                          ? "bg-rose-100 hover:bg-rose-200 text-rose-800 border-rose-300"
+                          : isToday
+                          ? "bg-amber-100 hover:bg-amber-200 text-amber-800 border-amber-300"
+                          : "bg-white hover:bg-indigo-100 text-indigo-800 border-indigo-200"
+                      }`}
+                    >
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Log & Complete
+                    </Button>
+                  </div>
+                );
+              }
+
+              if (!isTerminal) {
+                return (
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl border border-dashed border-amber-300 bg-amber-50/60 text-amber-900 text-xs">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span>
+                        <strong className="font-bold">No Follow-up Scheduled:</strong> This lead has no pending next task. Schedule an interaction to keep it active.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={isReadOnly}
+                        onClick={() => {
+                          setQuickLogFollowUpId(null);
+                          setIsQuickLogOpen(true);
+                        }}
+                        className="h-7 px-2.5 text-xs font-semibold bg-white text-teal-800 border-teal-300 hover:bg-teal-50 rounded-lg cursor-pointer transition-colors shadow-2xs"
+                      >
+                        <Phone className="h-3 w-3 mr-1 text-teal-600" />
+                        Quick Log Interaction
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={isReadOnly}
+                        onClick={() => {
+                          setFollowUpDate(new Date().toISOString().split("T")[0]);
+                          setIsFollowUpOpen(true);
+                        }}
+                        className="h-7 px-2.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg cursor-pointer transition-colors shadow-2xs"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Schedule Follow-up
+                      </Button>
+                    </div>
+                  </div>
+                );
+              }
+
+              return null;
+            })()}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 z-10">
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 z-10">
+              {enquiry.customer?.phone && (
+                <a
+                  href={`https://wa.me/${enquiry.customer.phone.replace(/[^0-9]/g, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 h-9 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs"
+                  title="Open WhatsApp Chat"
+                >
+                  <MessageSquare className="h-4 w-4 text-emerald-600" />
+                  <span>WhatsApp</span>
+                </a>
+              )}
+
+              <Button
+                onClick={() => {
+                  setQuickLogFollowUpId(null);
+                  setIsQuickLogOpen(true);
+                }}
+                disabled={isReadOnly}
+                className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs h-9 px-3.5 sm:px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Phone className="h-4 w-4" />
+                <span>Log Interaction</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setIsAssignOpen(true)}
+                disabled={isReadOnly}
+                className="bg-white hover:bg-indigo-50 text-indigo-700 border-slate-200 h-9 font-semibold text-xs rounded-xl shadow-2xs gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Assign or hand off lead"
+              >
+                <UserCheck className="h-4 w-4 text-indigo-600" />
+                <span>{enquiry.assignedTo ? "Reassign Lead" : "Assign Owner"}</span>
+              </Button>
+
             {enquiry.convertedTripId ? (
               <Button
                 onClick={() => router.push(`/trips/${enquiry.convertedTripId}`)}
@@ -523,7 +856,7 @@ export default function EnquiryDetailPage() {
             ) : (
               <Button
                 onClick={() => setIsConvertOpen(true)}
-                disabled={isReadOnly || enquiry.status === "LOST" || enquiry.status === "CANCELLED"}
+                disabled={isReadOnly || enquiry.status === "LOST" || enquiry.status === "CANCELLED" || enquiry.status === "CONVERTED"}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-3.5 sm:px-4 rounded-xl shadow-xs gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <Compass className="h-4 w-4" />
@@ -531,7 +864,7 @@ export default function EnquiryDetailPage() {
               </Button>
             )}
 
-            {enquiry.status !== "LOST" && enquiry.status !== "CONVERTED" && (
+            {enquiry.status !== "LOST" && enquiry.status !== "CONVERTED" && enquiry.status !== "CANCELLED" && (
               <Button
                 variant="outline"
                 size="sm"
@@ -675,6 +1008,163 @@ export default function EnquiryDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             {activeTab === "overview" && (
               <>
+                {/* Connected Sales Workspaces & Lead Progression Card */}
+                <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                      <Compass className="h-4 w-4 text-indigo-600 shrink-0" />
+                      <span>Connected Workspaces & Sales Progression</span>
+                    </h3>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Enquiry → Trip → Quotation → Won Booking
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Linked Trip Workspace */}
+                    <div className="p-4 rounded-xl border border-slate-200/90 bg-slate-50/60 space-y-3 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[10px] uppercase font-bold text-slate-400">
+                            Trip Itinerary Workspace
+                          </span>
+                          {enquiry.convertedTrip ? (
+                            <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 text-[10px] font-bold">
+                              {enquiry.convertedTrip.status}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-slate-500">
+                              Not Started
+                            </Badge>
+                          )}
+                        </div>
+
+                        {enquiry.convertedTrip ? (
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-bold text-slate-900 line-clamp-1">
+                              {enquiry.convertedTrip.title}
+                            </h4>
+                            <p className="text-[11px] text-slate-500 font-mono">
+                              Trip #{enquiry.convertedTrip.tripNumber}
+                            </p>
+                            <p className="text-[11px] text-slate-600 flex items-center gap-1">
+                              <Calendar className="h-3 w-3 text-slate-400" />
+                              <span>
+                                {formatDateDisplay(enquiry.convertedTrip.startDate)} → {formatDateDisplay(enquiry.convertedTrip.endDate)}
+                              </span>
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500 leading-relaxed">
+                            Convert this qualified lead to initialize an itinerary builder, assign hotels & vehicles, and generate pricing proposals.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/80 flex items-center gap-2">
+                        {enquiry.convertedTripId ? (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => router.push(`/trips/${enquiry.convertedTripId}`)}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-3 rounded-lg cursor-pointer flex-1 gap-1"
+                            >
+                              <Compass className="h-3.5 w-3.5" />
+                              <span>Open Trip Workspace</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => router.push(`/trips/${enquiry.convertedTripId}/quotation`)}
+                              className="border-slate-200 text-slate-700 hover:bg-slate-100 text-xs h-8 px-2.5 rounded-lg cursor-pointer"
+                              title="View Trip Quotations"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() => setIsConvertOpen(true)}
+                            disabled={isReadOnly || enquiry.status === "LOST" || enquiry.status === "CANCELLED" || enquiry.status === "CONVERTED"}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-3 rounded-lg cursor-pointer flex-1 gap-1 disabled:opacity-50"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>Create Trip Workspace</span>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Linked Quotation Proposal */}
+                    <div className="p-4 rounded-xl border border-slate-200/90 bg-slate-50/60 space-y-3 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[10px] uppercase font-bold text-slate-400">
+                            Client Quotation Proposal
+                          </span>
+                          {enquiry.convertedQuotation ? (
+                            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                              {enquiry.convertedQuotation.status}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-slate-500">
+                              {enquiry.convertedTripId ? "Awaiting Proposal" : "Pending Trip Creation"}
+                            </Badge>
+                          )}
+                        </div>
+
+                        {enquiry.convertedQuotation ? (
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-bold text-slate-900">
+                              Quotation #{enquiry.convertedQuotation.quotationNumber} (v{enquiry.convertedQuotation.version})
+                            </h4>
+                            <p className="text-sm font-black text-emerald-700 font-mono">
+                              {formatCurrency(Number(enquiry.convertedQuotation.finalAmount))}
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              Official client proposal ready for sharing or revisions.
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500 leading-relaxed">
+                            {enquiry.convertedTripId
+                              ? "Trip created! Generate costing and customized tiered quotations for this client inside the trip workspace."
+                              : "Once an itinerary is created, you can generate multi-tier quotations (Deluxe, Premium, Ultra Deluxe) with payment milestones."}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/80 flex items-center gap-2">
+                        {enquiry.convertedQuotationId ? (
+                          <Button
+                            size="sm"
+                            onClick={() => router.push(`/quotations/${enquiry.convertedQuotationId}`)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8 px-3 rounded-lg cursor-pointer flex-1 gap-1"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                            <span>Open Quotation Proposal</span>
+                          </Button>
+                        ) : enquiry.convertedTripId ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => router.push(`/trips/${enquiry.convertedTripId}/quotation`)}
+                            className="border-slate-200 text-slate-700 hover:bg-slate-100 text-xs h-8 px-3 rounded-lg cursor-pointer flex-1 gap-1"
+                          >
+                            <Plus className="h-3.5 w-3.5 text-indigo-600" />
+                            <span>Generate Proposal in Trip</span>
+                          </Button>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic">
+                            Requires Trip Workspace
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Travel Specification Card */}
                 <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
                   <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3 flex items-center gap-2">
@@ -788,7 +1278,15 @@ export default function EnquiryDetailPage() {
                         <div className="absolute -left-[23px] sm:-left-[27px] top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-indigo-600 shadow-sm" />
                         <div className="bg-slate-50/70 p-3 sm:p-3.5 rounded-xl border border-slate-200/80 text-xs space-y-1">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                            <span className="font-bold text-slate-900">{ev.title}</span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-slate-900">{ev.title}</span>
+                              {ev.actorName && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                  <Users className="h-2.5 w-2.5 text-indigo-500" />
+                                  <span>by {ev.actorName} {ev.actorRole ? `(${ev.actorRole === "AGENCY_OWNER" ? "Owner" : "Staff"})` : ""}</span>
+                                </span>
+                              )}
+                            </div>
                             <span className="text-[11px] text-slate-500">
                               {new Date(ev.timestamp).toLocaleDateString("en-IN", {
                                 day: "numeric",
@@ -799,6 +1297,21 @@ export default function EnquiryDetailPage() {
                             </span>
                           </div>
                           <p className="text-slate-600 leading-relaxed">{ev.description}</p>
+                          {ev.changes && ev.changes.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-200/60 space-y-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Modifications:</span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px]">
+                                {ev.changes.map((c, idx) => (
+                                  <div key={idx} className="bg-white/80 p-1.5 rounded-lg border border-slate-200/70">
+                                    <span className="font-semibold text-slate-700">{c.label || c.field}: </span>
+                                    <span className="line-through text-slate-400 mr-1">{String(c.oldValue ?? "empty")}</span>
+                                    <span className="text-slate-400">→</span>
+                                    <span className="text-teal-700 font-semibold ml-1">{String(c.newValue ?? "empty")}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           {ev.referenceUrl && (
                             <Link
                               href={ev.referenceUrl}
@@ -830,34 +1343,60 @@ export default function EnquiryDetailPage() {
                     </p>
                   </div>
 
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setFollowUpDate(new Date().toISOString().split("T")[0]);
-                      setIsFollowUpOpen(true);
-                    }}
-                    disabled={isReadOnly}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8 px-3 rounded-lg cursor-pointer disabled:opacity-50 shrink-0 self-start sm:self-auto"
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Task
-                  </Button>
+                  <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setQuickLogFollowUpId(null);
+                        setIsQuickLogOpen(true);
+                      }}
+                      disabled={isReadOnly}
+                      className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold h-8 px-3 rounded-lg cursor-pointer disabled:opacity-50"
+                    >
+                      <Phone className="h-3.5 w-3.5 mr-1" /> Log Interaction
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setFollowUpDate(new Date().toISOString().split("T")[0]);
+                        setIsFollowUpOpen(true);
+                      }}
+                      disabled={isReadOnly}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold h-8 px-3 rounded-lg cursor-pointer disabled:opacity-50"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Task
+                    </Button>
+                  </div>
                 </div>
 
                 {enquiry.followUps?.length === 0 ? (
                   <div className="p-8 sm:p-10 text-center space-y-2">
                     <Clock className="h-8 w-8 text-slate-300 mx-auto" />
                     <p className="text-xs text-slate-500 font-medium">No follow-up activities logged yet.</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setFollowUpDate(new Date().toISOString().split("T")[0]);
-                        setIsFollowUpOpen(true);
-                      }}
-                      className="text-xs h-8 cursor-pointer mt-2"
-                    >
-                      Schedule First Call
-                    </Button>
+                    <div className="flex items-center justify-center gap-2 pt-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setQuickLogFollowUpId(null);
+                          setIsQuickLogOpen(true);
+                        }}
+                        className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-8 cursor-pointer"
+                      >
+                        <Phone className="h-3.5 w-3.5 mr-1" /> Log First Call
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setFollowUpDate(new Date().toISOString().split("T")[0]);
+                          setIsFollowUpOpen(true);
+                        }}
+                        className="text-xs h-8 cursor-pointer"
+                      >
+                        Schedule Task
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="p-3 sm:p-5 space-y-3 sm:space-y-4">
@@ -906,7 +1445,7 @@ export default function EnquiryDetailPage() {
                             </div>
 
                             <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap pt-0.5">
-                              {f.notes || "No notes logged for this interaction."}
+                              {stripIdempotencyMarker(f.notes) || "No notes logged for this interaction."}
                             </p>
                             {f.outcome && (
                               <div className="mt-1 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 w-fit">
@@ -920,7 +1459,10 @@ export default function EnquiryDetailPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleOpenCompleteFollowUp(f)}
+                                onClick={() => {
+                                  setQuickLogFollowUpId(f.id);
+                                  setIsQuickLogOpen(true);
+                                }}
                                 disabled={isReadOnly}
                                 className="h-7 px-2.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 border-emerald-200 rounded-lg cursor-pointer"
                               >
@@ -969,7 +1511,9 @@ export default function EnquiryDetailPage() {
                     <SelectItem value={EnquiryStatus.QUOTATION_SENT}>Quotation Sent</SelectItem>
                     <SelectItem value={EnquiryStatus.FOLLOW_UP}>Follow-up</SelectItem>
                     <SelectItem value={EnquiryStatus.NEGOTIATION}>Negotiation</SelectItem>
-                    <SelectItem value={EnquiryStatus.CONVERTED}>Converted (Won)</SelectItem>
+                    {enquiry.status === EnquiryStatus.CONVERTED && (
+                      <SelectItem value={EnquiryStatus.CONVERTED} disabled>Converted (Confirmed Booking)</SelectItem>
+                    )}
                     <SelectItem value={EnquiryStatus.LOST}>Lost</SelectItem>
                     <SelectItem value={EnquiryStatus.CANCELLED}>Cancelled</SelectItem>
                   </SelectContent>
@@ -992,6 +1536,45 @@ export default function EnquiryDetailPage() {
                     <SelectItem value={EnquiryPriority.URGENT}>Urgent</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            {/* Lead Owner & Assignment Card */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-indigo-600" />
+                  <span>Lead Ownership</span>
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isReadOnly}
+                  onClick={() => setIsAssignOpen(true)}
+                  className="h-6 px-2 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-md cursor-pointer disabled:opacity-50"
+                >
+                  {enquiry.assignedTo ? "Reassign" : "Assign"}
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                  enquiry.assignedTo ? "bg-indigo-600 text-white shadow-2xs" : "bg-amber-100 text-amber-700"
+                }`}>
+                  {enquiry.assignedTo ? (
+                    enquiry.assignedTo.slice(0, 2).toUpperCase()
+                  ) : (
+                    <UserX className="h-3.5 w-3.5 text-amber-600" />
+                  )}
+                </div>
+                <div className="flex flex-col min-w-0 flex-1 text-xs">
+                  <span className="font-bold text-slate-900 truncate">
+                    {enquiry.assignedTo || "Unassigned"}
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    {enquiry.assignedTo ? "Assigned Sales Consultant" : "In unassigned agency pool"}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -1021,12 +1604,26 @@ export default function EnquiryDetailPage() {
 
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400">Phone Contact</span>
-                  <p className="text-slate-700 flex items-center gap-1.5 mt-0.5">
-                    <Phone className="h-3.5 w-3.5 text-slate-400" />
-                    <a href={`tel:${enquiry.customer?.phone}`} className="hover:underline text-indigo-600 font-semibold">
-                      {enquiry.customer?.phone}
-                    </a>
-                  </p>
+                  <div className="flex items-center justify-between gap-1 mt-0.5">
+                    <p className="text-slate-700 flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-slate-400" />
+                      <a href={`tel:${enquiry.customer?.phone}`} className="hover:underline text-indigo-600 font-semibold">
+                        {enquiry.customer?.phone}
+                      </a>
+                    </p>
+                    {enquiry.customer?.phone && (
+                      <a
+                        href={`https://wa.me/${enquiry.customer.phone.replace(/[^0-9]/g, "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                        title="Chat on WhatsApp"
+                      >
+                        <MessageSquare className="h-3 w-3 text-emerald-600" />
+                        <span>WhatsApp</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
 
                 {enquiry.customer?.email && (
@@ -1244,6 +1841,31 @@ export default function EnquiryDetailPage() {
                       </div>
                     </div>
 
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-semibold text-slate-700 block">Next Follow-up Date</label>
+                        <div className="flex items-center gap-1">
+                          {[
+                            { label: "Tomorrow", offset: 1 },
+                            { label: "+2 Days", offset: 2 },
+                            { label: "+1 Week", offset: 7 },
+                          ].map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => {
+                                const target = new Date();
+                                target.setDate(target.getDate() + preset.offset);
+                                setNextDate(target.toISOString().split("T")[0]);
+                              }}
+                              className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-white hover:bg-indigo-100 text-indigo-800 border border-indigo-200 cursor-pointer shadow-2xs"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-[11px] font-semibold text-slate-700 block mb-1">Date</label>
@@ -1462,6 +2084,32 @@ export default function EnquiryDetailPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* ─── QUICK LOG INTERACTION MODAL ─── */}
+        <QuickLogModal
+          enquiry={enquiry}
+          isOpen={isQuickLogOpen}
+          onClose={() => {
+            setIsQuickLogOpen(false);
+            setQuickLogFollowUpId(null);
+          }}
+          onSuccess={handleQuickLogSuccess}
+          isReadOnly={isReadOnly}
+          initialFollowUpId={quickLogFollowUpId}
+          customerId={enquiry?.customerId}
+        />
+
+        {/* ─── ASSIGN / HANDOFF LEAD MODAL ─── */}
+        <AssignLeadModal
+          enquiry={enquiry}
+          isOpen={isAssignOpen}
+          onClose={() => setIsAssignOpen(false)}
+          onSuccess={async () => {
+            setIsAssignOpen(false);
+            await fetchEnquiry();
+          }}
+          isReadOnly={isReadOnly}
+        />
       </div>
     </div>
   );

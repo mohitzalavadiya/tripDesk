@@ -128,6 +128,13 @@ export const ENUM_LABEL_MAP: Record<string, string> = {
   MEDIUM: "Medium",
   LOW: "Low",
   RESCHEDULED: "Rescheduled",
+  CONNECTED_MEANINGFUL: "Connected / Discussed",
+  QUOTATION_DISCUSSED: "Quote Discussed",
+  REQUIREMENTS_GATHERED: "Requirements Gathered",
+  NO_ANSWER: "No Answer",
+  WRONG_NUMBER: "Wrong Number",
+  MESSAGE_LEFT: "Left Message",
+  BUSY: "Busy",
 
   // ─── Operational Confirmations & Dispatches ───
   REQUESTED: "Requested",
@@ -155,6 +162,9 @@ export const ENUM_LABEL_MAP: Record<string, string> = {
   // ─── Operational Communications & Reviews ───
   DRIVER_PICKUP: "Driver (Chauffeur) & Pickup Details",
   HOTEL_VOUCHER: "Hotel Check-in & Voucher",
+  VEHICLE_VOUCHER: "Vehicle Voucher",
+  CUSTOMER_ITINERARY: "Customer Itinerary",
+  BOOKING_CONFIRMATION: "Booking Confirmation",
   ACTIVITY_PASS: "Excursion & Activity E-Pass",
   WELCOME_BRIEFING: "Welcome Briefing & Itinerary",
   EMERGENCY_BROADCAST: "Operations Alert / Broadcast",
@@ -268,4 +278,22 @@ export function formatEnumLabel(val: unknown): string {
   }
 
   return str;
+}
+
+const EMBEDDED_ENUM_REGEX = new RegExp(
+  `\\b(${Object.keys(ENUM_LABEL_MAP)
+    .filter((k) => k.length >= 4 && !ACRONYMS.has(k))
+    .join("|")})\\b`,
+  "g"
+);
+
+/**
+ * Replaces embedded uppercase underscore enum codes (e.g. PER_KM, CONNECTED_MEANINGFUL)
+ * inside longer display descriptions with their human-readable labels.
+ */
+export function formatEmbeddedEnums(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  const str = String(val);
+  if (!str) return "";
+  return str.replace(EMBEDDED_ENUM_REGEX, (match) => ENUM_LABEL_MAP[match] || match);
 }

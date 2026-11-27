@@ -1,8 +1,9 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import { financeService } from "@/lib/services/finance-service";
 import { updateExpenseSchema } from "@/lib/validation/finance-schema";
@@ -21,6 +22,13 @@ interface RouteParams {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "FINANCE",
+      "UPDATE"
+    );
     const { id } = await params;
     const body = await validateJson(updateExpenseSchema, request);
 
@@ -44,6 +52,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "FINANCE",
+      "DELETE"
+    );
     const { id } = await params;
 
     const deleted = await financeService.deleteExpense(

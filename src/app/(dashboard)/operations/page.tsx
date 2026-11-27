@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { CreateIssueModal } from "@/components/operations/create-issue-modal";
 import {
 TripOperationsStatusBadge
@@ -40,6 +43,19 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 
 export default function OperationsDashboardPage() {
+  const { isAgencyStaff: __isStaffGuard, hasStaffPermission: __hasStaffPermGuard } = useAuth();
+  if (__isStaffGuard && !__hasStaffPermGuard("OPERATIONS", "view")) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Operations & Dispatch"
+          badgeText="Access Restricted"
+          description="You do not have permission to view this section. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const router = useRouter();
 
   // Data states
@@ -73,9 +89,9 @@ export default function OperationsDashboardPage() {
   }, [search]);
 
   // Fetch real operations from API
-  const fetchOperations = React.useCallback(async () => {
+  const fetchOperations = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       const res = await operationsClient.getOperations({
@@ -102,7 +118,7 @@ export default function OperationsDashboardPage() {
         setError(err.message || "Failed to load operations.");
       }
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [page, statusFilter]);
 
@@ -228,8 +244,8 @@ export default function OperationsDashboardPage() {
   }, [operations]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Read-only Banner */}
         {isReadOnly && (
           <ReadOnlyBanner moduleName="Operations" />
@@ -663,7 +679,7 @@ export default function OperationsDashboardPage() {
           bookingNumber: op.booking?.bookingNumber || op.trip.tripNumber,
           customerName: op.trip.customer.name,
         }))}
-        onSuccess={fetchOperations}
+        onSuccess={() => fetchOperations(true)}
       />
     </div>
   );

@@ -1,4 +1,5 @@
 import {
+  enforceStaffPermission,
 apiCreated,
 handleApiError,
 requireWriteAccess,
@@ -19,6 +20,7 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "QUOTATIONS", "CREATE");
     const { id: quotationId } = await params;
 
     const newVersion = await quotationService.createQuotationVersion(

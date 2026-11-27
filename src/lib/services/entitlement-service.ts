@@ -6,6 +6,7 @@ QuotaExceededError,
 ReadOnlyAccessError,
 } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { evaluateEffectiveSubscriptionState } from "@/lib/auth/subscription-state";
 import {
 Prisma,
 Subscription,
@@ -49,7 +50,8 @@ export const entitlementService = {
    */
   async resolveAgencySubscription(
     agencyId: string,
-    client: PrismaClientOrTx = prisma
+    client: PrismaClientOrTx = prisma,
+    now: Date = new Date()
   ): Promise<ResolvedEntitlementContext> {
     if (!agencyId) {
       throw new NoActiveSubscriptionError("Agency ID is required for entitlement resolution.");
@@ -68,15 +70,15 @@ export const entitlementService = {
       );
     }
 
-    const now = new Date();
+    const evalState = evaluateEffectiveSubscriptionState({ subscription: sub }, now);
 
     // Handling TRIAL Status
     if (sub.status === SubscriptionStatus.TRIAL) {
-      if (!sub.trialStart || !sub.trialEnd) {
+      if (evalState.diagnosticReason === "INVALID_OR_MISSING_TRIAL_END" || !sub.trialStart || !sub.trialEnd) {
         throw new EntitlementConfigError("Trial subscription has invalid or missing trial dates.");
       }
 
-      if (now.getTime() >= sub.trialEnd.getTime()) {
+      if (evalState.isExpired) {
         throw new ReadOnlyAccessError(
           "Your free trial has expired. Existing data is accessible in read-only mode. Upgrade your subscription to resume modifications."
         );
@@ -108,14 +110,14 @@ export const entitlementService = {
 
     // Handling ACTIVE Status
     if (sub.status === SubscriptionStatus.ACTIVE) {
-      const periodStart = sub.subscriptionStart || sub.createdAt;
-      const periodEnd = sub.subscriptionEnd;
-
-      if (!periodEnd) {
-        throw new EntitlementConfigError("Active subscription has invalid or missing subscription end date.");
+      if (evalState.diagnosticReason === "INVALID_OR_MISSING_SUBSCRIPTION_END" || !evalState.periodEnd) {
+        console.warn(`[entitlementService] Agency ${agencyId} ACTIVE subscription has invalid/missing subscriptionEnd; failing closed.`);
+        throw new ReadOnlyAccessError(
+          "Your subscription end date is missing or invalid. Existing data is accessible in read-only mode. Please contact support or renew your subscription."
+        );
       }
 
-      if (now.getTime() >= periodEnd.getTime()) {
+      if (evalState.isExpired) {
         throw new ReadOnlyAccessError(
           "Your active subscription period has expired. Existing data is accessible in read-only mode. Renew to resume modifications."
         );
@@ -127,8 +129,8 @@ export const entitlementService = {
         effectivePlanId: sub.planId,
         effectivePlanName: sub.plan.name,
         status: SubscriptionStatus.ACTIVE,
-        periodStart,
-        periodEnd,
+        periodStart: evalState.periodStart || sub.createdAt,
+        periodEnd: evalState.periodEnd,
         isTrial: false,
       };
     }
@@ -235,6 +237,18 @@ export const entitlementService = {
     });
 
     if (!usageLimit) {
+      if (resourceKey === "STAFF_MEMBERS") {
+        // Fallback to confirmed plan limits if row is not yet seeded in plan_usage_limits
+        const plan = client.subscriptionPlan
+          ? await client.subscriptionPlan.findUnique({
+              where: { id: effectivePlanId },
+              select: { name: true },
+            })
+          : null;
+        if (plan?.name?.toLowerCase().includes("starter")) return 5;
+        if (plan?.name?.toLowerCase().includes("professional")) return 20;
+        return 20;
+      }
       throw new EntitlementConfigError(
         `Usage limit configuration for resource '${resourceKey}' is missing for plan ID '${effectivePlanId}'.`
       );
@@ -289,6 +303,22 @@ export const entitlementService = {
           },
         },
       });
+    } else if (resourceKey === "STAFF_MEMBERS") {
+      // Active staff count (excluding owner and deactivated staff) + pending unexpired invitations
+      const activeStaff = await client.user.count({
+        where: { agencyId, role: "AGENCY_STAFF", isActive: true },
+      });
+      let pendingInvites = 0;
+      if ((client as any).agencyInvitation?.count) {
+        pendingInvites = await (client as any).agencyInvitation.count({
+          where: {
+            agencyId,
+            status: "PENDING",
+            expiresAt: { gt: new Date() },
+          },
+        });
+      }
+      currentUsage = activeStaff + pendingInvites;
     } else {
       throw new EntitlementConfigError(`Unsupported resource key for usage calculation: '${resourceKey}'.`);
     }

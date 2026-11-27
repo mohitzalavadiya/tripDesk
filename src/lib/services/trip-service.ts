@@ -197,6 +197,8 @@ export const tripService = {
             finalAmount: true,
             shareToken: true,
             acceptedAt: true,
+            customerFeedback: true,
+            customerFeedbackAt: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -331,8 +333,8 @@ export const tripService = {
    * Verifies the referenced customer belongs to the same agency and is active.
    * If destinationIds are provided, verifies all exist under agency and creates TripDestination records.
    */
-  async createTrip(agencyId: string, data: CreateTripInput): Promise<Trip> {
-    return prisma.$transaction(async (tx) => {
+  async createTrip(agencyId: string, data: CreateTripInput, txClient?: Prisma.TransactionClient): Promise<Trip> {
+    const execute = async (tx: Prisma.TransactionClient) => {
       // 1. Lock authoritative agency subscription row FOR UPDATE
       await entitlementService.lockAgencySubscription(agencyId, tx);
 
@@ -404,7 +406,9 @@ export const tripService = {
           },
         },
       });
-    });
+    };
+
+    return txClient ? execute(txClient) : prisma.$transaction(execute);
   },
 
   /**

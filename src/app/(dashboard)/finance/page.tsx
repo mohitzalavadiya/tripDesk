@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+
 import { CreateExpenseDialog } from "@/components/finance/create-expense-dialog";
 import { EditPayableDialog } from "@/components/finance/edit-payable-dialog";
 import { FinanceKpiGrid } from "@/components/finance/finance-kpi-grid";
@@ -37,6 +40,22 @@ import * as React from "react";
 import { toast } from "sonner";
 
 export default function FinanceDashboardPage() {
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+
+  const isViewAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("FINANCE", "view"));
+
+  if (!isViewAllowed) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Financial Management"
+          badgeText="Access Restricted"
+          description="The agency finance ledger and operational financial tools are restricted. Please contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
+
   const [preset, setPreset] = React.useState<FinancePreset>("LAST_30_DAYS");
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -139,8 +158,8 @@ export default function FinanceDashboardPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
-      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-6">
+    <div className="flex flex-col min-h-[calc(100vh-64px)] bg-slate-50/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         <PageHeader
           title="Finance & Profitability"
           description="Server-authoritative revenue, customer collections, supplier payables, expenses, and net profit margins."
@@ -242,14 +261,26 @@ export default function FinanceDashboardPage() {
         {/* Profitability & Outstanding Dues Grid */}
         {data && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ProfitabilityCard profitability={data.profitability} />
+            {isAgencyOwner ? (
+              <ProfitabilityCard profitability={data.profitability} />
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col justify-center items-center text-center space-y-2">
+                <div className="h-10 w-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+                  <Receipt className="h-5 w-5" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-800">Commercial Margins Redacted</h4>
+                <p className="text-xs text-slate-500 max-w-sm">
+                  Profitability margins and net supplier contract terms are restricted to Agency Owners.
+                </p>
+              </div>
+            )}
             <OutstandingBalancesCard
               customerReceivables={data.customerReceivables}
-              supplierPayables={data.supplierPayables}
+              supplierPayables={isAgencyOwner ? data.supplierPayables : { totalOutstanding: 0, overdueCount: 0, overdueAmount: 0, items: [] }}
               onRecordCustomerPayment={handleRecordCustomerPayment}
-              onRecordSupplierPayment={handleRecordSupplierPayment}
-              onRecordPayable={handleRecordPayable}
-              onEditPayable={handleEditPayable}
+              onRecordSupplierPayment={isAgencyOwner ? handleRecordSupplierPayment : () => {}}
+              onRecordPayable={isAgencyOwner ? handleRecordPayable : () => {}}
+              onEditPayable={isAgencyOwner ? handleEditPayable : () => {}}
             />
           </div>
         )}

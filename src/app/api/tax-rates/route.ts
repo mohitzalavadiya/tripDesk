@@ -1,7 +1,7 @@
 import {
 apiSuccess,
 handleApiError,
-requireAgencyOwnerContext,
+requireReadAccess,
 } from "@/lib/api";
 import { taxProfileService } from "@/lib/services/tax-profile-service";
 
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     // Requires authenticated agency owner context
-    await requireAgencyOwnerContext();
+    await requireReadAccess();
     const rates = await taxProfileService.listActiveTaxRates();
 
     return apiSuccess(rates);

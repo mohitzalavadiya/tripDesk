@@ -3,10 +3,12 @@ apiSuccess,
 handleApiError,
 NotFoundError,
 requireReadAccess,
+enforceStaffPermission,
 requireWriteAccess,
 validateJson,
 validateRouteParams,
 } from "@/lib/api";
+import { redactStaffFinancials } from "@/lib/auth/permissions";
 import { rateSheetService } from "@/lib/services/rate-sheet-service";
 import {
 rateSheetIdParamSchema,
@@ -27,6 +29,7 @@ interface RouteProps {
 export async function GET(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "RATE_SHEETS", "VIEW");
     const { id } = validateRouteParams(rateSheetIdParamSchema, await props.params);
 
     const rateSheet = await rateSheetService.getRateSheetById(context.agencyId, id);
@@ -35,7 +38,8 @@ export async function GET(request: NextRequest, props: RouteProps) {
       throw new NotFoundError("Rate Sheet");
     }
 
-    return apiSuccess(rateSheet);
+    const data = context.isAgencyStaff ? redactStaffFinancials(rateSheet, context.dbUser.role) : rateSheet;
+    return apiSuccess(data);
   } catch (error) {
     return handleApiError(error);
   }
@@ -48,6 +52,7 @@ export async function GET(request: NextRequest, props: RouteProps) {
 export async function PATCH(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "RATE_SHEETS", "UPDATE");
     const { id } = validateRouteParams(rateSheetIdParamSchema, await props.params);
     const body = await validateJson(updateRateSheetSchema, request);
 
@@ -66,6 +71,7 @@ export async function PATCH(request: NextRequest, props: RouteProps) {
 export async function DELETE(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "RATE_SHEETS", "DELETE");
     const { id } = validateRouteParams(rateSheetIdParamSchema, await props.params);
 
     const archivedRateSheet = await rateSheetService.archiveRateSheet(context.agencyId, id);

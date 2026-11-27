@@ -1,9 +1,10 @@
 import {
-apiCreated,
-handleApiError,
-requireWriteAccess,
-validateJson,
-validateRouteParams,
+  apiCreated,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
+  validateJson,
+  validateRouteParams,
 } from "@/lib/api";
 import { operationsService } from "@/lib/services/operations-service";
 import { logCommunicationSchema } from "@/lib/validation/operations-schema";
@@ -27,6 +28,7 @@ interface RouteProps {
 export async function POST(request: NextRequest, props: RouteProps) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "OPERATIONS", "UPDATE");
     const { id } = validateRouteParams(idParamSchema, await props.params);
     const body = await validateJson(logCommunicationSchema, request);
 

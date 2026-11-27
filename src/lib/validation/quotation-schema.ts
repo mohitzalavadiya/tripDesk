@@ -128,6 +128,7 @@ export type GenerateTripQuotationInput = z.infer<typeof generateTripQuotationSch
  * Schema for public customer actions
  */
 export const acceptQuotationSchema = z.object({
+  version: z.coerce.number().int().positive("Quotation version is required"),
   customerName: z.string().trim().min(1).max(200).optional(),
   customerEmail: z.string().trim().email().optional().nullable(),
   customerPhone: z.string().trim().max(30).optional().nullable(),
@@ -137,6 +138,7 @@ export const acceptQuotationSchema = z.object({
 export type AcceptQuotationInput = z.infer<typeof acceptQuotationSchema>;
 
 export const requestChangesSchema = z.object({
+  version: z.coerce.number().int().positive("Quotation version is required"),
   message: z
     .string()
     .trim()

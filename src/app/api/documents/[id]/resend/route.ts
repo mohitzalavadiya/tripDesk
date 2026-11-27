@@ -1,8 +1,9 @@
 import {
-apiSuccess,
-handleApiError,
-requireWriteAccess,
-validateJson,
+  apiSuccess,
+  enforceStaffPermission,
+  handleApiError,
+  requireWriteAccess,
+  validateJson,
 } from "@/lib/api";
 import { travelDocumentService } from "@/lib/services/travel-document-service";
 import { resendDocumentSchema } from "@/lib/validation/document-schema";
@@ -21,6 +22,13 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(
+      context.dbUser.role,
+      context.agencyId,
+      context.dbUser.id,
+      "DOCUMENTS",
+      "UPDATE"
+    );
     const { id } = await params;
 
     let body = {};

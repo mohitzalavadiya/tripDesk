@@ -1,17 +1,36 @@
 "use client";
 
+import { useAuth } from "@/context/auth-context";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
 import { Button } from "@/components/ui/button";
-import { CalendarCheck,Loader2 } from "lucide-react";
+import { CalendarCheck, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
 export default function InvoicesRedirectPage() {
   const router = useRouter();
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+
+  const isAllowed = isAgencyOwner || (isAgencyStaff && hasStaffPermission("INVOICES", "view"));
 
   React.useEffect(() => {
-    router.replace("/bookings");
-  }, [router]);
+    if (isAllowed) {
+      router.replace("/bookings");
+    }
+  }, [router, isAllowed]);
+
+  if (!isAllowed) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Invoices & Billing"
+          badgeText="Access Restricted"
+          description="You do not have permission to view invoices. Contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">

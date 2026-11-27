@@ -4,6 +4,7 @@ handleApiError,
 NotFoundError,
 requireReadAccess,
 requireWriteAccess,
+  enforceStaffPermission,
 validateJson,
 } from "@/lib/api";
 import { destinationService } from "@/lib/services/destination-service";
@@ -24,6 +25,7 @@ interface RouteParams {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireReadAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "DESTINATIONS", "VIEW");
     const { id } = await params;
 
     const destination = await destinationService.getDestinationById(context.agencyId, id);
@@ -46,6 +48,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "DESTINATIONS", "UPDATE");
     const { id } = await params;
     const body = await validateJson(updateDestinationSchema, request);
 
@@ -65,6 +68,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const context = await requireWriteAccess();
+    await enforceStaffPermission(context.dbUser.role, context.agencyId, context.dbUser.id, "DESTINATIONS", "DELETE");
     const { id } = await params;
 
     const deleted = await destinationService.deleteDestination(context.agencyId, id);

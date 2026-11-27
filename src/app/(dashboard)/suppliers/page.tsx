@@ -6,6 +6,8 @@ import { ErrorState } from "@/components/shared/error-state";
 import { TableSkeleton } from "@/components/shared/loading-skeletons";
 import { ReadOnlyBanner } from "@/components/shared/read-only-banner";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { OwnerRestrictedCard } from "@/components/shared/owner-restricted-card";
+import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import {
 DropdownMenu,
@@ -73,6 +75,19 @@ function getGradient(name: string) {
 
 export default function SuppliersPage() {
   const router = useRouter();
+  const { isAgencyOwner, isAgencyStaff, hasStaffPermission } = useAuth();
+
+  if (!isAgencyOwner && (!isAgencyStaff || !hasStaffPermission("SUPPLIERS", "view"))) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
+        <OwnerRestrictedCard
+          featureName="Supplier Management"
+          badgeText="Access Restricted"
+          description="You do not have permission to view supplier records. Contact your Agency Owner to request access."
+        />
+      </div>
+    );
+  }
 
   // Data states
   const [suppliers, setSuppliers] = React.useState<SupplierWithCounts[]>([]);
@@ -104,9 +119,9 @@ export default function SuppliersPage() {
   }, [search]);
 
   // Fetch suppliers from PostgreSQL API
-  const fetchSuppliers = React.useCallback(async () => {
+  const fetchSuppliers = React.useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       const res = await supplierClient.getSuppliers({
@@ -130,7 +145,7 @@ export default function SuppliersPage() {
       }
       setError(getErrorMessage(err, "Unable to load supplier directory. Please try again."));
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [debouncedSearch, typeFilter, statusFilter, includeArchived, page]);
 
@@ -178,7 +193,7 @@ export default function SuppliersPage() {
           await supplierClient.archiveSupplier(id);
           toast.success(`Supplier ${ref} archived successfully.`);
           setConfirmAction(null);
-          await fetchSuppliers();
+          await fetchSuppliers(true);
         } catch (err: any) {
           toast.error(getErrorMessage(err, "We couldn't archive the supplier. Please try again."));
         } finally {
@@ -199,7 +214,7 @@ export default function SuppliersPage() {
     try {
       await supplierClient.reactivateSupplier(id);
       toast.success(`Supplier ${ref} reactivated successfully.`);
-      await fetchSuppliers();
+      await fetchSuppliers(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to reactivate supplier.");
     }
@@ -221,8 +236,8 @@ export default function SuppliersPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50 pb-16">
-      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+    <div className="min-h-[calc(100vh-64px)] bg-gradient-to-b from-slate-50 to-slate-100/50 pb-4 md:pb-6">
+      <div className="max-w-[1550px] mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 space-y-4">
         {/* Read-Only Banner */}
         {isReadOnly && <ReadOnlyBanner moduleName="Supplier Directory" />}
 
@@ -347,14 +362,14 @@ export default function SuppliersPage() {
           </div>
 
           {/* Loading State */}
-          {loading && (
+          {loading && suppliers.length === 0 && (
             <div className="p-4">
               <TableSkeleton rows={6} />
             </div>
           )}
 
           {/* Error State */}
-          {!loading && error && (
+          {!loading && error && suppliers.length === 0 && (
             <div className="p-8">
               <ErrorState
                 title="Unable to load suppliers"
@@ -365,7 +380,7 @@ export default function SuppliersPage() {
           )}
 
           {/* Table View */}
-          {!loading && !error && suppliers.length === 0 ? (
+          {(!loading || suppliers.length > 0) && !error && suppliers.length === 0 ? (
             <div className="p-12 text-center">
               <EmptyState
                 icon={Truck}
@@ -379,10 +394,10 @@ export default function SuppliersPage() {
                 onAction={isFilterActive ? handleClearFilters : () => router.push("/suppliers/new")}
               />
             </div>
-          ) : !loading && !error && (
+          ) : (!loading || suppliers.length > 0) && !error && (
             <div>
               {/* Desktop Table */}
-              <div className="hidden lg:block overflow-x-auto max-h-[620px] overflow-y-auto">
+              <div className="hidden lg:block overflow-x-auto max-h-[calc(100vh-420px)] min-h-[300px] overflow-y-auto custom-scrollbar overscroll-contain">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm shadow-2xs">
                     <TableRow className="hover:bg-transparent bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-semibold select-none">
