@@ -138,8 +138,8 @@ export default function AdminAgenciesPage() {
         {/* Top Header */}
         <PageHeader
           title="Agency Directory"
-          description="Manage subscribed travel agencies, inspect live usage telemetry, manage subscription trials, and enforce platform governance."
-          breadcrumbs={[{ label: "SaaS Platform", href: "/admin" }, { label: "Agencies" }]}
+          description="Manage travel agencies, inspect live usage telemetry, and enforce platform governance."
+          breadcrumbs={[{ label: "Platform", href: "/admin" }, { label: "Agencies" }]}
           primaryAction={{
             label: "Refresh List",
             onClick: fetchAgencies,
@@ -184,28 +184,6 @@ export default function AdminAgenciesPage() {
               </SelectContent>
             </Select>
 
-            {/* Subscription Status Filter */}
-            <Select
-              value={subStatusFilter}
-              onValueChange={(val) => {
-                if (val) {
-                  setSubStatusFilter(val);
-                  setPage(1);
-                }
-              }}
-            >
-              <SelectTrigger className="h-8 sm:h-9 text-xs w-full min-[360px]:w-37.5 flex-1 min-[360px]:flex-initial">
-                <SelectValue placeholder="Subscription" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Subscriptions</SelectItem>
-                <SelectItem value="TRIAL">In Free Trial</SelectItem>
-                <SelectItem value="ACTIVE">Paid Active</SelectItem>
-                <SelectItem value="EXPIRED">Expired</SelectItem>
-                <SelectItem value="CANCELLED">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-
             <span className="text-xs font-semibold text-slate-500 hidden sm:inline">
               ({totalCount} Total)
             </span>
@@ -220,7 +198,6 @@ export default function AdminAgenciesPage() {
                 <TableHead className="text-xs font-bold uppercase text-slate-600">Agency & Contact</TableHead>
                 <TableHead className="text-xs font-bold uppercase text-slate-600">Owner Profile</TableHead>
                 <TableHead className="text-xs font-bold uppercase text-slate-600">Account Status</TableHead>
-                <TableHead className="text-xs font-bold uppercase text-slate-600">Subscription & Trial</TableHead>
                 <TableHead className="text-xs font-bold uppercase text-slate-600 text-center">Usage Metrics</TableHead>
                 <TableHead className="text-xs font-bold uppercase text-slate-600 text-right pr-6">Actions</TableHead>
               </TableRow>
@@ -228,19 +205,18 @@ export default function AdminAgenciesPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-40 text-center text-slate-400 text-xs">
+                  <TableCell colSpan={5} className="h-40 text-center text-slate-400 text-xs">
                     Loading agency records...
                   </TableCell>
                 </TableRow>
               ) : agencies.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-40 text-center text-slate-400 text-xs">
+                  <TableCell colSpan={5} className="h-40 text-center text-slate-400 text-xs">
                     No agencies match the current filter criteria.
                   </TableCell>
                 </TableRow>
               ) : (
                 agencies.map((agency) => {
-                  const sub = agency.subscription;
                   return (
                     <TableRow
                       key={agency.id}
@@ -292,39 +268,6 @@ export default function AdminAgenciesPage() {
                         />
                       </TableCell>
 
-                      {/* Subscription & Trial */}
-                      <TableCell>
-                        {sub ? (
-                          <div className="space-y-0.5 text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-900">{sub.planName}</span>
-                              <StatusBadge
-                                status={sub.status}
-                                label={
-                                  sub.status === "ACTIVE"
-                                    ? "Active"
-                                    : sub.status === "TRIAL"
-                                    ? "Trial"
-                                    : sub.status === "EXPIRED"
-                                    ? "Expired"
-                                    : sub.status
-                                }
-                              />
-                            </div>
-                            {sub.status === "TRIAL" && (
-                              <p className="text-[11px] text-amber-700 font-medium flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {sub.daysRemaining > 0
-                                  ? `${sub.daysRemaining} days left`
-                                  : "Trial Expired"}
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-400">No Subscription</span>
-                        )}
-                      </TableCell>
-
                       {/* Usage Metrics */}
                       <TableCell className="text-center">
                         <div className="inline-flex items-center gap-3 text-xs bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
@@ -343,18 +286,6 @@ export default function AdminAgenciesPage() {
                       {/* Actions */}
                       <TableCell className="text-right pr-6" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
-                          {sub?.status === "TRIAL" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setExtendAgency({ id: agency.id, name: agency.name })}
-                              className="h-7 text-[11px] font-semibold border-amber-300 text-amber-800 hover:bg-amber-50 cursor-pointer"
-                              title="Extend Trial Period"
-                            >
-                              + Trial
-                            </Button>
-                          )}
-
                           {agency.status === "ACTIVE" ? (
                             <Button
                               size="sm"

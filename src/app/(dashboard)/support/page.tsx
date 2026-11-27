@@ -139,10 +139,7 @@ export default function SupportPage() {
   const isBannerActive =
     !isPlatformOwner &&
     Boolean(currentUser?.agencyId) &&
-    (subscriptionAccess?.status === "SUSPENDED" ||
-      subscriptionAccess?.status === "READ_ONLY" ||
-      Boolean(subscriptionAccess?.isReadOnly) ||
-      subscriptionAccess?.status === "TRIAL");
+    subscriptionAccess?.status === "SUSPENDED";
 
   return (
     <div
@@ -166,7 +163,7 @@ export default function SupportPage() {
               </span>
             </div>
             <p className="text-xs text-slate-500 hidden sm:block">
-              Direct assistance with onboarding, trial questions, plan changes & technical support.
+              Direct assistance with onboarding, workspace setup & technical support.
             </p>
             {(conversation?.supportEmail || conversation?.supportPhone) && (
               <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 flex-wrap">

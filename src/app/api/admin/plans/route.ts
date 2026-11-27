@@ -1,4 +1,5 @@
 import { requirePlatformOwnerContext } from "@/lib/api/context";
+import { subscriptionRetiredResponse } from "@/lib/api/errors";
 import { adminService } from "@/lib/services/admin-service";
 import { planCreateSchema } from "@/lib/validation/admin-schema";
 import { NextRequest,NextResponse } from "next/server";
@@ -6,6 +7,7 @@ import { NextRequest,NextResponse } from "next/server";
 export async function GET(_req: NextRequest) {
   try {
     await requirePlatformOwnerContext();
+    return subscriptionRetiredResponse();
     const plans = await adminService.listPlans();
 
     return NextResponse.json({
@@ -30,6 +32,7 @@ export async function GET(_req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const context = await requirePlatformOwnerContext();
+    return subscriptionRetiredResponse();
     const body = await req.json();
 
     const parsed = planCreateSchema.parse(body);

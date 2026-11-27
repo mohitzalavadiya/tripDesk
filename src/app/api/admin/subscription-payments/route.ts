@@ -1,4 +1,5 @@
 import { requirePlatformOwnerContext } from "@/lib/api/context";
+import { subscriptionRetiredResponse } from "@/lib/api/errors";
 import { adminService } from "@/lib/services/admin-service";
 import {
 subscriptionPaymentCreateSchema,
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const authContext = await requirePlatformOwnerContext();
+    return subscriptionRetiredResponse();
     const { searchParams } = new URL(request.url);
 
     const filter = subscriptionPaymentFilterSchema.parse({
@@ -54,6 +56,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authContext = await requirePlatformOwnerContext();
+    return subscriptionRetiredResponse();
     const body = await request.json();
     const validatedInput = subscriptionPaymentCreateSchema.parse(body);
 

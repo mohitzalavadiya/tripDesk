@@ -178,14 +178,6 @@ export default function AgencyDetailsPage() {
               </Button>
             )}
 
-            <Button
-              size="sm"
-              onClick={() => setIsExtendOpen(true)}
-              className="flex-1 sm:flex-initial h-8 text-[11px] sm:text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white px-2.5 sm:px-3 justify-center"
-            >
-              <Clock className="h-3.5 w-3.5 mr-1 shrink-0" />
-              <span>Extend Trial</span>
-            </Button>
           </div>
         </div>
 
@@ -212,11 +204,6 @@ export default function AgencyDetailsPage() {
                   >
                     {identity.status}
                   </span>
-                  {subscription && (
-                    <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
-                      Plan: {subscription.plan?.name || "Standard"} ({subscription.status})
-                    </span>
-                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] sm:text-xs text-slate-500">
                   <span className="flex items-center gap-1 break-all">
@@ -260,7 +247,6 @@ export default function AgencyDetailsPage() {
           <div className="flex items-center gap-1.5 sm:gap-2 border-t border-slate-100 mt-4 sm:mt-6 pt-3 overflow-x-auto no-scrollbar scroll-smooth">
             {[
               { id: "overview", label: "Agency Overview & Owner" },
-              { id: "subscription", label: "Subscription & Trial Lifecycle" },
               { id: "usage", label: "Live Usage Telemetry" },
               { id: "audit", label: `Platform Audit Logs (${auditLogs.length})` },
             ].map((tab) => (
@@ -347,69 +333,6 @@ export default function AgencyDetailsPage() {
           </div>
         )}
 
-        {/* TAB 2: SUBSCRIPTION */}
-        {activeTab === "subscription" && (
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-6 shadow-2xs space-y-4 sm:space-y-6 min-w-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3 sm:pb-4 min-w-0">
-              <div className="min-w-0">
-                <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">
-                  Subscription & Billing Lifecycle
-                </h3>
-                <p className="text-[11px] sm:text-xs text-slate-500">Plan details, free trial tracking, and renewals</p>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => setIsExtendOpen(true)}
-                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shrink-0 justify-center cursor-pointer"
-              >
-                + Extend Trial
-              </Button>
-            </div>
-
-            {subscription ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
-                <div className="p-3.5 sm:p-4 rounded-xl bg-purple-50/60 border border-purple-100 space-y-1 min-w-0">
-                  <span className="text-[10px] uppercase font-bold text-purple-600">Current Plan</span>
-                  <p className="text-base sm:text-lg font-black text-slate-900 break-words">{subscription.plan?.name || "Standard"}</p>
-                  <p className="text-xs text-slate-500">₹{subscription.plan?.price || 0} / month</p>
-                </div>
-
-                <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1 min-w-0">
-                  <span className="text-[10px] uppercase font-bold text-slate-500">Status</span>
-                  <p className="text-base sm:text-lg font-black text-slate-900">{subscription.status}</p>
-                  <p className="text-xs text-slate-500">
-                    {subscription.status === "TRIAL"
-                      ? `${subscription.daysRemaining} days remaining`
-                      : "Active Subscription"}
-                  </p>
-                </div>
-
-                <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1 min-w-0">
-                  <span className="text-[10px] uppercase font-bold text-slate-500">Trial Period</span>
-                  <p className="text-xs font-semibold text-slate-800">
-                    {subscription.trialStart ? new Date(subscription.trialStart).toLocaleDateString() : "N/A"}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    to {subscription.trialEnd ? new Date(subscription.trialEnd).toLocaleDateString() : "N/A"}
-                  </p>
-                </div>
-
-                <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1 min-w-0">
-                  <span className="text-[10px] uppercase font-bold text-slate-500">Paid Period</span>
-                  <p className="text-xs font-semibold text-slate-800">
-                    {subscription.subscriptionStart ? new Date(subscription.subscriptionStart).toLocaleDateString() : "Not active"}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    to {subscription.subscriptionEnd ? new Date(subscription.subscriptionEnd).toLocaleDateString() : "N/A"}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400 py-6 text-center">No active subscription record.</p>
-            )}
-          </div>
-        )}
-
         {/* TAB 3: USAGE TELEMETRY */}
         {activeTab === "usage" && (
           <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-6 shadow-2xs space-y-3 sm:space-y-4 min-w-0">
@@ -489,7 +412,7 @@ export default function AgencyDetailsPage() {
             <form onSubmit={handleExtendTrial} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Days to Add</label>
-                <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
                   {[7, 14, 30, 60].map((d) => (
                     <button
                       key={d}

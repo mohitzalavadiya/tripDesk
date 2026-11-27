@@ -1,6 +1,5 @@
 import prisma from "@/lib/prisma";
 import { isDbUserSessionValid } from "@/lib/auth/session-validation";
-import { evaluateEffectiveSubscriptionState } from "@/lib/auth/subscription-state";
 import { createClient } from "@/lib/supabase/server";
 import { Agency,Subscription,SubscriptionPlan,SubscriptionStatus,User } from "@prisma/client";
 import { redirect } from "next/navigation";
@@ -77,15 +76,11 @@ export async function getCurrentUser(): Promise<AuthenticatedContext | null> {
     const isAgencyOwner = dbUser.role === "AGENCY_OWNER" && !!dbUser.agencyId;
     const isAgencyStaff = dbUser.role === "AGENCY_STAFF" && !!dbUser.agencyId;
 
-    // Determine authoritative effective subscription access
-    const evalState = evaluateEffectiveSubscriptionState({
-      agencyStatus: agency?.status,
-      subscription,
-      isPlatformOwner,
-    });
-    const hasFullAccess = evalState.hasFullAccess;
-    const isReadOnly = evalState.isReadOnly;
-    const trialDaysRemaining = evalState.daysRemaining;
+    // Subscription feature retired (Free SaaS): only SUSPENDED agency status restricts access
+    const isSuspendedAgency = !isPlatformOwner && agency?.status === "SUSPENDED";
+    const hasFullAccess = !isSuspendedAgency;
+    const isReadOnly = isSuspendedAgency;
+    const trialDaysRemaining = 0;
 
     return {
       supabaseUser: {
@@ -176,33 +171,17 @@ export async function requireAgencyMember(): Promise<AuthenticatedContext> {
 export async function getSubscriptionAccess(agencyId: string) {
   const agency = await prisma.agency.findUnique({
     where: { id: agencyId },
-    include: {
-      subscriptions: {
-        include: {
-          plan: true,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 1,
-      },
-    },
+    select: { status: true },
   });
 
-  if (!agency) {
-    return { status: "EXPIRED" as SubscriptionStatus, hasFullAccess: false, isReadOnly: true };
+  if (!agency || agency.status === "SUSPENDED") {
+    return { status: "EXPIRED" as SubscriptionStatus, hasFullAccess: false, isReadOnly: true, daysLeft: 0 };
   }
 
-  const sub = agency.subscriptions[0] || null;
-  const evalState = evaluateEffectiveSubscriptionState({
-    agencyStatus: agency.status,
-    subscription: sub,
-  });
-
   return {
-    status: evalState.effectiveStatus,
-    hasFullAccess: evalState.hasFullAccess,
-    isReadOnly: evalState.isReadOnly,
-    daysLeft: evalState.daysRemaining,
+    status: "ACTIVE" as SubscriptionStatus,
+    hasFullAccess: true,
+    isReadOnly: false,
+    daysLeft: 0,
   };
 }

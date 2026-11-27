@@ -51,8 +51,6 @@ export const customerInsightsService = {
    * Aggregate real-time customer analytics with strict tenant isolation
    */
   async getCustomerInsights(agencyId: string): Promise<CustomerInsightsData> {
-    await entitlementService.checkFeatureAllowed(agencyId, "CUSTOMER_INSIGHTS");
-
     const [
       customers,
       trips,

@@ -1,10 +1,12 @@
 import { requireReadAccess } from "@/lib/api/context";
+import { subscriptionRetiredResponse } from "@/lib/api/errors";
 import { subscriptionService } from "@/lib/services/subscription-service";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
     const context = await requireReadAccess();
+    return subscriptionRetiredResponse();
     const overview = await subscriptionService.getAgencySubscription(context.agencyId);
 
     return NextResponse.json({

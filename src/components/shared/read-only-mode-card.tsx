@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { ReadOnlyReason } from "@/context/subscription-context";
-import { ArrowLeft,ArrowRight,CheckCircle2,CreditCard,Lock,Phone,ShieldAlert } from "lucide-react";
+import { ArrowLeft,CheckCircle2,Lock,Phone,ShieldAlert } from "lucide-react";
 import Link from "next/link";
 
 export interface ReadOnlyModeCardProps {
@@ -18,7 +18,7 @@ export function ReadOnlyModeCard({
   resourceName = "Record",
   title: _title,
   description: _description,
-  reason = "EXPIRED",
+  reason = "SUSPENDED",
   backHref,
   backLabel,
 }: ReadOnlyModeCardProps) {
@@ -75,7 +75,7 @@ export function ReadOnlyModeCard({
             </>
           ) : (
             <>
-              Your subscription or trial is inactive. You have full read-only access to review existing workspace data, but initializing new <strong>{resourceName.toLowerCase()}s</strong> requires an active plan.
+              This action is temporarily unavailable in read-only mode. You have full read-only access to review existing workspace records.
             </>
           )}
         </p>
@@ -94,11 +94,7 @@ export function ReadOnlyModeCard({
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-              <span>
-                {isSuspended
-                  ? "Support team assistance is available to reactivate your workspace."
-                  : "Instant plan renewal reactivates unlimited creation workflows immediately."}
-              </span>
+              <span>Support team assistance is available to review or restore your workspace.</span>
             </div>
           </div>
         </div>
@@ -116,28 +112,15 @@ export function ReadOnlyModeCard({
             </Button>
           </Link>
 
-          {isSuspended ? (
-            <Link href="/support" className="w-full sm:w-auto">
-              <Button
-                size="lg"
-                className="w-full sm:w-auto bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm px-6 h-11 rounded-xl shadow-lg shadow-rose-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <Phone className="h-4 w-4" />
-                <span>Contact Your Travel Desk Support</span>
-              </Button>
-            </Link>
-          ) : (
-            <Link href="/subscription" className="w-full sm:w-auto">
-              <Button
-                size="lg"
-                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm px-6 h-11 rounded-xl shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <CreditCard className="h-4 w-4" />
-                <span>Renew Subscription</span>
-                <ArrowRight className="h-4 w-4 ml-0.5" />
-              </Button>
-            </Link>
-          )}
+          <Link href="/support" className="w-full sm:w-auto">
+            <Button
+              size="lg"
+              className="w-full sm:w-auto bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm px-6 h-11 rounded-xl shadow-lg shadow-rose-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Phone className="h-4 w-4" />
+              <span>Contact Your Travel Desk Support</span>
+            </Button>
+          </Link>
         </div>
       </div>
     </div>

@@ -378,7 +378,7 @@ export function StaffPermissionsModal({
               <>
                 {CATEGORIES.map((category) => {
                   const pages = PAGE_PERMISSIONS_REGISTRY.filter(
-                    (p) => p.category === category
+                    (p) => p.category === category && p.moduleKey !== "SUBSCRIPTION"
                   );
                   if (pages.length === 0) return null;
 

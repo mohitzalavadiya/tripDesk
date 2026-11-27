@@ -167,8 +167,6 @@ export class ReportingService {
     agencyId: string,
     filter: ReportFilterInput
   ): Promise<AgencyBIReportResult> {
-    await entitlementService.checkFeatureAllowed(agencyId, "REPORTS_ANALYTICS");
-
     const { startDate, endDate } = calculateReportDateRange(
       filter.preset,
       filter.startDate,

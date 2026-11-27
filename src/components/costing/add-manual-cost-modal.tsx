@@ -239,7 +239,7 @@ export function AddManualCostModal({
             </div>
 
             {/* Calculation Formula: Unit Cost × Quantity × Duration */}
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-700 uppercase">Unit Cost (₹) *</label>
                 <Input

@@ -649,7 +649,7 @@ async function runApplicationWideAudit() {
   {
     // Requirement 3: Every application page remains visible in the sidebar & navigation for all users
     const allNavItems = agencyNavigationConfig.flatMap((s) => s.items.map((i) => i.href));
-    assert(allNavItems.length === 26, "agencyNavigationConfig defines all 26 application pages");
+    assert(allNavItems.length === 25, "agencyNavigationConfig defines all 25 active application pages (subscription retired)");
 
     // All pages remain visible for both Agency Owner and Agency Staff
     assert(allNavItems.includes("/dashboard"), "Sidebar: /dashboard is visible in navigation");
@@ -676,7 +676,7 @@ async function runApplicationWideAudit() {
     assert(allNavItems.includes("/communications"), "Sidebar: /communications is visible in navigation");
     assert(allNavItems.includes("/referrals"), "Sidebar: /referrals is visible in navigation");
     assert(allNavItems.includes("/settings"), "Sidebar: /settings is visible in navigation");
-    assert(allNavItems.includes("/subscription"), "Sidebar: /subscription is visible in navigation");
+    assert(!allNavItems.includes("/subscription"), "Sidebar: /subscription is retired from navigation");
     assert(allNavItems.includes("/support"), "Sidebar: /support is visible in navigation");
   }
 

@@ -53,15 +53,15 @@ export function DateRangeFilter({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
-      <div className="flex items-center gap-2 text-slate-500 text-xs font-bold shrink-0">
-        <Clock className="h-3.5 w-3.5 text-indigo-600" />
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs max-w-full min-w-0">
+      <div className="flex items-center gap-2 text-slate-500 text-xs font-bold shrink-0 whitespace-nowrap">
+        <Clock className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
         <span>Time Horizon:</span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-        {/* Fast Preset Buttons for Desktop */}
-        <div className="hidden lg:flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl">
+      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto min-w-0">
+        {/* Fast Preset Buttons for Wide Desktop */}
+        <div className="hidden xl:flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl shrink-0">
           {[
             { id: "TODAY", label: "Today" },
             { id: "THIS_WEEK", label: "This Week" },
@@ -78,7 +78,7 @@ export function DateRangeFilter({
                 onPresetChange(p.id as DashboardPreset);
               }}
               disabled={loading}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                 preset === p.id && !showCustomInputs
                   ? "bg-white text-indigo-700 shadow-2xs font-bold"
                   : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
@@ -91,7 +91,7 @@ export function DateRangeFilter({
             type="button"
             onClick={() => setShowCustomInputs(!showCustomInputs)}
             disabled={loading}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
               showCustomInputs
                 ? "bg-white text-indigo-700 shadow-2xs font-bold"
                 : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
@@ -101,8 +101,8 @@ export function DateRangeFilter({
           </button>
         </div>
 
-        {/* Dropdown for Mobile / Tablet */}
-        <div className="lg:hidden w-full sm:w-[180px]">
+        {/* Dropdown for Mobile / Tablet / Compact Laptop */}
+        <div className="xl:hidden w-full sm:w-[190px]">
           <Select value={preset} onValueChange={handlePresetSelect} disabled={loading}>
             <SelectTrigger className="h-8 text-xs bg-slate-50 border-slate-200">
               <SelectValue placeholder="Select Range" />

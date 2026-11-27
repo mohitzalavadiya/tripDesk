@@ -219,3 +219,19 @@ export function handleApiError(error: unknown): NextResponse {
     { status: 500 }
   );
 }
+
+/**
+ * Consistent 410 Gone response for retired subscription & billing endpoints (Free SaaS conversion).
+ */
+export function subscriptionRetiredResponse() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: {
+        code: "FEATURE_RETIRED",
+        message: "Subscription and billing features have been retired. Your Travel Desk is free for all agencies.",
+      },
+    },
+    { status: 410 }
+  );
+}

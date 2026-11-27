@@ -2,23 +2,12 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-Select,
-SelectContent,
-SelectItem,
-SelectTrigger,
-SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useSaaS } from "@/context/saas-context";
-import { BillingCycle } from "@/data/saas-data";
-import { formatCurrency } from "@/lib/costing-engine";
 import { isValidPhoneNumber } from "@/lib/validation/field-validators";
 import {
 ArrowLeft,
 Building2,
-Clock,
-CreditCard,
 User
 } from "lucide-react";
 import Link from "next/link";
@@ -28,11 +17,11 @@ import { toast } from "sonner";
 
 export default function CreateAgencyPage() {
   const router = useRouter();
-  const { createAgency, plans } = useSaaS();
+  const { createAgency } = useSaaS();
 
   // Section 1: Agency Information
   const [name, setName] = React.useState("");
-  const [logo, setLogo] = React.useState("");
+  const [logo] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [phone, setPhone] = React.useState("");
   const [address, setAddress] = React.useState("");
@@ -47,20 +36,6 @@ export default function CreateAgencyPage() {
   const [ownerName, setOwnerName] = React.useState("");
   const [ownerEmail, setOwnerEmail] = React.useState("");
   const [ownerPhone, setOwnerPhone] = React.useState("");
-
-  // Section 3: Subscription
-  const [planId, setPlanId] = React.useState<"starter" | "professional">("starter");
-  const [billingCycle, setBillingCycle] = React.useState<BillingCycle>("Monthly");
-  const [isTrial, setIsTrial] = React.useState(true);
-  const [paymentStatus, setPaymentStatus] = React.useState<"Trial" | "Pending Payment" | "Paid">("Trial");
-
-  // Dynamic 7-day trial calculations
-  const now = new Date();
-  const todayFormatted = now.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-  const trialEndObj = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const trialEndFormatted = trialEndObj.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-
-  const selectedPlan = plans.find((p) => p.id === planId) || plans[0];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,10 +71,10 @@ export default function CreateAgencyPage() {
       ownerName,
       ownerEmail,
       ownerPhone,
-      planId,
-      billingCycle,
-      isTrial,
-      paymentStatus: isTrial ? "Trial" : paymentStatus,
+      planId: "starter",
+      billingCycle: "Monthly",
+      isTrial: false,
+      paymentStatus: "Paid",
     });
 
     router.push(`/admin/agencies/${created.id}`);
@@ -121,7 +96,7 @@ export default function CreateAgencyPage() {
             Create New Agency
           </h1>
           <p className="text-xs text-slate-500">
-            Register an agency account, assign the agency owner profile, and setup initial subscription & 7-day trial terms.
+            Register an agency account and assign the agency owner profile.
           </p>
         </div>
 
@@ -304,140 +279,6 @@ export default function CreateAgencyPage() {
                 />
               </div>
             </div>
-          </div>
-
-          {/* ─── SECTION 3: SUBSCRIPTION & 7-DAY TRIAL ─────────────────────── */}
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-2xs space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-emerald-600" />
-                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900">
-                  Section 3 — Subscription & Terms
-                </h2>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-700">SaaS Plan Tier</label>
-                <Select
-                  value={planId}
-                  onValueChange={(val) => setPlanId(val as "starter" | "professional")}
-                >
-                  <SelectTrigger className="h-9 text-xs font-semibold">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200">
-                    {plans && plans.length > 0 ? (
-                      plans.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name} Plan (₹{p.monthlyPrice.toLocaleString("en-IN")}/mo)
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <>
-                        <SelectItem value="starter">Starter Plan (₹499/mo)</SelectItem>
-                        <SelectItem value="professional">Professional Plan (₹999/mo)</SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-700">Billing Cycle</label>
-                <Select
-                  value={billingCycle}
-                  onValueChange={(val) => setBillingCycle(val as BillingCycle)}
-                >
-                  <SelectTrigger className="h-9 text-xs font-semibold">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200">
-                    <SelectItem value="Monthly">Monthly</SelectItem>
-                    <SelectItem value="Yearly">Yearly (Annual Discount)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-700">Account Access Mode</label>
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsTrial(true);
-                      setPaymentStatus("Trial");
-                    }}
-                    className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                      isTrial
-                        ? "bg-amber-500 text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    7-Day Free Trial
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsTrial(false);
-                      setPaymentStatus("Paid");
-                    }}
-                    className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                      !isTrial
-                        ? "bg-emerald-600 text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    Direct Paid Activation
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Trial calculation banner */}
-            {isTrial ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 text-amber-900">
-                <Clock className="h-5 w-5 text-amber-600 shrink-0" />
-                <div className="space-y-0.5">
-                  <p className="font-bold">
-                    7-Day Dynamic Trial Active: {todayFormatted} → {trialEndFormatted}
-                  </p>
-                  <p className="text-amber-800 text-[11px]">
-                    The agency will receive full access to {selectedPlan.name} Plan features for 7 days without upfront payment.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
-                <div className="space-y-1">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                    Subscription Fee ({billingCycle})
-                  </span>
-                  <span className="font-black text-sm text-slate-900 font-mono">
-                    {formatCurrency(
-                      billingCycle === "Yearly" ? selectedPlan.yearlyPrice : selectedPlan.monthlyPrice
-                    )}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 block">Payment State</label>
-                  <Select
-                    value={paymentStatus}
-                    onValueChange={(val) => setPaymentStatus(val as any)}
-                  >
-                    <SelectTrigger className="h-8 text-xs bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-slate-200">
-                      <SelectItem value="Paid">Paid & Active</SelectItem>
-                      <SelectItem value="Pending Payment">Pending Payment Verification</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Form Actions */}

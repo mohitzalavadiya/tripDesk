@@ -449,13 +449,7 @@ export const bookingService = {
    */
   async createBooking(agencyId: string, data: CreateBookingInput): Promise<BookingWithRelations> {
     const { createdBooking, tripTitle, isAmbiguousEnquiryMatch, candidateEnquiryNumbers } = await prisma.$transaction(async (tx) => {
-      // 1. Lock authoritative agency subscription FOR UPDATE
-      await entitlementService.lockAgencySubscription(agencyId, tx);
-
-      // 2. Validate quota for "BOOKINGS" resource inside transaction
-      await entitlementService.checkQuota(agencyId, "BOOKINGS", tx);
-
-      // 3. Verify Trip exists under this agency and is active
+      // Verify Trip exists under this agency and is active
       const trip = await tx.trip.findFirst({
         where: { id: data.tripId, agencyId, archivedAt: null },
       });
@@ -809,9 +803,6 @@ export const bookingService = {
     const igstAmount = quotation.igstAmount ?? null;
 
     const txResult = await prisma.$transaction(async (tx) => {
-      // 1. Lock authoritative agency subscription FOR UPDATE
-      await entitlementService.lockAgencySubscription(agencyId, tx);
-
       // Lock the quotation row FOR UPDATE to serialize concurrent booking conversions
       await tx.$queryRaw`
         SELECT "id" FROM "quotations"
@@ -827,9 +818,6 @@ export const bookingService = {
       if (concurrentBooking) {
         return { ...concurrentBooking, isExisting: true } as any;
       }
-
-      // 2. Validate quota for "BOOKINGS" resource inside transaction
-      await entitlementService.checkQuota(agencyId, "BOOKINGS", tx);
 
       // Resolve originating enquiry if an unambiguous link exists for the trip or quotation
       // 1. Prioritize explicit direct quotation linkage (convertedQuotationId)

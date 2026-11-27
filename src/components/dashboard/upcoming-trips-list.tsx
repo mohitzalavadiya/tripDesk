@@ -51,8 +51,8 @@ export function UpcomingTripsList({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-2xs flex flex-col h-full space-y-4">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-2">
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-2xs flex flex-col h-full space-y-4 min-w-0 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-3 gap-2">
         <div className="min-w-0">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <Compass className="h-4 w-4 text-indigo-600 shrink-0" />

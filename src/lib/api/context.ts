@@ -1,6 +1,5 @@
 import prisma from "@/lib/prisma";
 import { isDbUserSessionValid } from "@/lib/auth/session-validation";
-import { evaluateEffectiveSubscriptionState } from "@/lib/auth/subscription-state";
 import { createClient } from "@/lib/supabase/server";
 import {
 Agency,
@@ -119,30 +118,20 @@ export async function getRequestContext(): Promise<RequestContext | null> {
     const isAgencyOwner = dbUser.role === UserRole.AGENCY_OWNER && !!dbUser.agencyId;
     const isAgencyStaff = dbUser.role === UserRole.AGENCY_STAFF && !!dbUser.agencyId;
 
-    // Calculate authoritative effective subscription access (never trusts stored ACTIVE if subscriptionEnd has passed)
-    const evalState = evaluateEffectiveSubscriptionState({
-      agencyStatus: agency?.status,
-      subscription,
-      isPlatformOwner,
-    });
-
-    if (evalState.diagnosticReason && evalState.diagnosticReason !== "PLATFORM_OWNER" && evalState.isExpired) {
-      console.info(
-        `[getRequestContext] Agency ${agency?.id ?? "unknown"} restricted (${evalState.diagnosticReason})`
-      );
-    }
+    // Subscription feature retired (Free SaaS): only SUSPENDED agency status restricts access
+    const isSuspendedAgency = !isPlatformOwner && agency?.status === AgencyStatus.SUSPENDED;
 
     const subscriptionAccess: SubscriptionAccessInfo = {
-      status: evalState.effectiveStatus,
-      hasFullAccess: evalState.hasFullAccess,
-      isReadOnly: evalState.isReadOnly,
-      canRead: evalState.canRead,
-      canWrite: evalState.canWrite,
-      trialDaysRemaining: evalState.daysRemaining,
-      trialStart: subscription?.trialStart,
-      trialEnd: subscription?.trialEnd,
-      subscriptionEnd: subscription?.subscriptionEnd,
-      planName: subscription?.plan.name,
+      status: (isSuspendedAgency ? "EXPIRED" : "ACTIVE") as SubscriptionStatus,
+      hasFullAccess: !isSuspendedAgency,
+      isReadOnly: isSuspendedAgency,
+      canRead: !isSuspendedAgency,
+      canWrite: !isSuspendedAgency,
+      trialDaysRemaining: 0,
+      trialStart: null,
+      trialEnd: null,
+      subscriptionEnd: null,
+      planName: undefined,
     };
 
     return {

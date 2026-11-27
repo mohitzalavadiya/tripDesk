@@ -651,7 +651,7 @@ export default function NewEnquiryPage() {
                 <span>Passenger Count & Commercial Budget</span>
               </h3>
 
-              <div className="grid grid-cols-3 gap-1.5 sm:gap-3 text-xs min-w-0">
+              <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2 sm:gap-3 text-xs min-w-0">
                 <div className="space-y-1 min-w-0">
                   <label className="font-bold text-slate-700 text-[10px] sm:text-xs block truncate" title="Adults (12+ yrs) *">Adults (12+ y)*</label>
                   <Input
