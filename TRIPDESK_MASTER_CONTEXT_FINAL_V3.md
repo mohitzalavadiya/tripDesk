@@ -23425,3 +23425,37 @@ In standard viewport heights (900px - 1000px display with top navbar, breadcrumb
   - `20261027150000_phase_f_staff_permissions`: **APPLIED**
   - `20261126120000_add_staff_lifecycle_fields`: **APPLIED**
 - **Safety Confirmation:** Zero database writes, zero `_prisma_migrations` edits, zero business record queries, and zero application/schema/environment/dependency/Git modifications occurred.
+
+
+---
+
+## § 276.98 Hide Activities, Suppliers and Invoices Pages from UI (2026-11-28 18:16 IST)
+
+> **HIDDEN UI & ROUTE GUARDS APPLIED (`VERIFIED VIA BUILD + DB-FREE SUITES`):** Hid Activities, Suppliers, and Invoices from all UI navigation, search hints, staff permissions UI, and Booking detail navigation links while preserving all original page components, APIs, services, Prisma schema, and internal cross-module workflows. Live interactive browser verification was not performed in this step.
+
+### 1. Exact Routes Hidden
+- **Activities:** `/activities`, `/activities/new`, `/activities/[id]` (`src/app/(dashboard)/activities/page.tsx`, `new/page.tsx`, `[id]/page.tsx`)
+- **Suppliers:** `/suppliers`, `/suppliers/new`, `/suppliers/[id]` (`src/app/(dashboard)/suppliers/page.tsx`, `new/page.tsx`, `[id]/page.tsx`)
+- **Invoices:** `/invoices`, `/invoices/[id]` (`src/app/(dashboard)/invoices/page.tsx`, `[id]/page.tsx`)
+
+### 2. Navigation & UI Locations Updated
+- `src/lib/navigation.ts`: Commented out `Activities` (`/activities`), `Suppliers` (`/suppliers`), and `Invoices` (`/invoices`) in `agencyNavigationConfig` (preserving the original definitions in-place for future restoration). `adminNavigationConfig` and `secondaryNavigation` remain free of these routes, so both desktop (`src/components/layout/sidebar.tsx`) and mobile (`src/components/layout/mobile-nav.tsx`) navigation hide them across `PLATFORM_OWNER`, `AGENCY_OWNER`, and `AGENCY_STAFF`. `Referrals & Rewards` (`/referrals`) remains untouched.
+- `src/components/shared/global-search.tsx`: Updated search input placeholder to `"Search customers, trips, bookings..."` (removing the `invoices` hint; `quickNavModules` does not list hidden routes).
+- `src/components/team/staff-permissions-modal.tsx`: Excluded `"ACTIVITIES"`, `"SUPPLIERS"`, and `"INVOICES"` alongside `"SUBSCRIPTION"` via `HIDDEN_PERMISSION_MODULES` when rendering the permission matrix modal, while keeping `PAGE_PERMISSIONS_REGISTRY` intact in `src/lib/auth/permissions.ts` for backend API authorization.
+- `src/app/(dashboard)/bookings/[id]/page.tsx`: Commented out `"View Invoice"` links to `/invoices/${activeInvoice.id}` in the Booking Actions dropdown and Invoice card, and updated `handleGenerateInvoice` to toast success and refresh booking state (`fetchBooking(true)`) instead of pushing to `/invoices/${inv.id}`. Booking PDF download (`/api/invoices/[id]/pdf`) and invoice regeneration (`/api/invoices/[id]/regenerate`) remain operational.
+
+### 3. Direct URL Access Protection
+- `src/lib/supabase/middleware.ts`: Added `HIDDEN_PAGE_ROUTES` (`["/activities", "/suppliers", "/invoices"]`) and `isHiddenPagePath(pathname)`. Inside `updateSession`, unauthenticated requests continue to redirect to `/login?redirectTo=...`; authenticated direct requests to `/activities*`, `/suppliers*`, or `/invoices*` (including trailing slashes, nested segments, and query parameters) redirect to `/dashboard` (`NextResponse.redirect(new URL("/dashboard", request.url))`). `/api/activities*`, `/api/suppliers*`, `/api/invoices*`, and unrelated pages pass through untouched.
+- Added layout guards (`src/app/(dashboard)/activities/layout.tsx`, `src/app/(dashboard)/suppliers/layout.tsx`, `src/app/(dashboard)/invoices/layout.tsx`) executing `redirect("/dashboard")` before any nested `page.tsx` can render.
+
+### 4. Preserved Functionality & Verification (`task-3713`, Exit `0`)
+- All original page files (`page.tsx`), API routes, backend services, Prisma schema, migrations, and data remain untouched and unretired.
+- **Tests:**
+  - `npx tsx prisma/test-hidden-pages-guard.ts` (DB-free, mocked `@supabase/ssr`): **`6/6` passed**.
+  - `npx tsx prisma/test-staff-application-wide-authorization.ts` (Category 8 updated to `22` visible agency nav routes): **`137/137` passed**.
+  - `npx tsx prisma/test-free-saas-retirement.ts`: **`10/10` passed**.
+- **Static & Build:**
+  - `npx tsc --noEmit`: **`PASS`** (`0` errors).
+  - Focused `npx eslint` (`src/lib/navigation.ts`, `src/lib/supabase/middleware.ts`, `src/components/shared/global-search.tsx`, `src/components/team/staff-permissions-modal.tsx`, and the 3 hidden `layout.tsx` guards): **`PASS`** (`0` errors, `0` warnings).
+  - `git diff --check`: **`PASS`**.
+  - `npm run build` (Next.js `16.4.6` Turbopack): **`PASS`** (`Compiled successfully in 30.4s`, TypeScript `64s`, `42/42` static pages).

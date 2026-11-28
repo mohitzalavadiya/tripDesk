@@ -647,11 +647,11 @@ async function runApplicationWideAudit() {
   setCategory(8);
   console.log("\n▶ CATEGORY 8: Client-Side Least-Privilege & Navigation Visibility");
   {
-    // Requirement 3: Every application page remains visible in the sidebar & navigation for all users
+    // Active visible application pages remain in sidebar & navigation; retired/hidden pages excluded
     const allNavItems = agencyNavigationConfig.flatMap((s) => s.items.map((i) => i.href));
-    assert(allNavItems.length === 25, "agencyNavigationConfig defines all 25 active application pages (subscription retired)");
+    assert(allNavItems.length === 22, "agencyNavigationConfig defines all 22 active application pages (subscription retired; activities/suppliers/invoices hidden)");
 
-    // All pages remain visible for both Agency Owner and Agency Staff
+    // Active pages remain visible for both Agency Owner and Agency Staff
     assert(allNavItems.includes("/dashboard"), "Sidebar: /dashboard is visible in navigation");
     assert(allNavItems.includes("/enquiries"), "Sidebar: /enquiries is visible in navigation");
     assert(allNavItems.includes("/follow-ups"), "Sidebar: /follow-ups is visible in navigation");
@@ -665,11 +665,11 @@ async function runApplicationWideAudit() {
     assert(allNavItems.includes("/destinations"), "Sidebar: /destinations is visible in navigation");
     assert(allNavItems.includes("/hotels"), "Sidebar: /hotels is visible in navigation");
     assert(allNavItems.includes("/vehicles"), "Sidebar: /vehicles is visible in navigation");
-    assert(allNavItems.includes("/activities"), "Sidebar: /activities is visible in navigation");
+    assert(!allNavItems.includes("/activities"), "Sidebar: /activities is hidden from navigation");
     assert(allNavItems.includes("/rate-sheets"), "Sidebar: /rate-sheets is visible in navigation");
-    assert(allNavItems.includes("/suppliers"), "Sidebar: /suppliers is visible in navigation");
+    assert(!allNavItems.includes("/suppliers"), "Sidebar: /suppliers is hidden from navigation");
     assert(allNavItems.includes("/finance"), "Sidebar: /finance is visible in navigation");
-    assert(allNavItems.includes("/invoices"), "Sidebar: /invoices is visible in navigation");
+    assert(!allNavItems.includes("/invoices"), "Sidebar: /invoices is hidden from navigation");
     assert(allNavItems.includes("/payments"), "Sidebar: /payments is visible in navigation");
     assert(allNavItems.includes("/feedback"), "Sidebar: /feedback is visible in navigation");
     assert(allNavItems.includes("/reports"), "Sidebar: /reports is visible in navigation");

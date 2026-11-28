@@ -781,44 +781,132 @@ export const enquiryService = {
     data?: ConvertEnquiryToTripInput,
     actor?: { userId?: string; userName?: string; role?: string }
   ): Promise<{ tripId: string; enquiry: EnquiryWithRelations }> {
-    return await prisma.$transaction(async (tx) => {
-      // 1. Lock the enquiry row FOR UPDATE to strictly serialize concurrent conversion requests
-      const lockedEnquiries = await tx.$queryRaw<Array<{
-        id: string;
-        agencyId: string;
-        convertedTripId: string | null;
-        customerId: string;
-        status: EnquiryStatus;
-        title: string | null;
-        destination: string | null;
-        enquiryNumber: string;
-        notes: string | null;
-        startDate: Date | null;
-        endDate: Date | null;
-        adults: number;
-        children: number;
-        infants: number;
-      }>>`
-        SELECT "id", "agencyId", "convertedTripId", "customerId", "status", "title", "destination", "enquiryNumber", "notes", "startDate", "endDate", "adults", "children", "infants"
-        FROM "enquiries"
-        WHERE "id" = ${enquiryId} AND "agencyId" = ${agencyId} AND "archivedAt" IS NULL
-        FOR UPDATE
-      `;
+    let auditEvent: Parameters<typeof agencyAuditService.logEvent>[0] | null = null;
 
-      const lockedEnquiry = lockedEnquiries[0];
-      if (!lockedEnquiry) {
-        throw new Error("Enquiry not found.");
-      }
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // 1. Lock the enquiry row FOR UPDATE to strictly serialize concurrent conversion requests
+        const lockedEnquiries = await tx.$queryRaw<Array<{
+          id: string;
+          agencyId: string;
+          convertedTripId: string | null;
+          customerId: string;
+          status: EnquiryStatus;
+          title: string | null;
+          destination: string | null;
+          enquiryNumber: string;
+          notes: string | null;
+          startDate: Date | null;
+          endDate: Date | null;
+          adults: number;
+          children: number;
+          infants: number;
+        }>>`
+          SELECT "id", "agencyId", "convertedTripId", "customerId", "status", "title", "destination", "enquiryNumber", "notes", "startDate", "endDate", "adults", "children", "infants"
+          FROM "enquiries"
+          WHERE "id" = ${enquiryId} AND "agencyId" = ${agencyId} AND "archivedAt" IS NULL
+          FOR UPDATE
+        `;
 
-      // Prohibit converting a lost or cancelled enquiry to a trip workspace without explicit reopening
-      if (lockedEnquiry.status === EnquiryStatus.LOST || lockedEnquiry.status === EnquiryStatus.CANCELLED) {
-        throw new ValidationError("Cannot convert a lost or cancelled enquiry to a trip workspace without reopening it first.");
-      }
+        const lockedEnquiry = lockedEnquiries[0];
+        if (!lockedEnquiry) {
+          throw new NotFoundError("Enquiry");
+        }
 
-      // 2. Idempotency guard: If already converted, return existing trip
-      if (lockedEnquiry.convertedTripId) {
-        const existingFullEnquiry = await tx.enquiry.findFirst({
-          where: { id: enquiryId, agencyId, archivedAt: null },
+        // Prohibit converting a lost or cancelled enquiry to a trip workspace without explicit reopening
+        if (lockedEnquiry.status === EnquiryStatus.LOST || lockedEnquiry.status === EnquiryStatus.CANCELLED) {
+          throw new ValidationError("Cannot convert a lost or cancelled enquiry to a trip workspace without reopening it first.");
+        }
+
+        // 2. Idempotency guard: If already converted, return existing trip
+        if (lockedEnquiry.convertedTripId) {
+          const existingFullEnquiry = await tx.enquiry.findFirst({
+            where: { id: enquiryId, agencyId, archivedAt: null },
+            include: {
+              customer: { select: { id: true, name: true, phone: true, email: true, address: true } },
+              convertedTrip: { select: { id: true, title: true, tripNumber: true, startDate: true, endDate: true, status: true } },
+              convertedQuotation: { select: { id: true, quotationNumber: true, version: true, finalAmount: true, status: true } },
+              followUps: { where: { archivedAt: null }, orderBy: { scheduledAt: "desc" } },
+            },
+          });
+          return { tripId: lockedEnquiry.convertedTripId, enquiry: existingFullEnquiry as EnquiryWithRelations };
+        }
+
+        const tripTitle = data?.title?.trim() || lockedEnquiry.title || `${lockedEnquiry.destination || "Custom"} Trip`;
+        const startDate = lockedEnquiry.startDate ? new Date(lockedEnquiry.startDate) : new Date();
+        const endDate = lockedEnquiry.endDate
+          ? new Date(lockedEnquiry.endDate)
+          : new Date(startDate.getTime() + 86400000 * 5); // 5 days default
+
+        // 3. Create Trip within the SAME transaction tx
+        const createdTrip = await tripService.createTrip(
+          agencyId,
+          {
+            customerId: lockedEnquiry.customerId,
+            title: tripTitle,
+            startDate: startDate,
+            endDate: endDate,
+            status: "DRAFT",
+            notes: data?.notes || lockedEnquiry.notes || `Created from Enquiry ${lockedEnquiry.enquiryNumber}.`,
+          },
+          tx
+        );
+
+        // 4. Batch-insert extra traveler records to avoid N+1 round-trips inside transaction
+        const adultsCount = Number(lockedEnquiry.adults || 0);
+        const childrenCount = Number(lockedEnquiry.children || 0);
+        const infantsCount = Number(lockedEnquiry.infants || 0);
+        const travelersToCreate: Array<{
+          tripId: string;
+          name: string;
+          type: "ADULT" | "CHILD";
+        }> = [];
+
+        for (let i = 2; i <= adultsCount; i++) {
+          travelersToCreate.push({
+            tripId: createdTrip.id,
+            name: `Adult Guest ${i}`,
+            type: "ADULT",
+          });
+        }
+        for (let i = 1; i <= childrenCount; i++) {
+          travelersToCreate.push({
+            tripId: createdTrip.id,
+            name: `Child ${i}`,
+            type: "CHILD",
+          });
+        }
+        for (let i = 1; i <= infantsCount; i++) {
+          travelersToCreate.push({
+            tripId: createdTrip.id,
+            name: `Infant ${i}`,
+            type: "CHILD",
+          });
+        }
+
+        if (travelersToCreate.length > 0) {
+          if (typeof tx.traveler?.createMany === "function") {
+            await tx.traveler.createMany({ data: travelersToCreate });
+          } else {
+            for (const travelerData of travelersToCreate) {
+              await tx.traveler.create({ data: travelerData });
+            }
+          }
+        }
+
+        // 5. Update Enquiry: advance to QUALIFIED if was NEW or CONTACTED, preserve active status and do NOT close
+        const newStatus =
+          lockedEnquiry.status === EnquiryStatus.NEW || lockedEnquiry.status === EnquiryStatus.CONTACTED
+            ? EnquiryStatus.QUALIFIED
+            : lockedEnquiry.status;
+
+        const updatedEnquiry = await tx.enquiry.update({
+          where: { id: enquiryId },
+          data: {
+            status: newStatus,
+            convertedTripId: createdTrip.id,
+            closedAt: null,
+          },
           include: {
             customer: { select: { id: true, name: true, phone: true, email: true, address: true } },
             convertedTrip: { select: { id: true, title: true, tripNumber: true, startDate: true, endDate: true, status: true } },
@@ -826,105 +914,40 @@ export const enquiryService = {
             followUps: { where: { archivedAt: null }, orderBy: { scheduledAt: "desc" } },
           },
         });
-        return { tripId: lockedEnquiry.convertedTripId, enquiry: existingFullEnquiry as EnquiryWithRelations };
-      }
 
-      const tripTitle = data?.title?.trim() || lockedEnquiry.title || `${lockedEnquiry.destination || "Custom"} Trip`;
-      const startDate = lockedEnquiry.startDate || new Date();
-      const endDate = lockedEnquiry.endDate || new Date(Date.now() + 86400000 * 5); // 5 days default
+        auditEvent = {
+          agencyId,
+          actorUserId: actor?.userId || "SYSTEM",
+          action: "ENQUIRY_CONVERTED_TO_TRIP",
+          entityType: "ENQUIRY",
+          entityId: enquiryId,
+          metadata: {
+            actorName: actor?.userName || "Team Member",
+            actorRole: actor?.role,
+            tripId: createdTrip.id,
+            tripNumber: createdTrip.tripNumber,
+            changes: [
+              { field: "convertedTripId", label: "Trip Workspace", oldValue: null, newValue: createdTrip.tripNumber },
+              ...(newStatus !== lockedEnquiry.status ? [{ field: "status", label: "Stage", oldValue: lockedEnquiry.status, newValue: newStatus }] : []),
+            ],
+            summary: `Converted to Trip Workspace ${createdTrip.tripNumber} (${tripTitle})`,
+          },
+        };
 
-      // 3. Create Trip within the SAME transaction tx
-      const createdTrip = await tripService.createTrip(
-        agencyId,
-        {
-          customerId: lockedEnquiry.customerId,
-          title: tripTitle,
-          startDate: startDate,
-          endDate: endDate,
-          status: "DRAFT",
-          notes: data?.notes || lockedEnquiry.notes || `Created from Enquiry ${lockedEnquiry.enquiryNumber}.`,
-        },
-        tx
-      );
-
-      // 4. Add extra traveler records if needed
-      const totalPax = lockedEnquiry.adults + lockedEnquiry.children + lockedEnquiry.infants;
-      if (totalPax > 1) {
-        for (let i = 2; i <= lockedEnquiry.adults; i++) {
-          await tx.traveler.create({
-            data: {
-              tripId: createdTrip.id,
-              name: `Adult Guest ${i}`,
-              type: "ADULT",
-            },
-          });
-        }
-        for (let i = 1; i <= lockedEnquiry.children; i++) {
-          await tx.traveler.create({
-            data: {
-              tripId: createdTrip.id,
-              name: `Child ${i}`,
-              type: "CHILD",
-            },
-          });
-        }
-        for (let i = 1; i <= lockedEnquiry.infants; i++) {
-          await tx.traveler.create({
-            data: {
-              tripId: createdTrip.id,
-              name: `Infant ${i}`,
-              type: "CHILD",
-            },
-          });
-        }
-      }
-
-      // 5. Update Enquiry: advance to QUALIFIED if was NEW or CONTACTED, preserve active status and do NOT close
-      const newStatus =
-        lockedEnquiry.status === EnquiryStatus.NEW || lockedEnquiry.status === EnquiryStatus.CONTACTED
-          ? EnquiryStatus.QUALIFIED
-          : lockedEnquiry.status;
-
-      const updatedEnquiry = await tx.enquiry.update({
-        where: { id: enquiryId },
-        data: {
-          status: newStatus,
-          convertedTripId: createdTrip.id,
-          closedAt: null,
-        },
-        include: {
-          customer: { select: { id: true, name: true, phone: true, email: true, address: true } },
-          convertedTrip: { select: { id: true, title: true, tripNumber: true, startDate: true, endDate: true, status: true } },
-          convertedQuotation: { select: { id: true, quotationNumber: true, version: true, finalAmount: true, status: true } },
-          followUps: { where: { archivedAt: null }, orderBy: { scheduledAt: "desc" } },
-        },
-      });
-
-      // 6. Record conversion audit history
-      await agencyAuditService.logEvent({
-        agencyId,
-        actorUserId: actor?.userId || "SYSTEM",
-        action: "ENQUIRY_CONVERTED_TO_TRIP",
-        entityType: "ENQUIRY",
-        entityId: enquiryId,
-        metadata: {
-          actorName: actor?.userName || "Team Member",
-          actorRole: actor?.role,
+        return {
           tripId: createdTrip.id,
-          tripNumber: createdTrip.tripNumber,
-          changes: [
-            { field: "convertedTripId", label: "Trip Workspace", oldValue: null, newValue: createdTrip.tripNumber },
-            ...(newStatus !== lockedEnquiry.status ? [{ field: "status", label: "Stage", oldValue: lockedEnquiry.status, newValue: newStatus }] : []),
-          ],
-          summary: `Converted to Trip Workspace ${createdTrip.tripNumber} (${tripTitle})`,
-        },
-      }, tx).catch(() => {});
+          enquiry: updatedEnquiry as EnquiryWithRelations,
+        };
+      },
+      { maxWait: 10000, timeout: 20000 }
+    );
 
-      return {
-        tripId: createdTrip.id,
-        enquiry: updatedEnquiry as EnquiryWithRelations,
-      };
-    });
+    // 6. Record conversion audit history outside transaction so audit failures/checks cannot abort commit (25P02)
+    if (auditEvent) {
+      await agencyAuditService.logEvent(auditEvent).catch(() => {});
+    }
+
+    return result;
   },
 
   /**

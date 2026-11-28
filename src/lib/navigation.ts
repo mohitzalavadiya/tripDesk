@@ -13,14 +13,14 @@ Gift,
 Hotel,
 Inbox,
 IndianRupee,
-Layers,
+// Layers,
 LayoutDashboard,
 LucideIcon,
 MapPin,
 MessageSquare,
 Settings,
 Star,
-Ticket,
+// Ticket,
 TrendingUp,
 Users
 } from "lucide-react";
@@ -137,24 +137,26 @@ export const agencyNavigationConfig: NavigationSection[] = [
         icon: Car,
         moduleKey: "VEHICLES",
       },
-      {
-        label: "Activities",
-        href: "/activities",
-        icon: Ticket,
-        moduleKey: "ACTIVITIES",
-      },
+      // Hidden from UI navigation (original page & API functionality preserved):
+      // {
+      //   label: "Activities",
+      //   href: "/activities",
+      //   icon: Ticket,
+      //   moduleKey: "ACTIVITIES",
+      // },
       {
         label: "Rate Sheets",
         href: "/rate-sheets",
         icon: FileSpreadsheet,
         moduleKey: "RATE_SHEETS",
       },
-      {
-        label: "Suppliers",
-        href: "/suppliers",
-        icon: Building,
-        moduleKey: "SUPPLIERS",
-      },
+      // Hidden from UI navigation (original page & API functionality preserved):
+      // {
+      //   label: "Suppliers",
+      //   href: "/suppliers",
+      //   icon: Building,
+      //   moduleKey: "SUPPLIERS",
+      // },
     ],
   },
   {
@@ -166,12 +168,13 @@ export const agencyNavigationConfig: NavigationSection[] = [
         icon: IndianRupee,
         moduleKey: "FINANCE",
       },
-      {
-        label: "Invoices",
-        href: "/invoices",
-        icon: FileText,
-        moduleKey: "INVOICES",
-      },
+      // Hidden from UI navigation (original page & API functionality preserved):
+      // {
+      //   label: "Invoices",
+      //   href: "/invoices",
+      //   icon: FileText,
+      //   moduleKey: "INVOICES",
+      // },
       {
         label: "Payments",
         href: "/payments",
