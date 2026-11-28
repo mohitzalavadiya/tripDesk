@@ -2,6 +2,20 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse,type NextRequest } from "next/server";
 import { normalizeSupabaseUrl } from "./normalize";
 
+/**
+ * UI page routes temporarily hidden from user access.
+ * Original pages, APIs, services, and database models remain preserved.
+ */
+export const HIDDEN_PAGE_ROUTES = ["/activities", "/suppliers", "/invoices"] as const;
+
+export function isHiddenPagePath(pathname: string): boolean {
+  const normalized =
+    pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+  return HIDDEN_PAGE_ROUTES.some(
+    (route) => normalized === route || normalized.startsWith(`${route}/`)
+  );
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -96,6 +110,11 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
+  }
+
+  // Prevent direct URL access to hidden pages (/activities, /suppliers, /invoices and nested routes)
+  if (user && isHiddenPagePath(pathname)) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return supabaseResponse;
