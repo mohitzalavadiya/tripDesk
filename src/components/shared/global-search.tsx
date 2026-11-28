@@ -111,7 +111,7 @@ export function GlobalSearch() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search customers, trips, invoices, bookings..."
+              placeholder="Search customers, trips, bookings..."
               className="w-full bg-slate-50 border-slate-200 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-0 h-10 text-sm"
               autoFocus
             />

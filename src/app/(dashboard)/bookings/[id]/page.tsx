@@ -204,8 +204,11 @@ export default function BookingDetailPage() {
       if (!res.ok) {
         throw new Error(json.error?.message || json.message || "Failed to generate invoice.");
       }
-      const inv = json.data || json;
-      router.push(`/invoices/${inv.id}`);
+      // Hidden /invoices page UI route: keep workflow inside Booking Dossier
+      // const inv = json.data || json;
+      // router.push(`/invoices/${inv.id}`);
+      toast.success("Invoice generated successfully.");
+      await fetchBooking(true);
     } catch (err: any) {
       toast.error(err?.message || "Failed to generate invoice.");
     } finally {
@@ -622,6 +625,7 @@ export default function BookingDetailPage() {
                   </DropdownMenuLabel>
                   {activeInvoice ? (
                     <>
+                      {/* Hidden /invoices/[id] page link preserved commented for future restoration:
                       <DropdownMenuItem
                         onClick={() => router.push(`/invoices/${activeInvoice.id}`)}
                         className="text-xs cursor-pointer rounded-md"
@@ -629,6 +633,7 @@ export default function BookingDetailPage() {
                         <FileText className="mr-2 h-3.5 w-3.5 text-slate-500" />
                         View Invoice ({activeInvoice.invoiceNumber || "Draft"})
                       </DropdownMenuItem>
+                      */}
                       <DropdownMenuItem
                         onClick={() => window.open(`/api/invoices/${activeInvoice.id}/pdf`, "_blank")}
                         className="text-xs cursor-pointer rounded-md"
@@ -1757,7 +1762,8 @@ export default function BookingDetailPage() {
                   </div>
 
                   <div className="space-y-2 pt-1">
-                    <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2">
+                      {/* Hidden /invoices/[id] page link preserved commented for future restoration:
                       <Link href={`/invoices/${activeInvoice.id}`} className="w-full">
                         <Button
                           variant="outline"
@@ -1768,6 +1774,7 @@ export default function BookingDetailPage() {
                           View Invoice
                         </Button>
                       </Link>
+                      */}
                       <a
                         href={`/api/invoices/${activeInvoice.id}/pdf`}
                         target="_blank"

@@ -41,6 +41,13 @@ interface StaffPermissionsModalProps {
   } | null;
 }
 
+const HIDDEN_PERMISSION_MODULES = new Set([
+  "SUBSCRIPTION",
+  "ACTIVITIES",
+  "SUPPLIERS",
+  "INVOICES",
+]);
+
 const CATEGORIES: Array<PagePermissionConfig["category"]> = [
   "CRM & Sales",
   "Trips & Bookings",
@@ -378,7 +385,7 @@ export function StaffPermissionsModal({
               <>
                 {CATEGORIES.map((category) => {
                   const pages = PAGE_PERMISSIONS_REGISTRY.filter(
-                    (p) => p.category === category && p.moduleKey !== "SUBSCRIPTION"
+                    (p) => p.category === category && !HIDDEN_PERMISSION_MODULES.has(p.moduleKey)
                   );
                   if (pages.length === 0) return null;
 
